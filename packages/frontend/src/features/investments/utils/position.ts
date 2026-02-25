@@ -1,0 +1,90 @@
+import type {
+  HoldingTransaction,
+  Mortgage,
+  Property,
+  PropertyTransaction,
+} from "@quro/shared";
+
+export type HoldingTxnType = "buy" | "sell" | "dividend";
+export type PropertyTxnType = "repayment" | "valuation" | "rent_income" | "expense";
+
+const INVESTMENT_PROPERTY_TYPES = new Set(["Buy-to-Let", "Investment", "Holiday Home", "Commercial"]);
+
+export type Position = {
+  shares: number;
+  avgCost: number;
+  realizedGain: number;
+  totalDividends: number;
+};
+
+export function computePosition(holdingId: number, txns: HoldingTransaction[]): Position {
+  const relevant = txns
+    .filter((t) => t.holdingId === holdingId)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  let shares = 0;
+  let totalCost = 0;
+  let realizedGain = 0;
+  let totalDividends = 0;
+
+  for (const t of relevant) {
+    const tShares = Number(t.shares ?? 0);
+    const tPrice = Number(t.price ?? 0);
+    if (t.type === "buy" && tShares > 0) {
+      totalCost += tShares * tPrice;
+      shares += tShares;
+    } else if (t.type === "sell" && tShares > 0) {
+      const avgCostNow = shares > 0 ? totalCost / shares : 0;
+      realizedGain += (tPrice - avgCostNow) * tShares;
+      totalCost -= tShares * avgCostNow;
+      shares = Math.max(0, shares - tShares);
+    } else if (t.type === "dividend") {
+      totalDividends += tPrice;
+    }
+  }
+
+  return {
+    shares,
+    avgCost: shares > 0 ? totalCost / shares : 0,
+    realizedGain,
+    totalDividends,
+  };
+}
+
+export type DatedHoldingTransaction = HoldingTransaction & { timestamp: number };
+export type DatedPropertyTransaction = PropertyTransaction & { timestamp: number };
+
+export function toUtcTimestamp(isoDate: string): number {
+  return Date.parse(`${isoDate}T00:00:00Z`);
+}
+
+export function monthStartUtc(timestamp: number): number {
+  const d = new Date(timestamp);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+}
+
+export function monthEndUtc(monthStart: number): number {
+  const d = new Date(monthStart);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+export function addMonthsUtc(monthStart: number, months: number): number {
+  const d = new Date(monthStart);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1);
+}
+
+export function formatMonthLabel(monthStart: number): string {
+  return new Date(monthStart).toLocaleDateString("en-US", { month: "short" });
+}
+
+export function isInvestmentProperty(propertyType: string): boolean {
+  return INVESTMENT_PROPERTY_TYPES.has(propertyType);
+}
+
+export function getPropertyMortgageBalance(property: Property, mortgageById: Map<number, Mortgage>): number {
+  if (property.mortgageId != null) {
+    const linked = mortgageById.get(property.mortgageId);
+    if (linked) return linked.outstandingBalance;
+  }
+  return property.mortgage;
+}

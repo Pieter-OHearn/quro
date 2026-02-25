@@ -1,0 +1,33 @@
+{
+  "name": "quro",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "bun run --filter '@quro/*' dev",
+    "dev:frontend": "bun run --filter '@quro/frontend' dev",
+    "dev:backend": "bun run --filter '@quro/backend' dev",
+    "build": "bun run --filter '@quro/frontend' build",
+    "db:migrate": "bun run --filter '@quro/backend' db:migrate",
+    "db:seed": "bun run --filter '@quro/backend' db:seed",
+    "db:clear": "bun run --filter '@quro/backend' db:clear",
+    "lint": "bunx eslint packages --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts",
+    "lint:fix": "bunx eslint packages --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "eslint-plugin-unicorn": "^59.0.1",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@quro/backend",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "db:seed": "bun run src/db/seed.ts",
+    "db:clear": "bun run src/db/clear.ts"
+  },
+  "dependencies": {
+    "@quro/shared": "workspace:*",
+    "hono": "^4.7.0",
+    "drizzle-orm": "^0.38.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.30.0",
+    "typescript": "^5.7.0",
+    "@types/bun": "latest"
+  }
+}
