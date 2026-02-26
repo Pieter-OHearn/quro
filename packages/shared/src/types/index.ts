@@ -1,4 +1,4 @@
-export type CurrencyCode = "EUR" | "GBP" | "USD" | "AUD" | "NZD" | "CAD" | "CHF" | "SGD";
+export type CurrencyCode = 'EUR' | 'GBP' | 'USD' | 'AUD' | 'NZD' | 'CAD' | 'CHF' | 'SGD';
 
 export type User = {
   id: number;
@@ -14,7 +14,7 @@ export type SavingsAccount = {
   balance: number;
   currency: CurrencyCode;
   interestRate: number;
-  accountType: "Easy Access" | "Term Deposit";
+  accountType: 'Easy Access' | 'Term Deposit';
   color: string;
   emoji: string;
 };
@@ -22,7 +22,7 @@ export type SavingsAccount = {
 export type SavingsTransaction = {
   id: number;
   accountId: number;
-  type: "deposit" | "withdrawal" | "interest";
+  type: 'deposit' | 'withdrawal' | 'interest';
   amount: number;
   date: string;
   note: string;
@@ -40,7 +40,7 @@ export type Holding = {
 export type HoldingTransaction = {
   id: number;
   holdingId: number;
-  type: "buy" | "sell" | "dividend";
+  type: 'buy' | 'sell' | 'dividend';
   shares: number | null;
   price: number;
   date: string;
@@ -63,7 +63,7 @@ export type Property = {
 export type PropertyTransaction = {
   id: number;
   propertyId: number;
-  type: "repayment" | "valuation" | "rent_income" | "expense";
+  type: 'repayment' | 'valuation' | 'rent_income' | 'expense';
   amount: number;
   interest: number | null;
   principal: number | null;
@@ -75,7 +75,7 @@ export type PensionPot = {
   id: number;
   name: string;
   provider: string;
-  type: "Workplace" | "SIPP" | "Superannuation" | "Final Salary" | "Other";
+  type: 'Workplace' | 'SIPP' | 'Superannuation' | 'Final Salary' | 'Other';
   balance: number;
   currency: CurrencyCode;
   employeeMonthly: number;
@@ -88,7 +88,7 @@ export type PensionPot = {
 export type PensionTransaction = {
   id: number;
   potId: number;
-  type: "contribution" | "fee";
+  type: 'contribution' | 'fee';
   amount: number;
   date: string;
   note: string;
@@ -117,7 +117,7 @@ export type Mortgage = {
 export type MortgageTransaction = {
   id: number;
   mortgageId: number;
-  type: "repayment" | "valuation" | "rate_change";
+  type: 'repayment' | 'valuation' | 'rate_change';
   amount: number;
   interest: number | null;
   principal: number | null;
@@ -145,13 +145,7 @@ export type SalaryHistory = {
   currency: CurrencyCode;
 };
 
-export type GoalType =
-  | "savings"
-  | "salary"
-  | "invest_habit"
-  | "portfolio"
-  | "net_worth"
-  | "annual";
+export type GoalType = 'savings' | 'salary' | 'invest_habit' | 'portfolio' | 'net_worth' | 'annual';
 
 export type Goal = {
   id: number;
@@ -219,7 +213,7 @@ export type CurrencyRate = {
 export type DashboardTransaction = {
   id: number;
   name: string;
-  type: "income" | "expense" | "transfer";
+  type: 'income' | 'expense' | 'transfer';
   amount: number;
   date: string;
   category: string;
@@ -232,14 +226,14 @@ export type CurrencyMeta = {
 };
 
 export const CURRENCY_META: Record<CurrencyCode, CurrencyMeta> = {
-  EUR: { symbol: "\u20ac", name: "Euro", flag: "\ud83c\uddea\ud83c\uddfa" },
-  GBP: { symbol: "\u00a3", name: "British Pound", flag: "\ud83c\uddec\ud83c\udde7" },
-  USD: { symbol: "$", name: "US Dollar", flag: "\ud83c\uddfa\ud83c\uddf8" },
-  AUD: { symbol: "A$", name: "Australian Dollar", flag: "\ud83c\udde6\ud83c\uddfa" },
-  NZD: { symbol: "NZ$", name: "New Zealand Dollar", flag: "\ud83c\uddf3\ud83c\uddff" },
-  CAD: { symbol: "CA$", name: "Canadian Dollar", flag: "\ud83c\udde8\ud83c\udde6" },
-  CHF: { symbol: "CHF", name: "Swiss Franc", flag: "\ud83c\udde8\ud83c\udded" },
-  SGD: { symbol: "S$", name: "Singapore Dollar", flag: "\ud83c\uddf8\ud83c\uddec" },
+  EUR: { symbol: '\u20ac', name: 'Euro', flag: '\ud83c\uddea\ud83c\uddfa' },
+  GBP: { symbol: '\u00a3', name: 'British Pound', flag: '\ud83c\uddec\ud83c\udde7' },
+  USD: { symbol: '$', name: 'US Dollar', flag: '\ud83c\uddfa\ud83c\uddf8' },
+  AUD: { symbol: 'A$', name: 'Australian Dollar', flag: '\ud83c\udde6\ud83c\uddfa' },
+  NZD: { symbol: 'NZ$', name: 'New Zealand Dollar', flag: '\ud83c\uddf3\ud83c\uddff' },
+  CAD: { symbol: 'CA$', name: 'Canadian Dollar', flag: '\ud83c\udde8\ud83c\udde6' },
+  CHF: { symbol: 'CHF', name: 'Swiss Franc', flag: '\ud83c\udde8\ud83c\udded' },
+  SGD: { symbol: 'S$', name: 'Singapore Dollar', flag: '\ud83c\uddf8\ud83c\uddec' },
 };
 
 export const CURRENCY_LIST = Object.keys(CURRENCY_META) as CurrencyCode[];

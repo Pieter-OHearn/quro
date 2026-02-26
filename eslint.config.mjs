@@ -113,7 +113,10 @@ export default [
       parser: tsParser,
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['packages/backend/drizzle.config.ts', 'packages/frontend/vite.config.ts'],
+          allowDefaultProject: [
+            'packages/backend/drizzle.config.ts',
+            'packages/frontend/vite.config.ts',
+          ],
         },
         tsconfigRootDir: __dirname,
       },

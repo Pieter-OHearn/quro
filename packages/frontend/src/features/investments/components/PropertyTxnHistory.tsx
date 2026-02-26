@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { CircleMinus, DollarSign, Home, Landmark } from "lucide-react";
-import { useCurrency } from "@/lib/CurrencyContext";
-import { TxnHistoryPanel, TxnRow } from "@/components/ui";
-import type { TxnTypeMeta } from "@/components/ui";
-import type { Property, PropertyTransaction } from "@quro/shared";
-import { isInvestmentProperty, type PropertyTxnType } from "../utils/position";
+import { useState } from 'react';
+import { CircleMinus, DollarSign, Home, Landmark } from 'lucide-react';
+import { useCurrency } from '@/lib/CurrencyContext';
+import { TxnHistoryPanel, TxnRow } from '@/components/ui';
+import type { TxnTypeMeta } from '@/components/ui';
+import type { Property, PropertyTransaction } from '@quro/shared';
+import { isInvestmentProperty, type PropertyTxnType } from '../utils/position';
 
 type PropertyTxnHistoryProps = {
   property: Property;
@@ -15,86 +15,105 @@ type PropertyTxnHistoryProps = {
 
 const PROPERTY_TXN_META: Record<PropertyTxnType, TxnTypeMeta> = {
   repayment: {
-    key: "repayment",
-    label: "Repayment",
+    key: 'repayment',
+    label: 'Repayment',
     icon: Landmark,
-    color: "text-indigo-600",
-    bg: "bg-indigo-50",
-    borderColor: "border-indigo-300",
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+    borderColor: 'border-indigo-300',
   },
   valuation: {
-    key: "valuation",
-    label: "Valuation",
+    key: 'valuation',
+    label: 'Valuation',
     icon: Home,
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
-    borderColor: "border-emerald-300",
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    borderColor: 'border-emerald-300',
   },
   rent_income: {
-    key: "rent_income",
-    label: "Rent Income",
+    key: 'rent_income',
+    label: 'Rent Income',
     icon: DollarSign,
-    color: "text-sky-600",
-    bg: "bg-sky-50",
-    borderColor: "border-sky-300",
+    color: 'text-sky-600',
+    bg: 'bg-sky-50',
+    borderColor: 'border-sky-300',
   },
   expense: {
-    key: "expense",
-    label: "Expense",
+    key: 'expense',
+    label: 'Expense',
     icon: CircleMinus,
-    color: "text-rose-500",
-    bg: "bg-rose-50",
-    borderColor: "border-rose-300",
+    color: 'text-rose-500',
+    bg: 'bg-rose-50',
+    borderColor: 'border-rose-300',
   },
 };
 
-export function PropertyTxnHistory({ property, transactions, onAdd, onDelete }: PropertyTxnHistoryProps) {
+export function PropertyTxnHistory({
+  property,
+  transactions,
+  onAdd,
+  onDelete,
+}: PropertyTxnHistoryProps) {
   const { fmtNative } = useCurrency();
   const supportsCashflowTxns = isInvestmentProperty(property.propertyType);
   const filterOptions = supportsCashflowTxns
-    ? (["all", "repayment", "valuation", "rent_income", "expense"] as const)
-    : (["all", "repayment", "valuation"] as const);
-  const [filter, setFilter] = useState<PropertyTxnType | "all">("all");
+    ? (['all', 'repayment', 'valuation', 'rent_income', 'expense'] as const)
+    : (['all', 'repayment', 'valuation'] as const);
+  const [filter, setFilter] = useState<PropertyTxnType | 'all'>('all');
 
   const sorted = [...transactions]
-    .filter((transaction) => filter === "all" || transaction.type === filter)
+    .filter((transaction) => filter === 'all' || transaction.type === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const totalRepaid = transactions
-    .filter((transaction) => transaction.type === "repayment")
+    .filter((transaction) => transaction.type === 'repayment')
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalPrincipal = transactions
-    .filter((transaction) => transaction.type === "repayment")
+    .filter((transaction) => transaction.type === 'repayment')
     .reduce((sum, transaction) => sum + (transaction.principal ?? 0), 0);
   const totalInterest = transactions
-    .filter((transaction) => transaction.type === "repayment")
+    .filter((transaction) => transaction.type === 'repayment')
     .reduce((sum, transaction) => sum + (transaction.interest ?? 0), 0);
-  const valuationCount = transactions.filter((transaction) => transaction.type === "valuation").length;
+  const valuationCount = transactions.filter(
+    (transaction) => transaction.type === 'valuation',
+  ).length;
   const totalRentIncome = transactions
-    .filter((transaction) => transaction.type === "rent_income")
+    .filter((transaction) => transaction.type === 'rent_income')
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalExpenses = transactions
-    .filter((transaction) => transaction.type === "expense")
+    .filter((transaction) => transaction.type === 'expense')
     .reduce((sum, transaction) => sum + transaction.amount, 0);
 
   const stats = [
-    { label: "Total Repaid", value: fmtNative(totalRepaid, property.currency, true), color: "text-slate-800" },
-    { label: "Principal", value: fmtNative(totalPrincipal, property.currency, true), color: "text-indigo-600" },
-    { label: "Interest Paid", value: fmtNative(totalInterest, property.currency, true), color: "text-rose-500" },
-    { label: "Valuations", value: `${valuationCount}`, color: "text-emerald-600" },
+    {
+      label: 'Total Repaid',
+      value: fmtNative(totalRepaid, property.currency, true),
+      color: 'text-slate-800',
+    },
+    {
+      label: 'Principal',
+      value: fmtNative(totalPrincipal, property.currency, true),
+      color: 'text-indigo-600',
+    },
+    {
+      label: 'Interest Paid',
+      value: fmtNative(totalInterest, property.currency, true),
+      color: 'text-rose-500',
+    },
+    { label: 'Valuations', value: `${valuationCount}`, color: 'text-emerald-600' },
     ...(supportsCashflowTxns
       ? [
-        {
-          label: "Rent Income",
-          value: `+${fmtNative(totalRentIncome, property.currency, true)}`,
-          color: "text-sky-600",
-        },
-        {
-          label: "Expenses",
-          value: `-${fmtNative(totalExpenses, property.currency, true)}`,
-          color: "text-rose-500",
-        },
-      ]
+          {
+            label: 'Rent Income',
+            value: `+${fmtNative(totalRentIncome, property.currency, true)}`,
+            color: 'text-sky-600',
+          },
+          {
+            label: 'Expenses',
+            value: `-${fmtNative(totalExpenses, property.currency, true)}`,
+            color: 'text-rose-500',
+          },
+        ]
       : []),
   ];
 
@@ -103,14 +122,14 @@ export function PropertyTxnHistory({ property, transactions, onAdd, onDelete }: 
       filterOptions={filterOptions.map((option) => ({
         key: option,
         label:
-          option === "all"
-            ? "All"
-            : option === "rent_income"
-              ? "Rent Income"
+          option === 'all'
+            ? 'All'
+            : option === 'rent_income'
+              ? 'Rent Income'
               : `${PROPERTY_TXN_META[option as PropertyTxnType].label}s`,
       }))}
       filter={filter}
-      onFilterChange={(key) => setFilter(key as PropertyTxnType | "all")}
+      onFilterChange={(key) => setFilter(key as PropertyTxnType | 'all')}
       stats={stats}
       statsColumns={supportsCashflowTxns ? 6 : 4}
       onAdd={onAdd}
@@ -120,28 +139,40 @@ export function PropertyTxnHistory({ property, transactions, onAdd, onDelete }: 
         const meta = PROPERTY_TXN_META[transaction.type];
 
         const amount =
-          transaction.type === "repayment" ? (
+          transaction.type === 'repayment' ? (
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-slate-700">-{fmtNative(transaction.amount, property.currency, true)}</p>
+              <p className="text-sm font-semibold text-slate-700">
+                -{fmtNative(transaction.amount, property.currency, true)}
+              </p>
               <p className="text-[10px] text-slate-400">
-                <span className="text-rose-400">{fmtNative(transaction.interest ?? 0, property.currency, true)} int</span>
-                {" · "}
-                <span className="text-indigo-500">{fmtNative(transaction.principal ?? 0, property.currency, true)} prin</span>
+                <span className="text-rose-400">
+                  {fmtNative(transaction.interest ?? 0, property.currency, true)} int
+                </span>
+                {' · '}
+                <span className="text-indigo-500">
+                  {fmtNative(transaction.principal ?? 0, property.currency, true)} prin
+                </span>
               </p>
             </div>
-          ) : transaction.type === "valuation" ? (
+          ) : transaction.type === 'valuation' ? (
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-emerald-600">{fmtNative(transaction.amount, property.currency, true)}</p>
+              <p className="text-sm font-semibold text-emerald-600">
+                {fmtNative(transaction.amount, property.currency, true)}
+              </p>
               <p className="text-[10px] text-slate-400">new value</p>
             </div>
-          ) : transaction.type === "rent_income" ? (
+          ) : transaction.type === 'rent_income' ? (
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-sky-600">+{fmtNative(transaction.amount, property.currency, true)}</p>
+              <p className="text-sm font-semibold text-sky-600">
+                +{fmtNative(transaction.amount, property.currency, true)}
+              </p>
               <p className="text-[10px] text-slate-400">rent received</p>
             </div>
           ) : (
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-rose-500">-{fmtNative(transaction.amount, property.currency, true)}</p>
+              <p className="text-sm font-semibold text-rose-500">
+                -{fmtNative(transaction.amount, property.currency, true)}
+              </p>
               <p className="text-[10px] text-slate-400">expense</p>
             </div>
           );

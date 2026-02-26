@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { Payslip, SalaryHistory } from "@quro/shared";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { Payslip, SalaryHistory } from '@quro/shared';
 
-type ApiPayslip = Omit<Payslip, "gross" | "tax" | "pension" | "net" | "bonus"> & {
+type ApiPayslip = Omit<Payslip, 'gross' | 'tax' | 'pension' | 'net' | 'bonus'> & {
   gross: number | string;
   tax: number | string;
   pension: number | string;
@@ -10,13 +10,13 @@ type ApiPayslip = Omit<Payslip, "gross" | "tax" | "pension" | "net" | "bonus"> &
   bonus: number | string | null;
 };
 
-type ApiSalaryHistory = Omit<SalaryHistory, "annualSalary"> & {
+type ApiSalaryHistory = Omit<SalaryHistory, 'annualSalary'> & {
   annualSalary: number | string;
 };
 
 const toNumber = (value: number | string | null | undefined): number => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -39,9 +39,9 @@ const normalizeSalaryHistory = (entry: ApiSalaryHistory): SalaryHistory => ({
 
 export function usePayslips() {
   return useQuery({
-    queryKey: ["salary", "payslips"],
+    queryKey: ['salary', 'payslips'],
     queryFn: async () => {
-      const { data } = await api.get("/api/salary/payslips");
+      const { data } = await api.get('/api/salary/payslips');
       return (data.data as ApiPayslip[]).map(normalizePayslip);
     },
   });
@@ -50,13 +50,13 @@ export function usePayslips() {
 export function useCreatePayslip() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payslip: Omit<Payslip, "id">) => {
-      const { data } = await api.post("/api/salary/payslips", payslip);
+    mutationFn: async (payslip: Omit<Payslip, 'id'>) => {
+      const { data } = await api.post('/api/salary/payslips', payslip);
       return normalizePayslip(data.data as ApiPayslip);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["salary"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['salary'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -68,17 +68,17 @@ export function useDeletePayslip() {
       await api.delete(`/api/salary/payslips/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["salary"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['salary'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
 
 export function useSalaryHistory() {
   return useQuery({
-    queryKey: ["salary", "history"],
+    queryKey: ['salary', 'history'],
     queryFn: async () => {
-      const { data } = await api.get("/api/salary/history");
+      const { data } = await api.get('/api/salary/history');
       return (data.data as ApiSalaryHistory[]).map(normalizeSalaryHistory);
     },
   });
@@ -87,13 +87,13 @@ export function useSalaryHistory() {
 export function useCreateSalaryHistory() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (entry: Omit<SalaryHistory, "id">) => {
-      const { data } = await api.post("/api/salary/history", entry);
+    mutationFn: async (entry: Omit<SalaryHistory, 'id'>) => {
+      const { data } = await api.post('/api/salary/history', entry);
       return normalizeSalaryHistory(data.data as ApiSalaryHistory);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["salary"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['salary'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

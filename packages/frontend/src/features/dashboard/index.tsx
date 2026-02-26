@@ -1,21 +1,23 @@
-import { Link } from "react-router";
+import { Link } from 'react-router';
+import { PieChart, Pie, Cell } from 'recharts';
 import {
-  PieChart, Pie, Cell,
-} from "recharts";
-import {
-  TrendingUp, PiggyBank, Briefcase,
-  ArrowRight, CreditCard, ShieldCheck,
+  TrendingUp,
+  PiggyBank,
+  Briefcase,
+  ArrowRight,
+  CreditCard,
+  ShieldCheck,
   TrendingDown,
-} from "lucide-react";
-import { AreaChartCard, LoadingSpinner, StatCard } from "@/components/ui";
-import { useCurrency } from "@/lib/CurrencyContext";
-import { useAuth } from "@/lib/AuthContext";
+} from 'lucide-react';
+import { AreaChartCard, LoadingSpinner, StatCard } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
+import { useAuth } from '@/lib/AuthContext';
 import {
   useNetWorthSnapshots,
   useAssetAllocations,
   useDashboardTransactions,
   useGoalsSummary,
-} from "./hooks";
+} from './hooks';
 
 export function Dashboard() {
   const { fmtBase, baseCurrency } = useCurrency();
@@ -49,59 +51,60 @@ export function Dashboard() {
   }, {});
 
   const currentDate = new Date();
-  const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
   const previousMonthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-  const previousMonthKey = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, "0")}`;
+  const previousMonthKey = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
   const monthTransactions = recentTransactions.filter((tx) => tx.date.startsWith(currentMonthKey));
 
   const monthlyCategoryChange = (category: string) =>
     monthTransactions
       .filter((tx) => tx.category === category)
-      .reduce((sum, tx) => sum + (tx.type === "transfer" ? -tx.amount : tx.amount), 0);
+      .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
 
   const salaryThisMonth = monthTransactions
-    .filter((tx) => tx.category === "Salary")
+    .filter((tx) => tx.category === 'Salary')
     .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
   const salaryLastMonth = recentTransactions
-    .filter((tx) => tx.category === "Salary" && tx.date.startsWith(previousMonthKey))
+    .filter((tx) => tx.category === 'Salary' && tx.date.startsWith(previousMonthKey))
     .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-  const latestSalary = recentTransactions.find((tx) => tx.category === "Salary");
-  const monthlySalaryValue = salaryThisMonth > 0 ? salaryThisMonth : latestSalary ? Math.abs(latestSalary.amount) : 0;
+  const latestSalary = recentTransactions.find((tx) => tx.category === 'Salary');
+  const monthlySalaryValue =
+    salaryThisMonth > 0 ? salaryThisMonth : latestSalary ? Math.abs(latestSalary.amount) : 0;
   const monthlySalaryChange = salaryLastMonth > 0 ? monthlySalaryValue - salaryLastMonth : 0;
 
   const dashboardCards = [
     {
-      label: "Total Savings",
+      label: 'Total Savings',
       value: allocationByName.Savings ?? 0,
-      monthlyChange: monthlyCategoryChange("Savings"),
+      monthlyChange: monthlyCategoryChange('Savings'),
       icon: PiggyBank,
-      path: "/savings",
-      color: "indigo",
+      path: '/savings',
+      color: 'indigo',
     },
     {
-      label: "Investments",
+      label: 'Investments',
       value: allocationByName.Brokerage ?? 0,
-      monthlyChange: monthlyCategoryChange("Investment"),
+      monthlyChange: monthlyCategoryChange('Investment'),
       icon: TrendingUp,
-      path: "/investments",
-      color: "sky",
+      path: '/investments',
+      color: 'sky',
     },
     {
-      label: "Pension",
+      label: 'Pension',
       value: allocationByName.Pension ?? 0,
-      monthlyChange: monthlyCategoryChange("Pension"),
+      monthlyChange: monthlyCategoryChange('Pension'),
       icon: ShieldCheck,
-      path: "/pension",
-      color: "amber",
+      path: '/pension',
+      color: 'amber',
     },
     {
-      label: "Monthly Salary",
+      label: 'Monthly Salary',
       value: monthlySalaryValue,
       monthlyChange: monthlySalaryChange,
       icon: Briefcase,
-      path: "/salary",
-      color: "emerald",
+      path: '/salary',
+      color: 'emerald',
     },
   ] as const;
 
@@ -117,11 +120,11 @@ export function Dashboard() {
 
   // Goals data for dashboard
   const goalsMock = goals.map((g) => {
-    const goalType = g.type ?? "savings";
+    const goalType = g.type ?? 'savings';
     const defaultCurrent = g.currentAmount;
     const defaultTarget = g.targetAmount;
 
-    if (goalType === "invest_habit") {
+    if (goalType === 'invest_habit') {
       const monthlyTarget = g.monthlyTarget ?? 0;
       const monthsCompleted = g.monthsCompleted ?? 0;
       const totalMonths = g.totalMonths ?? 12;
@@ -134,7 +137,7 @@ export function Dashboard() {
       };
     }
 
-    if (goalType === "salary") {
+    if (goalType === 'salary') {
       return {
         name: g.name,
         current: monthlySalaryValue * 12,
@@ -160,15 +163,15 @@ export function Dashboard() {
 
   // Monthly summary from transactions
   const totalIncome = recentTransactions
-    .filter((tx) => tx.type === "income")
+    .filter((tx) => tx.type === 'income')
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);
   const totalExpenses = recentTransactions
-    .filter((tx) => tx.type === "expense")
+    .filter((tx) => tx.type === 'expense')
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);
   const monthlySavings = totalIncome - totalExpenses;
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const greetingName = user?.name ?? "there";
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greetingName = user?.name ?? 'there';
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -182,7 +185,9 @@ export function Dashboard() {
         <div className="absolute bottom-0 right-24 w-40 h-40 bg-purple-500/10 rounded-full translate-y-1/2" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <p className="text-indigo-300 text-sm mb-1">{greeting}, {greetingName}</p>
+            <p className="text-indigo-300 text-sm mb-1">
+              {greeting}, {greetingName}
+            </p>
             <h2 className="text-2xl font-bold">Your Financial Overview</h2>
             <p className="text-slate-400 text-sm mt-1">Base currency: {baseCurrency}</p>
           </div>
@@ -196,8 +201,11 @@ export function Dashboard() {
                 ) : (
                   <TrendingDown size={13} className="text-rose-400" />
                 )}
-                <span className={`text-xs ${monthChange >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  {monthChange >= 0 ? "+" : ""}{fmtBase(monthChange)} this month
+                <span
+                  className={`text-xs ${monthChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                >
+                  {monthChange >= 0 ? '+' : ''}
+                  {fmtBase(monthChange)} this month
                 </span>
               </div>
             )}
@@ -218,7 +226,7 @@ export function Dashboard() {
               color={card.color}
               href={card.path}
               change={{
-                value: `${card.monthlyChange >= 0 ? "+" : "-"}${fmtBase(Math.abs(card.monthlyChange), undefined, true)} this month`,
+                value: `${card.monthlyChange >= 0 ? '+' : '-'}${fmtBase(Math.abs(card.monthlyChange), undefined, true)} this month`,
                 positive: card.monthlyChange >= 0,
               }}
             />
@@ -240,8 +248,10 @@ export function Dashboard() {
             formatValue={fmtBase}
             badge={
               ytdPct !== 0 ? (
-                <span className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-                  {ytdPct >= 0 ? "+" : ""}
+                <span
+                  className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
+                >
+                  {ytdPct >= 0 ? '+' : ''}
                   {ytdPct.toFixed(1)}%
                 </span>
               ) : undefined
@@ -258,8 +268,18 @@ export function Dashboard() {
             <>
               <div className="flex justify-center mb-4">
                 <PieChart width={160} height={160}>
-                  <Pie data={allocationData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
-                    {allocationData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  <Pie
+                    data={allocationData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={75}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {allocationData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
                   </Pie>
                 </PieChart>
               </div>
@@ -267,12 +287,19 @@ export function Dashboard() {
                 {allocationData.map((item) => (
                   <div key={item.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      <div
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
                       <span className="text-xs text-slate-600">{item.name}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-semibold text-slate-800">{fmtBase(item.value)}</span>
-                      <span className="text-[10px] text-slate-400 ml-1">{totalAlloc > 0 ? ((item.value / totalAlloc) * 100).toFixed(0) : 0}%</span>
+                      <span className="text-xs font-semibold text-slate-800">
+                        {fmtBase(item.value)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 ml-1">
+                        {totalAlloc > 0 ? ((item.value / totalAlloc) * 100).toFixed(0) : 0}%
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -292,7 +319,10 @@ export function Dashboard() {
               <h3 className="font-semibold text-slate-900">Recent Transactions</h3>
               <p className="text-xs text-slate-400 mt-0.5">This month in {baseCurrency}</p>
             </div>
-            <Link to="/budget" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+            <Link
+              to="/budget"
+              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+            >
               View all <ArrowRight size={12} />
             </Link>
           </div>
@@ -301,20 +331,29 @@ export function Dashboard() {
               {displayedRecentTransactions.map((tx) => (
                 <div key={tx.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                      tx.type === "income"   ? "bg-emerald-50 text-emerald-600" :
-                      tx.type === "transfer" ? "bg-indigo-50 text-indigo-600"   :
-                      "bg-slate-100 text-slate-500"
-                    }`}>
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                        tx.type === 'income'
+                          ? 'bg-emerald-50 text-emerald-600'
+                          : tx.type === 'transfer'
+                            ? 'bg-indigo-50 text-indigo-600'
+                            : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
                       <CreditCard size={15} />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-slate-800">{tx.name}</p>
-                      <p className="text-xs text-slate-400">{tx.category} · {tx.date}</p>
+                      <p className="text-xs text-slate-400">
+                        {tx.category} · {tx.date}
+                      </p>
                     </div>
                   </div>
-                  <span className={`text-sm font-semibold ${tx.amount > 0 ? "text-emerald-600" : "text-slate-700"}`}>
-                    {tx.amount > 0 ? "+" : ""}{fmtBase(Math.abs(tx.amount), undefined, true)}
+                  <span
+                    className={`text-sm font-semibold ${tx.amount > 0 ? 'text-emerald-600' : 'text-slate-700'}`}
+                  >
+                    {tx.amount > 0 ? '+' : ''}
+                    {fmtBase(Math.abs(tx.amount), undefined, true)}
                   </span>
                 </div>
               ))}
@@ -331,7 +370,10 @@ export function Dashboard() {
               <h3 className="font-semibold text-slate-900">Financial Goals</h3>
               <p className="text-xs text-slate-400 mt-0.5">Progress update</p>
             </div>
-            <Link to="/goals" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+            <Link
+              to="/goals"
+              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+            >
               View all <ArrowRight size={12} />
             </Link>
           </div>
@@ -347,20 +389,32 @@ export function Dashboard() {
                         <span className="text-sm font-medium text-slate-700">{goal.name}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-semibold text-slate-800">{fmtBase(goal.current)}</span>
+                        <span className="text-xs font-semibold text-slate-800">
+                          {fmtBase(goal.current)}
+                        </span>
                         <span className="text-xs text-slate-400"> / {fmtBase(goal.target)}</span>
                       </div>
                     </div>
                     <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: goal.color }} />
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: goal.color }}
+                      />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5 text-right">{pct.toFixed(0)}% complete</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5 text-right">
+                      {pct.toFixed(0)}% complete
+                    </p>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <p className="text-sm text-slate-400 py-8 text-center">No goals yet. <Link to="/goals" className="text-indigo-500">Create one</Link></p>
+            <p className="text-sm text-slate-400 py-8 text-center">
+              No goals yet.{' '}
+              <Link to="/goals" className="text-indigo-500">
+                Create one
+              </Link>
+            </p>
           )}
         </div>
       </div>
@@ -369,11 +423,35 @@ export function Dashboard() {
       {recentTransactions.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: "Total Income",    value: fmtBase(totalIncome, undefined, true), icon: "\ud83d\udcb0", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-100" },
-            { label: "Total Expenses",  value: fmtBase(totalExpenses, undefined, true), icon: "\ud83d\udce4", bg: "bg-rose-50",    text: "text-rose-700",    border: "border-rose-100"    },
-            { label: "Monthly Savings", value: fmtBase(monthlySavings, undefined, true), icon: "\ud83c\udfe6", bg: "bg-indigo-50",  text: "text-indigo-700",  border: "border-indigo-100"  },
+            {
+              label: 'Total Income',
+              value: fmtBase(totalIncome, undefined, true),
+              icon: '\ud83d\udcb0',
+              bg: 'bg-emerald-50',
+              text: 'text-emerald-700',
+              border: 'border-emerald-100',
+            },
+            {
+              label: 'Total Expenses',
+              value: fmtBase(totalExpenses, undefined, true),
+              icon: '\ud83d\udce4',
+              bg: 'bg-rose-50',
+              text: 'text-rose-700',
+              border: 'border-rose-100',
+            },
+            {
+              label: 'Monthly Savings',
+              value: fmtBase(monthlySavings, undefined, true),
+              icon: '\ud83c\udfe6',
+              bg: 'bg-indigo-50',
+              text: 'text-indigo-700',
+              border: 'border-indigo-100',
+            },
           ].map((item) => (
-            <div key={item.label} className={`rounded-2xl p-5 border ${item.bg} ${item.border} flex items-center gap-4`}>
+            <div
+              key={item.label}
+              className={`rounded-2xl p-5 border ${item.bg} ${item.border} flex items-center gap-4`}
+            >
               <span className="text-3xl">{item.icon}</span>
               <div>
                 <p className="text-xs text-slate-500 mb-0.5">{item.label}</p>

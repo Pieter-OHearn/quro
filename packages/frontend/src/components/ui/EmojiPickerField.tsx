@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import { cn } from '@/lib/utils';
 
 type EmojiPickerFieldProps = {
   label?: string;
@@ -15,12 +15,92 @@ type EmojiPickerFieldProps = {
   buttonClassName?: string;
 };
 
+function getPickerPos(buttonEl: HTMLButtonElement, pickerWidth: number, pickerHeight: number) {
+  const rect = buttonEl.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const viewportPadding = 8;
+
+  let left = rect.left;
+  if (left + pickerWidth > window.innerWidth - viewportPadding) {
+    left = Math.max(viewportPadding, window.innerWidth - pickerWidth - viewportPadding);
+  }
+
+  if (spaceBelow < pickerHeight + 12) {
+    return {
+      position: 'fixed' as const,
+      bottom: window.innerHeight - rect.top + 6,
+      left,
+      zIndex: 9999,
+    };
+  }
+
+  return { position: 'fixed' as const, top: rect.bottom + 6, left, zIndex: 9999 };
+}
+
+function getButtonBorderClass(error: string | undefined, open: boolean): string {
+  if (error) return 'border-rose-300 bg-rose-50';
+  if (open) return 'border-indigo-400 bg-indigo-50';
+  return 'border-slate-200 bg-slate-50';
+}
+
+function useOutsideClose(
+  open: boolean,
+  pickerRef: React.RefObject<HTMLDivElement | null>,
+  buttonRef: React.RefObject<HTMLButtonElement | null>,
+  onClose: () => void,
+) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const outsidePicker = pickerRef.current && !pickerRef.current.contains(target);
+      const outsideButton = buttonRef.current && !buttonRef.current.contains(target);
+      if (outsidePicker && outsideButton) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, pickerRef, buttonRef, onClose]);
+}
+
+type PickerPortalProps = {
+  pickerRef: React.RefObject<HTMLDivElement | null>;
+  pickerStyle: React.CSSProperties;
+  onChange: (emoji: string) => void;
+  onClose: () => void;
+  pickerHeight: number;
+  pickerWidth: number;
+};
+
+function PickerPortal({
+  pickerRef,
+  pickerStyle,
+  onChange,
+  onClose,
+  pickerHeight,
+  pickerWidth,
+}: PickerPortalProps) {
+  return createPortal(
+    <div ref={pickerRef} style={pickerStyle}>
+      <EmojiPicker
+        onEmojiClick={(data: EmojiClickData) => {
+          onChange(data.emoji);
+          onClose();
+        }}
+        height={pickerHeight}
+        width={pickerWidth}
+        previewConfig={{ showPreview: false }}
+      />
+    </div>,
+    document.body,
+  );
+}
+
 export function EmojiPickerField({
-  label = "Icon",
+  label = 'Icon',
   value,
   onChange,
   error,
-  title = "Pick an emoji",
+  title = 'Pick an emoji',
   pickerHeight = 380,
   pickerWidth = 300,
   containerClassName,
@@ -30,75 +110,39 @@ export function EmojiPickerField({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  useOutsideClose(open, pickerRef, buttonRef, () => setOpen(false));
 
-    const handler = (event: MouseEvent) => {
-      if (
-        pickerRef.current && !pickerRef.current.contains(event.target as Node) &&
-        buttonRef.current && !buttonRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const getPickerPos = () => {
-    if (!buttonRef.current) return { position: "fixed" as const, top: 24, left: 12, zIndex: 9999 };
-
-    const rect = buttonRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const viewportPadding = 8;
-
-    let left = rect.left;
-    if (left + pickerWidth > window.innerWidth - viewportPadding) {
-      left = Math.max(viewportPadding, window.innerWidth - pickerWidth - viewportPadding);
-    }
-
-    if (spaceBelow < pickerHeight + 12) {
-      return { position: "fixed" as const, bottom: window.innerHeight - rect.top + 6, left, zIndex: 9999 };
-    }
-
-    return { position: "fixed" as const, top: rect.bottom + 6, left, zIndex: 9999 };
-  };
+  const pickerStyle = buttonRef.current
+    ? getPickerPos(buttonRef.current, pickerWidth, pickerHeight)
+    : { position: 'fixed' as const, top: 24, left: 12, zIndex: 9999 };
 
   return (
-    <div className={cn("flex-shrink-0", containerClassName)}>
-      {label && <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>}
+    <div className={cn('flex-shrink-0', containerClassName)}>
+      {label && (
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
+      )}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "w-14 h-[42px] rounded-xl border text-xl flex items-center justify-center transition-all hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300",
-          error
-            ? "border-rose-300 bg-rose-50"
-            : open
-            ? "border-indigo-400 bg-indigo-50"
-            : "border-slate-200 bg-slate-50",
-          buttonClassName
+          'w-14 h-[42px] rounded-xl border text-xl flex items-center justify-center transition-all hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300',
+          getButtonBorderClass(error, open),
+          buttonClassName,
         )}
         title={title}
       >
         {value}
       </button>
-
-      {open && typeof document !== "undefined" && createPortal(
-        <div ref={pickerRef} style={getPickerPos()}>
-          <EmojiPicker
-            onEmojiClick={(data: EmojiClickData) => {
-              onChange(data.emoji);
-              setOpen(false);
-            }}
-            height={pickerHeight}
-            width={pickerWidth}
-            previewConfig={{ showPreview: false }}
-          />
-        </div>,
-        document.body
+      {open && typeof document !== 'undefined' && (
+        <PickerPortal
+          pickerRef={pickerRef}
+          pickerStyle={pickerStyle}
+          onChange={onChange}
+          onClose={() => setOpen(false)}
+          pickerHeight={pickerHeight}
+          pickerWidth={pickerWidth}
+        />
       )}
       {error && <p className="text-xs text-rose-500 mt-1">{error}</p>}
     </div>

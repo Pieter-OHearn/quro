@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -7,7 +7,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from "recharts";
+} from 'recharts';
 import {
   ShieldCheck,
   Plus,
@@ -19,9 +19,9 @@ import {
   TrendingUp,
   Calendar,
   Clock,
-} from "lucide-react";
-import { useCurrency } from "@/lib/CurrencyContext";
-import type { PensionPot, PensionTransaction } from "@quro/shared";
+} from 'lucide-react';
+import { useCurrency } from '@/lib/CurrencyContext';
+import type { PensionPot, PensionTransaction } from '@quro/shared';
 import {
   usePensionPots,
   usePensionTransactions,
@@ -30,13 +30,20 @@ import {
   useDeletePensionPot,
   useCreatePensionTransaction,
   useDeletePensionTransaction,
-} from "./hooks";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { StatCard } from "@/components/ui/StatCard";
-import { AddPensionTxnModal } from "./components/AddPensionTxnModal";
-import { PensionModal } from "./components/PensionModal";
-import { PensionTxnHistory } from "./components/PensionTxnHistory";
-import { TYPE_COLORS, toUtcTimestamp, yearEndUtc, type DatedPensionTransaction } from "./constants";
+} from './hooks';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { StatCard } from '@/components/ui/StatCard';
+import { AddPensionTxnModal } from './components/AddPensionTxnModal';
+import { PensionModal } from './components/PensionModal';
+import { PensionTxnHistory } from './components/PensionTxnHistory';
+import {
+  TYPE_COLORS,
+  toUtcTimestamp,
+  yearEndUtc,
+  ANNUAL_GROWTH_RATE,
+  DRAWDOWN_YEARS,
+  type DatedPensionTransaction,
+} from './constants';
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
@@ -64,15 +71,15 @@ export function Pension(): JSX.Element {
   const isLoading = loadingPots || loadingTxns;
 
   // ─── Handlers ───────────────────────────────────────────────────────────
-  function handleSave(pot: PensionPot | Omit<PensionPot, "id">): void {
-    if ("id" in pot) {
+  function handleSave(pot: PensionPot | Omit<PensionPot, 'id'>): void {
+    if ('id' in pot) {
       updatePot.mutate(pot as PensionPot);
     } else {
       createPot.mutate(pot);
     }
   }
 
-  function handleAddPensionTxn(t: Omit<PensionTransaction, "id">): void {
+  function handleAddPensionTxn(t: Omit<PensionTransaction, 'id'>): void {
     createTxn.mutate(t);
   }
 
@@ -83,16 +90,18 @@ export function Pension(): JSX.Element {
   // ─── Derived values ────────────────────────────────────────────────────
   const totalInBase = pensions.reduce((s, p) => s + convertToBase(p.balance, p.currency), 0);
   const totalMonthlyContribInBase = pensions.reduce(
-    (s, p) => s + convertToBase(p.employeeMonthly + p.employerMonthly, p.currency), 0,
+    (s, p) => s + convertToBase(p.employeeMonthly + p.employerMonthly, p.currency),
+    0,
   );
 
   const yearsToRetirement = 29;
-  const r = 0.05 / 12;
+  const r = ANNUAL_GROWTH_RATE / 12;
   const months = yearsToRetirement * 12;
-  const projected = totalInBase * Math.pow(1.05, yearsToRetirement) +
+  const projected =
+    totalInBase * Math.pow(1 + ANNUAL_GROWTH_RATE, yearsToRetirement) +
     totalMonthlyContribInBase * ((Math.pow(1 + r, months) - 1) / r);
 
-  const monthlyDrawdown = projected / (25 * 12);
+  const monthlyDrawdown = projected / (DRAWDOWN_YEARS * 12);
 
   const pensionGrowthData = useMemo(() => {
     if (pensions.length === 0 || pensionTxns.length === 0) return [];
@@ -104,7 +113,9 @@ export function Pension(): JSX.Element {
 
     const now = new Date();
     const currentYear = now.getUTCFullYear();
-    const earliestYear = new Date(Math.min(...datedTxns.map((txn) => txn.timestamp))).getUTCFullYear();
+    const earliestYear = new Date(
+      Math.min(...datedTxns.map((txn) => txn.timestamp)),
+    ).getUTCFullYear();
     const years = Array.from(
       { length: currentYear - earliestYear + 1 },
       (_, i) => earliestYear + i,
@@ -115,9 +126,7 @@ export function Pension(): JSX.Element {
       const total = pensions.reduce((sum, pot) => {
         const netAfterCutoff = datedTxns
           .filter((txn) => txn.potId === pot.id && txn.timestamp > cutoff)
-          .reduce((acc, txn) => (
-            acc + (txn.type === "contribution" ? txn.amount : -txn.amount)
-          ), 0);
+          .reduce((acc, txn) => acc + (txn.type === 'contribution' ? txn.amount : -txn.amount), 0);
         const estimatedBalance = Math.max(0, pot.balance - netAfterCutoff);
         return sum + convertToBase(estimatedBalance, pot.currency);
       }, 0);
@@ -144,7 +153,10 @@ export function Pension(): JSX.Element {
       {(showModal || editing) && (
         <PensionModal
           existing={editing}
-          onClose={() => { setShowModal(false); setEditing(undefined); }}
+          onClose={() => {
+            setShowModal(false);
+            setEditing(undefined);
+          }}
           onSave={handleSave}
         />
       )}
@@ -167,11 +179,16 @@ export function Pension(): JSX.Element {
               <p className="text-amber-300 text-sm">Retirement Planning</p>
             </div>
             <h2 className="text-2xl font-bold">Pension Tracker</h2>
-            <p className="text-slate-400 text-sm mt-1">{pensions.length} pension pots across {new Set(pensions.map(p => p.currency)).size} currencies</p>
+            <p className="text-slate-400 text-sm mt-1">
+              {pensions.length} pension pots across {new Set(pensions.map((p) => p.currency)).size}{' '}
+              currencies
+            </p>
           </div>
           <div className="flex gap-3">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-4 text-center">
-              <p className="text-amber-300 text-[10px] uppercase tracking-widest mb-1">Total Balance</p>
+              <p className="text-amber-300 text-[10px] uppercase tracking-widest mb-1">
+                Total Balance
+              </p>
               <p className="text-2xl font-bold">{fmtBase(totalInBase)}</p>
               <p className="text-slate-400 text-xs mt-0.5">in {baseCurrency}</p>
             </div>
@@ -186,10 +203,34 @@ export function Pension(): JSX.Element {
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Pension Value"   value={fmtBase(totalInBase)}                    subtitle={`across ${pensions.length} pots`} icon={ShieldCheck} color="amber" />
-        <StatCard label="Monthly Contributions" value={fmtBase(totalMonthlyContribInBase)}      subtitle="combined (you + employer)"         icon={TrendingUp}  color="indigo" />
-        <StatCard label="Annual Contributions"  value={fmtBase(totalMonthlyContribInBase * 12)} subtitle="in total per year"                 icon={Calendar}    color="emerald" />
-        <StatCard label="Monthly Drawdown Est." value={fmtBase(monthlyDrawdown)}                subtitle="at 65 over 25 years"               icon={Clock}       color="sky" />
+        <StatCard
+          label="Total Pension Value"
+          value={fmtBase(totalInBase)}
+          subtitle={`across ${pensions.length} pots`}
+          icon={ShieldCheck}
+          color="amber"
+        />
+        <StatCard
+          label="Monthly Contributions"
+          value={fmtBase(totalMonthlyContribInBase)}
+          subtitle="combined (you + employer)"
+          icon={TrendingUp}
+          color="indigo"
+        />
+        <StatCard
+          label="Annual Contributions"
+          value={fmtBase(totalMonthlyContribInBase * 12)}
+          subtitle="in total per year"
+          icon={Calendar}
+          color="emerald"
+        />
+        <StatCard
+          label="Monthly Drawdown Est."
+          value={fmtBase(monthlyDrawdown)}
+          subtitle="at 65 over 25 years"
+          icon={Clock}
+          color="sky"
+        />
       </div>
 
       {/* Growth chart */}
@@ -197,15 +238,18 @@ export function Pension(): JSX.Element {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="font-semibold text-slate-900">Total Pension Growth</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Combined value across all pots ({baseCurrency})</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Combined value across all pots ({baseCurrency})
+            </p>
           </div>
           {pensionGrowthPct !== null && (
-            <span className={`text-sm px-4 py-2 rounded-full font-semibold ${
-              pensionGrowthPct >= 0 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-600"
-            }`}>
-              {pensionGrowthPct >= 0 ? "+" : ""}{pensionGrowthPct.toFixed(0)}%
-              {" "}
-              since {pensionGrowthData[0]?.year}
+            <span
+              className={`text-sm px-4 py-2 rounded-full font-semibold ${
+                pensionGrowthPct >= 0 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-600'
+              }`}
+            >
+              {pensionGrowthPct >= 0 ? '+' : ''}
+              {pensionGrowthPct.toFixed(0)}% since {pensionGrowthData[0]?.year}
             </span>
           )}
         </div>
@@ -221,22 +265,22 @@ export function Pension(): JSX.Element {
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis
                 dataKey="year"
-                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
               />
               <Tooltip
-                formatter={(value) => [fmtBase(Number(value) || 0), "Pension Value"]}
+                formatter={(value) => [fmtBase(Number(value) || 0), 'Pension Value']}
                 contentStyle={{
-                  borderRadius: "12px",
-                  border: "1px solid #e2e8f0",
-                  fontSize: "12px",
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '12px',
                 }}
               />
               <Area
@@ -246,7 +290,7 @@ export function Pension(): JSX.Element {
                 strokeWidth={4}
                 fill="url(#pensionGrowthGrad)"
                 dot={false}
-                activeDot={{ r: 5, fill: "#f59e0b" }}
+                activeDot={{ r: 5, fill: '#f59e0b' }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -265,7 +309,10 @@ export function Pension(): JSX.Element {
             <p className="text-xs text-slate-400 mt-0.5">Click a pot to view transactions</p>
           </div>
           <button
-            onClick={() => { setEditing(undefined); setShowModal(true); }}
+            onClick={() => {
+              setEditing(undefined);
+              setShowModal(true);
+            }}
             className="flex items-center gap-2 text-sm bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition-colors"
           >
             <Plus size={15} /> Add Pot
@@ -294,15 +341,32 @@ export function Pension(): JSX.Element {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <p className="font-semibold text-slate-800 text-sm">{pot.name}</p>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${TYPE_COLORS[pot.type]}`}>{pot.type}</span>
-                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{pot.currency}</span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full ${TYPE_COLORS[pot.type]}`}
+                      >
+                        {pot.type}
+                      </span>
+                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                        {pot.currency}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-400">{pot.provider} · {fmtNative(totalMonthly, pot.currency)}/mo · {txnCount} transactions</p>
+                    <p className="text-xs text-slate-400">
+                      {pot.provider} · {fmtNative(totalMonthly, pot.currency)}/mo · {txnCount}{' '}
+                      transactions
+                    </p>
                   </div>
                   <div className="text-right flex-shrink-0 mr-3">
-                    <p className="font-bold text-slate-900">{fmtNative(pot.balance, pot.currency)}</p>
-                    {foreign && <p className="text-xs text-amber-600 font-medium">&asymp; {fmtBase(balanceInBase)}</p>}
-                    <p className="text-xs text-emerald-600">+{fmtNative(totalMonthly * 12, pot.currency)}/yr</p>
+                    <p className="font-bold text-slate-900">
+                      {fmtNative(pot.balance, pot.currency)}
+                    </p>
+                    {foreign && (
+                      <p className="text-xs text-amber-600 font-medium">
+                        &asymp; {fmtBase(balanceInBase)}
+                      </p>
+                    )}
+                    <p className="text-xs text-emerald-600">
+                      +{fmtNative(totalMonthly * 12, pot.currency)}/yr
+                    </p>
                   </div>
                   {/* Actions */}
                   <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -316,7 +380,7 @@ export function Pension(): JSX.Element {
                     <button
                       onClick={() => setExpanded(isOpen ? null : pot.id)}
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
-                      title={isOpen ? "Collapse" : "View transactions"}
+                      title={isOpen ? 'Collapse' : 'View transactions'}
                     >
                       {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
@@ -330,12 +394,27 @@ export function Pension(): JSX.Element {
                     <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/30">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
                         {[
-                          { label: "Balance (Native)",          value: fmtNative(pot.balance, pot.currency) },
+                          {
+                            label: 'Balance (Native)',
+                            value: fmtNative(pot.balance, pot.currency),
+                          },
                           { label: `Balance (${baseCurrency})`, value: fmtBase(balanceInBase) },
-                          { label: "Your Contribution",         value: `${fmtNative(pot.employeeMonthly, pot.currency)}/mo` },
-                          { label: "Employer Match",            value: pot.employerMonthly > 0 ? `${fmtNative(pot.employerMonthly, pot.currency)}/mo` : "N/A" },
+                          {
+                            label: 'Your Contribution',
+                            value: `${fmtNative(pot.employeeMonthly, pot.currency)}/mo`,
+                          },
+                          {
+                            label: 'Employer Match',
+                            value:
+                              pot.employerMonthly > 0
+                                ? `${fmtNative(pot.employerMonthly, pot.currency)}/mo`
+                                : 'N/A',
+                          },
                         ].map(({ label, value }) => (
-                          <div key={label} className="bg-white rounded-xl p-3 border border-slate-100">
+                          <div
+                            key={label}
+                            className="bg-white rounded-xl p-3 border border-slate-100"
+                          >
                             <p className="text-xs text-slate-400 mb-1">{label}</p>
                             <p className="text-sm font-semibold text-slate-800">{value}</p>
                           </div>
@@ -344,7 +423,10 @@ export function Pension(): JSX.Element {
                       {foreign && (
                         <div className="mb-3 p-2.5 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2 text-xs text-amber-700">
                           <Info size={13} className="mt-0.5 flex-shrink-0" />
-                          <span>This pot is held in <strong>{pot.currency}</strong>. The {baseCurrency} equivalent uses approximate exchange rates.</span>
+                          <span>
+                            This pot is held in <strong>{pot.currency}</strong>. The {baseCurrency}{' '}
+                            equivalent uses approximate exchange rates.
+                          </span>
                         </div>
                       )}
                       {pot.notes && (
@@ -383,10 +465,18 @@ export function Pension(): JSX.Element {
         <h3 className="font-semibold text-slate-900 mb-4">Retirement Projection</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: "Current Total",       value: fmtBase(totalInBase),         note: `in ${baseCurrency}` },
-            { label: "Years to Retirement", value: `${yearsToRetirement} years`, note: "Target age 65" },
-            { label: "Projected at 65",     value: fmtBase(projected),           note: "Assumes 5% growth p.a." },
-            { label: "Est. Monthly Income", value: fmtBase(monthlyDrawdown),     note: "Over 25-year drawdown" },
+            { label: 'Current Total', value: fmtBase(totalInBase), note: `in ${baseCurrency}` },
+            {
+              label: 'Years to Retirement',
+              value: `${yearsToRetirement} years`,
+              note: 'Target age 65',
+            },
+            { label: 'Projected at 65', value: fmtBase(projected), note: 'Assumes 5% growth p.a.' },
+            {
+              label: 'Est. Monthly Income',
+              value: fmtBase(monthlyDrawdown),
+              note: 'Over 25-year drawdown',
+            },
           ].map(({ label, value, note }) => (
             <div key={label} className="bg-white/80 rounded-xl p-4">
               <p className="text-xs text-slate-500 mb-1">{label}</p>

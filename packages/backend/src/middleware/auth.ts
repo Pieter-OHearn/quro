@@ -1,18 +1,19 @@
-import { createMiddleware } from "hono/factory";
-import { getCookie } from "hono/cookie";
-import { db } from "../db/client";
-import { sessions, users } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { createMiddleware } from 'hono/factory';
+import { getCookie } from 'hono/cookie';
+import { db } from '../db/client';
+import { sessions, users } from '../db/schema';
+import { eq } from 'drizzle-orm';
+import { HTTP_STATUS } from '../constants/http';
 
 export const requireAuth = createMiddleware(async (c, next) => {
-  const sessionId = getCookie(c, "session");
+  const sessionId = getCookie(c, 'session');
   if (!sessionId) {
-    return c.json({ error: "Authentication required" }, 401);
+    return c.json({ error: 'Authentication required' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
   const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
   if (!session || session.expiresAt < new Date()) {
-    return c.json({ error: "Session expired" }, 401);
+    return c.json({ error: 'Session expired' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
   const [user] = await db
@@ -21,9 +22,9 @@ export const requireAuth = createMiddleware(async (c, next) => {
     .where(eq(users.id, session.userId));
 
   if (!user) {
-    return c.json({ error: "User not found" }, 401);
+    return c.json({ error: 'User not found' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
-  c.set("user", user);
+  c.set('user', user);
   await next();
 });

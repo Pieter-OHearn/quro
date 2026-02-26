@@ -1,23 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import type {
   NetWorthSnapshot,
   AssetAllocation,
   DashboardTransaction,
   Goal,
   GoalType,
-} from "@quro/shared";
+} from '@quro/shared';
 
 type ApiGoal = Omit<
   Goal,
-  | "type"
-  | "currentAmount"
-  | "targetAmount"
-  | "year"
-  | "monthlyContribution"
-  | "monthlyTarget"
-  | "monthsCompleted"
-  | "totalMonths"
+  | 'type'
+  | 'currentAmount'
+  | 'targetAmount'
+  | 'year'
+  | 'monthlyContribution'
+  | 'monthlyTarget'
+  | 'monthsCompleted'
+  | 'totalMonths'
 > & {
   type?: GoalType | string | null;
   currentAmount: number | string;
@@ -30,17 +30,17 @@ type ApiGoal = Omit<
 };
 
 const GOAL_TYPES: GoalType[] = [
-  "savings",
-  "salary",
-  "invest_habit",
-  "portfolio",
-  "net_worth",
-  "annual",
+  'savings',
+  'salary',
+  'invest_habit',
+  'portfolio',
+  'net_worth',
+  'annual',
 ];
 
 const toNumber = (value: number | string | null | undefined): number => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -55,8 +55,8 @@ const toNullableInteger = (value: number | string | null | undefined): number | 
 };
 
 const normalizeGoalType = (value: GoalType | string | null | undefined): GoalType => {
-  if (!value) return "savings";
-  return GOAL_TYPES.includes(value as GoalType) ? (value as GoalType) : "savings";
+  if (!value) return 'savings';
+  return GOAL_TYPES.includes(value as GoalType) ? (value as GoalType) : 'savings';
 };
 
 const normalizeGoal = (goal: ApiGoal): Goal => ({
@@ -70,19 +70,19 @@ const normalizeGoal = (goal: ApiGoal): Goal => ({
   monthsCompleted: toNullableInteger(goal.monthsCompleted),
   totalMonths: toNullableInteger(goal.totalMonths),
   unit: goal.unit ?? null,
-  color: goal.color || "#6366f1",
-  notes: goal.notes || "",
-  category: goal.category || "Other",
-  emoji: goal.emoji || "🎯",
-  deadline: goal.deadline || "TBD",
-  currency: goal.currency || "EUR",
+  color: goal.color || '#6366f1',
+  notes: goal.notes || '',
+  category: goal.category || 'Other',
+  emoji: goal.emoji || '🎯',
+  deadline: goal.deadline || 'TBD',
+  currency: goal.currency || 'EUR',
 });
 
 export function useNetWorthSnapshots() {
   return useQuery({
-    queryKey: ["dashboard", "netWorth"],
+    queryKey: ['dashboard', 'netWorth'],
     queryFn: async () => {
-      const { data } = await api.get("/api/dashboard/net-worth");
+      const { data } = await api.get('/api/dashboard/net-worth');
       return data.data as NetWorthSnapshot[];
     },
   });
@@ -90,9 +90,9 @@ export function useNetWorthSnapshots() {
 
 export function useAssetAllocations() {
   return useQuery({
-    queryKey: ["dashboard", "allocations"],
+    queryKey: ['dashboard', 'allocations'],
     queryFn: async () => {
-      const { data } = await api.get("/api/dashboard/allocations");
+      const { data } = await api.get('/api/dashboard/allocations');
       return data.data as AssetAllocation[];
     },
   });
@@ -100,9 +100,9 @@ export function useAssetAllocations() {
 
 export function useDashboardTransactions() {
   return useQuery({
-    queryKey: ["dashboard", "transactions"],
+    queryKey: ['dashboard', 'transactions'],
     queryFn: async () => {
-      const { data } = await api.get("/api/dashboard/transactions");
+      const { data } = await api.get('/api/dashboard/transactions');
       return data.data as DashboardTransaction[];
     },
   });
@@ -110,9 +110,9 @@ export function useDashboardTransactions() {
 
 export function useGoalsSummary() {
   return useQuery({
-    queryKey: ["dashboard", "goals"],
+    queryKey: ['dashboard', 'goals'],
     queryFn: async () => {
-      const { data } = await api.get("/api/goals");
+      const { data } = await api.get('/api/goals');
       return (data.data as ApiGoal[]).map(normalizeGoal);
     },
   });

@@ -1,14 +1,14 @@
-import type {
-  HoldingTransaction,
-  Mortgage,
-  Property,
-  PropertyTransaction,
-} from "@quro/shared";
+import type { HoldingTransaction, Mortgage, Property, PropertyTransaction } from '@quro/shared';
 
-export type HoldingTxnType = "buy" | "sell" | "dividend";
-export type PropertyTxnType = "repayment" | "valuation" | "rent_income" | "expense";
+export type HoldingTxnType = 'buy' | 'sell' | 'dividend';
+export type PropertyTxnType = 'repayment' | 'valuation' | 'rent_income' | 'expense';
 
-const INVESTMENT_PROPERTY_TYPES = new Set(["Buy-to-Let", "Investment", "Holiday Home", "Commercial"]);
+const INVESTMENT_PROPERTY_TYPES = new Set([
+  'Buy-to-Let',
+  'Investment',
+  'Holiday Home',
+  'Commercial',
+]);
 
 export type Position = {
   shares: number;
@@ -17,37 +17,53 @@ export type Position = {
   totalDividends: number;
 };
 
+type PositionState = {
+  shares: number;
+  totalCost: number;
+  realizedGain: number;
+  totalDividends: number;
+};
+
+function applyBuy(state: PositionState, tShares: number, tPrice: number): void {
+  state.totalCost += tShares * tPrice;
+  state.shares += tShares;
+}
+
+function applySell(state: PositionState, tShares: number, tPrice: number): void {
+  const avgCostNow = state.shares > 0 ? state.totalCost / state.shares : 0;
+  state.realizedGain += (tPrice - avgCostNow) * tShares;
+  state.totalCost -= tShares * avgCostNow;
+  state.shares = Math.max(0, state.shares - tShares);
+}
+
+function applyTxn(state: PositionState, t: HoldingTransaction): void {
+  const tShares = Number(t.shares ?? 0);
+  const tPrice = Number(t.price ?? 0);
+  if (t.type === 'buy' && tShares > 0) {
+    applyBuy(state, tShares, tPrice);
+  } else if (t.type === 'sell' && tShares > 0) {
+    applySell(state, tShares, tPrice);
+  } else if (t.type === 'dividend') {
+    state.totalDividends += tPrice;
+  }
+}
+
 export function computePosition(holdingId: number, txns: HoldingTransaction[]): Position {
   const relevant = txns
     .filter((t) => t.holdingId === holdingId)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  let shares = 0;
-  let totalCost = 0;
-  let realizedGain = 0;
-  let totalDividends = 0;
+  const state: PositionState = { shares: 0, totalCost: 0, realizedGain: 0, totalDividends: 0 };
 
   for (const t of relevant) {
-    const tShares = Number(t.shares ?? 0);
-    const tPrice = Number(t.price ?? 0);
-    if (t.type === "buy" && tShares > 0) {
-      totalCost += tShares * tPrice;
-      shares += tShares;
-    } else if (t.type === "sell" && tShares > 0) {
-      const avgCostNow = shares > 0 ? totalCost / shares : 0;
-      realizedGain += (tPrice - avgCostNow) * tShares;
-      totalCost -= tShares * avgCostNow;
-      shares = Math.max(0, shares - tShares);
-    } else if (t.type === "dividend") {
-      totalDividends += tPrice;
-    }
+    applyTxn(state, t);
   }
 
   return {
-    shares,
-    avgCost: shares > 0 ? totalCost / shares : 0,
-    realizedGain,
-    totalDividends,
+    shares: state.shares,
+    avgCost: state.shares > 0 ? state.totalCost / state.shares : 0,
+    realizedGain: state.realizedGain,
+    totalDividends: state.totalDividends,
   };
 }
 
@@ -74,14 +90,17 @@ export function addMonthsUtc(monthStart: number, months: number): number {
 }
 
 export function formatMonthLabel(monthStart: number): string {
-  return new Date(monthStart).toLocaleDateString("en-US", { month: "short" });
+  return new Date(monthStart).toLocaleDateString('en-US', { month: 'short' });
 }
 
 export function isInvestmentProperty(propertyType: string): boolean {
   return INVESTMENT_PROPERTY_TYPES.has(propertyType);
 }
 
-export function getPropertyMortgageBalance(property: Property, mortgageById: Map<number, Mortgage>): number {
+export function getPropertyMortgageBalance(
+  property: Property,
+  mortgageById: Map<number, Mortgage>,
+): number {
   if (property.mortgageId != null) {
     const linked = mortgageById.get(property.mortgageId);
     if (linked) return linked.outstandingBalance;

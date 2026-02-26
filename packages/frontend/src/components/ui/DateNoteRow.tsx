@@ -1,4 +1,4 @@
-import { FormField, TextInput } from "./FormField";
+import { FormField, TextInput } from './FormField';
 
 type DateNoteRowProps = {
   date: string;
@@ -8,7 +8,13 @@ type DateNoteRowProps = {
   notePlaceholder?: string;
 };
 
-export function DateNoteRow({ date, note, onDateChange, onNoteChange, notePlaceholder = "e.g. Monthly..." }: DateNoteRowProps) {
+export function DateNoteRow({
+  date,
+  note,
+  onDateChange,
+  onNoteChange,
+  notePlaceholder = 'e.g. Monthly...',
+}: DateNoteRowProps) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <FormField label="Date">
@@ -20,11 +26,7 @@ export function DateNoteRow({ date, note, onDateChange, onNoteChange, notePlaceh
         />
       </FormField>
       <FormField label="Note" hint="optional">
-        <TextInput
-          value={note}
-          onChange={onNoteChange}
-          placeholder={notePlaceholder}
-        />
+        <TextInput value={note} onChange={onNoteChange} placeholder={notePlaceholder} />
       </FormField>
     </div>
   );

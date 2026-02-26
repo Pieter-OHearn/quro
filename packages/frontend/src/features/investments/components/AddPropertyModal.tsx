@@ -1,25 +1,69 @@
-import { useState } from "react";
-import { CURRENCY_LIST, type CurrencyCode, useCurrency } from "@/lib/CurrencyContext";
-import { Modal, ModalFooter, FormField, SelectInput, TextInput } from "@/components/ui";
-import type { Property } from "@quro/shared";
+import { useState } from 'react';
+import { CURRENCY_LIST, type CurrencyCode, useCurrency } from '@/lib/CurrencyContext';
+import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
+import type { Property } from '@quro/shared';
 
-const PROPERTY_TYPES = ["Buy-to-Let", "Primary Residence", "Investment", "Holiday Home", "Commercial"] as const;
+const PROPERTY_TYPES = [
+  'Buy-to-Let',
+  'Primary Residence',
+  'Investment',
+  'Holiday Home',
+  'Commercial',
+] as const;
 
 type AddPropertyModalProps = {
   onClose: () => void;
-  onSave: (p: Omit<Property, "id">) => void;
+  onSave: (p: Omit<Property, 'id'>) => void;
 };
+
+type PropertyEquityPreviewProps = {
+  equity: number;
+  appreciation: number;
+  currency: CurrencyCode;
+  purchasePrice: number;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+function PropertyEquityPreview({
+  equity,
+  appreciation,
+  currency,
+  purchasePrice,
+  fmtNative,
+}: PropertyEquityPreviewProps) {
+  return (
+    <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500">Equity</span>
+        <span className={`font-semibold ${equity >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+          {fmtNative(equity, currency, true)}
+        </span>
+      </div>
+      {purchasePrice > 0 && (
+        <div className="flex justify-between text-xs">
+          <span className="text-slate-500">Appreciation</span>
+          <span
+            className={`font-semibold ${appreciation >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+          >
+            {appreciation >= 0 ? '+' : ''}
+            {fmtNative(appreciation, currency, true)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
   const { fmtNative } = useCurrency();
   const [form, setForm] = useState({
-    emoji: "🏠",
-    address: "",
-    propertyType: "Buy-to-Let",
-    currency: "EUR" as CurrencyCode,
-    purchasePrice: "",
-    currentValue: "",
-    monthlyRent: "",
+    emoji: '🏠',
+    address: '',
+    propertyType: 'Buy-to-Let',
+    currency: 'EUR' as CurrencyCode,
+    purchasePrice: '',
+    currentValue: '',
+    monthlyRent: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -45,9 +89,9 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
 
   function handleSave() {
     const errs: Record<string, string> = {};
-    if (!form.address.trim()) errs.address = "Required";
-    if (!form.purchasePrice || parsed.purchasePrice <= 0) errs.purchasePrice = "Required";
-    if (!form.currentValue || parsed.currentValue <= 0) errs.currentValue = "Required";
+    if (!form.address.trim()) errs.address = 'Required';
+    if (!form.purchasePrice || parsed.purchasePrice <= 0) errs.purchasePrice = 'Required';
+    if (!form.currentValue || parsed.currentValue <= 0) errs.currentValue = 'Required';
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
@@ -80,7 +124,7 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
         <FormField label="Icon" className="w-20 flex-shrink-0">
           <TextInput
             value={form.emoji}
-            onChange={(value) => set("emoji", value)}
+            onChange={(value) => set('emoji', value)}
             className="text-center text-lg"
             maxLength={2}
           />
@@ -88,8 +132,8 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
         <FormField label="Address" required error={errors.address} className="flex-1">
           <TextInput
             value={form.address}
-            onChange={(value) => set("address", value)}
-            error={!!errors.address}
+            onChange={(value) => set('address', value)}
+            error={Boolean(errors.address)}
             placeholder="e.g. Keizersgracht 12, Amsterdam"
           />
         </FormField>
@@ -97,10 +141,18 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Property Type">
-          <SelectInput value={form.propertyType} onChange={(value) => set("propertyType", value)} options={Array.from(PROPERTY_TYPES)} />
+          <SelectInput
+            value={form.propertyType}
+            onChange={(value) => set('propertyType', value)}
+            options={Array.from(PROPERTY_TYPES)}
+          />
         </FormField>
         <FormField label="Currency">
-          <SelectInput value={form.currency} onChange={(value) => set("currency", value)} options={CURRENCY_LIST} />
+          <SelectInput
+            value={form.currency}
+            onChange={(value) => set('currency', value)}
+            options={CURRENCY_LIST}
+          />
         </FormField>
       </div>
 
@@ -109,8 +161,8 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
           <TextInput
             type="number"
             value={form.purchasePrice}
-            onChange={(value) => set("purchasePrice", value)}
-            error={!!errors.purchasePrice}
+            onChange={(value) => set('purchasePrice', value)}
+            error={Boolean(errors.purchasePrice)}
             placeholder="0"
           />
         </FormField>
@@ -118,8 +170,8 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
           <TextInput
             type="number"
             value={form.currentValue}
-            onChange={(value) => set("currentValue", value)}
-            error={!!errors.currentValue}
+            onChange={(value) => set('currentValue', value)}
+            error={Boolean(errors.currentValue)}
             placeholder="0"
           />
         </FormField>
@@ -129,29 +181,19 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
         <TextInput
           type="number"
           value={form.monthlyRent}
-          onChange={(value) => set("monthlyRent", value)}
+          onChange={(value) => set('monthlyRent', value)}
           placeholder="0"
         />
       </FormField>
 
       {parsed.currentValue > 0 && (
-        <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-500">Equity</span>
-            <span className={`font-semibold ${equity >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-              {fmtNative(equity, form.currency, true)}
-            </span>
-          </div>
-          {parsed.purchasePrice > 0 && (
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-500">Appreciation</span>
-              <span className={`font-semibold ${appreciation >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-                {appreciation >= 0 ? "+" : ""}
-                {fmtNative(appreciation, form.currency, true)}
-              </span>
-            </div>
-          )}
-        </div>
+        <PropertyEquityPreview
+          equity={equity}
+          appreciation={appreciation}
+          currency={form.currency}
+          purchasePrice={parsed.purchasePrice}
+          fmtNative={fmtNative}
+        />
       )}
     </Modal>
   );

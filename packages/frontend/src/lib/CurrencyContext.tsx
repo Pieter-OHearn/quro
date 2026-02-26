@@ -1,16 +1,16 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type CurrencyCode = "EUR" | "GBP" | "USD" | "AUD" | "NZD" | "CAD" | "CHF" | "SGD";
+export type CurrencyCode = 'EUR' | 'GBP' | 'USD' | 'AUD' | 'NZD' | 'CAD' | 'CHF' | 'SGD';
 
 export const CURRENCY_META: Record<CurrencyCode, { symbol: string; name: string; flag: string }> = {
-  EUR: { symbol: "€",    name: "Euro",                flag: "🇪🇺" },
-  GBP: { symbol: "£",    name: "British Pound",       flag: "🇬🇧" },
-  USD: { symbol: "$",    name: "US Dollar",           flag: "🇺🇸" },
-  AUD: { symbol: "A$",   name: "Australian Dollar",   flag: "🇦🇺" },
-  NZD: { symbol: "NZ$",  name: "New Zealand Dollar",  flag: "🇳🇿" },
-  CAD: { symbol: "CA$",  name: "Canadian Dollar",     flag: "🇨🇦" },
-  CHF: { symbol: "CHF",  name: "Swiss Franc",         flag: "🇨🇭" },
-  SGD: { symbol: "S$",   name: "Singapore Dollar",    flag: "🇸🇬" },
+  EUR: { symbol: '€', name: 'Euro', flag: '🇪🇺' },
+  GBP: { symbol: '£', name: 'British Pound', flag: '🇬🇧' },
+  USD: { symbol: '$', name: 'US Dollar', flag: '🇺🇸' },
+  AUD: { symbol: 'A$', name: 'Australian Dollar', flag: '🇦🇺' },
+  NZD: { symbol: 'NZ$', name: 'New Zealand Dollar', flag: '🇳🇿' },
+  CAD: { symbol: 'CA$', name: 'Canadian Dollar', flag: '🇨🇦' },
+  CHF: { symbol: 'CHF', name: 'Swiss Franc', flag: '🇨🇭' },
+  SGD: { symbol: 'S$', name: 'Singapore Dollar', flag: '🇸🇬' },
 };
 
 /**
@@ -21,14 +21,14 @@ export const CURRENCY_META: Record<CurrencyCode, { symbol: string; name: string;
  * Approximate rates as of early 2026.
  */
 export const RATES_TO_EUR: Record<CurrencyCode, number> = {
-  EUR: 1.000,
-  GBP: 1.180,
+  EUR: 1.0,
+  GBP: 1.18,
   USD: 0.922,
-  AUD: 0.600,
+  AUD: 0.6,
   NZD: 0.551,
-  CAD: 0.660,
+  CAD: 0.66,
   CHF: 1.046,
-  SGD: 0.680,
+  SGD: 0.68,
 };
 
 export const CURRENCY_LIST = Object.keys(CURRENCY_META) as CurrencyCode[];
@@ -51,7 +51,7 @@ type CurrencyContextType = {
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("EUR");
+  const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>('EUR');
 
   const convertToBase = (amount: number, fromCurrency: CurrencyCode): number => {
     const amountInEUR = amount * RATES_TO_EUR[fromCurrency];
@@ -59,8 +59,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   };
 
   const fmtCurrency = (amount: number, currency: CurrencyCode, decimals = false): string =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
       currency,
       minimumFractionDigits: decimals ? 2 : 0,
       maximumFractionDigits: decimals ? 2 : 0,
@@ -77,7 +77,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const isForeign = (currency: CurrencyCode) => currency !== baseCurrency;
 
   return (
-    <CurrencyContext.Provider value={{ baseCurrency, setBaseCurrency, convertToBase, fmtBase, fmtNative, isForeign }}>
+    <CurrencyContext.Provider
+      value={{ baseCurrency, setBaseCurrency, convertToBase, fmtBase, fmtNative, isForeign }}
+    >
       {children}
     </CurrencyContext.Provider>
   );
@@ -85,6 +87,6 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
 export function useCurrency() {
   const ctx = useContext(CurrencyContext);
-  if (!ctx) throw new Error("useCurrency must be used within CurrencyProvider");
+  if (!ctx) throw new Error('useCurrency must be used within CurrencyProvider');
   return ctx;
 }

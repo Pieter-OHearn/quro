@@ -21,6 +21,7 @@ Quro gives you one beautifully organised place to track your financial life.
 It combines savings, investments, mortgage, pension, salary, goals, and budgeting into a single experience built around clarity and momentum.
 
 At a glance, Quro helps you:
+
 - understand your current net worth
 - track progress across every major money category
 - work across multiple currencies
@@ -101,6 +102,7 @@ bun run dev
 ```
 
 7. Open the app:
+
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:3000/api/health`
 
@@ -120,6 +122,7 @@ bun run db:clear
 ### Seeded demo account
 
 If you run `bun run db:seed`, a demo user is created:
+
 - Email: `demo@quro.local`
 - Password: `password123`
 
@@ -152,6 +155,7 @@ docker compose up --build
 ```
 
 Services:
+
 - Frontend (nginx): `http://localhost`
 - Backend API: `http://localhost:3000`
 - Postgres: `localhost:5432`
@@ -212,4 +216,3 @@ git push origin feature/my-change
 ## License
 
 This project is licensed under the MIT License.
-  

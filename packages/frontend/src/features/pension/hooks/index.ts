@@ -1,23 +1,23 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { PensionPot, PensionTransaction } from "@quro/shared";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { PensionPot, PensionTransaction } from '@quro/shared';
 
 type NumericLike = number | string | null | undefined;
 type IntegerLike = number | string | null | undefined;
 
-type ApiPensionPot = Omit<PensionPot, "balance" | "employeeMonthly" | "employerMonthly"> & {
+type ApiPensionPot = Omit<PensionPot, 'balance' | 'employeeMonthly' | 'employerMonthly'> & {
   balance: NumericLike;
   employeeMonthly: NumericLike;
   employerMonthly: NumericLike;
 };
 
-type ApiPensionTransaction = Omit<PensionTransaction, "amount"> & {
+type ApiPensionTransaction = Omit<PensionTransaction, 'amount'> & {
   amount: NumericLike;
 };
 
 const toNumber = (value: NumericLike): number => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
     const parsed = parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -25,10 +25,10 @@ const toNumber = (value: NumericLike): number => {
 };
 
 const toPositiveInt = (value: IntegerLike): number => {
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return Number.isInteger(value) && value > 0 ? value : 0;
   }
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     const parsed = Number.parseInt(value, 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
   }
@@ -52,24 +52,23 @@ const normalizeTransaction = (txn: ApiPensionTransaction): PensionTransaction =>
 
 export function usePensionPots() {
   return useQuery({
-    queryKey: ["pensions", "pots"],
+    queryKey: ['pensions', 'pots'],
     queryFn: async () => {
-      const { data } = await api.get("/api/pensions/pots");
+      const { data } = await api.get('/api/pensions/pots');
       return (data.data as ApiPensionPot[]).map(normalizePot).filter((pot) => pot.id > 0);
     },
   });
 }
 
 export function usePensionTransactions(potId?: number) {
-  const normalizedPotId = Number.isInteger(potId) && (potId as number) > 0
-    ? (potId as number)
-    : undefined;
+  const normalizedPotId =
+    Number.isInteger(potId) && (potId as number) > 0 ? (potId as number) : undefined;
 
   return useQuery({
-    queryKey: ["pensions", "transactions", normalizedPotId],
+    queryKey: ['pensions', 'transactions', normalizedPotId],
     queryFn: async () => {
       const params = normalizedPotId ? { potId: normalizedPotId } : undefined;
-      const { data } = await api.get("/api/pensions/transactions", { params });
+      const { data } = await api.get('/api/pensions/transactions', { params });
       return (data.data as ApiPensionTransaction[])
         .map(normalizeTransaction)
         .filter((txn) => txn.id > 0 && txn.potId > 0);
@@ -80,13 +79,13 @@ export function usePensionTransactions(potId?: number) {
 export function useCreatePensionPot() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (pot: Omit<PensionPot, "id">) => {
-      const { data } = await api.post("/api/pensions/pots", pot);
+    mutationFn: async (pot: Omit<PensionPot, 'id'>) => {
+      const { data } = await api.post('/api/pensions/pots', pot);
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['pensions'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -99,8 +98,8 @@ export function useUpdatePensionPot() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['pensions'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -112,8 +111,8 @@ export function useDeletePensionPot() {
       await api.delete(`/api/pensions/pots/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['pensions'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -121,13 +120,13 @@ export function useDeletePensionPot() {
 export function useCreatePensionTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (txn: Omit<PensionTransaction, "id">) => {
-      const { data } = await api.post("/api/pensions/transactions", txn);
+    mutationFn: async (txn: Omit<PensionTransaction, 'id'>) => {
+      const { data } = await api.post('/api/pensions/transactions', txn);
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['pensions'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -139,8 +138,8 @@ export function useDeletePensionTransaction() {
       await api.delete(`/api/pensions/transactions/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ['pensions'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

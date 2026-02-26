@@ -1,4 +1,4 @@
-import type { Context } from "hono";
+import type { Context } from 'hono';
 
 export type AuthUser = {
   id: number;
@@ -7,5 +7,5 @@ export type AuthUser = {
 };
 
 export function getAuthUser(c: Context): AuthUser {
-  return c.get("user") as AuthUser;
+  return c.get('user') as AuthUser;
 }

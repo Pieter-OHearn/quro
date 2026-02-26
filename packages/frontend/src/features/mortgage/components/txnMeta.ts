@@ -1,6 +1,6 @@
-import { Home, Landmark, Percent } from "lucide-react";
+import { Home, Landmark, Percent } from 'lucide-react';
 
-export type MortgageTxnType = "repayment" | "valuation" | "rate_change";
+export type MortgageTxnType = 'repayment' | 'valuation' | 'rate_change';
 
 export const TXN_META: Record<
   MortgageTxnType,
@@ -13,24 +13,24 @@ export const TXN_META: Record<
   }
 > = {
   repayment: {
-    label: "Repayment",
+    label: 'Repayment',
     icon: Landmark,
-    color: "text-indigo-600",
-    bg: "bg-indigo-50",
-    borderColor: "border-indigo-300",
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+    borderColor: 'border-indigo-300',
   },
   valuation: {
-    label: "Valuation",
+    label: 'Valuation',
     icon: Home,
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
-    borderColor: "border-emerald-300",
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    borderColor: 'border-emerald-300',
   },
   rate_change: {
-    label: "Rate Change",
+    label: 'Rate Change',
     icon: Percent,
-    color: "text-amber-600",
-    bg: "bg-amber-50",
-    borderColor: "border-amber-300",
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    borderColor: 'border-amber-300',
   },
 };

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-} from "recharts";
+} from 'recharts';
 import {
   AlertCircle,
   Calendar,
@@ -19,10 +19,10 @@ import {
   Plus,
   TrendingDown,
   Percent,
-} from "lucide-react";
-import { EmptyState, LoadingSpinner, StatCard } from "@/components/ui";
-import { useCurrency } from "@/lib/CurrencyContext";
-import type { Mortgage as MortgageType, MortgageTransaction, Property } from "@quro/shared";
+} from 'lucide-react';
+import { EmptyState, LoadingSpinner, StatCard } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
+import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
 import {
   useMortgages,
   useMortgageTransactions,
@@ -32,11 +32,11 @@ import {
   useDeleteMortgageTransaction,
   type CreateMortgagePayload,
   type UpdateMortgagePayload,
-} from "./hooks";
-import { useProperties } from "../investments/hooks";
-import { AddMortgageModal, type MortgageFormPayload } from "./components/AddMortgageModal";
-import { AddMortgageTxnModal } from "./components/AddMortgageTxnModal";
-import { MortgageTxnHistory } from "./components/MortgageTxnHistory";
+} from './hooks';
+import { useProperties } from '../investments/hooks';
+import { AddMortgageModal, type MortgageFormPayload } from './components/AddMortgageModal';
+import { AddMortgageTxnModal } from './components/AddMortgageTxnModal';
+import { MortgageTxnHistory } from './components/MortgageTxnHistory';
 
 function generateSchedule(balance: number, rate: number, monthlyPayment: number) {
   const schedule = [];
@@ -87,13 +87,13 @@ export function Mortgage() {
     ? (linkedPropertyByMortgageId.get(editingMortgage.id)?.id ?? null)
     : null;
 
-  function handleAddTxn(transaction: Omit<MortgageTransaction, "id">) {
+  function handleAddTxn(transaction: Omit<MortgageTransaction, 'id'>) {
     createTxn.mutate(transaction);
   }
 
   async function handleSaveMortgage(payload: MortgageFormPayload) {
     const { id, ...body } = payload;
-    if (typeof id === "number") {
+    if (typeof id === 'number') {
       const updated = await updateMortgageMut.mutateAsync({ ...body, id } as UpdateMortgagePayload);
       setActiveMortgageId((updated as MortgageType).id);
       return;
@@ -133,7 +133,7 @@ export function Mortgage() {
             title="No mortgages yet"
             description="Add a property first, then create a mortgage linked to that property."
             action={{
-              label: properties.length === 0 ? "Add Property First" : "Set Up Mortgage",
+              label: properties.length === 0 ? 'Add Property First' : 'Set Up Mortgage',
               onClick: () => setShowMortgageModal(true),
             }}
           />
@@ -151,8 +151,7 @@ export function Mortgage() {
       1 -
         (mortgage.outstandingBalance * (mortgage.interestRate / 100 / 12)) /
           mortgage.monthlyPayment,
-    ) /
-      Math.log(1 + mortgage.interestRate / 100 / 12),
+    ) / Math.log(1 + mortgage.interestRate / 100 / 12),
   );
   const yearsRemaining = Math.floor(monthsRemaining / 12);
 
@@ -169,7 +168,7 @@ export function Mortgage() {
     const interest = Math.round(balance * monthlyRate);
     const principal = mortgage.monthlyPayment - interest;
     return {
-      month: date.toLocaleDateString("en-GB", { month: "short" }),
+      month: date.toLocaleDateString('en-GB', { month: 'short' }),
       principal,
       interest,
     };
@@ -202,12 +201,12 @@ export function Mortgage() {
             onClick={() => setActiveMortgageId(entry.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
               mortgage.id === entry.id
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20"
-                : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
             }`}
           >
             <Home size={13} />
-            <span className="max-w-[180px] truncate">{entry.propertyAddress.split(",")[0]}</span>
+            <span className="max-w-[180px] truncate">{entry.propertyAddress.split(',')[0]}</span>
           </button>
         ))}
         <button
@@ -248,22 +247,22 @@ export function Mortgage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
             {
-              label: "Outstanding Balance",
+              label: 'Outstanding Balance',
               value: fmt(mortgage.outstandingBalance),
               sub: `of ${fmt(mortgage.originalAmount)} original`,
             },
             {
-              label: "Monthly Payment",
+              label: 'Monthly Payment',
               value: fmt(mortgage.monthlyPayment),
-              sub: "Capital + Interest",
+              sub: 'Capital + Interest',
             },
             {
-              label: "Interest Rate",
+              label: 'Interest Rate',
               value: `${mortgage.interestRate}%`,
               sub: `${mortgage.rateType} (until ${mortgage.fixedUntil})`,
             },
             {
-              label: "Years Remaining",
+              label: 'Years Remaining',
               value: `${yearsRemaining} yrs`,
               sub: `~${monthsRemaining} months`,
             },
@@ -295,7 +294,7 @@ export function Mortgage() {
         <StatCard
           label="Loan-to-Value"
           value={`${ltv.toFixed(1)}%`}
-          subtitle={ltv < 70 ? "Good — below 70%" : "High LTV"}
+          subtitle={ltv < 70 ? 'Good — below 70%' : 'High LTV'}
           icon={Percent}
           color="sky"
         />
@@ -311,7 +310,9 @@ export function Mortgage() {
       <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-slate-900">Mortgage Repayment Progress</h3>
-          <span className="text-sm font-semibold text-indigo-600">{paidPct.toFixed(1)}% paid off</span>
+          <span className="text-sm font-semibold text-indigo-600">
+            {paidPct.toFixed(1)}% paid off
+          </span>
         </div>
         <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-2">
           <div
@@ -343,16 +344,25 @@ export function Mortgage() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <XAxis
+                dataKey="year"
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
               <YAxis
-                tick={{ fontSize: 11, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
               />
               <Tooltip
-                formatter={(v: number) => [fmt(v), "Balance"]}
-                contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+                formatter={(v: number) => [fmt(v), 'Balance']}
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '12px',
+                }}
               />
               <Area
                 type="monotone"
@@ -372,19 +382,43 @@ export function Mortgage() {
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={paymentBreakdown} barSize={22}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
               <YAxis
-                tick={{ fontSize: 11, fill: "#94a3b8" }}
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
               />
               <Tooltip
-                contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
-                formatter={(v: number, name) => [fmt(v), name === "principal" ? "Principal" : "Interest"]}
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '12px',
+                }}
+                formatter={(v: number, name) => [
+                  fmt(v),
+                  name === 'principal' ? 'Principal' : 'Interest',
+                ]}
               />
-              <Bar dataKey="principal" name="principal" fill="#6366f1" stackId="a" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="interest" name="interest" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="principal"
+                name="principal"
+                fill="#6366f1"
+                stackId="a"
+                radius={[0, 0, 0, 0]}
+              />
+              <Bar
+                dataKey="interest"
+                name="interest"
+                fill="#f59e0b"
+                stackId="a"
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
           <div className="flex items-center gap-5 mt-3">
@@ -413,8 +447,8 @@ export function Mortgage() {
           <div>
             <p className="text-sm font-semibold text-amber-800">Rate Fix Expiry Coming</p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Your fixed rate of {mortgage.interestRate}% expires in {mortgage.fixedUntil}. Start comparing
-              remortgage deals 6 months before to avoid the Standard Variable Rate.
+              Your fixed rate of {mortgage.interestRate}% expires in {mortgage.fixedUntil}. Start
+              comparing remortgage deals 6 months before to avoid the Standard Variable Rate.
             </p>
           </div>
         </div>
@@ -423,9 +457,10 @@ export function Mortgage() {
           <div>
             <p className="text-sm font-semibold text-emerald-800">Overpayment Opportunity</p>
             <p className="text-xs text-emerald-700 mt-0.5">
-              You can overpay up to {mortgage.overpaymentLimit}% ({fmt(mortgage.outstandingBalance * 0.10)}) per
-              year without penalty. An extra {fmt(200)}/month would save approximately {fmt(12400)} in interest and
-              reduce your term by 3 years.
+              You can overpay up to {mortgage.overpaymentLimit}% (
+              {fmt(mortgage.outstandingBalance * 0.1)}) per year without penalty. An extra{' '}
+              {fmt(200)}/month would save approximately {fmt(12400)} in interest and reduce your
+              term by 3 years.
             </p>
           </div>
         </div>
