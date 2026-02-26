@@ -3,6 +3,7 @@ import { db } from '../db/client';
 import { budgetCategories, budgetTransactions } from '../db/schema';
 import { and, eq } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import { HTTP_STATUS } from '../constants/http';
 
 const app = new Hono();
 
@@ -21,7 +22,7 @@ app.get('/categories/:id', async (c) => {
     .select()
     .from(budgetCategories)
     .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)));
-  if (!data) return c.json({ error: 'Category not found' }, 404);
+  if (!data) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -32,7 +33,7 @@ app.post('/categories', async (c) => {
     .insert(budgetCategories)
     .values({ ...body, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/categories/:id', async (c) => {
@@ -45,7 +46,7 @@ app.patch('/categories/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Category not found' }, 404);
+  if (!data) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -56,7 +57,7 @@ app.delete('/categories/:id', async (c) => {
     .delete(budgetCategories)
     .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Category not found' }, 404);
+  if (!data) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -91,7 +92,7 @@ app.get('/transactions/:id', async (c) => {
     .select()
     .from(budgetTransactions)
     .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)));
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -102,13 +103,13 @@ app.post('/transactions', async (c) => {
     .select({ id: budgetCategories.id })
     .from(budgetCategories)
     .where(and(eq(budgetCategories.id, body.categoryId), eq(budgetCategories.userId, user.id)));
-  if (!category) return c.json({ error: 'Category not found' }, 404);
+  if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db
     .insert(budgetTransactions)
     .values({ ...body, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/transactions/:id', async (c) => {
@@ -121,7 +122,7 @@ app.patch('/transactions/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -132,7 +133,7 @@ app.delete('/transactions/:id', async (c) => {
     .delete(budgetTransactions)
     .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 

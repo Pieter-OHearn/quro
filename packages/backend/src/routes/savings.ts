@@ -3,6 +3,7 @@ import { db } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import { HTTP_STATUS } from '../constants/http';
 
 const app = new Hono();
 
@@ -21,7 +22,7 @@ app.get('/accounts/:id', async (c) => {
     .select()
     .from(savingsAccounts)
     .where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, user.id)));
-  if (!data) return c.json({ error: 'Account not found' }, 404);
+  if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -32,7 +33,7 @@ app.post('/accounts', async (c) => {
     .insert(savingsAccounts)
     .values({ ...body, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/accounts/:id', async (c) => {
@@ -45,7 +46,7 @@ app.patch('/accounts/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Account not found' }, 404);
+  if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -56,7 +57,7 @@ app.delete('/accounts/:id', async (c) => {
     .delete(savingsAccounts)
     .where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Account not found' }, 404);
+  if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -91,7 +92,7 @@ app.get('/transactions/:id', async (c) => {
     .select()
     .from(savingsTransactions)
     .where(and(eq(savingsTransactions.id, id), eq(savingsTransactions.userId, user.id)));
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -102,7 +103,7 @@ app.post('/transactions', async (c) => {
     .select()
     .from(savingsAccounts)
     .where(and(eq(savingsAccounts.id, body.accountId), eq(savingsAccounts.userId, user.id)));
-  if (!account) return c.json({ error: 'Account not found' }, 404);
+  if (!account) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db
     .insert(savingsTransactions)
@@ -119,7 +120,7 @@ app.post('/transactions', async (c) => {
     })
     .where(and(eq(savingsAccounts.id, body.accountId), eq(savingsAccounts.userId, user.id)));
 
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/transactions/:id', async (c) => {
@@ -132,7 +133,7 @@ app.patch('/transactions/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(savingsTransactions.id, id), eq(savingsTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -143,7 +144,7 @@ app.delete('/transactions/:id', async (c) => {
     .delete(savingsTransactions)
     .where(and(eq(savingsTransactions.id, id), eq(savingsTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   await db
     .update(savingsAccounts)

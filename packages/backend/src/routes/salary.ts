@@ -3,6 +3,7 @@ import { db } from '../db/client';
 import { payslips, salaryHistory } from '../db/schema';
 import { and, eq } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import { HTTP_STATUS } from '../constants/http';
 
 const app = new Hono();
 
@@ -21,7 +22,7 @@ app.get('/payslips/:id', async (c) => {
     .select()
     .from(payslips)
     .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)));
-  if (!data) return c.json({ error: 'Payslip not found' }, 404);
+  if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -32,7 +33,7 @@ app.post('/payslips', async (c) => {
     .insert(payslips)
     .values({ ...body, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/payslips/:id', async (c) => {
@@ -45,7 +46,7 @@ app.patch('/payslips/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Payslip not found' }, 404);
+  if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -56,7 +57,7 @@ app.delete('/payslips/:id', async (c) => {
     .delete(payslips)
     .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Payslip not found' }, 404);
+  if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -75,7 +76,7 @@ app.get('/history/:id', async (c) => {
     .select()
     .from(salaryHistory)
     .where(and(eq(salaryHistory.id, id), eq(salaryHistory.userId, user.id)));
-  if (!data) return c.json({ error: 'Salary history entry not found' }, 404);
+  if (!data) return c.json({ error: 'Salary history entry not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -86,7 +87,7 @@ app.post('/history', async (c) => {
     .insert(salaryHistory)
     .values({ ...body, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/history/:id', async (c) => {
@@ -99,7 +100,7 @@ app.patch('/history/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(salaryHistory.id, id), eq(salaryHistory.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Salary history entry not found' }, 404);
+  if (!data) return c.json({ error: 'Salary history entry not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -110,7 +111,7 @@ app.delete('/history/:id', async (c) => {
     .delete(salaryHistory)
     .where(and(eq(salaryHistory.id, id), eq(salaryHistory.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Salary history entry not found' }, 404);
+  if (!data) return c.json({ error: 'Salary history entry not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 

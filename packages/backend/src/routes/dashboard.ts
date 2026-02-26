@@ -21,6 +21,7 @@ import { getAuthUser } from '../lib/authUser';
 
 const app = new Hono();
 const BASE_CURRENCY = 'EUR';
+const RECENT_TRANSACTIONS_LIMIT = 20;
 
 const toNumber = (value: unknown): number => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -280,7 +281,7 @@ function buildActivityList(p: any[], b: any[], s: any[], h: any[], m: any[], pe:
     ...pr.filter((row) => row.type === 'rent_income' || row.type === 'expense').map(mapPropertyTxn),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 20)
+    .slice(0, RECENT_TRANSACTIONS_LIMIT)
     .map((row, index) => ({ id: index + 1, ...row }));
 }
 

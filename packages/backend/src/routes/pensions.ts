@@ -3,6 +3,7 @@ import { db } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, eq } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import { HTTP_STATUS } from '../constants/http';
 
 const app = new Hono();
 const MAX_INT32 = 2_147_483_647;
@@ -24,12 +25,12 @@ app.get('/pots', async (c) => {
 app.get('/pots/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid pension pot id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
   const [data] = await db
     .select()
     .from(pensionPots)
     .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)));
-  if (!data) return c.json({ error: 'Pension pot not found' }, 404);
+  if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -40,13 +41,13 @@ app.post('/pots', async (c) => {
     .insert(pensionPots)
     .values({ ...body, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/pots/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid pension pot id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
   const body = await c.req.json();
   const { userId: _ignoredUserId, ...safeBody } = body ?? {};
   const [data] = await db
@@ -54,19 +55,19 @@ app.patch('/pots/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Pension pot not found' }, 404);
+  if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
 app.delete('/pots/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid pension pot id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
   const [data] = await db
     .delete(pensionPots)
     .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Pension pot not found' }, 404);
+  if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -77,7 +78,7 @@ app.get('/transactions', async (c) => {
   const potId = c.req.query('potId');
   if (potId !== undefined) {
     const parsedPotId = parseId(potId);
-    if (parsedPotId === null) return c.json({ error: 'Invalid pension pot id' }, 400);
+    if (parsedPotId === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
     const data = await db
       .select()
       .from(pensionTransactions)
@@ -96,12 +97,12 @@ app.get('/transactions', async (c) => {
 app.get('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const [data] = await db
     .select()
     .from(pensionTransactions)
     .where(and(eq(pensionTransactions.id, id), eq(pensionTransactions.userId, user.id)));
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -109,24 +110,24 @@ app.post('/transactions', async (c) => {
   const user = getAuthUser(c);
   const body = await c.req.json();
   const potId = parseId(String(body?.potId));
-  if (potId === null) return c.json({ error: 'Invalid pension pot id' }, 400);
+  if (potId === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
   const [pot] = await db
     .select({ id: pensionPots.id })
     .from(pensionPots)
     .where(and(eq(pensionPots.id, potId), eq(pensionPots.userId, user.id)));
-  if (!pot) return c.json({ error: 'Pension pot not found' }, 404);
+  if (!pot) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db
     .insert(pensionTransactions)
     .values({ ...body, potId, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const body = await c.req.json();
   const { userId: _ignoredUserId, ...safeBody } = body ?? {};
   const [data] = await db
@@ -134,19 +135,19 @@ app.patch('/transactions/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(pensionTransactions.id, id), eq(pensionTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
 app.delete('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const [data] = await db
     .delete(pensionTransactions)
     .where(and(eq(pensionTransactions.id, id), eq(pensionTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 

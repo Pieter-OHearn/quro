@@ -3,6 +3,7 @@ import { db } from '../db/client';
 import { goals } from '../db/schema';
 import { and, eq } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import { HTTP_STATUS } from '../constants/http';
 
 const app = new Hono();
 
@@ -19,7 +20,7 @@ app.get('/:id', async (c) => {
     .select()
     .from(goals)
     .where(and(eq(goals.id, id), eq(goals.userId, user.id)));
-  if (!data) return c.json({ error: 'Goal not found' }, 404);
+  if (!data) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -30,7 +31,7 @@ app.post('/', async (c) => {
     .insert(goals)
     .values({ ...body, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/:id', async (c) => {
@@ -43,7 +44,7 @@ app.patch('/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(goals.id, id), eq(goals.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Goal not found' }, 404);
+  if (!data) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -54,7 +55,7 @@ app.delete('/:id', async (c) => {
     .delete(goals)
     .where(and(eq(goals.id, id), eq(goals.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Goal not found' }, 404);
+  if (!data) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 

@@ -3,6 +3,7 @@ import { db } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
 import { and, eq } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import { HTTP_STATUS } from '../constants/http';
 
 const app = new Hono();
 const MAX_INT32 = 2_147_483_647;
@@ -95,12 +96,12 @@ app.get('/', async (c) => {
 app.get('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid mortgage id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
   const [data] = await db
     .select()
     .from(mortgages)
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)));
-  if (!data) return c.json({ error: 'Mortgage not found' }, 404);
+  if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -109,7 +110,7 @@ app.post('/', async (c) => {
   const body = await c.req.json();
   const { userId: _ignoredUserId, linkedPropertyId: rawLinkedPropertyId, ...safeBody } = body ?? {};
   const linkedPropertyId = parseId(String(rawLinkedPropertyId));
-  if (linkedPropertyId === null) return c.json({ error: 'linkedPropertyId is required' }, 400);
+  if (linkedPropertyId === null) return c.json({ error: 'linkedPropertyId is required' }, HTTP_STATUS.BAD_REQUEST);
 
   const [property] = await db
     .select({
@@ -121,9 +122,9 @@ app.post('/', async (c) => {
     })
     .from(properties)
     .where(and(eq(properties.id, linkedPropertyId), eq(properties.userId, user.id)));
-  if (!property) return c.json({ error: 'Property not found' }, 404);
+  if (!property) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
   if (property.mortgageId != null)
-    return c.json({ error: 'Property already has a linked mortgage' }, 409);
+    return c.json({ error: 'Property already has a linked mortgage' }, HTTP_STATUS.CONFLICT);
 
   const [data] = await db
     .insert(mortgages)
@@ -144,13 +145,13 @@ app.post('/', async (c) => {
     } as any)
     .where(and(eq(properties.id, property.id), eq(properties.userId, user.id)));
 
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid mortgage id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
   const body = await c.req.json();
   const { userId: _ignoredUserId, linkedPropertyId: rawLinkedPropertyId, ...safeBody } = body ?? {};
 
@@ -158,7 +159,7 @@ app.patch('/:id', async (c) => {
     .select({ id: mortgages.id })
     .from(mortgages)
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)));
-  if (!existingMortgage) return c.json({ error: 'Mortgage not found' }, 404);
+  if (!existingMortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [currentLinkedProperty] = await db
     .select({ id: properties.id })
@@ -169,7 +170,7 @@ app.patch('/:id', async (c) => {
     rawLinkedPropertyId,
     currentLinkedProperty?.id ?? null,
   );
-  if (!nextIdResult.ok) return c.json({ error: nextIdResult.error }, 400);
+  if (!nextIdResult.ok) return c.json({ error: nextIdResult.error }, HTTP_STATUS.BAD_REQUEST);
   const nextLinkedPropertyId = nextIdResult.id;
 
   let nextLinkedProperty: LinkedProperty | null = null;
@@ -192,7 +193,7 @@ app.patch('/:id', async (c) => {
     .set(updates as any)
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Mortgage not found' }, 404);
+  if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
   await syncLinkedProperty(
     user.id,
@@ -207,7 +208,7 @@ app.patch('/:id', async (c) => {
 app.delete('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid mortgage id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
   await db
     .update(properties)
@@ -218,7 +219,7 @@ app.delete('/:id', async (c) => {
     .delete(mortgages)
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Mortgage not found' }, 404);
+  if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -229,7 +230,7 @@ app.get('/transactions', async (c) => {
   const mortgageId = c.req.query('mortgageId');
   if (mortgageId) {
     const parsedMortgageId = parseId(mortgageId);
-    if (parsedMortgageId === null) return c.json({ error: 'Invalid mortgage id' }, 400);
+    if (parsedMortgageId === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
     const data = await db
       .select()
       .from(mortgageTransactions)
@@ -251,12 +252,12 @@ app.get('/transactions', async (c) => {
 app.get('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const [data] = await db
     .select()
     .from(mortgageTransactions)
     .where(and(eq(mortgageTransactions.id, id), eq(mortgageTransactions.userId, user.id)));
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
@@ -264,24 +265,24 @@ app.post('/transactions', async (c) => {
   const user = getAuthUser(c);
   const body = await c.req.json();
   const mortgageId = parseId(String(body.mortgageId));
-  if (mortgageId === null) return c.json({ error: 'Invalid mortgage id' }, 400);
+  if (mortgageId === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
   const [mortgage] = await db
     .select({ id: mortgages.id })
     .from(mortgages)
     .where(and(eq(mortgages.id, mortgageId), eq(mortgages.userId, user.id)));
-  if (!mortgage) return c.json({ error: 'Mortgage not found' }, 404);
+  if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db
     .insert(mortgageTransactions)
     .values({ ...body, mortgageId, userId: user.id })
     .returning();
-  return c.json({ data }, 201);
+  return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const body = await c.req.json();
   const { userId: _ignoredUserId, ...safeBody } = body ?? {};
   const [data] = await db
@@ -289,19 +290,19 @@ app.patch('/transactions/:id', async (c) => {
     .set(safeBody)
     .where(and(eq(mortgageTransactions.id, id), eq(mortgageTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
 app.delete('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, 400);
+  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const [data] = await db
     .delete(mortgageTransactions)
     .where(and(eq(mortgageTransactions.id, id), eq(mortgageTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, 404);
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 

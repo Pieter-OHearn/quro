@@ -36,7 +36,14 @@ import { StatCard } from '@/components/ui/StatCard';
 import { AddPensionTxnModal } from './components/AddPensionTxnModal';
 import { PensionModal } from './components/PensionModal';
 import { PensionTxnHistory } from './components/PensionTxnHistory';
-import { TYPE_COLORS, toUtcTimestamp, yearEndUtc, type DatedPensionTransaction } from './constants';
+import {
+  TYPE_COLORS,
+  toUtcTimestamp,
+  yearEndUtc,
+  ANNUAL_GROWTH_RATE,
+  DRAWDOWN_YEARS,
+  type DatedPensionTransaction,
+} from './constants';
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
@@ -88,13 +95,13 @@ export function Pension(): JSX.Element {
   );
 
   const yearsToRetirement = 29;
-  const r = 0.05 / 12;
+  const r = ANNUAL_GROWTH_RATE / 12;
   const months = yearsToRetirement * 12;
   const projected =
-    totalInBase * Math.pow(1.05, yearsToRetirement) +
+    totalInBase * Math.pow(1 + ANNUAL_GROWTH_RATE, yearsToRetirement) +
     totalMonthlyContribInBase * ((Math.pow(1 + r, months) - 1) / r);
 
-  const monthlyDrawdown = projected / (25 * 12);
+  const monthlyDrawdown = projected / (DRAWDOWN_YEARS * 12);
 
   const pensionGrowthData = useMemo(() => {
     if (pensions.length === 0 || pensionTxns.length === 0) return [];

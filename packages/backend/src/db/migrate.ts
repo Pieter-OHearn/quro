@@ -10,6 +10,8 @@ const migrationsFolder = resolve(here, 'migrations');
 
 const sleep = (ms: number) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
+const RETRY_DELAY_MS = 1000;
+
 const isRetryableDbError = (error: unknown): boolean => {
   const code =
     typeof error === 'object' && error !== null && 'code' in error
@@ -32,6 +34,6 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     if (!isRetryableDbError(error) || attempt === maxAttempts) {
       throw error;
     }
-    await sleep(1000);
+    await sleep(RETRY_DELAY_MS);
   }
 }
