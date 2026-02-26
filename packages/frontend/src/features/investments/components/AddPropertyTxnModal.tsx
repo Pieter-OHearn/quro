@@ -173,7 +173,7 @@ export function AddPropertyTxnModal({ property, mortgageBalance, onClose, onSave
             setAmount(value);
             setError("");
           }}
-          error={!!error && parsedAmount <= 0}
+          error={Boolean(error) && parsedAmount <= 0}
         />
       </FormField>
 
@@ -190,7 +190,7 @@ export function AddPropertyTxnModal({ property, mortgageBalance, onClose, onSave
               setInterest(value);
               setError("");
             }}
-            error={!!error && parsedInterest > parsedAmount}
+            error={Boolean(error) && parsedInterest > parsedAmount}
           />
           <div className="mt-2 flex gap-4 text-xs text-slate-500">
             <span>

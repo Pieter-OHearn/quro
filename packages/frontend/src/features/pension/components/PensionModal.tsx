@@ -105,7 +105,7 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps): 
           <TextInput
             value={form.name}
             onChange={(v) => set("name", v)}
-            error={!!errors.name}
+            error={Boolean(errors.name)}
             placeholder="e.g. ABP Workplace Pension"
           />
         </FormField>
@@ -116,7 +116,7 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps): 
           <TextInput
             value={form.provider}
             onChange={(v) => set("provider", v)}
-            error={!!errors.provider}
+            error={Boolean(errors.provider)}
             placeholder="e.g. ABP, AustralianSuper"
           />
         </FormField>
@@ -135,7 +135,7 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps): 
             type="number"
             value={form.balance}
             onChange={(v) => set("balance", v)}
-            error={!!errors.balance}
+            error={Boolean(errors.balance)}
             placeholder="48200"
           />
         </FormField>

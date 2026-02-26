@@ -1,7 +1,6 @@
 import { Filter, Plus, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
+import { cn , formatDate } from "@/lib/utils";
 
 type FilterOption = {
   key: string;

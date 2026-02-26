@@ -147,7 +147,7 @@ export function AddHoldingTxnModal({ holding, currentPosition, onClose, onSave }
               setShares(value);
               setError("");
             }}
-            error={!!error && parsedShares <= 0}
+            error={Boolean(error) && parsedShares <= 0}
             placeholder="0"
           />
         </FormField>
@@ -168,7 +168,7 @@ export function AddHoldingTxnModal({ holding, currentPosition, onClose, onSave }
             setPrice(value);
             setError("");
           }}
-          error={!!error && parsedPrice <= 0}
+          error={Boolean(error) && parsedPrice <= 0}
           step="0.0001"
         />
       </FormField>

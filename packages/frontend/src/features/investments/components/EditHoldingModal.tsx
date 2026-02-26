@@ -109,7 +109,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
           <TextInput
             value={form.name}
             onChange={(value) => set("name", value)}
-            error={!!errors.name}
+            error={Boolean(errors.name)}
             placeholder="e.g. Vanguard FTSE All-World"
           />
         </FormField>
@@ -118,7 +118,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
           <TextInput
             value={form.ticker}
             onChange={(value) => set("ticker", value)}
-            error={!!errors.ticker}
+            error={Boolean(errors.ticker)}
             placeholder="VWCE"
           />
         </FormField>
@@ -145,7 +145,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
             step="0.01"
             value={form.currentPrice}
             onChange={(value) => set("currentPrice", value)}
-            error={!!errors.currentPrice}
+            error={Boolean(errors.currentPrice)}
             placeholder="112.50"
           />
         </FormField>
@@ -161,7 +161,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
                 step="0.0001"
                 value={form.initShares}
                 onChange={(value) => set("initShares", value)}
-                error={!!errors.initShares}
+                error={Boolean(errors.initShares)}
                 placeholder="50"
               />
             </FormField>
@@ -171,7 +171,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
                 step="0.01"
                 value={form.initPrice}
                 onChange={(value) => set("initPrice", value)}
-                error={!!errors.initPrice}
+                error={Boolean(errors.initPrice)}
                 placeholder="98.20"
               />
             </FormField>

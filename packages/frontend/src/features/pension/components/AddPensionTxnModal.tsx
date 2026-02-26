@@ -109,7 +109,7 @@ export function AddPensionTxnModal({ pot, onClose, onSave }: AddPensionTxnModalP
           currency={pot.currency}
           value={amount}
           onChange={(v) => { setAmount(v); setError(""); }}
-          error={!!error}
+          error={Boolean(error)}
         />
       </FormField>
 

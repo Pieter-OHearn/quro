@@ -59,7 +59,7 @@ export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
           currency={account.currency}
           value={amount}
           onChange={(v) => { setAmount(v); setError(""); }}
-          error={!!error}
+          error={Boolean(error)}
         />
       </FormField>
 

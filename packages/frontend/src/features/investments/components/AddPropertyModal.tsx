@@ -89,7 +89,7 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
           <TextInput
             value={form.address}
             onChange={(value) => set("address", value)}
-            error={!!errors.address}
+            error={Boolean(errors.address)}
             placeholder="e.g. Keizersgracht 12, Amsterdam"
           />
         </FormField>
@@ -110,7 +110,7 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
             type="number"
             value={form.purchasePrice}
             onChange={(value) => set("purchasePrice", value)}
-            error={!!errors.purchasePrice}
+            error={Boolean(errors.purchasePrice)}
             placeholder="0"
           />
         </FormField>
@@ -119,7 +119,7 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
             type="number"
             value={form.currentValue}
             onChange={(value) => set("currentValue", value)}
-            error={!!errors.currentValue}
+            error={Boolean(errors.currentValue)}
             placeholder="0"
           />
         </FormField>

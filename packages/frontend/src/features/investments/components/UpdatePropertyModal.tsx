@@ -49,7 +49,7 @@ export function UpdatePropertyModal({ property, mortgageBalance, onClose, onSave
             setValue(next);
             setErrors((previous) => ({ ...previous, value: "" }));
           }}
-          error={!!errors.value}
+          error={Boolean(errors.value)}
         />
         <p className="text-xs text-slate-400 mt-1">Previously {fmtNative(property.currentValue, property.currency)}</p>
       </FormField>

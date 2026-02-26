@@ -7,10 +7,9 @@ import {
   Briefcase, Calculator, Download, ArrowUpRight,
   Plus, X, Info, Trash2, ShieldCheck, ArrowRight, Loader2,
 } from "lucide-react";
-import { StatCard, LoadingSpinner } from "@/components/ui";
 import { Link } from "react-router";
 import { useCurrency } from "@/lib/CurrencyContext";
-import type { Payslip, SalaryHistory } from "@quro/shared";
+import type { Payslip } from "@quro/shared";
 import { usePayslips, useCreatePayslip, useDeletePayslip, useSalaryHistory } from "./hooks";
 
 // ─── Add Payslip Modal ────────────────────────────────────────────────────────

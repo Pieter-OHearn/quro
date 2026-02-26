@@ -91,7 +91,7 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
           <TextInput
             value={form.name}
             onChange={(v) => set("name", v)}
-            error={!!errors.name}
+            error={Boolean(errors.name)}
             placeholder="e.g. ASN Spaarrekening"
           />
         </FormField>
@@ -101,7 +101,7 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
         <TextInput
           value={form.bank}
           onChange={(v) => set("bank", v)}
-          error={!!errors.bank}
+          error={Boolean(errors.bank)}
           placeholder="e.g. Rabobank"
         />
       </FormField>
@@ -112,7 +112,7 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
             type="number"
             value={form.balance}
             onChange={(v) => set("balance", v)}
-            error={!!errors.balance}
+            error={Boolean(errors.balance)}
             placeholder="18500"
           />
         </FormField>
@@ -132,7 +132,7 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
             step="0.01"
             value={form.rate}
             onChange={(v) => set("rate", v)}
-            error={!!errors.rate}
+            error={Boolean(errors.rate)}
             placeholder="3.50"
           />
         </FormField>
