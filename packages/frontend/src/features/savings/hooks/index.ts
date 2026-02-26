@@ -31,8 +31,8 @@ export function useCreateSavingsAccount() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["savings"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["savings"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -45,8 +45,8 @@ export function useUpdateSavingsAccount() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["savings"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["savings"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -58,8 +58,8 @@ export function useDeleteSavingsAccount() {
       await api.delete(`/api/savings/accounts/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["savings"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["savings"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -72,8 +72,8 @@ export function useCreateSavingsTransaction() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["savings"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["savings"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -85,8 +85,8 @@ export function useDeleteSavingsTransaction() {
       await api.delete(`/api/savings/transactions/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["savings"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["savings"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

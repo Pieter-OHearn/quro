@@ -55,8 +55,8 @@ export function useCreatePayslip() {
       return normalizePayslip(data.data as ApiPayslip);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["salary"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["salary"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -68,8 +68,8 @@ export function useDeletePayslip() {
       await api.delete(`/api/salary/payslips/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["salary"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["salary"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -92,8 +92,8 @@ export function useCreateSalaryHistory() {
       return normalizeSalaryHistory(data.data as ApiSalaryHistory);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["salary"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["salary"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

@@ -10,6 +10,35 @@ type UpdatePropertyModalProps = {
   onSave: (id: number, value: number, rent: number) => void;
 };
 
+type PropertyStatsPreviewProps = {
+  equity: number;
+  appreciation: number;
+  appreciationPct: number;
+  currency: string;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+function PropertyStatsPreview({ equity, appreciation, appreciationPct, currency, fmtNative }: PropertyStatsPreviewProps) {
+  return (
+    <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500">Equity</span>
+        <span className={`font-semibold ${equity >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+          {fmtNative(equity, currency)}
+        </span>
+      </div>
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500">Appreciation</span>
+        <span className={`font-semibold ${appreciation >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+          {appreciation >= 0 ? "+" : ""}
+          {fmtNative(appreciation, currency)} ({appreciationPct >= 0 ? "+" : ""}
+          {appreciationPct.toFixed(1)}%)
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function UpdatePropertyModal({ property, mortgageBalance, onClose, onSave }: UpdatePropertyModalProps) {
   const { fmtNative } = useCurrency();
   const [value, setValue] = useState(property.currentValue.toString());
@@ -65,22 +94,13 @@ export function UpdatePropertyModal({ property, mortgageBalance, onClose, onSave
         <TextInput type="number" value={rent} onChange={setRent} />
       </FormField>
 
-      <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-        <div className="flex justify-between text-xs">
-          <span className="text-slate-500">Equity</span>
-          <span className={`font-semibold ${equity >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-            {fmtNative(equity, property.currency)}
-          </span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-slate-500">Appreciation</span>
-          <span className={`font-semibold ${appreciation >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-            {appreciation >= 0 ? "+" : ""}
-            {fmtNative(appreciation, property.currency)} ({appreciationPct >= 0 ? "+" : ""}
-            {appreciationPct.toFixed(1)}%)
-          </span>
-        </div>
-      </div>
+      <PropertyStatsPreview
+        equity={equity}
+        appreciation={appreciation}
+        appreciationPct={appreciationPct}
+        currency={property.currency}
+        fmtNative={fmtNative}
+      />
     </Modal>
   );
 }

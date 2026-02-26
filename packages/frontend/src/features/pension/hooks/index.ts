@@ -85,8 +85,8 @@ export function useCreatePensionPot() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["pensions"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -99,8 +99,8 @@ export function useUpdatePensionPot() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["pensions"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -112,8 +112,8 @@ export function useDeletePensionPot() {
       await api.delete(`/api/pensions/pots/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["pensions"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -126,8 +126,8 @@ export function useCreatePensionTransaction() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["pensions"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -139,8 +139,8 @@ export function useDeletePensionTransaction() {
       await api.delete(`/api/pensions/transactions/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["pensions"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["pensions"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

@@ -94,8 +94,8 @@ export function useCreateHolding() {
       return normalizeHolding(data.data as Holding);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -111,8 +111,8 @@ export function useUpdateHolding() {
       return normalizeHolding(data.data as Holding);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -124,8 +124,8 @@ export function useDeleteHolding() {
       await api.delete(`/api/investments/holdings/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -141,8 +141,8 @@ export function useCreateHoldingTransaction() {
       return normalizeHoldingTransaction(data.data as HoldingTransaction);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -154,8 +154,8 @@ export function useDeleteHoldingTransaction() {
       await api.delete(`/api/investments/holding-transactions/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -194,8 +194,8 @@ export function useCreateProperty() {
       return normalizeProperty(data.data as Property);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -211,8 +211,8 @@ export function useUpdateProperty() {
       return normalizeProperty(data.data as Property);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -224,8 +224,8 @@ export function useDeleteProperty() {
       await api.delete(`/api/investments/properties/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -241,8 +241,8 @@ export function useCreatePropertyTransaction() {
       return normalizePropertyTransaction(data.data as PropertyTransaction);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -254,8 +254,8 @@ export function useDeletePropertyTransaction() {
       await api.delete(`/api/investments/property-transactions/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

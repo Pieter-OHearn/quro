@@ -22,8 +22,8 @@ export function useCreateBudgetCategory() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["budget"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -39,8 +39,8 @@ export function useUpdateBudgetCategory() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["budget"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -52,8 +52,8 @@ export function useDeleteBudgetCategory() {
       await api.delete(`/api/budget/categories/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["budget"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -79,8 +79,8 @@ export function useCreateBudgetTransaction() {
       return data.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["budget"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -92,8 +92,8 @@ export function useDeleteBudgetTransaction() {
       await api.delete(`/api/budget/transactions/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["budget"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

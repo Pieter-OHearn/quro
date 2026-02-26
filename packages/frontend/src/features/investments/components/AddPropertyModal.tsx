@@ -10,6 +10,36 @@ type AddPropertyModalProps = {
   onSave: (p: Omit<Property, "id">) => void;
 };
 
+type PropertyEquityPreviewProps = {
+  equity: number;
+  appreciation: number;
+  currency: CurrencyCode;
+  purchasePrice: number;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+function PropertyEquityPreview({ equity, appreciation, currency, purchasePrice, fmtNative }: PropertyEquityPreviewProps) {
+  return (
+    <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-500">Equity</span>
+        <span className={`font-semibold ${equity >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+          {fmtNative(equity, currency, true)}
+        </span>
+      </div>
+      {purchasePrice > 0 && (
+        <div className="flex justify-between text-xs">
+          <span className="text-slate-500">Appreciation</span>
+          <span className={`font-semibold ${appreciation >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
+            {appreciation >= 0 ? "+" : ""}
+            {fmtNative(appreciation, currency, true)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
   const { fmtNative } = useCurrency();
   const [form, setForm] = useState({
@@ -135,23 +165,13 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
       </FormField>
 
       {parsed.currentValue > 0 && (
-        <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-500">Equity</span>
-            <span className={`font-semibold ${equity >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-              {fmtNative(equity, form.currency, true)}
-            </span>
-          </div>
-          {parsed.purchasePrice > 0 && (
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-500">Appreciation</span>
-              <span className={`font-semibold ${appreciation >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-                {appreciation >= 0 ? "+" : ""}
-                {fmtNative(appreciation, form.currency, true)}
-              </span>
-            </div>
-          )}
-        </div>
+        <PropertyEquityPreview
+          equity={equity}
+          appreciation={appreciation}
+          currency={form.currency}
+          purchasePrice={parsed.purchasePrice}
+          fmtNative={fmtNative}
+        />
       )}
     </Modal>
   );

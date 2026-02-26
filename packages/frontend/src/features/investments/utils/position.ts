@@ -17,37 +17,48 @@ export type Position = {
   totalDividends: number;
 };
 
+type PositionState = { shares: number; totalCost: number; realizedGain: number; totalDividends: number };
+
+function applyBuy(state: PositionState, tShares: number, tPrice: number): void {
+  state.totalCost += tShares * tPrice;
+  state.shares += tShares;
+}
+
+function applySell(state: PositionState, tShares: number, tPrice: number): void {
+  const avgCostNow = state.shares > 0 ? state.totalCost / state.shares : 0;
+  state.realizedGain += (tPrice - avgCostNow) * tShares;
+  state.totalCost -= tShares * avgCostNow;
+  state.shares = Math.max(0, state.shares - tShares);
+}
+
+function applyTxn(state: PositionState, t: HoldingTransaction): void {
+  const tShares = Number(t.shares ?? 0);
+  const tPrice = Number(t.price ?? 0);
+  if (t.type === "buy" && tShares > 0) {
+    applyBuy(state, tShares, tPrice);
+  } else if (t.type === "sell" && tShares > 0) {
+    applySell(state, tShares, tPrice);
+  } else if (t.type === "dividend") {
+    state.totalDividends += tPrice;
+  }
+}
+
 export function computePosition(holdingId: number, txns: HoldingTransaction[]): Position {
   const relevant = txns
     .filter((t) => t.holdingId === holdingId)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  let shares = 0;
-  let totalCost = 0;
-  let realizedGain = 0;
-  let totalDividends = 0;
+  const state: PositionState = { shares: 0, totalCost: 0, realizedGain: 0, totalDividends: 0 };
 
   for (const t of relevant) {
-    const tShares = Number(t.shares ?? 0);
-    const tPrice = Number(t.price ?? 0);
-    if (t.type === "buy" && tShares > 0) {
-      totalCost += tShares * tPrice;
-      shares += tShares;
-    } else if (t.type === "sell" && tShares > 0) {
-      const avgCostNow = shares > 0 ? totalCost / shares : 0;
-      realizedGain += (tPrice - avgCostNow) * tShares;
-      totalCost -= tShares * avgCostNow;
-      shares = Math.max(0, shares - tShares);
-    } else if (t.type === "dividend") {
-      totalDividends += tPrice;
-    }
+    applyTxn(state, t);
   }
 
   return {
-    shares,
-    avgCost: shares > 0 ? totalCost / shares : 0,
-    realizedGain,
-    totalDividends,
+    shares: state.shares,
+    avgCost: state.shares > 0 ? state.totalCost / state.shares : 0,
+    realizedGain: state.realizedGain,
+    totalDividends: state.totalDividends,
   };
 }
 

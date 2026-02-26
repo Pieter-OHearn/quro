@@ -198,7 +198,7 @@ export function Brand() {
         <section>
           <SectionHeader title="Colour System" sub="The five tones that define the Quro mark" />
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-6">
-            {palette.map(({ name, hex, role, text, border }) => (
+            {palette.map(({ name, hex, role, border }) => (
               <div key={hex} className={`rounded-xl overflow-hidden shadow-sm ${border ? "border border-slate-200" : ""}`}>
                 <div className="h-16" style={{ backgroundColor: hex }} />
                 <div className="bg-white px-3 py-2.5">

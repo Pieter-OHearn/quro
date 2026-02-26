@@ -50,6 +50,88 @@ const TXN_META: Record<HoldingTxnType, TxnTypeMeta> = {
 
 const TXN_TYPES = ["buy", "sell", "dividend"] as const satisfies HoldingTxnType[];
 
+type TxnPreviewProps = {
+  type: HoldingTxnType;
+  parsedShares: number;
+  parsedPrice: number;
+  holding: Holding;
+  currentPosition: Position;
+  newAvgCost: number;
+  realizedGain: number;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+function TxnPreview({ type, parsedShares, parsedPrice, holding, currentPosition, newAvgCost, realizedGain, fmtNative }: TxnPreviewProps) {
+  const bgClass = type === "sell"
+    ? "bg-rose-50 border-rose-100"
+    : type === "dividend"
+      ? "bg-indigo-50 border-indigo-100"
+      : "bg-emerald-50 border-emerald-100";
+
+  return (
+    <div className={`rounded-xl p-4 border ${bgClass}`}>
+      {type === "buy" && parsedShares > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">Total cost</span>
+            <span className="font-semibold text-slate-800">
+              {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">New avg cost</span>
+            <span className="font-semibold text-emerald-700">
+              {fmtNative(newAvgCost, holding.currency, true)}
+              {newAvgCost !== currentPosition.avgCost && currentPosition.shares > 0 && (
+                <span className="text-slate-400 font-normal ml-1">
+                  (was {fmtNative(currentPosition.avgCost, holding.currency, true)})
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">New position</span>
+            <span className="font-semibold text-slate-800">
+              {(currentPosition.shares + parsedShares).toFixed(4).replace(/\.?0+$/, "")} shares
+            </span>
+          </div>
+        </div>
+      )}
+
+      {type === "sell" && parsedShares > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">Proceeds</span>
+            <span className="font-semibold text-slate-800">
+              {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">Realized gain/loss</span>
+            <span className={`font-semibold ${realizedGain >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              {realizedGain >= 0 ? "+" : ""}
+              {fmtNative(realizedGain, holding.currency, true)}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">Remaining shares</span>
+            <span className="font-semibold text-slate-800">
+              {Math.max(0, currentPosition.shares - parsedShares).toFixed(4).replace(/\.?0+$/, "")}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {type === "dividend" && (
+        <div className="flex justify-between text-xs">
+          <span className="text-indigo-700 font-medium">Dividend income</span>
+          <span className="font-bold text-indigo-700">+{fmtNative(parsedPrice, holding.currency, true)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AddHoldingTxnModal({ holding, currentPosition, onClose, onSave }: AddHoldingTxnModalProps) {
   const { fmtNative } = useCurrency();
   const [type, setType] = useState<HoldingTxnType>("buy");
@@ -182,74 +264,16 @@ export function AddHoldingTxnModal({ holding, currentPosition, onClose, onSave }
       />
 
       {parsedPrice > 0 && (
-        <div
-          className={`rounded-xl p-4 border ${
-            type === "sell"
-              ? "bg-rose-50 border-rose-100"
-              : type === "dividend"
-                ? "bg-indigo-50 border-indigo-100"
-                : "bg-emerald-50 border-emerald-100"
-          }`}
-        >
-          {type === "buy" && parsedShares > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600">Total cost</span>
-                <span className="font-semibold text-slate-800">
-                  {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600">New avg cost</span>
-                <span className="font-semibold text-emerald-700">
-                  {fmtNative(newAvgCost, holding.currency, true)}
-                  {newAvgCost !== currentPosition.avgCost && currentPosition.shares > 0 && (
-                    <span className="text-slate-400 font-normal ml-1">
-                      (was {fmtNative(currentPosition.avgCost, holding.currency, true)})
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600">New position</span>
-                <span className="font-semibold text-slate-800">
-                  {(currentPosition.shares + parsedShares).toFixed(4).replace(/\.?0+$/, "")} shares
-                </span>
-              </div>
-            </div>
-          )}
-
-          {type === "sell" && parsedShares > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600">Proceeds</span>
-                <span className="font-semibold text-slate-800">
-                  {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600">Realized gain/loss</span>
-                <span className={`font-semibold ${realizedGain >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                  {realizedGain >= 0 ? "+" : ""}
-                  {fmtNative(realizedGain, holding.currency, true)}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-600">Remaining shares</span>
-                <span className="font-semibold text-slate-800">
-                  {Math.max(0, currentPosition.shares - parsedShares).toFixed(4).replace(/\.?0+$/, "")}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {type === "dividend" && (
-            <div className="flex justify-between text-xs">
-              <span className="text-indigo-700 font-medium">Dividend income</span>
-              <span className="font-bold text-indigo-700">+{fmtNative(parsedPrice, holding.currency, true)}</span>
-            </div>
-          )}
-        </div>
+        <TxnPreview
+          type={type}
+          parsedShares={parsedShares}
+          parsedPrice={parsedPrice}
+          holding={holding}
+          currentPosition={currentPosition}
+          newAvgCost={newAvgCost}
+          realizedGain={realizedGain}
+          fmtNative={fmtNative}
+        />
       )}
     </Modal>
   );

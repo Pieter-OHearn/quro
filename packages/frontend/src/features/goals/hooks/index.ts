@@ -102,8 +102,8 @@ export function useCreateGoal() {
       return normalizeGoal(data.data as ApiGoal);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["goals"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["goals"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -116,8 +116,8 @@ export function useUpdateGoal() {
       return normalizeGoal(data.data as ApiGoal);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["goals"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["goals"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -129,8 +129,8 @@ export function useDeleteGoal() {
       await api.delete(`/api/goals/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["goals"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["goals"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

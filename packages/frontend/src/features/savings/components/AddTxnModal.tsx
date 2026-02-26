@@ -13,6 +13,36 @@ type AddTxnModalProps = {
   onSave: (t: Omit<SavingsTransaction, "id">) => void;
 };
 
+type BalancePreviewProps = {
+  type: TxnType;
+  parsed: number;
+  account: SavingsAccount;
+  fmtNative: (v: number, c: string, d?: boolean) => string;
+};
+
+function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProps) {
+  const newBalance = type === "withdrawal"
+    ? account.balance - parsed
+    : account.balance + parsed;
+  return (
+    <div className={`rounded-xl p-4 border ${type === "withdrawal" ? "bg-rose-50 border-rose-100" : "bg-emerald-50 border-emerald-100"}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-slate-600">Balance after transaction</span>
+        <span className={`font-bold ${newBalance < 0 ? "text-rose-600" : "text-emerald-700"}`}>
+          {fmtNative(newBalance, account.currency, true)}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-slate-500">
+        <span>{fmtNative(account.balance, account.currency, true)}</span>
+        <span>{type === "withdrawal" ? "\u2212" : "+"}</span>
+        <span className={TXN_META[type].color}>{fmtNative(parsed, account.currency, true)}</span>
+        <span>=</span>
+        <span className="font-semibold">{fmtNative(newBalance, account.currency, true)}</span>
+      </div>
+    </div>
+  );
+}
+
 export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
   const { fmtNative } = useCurrency();
   const [type, setType] = useState<TxnType>("deposit");
@@ -22,9 +52,6 @@ export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
   const [error, setError] = useState("");
 
   const parsed = parseFloat(amount) || 0;
-  const newBalance = type === "withdrawal"
-    ? account.balance - parsed
-    : account.balance + parsed;
 
   function handleSave(): void {
     if (!amount || isNaN(parsed) || parsed <= 0) { setError("Enter a valid amount"); return; }
@@ -53,7 +80,6 @@ export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
           onChange={(t) => { setType(t as TxnType); setError(""); }}
         />
       </FormField>
-
       <FormField label={`Amount (${account.currency})`} error={error}>
         <CurrencyInput
           currency={account.currency}
@@ -62,7 +88,6 @@ export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
           error={Boolean(error)}
         />
       </FormField>
-
       <DateNoteRow
         date={date}
         note={note}
@@ -70,23 +95,8 @@ export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
         onNoteChange={setNote}
         notePlaceholder="e.g. Monthly transfer, Quarterly interest..."
       />
-
       {parsed > 0 && (
-        <div className={`rounded-xl p-4 border ${type === "withdrawal" ? "bg-rose-50 border-rose-100" : "bg-emerald-50 border-emerald-100"}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-600">Balance after transaction</span>
-            <span className={`font-bold ${newBalance < 0 ? "text-rose-600" : "text-emerald-700"}`}>
-              {fmtNative(newBalance, account.currency, true)}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>{fmtNative(account.balance, account.currency, true)}</span>
-            <span>{type === "withdrawal" ? "\u2212" : "+"}</span>
-            <span className={TXN_META[type].color}>{fmtNative(parsed, account.currency, true)}</span>
-            <span>=</span>
-            <span className="font-semibold">{fmtNative(newBalance, account.currency, true)}</span>
-          </div>
-        </div>
+        <BalancePreview type={type} parsed={parsed} account={account} fmtNative={fmtNative} />
       )}
     </Modal>
   );

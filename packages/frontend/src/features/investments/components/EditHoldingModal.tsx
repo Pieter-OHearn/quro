@@ -17,8 +17,92 @@ type EditHoldingModalProps = {
   onDelete?: (id: number) => void;
 };
 
+type HoldingForm = {
+  name: string;
+  ticker: string;
+  currency: CurrencyCode;
+  sector: string;
+  currentPrice: string;
+  initShares: string;
+  initPrice: string;
+  initDate: string;
+};
+
+function validateHoldingForm(form: HoldingForm, existing: Holding | undefined): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (!form.name.trim()) errs.name = "Required";
+  if (!form.ticker.trim()) errs.ticker = "Required";
+  if (!form.currentPrice || isNaN(parseFloat(form.currentPrice))) errs.currentPrice = "Required";
+
+  if (!existing) {
+    if (!form.initShares || isNaN(parseFloat(form.initShares)) || parseFloat(form.initShares) <= 0) {
+      errs.initShares = "Required";
+    }
+    if (!form.initPrice || isNaN(parseFloat(form.initPrice)) || parseFloat(form.initPrice) <= 0) {
+      errs.initPrice = "Required";
+    }
+  }
+
+  return errs;
+}
+
+type InitialBuySectionProps = {
+  form: HoldingForm;
+  errors: Record<string, string>;
+  currency: CurrencyCode;
+  onChange: (field: string, value: string) => void;
+};
+
+function InitialBuySection({ form, errors, currency, onChange }: InitialBuySectionProps) {
+  return (
+    <div className="border-t border-dashed border-slate-200 pt-4">
+      <p className="text-xs font-semibold text-slate-600 mb-3">Initial Buy Transaction</p>
+      <div className="grid grid-cols-3 gap-3">
+        <FormField label="Shares" required error={errors.initShares}>
+          <TextInput
+            type="number"
+            step="0.0001"
+            value={form.initShares}
+            onChange={(value) => onChange("initShares", value)}
+            error={Boolean(errors.initShares)}
+            placeholder="50"
+          />
+        </FormField>
+        <FormField label="Buy Price" required error={errors.initPrice}>
+          <TextInput
+            type="number"
+            step="0.01"
+            value={form.initPrice}
+            onChange={(value) => onChange("initPrice", value)}
+            error={Boolean(errors.initPrice)}
+            placeholder="98.20"
+          />
+        </FormField>
+        <FormField label="Date">
+          <input
+            type="date"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            value={form.initDate}
+            onChange={(event) => onChange("initDate", event.target.value)}
+          />
+        </FormField>
+      </div>
+
+      {form.initShares && form.initPrice && (
+        <div className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-2">
+          <Check size={13} className="text-emerald-600" />
+          <span className="text-xs text-emerald-700">
+            Initial position: {form.initShares} shares @ {currency} {form.initPrice} = {currency}{" "}
+            {(parseFloat(form.initShares) * parseFloat(form.initPrice)).toFixed(2)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHoldingModalProps) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<HoldingForm>({
     name: existing?.name ?? "",
     ticker: existing?.ticker ?? "",
     currency: (existing?.currency ?? "EUR") as CurrencyCode,
@@ -36,19 +120,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
   }
 
   function handleSave() {
-    const errs: Record<string, string> = {};
-    if (!form.name.trim()) errs.name = "Required";
-    if (!form.ticker.trim()) errs.ticker = "Required";
-    if (!form.currentPrice || isNaN(parseFloat(form.currentPrice))) errs.currentPrice = "Required";
-
-    if (!existing) {
-      if (!form.initShares || isNaN(parseFloat(form.initShares)) || parseFloat(form.initShares) <= 0) {
-        errs.initShares = "Required";
-      }
-      if (!form.initPrice || isNaN(parseFloat(form.initPrice)) || parseFloat(form.initPrice) <= 0) {
-        errs.initPrice = "Required";
-      }
-    }
+    const errs = validateHoldingForm(form, existing);
 
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
@@ -152,49 +224,12 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
       </div>
 
       {!existing && (
-        <div className="border-t border-dashed border-slate-200 pt-4">
-          <p className="text-xs font-semibold text-slate-600 mb-3">Initial Buy Transaction</p>
-          <div className="grid grid-cols-3 gap-3">
-            <FormField label="Shares" required error={errors.initShares}>
-              <TextInput
-                type="number"
-                step="0.0001"
-                value={form.initShares}
-                onChange={(value) => set("initShares", value)}
-                error={Boolean(errors.initShares)}
-                placeholder="50"
-              />
-            </FormField>
-            <FormField label="Buy Price" required error={errors.initPrice}>
-              <TextInput
-                type="number"
-                step="0.01"
-                value={form.initPrice}
-                onChange={(value) => set("initPrice", value)}
-                error={Boolean(errors.initPrice)}
-                placeholder="98.20"
-              />
-            </FormField>
-            <FormField label="Date">
-              <input
-                type="date"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                value={form.initDate}
-                onChange={(event) => set("initDate", event.target.value)}
-              />
-            </FormField>
-          </div>
-
-          {form.initShares && form.initPrice && (
-            <div className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-2">
-              <Check size={13} className="text-emerald-600" />
-              <span className="text-xs text-emerald-700">
-                Initial position: {form.initShares} shares @ {form.currency} {form.initPrice} = {form.currency}{" "}
-                {(parseFloat(form.initShares) * parseFloat(form.initPrice)).toFixed(2)}
-              </span>
-            </div>
-          )}
-        </div>
+        <InitialBuySection
+          form={form}
+          errors={errors}
+          currency={form.currency}
+          onChange={set}
+        />
       )}
     </Modal>
   );

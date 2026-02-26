@@ -35,7 +35,7 @@ function SignInModal({ onClose, onSwitchToSignUp }: { onClose: () => void; onSwi
     setLoading(true);
     try {
       await signIn(email, password);
-      navigate("/");
+      void navigate("/");
     } catch (err: any) {
       setErrors({ email: err?.response?.data?.error || "Sign in failed" });
     } finally {
@@ -83,7 +83,7 @@ function SignInModal({ onClose, onSwitchToSignUp }: { onClose: () => void; onSwi
                 className={`w-full rounded-xl border px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.password ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-slate-50"}`}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: "" })); }}
-                onKeyDown={(e) => e.key === "Enter" && handleSignIn()}
+                onKeyDown={(e) => { if (e.key === "Enter") void handleSignIn(); }}
               />
               <button onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -93,7 +93,7 @@ function SignInModal({ onClose, onSwitchToSignUp }: { onClose: () => void; onSwi
           </div>
 
           <button
-            onClick={handleSignIn}
+            onClick={() => { void handleSignIn(); }}
             disabled={loading}
             className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2 mt-2"
           >
@@ -149,7 +149,7 @@ function SignUpModal({ onClose, onSwitchToSignIn }: { onClose: () => void; onSwi
     setLoading(true);
     try {
       await signUp(form.name, form.email, form.password);
-      navigate("/");
+      void navigate("/");
     } catch (err: any) {
       setErrors({ email: err?.response?.data?.error || "Sign up failed" });
     } finally {
@@ -240,7 +240,7 @@ function SignUpModal({ onClose, onSwitchToSignIn }: { onClose: () => void; onSwi
                 className={`w-full rounded-xl border px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.confirm ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-slate-50"}`}
                 value={form.confirm}
                 onChange={(e) => set("confirm", e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSignUp()}
+                onKeyDown={(e) => { if (e.key === "Enter") void handleSignUp(); }}
               />
               <button onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                 {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -250,7 +250,7 @@ function SignUpModal({ onClose, onSwitchToSignIn }: { onClose: () => void; onSwi
           </div>
 
           <button
-            onClick={handleSignUp}
+            onClick={() => { void handleSignUp(); }}
             disabled={loading}
             className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2 mt-2"
           >

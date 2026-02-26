@@ -78,6 +78,17 @@ type DerivedAllocation = {
   snapshotId: number;
 };
 
+function computeSharesByHolding(txns: Array<{ holdingId: number; shares: unknown; type: string }>): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const txn of txns) {
+    const existing = map.get(txn.holdingId) ?? 0;
+    const shares = toNumber(txn.shares);
+    if (txn.type === "buy") map.set(txn.holdingId, existing + shares);
+    else if (txn.type === "sell") map.set(txn.holdingId, existing - shares);
+  }
+  return map;
+}
+
 async function buildDerivedAllocations(userId: number): Promise<DerivedAllocation[]> {
   const [rates, userSavings, userHoldings, userHoldingTxns, userProperties, userPensions, userMortgages] =
     await Promise.all([
@@ -95,21 +106,10 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
     0,
   );
 
-  const sharesByHolding = new Map<number, number>();
-  for (const txn of userHoldingTxns) {
-    const existing = sharesByHolding.get(txn.holdingId) ?? 0;
-    const shares = toNumber(txn.shares);
-    if (txn.type === "buy") {
-      sharesByHolding.set(txn.holdingId, existing + shares);
-    } else if (txn.type === "sell") {
-      sharesByHolding.set(txn.holdingId, existing - shares);
-    }
-  }
-
+  const sharesByHolding = computeSharesByHolding(userHoldingTxns);
   const brokerageTotal = userHoldings.reduce((sum, holding) => {
     const shares = Math.max(0, sharesByHolding.get(holding.id) ?? 0);
-    const value = shares * toNumber(holding.currentPrice);
-    return sum + convertToBase(value, holding.currency, rates);
+    return sum + convertToBase(shares * toNumber(holding.currentPrice), holding.currency, rates);
   }, 0);
 
   const mortgageBalanceById = new Map<number, number>();
@@ -118,11 +118,8 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
   }
 
   const propertyEquityTotal = userProperties.reduce((sum, property) => {
-    const linkedBalance = property.mortgageId
-      ? mortgageBalanceById.get(property.mortgageId)
-      : undefined;
-    const mortgageBalance = linkedBalance ?? toNumber(property.mortgage);
-    const equity = toNumber(property.currentValue) - mortgageBalance;
+    const linkedBalance = property.mortgageId ? mortgageBalanceById.get(property.mortgageId) : undefined;
+    const equity = toNumber(property.currentValue) - (linkedBalance ?? toNumber(property.mortgage));
     return sum + convertToBase(equity, property.currency, rates);
   }, 0);
 
@@ -182,18 +179,48 @@ app.get("/allocations", async (c) => {
   return c.json({ data });
 });
 
+type ActivityRow = { note?: string | null; type: string; amount: unknown; date: string };
+
+function mapSavingsTxn(row: ActivityRow & { type: string }) {
+  if (row.type === "interest") {
+    return { name: row.note || "Savings interest", type: "income" as const, amount: Math.abs(toNumber(row.amount)), date: row.date, category: "Savings" };
+  }
+  const isDeposit = row.type === "deposit";
+  return { name: row.note || (isDeposit ? "Savings deposit" : "Savings withdrawal"), type: "transfer" as const, amount: isDeposit ? -Math.abs(toNumber(row.amount)) : Math.abs(toNumber(row.amount)), date: row.date, category: "Savings" };
+}
+
+function mapHoldingTxn(row: ActivityRow & { shares: unknown; price: unknown }) {
+  if (row.type === "dividend") {
+    return { name: row.note || "Dividend", type: "income" as const, amount: Math.abs(toNumber(row.price)), date: row.date, category: "Investment" };
+  }
+  const gross = toNumber(row.shares) * toNumber(row.price);
+  const isBuy = row.type === "buy";
+  return { name: row.note || (isBuy ? "Investment buy" : "Investment sell"), type: "transfer" as const, amount: isBuy ? -Math.abs(gross) : Math.abs(gross), date: row.date, category: "Investment" };
+}
+
+function mapPropertyTxn(row: ActivityRow) {
+  const isIncome = row.type === "rent_income";
+  return { name: row.note || (isIncome ? "Rent income" : "Property expense"), type: isIncome ? ("income" as const) : ("expense" as const), amount: isIncome ? Math.abs(toNumber(row.amount)) : -Math.abs(toNumber(row.amount)), date: row.date, category: "Property" };
+}
+
+function buildActivityList(p: any[], b: any[], s: any[], h: any[], m: any[], pe: any[], pr: any[]) {
+  return [
+    ...p.map((row) => ({ name: `Salary ${row.month}`, type: "income" as const, amount: toNumber(row.net) + toNumber(row.bonus), date: row.date, category: "Salary" })),
+    ...b.map((row) => ({ name: row.description, type: "expense" as const, amount: -Math.abs(toNumber(row.amount)), date: row.date, category: "Budget" })),
+    ...s.map(mapSavingsTxn),
+    ...h.map(mapHoldingTxn),
+    ...m.filter((row) => row.type === "repayment").map((row) => ({ name: row.note || "Mortgage repayment", type: "expense" as const, amount: -Math.abs(toNumber(row.amount)), date: row.date, category: "Mortgage" })),
+    ...pe.map((row) => ({ name: row.note || "Pension contribution", type: row.type === "fee" ? ("expense" as const) : ("transfer" as const), amount: -Math.abs(toNumber(row.amount)), date: row.date, category: "Pension" })),
+    ...pr.filter((row) => row.type === "rent_income" || row.type === "expense").map(mapPropertyTxn),
+  ]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 20)
+    .map((row, index) => ({ id: index + 1, ...row }));
+}
+
 app.get("/transactions", async (c) => {
   const user = getAuthUser(c);
-
-  const [
-    userPayslips,
-    userBudgetTxns,
-    userSavingsTxns,
-    userHoldingTxns,
-    userMortgageTxns,
-    userPensionTxns,
-    userPropertyTxns,
-  ] = await Promise.all([
+  const [p, b, s, h, m, pe, pr] = await Promise.all([
     db.select().from(payslips).where(eq(payslips.userId, user.id)),
     db.select().from(budgetTransactions).where(eq(budgetTransactions.userId, user.id)),
     db.select().from(savingsTransactions).where(eq(savingsTransactions.userId, user.id)),
@@ -202,96 +229,7 @@ app.get("/transactions", async (c) => {
     db.select().from(pensionTransactions).where(eq(pensionTransactions.userId, user.id)),
     db.select().from(propertyTransactions).where(eq(propertyTransactions.userId, user.id)),
   ]);
-
-  const activity = [
-    ...userPayslips.map((row) => ({
-      name: `Salary ${row.month}`,
-      type: "income" as const,
-      amount: toNumber(row.net) + toNumber(row.bonus),
-      date: row.date,
-      category: "Salary",
-    })),
-    ...userBudgetTxns.map((row) => ({
-      name: row.description,
-      type: "expense" as const,
-      amount: -Math.abs(toNumber(row.amount)),
-      date: row.date,
-      category: "Budget",
-    })),
-    ...userSavingsTxns.map((row) => {
-      if (row.type === "interest") {
-        return {
-          name: row.note || "Savings interest",
-          type: "income" as const,
-          amount: Math.abs(toNumber(row.amount)),
-          date: row.date,
-          category: "Savings",
-        };
-      }
-      const isDeposit = row.type === "deposit";
-      return {
-        name: row.note || (isDeposit ? "Savings deposit" : "Savings withdrawal"),
-        type: "transfer" as const,
-        amount: isDeposit ? -Math.abs(toNumber(row.amount)) : Math.abs(toNumber(row.amount)),
-        date: row.date,
-        category: "Savings",
-      };
-    }),
-    ...userHoldingTxns.map((row) => {
-      if (row.type === "dividend") {
-        return {
-          name: row.note || "Dividend",
-          type: "income" as const,
-          amount: Math.abs(toNumber(row.price)),
-          date: row.date,
-          category: "Investment",
-        };
-      }
-
-      const gross = toNumber(row.shares) * toNumber(row.price);
-      const isBuy = row.type === "buy";
-      return {
-        name: row.note || (isBuy ? "Investment buy" : "Investment sell"),
-        type: "transfer" as const,
-        amount: isBuy ? -Math.abs(gross) : Math.abs(gross),
-        date: row.date,
-        category: "Investment",
-      };
-    }),
-    ...userMortgageTxns
-      .filter((row) => row.type === "repayment")
-      .map((row) => ({
-        name: row.note || "Mortgage repayment",
-        type: "expense" as const,
-        amount: -Math.abs(toNumber(row.amount)),
-        date: row.date,
-        category: "Mortgage",
-      })),
-    ...userPensionTxns.map((row) => ({
-      name: row.note || "Pension contribution",
-      type: row.type === "fee" ? ("expense" as const) : ("transfer" as const),
-      amount: -Math.abs(toNumber(row.amount)),
-      date: row.date,
-      category: "Pension",
-    })),
-    ...userPropertyTxns
-      .filter((row) => row.type === "rent_income" || row.type === "expense")
-      .map((row) => {
-        const isIncome = row.type === "rent_income";
-        return {
-          name: row.note || (isIncome ? "Rent income" : "Property expense"),
-          type: isIncome ? ("income" as const) : ("expense" as const),
-          amount: isIncome ? Math.abs(toNumber(row.amount)) : -Math.abs(toNumber(row.amount)),
-          date: row.date,
-          category: "Property",
-        };
-      }),
-  ]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 20)
-    .map((row, index) => ({ id: index + 1, ...row }));
-
-  return c.json({ data: activity });
+  return c.json({ data: buildActivityList(p, b, s, h, m, pe, pr) });
 });
 
 export default app;

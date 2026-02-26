@@ -20,6 +20,37 @@ function parseOptionalId(value: unknown): number | null | "invalid" {
   return parsed;
 }
 
+type LinkedProperty = { id: number; address: string; currency: string; currentValue: unknown; mortgageId: number | null };
+
+function resolveNextPropertyId(raw: unknown, currentId: number | null): { ok: true; id: number | null } | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true, id: currentId };
+  const parsed = parseOptionalId(raw);
+  if (parsed === "invalid") return { ok: false, error: "Invalid linkedPropertyId" };
+  if (parsed === null) return { ok: false, error: "Mortgage must be linked to a property" };
+  return { ok: true, id: parsed };
+}
+
+async function fetchLinkedProperty(userId: number, propertyId: number, mortgageId: number): Promise<{ ok: true; property: LinkedProperty } | { ok: false; error: string; status: 404 | 409 }> {
+  const [property] = await db
+    .select({ id: properties.id, address: properties.address, currency: properties.currency, currentValue: properties.currentValue, mortgageId: properties.mortgageId })
+    .from(properties)
+    .where(and(eq(properties.id, propertyId), eq(properties.userId, userId)));
+  if (!property) return { ok: false, error: "Property not found", status: 404 };
+  if (property.mortgageId != null && property.mortgageId !== mortgageId) {
+    return { ok: false, error: "Property already has a linked mortgage", status: 409 };
+  }
+  return { ok: true, property };
+}
+
+async function syncLinkedProperty(userId: number, prevId: number | null, nextId: number | null, mortgageId: number, balance: unknown) {
+  if (prevId != null && prevId !== nextId) {
+    await db.update(properties).set({ mortgageId: null, mortgage: 0 } as any).where(and(eq(properties.id, prevId), eq(properties.userId, userId)));
+  }
+  if (nextId != null) {
+    await db.update(properties).set({ mortgageId, mortgage: balance } as any).where(and(eq(properties.id, nextId), eq(properties.userId, userId)));
+  }
+}
+
 // ── Mortgages ────────────────────────────────────────────────────────────────
 
 app.get("/", async (c) => {
@@ -89,84 +120,33 @@ app.patch("/:id", async (c) => {
   const body = await c.req.json();
   const { userId: _ignoredUserId, linkedPropertyId: rawLinkedPropertyId, ...safeBody } = body ?? {};
 
-  const [existingMortgage] = await db
-    .select({ id: mortgages.id })
-    .from(mortgages)
-    .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)));
+  const [existingMortgage] = await db.select({ id: mortgages.id }).from(mortgages).where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)));
   if (!existingMortgage) return c.json({ error: "Mortgage not found" }, 404);
 
-  const [currentLinkedProperty] = await db
-    .select({ id: properties.id })
-    .from(properties)
-    .where(and(eq(properties.userId, user.id), eq(properties.mortgageId, id)));
+  const [currentLinkedProperty] = await db.select({ id: properties.id }).from(properties).where(and(eq(properties.userId, user.id), eq(properties.mortgageId, id)));
 
-  let nextLinkedPropertyId = currentLinkedProperty?.id ?? null;
-  if (rawLinkedPropertyId !== undefined) {
-    const parsedLinkedPropertyId = parseOptionalId(rawLinkedPropertyId);
-    if (parsedLinkedPropertyId === "invalid") return c.json({ error: "Invalid linkedPropertyId" }, 400);
-    if (parsedLinkedPropertyId === null) return c.json({ error: "Mortgage must be linked to a property" }, 400);
-    nextLinkedPropertyId = parsedLinkedPropertyId;
-  }
+  const nextIdResult = resolveNextPropertyId(rawLinkedPropertyId, currentLinkedProperty?.id ?? null);
+  if (!nextIdResult.ok) return c.json({ error: nextIdResult.error }, 400);
+  const nextLinkedPropertyId = nextIdResult.id;
 
-  let nextLinkedProperty: {
-    id: number;
-    address: string;
-    currency: string;
-    currentValue: unknown;
-    mortgageId: number | null;
-  } | null = null;
-
+  let nextLinkedProperty: LinkedProperty | null = null;
   if (nextLinkedPropertyId != null) {
-    const [property] = await db
-      .select({
-        id: properties.id,
-        address: properties.address,
-        currency: properties.currency,
-        currentValue: properties.currentValue,
-        mortgageId: properties.mortgageId,
-      })
-      .from(properties)
-      .where(and(eq(properties.id, nextLinkedPropertyId), eq(properties.userId, user.id)));
-    if (!property) return c.json({ error: "Property not found" }, 404);
-    if (property.mortgageId != null && property.mortgageId !== id) {
-      return c.json({ error: "Property already has a linked mortgage" }, 409);
-    }
-    nextLinkedProperty = property;
+    const result = await fetchLinkedProperty(user.id, nextLinkedPropertyId, id);
+    if (!result.ok) return c.json({ error: result.error }, result.status);
+    nextLinkedProperty = result.property;
   }
 
   const updates: Record<string, unknown> = { ...safeBody };
   if (nextLinkedProperty) {
     updates.propertyAddress = nextLinkedProperty.address;
     updates.currency = nextLinkedProperty.currency;
-    if (updates.propertyValue === undefined) {
-      updates.propertyValue = nextLinkedProperty.currentValue;
-    }
+    if (updates.propertyValue === undefined) updates.propertyValue = nextLinkedProperty.currentValue;
   }
 
-  const [data] = await db
-    .update(mortgages)
-    .set(updates as any)
-    .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
-    .returning();
+  const [data] = await db.update(mortgages).set(updates as any).where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id))).returning();
   if (!data) return c.json({ error: "Mortgage not found" }, 404);
 
-  if (currentLinkedProperty && currentLinkedProperty.id !== nextLinkedPropertyId) {
-    await db
-      .update(properties)
-      .set({ mortgageId: null, mortgage: 0 } as any)
-      .where(and(eq(properties.id, currentLinkedProperty.id), eq(properties.userId, user.id)));
-  }
-
-  if (nextLinkedPropertyId != null) {
-    await db
-      .update(properties)
-      .set({
-        mortgageId: id,
-        mortgage: updates.outstandingBalance ?? data.outstandingBalance,
-      } as any)
-      .where(and(eq(properties.id, nextLinkedPropertyId), eq(properties.userId, user.id)));
-  }
-
+  await syncLinkedProperty(user.id, currentLinkedProperty?.id ?? null, nextLinkedPropertyId, id, updates.outstandingBalance ?? data.outstandingBalance);
   return c.json({ data });
 });
 

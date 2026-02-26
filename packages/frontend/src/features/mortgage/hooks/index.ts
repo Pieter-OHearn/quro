@@ -74,9 +74,9 @@ export function useCreateMortgage() {
       return normalizeMortgage(data.data as Mortgage);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mortgages"] });
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["mortgages"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -89,9 +89,9 @@ export function useUpdateMortgage() {
       return normalizeMortgage(data.data as Mortgage);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mortgages"] });
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["mortgages"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -103,9 +103,9 @@ export function useDeleteMortgage() {
       await api.delete(`/api/mortgages/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mortgages"] });
-      qc.invalidateQueries({ queryKey: ["investments"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["mortgages"] });
+      void qc.invalidateQueries({ queryKey: ["investments"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -118,8 +118,8 @@ export function useCreateMortgageTransaction() {
       return normalizeMortgageTransaction(data.data as MortgageTransaction);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mortgages"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["mortgages"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -131,8 +131,8 @@ export function useDeleteMortgageTransaction() {
       await api.delete(`/api/mortgages/transactions/${id}`);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["mortgages"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      void qc.invalidateQueries({ queryKey: ["mortgages"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

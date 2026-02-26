@@ -61,6 +61,278 @@ const EMPTY_POSITION: Position = {
   totalDividends: 0,
 };
 
+function buildHoldingTxnMap(datedHoldingTxns: DatedHoldingTransaction[]) {
+  const map = new Map<number, DatedHoldingTransaction[]>();
+  for (const transaction of datedHoldingTxns) {
+    const bucket = map.get(transaction.holdingId);
+    if (bucket) bucket.push(transaction);
+    else map.set(transaction.holdingId, [transaction]);
+  }
+  for (const txns of map.values()) {
+    txns.sort((a, b) => a.timestamp - b.timestamp);
+  }
+  return map;
+}
+
+function buildPropertyTxnMap(datedPropertyTxns: DatedPropertyTransaction[]) {
+  const map = new Map<number, DatedPropertyTransaction[]>();
+  for (const transaction of datedPropertyTxns) {
+    const bucket = map.get(transaction.propertyId);
+    if (bucket) bucket.push(transaction);
+    else map.set(transaction.propertyId, [transaction]);
+  }
+  for (const txns of map.values()) {
+    txns.sort((a, b) => a.timestamp - b.timestamp);
+  }
+  return map;
+}
+
+function computeBrokerageForMonth(
+  holdings: Holding[],
+  holdingTxnMap: Map<number, DatedHoldingTransaction[]>,
+  cutoff: number,
+  convertToBase: (value: number, currency: string) => number,
+) {
+  return holdings.reduce((sum, holding) => {
+    const txns = holdingTxnMap.get(holding.id) ?? [];
+    let shares = 0;
+    let dividends = 0;
+
+    for (const transaction of txns) {
+      if (transaction.timestamp > cutoff) break;
+      const txnShares = Number(transaction.shares ?? 0);
+      if (transaction.type === "buy" && txnShares > 0) {
+        shares += txnShares;
+      } else if (transaction.type === "sell" && txnShares > 0) {
+        shares = Math.max(0, shares - txnShares);
+      } else if (transaction.type === "dividend") {
+        dividends += transaction.price;
+      }
+    }
+
+    const nativeValue = Math.max(0, shares) * holding.currentPrice + dividends;
+    return sum + convertToBase(nativeValue, holding.currency);
+  }, 0);
+}
+
+function computePropertyEquityForMonth(
+  properties: Property[],
+  propertyTxnMap: Map<number, DatedPropertyTransaction[]>,
+  cutoff: number,
+  mortgageById: Map<number, Mortgage>,
+  convertToBase: (value: number, currency: string) => number,
+) {
+  return properties.reduce((sum, property) => {
+    const txns = propertyTxnMap.get(property.id) ?? [];
+    const hasValuationTxn = txns.some((transaction) => transaction.type === "valuation");
+    let value = hasValuationTxn ? property.purchasePrice : property.currentValue;
+
+    for (const transaction of txns) {
+      if (transaction.timestamp > cutoff) break;
+      if (transaction.type === "valuation") value = transaction.amount;
+    }
+
+    let mortgage = getPropertyMortgageBalance(property, mortgageById);
+    for (const transaction of txns) {
+      if (transaction.timestamp <= cutoff || transaction.type !== "repayment") continue;
+      const principal = transaction.principal ?? Math.max(0, transaction.amount - (transaction.interest ?? 0));
+      mortgage += principal;
+    }
+
+    return sum + convertToBase(value - mortgage, property.currency);
+  }, 0);
+}
+
+function computePortfolioHistory(
+  holdings: Holding[],
+  holdingTxns: HoldingTransaction[],
+  properties: Property[],
+  propertyTxns: PropertyTransaction[],
+  mortgageById: Map<number, Mortgage>,
+  convertToBase: (value: number, currency: string) => number,
+) {
+  const datedHoldingTxns: DatedHoldingTransaction[] = holdingTxns
+    .map((transaction) => ({ ...transaction, timestamp: toUtcTimestamp(transaction.date) }))
+    .filter((transaction) => Number.isFinite(transaction.timestamp));
+  const datedPropertyTxns: DatedPropertyTransaction[] = propertyTxns
+    .map((transaction) => ({ ...transaction, timestamp: toUtcTimestamp(transaction.date) }))
+    .filter((transaction) => Number.isFinite(transaction.timestamp));
+
+  const allTimestamps = [
+    ...datedHoldingTxns.map((transaction) => transaction.timestamp),
+    ...datedPropertyTxns.map((transaction) => transaction.timestamp),
+  ];
+
+  if (allTimestamps.length === 0) return [];
+
+  const currentMonthStart = monthStartUtc(Date.now());
+  const earliestMonth = monthStartUtc(Math.min(...allTimestamps));
+  const oldestVisibleMonth = addMonthsUtc(currentMonthStart, -11);
+  const firstMonth = Math.max(earliestMonth, oldestVisibleMonth);
+
+  const holdingTxnMap = buildHoldingTxnMap(datedHoldingTxns);
+  const propertyTxnMap = buildPropertyTxnMap(datedPropertyTxns);
+
+  const months: number[] = [];
+  for (let month = firstMonth; month <= currentMonthStart; month = addMonthsUtc(month, 1)) {
+    months.push(month);
+  }
+
+  return months.map((month) => {
+    const cutoff = monthEndUtc(month);
+    const brokerage = computeBrokerageForMonth(holdings, holdingTxnMap, cutoff, convertToBase);
+    const propertyEquity = computePropertyEquityForMonth(properties, propertyTxnMap, cutoff, mortgageById, convertToBase);
+    return { month: formatMonthLabel(month), brokerage, propertyEquity };
+  });
+}
+
+function computeTotalRental(
+  propertyTxns: PropertyTransaction[],
+  properties: Property[],
+  convertToBase: (value: number, currency: string) => number,
+) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const rentalTxns = propertyTxns.filter(
+    (transaction) => transaction.type === "rent_income" && transaction.date.startsWith(currentMonth),
+  );
+
+  if (rentalTxns.length === 0) {
+    return properties.reduce(
+      (sum, property) => sum + convertToBase(property.monthlyRent, property.currency),
+      0,
+    );
+  }
+
+  const propertyById = new Map(properties.map((property) => [property.id, property]));
+  return rentalTxns.reduce((sum, transaction) => {
+    const property = propertyById.get(transaction.propertyId);
+    return sum + convertToBase(transaction.amount, property?.currency ?? "EUR");
+  }, 0);
+}
+
+type InvestmentModalsProps = {
+  showAddHolding: boolean;
+  editingHolding: Holding | null;
+  addTxnForHolding: Holding | null;
+  updatingProperty: Property | null;
+  showAddProperty: boolean;
+  addTxnForProperty: Property | null;
+  positions: Record<number, Position>;
+  mortgageById: Map<number, Mortgage>;
+  onCloseEditHolding: () => void;
+  onSaveHolding: (holding: Holding, initialBuy?: { shares: number; price: number; date: string }) => void;
+  onDeleteHolding: (id: number) => void;
+  onCloseAddHoldingTxn: () => void;
+  onSaveHoldingTxn: (t: Omit<HoldingTransaction, "id">) => void;
+  onCloseUpdateProperty: () => void;
+  onSaveUpdateProperty: (id: number, value: number, rent: number) => void;
+  onCloseAddProperty: () => void;
+  onSaveAddProperty: (p: Omit<Property, "id">) => void;
+  onCloseAddPropertyTxn: () => void;
+  onSavePropertyTxn: (t: Omit<PropertyTransaction, "id">) => void;
+};
+
+function InvestmentModals({
+  showAddHolding,
+  editingHolding,
+  addTxnForHolding,
+  updatingProperty,
+  showAddProperty,
+  addTxnForProperty,
+  positions,
+  mortgageById,
+  onCloseEditHolding,
+  onSaveHolding,
+  onDeleteHolding,
+  onCloseAddHoldingTxn,
+  onSaveHoldingTxn,
+  onCloseUpdateProperty,
+  onSaveUpdateProperty,
+  onCloseAddProperty,
+  onSaveAddProperty,
+  onCloseAddPropertyTxn,
+  onSavePropertyTxn,
+}: InvestmentModalsProps) {
+  return (
+    <>
+      {(showAddHolding || editingHolding) && (
+        <EditHoldingModal
+          existing={editingHolding ?? undefined}
+          onClose={onCloseEditHolding}
+          onSave={onSaveHolding}
+          onDelete={onDeleteHolding}
+        />
+      )}
+
+      {addTxnForHolding && (
+        <AddHoldingTxnModal
+          holding={addTxnForHolding}
+          currentPosition={positions[addTxnForHolding.id] ?? EMPTY_POSITION}
+          onClose={onCloseAddHoldingTxn}
+          onSave={onSaveHoldingTxn}
+        />
+      )}
+
+      {updatingProperty && (
+        <UpdatePropertyModal
+          property={updatingProperty}
+          mortgageBalance={getPropertyMortgageBalance(updatingProperty, mortgageById)}
+          onClose={onCloseUpdateProperty}
+          onSave={onSaveUpdateProperty}
+        />
+      )}
+
+      {showAddProperty && (
+        <AddPropertyModal
+          onClose={onCloseAddProperty}
+          onSave={onSaveAddProperty}
+        />
+      )}
+
+      {addTxnForProperty && (
+        <AddPropertyTxnModal
+          property={addTxnForProperty}
+          mortgageBalance={getPropertyMortgageBalance(addTxnForProperty, mortgageById)}
+          onClose={onCloseAddPropertyTxn}
+          onSave={onSavePropertyTxn}
+        />
+      )}
+    </>
+  );
+}
+
+type TabSwitcherProps = {
+  tab: Tab;
+  onSetTab: (tab: Tab) => void;
+};
+
+function TabSwitcher({ tab, onSetTab }: TabSwitcherProps) {
+  return (
+    <div className="flex border-b border-slate-100">
+      <button
+        onClick={() => onSetTab("brokerage")}
+        className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors ${
+          tab === "brokerage"
+            ? "text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40"
+            : "text-slate-500 hover:text-slate-700"
+        }`}
+      >
+        <BarChart2 size={16} /> Brokerage Holdings
+      </button>
+      <button
+        onClick={() => onSetTab("property")}
+        className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors ${
+          tab === "property"
+            ? "text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40"
+            : "text-slate-500 hover:text-slate-700"
+        }`}
+      >
+        <Building2 size={16} /> Property Portfolio
+      </button>
+    </div>
+  );
+}
+
 export function Investments() {
   const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
 
@@ -154,123 +426,15 @@ export function Investments() {
     return sum + convertToBase(equity, property.currency);
   }, 0);
 
-  const totalRentalBase = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const rentalTxns = propertyTxns.filter(
-      (transaction) => transaction.type === "rent_income" && transaction.date.startsWith(currentMonth),
-    );
+  const totalRentalBase = useMemo(
+    () => computeTotalRental(propertyTxns, properties, convertToBase),
+    [propertyTxns, properties, convertToBase],
+  );
 
-    if (rentalTxns.length === 0) {
-      return properties.reduce(
-        (sum, property) => sum + convertToBase(property.monthlyRent, property.currency),
-        0,
-      );
-    }
-
-    const propertyById = new Map(properties.map((property) => [property.id, property]));
-    return rentalTxns.reduce((sum, transaction) => {
-      const property = propertyById.get(transaction.propertyId);
-      return sum + convertToBase(transaction.amount, property?.currency ?? "EUR");
-    }, 0);
-  }, [propertyTxns, properties, convertToBase]);
-
-  const portfolioHistory = useMemo(() => {
-    const datedHoldingTxns: DatedHoldingTransaction[] = holdingTxns
-      .map((transaction) => ({ ...transaction, timestamp: toUtcTimestamp(transaction.date) }))
-      .filter((transaction) => Number.isFinite(transaction.timestamp));
-    const datedPropertyTxns: DatedPropertyTransaction[] = propertyTxns
-      .map((transaction) => ({ ...transaction, timestamp: toUtcTimestamp(transaction.date) }))
-      .filter((transaction) => Number.isFinite(transaction.timestamp));
-
-    const allTimestamps = [
-      ...datedHoldingTxns.map((transaction) => transaction.timestamp),
-      ...datedPropertyTxns.map((transaction) => transaction.timestamp),
-    ];
-
-    if (allTimestamps.length === 0) return [];
-
-    const currentMonthStart = monthStartUtc(Date.now());
-    const earliestMonth = monthStartUtc(Math.min(...allTimestamps));
-    const oldestVisibleMonth = addMonthsUtc(currentMonthStart, -11);
-    const firstMonth = Math.max(earliestMonth, oldestVisibleMonth);
-
-    const holdingTxnMap = new Map<number, DatedHoldingTransaction[]>();
-    for (const transaction of datedHoldingTxns) {
-      const bucket = holdingTxnMap.get(transaction.holdingId);
-      if (bucket) bucket.push(transaction);
-      else holdingTxnMap.set(transaction.holdingId, [transaction]);
-    }
-    for (const txns of holdingTxnMap.values()) {
-      txns.sort((a, b) => a.timestamp - b.timestamp);
-    }
-
-    const propertyTxnMap = new Map<number, DatedPropertyTransaction[]>();
-    for (const transaction of datedPropertyTxns) {
-      const bucket = propertyTxnMap.get(transaction.propertyId);
-      if (bucket) bucket.push(transaction);
-      else propertyTxnMap.set(transaction.propertyId, [transaction]);
-    }
-    for (const txns of propertyTxnMap.values()) {
-      txns.sort((a, b) => a.timestamp - b.timestamp);
-    }
-
-    const months: number[] = [];
-    for (let month = firstMonth; month <= currentMonthStart; month = addMonthsUtc(month, 1)) {
-      months.push(month);
-    }
-
-    return months.map((month) => {
-      const cutoff = monthEndUtc(month);
-
-      const brokerage = holdings.reduce((sum, holding) => {
-        const txns = holdingTxnMap.get(holding.id) ?? [];
-        let shares = 0;
-        let dividends = 0;
-
-        for (const transaction of txns) {
-          if (transaction.timestamp > cutoff) break;
-
-          const txnShares = Number(transaction.shares ?? 0);
-          if (transaction.type === "buy" && txnShares > 0) {
-            shares += txnShares;
-          } else if (transaction.type === "sell" && txnShares > 0) {
-            shares = Math.max(0, shares - txnShares);
-          } else if (transaction.type === "dividend") {
-            dividends += transaction.price;
-          }
-        }
-
-        const nativeValue = Math.max(0, shares) * holding.currentPrice + dividends;
-        return sum + convertToBase(nativeValue, holding.currency);
-      }, 0);
-
-      const propertyEquity = properties.reduce((sum, property) => {
-        const txns = propertyTxnMap.get(property.id) ?? [];
-        const hasValuationTxn = txns.some((transaction) => transaction.type === "valuation");
-        let value = hasValuationTxn ? property.purchasePrice : property.currentValue;
-
-        for (const transaction of txns) {
-          if (transaction.timestamp > cutoff) break;
-          if (transaction.type === "valuation") value = transaction.amount;
-        }
-
-        let mortgage = getPropertyMortgageBalance(property, mortgageById);
-        for (const transaction of txns) {
-          if (transaction.timestamp <= cutoff || transaction.type !== "repayment") continue;
-          const principal = transaction.principal ?? Math.max(0, transaction.amount - (transaction.interest ?? 0));
-          mortgage += principal;
-        }
-
-        return sum + convertToBase(value - mortgage, property.currency);
-      }, 0);
-
-      return {
-        month: formatMonthLabel(month),
-        brokerage,
-        propertyEquity,
-      };
-    });
-  }, [holdings, holdingTxns, properties, propertyTxns, convertToBase, mortgageById]);
+  const portfolioHistory = useMemo(
+    () => computePortfolioHistory(holdings, holdingTxns, properties, propertyTxns, mortgageById, convertToBase),
+    [holdings, holdingTxns, properties, propertyTxns, convertToBase, mortgageById],
+  );
 
   function handleSaveHolding(
     holding: Holding,
@@ -342,51 +506,27 @@ export function Investments() {
 
   return (
     <div className="p-6 space-y-6">
-      {(showAddHolding || editingHolding) && (
-        <EditHoldingModal
-          existing={editingHolding ?? undefined}
-          onClose={() => {
-            setShowAddHolding(false);
-            setEditingHolding(null);
-          }}
-          onSave={handleSaveHolding}
-          onDelete={handleDeleteHolding}
-        />
-      )}
-
-      {addTxnForHolding && (
-        <AddHoldingTxnModal
-          holding={addTxnForHolding}
-          currentPosition={positions[addTxnForHolding.id] ?? EMPTY_POSITION}
-          onClose={() => setAddTxnForHolding(null)}
-          onSave={handleAddHoldingTxn}
-        />
-      )}
-
-      {updatingProperty && (
-        <UpdatePropertyModal
-          property={updatingProperty}
-          mortgageBalance={getPropertyMortgageBalance(updatingProperty, mortgageById)}
-          onClose={() => setUpdatingProperty(null)}
-          onSave={handleUpdateProperty}
-        />
-      )}
-
-      {showAddProperty && (
-        <AddPropertyModal
-          onClose={() => setShowAddProperty(false)}
-          onSave={handleSaveProperty}
-        />
-      )}
-
-      {addTxnForProperty && (
-        <AddPropertyTxnModal
-          property={addTxnForProperty}
-          mortgageBalance={getPropertyMortgageBalance(addTxnForProperty, mortgageById)}
-          onClose={() => setAddTxnForProperty(null)}
-          onSave={handleAddPropertyTxn}
-        />
-      )}
+      <InvestmentModals
+        showAddHolding={showAddHolding}
+        editingHolding={editingHolding}
+        addTxnForHolding={addTxnForHolding}
+        updatingProperty={updatingProperty}
+        showAddProperty={showAddProperty}
+        addTxnForProperty={addTxnForProperty}
+        positions={positions}
+        mortgageById={mortgageById}
+        onCloseEditHolding={() => { setShowAddHolding(false); setEditingHolding(null); }}
+        onSaveHolding={handleSaveHolding}
+        onDeleteHolding={handleDeleteHolding}
+        onCloseAddHoldingTxn={() => setAddTxnForHolding(null)}
+        onSaveHoldingTxn={handleAddHoldingTxn}
+        onCloseUpdateProperty={() => setUpdatingProperty(null)}
+        onSaveUpdateProperty={handleUpdateProperty}
+        onCloseAddProperty={() => setShowAddProperty(false)}
+        onSaveAddProperty={handleSaveProperty}
+        onCloseAddPropertyTxn={() => setAddTxnForProperty(null)}
+        onSavePropertyTxn={handleAddPropertyTxn}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -426,28 +566,7 @@ export function Investments() {
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="flex border-b border-slate-100">
-          <button
-            onClick={() => setTab("brokerage")}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors ${
-              tab === "brokerage"
-                ? "text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <BarChart2 size={16} /> Brokerage Holdings
-          </button>
-          <button
-            onClick={() => setTab("property")}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors ${
-              tab === "property"
-                ? "text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <Building2 size={16} /> Property Portfolio
-          </button>
-        </div>
+        <TabSwitcher tab={tab} onSetTab={setTab} />
 
         {tab === "brokerage" && (
           <BrokerageTab
