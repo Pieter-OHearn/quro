@@ -6,7 +6,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from "recharts";
+} from 'recharts';
 
 type PortfolioPoint = {
   month: string;
@@ -25,7 +25,9 @@ export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartPr
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
       <div className="mb-5">
         <h3 className="font-semibold text-slate-900">Portfolio Performance</h3>
-        <p className="text-xs text-slate-400 mt-0.5">Brokerage + Property equity in {baseCurrency}</p>
+        <p className="text-xs text-slate-400 mt-0.5">
+          Brokerage + Property equity in {baseCurrency}
+        </p>
       </div>
       {data.length > 0 ? (
         <>
@@ -44,12 +46,12 @@ export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartPr
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                tick={{ fontSize: 12, fill: '#94a3b8' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
@@ -57,12 +59,12 @@ export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartPr
               <Tooltip
                 formatter={(value, name) => [
                   fmtBase(Number(value) || 0),
-                  name === "brokerage" ? "Brokerage" : "Property Equity",
+                  name === 'brokerage' ? 'Brokerage' : 'Property Equity',
                 ]}
                 contentStyle={{
-                  borderRadius: "12px",
-                  border: "1px solid #e2e8f0",
-                  fontSize: "12px",
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '12px',
                 }}
               />
               <Area
@@ -72,7 +74,7 @@ export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartPr
                 strokeWidth={3}
                 fill="url(#investmentsPropertyGrad)"
                 dot={false}
-                activeDot={{ r: 4, fill: "#10b981" }}
+                activeDot={{ r: 4, fill: '#10b981' }}
               />
               <Area
                 type="monotone"
@@ -81,7 +83,7 @@ export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartPr
                 strokeWidth={3}
                 fill="url(#investmentsBrokerageGrad)"
                 dot={false}
-                activeDot={{ r: 4, fill: "#6366f1" }}
+                activeDot={{ r: 4, fill: '#6366f1' }}
               />
             </AreaChart>
           </ResponsiveContainer>

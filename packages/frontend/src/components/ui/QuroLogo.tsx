@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId } from 'react';
 
 // ─── Quro Abstract Logo Mark ──────────────────────────────────────────────────
 //
@@ -43,13 +43,13 @@ type LogoColors = {
 
 function getLogoColors(inverted: boolean): LogoColors {
   return {
-    arcStroke:    inverted ? "#0a0f1e" : "white",
-    arcOpacity:   inverted ? 0.88      : 0.92,
+    arcStroke: inverted ? '#0a0f1e' : 'white',
+    arcOpacity: inverted ? 0.88 : 0.92,
     ghostOpacity: 0.06,
-    dotFill:      inverted ? "#6366f1" : "white",
-    dotOpacity:   inverted ? 1         : 0.72,
-    tailA:        inverted ? "#6366f1" : "#818cf8",
-    tailB:        inverted ? "#8b5cf6" : "#c084fc",
+    dotFill: inverted ? '#6366f1' : 'white',
+    dotOpacity: inverted ? 1 : 0.72,
+    tailA: inverted ? '#6366f1' : '#818cf8',
+    tailB: inverted ? '#8b5cf6' : '#c084fc',
   };
 }
 
@@ -59,21 +59,20 @@ function LogoDefs({ id, showBg, tailA, tailB }: LogoDefsProps) {
   return (
     <defs>
       {showBg && (
-        <linearGradient
-          id={`${id}bg`}
-          x1="0" y1="0" x2="64" y2="64"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop offset="0%"   stopColor="#0d1627" />
+        <linearGradient id={`${id}bg`} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0d1627" />
           <stop offset="100%" stopColor="#1b2550" />
         </linearGradient>
       )}
       <linearGradient
         id={`${id}tail`}
-        x1="49.32" y1="42" x2="57" y2="24"
+        x1="49.32"
+        y1="42"
+        x2="57"
+        y2="24"
         gradientUnits="userSpaceOnUse"
       >
-        <stop offset="0%"   stopColor={tailA} />
+        <stop offset="0%" stopColor={tailA} />
         <stop offset="100%" stopColor={tailB} />
       </linearGradient>
     </defs>
@@ -87,7 +86,15 @@ function LogoBody({ id, showBg, colors }: LogoBodyProps) {
   return (
     <>
       {showBg && <rect width="64" height="64" rx="15" fill={`url(#${id}bg)`} />}
-      <circle cx="32" cy="32" r="20" fill="none" stroke={arcStroke} strokeWidth="4.8" strokeOpacity={ghostOpacity} />
+      <circle
+        cx="32"
+        cy="32"
+        r="20"
+        fill="none"
+        stroke={arcStroke}
+        strokeWidth="4.8"
+        strokeOpacity={ghostOpacity}
+      />
       <path
         d="M 37.18 51.32 A 20 20 0 1 1 49.32 42"
         fill="none"
@@ -112,10 +119,10 @@ export function QuroLogo({
   size = 36,
   showBg = true,
   inverted = false,
-  className = "",
+  className = '',
 }: QuroLogoProps) {
   const raw = useId();
-  const id = raw.replace(/:/g, "");
+  const id = raw.replace(/:/g, '');
 
   const colors = getLogoColors(inverted);
   const { tailA, tailB } = colors;

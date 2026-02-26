@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId } from 'react';
 import {
   AreaChart,
   Area,
@@ -7,7 +7,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from "recharts";
+} from 'recharts';
 
 type AreaChartCardProps<T extends Record<string, unknown>> = {
   title: string;
@@ -38,7 +38,16 @@ type ChartContentProps<T extends Record<string, unknown>> = {
 };
 
 function ChartContent<T extends Record<string, unknown>>({
-  data, dataKey, xKey, color, height, formatValue, formatYAxis, strokeWidth, gradientId, title,
+  data,
+  dataKey,
+  xKey,
+  color,
+  height,
+  formatValue,
+  formatYAxis,
+  strokeWidth,
+  gradientId,
+  title,
 }: ChartContentProps<T>) {
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -52,19 +61,21 @@ function ChartContent<T extends Record<string, unknown>>({
         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
         <XAxis
           dataKey={xKey}
-          tick={{ fontSize: 11, fill: "#94a3b8" }}
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "#94a3b8" }}
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(value) => (formatYAxis ? formatYAxis(Number(value)) : `${(Number(value) / 1000).toFixed(0)}k`)}
+          tickFormatter={(value) =>
+            formatYAxis ? formatYAxis(Number(value)) : `${(Number(value) / 1000).toFixed(0)}k`
+          }
         />
         <Tooltip
           formatter={(value: number) => [formatValue(Number(value) || 0), title]}
-          contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+          contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
         />
         <Area
           type="monotone"
@@ -91,10 +102,10 @@ export function AreaChartCard<T extends Record<string, unknown>>({
   formatValue,
   formatYAxis,
   badge,
-  emptyMessage = "No data yet.",
+  emptyMessage = 'No data yet.',
   strokeWidth = 2.5,
 }: AreaChartCardProps<T>) {
-  const gradientId = useId().replace(/:/g, "");
+  const gradientId = useId().replace(/:/g, '');
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">

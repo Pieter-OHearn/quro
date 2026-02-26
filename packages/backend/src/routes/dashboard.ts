@@ -1,6 +1,6 @@
-import { Hono } from "hono";
-import { eq } from "drizzle-orm";
-import { db } from "../db/client";
+import { Hono } from 'hono';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/client';
 import {
   budgetTransactions,
   currencyRates,
@@ -16,23 +16,22 @@ import {
   savingsAccounts,
   savingsTransactions,
   netWorthSnapshots,
-} from "../db/schema";
-import { getAuthUser } from "../lib/authUser";
+} from '../db/schema';
+import { getAuthUser } from '../lib/authUser';
 
 const app = new Hono();
-const BASE_CURRENCY = "EUR";
+const BASE_CURRENCY = 'EUR';
 
 const toNumber = (value: unknown): number => {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
     const parsed = parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
 };
 
-const monthName = (date = new Date()) =>
-  date.toLocaleDateString("en-US", { month: "long" });
+const monthName = (date = new Date()) => date.toLocaleDateString('en-US', { month: 'long' });
 
 const monthOrder: Record<string, number> = {
   january: 0,
@@ -78,28 +77,37 @@ type DerivedAllocation = {
   snapshotId: number;
 };
 
-function computeSharesByHolding(txns: Array<{ holdingId: number; shares: unknown; type: string }>): Map<number, number> {
+function computeSharesByHolding(
+  txns: Array<{ holdingId: number; shares: unknown; type: string }>,
+): Map<number, number> {
   const map = new Map<number, number>();
   for (const txn of txns) {
     const existing = map.get(txn.holdingId) ?? 0;
     const shares = toNumber(txn.shares);
-    if (txn.type === "buy") map.set(txn.holdingId, existing + shares);
-    else if (txn.type === "sell") map.set(txn.holdingId, existing - shares);
+    if (txn.type === 'buy') map.set(txn.holdingId, existing + shares);
+    else if (txn.type === 'sell') map.set(txn.holdingId, existing - shares);
   }
   return map;
 }
 
 async function buildDerivedAllocations(userId: number): Promise<DerivedAllocation[]> {
-  const [rates, userSavings, userHoldings, userHoldingTxns, userProperties, userPensions, userMortgages] =
-    await Promise.all([
-      getRatesToBaseCurrency(),
-      db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, userId)),
-      db.select().from(holdings).where(eq(holdings.userId, userId)),
-      db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-      db.select().from(properties).where(eq(properties.userId, userId)),
-      db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
-      db.select().from(mortgages).where(eq(mortgages.userId, userId)),
-    ]);
+  const [
+    rates,
+    userSavings,
+    userHoldings,
+    userHoldingTxns,
+    userProperties,
+    userPensions,
+    userMortgages,
+  ] = await Promise.all([
+    getRatesToBaseCurrency(),
+    db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, userId)),
+    db.select().from(holdings).where(eq(holdings.userId, userId)),
+    db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
+    db.select().from(properties).where(eq(properties.userId, userId)),
+    db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
+    db.select().from(mortgages).where(eq(mortgages.userId, userId)),
+  ]);
 
   const savingsTotal = userSavings.reduce(
     (sum, account) => sum + convertToBase(toNumber(account.balance), account.currency, rates),
@@ -118,7 +126,9 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
   }
 
   const propertyEquityTotal = userProperties.reduce((sum, property) => {
-    const linkedBalance = property.mortgageId ? mortgageBalanceById.get(property.mortgageId) : undefined;
+    const linkedBalance = property.mortgageId
+      ? mortgageBalanceById.get(property.mortgageId)
+      : undefined;
     const equity = toNumber(property.currentValue) - (linkedBalance ?? toNumber(property.mortgage));
     return sum + convertToBase(equity, property.currency, rates);
   }, 0);
@@ -129,14 +139,14 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
   );
 
   return [
-    { id: 1, name: "Savings", value: savingsTotal, color: "#6366f1", snapshotId: 1 },
-    { id: 2, name: "Brokerage", value: brokerageTotal, color: "#0ea5e9", snapshotId: 1 },
-    { id: 3, name: "Property Equity", value: propertyEquityTotal, color: "#10b981", snapshotId: 1 },
-    { id: 4, name: "Pension", value: pensionTotal, color: "#f59e0b", snapshotId: 1 },
+    { id: 1, name: 'Savings', value: savingsTotal, color: '#6366f1', snapshotId: 1 },
+    { id: 2, name: 'Brokerage', value: brokerageTotal, color: '#0ea5e9', snapshotId: 1 },
+    { id: 3, name: 'Property Equity', value: propertyEquityTotal, color: '#10b981', snapshotId: 1 },
+    { id: 4, name: 'Pension', value: pensionTotal, color: '#f59e0b', snapshotId: 1 },
   ];
 }
 
-app.get("/net-worth", async (c) => {
+app.get('/net-worth', async (c) => {
   const user = getAuthUser(c);
   const [snapshots, allocations] = await Promise.all([
     db.select().from(netWorthSnapshots).where(eq(netWorthSnapshots.userId, user.id)),
@@ -173,7 +183,7 @@ app.get("/net-worth", async (c) => {
   });
 });
 
-app.get("/allocations", async (c) => {
+app.get('/allocations', async (c) => {
   const user = getAuthUser(c);
   const data = await buildDerivedAllocations(user.id);
   return c.json({ data });
@@ -182,43 +192,99 @@ app.get("/allocations", async (c) => {
 type ActivityRow = { note?: string | null; type: string; amount: unknown; date: string };
 
 function mapSavingsTxn(row: ActivityRow & { type: string }) {
-  if (row.type === "interest") {
-    return { name: row.note || "Savings interest", type: "income" as const, amount: Math.abs(toNumber(row.amount)), date: row.date, category: "Savings" };
+  if (row.type === 'interest') {
+    return {
+      name: row.note || 'Savings interest',
+      type: 'income' as const,
+      amount: Math.abs(toNumber(row.amount)),
+      date: row.date,
+      category: 'Savings',
+    };
   }
-  const isDeposit = row.type === "deposit";
-  return { name: row.note || (isDeposit ? "Savings deposit" : "Savings withdrawal"), type: "transfer" as const, amount: isDeposit ? -Math.abs(toNumber(row.amount)) : Math.abs(toNumber(row.amount)), date: row.date, category: "Savings" };
+  const isDeposit = row.type === 'deposit';
+  return {
+    name: row.note || (isDeposit ? 'Savings deposit' : 'Savings withdrawal'),
+    type: 'transfer' as const,
+    amount: isDeposit ? -Math.abs(toNumber(row.amount)) : Math.abs(toNumber(row.amount)),
+    date: row.date,
+    category: 'Savings',
+  };
 }
 
 function mapHoldingTxn(row: ActivityRow & { shares: unknown; price: unknown }) {
-  if (row.type === "dividend") {
-    return { name: row.note || "Dividend", type: "income" as const, amount: Math.abs(toNumber(row.price)), date: row.date, category: "Investment" };
+  if (row.type === 'dividend') {
+    return {
+      name: row.note || 'Dividend',
+      type: 'income' as const,
+      amount: Math.abs(toNumber(row.price)),
+      date: row.date,
+      category: 'Investment',
+    };
   }
   const gross = toNumber(row.shares) * toNumber(row.price);
-  const isBuy = row.type === "buy";
-  return { name: row.note || (isBuy ? "Investment buy" : "Investment sell"), type: "transfer" as const, amount: isBuy ? -Math.abs(gross) : Math.abs(gross), date: row.date, category: "Investment" };
+  const isBuy = row.type === 'buy';
+  return {
+    name: row.note || (isBuy ? 'Investment buy' : 'Investment sell'),
+    type: 'transfer' as const,
+    amount: isBuy ? -Math.abs(gross) : Math.abs(gross),
+    date: row.date,
+    category: 'Investment',
+  };
 }
 
 function mapPropertyTxn(row: ActivityRow) {
-  const isIncome = row.type === "rent_income";
-  return { name: row.note || (isIncome ? "Rent income" : "Property expense"), type: isIncome ? ("income" as const) : ("expense" as const), amount: isIncome ? Math.abs(toNumber(row.amount)) : -Math.abs(toNumber(row.amount)), date: row.date, category: "Property" };
+  const isIncome = row.type === 'rent_income';
+  return {
+    name: row.note || (isIncome ? 'Rent income' : 'Property expense'),
+    type: isIncome ? ('income' as const) : ('expense' as const),
+    amount: isIncome ? Math.abs(toNumber(row.amount)) : -Math.abs(toNumber(row.amount)),
+    date: row.date,
+    category: 'Property',
+  };
 }
 
 function buildActivityList(p: any[], b: any[], s: any[], h: any[], m: any[], pe: any[], pr: any[]) {
   return [
-    ...p.map((row) => ({ name: `Salary ${row.month}`, type: "income" as const, amount: toNumber(row.net) + toNumber(row.bonus), date: row.date, category: "Salary" })),
-    ...b.map((row) => ({ name: row.description, type: "expense" as const, amount: -Math.abs(toNumber(row.amount)), date: row.date, category: "Budget" })),
+    ...p.map((row) => ({
+      name: `Salary ${row.month}`,
+      type: 'income' as const,
+      amount: toNumber(row.net) + toNumber(row.bonus),
+      date: row.date,
+      category: 'Salary',
+    })),
+    ...b.map((row) => ({
+      name: row.description,
+      type: 'expense' as const,
+      amount: -Math.abs(toNumber(row.amount)),
+      date: row.date,
+      category: 'Budget',
+    })),
     ...s.map(mapSavingsTxn),
     ...h.map(mapHoldingTxn),
-    ...m.filter((row) => row.type === "repayment").map((row) => ({ name: row.note || "Mortgage repayment", type: "expense" as const, amount: -Math.abs(toNumber(row.amount)), date: row.date, category: "Mortgage" })),
-    ...pe.map((row) => ({ name: row.note || "Pension contribution", type: row.type === "fee" ? ("expense" as const) : ("transfer" as const), amount: -Math.abs(toNumber(row.amount)), date: row.date, category: "Pension" })),
-    ...pr.filter((row) => row.type === "rent_income" || row.type === "expense").map(mapPropertyTxn),
+    ...m
+      .filter((row) => row.type === 'repayment')
+      .map((row) => ({
+        name: row.note || 'Mortgage repayment',
+        type: 'expense' as const,
+        amount: -Math.abs(toNumber(row.amount)),
+        date: row.date,
+        category: 'Mortgage',
+      })),
+    ...pe.map((row) => ({
+      name: row.note || 'Pension contribution',
+      type: row.type === 'fee' ? ('expense' as const) : ('transfer' as const),
+      amount: -Math.abs(toNumber(row.amount)),
+      date: row.date,
+      category: 'Pension',
+    })),
+    ...pr.filter((row) => row.type === 'rent_income' || row.type === 'expense').map(mapPropertyTxn),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 20)
     .map((row, index) => ({ id: index + 1, ...row }));
 }
 
-app.get("/transactions", async (c) => {
+app.get('/transactions', async (c) => {
   const user = getAuthUser(c);
   const [p, b, s, h, m, pe, pr] = await Promise.all([
     db.select().from(payslips).where(eq(payslips.userId, user.id)),

@@ -1,14 +1,14 @@
-import type {
-  HoldingTransaction,
-  Mortgage,
-  Property,
-  PropertyTransaction,
-} from "@quro/shared";
+import type { HoldingTransaction, Mortgage, Property, PropertyTransaction } from '@quro/shared';
 
-export type HoldingTxnType = "buy" | "sell" | "dividend";
-export type PropertyTxnType = "repayment" | "valuation" | "rent_income" | "expense";
+export type HoldingTxnType = 'buy' | 'sell' | 'dividend';
+export type PropertyTxnType = 'repayment' | 'valuation' | 'rent_income' | 'expense';
 
-const INVESTMENT_PROPERTY_TYPES = new Set(["Buy-to-Let", "Investment", "Holiday Home", "Commercial"]);
+const INVESTMENT_PROPERTY_TYPES = new Set([
+  'Buy-to-Let',
+  'Investment',
+  'Holiday Home',
+  'Commercial',
+]);
 
 export type Position = {
   shares: number;
@@ -17,7 +17,12 @@ export type Position = {
   totalDividends: number;
 };
 
-type PositionState = { shares: number; totalCost: number; realizedGain: number; totalDividends: number };
+type PositionState = {
+  shares: number;
+  totalCost: number;
+  realizedGain: number;
+  totalDividends: number;
+};
 
 function applyBuy(state: PositionState, tShares: number, tPrice: number): void {
   state.totalCost += tShares * tPrice;
@@ -34,11 +39,11 @@ function applySell(state: PositionState, tShares: number, tPrice: number): void 
 function applyTxn(state: PositionState, t: HoldingTransaction): void {
   const tShares = Number(t.shares ?? 0);
   const tPrice = Number(t.price ?? 0);
-  if (t.type === "buy" && tShares > 0) {
+  if (t.type === 'buy' && tShares > 0) {
     applyBuy(state, tShares, tPrice);
-  } else if (t.type === "sell" && tShares > 0) {
+  } else if (t.type === 'sell' && tShares > 0) {
     applySell(state, tShares, tPrice);
-  } else if (t.type === "dividend") {
+  } else if (t.type === 'dividend') {
     state.totalDividends += tPrice;
   }
 }
@@ -85,14 +90,17 @@ export function addMonthsUtc(monthStart: number, months: number): number {
 }
 
 export function formatMonthLabel(monthStart: number): string {
-  return new Date(monthStart).toLocaleDateString("en-US", { month: "short" });
+  return new Date(monthStart).toLocaleDateString('en-US', { month: 'short' });
 }
 
 export function isInvestmentProperty(propertyType: string): boolean {
   return INVESTMENT_PROPERTY_TYPES.has(propertyType);
 }
 
-export function getPropertyMortgageBalance(property: Property, mortgageById: Map<number, Mortgage>): number {
+export function getPropertyMortgageBalance(
+  property: Property,
+  mortgageById: Map<number, Mortgage>,
+): number {
   if (property.mortgageId != null) {
     const linked = mortgageById.get(property.mortgageId);
     if (linked) return linked.outstandingBalance;

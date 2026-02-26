@@ -1,14 +1,8 @@
-import { useState } from "react";
-import { Check, Trash2 } from "lucide-react";
-import { CURRENCY_LIST, type CurrencyCode } from "@/lib/CurrencyContext";
-import {
-  Modal,
-  ModalFooter,
-  FormField,
-  SelectInput,
-  TextInput,
-} from "@/components/ui";
-import type { Holding } from "@quro/shared";
+import { useState } from 'react';
+import { Check, Trash2 } from 'lucide-react';
+import { CURRENCY_LIST, type CurrencyCode } from '@/lib/CurrencyContext';
+import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
+import type { Holding } from '@quro/shared';
 
 type EditHoldingModalProps = {
   existing?: Holding;
@@ -28,18 +22,25 @@ type HoldingForm = {
   initDate: string;
 };
 
-function validateHoldingForm(form: HoldingForm, existing: Holding | undefined): Record<string, string> {
+function validateHoldingForm(
+  form: HoldingForm,
+  existing: Holding | undefined,
+): Record<string, string> {
   const errs: Record<string, string> = {};
-  if (!form.name.trim()) errs.name = "Required";
-  if (!form.ticker.trim()) errs.ticker = "Required";
-  if (!form.currentPrice || isNaN(parseFloat(form.currentPrice))) errs.currentPrice = "Required";
+  if (!form.name.trim()) errs.name = 'Required';
+  if (!form.ticker.trim()) errs.ticker = 'Required';
+  if (!form.currentPrice || isNaN(parseFloat(form.currentPrice))) errs.currentPrice = 'Required';
 
   if (!existing) {
-    if (!form.initShares || isNaN(parseFloat(form.initShares)) || parseFloat(form.initShares) <= 0) {
-      errs.initShares = "Required";
+    if (
+      !form.initShares ||
+      isNaN(parseFloat(form.initShares)) ||
+      parseFloat(form.initShares) <= 0
+    ) {
+      errs.initShares = 'Required';
     }
     if (!form.initPrice || isNaN(parseFloat(form.initPrice)) || parseFloat(form.initPrice) <= 0) {
-      errs.initPrice = "Required";
+      errs.initPrice = 'Required';
     }
   }
 
@@ -63,7 +64,7 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
             type="number"
             step="0.0001"
             value={form.initShares}
-            onChange={(value) => onChange("initShares", value)}
+            onChange={(value) => onChange('initShares', value)}
             error={Boolean(errors.initShares)}
             placeholder="50"
           />
@@ -73,7 +74,7 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
             type="number"
             step="0.01"
             value={form.initPrice}
-            onChange={(value) => onChange("initPrice", value)}
+            onChange={(value) => onChange('initPrice', value)}
             error={Boolean(errors.initPrice)}
             placeholder="98.20"
           />
@@ -83,7 +84,7 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
             type="date"
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
             value={form.initDate}
-            onChange={(event) => onChange("initDate", event.target.value)}
+            onChange={(event) => onChange('initDate', event.target.value)}
           />
         </FormField>
       </div>
@@ -92,7 +93,7 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
         <div className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-2">
           <Check size={13} className="text-emerald-600" />
           <span className="text-xs text-emerald-700">
-            Initial position: {form.initShares} shares @ {currency} {form.initPrice} = {currency}{" "}
+            Initial position: {form.initShares} shares @ {currency} {form.initPrice} = {currency}{' '}
             {(parseFloat(form.initShares) * parseFloat(form.initPrice)).toFixed(2)}
           </span>
         </div>
@@ -103,20 +104,20 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
 
 export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHoldingModalProps) {
   const [form, setForm] = useState<HoldingForm>({
-    name: existing?.name ?? "",
-    ticker: existing?.ticker ?? "",
-    currency: (existing?.currency ?? "EUR") as CurrencyCode,
-    sector: existing?.sector ?? "ETF",
-    currentPrice: existing?.currentPrice.toString() ?? "",
-    initShares: "",
-    initPrice: "",
+    name: existing?.name ?? '',
+    ticker: existing?.ticker ?? '',
+    currency: (existing?.currency ?? 'EUR') as CurrencyCode,
+    sector: existing?.sector ?? 'ETF',
+    currentPrice: existing?.currentPrice.toString() ?? '',
+    initShares: '',
+    initPrice: '',
     initDate: new Date().toISOString().slice(0, 10),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function set(field: string, value: string): void {
     setForm((previous) => ({ ...previous, [field]: value }));
-    setErrors((previous) => ({ ...previous, [field]: "" }));
+    setErrors((previous) => ({ ...previous, [field]: '' }));
   }
 
   function handleSave() {
@@ -133,45 +134,46 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
       ticker: form.ticker.trim().toUpperCase(),
       currentPrice: parseFloat(form.currentPrice),
       currency: form.currency,
-      sector: form.sector || "Other",
+      sector: form.sector || 'Other',
     };
 
     onSave(
       holding,
       !existing
         ? {
-          shares: parseFloat(form.initShares),
-          price: parseFloat(form.initPrice),
-          date: form.initDate,
-        }
+            shares: parseFloat(form.initShares),
+            price: parseFloat(form.initPrice),
+            date: form.initDate,
+          }
         : undefined,
     );
     onClose();
   }
 
-  const deleteButton = existing && onDelete ? (
-    <button
-      onClick={() => {
-        onDelete(existing.id);
-        onClose();
-      }}
-      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-      title="Delete holding"
-    >
-      <Trash2 size={14} />
-    </button>
-  ) : undefined;
+  const deleteButton =
+    existing && onDelete ? (
+      <button
+        onClick={() => {
+          onDelete(existing.id);
+          onClose();
+        }}
+        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
+        title="Delete holding"
+      >
+        <Trash2 size={14} />
+      </button>
+    ) : undefined;
 
   return (
     <Modal
-      title={existing ? "Edit Holding" : "Add Holding"}
-      subtitle={existing ? "Update details" : "Add a stock, ETF or fund"}
+      title={existing ? 'Edit Holding' : 'Add Holding'}
+      subtitle={existing ? 'Update details' : 'Add a stock, ETF or fund'}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel={existing ? "Save Changes" : "Add Holding"}
+          confirmLabel={existing ? 'Save Changes' : 'Add Holding'}
           danger={deleteButton}
         />
       }
@@ -180,7 +182,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
         <FormField label="Security Name" required error={errors.name} className="col-span-2">
           <TextInput
             value={form.name}
-            onChange={(value) => set("name", value)}
+            onChange={(value) => set('name', value)}
             error={Boolean(errors.name)}
             placeholder="e.g. Vanguard FTSE All-World"
           />
@@ -189,7 +191,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
         <FormField label="Ticker" required error={errors.ticker}>
           <TextInput
             value={form.ticker}
-            onChange={(value) => set("ticker", value)}
+            onChange={(value) => set('ticker', value)}
             error={Boolean(errors.ticker)}
             placeholder="VWCE"
           />
@@ -198,7 +200,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
         <FormField label="Sector">
           <TextInput
             value={form.sector}
-            onChange={(value) => set("sector", value)}
+            onChange={(value) => set('sector', value)}
             placeholder="ETF, Tech, Finance..."
           />
         </FormField>
@@ -206,7 +208,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
         <FormField label="Currency">
           <SelectInput
             value={form.currency}
-            onChange={(value) => set("currency", value)}
+            onChange={(value) => set('currency', value)}
             options={CURRENCY_LIST}
           />
         </FormField>
@@ -216,7 +218,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
             type="number"
             step="0.01"
             value={form.currentPrice}
-            onChange={(value) => set("currentPrice", value)}
+            onChange={(value) => set('currentPrice', value)}
             error={Boolean(errors.currentPrice)}
             placeholder="112.50"
           />
@@ -224,12 +226,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
       </div>
 
       {!existing && (
-        <InitialBuySection
-          form={form}
-          errors={errors}
-          currency={form.currency}
-          onChange={set}
-        />
+        <InitialBuySection form={form} errors={errors} currency={form.currency} onChange={set} />
       )}
     </Modal>
   );

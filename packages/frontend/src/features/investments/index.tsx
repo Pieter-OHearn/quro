@@ -1,19 +1,14 @@
-import { useMemo, useState } from "react";
-import {
-  BarChart2,
-  Building2,
-  DollarSign,
-  TrendingUp,
-} from "lucide-react";
-import { LoadingSpinner, StatCard } from "@/components/ui";
-import { useCurrency } from "@/lib/CurrencyContext";
+import { useMemo, useState } from 'react';
+import { BarChart2, Building2, DollarSign, TrendingUp } from 'lucide-react';
+import { LoadingSpinner, StatCard } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
 import type {
   Holding,
   HoldingTransaction,
   Mortgage,
   Property,
   PropertyTransaction,
-} from "@quro/shared";
+} from '@quro/shared';
 import {
   useHoldings,
   useHoldingTransactions,
@@ -29,8 +24,8 @@ import {
   useDeleteProperty,
   useCreatePropertyTransaction,
   useDeletePropertyTransaction,
-} from "./hooks";
-import { useMortgages } from "../mortgage/hooks";
+} from './hooks';
+import { useMortgages } from '../mortgage/hooks';
 import {
   addMonthsUtc,
   computePosition,
@@ -42,17 +37,17 @@ import {
   type DatedHoldingTransaction,
   type DatedPropertyTransaction,
   type Position,
-} from "./utils/position";
-import { AddHoldingTxnModal } from "./components/AddHoldingTxnModal";
-import { EditHoldingModal } from "./components/EditHoldingModal";
-import { AddPropertyTxnModal } from "./components/AddPropertyTxnModal";
-import { AddPropertyModal } from "./components/AddPropertyModal";
-import { UpdatePropertyModal } from "./components/UpdatePropertyModal";
-import { PortfolioChart } from "./components/PortfolioChart";
-import { BrokerageTab } from "./components/BrokerageTab";
-import { PropertyTab } from "./components/PropertyTab";
+} from './utils/position';
+import { AddHoldingTxnModal } from './components/AddHoldingTxnModal';
+import { EditHoldingModal } from './components/EditHoldingModal';
+import { AddPropertyTxnModal } from './components/AddPropertyTxnModal';
+import { AddPropertyModal } from './components/AddPropertyModal';
+import { UpdatePropertyModal } from './components/UpdatePropertyModal';
+import { PortfolioChart } from './components/PortfolioChart';
+import { BrokerageTab } from './components/BrokerageTab';
+import { PropertyTab } from './components/PropertyTab';
 
-type Tab = "brokerage" | "property";
+type Tab = 'brokerage' | 'property';
 
 const EMPTY_POSITION: Position = {
   shares: 0,
@@ -101,11 +96,11 @@ function computeBrokerageForMonth(
     for (const transaction of txns) {
       if (transaction.timestamp > cutoff) break;
       const txnShares = Number(transaction.shares ?? 0);
-      if (transaction.type === "buy" && txnShares > 0) {
+      if (transaction.type === 'buy' && txnShares > 0) {
         shares += txnShares;
-      } else if (transaction.type === "sell" && txnShares > 0) {
+      } else if (transaction.type === 'sell' && txnShares > 0) {
         shares = Math.max(0, shares - txnShares);
-      } else if (transaction.type === "dividend") {
+      } else if (transaction.type === 'dividend') {
         dividends += transaction.price;
       }
     }
@@ -124,18 +119,19 @@ function computePropertyEquityForMonth(
 ) {
   return properties.reduce((sum, property) => {
     const txns = propertyTxnMap.get(property.id) ?? [];
-    const hasValuationTxn = txns.some((transaction) => transaction.type === "valuation");
+    const hasValuationTxn = txns.some((transaction) => transaction.type === 'valuation');
     let value = hasValuationTxn ? property.purchasePrice : property.currentValue;
 
     for (const transaction of txns) {
       if (transaction.timestamp > cutoff) break;
-      if (transaction.type === "valuation") value = transaction.amount;
+      if (transaction.type === 'valuation') value = transaction.amount;
     }
 
     let mortgage = getPropertyMortgageBalance(property, mortgageById);
     for (const transaction of txns) {
-      if (transaction.timestamp <= cutoff || transaction.type !== "repayment") continue;
-      const principal = transaction.principal ?? Math.max(0, transaction.amount - (transaction.interest ?? 0));
+      if (transaction.timestamp <= cutoff || transaction.type !== 'repayment') continue;
+      const principal =
+        transaction.principal ?? Math.max(0, transaction.amount - (transaction.interest ?? 0));
       mortgage += principal;
     }
 
@@ -181,7 +177,13 @@ function computePortfolioHistory(
   return months.map((month) => {
     const cutoff = monthEndUtc(month);
     const brokerage = computeBrokerageForMonth(holdings, holdingTxnMap, cutoff, convertToBase);
-    const propertyEquity = computePropertyEquityForMonth(properties, propertyTxnMap, cutoff, mortgageById, convertToBase);
+    const propertyEquity = computePropertyEquityForMonth(
+      properties,
+      propertyTxnMap,
+      cutoff,
+      mortgageById,
+      convertToBase,
+    );
     return { month: formatMonthLabel(month), brokerage, propertyEquity };
   });
 }
@@ -193,7 +195,8 @@ function computeTotalRental(
 ) {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const rentalTxns = propertyTxns.filter(
-    (transaction) => transaction.type === "rent_income" && transaction.date.startsWith(currentMonth),
+    (transaction) =>
+      transaction.type === 'rent_income' && transaction.date.startsWith(currentMonth),
   );
 
   if (rentalTxns.length === 0) {
@@ -206,7 +209,7 @@ function computeTotalRental(
   const propertyById = new Map(properties.map((property) => [property.id, property]));
   return rentalTxns.reduce((sum, transaction) => {
     const property = propertyById.get(transaction.propertyId);
-    return sum + convertToBase(transaction.amount, property?.currency ?? "EUR");
+    return sum + convertToBase(transaction.amount, property?.currency ?? 'EUR');
   }, 0);
 }
 
@@ -220,16 +223,19 @@ type InvestmentModalsProps = {
   positions: Record<number, Position>;
   mortgageById: Map<number, Mortgage>;
   onCloseEditHolding: () => void;
-  onSaveHolding: (holding: Holding, initialBuy?: { shares: number; price: number; date: string }) => void;
+  onSaveHolding: (
+    holding: Holding,
+    initialBuy?: { shares: number; price: number; date: string },
+  ) => void;
   onDeleteHolding: (id: number) => void;
   onCloseAddHoldingTxn: () => void;
-  onSaveHoldingTxn: (t: Omit<HoldingTransaction, "id">) => void;
+  onSaveHoldingTxn: (t: Omit<HoldingTransaction, 'id'>) => void;
   onCloseUpdateProperty: () => void;
   onSaveUpdateProperty: (id: number, value: number, rent: number) => void;
   onCloseAddProperty: () => void;
-  onSaveAddProperty: (p: Omit<Property, "id">) => void;
+  onSaveAddProperty: (p: Omit<Property, 'id'>) => void;
   onCloseAddPropertyTxn: () => void;
-  onSavePropertyTxn: (t: Omit<PropertyTransaction, "id">) => void;
+  onSavePropertyTxn: (t: Omit<PropertyTransaction, 'id'>) => void;
 };
 
 function InvestmentModals({
@@ -283,10 +289,7 @@ function InvestmentModals({
       )}
 
       {showAddProperty && (
-        <AddPropertyModal
-          onClose={onCloseAddProperty}
-          onSave={onSaveAddProperty}
-        />
+        <AddPropertyModal onClose={onCloseAddProperty} onSave={onSaveAddProperty} />
       )}
 
       {addTxnForProperty && (
@@ -310,21 +313,21 @@ function TabSwitcher({ tab, onSetTab }: TabSwitcherProps) {
   return (
     <div className="flex border-b border-slate-100">
       <button
-        onClick={() => onSetTab("brokerage")}
+        onClick={() => onSetTab('brokerage')}
         className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors ${
-          tab === "brokerage"
-            ? "text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40"
-            : "text-slate-500 hover:text-slate-700"
+          tab === 'brokerage'
+            ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40'
+            : 'text-slate-500 hover:text-slate-700'
         }`}
       >
         <BarChart2 size={16} /> Brokerage Holdings
       </button>
       <button
-        onClick={() => onSetTab("property")}
+        onClick={() => onSetTab('property')}
         className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors ${
-          tab === "property"
-            ? "text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40"
-            : "text-slate-500 hover:text-slate-700"
+          tab === 'property'
+            ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/40'
+            : 'text-slate-500 hover:text-slate-700'
         }`}
       >
         <Building2 size={16} /> Property Portfolio
@@ -343,7 +346,11 @@ export function Investments() {
   const { data: mortgages = [], isLoading: loadingMortgages } = useMortgages();
 
   const isLoading =
-    loadingHoldings || loadingHoldingTxns || loadingProperties || loadingPropertyTxns || loadingMortgages;
+    loadingHoldings ||
+    loadingHoldingTxns ||
+    loadingProperties ||
+    loadingPropertyTxns ||
+    loadingMortgages;
 
   const createHolding = useCreateHolding();
   const updateHolding = useUpdateHolding();
@@ -356,7 +363,7 @@ export function Investments() {
   const createPropertyTxn = useCreatePropertyTransaction();
   const deletePropertyTxn = useDeletePropertyTransaction();
 
-  const [tab, setTab] = useState<Tab>("brokerage");
+  const [tab, setTab] = useState<Tab>('brokerage');
   const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
   const [showAddHolding, setShowAddHolding] = useState(false);
   const [addTxnForHolding, setAddTxnForHolding] = useState<Holding | null>(null);
@@ -406,7 +413,8 @@ export function Investments() {
   const totalDividendsBase = useMemo(
     () =>
       holdings.reduce(
-        (sum, holding) => sum + convertToBase(positions[holding.id].totalDividends, holding.currency),
+        (sum, holding) =>
+          sum + convertToBase(positions[holding.id].totalDividends, holding.currency),
         0,
       ),
     [holdings, positions, convertToBase],
@@ -432,7 +440,15 @@ export function Investments() {
   );
 
   const portfolioHistory = useMemo(
-    () => computePortfolioHistory(holdings, holdingTxns, properties, propertyTxns, mortgageById, convertToBase),
+    () =>
+      computePortfolioHistory(
+        holdings,
+        holdingTxns,
+        properties,
+        propertyTxns,
+        mortgageById,
+        convertToBase,
+      ),
     [holdings, holdingTxns, properties, propertyTxns, convertToBase, mortgageById],
   );
 
@@ -452,11 +468,11 @@ export function Investments() {
         if (!initialBuy) return;
         createHoldingTxn.mutate({
           holdingId: created.id,
-          type: "buy",
+          type: 'buy',
           shares: initialBuy.shares,
           price: initialBuy.price,
           date: initialBuy.date,
-          note: "Initial position",
+          note: 'Initial position',
         });
         setExpandedHoldingId(created.id);
       },
@@ -468,7 +484,7 @@ export function Investments() {
     if (expandedHoldingId === id) setExpandedHoldingId(null);
   }
 
-  function handleAddHoldingTxn(transaction: Omit<HoldingTransaction, "id">) {
+  function handleAddHoldingTxn(transaction: Omit<HoldingTransaction, 'id'>) {
     createHoldingTxn.mutate(transaction);
   }
 
@@ -476,7 +492,7 @@ export function Investments() {
     deleteHoldingTxn.mutate(id);
   }
 
-  function handleAddPropertyTxn(transaction: Omit<PropertyTransaction, "id">) {
+  function handleAddPropertyTxn(transaction: Omit<PropertyTransaction, 'id'>) {
     createPropertyTxn.mutate(transaction);
   }
 
@@ -495,7 +511,7 @@ export function Investments() {
     }
   }
 
-  function handleSaveProperty(property: Omit<Property, "id">) {
+  function handleSaveProperty(property: Omit<Property, 'id'>) {
     createProperty.mutate(property);
     setShowAddProperty(false);
   }
@@ -515,7 +531,10 @@ export function Investments() {
         addTxnForProperty={addTxnForProperty}
         positions={positions}
         mortgageById={mortgageById}
-        onCloseEditHolding={() => { setShowAddHolding(false); setEditingHolding(null); }}
+        onCloseEditHolding={() => {
+          setShowAddHolding(false);
+          setEditingHolding(null);
+        }}
         onSaveHolding={handleSaveHolding}
         onDeleteHolding={handleDeleteHolding}
         onCloseAddHoldingTxn={() => setAddTxnForHolding(null)}
@@ -532,26 +551,35 @@ export function Investments() {
         <StatCard
           label="Brokerage Value"
           value={fmtBase(totalBrokerageBase)}
-          subtitle={`${gainPct >= 0 ? "+" : ""}${gainPct.toFixed(1)}% unrealized`}
+          subtitle={`${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}% unrealized`}
           icon={BarChart2}
           color="indigo"
-          change={{ value: `${gainPct >= 0 ? "+" : ""}${gainPct.toFixed(1)}%`, positive: gainPct >= 0 }}
+          change={{
+            value: `${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}%`,
+            positive: gainPct >= 0,
+          }}
         />
         <StatCard
           label="Unrealized Gain"
-          value={`${totalGainBase >= 0 ? "+" : ""}${fmtBase(Math.abs(totalGainBase))}`}
+          value={`${totalGainBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalGainBase))}`}
           subtitle={`Cost basis ${fmtBase(totalCostBase)}`}
           icon={TrendingUp}
           color="emerald"
-          change={{ value: `${totalGainBase >= 0 ? "+" : ""}${fmtBase(Math.abs(totalGainBase), undefined, true)}`, positive: totalGainBase >= 0 }}
+          change={{
+            value: `${totalGainBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalGainBase), undefined, true)}`,
+            positive: totalGainBase >= 0,
+          }}
         />
         <StatCard
           label="Dividends Received"
           value={`+${fmtBase(totalDividendsBase)}`}
-          subtitle={`${totalRealizedBase >= 0 ? "+" : ""}${fmtBase(totalRealizedBase)} realized`}
+          subtitle={`${totalRealizedBase >= 0 ? '+' : ''}${fmtBase(totalRealizedBase)} realized`}
           icon={DollarSign}
           color="sky"
-          change={{ value: `${totalRealizedBase >= 0 ? "+" : ""}${fmtBase(Math.abs(totalRealizedBase), undefined, true)}`, positive: totalRealizedBase >= 0 }}
+          change={{
+            value: `${totalRealizedBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalRealizedBase), undefined, true)}`,
+            positive: totalRealizedBase >= 0,
+          }}
         />
         <StatCard
           label="Property Equity"
@@ -559,7 +587,10 @@ export function Investments() {
           subtitle={`${fmtBase(totalRentalBase)}/mo rental`}
           icon={Building2}
           color="amber"
-          change={{ value: `${fmtBase(totalRentalBase, undefined, true)}/mo`, positive: totalRentalBase >= 0 }}
+          change={{
+            value: `${fmtBase(totalRentalBase, undefined, true)}/mo`,
+            positive: totalRentalBase >= 0,
+          }}
         />
       </div>
 
@@ -568,7 +599,7 @@ export function Investments() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <TabSwitcher tab={tab} onSetTab={setTab} />
 
-        {tab === "brokerage" && (
+        {tab === 'brokerage' && (
           <BrokerageTab
             holdings={holdings}
             holdingTxns={holdingTxns}
@@ -595,7 +626,7 @@ export function Investments() {
           />
         )}
 
-        {tab === "property" && (
+        {tab === 'property' && (
           <PropertyTab
             properties={properties}
             propertyTxns={propertyTxns}

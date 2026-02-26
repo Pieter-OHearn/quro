@@ -1,7 +1,9 @@
 {
   "name": "quro",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun run --filter '@quro/*' dev",
     "dev:frontend": "bun run --filter '@quro/frontend' dev",

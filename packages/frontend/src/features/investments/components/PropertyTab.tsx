@@ -1,9 +1,9 @@
-import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } from "lucide-react";
-import { Link } from "react-router";
-import { EmptyState } from "@/components/ui";
-import type { Mortgage, Property, PropertyTransaction } from "@quro/shared";
-import { getPropertyMortgageBalance } from "../utils/position";
-import { PropertyTxnHistory } from "./PropertyTxnHistory";
+import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } from 'lucide-react';
+import { Link } from 'react-router';
+import { EmptyState } from '@/components/ui';
+import type { Mortgage, Property, PropertyTransaction } from '@quro/shared';
+import { getPropertyMortgageBalance } from '../utils/position';
+import { PropertyTxnHistory } from './PropertyTxnHistory';
 
 type PropertyTabProps = {
   properties: Property[];
@@ -34,7 +34,8 @@ export function PropertyTab({
     <div>
       <div className="px-6 pt-5 pb-3 flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          {properties.length} {properties.length === 1 ? "property" : "properties"} · click a card to view transactions
+          {properties.length} {properties.length === 1 ? 'property' : 'properties'} · click a card
+          to view transactions
         </p>
         <button
           onClick={onAddProperty}
@@ -49,39 +50,51 @@ export function PropertyTab({
           icon={Home}
           title="No properties yet"
           description="Add your first property to track its value, rental income, expenses and link it to a mortgage."
-          action={{ label: "Add Property", onClick: onAddProperty }}
+          action={{ label: 'Add Property', onClick: onAddProperty }}
         />
       ) : (
         <div className="p-6 pt-0 space-y-4">
           {properties.map((property) => {
-            const linkedMortgage = property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
+            const linkedMortgage =
+              property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
             const mortgageBalance = getPropertyMortgageBalance(property, mortgageById);
             const equity = property.currentValue - mortgageBalance;
             const appreciation = property.currentValue - property.purchasePrice;
             const appreciationPct = (property.currentValue / property.purchasePrice - 1) * 100;
-            const ltv = mortgageBalance > 0 && property.currentValue > 0 ? (mortgageBalance / property.currentValue) * 100 : 0;
+            const ltv =
+              mortgageBalance > 0 && property.currentValue > 0
+                ? (mortgageBalance / property.currentValue) * 100
+                : 0;
             const isExpanded = expandedPropertyId === property.id;
-            const txnCount = propertyTxns.filter((transaction) => transaction.propertyId === property.id).length;
-            const propertyTransactions = propertyTxns.filter((transaction) => transaction.propertyId === property.id);
+            const txnCount = propertyTxns.filter(
+              (transaction) => transaction.propertyId === property.id,
+            ).length;
+            const propertyTransactions = propertyTxns.filter(
+              (transaction) => transaction.propertyId === property.id,
+            );
             const totalRent = propertyTransactions
-              .filter((transaction) => transaction.type === "rent_income")
+              .filter((transaction) => transaction.type === 'rent_income')
               .reduce((sum, transaction) => sum + transaction.amount, 0);
             const totalExpenses = propertyTransactions
-              .filter((transaction) => transaction.type === "expense")
+              .filter((transaction) => transaction.type === 'expense')
               .reduce((sum, transaction) => sum + transaction.amount, 0);
             const netDisplay = totalRent - totalExpenses;
-            const rentMonths = propertyTransactions.filter((transaction) => transaction.type === "rent_income").length;
+            const rentMonths = propertyTransactions.filter(
+              (transaction) => transaction.type === 'rent_income',
+            ).length;
             const annualRent = rentMonths > 0 ? (totalRent / rentMonths) * 12 : 0;
             const annualNOI = rentMonths > 0 ? (netDisplay / rentMonths) * 12 : 0;
-            const grossYield = property.currentValue > 0 ? (annualRent / property.currentValue) * 100 : 0;
-            const netYield = property.currentValue > 0 ? (annualNOI / property.currentValue) * 100 : 0;
+            const grossYield =
+              property.currentValue > 0 ? (annualRent / property.currentValue) * 100 : 0;
+            const netYield =
+              property.currentValue > 0 ? (annualNOI / property.currentValue) * 100 : 0;
             const hasPL = totalRent > 0 || totalExpenses > 0;
 
             return (
               <div
                 key={property.id}
                 className={`border border-slate-100 rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${
-                  isExpanded ? "shadow-md" : ""
+                  isExpanded ? 'shadow-md' : ''
                 }`}
               >
                 <div className="p-5 bg-white">
@@ -118,7 +131,7 @@ export function PropertyTab({
                       <button
                         onClick={() => onToggleExpanded(property.id)}
                         className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                        title={isExpanded ? "Collapse" : "View transactions"}
+                        title={isExpanded ? 'Collapse' : 'View transactions'}
                       >
                         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </button>
@@ -128,19 +141,37 @@ export function PropertyTab({
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div className="bg-slate-50 rounded-xl p-3">
                       <p className="text-[10px] text-slate-400 mb-0.5">Current Value</p>
-                      <p className="font-bold text-slate-900 text-sm">{fmtNative(property.currentValue, property.currency, true)}</p>
-                      <p className={`text-[10px] mt-0.5 font-medium ${appreciation >= 0 ? "text-emerald-600" : "text-rose-500"}`}>
-                        {appreciation >= 0 ? "+" : ""}
-                        {fmtNative(appreciation, property.currency, true)} ({appreciationPct >= 0 ? "+" : ""}
+                      <p className="font-bold text-slate-900 text-sm">
+                        {fmtNative(property.currentValue, property.currency, true)}
+                      </p>
+                      <p
+                        className={`text-[10px] mt-0.5 font-medium ${appreciation >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+                      >
+                        {appreciation >= 0 ? '+' : ''}
+                        {fmtNative(appreciation, property.currency, true)} (
+                        {appreciationPct >= 0 ? '+' : ''}
                         {appreciationPct.toFixed(1)}%)
                       </p>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-3">
-                      <p className="text-[10px] text-slate-400 mb-0.5">{linkedMortgage ? "Equity" : "Asset Value (no mortgage)"}</p>
-                      <p className="font-bold text-emerald-600 text-sm">{fmtNative(equity, property.currency, true)}</p>
+                      <p className="text-[10px] text-slate-400 mb-0.5">
+                        {linkedMortgage ? 'Equity' : 'Asset Value (no mortgage)'}
+                      </p>
+                      <p className="font-bold text-emerald-600 text-sm">
+                        {fmtNative(equity, property.currency, true)}
+                      </p>
                       {linkedMortgage && (
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          LTV <span className={ltv < 70 ? "text-emerald-600 font-medium" : "text-amber-600 font-medium"}>{ltv.toFixed(1)}%</span>
+                          LTV{' '}
+                          <span
+                            className={
+                              ltv < 70
+                                ? 'text-emerald-600 font-medium'
+                                : 'text-amber-600 font-medium'
+                            }
+                          >
+                            {ltv.toFixed(1)}%
+                          </span>
                         </p>
                       )}
                     </div>
@@ -153,10 +184,16 @@ export function PropertyTab({
                           <Building2 size={11} className="text-indigo-600" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[10px] text-slate-400">Linked mortgage · {linkedMortgage.lender}</p>
+                          <p className="text-[10px] text-slate-400">
+                            Linked mortgage · {linkedMortgage.lender}
+                          </p>
                           <p className="text-xs font-semibold text-slate-800 truncate">
-                            {fmtNative(linkedMortgage.outstandingBalance, linkedMortgage.currency, true)} outstanding ·{" "}
-                            {linkedMortgage.interestRate.toFixed(2)}%
+                            {fmtNative(
+                              linkedMortgage.outstandingBalance,
+                              linkedMortgage.currency,
+                              true,
+                            )}{' '}
+                            outstanding · {linkedMortgage.interestRate.toFixed(2)}%
                           </p>
                         </div>
                       </div>
@@ -176,7 +213,9 @@ export function PropertyTab({
                         <div className="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
                           <Building2 size={11} className="text-slate-400" />
                         </div>
-                        <p className="text-xs text-slate-400 truncate">No mortgage linked — add one on the Mortgage page</p>
+                        <p className="text-xs text-slate-400 truncate">
+                          No mortgage linked — add one on the Mortgage page
+                        </p>
                       </div>
                       <ExternalLink
                         size={11}
@@ -188,23 +227,35 @@ export function PropertyTab({
                   {hasPL && (
                     <div className="grid grid-cols-3 gap-2 mb-3">
                       <div className="text-center bg-indigo-50 rounded-xl p-2.5">
-                        <p className="text-[9px] text-indigo-500 font-medium uppercase tracking-wide mb-0.5">Gross Rent</p>
-                        <p className="text-xs font-bold text-indigo-700">+{fmtNative(totalRent, property.currency, true)}</p>
+                        <p className="text-[9px] text-indigo-500 font-medium uppercase tracking-wide mb-0.5">
+                          Gross Rent
+                        </p>
+                        <p className="text-xs font-bold text-indigo-700">
+                          +{fmtNative(totalRent, property.currency, true)}
+                        </p>
                       </div>
                       <div className="text-center bg-rose-50 rounded-xl p-2.5">
-                        <p className="text-[9px] text-rose-500 font-medium uppercase tracking-wide mb-0.5">Expenses</p>
-                        <p className="text-xs font-bold text-rose-600">-{fmtNative(totalExpenses, property.currency, true)}</p>
+                        <p className="text-[9px] text-rose-500 font-medium uppercase tracking-wide mb-0.5">
+                          Expenses
+                        </p>
+                        <p className="text-xs font-bold text-rose-600">
+                          -{fmtNative(totalExpenses, property.currency, true)}
+                        </p>
                       </div>
-                      <div className={`text-center rounded-xl p-2.5 ${netDisplay >= 0 ? "bg-emerald-50" : "bg-rose-50"}`}>
+                      <div
+                        className={`text-center rounded-xl p-2.5 ${netDisplay >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}
+                      >
                         <p
                           className={`text-[9px] font-medium uppercase tracking-wide mb-0.5 ${
-                            netDisplay >= 0 ? "text-emerald-600" : "text-rose-500"
+                            netDisplay >= 0 ? 'text-emerald-600' : 'text-rose-500'
                           }`}
                         >
                           Net Income
                         </p>
-                        <p className={`text-xs font-bold ${netDisplay >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                          {netDisplay >= 0 ? "+" : "-"}
+                        <p
+                          className={`text-xs font-bold ${netDisplay >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}
+                        >
+                          {netDisplay >= 0 ? '+' : '-'}
                           {fmtNative(Math.abs(netDisplay), property.currency, true)}
                         </p>
                       </div>
@@ -218,7 +269,9 @@ export function PropertyTab({
                       </span>
                       <span
                         className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${
-                          netYield >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600"
+                          netYield >= 0
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-rose-50 text-rose-600'
                         }`}
                       >
                         Net yield {netYield.toFixed(2)}%
@@ -235,7 +288,9 @@ export function PropertyTab({
                 {isExpanded && (
                   <PropertyTxnHistory
                     property={property}
-                    transactions={propertyTxns.filter((transaction) => transaction.propertyId === property.id)}
+                    transactions={propertyTxns.filter(
+                      (transaction) => transaction.propertyId === property.id,
+                    )}
                     onAdd={() => onAddTxnForProperty(property)}
                     onDelete={onDeleteTxn}
                   />

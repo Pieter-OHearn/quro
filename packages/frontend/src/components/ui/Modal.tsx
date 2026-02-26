@@ -1,49 +1,67 @@
-import { X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ModalProps = {
   title: string;
   subtitle?: string;
   onClose: () => void;
-  maxWidth?: "sm" | "md" | "lg" | "xl";
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
   children: React.ReactNode;
   footer?: React.ReactNode;
   scrollable?: boolean;
 };
 
 const MAX_WIDTH_MAP = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
-  xl: "max-w-xl",
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
 } as const;
 
-export function Modal({ title, subtitle, onClose, maxWidth = "md", children, footer, scrollable }: ModalProps) {
+export function Modal({
+  title,
+  subtitle,
+  onClose,
+  maxWidth = 'md',
+  children,
+  footer,
+  scrollable,
+}: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn(
-        "relative bg-white rounded-2xl shadow-2xl w-full overflow-hidden",
-        MAX_WIDTH_MAP[maxWidth],
-        scrollable && "flex flex-col max-h-[90vh]",
-      )}>
-        <div className={cn(
-          "bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between",
-          scrollable && "flex-shrink-0",
-        )}>
+      <div
+        className={cn(
+          'relative bg-white rounded-2xl shadow-2xl w-full overflow-hidden',
+          MAX_WIDTH_MAP[maxWidth],
+          scrollable && 'flex flex-col max-h-[90vh]',
+        )}
+      >
+        <div
+          className={cn(
+            'bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between',
+            scrollable && 'flex-shrink-0',
+          )}
+        >
           <div>
             <h2 className="font-bold text-white">{title}</h2>
             {subtitle && <p className="text-xs text-indigo-300 mt-0.5">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+          >
             <X size={18} />
           </button>
         </div>
-        <div className={cn("p-6 space-y-5", scrollable && "overflow-y-auto")}>
-          {children}
-        </div>
+        <div className={cn('p-6 space-y-5', scrollable && 'overflow-y-auto')}>{children}</div>
         {footer && (
-          <div className={cn("px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3", scrollable && "flex-shrink-0")}>
+          <div
+            className={cn(
+              'px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3',
+              scrollable && 'flex-shrink-0',
+            )}
+          >
             {footer}
           </div>
         )}
@@ -62,11 +80,22 @@ type ModalFooterProps = {
   danger?: React.ReactNode;
 };
 
-export function ModalFooter({ onCancel, onConfirm, confirmLabel = "Save", cancelLabel = "Cancel", disabled, loading, danger }: ModalFooterProps) {
+export function ModalFooter({
+  onCancel,
+  onConfirm,
+  confirmLabel = 'Save',
+  cancelLabel = 'Cancel',
+  disabled,
+  loading,
+  danger,
+}: ModalFooterProps) {
   return (
     <>
       {danger}
-      <button onClick={onCancel} className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-slate-100 transition-colors">
+      <button
+        onClick={onCancel}
+        className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-slate-100 transition-colors"
+      >
         {cancelLabel}
       </button>
       <button
@@ -74,7 +103,7 @@ export function ModalFooter({ onCancel, onConfirm, confirmLabel = "Save", cancel
         disabled={disabled}
         className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-2.5 text-sm transition-colors font-medium"
       >
-        {loading ? "Saving..." : confirmLabel}
+        {loading ? 'Saving...' : confirmLabel}
       </button>
     </>
   );

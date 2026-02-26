@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import { cn } from '@/lib/utils';
 
 type EmojiPickerFieldProps = {
   label?: string;
@@ -26,16 +26,21 @@ function getPickerPos(buttonEl: HTMLButtonElement, pickerWidth: number, pickerHe
   }
 
   if (spaceBelow < pickerHeight + 12) {
-    return { position: "fixed" as const, bottom: window.innerHeight - rect.top + 6, left, zIndex: 9999 };
+    return {
+      position: 'fixed' as const,
+      bottom: window.innerHeight - rect.top + 6,
+      left,
+      zIndex: 9999,
+    };
   }
 
-  return { position: "fixed" as const, top: rect.bottom + 6, left, zIndex: 9999 };
+  return { position: 'fixed' as const, top: rect.bottom + 6, left, zIndex: 9999 };
 }
 
 function getButtonBorderClass(error: string | undefined, open: boolean): string {
-  if (error) return "border-rose-300 bg-rose-50";
-  if (open) return "border-indigo-400 bg-indigo-50";
-  return "border-slate-200 bg-slate-50";
+  if (error) return 'border-rose-300 bg-rose-50';
+  if (open) return 'border-indigo-400 bg-indigo-50';
+  return 'border-slate-200 bg-slate-50';
 }
 
 function useOutsideClose(
@@ -52,8 +57,8 @@ function useOutsideClose(
       const outsideButton = buttonRef.current && !buttonRef.current.contains(target);
       if (outsidePicker && outsideButton) onClose();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [open, pickerRef, buttonRef, onClose]);
 }
 
@@ -66,11 +71,21 @@ type PickerPortalProps = {
   pickerWidth: number;
 };
 
-function PickerPortal({ pickerRef, pickerStyle, onChange, onClose, pickerHeight, pickerWidth }: PickerPortalProps) {
+function PickerPortal({
+  pickerRef,
+  pickerStyle,
+  onChange,
+  onClose,
+  pickerHeight,
+  pickerWidth,
+}: PickerPortalProps) {
   return createPortal(
     <div ref={pickerRef} style={pickerStyle}>
       <EmojiPicker
-        onEmojiClick={(data: EmojiClickData) => { onChange(data.emoji); onClose(); }}
+        onEmojiClick={(data: EmojiClickData) => {
+          onChange(data.emoji);
+          onClose();
+        }}
         height={pickerHeight}
         width={pickerWidth}
         previewConfig={{ showPreview: false }}
@@ -81,11 +96,11 @@ function PickerPortal({ pickerRef, pickerStyle, onChange, onClose, pickerHeight,
 }
 
 export function EmojiPickerField({
-  label = "Icon",
+  label = 'Icon',
   value,
   onChange,
   error,
-  title = "Pick an emoji",
+  title = 'Pick an emoji',
   pickerHeight = 380,
   pickerWidth = 300,
   containerClassName,
@@ -99,17 +114,19 @@ export function EmojiPickerField({
 
   const pickerStyle = buttonRef.current
     ? getPickerPos(buttonRef.current, pickerWidth, pickerHeight)
-    : { position: "fixed" as const, top: 24, left: 12, zIndex: 9999 };
+    : { position: 'fixed' as const, top: 24, left: 12, zIndex: 9999 };
 
   return (
-    <div className={cn("flex-shrink-0", containerClassName)}>
-      {label && <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>}
+    <div className={cn('flex-shrink-0', containerClassName)}>
+      {label && (
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
+      )}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "w-14 h-[42px] rounded-xl border text-xl flex items-center justify-center transition-all hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300",
+          'w-14 h-[42px] rounded-xl border text-xl flex items-center justify-center transition-all hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300',
           getButtonBorderClass(error, open),
           buttonClassName,
         )}
@@ -117,7 +134,7 @@ export function EmojiPickerField({
       >
         {value}
       </button>
-      {open && typeof document !== "undefined" && (
+      {open && typeof document !== 'undefined' && (
         <PickerPortal
           pickerRef={pickerRef}
           pickerStyle={pickerStyle}
