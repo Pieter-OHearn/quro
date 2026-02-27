@@ -29,6 +29,7 @@ bun run db:clear            # wipe all data
 ```
 
 Run from within `packages/backend` for migration generation:
+
 ```bash
 bun run db:generate         # generate new Drizzle migration from schema changes
 ```
