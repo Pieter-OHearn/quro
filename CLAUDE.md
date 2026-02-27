@@ -83,6 +83,11 @@ packages/
 
 Contains TypeScript types used by both frontend and backend. Imported as `@quro/shared` via path aliases configured in each package's `tsconfig.json`.
 
+## Pull Requests
+
+- Do not include a link to the Claude session in PR descriptions.
+- The PR description should describe the change in more detail than the title — explain what was changed and why, not just restate the title.
+
 ## Code Conventions
 
 - **ESLint rules to be aware of:** max 50 lines per function, max complexity 10, no floating promises, `readonly` preferred for params, strict equality required. Run `bun run lint` before committing.
