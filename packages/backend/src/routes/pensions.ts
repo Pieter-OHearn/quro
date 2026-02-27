@@ -78,7 +78,8 @@ app.get('/transactions', async (c) => {
   const potId = c.req.query('potId');
   if (potId !== undefined) {
     const parsedPotId = parseId(potId);
-    if (parsedPotId === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
+    if (parsedPotId === null)
+      return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
     const data = await db
       .select()
       .from(pensionTransactions)

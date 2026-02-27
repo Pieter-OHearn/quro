@@ -91,7 +91,8 @@ app.get('/holding-transactions', async (c) => {
   const holdingId = c.req.query('holdingId');
   if (holdingId) {
     const parsedHoldingId = parseId(holdingId);
-    if (parsedHoldingId === null) return c.json({ error: 'Invalid holding id' }, HTTP_STATUS.BAD_REQUEST);
+    if (parsedHoldingId === null)
+      return c.json({ error: 'Invalid holding id' }, HTTP_STATUS.BAD_REQUEST);
     const data = await db
       .select()
       .from(holdingTransactions)
@@ -193,7 +194,8 @@ app.post('/properties', async (c) => {
   const { userId: _ignoredUserId, mortgageId: rawMortgageId, ...safeBody } = body ?? {};
 
   const mortgageId = parseOptionalId(rawMortgageId);
-  if (mortgageId === 'invalid') return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
+  if (mortgageId === 'invalid')
+    return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
   if (mortgageId !== null) {
     const [mortgage] = await db
@@ -225,7 +227,8 @@ app.patch('/properties/:id', async (c) => {
   const updates: Record<string, unknown> = { ...safeBody };
   if (rawMortgageId !== undefined) {
     const mortgageId = parseOptionalId(rawMortgageId);
-    if (mortgageId === 'invalid') return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
+    if (mortgageId === 'invalid')
+      return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
     if (mortgageId !== null) {
       const [mortgage] = await db
@@ -266,7 +269,8 @@ app.get('/property-transactions', async (c) => {
   const propertyId = c.req.query('propertyId');
   if (propertyId) {
     const parsedPropertyId = parseId(propertyId);
-    if (parsedPropertyId === null) return c.json({ error: 'Invalid property id' }, HTTP_STATUS.BAD_REQUEST);
+    if (parsedPropertyId === null)
+      return c.json({ error: 'Invalid property id' }, HTTP_STATUS.BAD_REQUEST);
     const data = await db
       .select()
       .from(propertyTransactions)

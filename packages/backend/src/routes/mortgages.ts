@@ -110,7 +110,8 @@ app.post('/', async (c) => {
   const body = await c.req.json();
   const { userId: _ignoredUserId, linkedPropertyId: rawLinkedPropertyId, ...safeBody } = body ?? {};
   const linkedPropertyId = parseId(String(rawLinkedPropertyId));
-  if (linkedPropertyId === null) return c.json({ error: 'linkedPropertyId is required' }, HTTP_STATUS.BAD_REQUEST);
+  if (linkedPropertyId === null)
+    return c.json({ error: 'linkedPropertyId is required' }, HTTP_STATUS.BAD_REQUEST);
 
   const [property] = await db
     .select({
@@ -230,7 +231,8 @@ app.get('/transactions', async (c) => {
   const mortgageId = c.req.query('mortgageId');
   if (mortgageId) {
     const parsedMortgageId = parseId(mortgageId);
-    if (parsedMortgageId === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
+    if (parsedMortgageId === null)
+      return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
     const data = await db
       .select()
       .from(mortgageTransactions)
