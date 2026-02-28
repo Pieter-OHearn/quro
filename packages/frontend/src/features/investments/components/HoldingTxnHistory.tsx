@@ -51,6 +51,52 @@ const FILTER_OPTIONS = [
   { key: 'dividend', label: 'Dividends' },
 ];
 
+type HoldingTxnAmountProps = {
+  transaction: HoldingTransaction;
+  holding: Holding;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+function HoldingTxnAmount({ transaction, holding, fmtNative }: HoldingTxnAmountProps) {
+  if (transaction.type === 'buy' || transaction.type === 'sell') {
+    return (
+      <div className="text-right flex-shrink-0">
+        <p className={`text-sm font-semibold ${transaction.type === 'buy' ? 'text-slate-700' : 'text-emerald-600'}`}>
+          {transaction.type === 'buy' ? '-' : '+'}
+          {fmtNative((transaction.shares ?? 0) * transaction.price, holding.currency, true)}
+        </p>
+        <p className="text-[10px] text-slate-400">
+          {transaction.shares ?? 0} @ {fmtNative(transaction.price, holding.currency, true)}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="text-right flex-shrink-0">
+      <p className="text-sm font-semibold text-indigo-600">
+        +{fmtNative(transaction.price, holding.currency, true)}
+      </p>
+      <p className="text-[10px] text-slate-400">dividend</p>
+    </div>
+  );
+}
+
+function buildHoldingStats(
+  position: Position,
+  holding: Holding,
+  fmtNative: (value: number, currency: string, compact?: boolean) => string,
+) {
+  return [
+    { label: 'Avg Cost', value: fmtNative(position.avgCost, holding.currency, true), color: 'text-slate-800' },
+    { label: 'Total Dividends', value: `+${fmtNative(position.totalDividends, holding.currency, true)}`, color: 'text-indigo-600' },
+    {
+      label: 'Realized Gain',
+      value: `${position.realizedGain >= 0 ? '+' : ''}${fmtNative(position.realizedGain, holding.currency, true)}`,
+      color: position.realizedGain >= 0 ? 'text-emerald-600' : 'text-rose-500',
+    },
+  ];
+}
+
 export function HoldingTxnHistory({
   holding,
   position,
@@ -70,23 +116,7 @@ export function HoldingTxnHistory({
     )
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const stats = [
-    {
-      label: 'Avg Cost',
-      value: fmtNative(position.avgCost, holding.currency, true),
-      color: 'text-slate-800',
-    },
-    {
-      label: 'Total Dividends',
-      value: `+${fmtNative(position.totalDividends, holding.currency, true)}`,
-      color: 'text-indigo-600',
-    },
-    {
-      label: 'Realized Gain',
-      value: `${position.realizedGain >= 0 ? '+' : ''}${fmtNative(position.realizedGain, holding.currency, true)}`,
-      color: position.realizedGain >= 0 ? 'text-emerald-600' : 'text-rose-500',
-    },
-  ];
+  const stats = buildHoldingStats(position, holding, fmtNative);
 
   return (
     <TxnHistoryPanel
@@ -100,29 +130,6 @@ export function HoldingTxnHistory({
     >
       {sorted.map((transaction) => {
         const meta = TXN_META[transaction.type as HoldingTxnType];
-
-        const amount =
-          transaction.type === 'buy' || transaction.type === 'sell' ? (
-            <div className="text-right flex-shrink-0">
-              <p
-                className={`text-sm font-semibold ${transaction.type === 'buy' ? 'text-slate-700' : 'text-emerald-600'}`}
-              >
-                {transaction.type === 'buy' ? '-' : '+'}
-                {fmtNative((transaction.shares ?? 0) * transaction.price, holding.currency, true)}
-              </p>
-              <p className="text-[10px] text-slate-400">
-                {transaction.shares ?? 0} @ {fmtNative(transaction.price, holding.currency, true)}
-              </p>
-            </div>
-          ) : (
-            <div className="text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-indigo-600">
-                +{fmtNative(transaction.price, holding.currency, true)}
-              </p>
-              <p className="text-[10px] text-slate-400">dividend</p>
-            </div>
-          );
-
         return (
           <TxnRow
             key={transaction.id}
@@ -131,7 +138,7 @@ export function HoldingTxnHistory({
             iconBg={meta.bg}
             label={transaction.note || meta.label}
             date={transaction.date}
-            amount={amount}
+            amount={<HoldingTxnAmount transaction={transaction} holding={holding} fmtNative={fmtNative} />}
             onDelete={() => onDelete(transaction.id)}
           />
         );

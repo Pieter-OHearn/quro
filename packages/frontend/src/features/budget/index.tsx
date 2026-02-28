@@ -48,62 +48,81 @@ type SummaryCardsProps = {
   remaining: number;
   savingsRate: number;
   fmt: FmtFn;
-  fmtDec: FmtFn;
 };
 
-function BudgetSummaryCards({
+function TotalBudgetCard({ totalBudgeted, fmt }: Readonly<{ totalBudgeted: number; fmt: FmtFn }>) {
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
+        <Wallet size={18} />
+      </div>
+      <p className="text-xs text-slate-500 mb-1">Total Budget</p>
+      <p className="font-bold text-slate-900">{fmt(totalBudgeted)}</p>
+      <p className="text-xs text-slate-400 mt-1">This month</p>
+    </div>
+  );
+}
+
+function TotalSpentCard({
   totalBudgeted,
   totalSpent,
-  remaining,
-  savingsRate,
   fmt,
-  fmtDec,
-}: SummaryCardsProps) {
+}: Readonly<{ totalBudgeted: number; totalSpent: number; fmt: FmtFn }>) {
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+      <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
+        <TrendingDown size={18} />
+      </div>
+      <p className="text-xs text-slate-500 mb-1">Total Spent</p>
+      <p className="font-bold text-slate-900">{fmt(totalSpent)}</p>
+      <p className="text-xs text-slate-400 mt-1">
+        {totalBudgeted > 0 ? ((totalSpent / totalBudgeted) * 100).toFixed(0) : 0}% of budget
+      </p>
+    </div>
+  );
+}
+
+function RemainingCard({ remaining, fmt }: Readonly<{ remaining: number; fmt: FmtFn }>) {
+  const isPositive = remaining >= 0;
+  return (
+    <div
+      className={`bg-white rounded-2xl p-5 border shadow-sm ${isPositive ? 'border-slate-100' : 'border-rose-200'}`}
+    >
+      <div
+        className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center ${isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}
+      >
+        {isPositive ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+      </div>
+      <p className="text-xs text-slate-500 mb-1">Remaining</p>
+      <p className={`font-bold ${isPositive ? 'text-emerald-600' : 'text-rose-500'}`}>
+        {isPositive ? '+' : ''}
+        {fmt(remaining)}
+      </p>
+      <p className="text-xs text-slate-400 mt-1">{isPositive ? 'Under budget' : 'Over budget'}</p>
+    </div>
+  );
+}
+
+function SavingsRateCard({ savingsRate }: Readonly<{ savingsRate: number }>) {
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+      <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
+        <CheckCircle2 size={18} />
+      </div>
+      <p className="text-xs text-slate-500 mb-1">Savings Rate</p>
+      <p className="font-bold text-sky-600">{savingsRate.toFixed(1)}%</p>
+      <p className="text-xs text-slate-400 mt-1">of monthly budget</p>
+    </div>
+  );
+}
+
+function BudgetSummaryCards({ totalBudgeted, totalSpent, remaining, savingsRate, fmt }: SummaryCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
-          <Wallet size={18} />
-        </div>
-        <p className="text-xs text-slate-500 mb-1">Total Budget</p>
-        <p className="font-bold text-slate-900">{fmt(totalBudgeted)}</p>
-        <p className="text-xs text-slate-400 mt-1">This month</p>
-      </div>
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-        <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
-          <TrendingDown size={18} />
-        </div>
-        <p className="text-xs text-slate-500 mb-1">Total Spent</p>
-        <p className="font-bold text-slate-900">{fmt(totalSpent)}</p>
-        <p className="text-xs text-slate-400 mt-1">
-          {totalBudgeted > 0 ? ((totalSpent / totalBudgeted) * 100).toFixed(0) : 0}% of budget
-        </p>
-      </div>
-      <div
-        className={`bg-white rounded-2xl p-5 border shadow-sm ${remaining >= 0 ? 'border-slate-100' : 'border-rose-200'}`}
-      >
-        <div
-          className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center ${remaining >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}
-        >
-          {remaining >= 0 ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-        </div>
-        <p className="text-xs text-slate-500 mb-1">Remaining</p>
-        <p className={`font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-          {remaining >= 0 ? '+' : ''}
-          {fmt(remaining)}
-        </p>
-        <p className="text-xs text-slate-400 mt-1">
-          {remaining >= 0 ? 'Under budget' : 'Over budget'}
-        </p>
-      </div>
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-        <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3">
-          <CheckCircle2 size={18} />
-        </div>
-        <p className="text-xs text-slate-500 mb-1">Savings Rate</p>
-        <p className="font-bold text-sky-600">{savingsRate.toFixed(1)}%</p>
-        <p className="text-xs text-slate-400 mt-1">of monthly budget</p>
-      </div>
+      <TotalBudgetCard totalBudgeted={totalBudgeted} fmt={fmt} />
+      <TotalSpentCard totalBudgeted={totalBudgeted} totalSpent={totalSpent} fmt={fmt} />
+      <RemainingCard remaining={remaining} fmt={fmt} />
+      <SavingsRateCard savingsRate={savingsRate} />
     </div>
   );
 }
@@ -128,8 +147,8 @@ function SpendingPieChart({ pieData, fmtDec }: { pieData: PieEntry[]; fmtDec: Fm
                 paddingAngle={2}
                 dataKey="value"
               >
-                {pieData.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
+                {pieData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.color} />
                 ))}
               </Pie>
               <Tooltip
@@ -293,6 +312,47 @@ type BudgetCategoriesSectionProps = {
   onAddCategory: () => void;
 };
 
+function CategorySectionHeader({
+  overBudget,
+  onToggleAdd,
+}: Readonly<{ overBudget: BudgetCategory[]; onToggleAdd: () => void }>) {
+  return (
+    <div className="flex items-center justify-between mb-5">
+      <div>
+        <h3 className="font-semibold text-slate-900">Budget Categories</h3>
+        {overBudget.length > 0 && (
+          <p className="text-xs text-rose-500 mt-0.5">{overBudget.length} categories over budget</p>
+        )}
+      </div>
+      <button
+        onClick={onToggleAdd}
+        className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
+      >
+        <Plus size={15} /> Add Category
+      </button>
+    </div>
+  );
+}
+
+function CategoryList({
+  categories,
+  fmt,
+  fmtDec,
+}: Readonly<{ categories: BudgetCategory[]; fmt: FmtFn; fmtDec: FmtFn }>) {
+  return (
+    <div className="space-y-2">
+      {categories.map((cat) => (
+        <CategoryRow key={cat.id} cat={cat} fmt={fmt} fmtDec={fmtDec} />
+      ))}
+      {categories.length === 0 && (
+        <p className="text-sm text-slate-400 py-8 text-center">
+          No budget categories yet. Click <strong>Add Category</strong> to get started.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function BudgetCategoriesSection({
   categories,
   overBudget,
@@ -307,22 +367,7 @@ function BudgetCategoriesSection({
 }: BudgetCategoriesSectionProps) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h3 className="font-semibold text-slate-900">Budget Categories</h3>
-          {overBudget.length > 0 && (
-            <p className="text-xs text-rose-500 mt-0.5">
-              {overBudget.length} categories over budget
-            </p>
-          )}
-        </div>
-        <button
-          onClick={onToggleAdd}
-          className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-        >
-          <Plus size={15} /> Add Category
-        </button>
-      </div>
+      <CategorySectionHeader overBudget={overBudget} onToggleAdd={onToggleAdd} />
       {showAdd && (
         <AddCategoryForm
           newCat={newCat}
@@ -331,16 +376,7 @@ function BudgetCategoriesSection({
           onAdd={onAddCategory}
         />
       )}
-      <div className="space-y-2">
-        {categories.map((cat) => (
-          <CategoryRow key={cat.id} cat={cat} fmt={fmt} fmtDec={fmtDec} />
-        ))}
-        {categories.length === 0 && (
-          <p className="text-sm text-slate-400 py-8 text-center">
-            No budget categories yet. Click <strong>Add Category</strong> to get started.
-          </p>
-        )}
-      </div>
+      <CategoryList categories={categories} fmt={fmt} fmtDec={fmtDec} />
     </div>
   );
 }
@@ -398,18 +434,7 @@ function RecentTransactionsList({
   );
 }
 
-export function Budget() {
-  const { fmtBase, baseCurrency } = useCurrency();
-  const fmtDec = (n: number) => fmtBase(n, undefined, true);
-  const fmt = (n: number) => fmtBase(n);
-
-  const { data: categories = [], isLoading: loadingCats } = useBudgetCategories();
-  const { data: budgetTransactions = [], isLoading: loadingTxns } = useBudgetTransactions();
-  const createCategory = useCreateBudgetCategory();
-
-  const [showAdd, setShowAdd] = useState(false);
-  const [newCat, setNewCat] = useState({ name: '', budgeted: '' });
-
+function deriveBudgetStats(categories: BudgetCategory[]) {
   const totalBudgeted = categories.reduce((s, c) => s + c.budgeted, 0);
   const totalSpent = categories.reduce((s, c) => s + c.spent, 0);
   const remaining = totalBudgeted - totalSpent;
@@ -419,8 +444,14 @@ export function Budget() {
   const pieData = categories
     .filter((c) => c.spent > 0)
     .map((c) => ({ name: c.name, value: c.spent, color: c.color }));
+  return { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData };
+}
 
-  const recentTransactions = budgetTransactions.slice(0, 10).map((tx: BudgetTx) => {
+function mapRecentTransactions(
+  budgetTransactions: BudgetTx[],
+  categories: BudgetCategory[],
+): RecentTx[] {
+  return budgetTransactions.slice(0, 10).map((tx) => {
     const cat = categories.find((c) => c.id === tx.categoryId);
     return {
       id: tx.id,
@@ -432,16 +463,33 @@ export function Budget() {
       color: cat?.color,
     };
   });
+}
 
-  const isLoading = loadingCats || loadingTxns;
+type BudgetChartsRowProps = {
+  pieData: PieEntry[];
+  categories: BudgetCategory[];
+  fmtDec: FmtFn;
+  fmt: FmtFn;
+};
 
-  if (isLoading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-      </div>
-    );
-  }
+function BudgetChartsRow({ pieData, categories, fmtDec, fmt }: BudgetChartsRowProps) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <SpendingPieChart pieData={pieData} fmtDec={fmtDec} />
+      <BudgetVsSpentChart categories={categories} fmt={fmt} />
+    </div>
+  );
+}
+
+function useBudgetPage() {
+  const { fmtBase, baseCurrency } = useCurrency();
+  const fmtDec = (n: number) => fmtBase(n, undefined, true);
+  const fmt = (n: number) => fmtBase(n);
+  const { data: categories = [], isLoading: loadingCats } = useBudgetCategories();
+  const { data: budgetTransactions = [], isLoading: loadingTxns } = useBudgetTransactions();
+  const createCategory = useCreateBudgetCategory();
+  const [showAdd, setShowAdd] = useState(false);
+  const [newCat, setNewCat] = useState({ name: '', budgeted: '' });
 
   function handleAddCategory() {
     if (!newCat.name || !newCat.budgeted) return;
@@ -458,6 +506,37 @@ export function Budget() {
     setShowAdd(false);
   }
 
+  return {
+    fmtDec,
+    fmt,
+    baseCurrency,
+    categories,
+    budgetTransactions,
+    loadingCats,
+    loadingTxns,
+    showAdd,
+    newCat,
+    setShowAdd,
+    setNewCat,
+    handleAddCategory,
+  };
+}
+
+export function Budget() {
+  const { fmtDec, fmt, baseCurrency, categories, budgetTransactions, loadingCats, loadingTxns, showAdd, newCat, setShowAdd, setNewCat, handleAddCategory } = useBudgetPage();
+
+  if (loadingCats || loadingTxns) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } =
+    deriveBudgetStats(categories);
+  const recentTransactions = mapRecentTransactions(budgetTransactions, categories);
+
   return (
     <div className="p-6 space-y-6">
       <BudgetSummaryCards
@@ -466,12 +545,8 @@ export function Budget() {
         remaining={remaining}
         savingsRate={savingsRate}
         fmt={fmt}
-        fmtDec={fmtDec}
       />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <SpendingPieChart pieData={pieData} fmtDec={fmtDec} />
-        <BudgetVsSpentChart categories={categories} fmt={fmt} />
-      </div>
+      <BudgetChartsRow pieData={pieData} categories={categories} fmtDec={fmtDec} fmt={fmt} />
       <BudgetCategoriesSection
         categories={categories}
         overBudget={overBudget}

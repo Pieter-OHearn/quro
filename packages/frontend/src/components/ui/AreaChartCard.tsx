@@ -37,6 +37,17 @@ type ChartContentProps<T extends Record<string, unknown>> = {
   title: string;
 };
 
+function ChartGradient({ id, color }: Readonly<{ id: string; color: string }>) {
+  return (
+    <defs>
+      <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor={color} stopOpacity={0.15} />
+        <stop offset="95%" stopColor={color} stopOpacity={0} />
+      </linearGradient>
+    </defs>
+  );
+}
+
 function ChartContent<T extends Record<string, unknown>>({
   data,
   dataKey,
@@ -49,30 +60,15 @@ function ChartContent<T extends Record<string, unknown>>({
   gradientId,
   title,
 }: ChartContentProps<T>) {
+  const yTickFormatter = (value: unknown) =>
+    formatYAxis ? formatYAxis(Number(value)) : `${(Number(value) / 1000).toFixed(0)}k`;
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={color} stopOpacity={0.15} />
-            <stop offset="95%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
+        <ChartGradient id={gradientId} color={color} />
         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-        <XAxis
-          dataKey={xKey}
-          tick={{ fontSize: 11, fill: '#94a3b8' }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          tick={{ fontSize: 11, fill: '#94a3b8' }}
-          axisLine={false}
-          tickLine={false}
-          tickFormatter={(value) =>
-            formatYAxis ? formatYAxis(Number(value)) : `${(Number(value) / 1000).toFixed(0)}k`
-          }
-        />
+        <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={yTickFormatter} />
         <Tooltip
           formatter={(value: number) => [formatValue(Number(value) || 0), title]}
           contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}

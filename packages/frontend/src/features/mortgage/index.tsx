@@ -56,7 +56,27 @@ function generateSchedule(balance: number, rate: number, monthlyPayment: number)
   return schedule;
 }
 
-export function Mortgage() {
+type MortgagePageState = {
+  fmt: (n: number) => string;
+  mortgages: MortgageType[];
+  properties: Property[];
+  mortgage: MortgageType | undefined;
+  txns: MortgageTransaction[];
+  showTxnModal: boolean;
+  setShowTxnModal: (v: boolean) => void;
+  showMortgageModal: boolean;
+  setShowMortgageModal: (v: boolean) => void;
+  editingMortgage: MortgageType | null;
+  setEditingMortgage: (v: MortgageType | null) => void;
+  editingLinkedPropertyId: number | null;
+  setActiveMortgageId: (id: number | null) => void;
+  handleAddTxn: (transaction: Omit<MortgageTransaction, 'id'>) => void;
+  handleSaveMortgage: (payload: MortgageFormPayload) => Promise<void>;
+  handleDeleteTxn: (id: number) => void;
+  closeMortgageModal: () => void;
+};
+
+function useMortgagePageState(): MortgagePageState & { isLoading: boolean } {
   const { fmtBase } = useCurrency();
   const fmt = (n: number) => fmtBase(n);
 
@@ -98,7 +118,6 @@ export function Mortgage() {
       setActiveMortgageId((updated as MortgageType).id);
       return;
     }
-
     const created = await createMortgageMut.mutateAsync(body as CreateMortgagePayload);
     setActiveMortgageId((created as MortgageType).id);
   }
@@ -112,9 +131,402 @@ export function Mortgage() {
     setEditingMortgage(null);
   }
 
-  if (loadingMortgages || loadingProperties || loadingTxns) {
-    return <LoadingSpinner className="min-h-[256px]" />;
-  }
+  return {
+    fmt,
+    mortgages,
+    properties,
+    mortgage,
+    txns,
+    showTxnModal,
+    setShowTxnModal,
+    showMortgageModal,
+    setShowMortgageModal,
+    editingMortgage,
+    setEditingMortgage,
+    editingLinkedPropertyId,
+    setActiveMortgageId,
+    handleAddTxn,
+    handleSaveMortgage,
+    handleDeleteTxn,
+    closeMortgageModal,
+    isLoading: loadingMortgages || loadingProperties || loadingTxns,
+  };
+}
+
+type ModalsProps = {
+  showTxnModal: boolean;
+  showMortgageModal: boolean;
+  mortgage: MortgageType;
+  editingMortgage: MortgageType | null;
+  properties: Property[];
+  editingLinkedPropertyId: number | null;
+  onCloseTxnModal: () => void;
+  onCloseMortgageModal: () => void;
+  onSaveTxn: (t: Omit<MortgageTransaction, 'id'>) => void;
+  onSaveMortgage: (payload: MortgageFormPayload) => Promise<void>;
+};
+
+function MortgageModals({
+  showTxnModal,
+  showMortgageModal,
+  mortgage,
+  editingMortgage,
+  properties,
+  editingLinkedPropertyId,
+  onCloseTxnModal,
+  onCloseMortgageModal,
+  onSaveTxn,
+  onSaveMortgage,
+}: Readonly<ModalsProps>) {
+  return (
+    <>
+      {showTxnModal && (
+        <AddMortgageTxnModal mortgage={mortgage} onClose={onCloseTxnModal} onSave={onSaveTxn} />
+      )}
+      {showMortgageModal && (
+        <AddMortgageModal
+          existing={editingMortgage ?? undefined}
+          properties={properties}
+          linkedPropertyId={editingLinkedPropertyId}
+          onClose={onCloseMortgageModal}
+          onSave={onSaveMortgage}
+        />
+      )}
+    </>
+  );
+}
+
+type TabSelectorProps = {
+  mortgages: MortgageType[];
+  activeMortgage: MortgageType;
+  onSelect: (id: number | null) => void;
+  onAddClick: () => void;
+};
+
+function MortgageTabSelector({
+  mortgages,
+  activeMortgage,
+  onSelect,
+  onAddClick,
+}: Readonly<TabSelectorProps>) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {mortgages.map((entry) => (
+        <button
+          key={entry.id}
+          onClick={() => onSelect(entry.id)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+            activeMortgage.id === entry.id
+              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+          }`}
+        >
+          <Home size={13} />
+          <span className="max-w-[180px] truncate">{entry.propertyAddress.split(',')[0]}</span>
+        </button>
+      ))}
+      <button
+        onClick={onAddClick}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 text-sm font-medium transition-all"
+      >
+        <Plus size={14} /> Add Mortgage
+      </button>
+    </div>
+  );
+}
+
+type HeroCardProps = {
+  mortgage: MortgageType;
+  fmt: (n: number) => string;
+  yearsRemaining: number;
+  monthsRemaining: number;
+  onEdit: () => void;
+};
+
+function MortgageHeroCard({
+  mortgage,
+  fmt,
+  yearsRemaining,
+  monthsRemaining,
+  onEdit,
+}: Readonly<HeroCardProps>) {
+  const metrics = [
+    {
+      label: 'Outstanding Balance',
+      value: fmt(mortgage.outstandingBalance),
+      sub: `of ${fmt(mortgage.originalAmount)} original`,
+    },
+    { label: 'Monthly Payment', value: fmt(mortgage.monthlyPayment), sub: 'Capital + Interest' },
+    {
+      label: 'Interest Rate',
+      value: `${mortgage.interestRate}%`,
+      sub: `${mortgage.rateType} (until ${mortgage.fixedUntil})`,
+    },
+    {
+      label: 'Years Remaining',
+      value: `${yearsRemaining} yrs`,
+      sub: `~${monthsRemaining} months`,
+    },
+  ];
+  return (
+    <div className="bg-gradient-to-br from-[#0a0f1e] to-[#1a2040] rounded-2xl p-6 text-white">
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+            <Home size={22} />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg">{mortgage.propertyAddress}</h2>
+            <p className="text-slate-400 text-sm">
+              {mortgage.lender} · {mortgage.rateType} Rate · Fixed until {mortgage.fixedUntil}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white border border-white/20 hover:border-white/40 px-3 py-1.5 rounded-xl transition-all flex-shrink-0"
+        >
+          <Edit3 size={12} /> Edit
+        </button>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {metrics.map(({ label, value, sub }) => (
+          <div key={label} className="bg-white/10 rounded-xl p-4">
+            <p className="text-xs text-slate-400 mb-1">{label}</p>
+            <p className="font-bold text-white">{value}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type StatCardsProps = {
+  mortgage: MortgageType;
+  fmt: (n: number) => string;
+  equity: number;
+  ltv: number;
+  paid: number;
+  paidPct: number;
+};
+
+function MortgageStatCards({
+  mortgage,
+  fmt,
+  equity,
+  ltv,
+  paid,
+  paidPct,
+}: Readonly<StatCardsProps>) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard
+        label="Property Value"
+        value={fmt(mortgage.propertyValue)}
+        subtitle={`+${fmt(mortgage.propertyValue - mortgage.originalAmount)} since purchase`}
+        icon={Home}
+        color="emerald"
+      />
+      <StatCard
+        label="Equity Built"
+        value={fmt(equity)}
+        subtitle={`${((equity / mortgage.propertyValue) * 100).toFixed(0)}% of property value`}
+        icon={TrendingDown}
+        color="indigo"
+      />
+      <StatCard
+        label="Loan-to-Value"
+        value={`${ltv.toFixed(1)}%`}
+        subtitle={ltv < 70 ? 'Good — below 70%' : 'High LTV'}
+        icon={Percent}
+        color="sky"
+      />
+      <StatCard
+        label="Capital Repaid"
+        value={fmt(paid)}
+        subtitle={`${paidPct.toFixed(0)}% of original loan`}
+        icon={Calendar}
+        color="amber"
+      />
+    </div>
+  );
+}
+
+type RepaymentProgressProps = {
+  mortgage: MortgageType;
+  fmt: (n: number) => string;
+  paid: number;
+  paidPct: number;
+};
+
+function MortgageRepaymentProgress({
+  mortgage,
+  fmt,
+  paid,
+  paidPct,
+}: Readonly<RepaymentProgressProps>) {
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-slate-900">Mortgage Repayment Progress</h3>
+        <span className="text-sm font-semibold text-indigo-600">{paidPct.toFixed(1)}% paid off</span>
+      </div>
+      <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-2">
+        <div
+          className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
+          style={{ width: `${paidPct}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-xs text-slate-400">
+        <span>
+          {fmt(0)} ({mortgage.startDate})
+        </span>
+        <span className="text-indigo-600 font-medium">{fmt(paid)} repaid</span>
+        <span>
+          {fmt(mortgage.originalAmount)} ({mortgage.endDate})
+        </span>
+      </div>
+    </div>
+  );
+}
+
+type AmortizationRow = { year: string; balance: number; principal: number; interest: number };
+type PaymentBreakdownRow = { month: string; principal: number; interest: number };
+
+type ChartsProps = {
+  fmt: (n: number) => string;
+  amortization: AmortizationRow[];
+  paymentBreakdown: PaymentBreakdownRow[];
+};
+
+function MortgageCharts({ fmt, amortization, paymentBreakdown }: Readonly<ChartsProps>) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+        <h3 className="font-semibold text-slate-900 mb-1">Balance Projection</h3>
+        <p className="text-xs text-slate-400 mb-5">Remaining balance over loan term</p>
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={amortization}>
+            <defs>
+              <linearGradient id="mortGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis
+              dataKey="year"
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+            />
+            <Tooltip
+              formatter={(v: number) => [fmt(v), 'Balance']}
+              contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+            />
+            <Area
+              type="monotone"
+              dataKey="balance"
+              stroke="#6366f1"
+              strokeWidth={2.5}
+              fill="url(#mortGrad)"
+              dot={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+        <h3 className="font-semibold text-slate-900 mb-1">Payment Breakdown</h3>
+        <p className="text-xs text-slate-400 mb-5">Principal vs Interest per month</p>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={paymentBreakdown} barSize={22}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
+            />
+            <Tooltip
+              contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+              formatter={(v: number, name) => [fmt(v), name === 'principal' ? 'Principal' : 'Interest']}
+            />
+            <Bar dataKey="principal" name="principal" fill="#6366f1" stackId="a" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="interest" name="interest" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="flex items-center gap-5 mt-3">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-indigo-500" />
+            <span className="text-xs text-slate-500">Principal</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-amber-400" />
+            <span className="text-xs text-slate-500">Interest</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type TipsProps = {
+  mortgage: MortgageType;
+  fmt: (n: number) => string;
+};
+
+function MortgageTips({ mortgage, fmt }: Readonly<TipsProps>) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+        <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-amber-800">Rate Fix Expiry Coming</p>
+          <p className="text-xs text-amber-700 mt-0.5">
+            Your fixed rate of {mortgage.interestRate}% expires in {mortgage.fixedUntil}. Start
+            comparing remortgage deals 6 months before to avoid the Standard Variable Rate.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+        <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-emerald-800">Overpayment Opportunity</p>
+          <p className="text-xs text-emerald-700 mt-0.5">
+            You can overpay up to {mortgage.overpaymentLimit}% (
+            {fmt(mortgage.outstandingBalance * 0.1)}) per year without penalty. An extra{' '}
+            {fmt(200)}/month would save approximately {fmt(12400)} in interest and reduce your term
+            by 3 years.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function Mortgage() {
+  const state = useMortgagePageState();
+  const {
+    fmt, mortgages, properties, mortgage, txns, isLoading,
+    showTxnModal, setShowTxnModal, showMortgageModal, setShowMortgageModal,
+    editingMortgage, setEditingMortgage, editingLinkedPropertyId, setActiveMortgageId,
+    handleAddTxn, handleSaveMortgage, handleDeleteTxn, closeMortgageModal,
+  } = state;
+
+  if (isLoading) return <LoadingSpinner className="min-h-[256px]" />;
 
   if (!mortgage) {
     return (
@@ -146,325 +558,65 @@ export function Mortgage() {
   const equity = mortgage.propertyValue - mortgage.outstandingBalance;
   const paid = mortgage.originalAmount - mortgage.outstandingBalance;
   const paidPct = (paid / mortgage.originalAmount) * 100;
+  const monthlyRate = mortgage.interestRate / 100 / 12;
   const monthsRemaining = Math.round(
-    -Math.log(
-      1 -
-        (mortgage.outstandingBalance * (mortgage.interestRate / 100 / 12)) /
-          mortgage.monthlyPayment,
-    ) / Math.log(1 + mortgage.interestRate / 100 / 12),
+    -Math.log(1 - (mortgage.outstandingBalance * monthlyRate) / mortgage.monthlyPayment) /
+      Math.log(1 + monthlyRate),
   );
   const yearsRemaining = Math.floor(monthsRemaining / 12);
-
   const amortization = generateSchedule(
     mortgage.outstandingBalance,
     mortgage.interestRate,
     mortgage.monthlyPayment,
   );
-
   const paymentBreakdown = Array.from({ length: 6 }, (_, i) => {
     const date = new Date(2025, 8 + i, 1);
-    const monthlyRate = mortgage.interestRate / 100 / 12;
-    const balance = mortgage.outstandingBalance - i * 600;
-    const interest = Math.round(balance * monthlyRate);
-    const principal = mortgage.monthlyPayment - interest;
+    const bal = mortgage.outstandingBalance - i * 600;
+    const interest = Math.round(bal * monthlyRate);
     return {
       month: date.toLocaleDateString('en-GB', { month: 'short' }),
-      principal,
+      principal: mortgage.monthlyPayment - interest,
       interest,
     };
   });
 
   return (
     <div className="p-6 space-y-6">
-      {showTxnModal && (
-        <AddMortgageTxnModal
-          mortgage={mortgage}
-          onClose={() => setShowTxnModal(false)}
-          onSave={handleAddTxn}
-        />
-      )}
-
-      {showMortgageModal && (
-        <AddMortgageModal
-          existing={editingMortgage ?? undefined}
-          properties={properties}
-          linkedPropertyId={editingLinkedPropertyId}
-          onClose={closeMortgageModal}
-          onSave={handleSaveMortgage}
-        />
-      )}
-
-      <div className="flex items-center gap-2 flex-wrap">
-        {mortgages.map((entry) => (
-          <button
-            key={entry.id}
-            onClick={() => setActiveMortgageId(entry.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
-              mortgage.id === entry.id
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
-            }`}
-          >
-            <Home size={13} />
-            <span className="max-w-[180px] truncate">{entry.propertyAddress.split(',')[0]}</span>
-          </button>
-        ))}
-        <button
-          onClick={() => {
-            setEditingMortgage(null);
-            setShowMortgageModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 text-sm font-medium transition-all"
-        >
-          <Plus size={14} /> Add Mortgage
-        </button>
-      </div>
-
-      <div className="bg-gradient-to-br from-[#0a0f1e] to-[#1a2040] rounded-2xl p-6 text-white">
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
-              <Home size={22} />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg">{mortgage.propertyAddress}</h2>
-              <p className="text-slate-400 text-sm">
-                {mortgage.lender} · {mortgage.rateType} Rate · Fixed until {mortgage.fixedUntil}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              setEditingMortgage(mortgage);
-              setShowMortgageModal(true);
-            }}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white border border-white/20 hover:border-white/40 px-3 py-1.5 rounded-xl transition-all flex-shrink-0"
-          >
-            <Edit3 size={12} /> Edit
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            {
-              label: 'Outstanding Balance',
-              value: fmt(mortgage.outstandingBalance),
-              sub: `of ${fmt(mortgage.originalAmount)} original`,
-            },
-            {
-              label: 'Monthly Payment',
-              value: fmt(mortgage.monthlyPayment),
-              sub: 'Capital + Interest',
-            },
-            {
-              label: 'Interest Rate',
-              value: `${mortgage.interestRate}%`,
-              sub: `${mortgage.rateType} (until ${mortgage.fixedUntil})`,
-            },
-            {
-              label: 'Years Remaining',
-              value: `${yearsRemaining} yrs`,
-              sub: `~${monthsRemaining} months`,
-            },
-          ].map(({ label, value, sub }) => (
-            <div key={label} className="bg-white/10 rounded-xl p-4">
-              <p className="text-xs text-slate-400 mb-1">{label}</p>
-              <p className="font-bold text-white">{value}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Property Value"
-          value={fmt(mortgage.propertyValue)}
-          subtitle={`+${fmt(mortgage.propertyValue - mortgage.originalAmount)} since purchase`}
-          icon={Home}
-          color="emerald"
-        />
-        <StatCard
-          label="Equity Built"
-          value={fmt(equity)}
-          subtitle={`${((equity / mortgage.propertyValue) * 100).toFixed(0)}% of property value`}
-          icon={TrendingDown}
-          color="indigo"
-        />
-        <StatCard
-          label="Loan-to-Value"
-          value={`${ltv.toFixed(1)}%`}
-          subtitle={ltv < 70 ? 'Good — below 70%' : 'High LTV'}
-          icon={Percent}
-          color="sky"
-        />
-        <StatCard
-          label="Capital Repaid"
-          value={fmt(paid)}
-          subtitle={`${paidPct.toFixed(0)}% of original loan`}
-          icon={Calendar}
-          color="amber"
-        />
-      </div>
-
-      <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-slate-900">Mortgage Repayment Progress</h3>
-          <span className="text-sm font-semibold text-indigo-600">
-            {paidPct.toFixed(1)}% paid off
-          </span>
-        </div>
-        <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-2">
-          <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
-            style={{ width: `${paidPct}%` }}
-          />
-        </div>
-        <div className="flex justify-between text-xs text-slate-400">
-          <span>
-            {fmt(0)} ({mortgage.startDate})
-          </span>
-          <span className="text-indigo-600 font-medium">{fmt(paid)} repaid</span>
-          <span>
-            {fmt(mortgage.originalAmount)} ({mortgage.endDate})
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-1">Balance Projection</h3>
-          <p className="text-xs text-slate-400 mb-5">Remaining balance over loan term</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={amortization}>
-              <defs>
-                <linearGradient id="mortGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey="year"
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip
-                formatter={(v: number) => [fmt(v), 'Balance']}
-                contentStyle={{
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '12px',
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="balance"
-                stroke="#6366f1"
-                strokeWidth={2.5}
-                fill="url(#mortGrad)"
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-1">Payment Breakdown</h3>
-          <p className="text-xs text-slate-400 mb-5">Principal vs Interest per month</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={paymentBreakdown} barSize={22}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
-              />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '12px',
-                }}
-                formatter={(v: number, name) => [
-                  fmt(v),
-                  name === 'principal' ? 'Principal' : 'Interest',
-                ]}
-              />
-              <Bar
-                dataKey="principal"
-                name="principal"
-                fill="#6366f1"
-                stackId="a"
-                radius={[0, 0, 0, 0]}
-              />
-              <Bar
-                dataKey="interest"
-                name="interest"
-                fill="#f59e0b"
-                stackId="a"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="flex items-center gap-5 mt-3">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-indigo-500" />
-              <span className="text-xs text-slate-500">Principal</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-amber-400" />
-              <span className="text-xs text-slate-500">Interest</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
+      <MortgageModals
+        showTxnModal={showTxnModal}
+        showMortgageModal={showMortgageModal}
+        mortgage={mortgage}
+        editingMortgage={editingMortgage}
+        properties={properties}
+        editingLinkedPropertyId={editingLinkedPropertyId}
+        onCloseTxnModal={() => setShowTxnModal(false)}
+        onCloseMortgageModal={closeMortgageModal}
+        onSaveTxn={handleAddTxn}
+        onSaveMortgage={handleSaveMortgage}
+      />
+      <MortgageTabSelector
+        mortgages={mortgages}
+        activeMortgage={mortgage}
+        onSelect={setActiveMortgageId}
+        onAddClick={() => { setEditingMortgage(null); setShowMortgageModal(true); }}
+      />
+      <MortgageHeroCard
+        mortgage={mortgage}
+        fmt={fmt}
+        yearsRemaining={yearsRemaining}
+        monthsRemaining={monthsRemaining}
+        onEdit={() => { setEditingMortgage(mortgage); setShowMortgageModal(true); }}
+      />
+      <MortgageStatCards mortgage={mortgage} fmt={fmt} equity={equity} ltv={ltv} paid={paid} paidPct={paidPct} />
+      <MortgageRepaymentProgress mortgage={mortgage} fmt={fmt} paid={paid} paidPct={paidPct} />
+      <MortgageCharts fmt={fmt} amortization={amortization} paymentBreakdown={paymentBreakdown} />
       <MortgageTxnHistory
         mortgage={mortgage}
         transactions={txns}
         onAdd={() => setShowTxnModal(true)}
         onDelete={handleDeleteTxn}
       />
-
-      <div className="space-y-3">
-        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl">
-          <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-amber-800">Rate Fix Expiry Coming</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              Your fixed rate of {mortgage.interestRate}% expires in {mortgage.fixedUntil}. Start
-              comparing remortgage deals 6 months before to avoid the Standard Variable Rate.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-          <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-emerald-800">Overpayment Opportunity</p>
-            <p className="text-xs text-emerald-700 mt-0.5">
-              You can overpay up to {mortgage.overpaymentLimit}% (
-              {fmt(mortgage.outstandingBalance * 0.1)}) per year without penalty. An extra{' '}
-              {fmt(200)}/month would save approximately {fmt(12400)} in interest and reduce your
-              term by 3 years.
-            </p>
-          </div>
-        </div>
-      </div>
+      <MortgageTips mortgage={mortgage} fmt={fmt} />
     </div>
   );
 }

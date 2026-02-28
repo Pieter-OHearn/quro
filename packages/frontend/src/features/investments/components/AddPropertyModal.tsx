@@ -54,9 +54,120 @@ function PropertyEquityPreview({
   );
 }
 
-export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
-  const { fmtNative } = useCurrency();
-  const [form, setForm] = useState({
+type PropertyFormState = {
+  emoji: string;
+  address: string;
+  propertyType: string;
+  currency: CurrencyCode;
+  purchasePrice: string;
+  currentValue: string;
+  monthlyRent: string;
+};
+
+type PropertyFormFieldsProps = {
+  form: PropertyFormState;
+  errors: Record<string, string>;
+  onSet: (field: string, value: string) => void;
+};
+
+function PropertyIdentityFields({ form, errors, onSet }: PropertyFormFieldsProps) {
+  return (
+    <>
+      <div className="flex gap-3">
+        <FormField label="Icon" className="w-20 flex-shrink-0">
+          <TextInput
+            value={form.emoji}
+            onChange={(value) => onSet('emoji', value)}
+            className="text-center text-lg"
+            maxLength={2}
+          />
+        </FormField>
+        <FormField label="Address" required error={errors.address} className="flex-1">
+          <TextInput
+            value={form.address}
+            onChange={(value) => onSet('address', value)}
+            error={Boolean(errors.address)}
+            placeholder="e.g. Keizersgracht 12, Amsterdam"
+          />
+        </FormField>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Property Type">
+          <SelectInput
+            value={form.propertyType}
+            onChange={(value) => onSet('propertyType', value)}
+            options={Array.from(PROPERTY_TYPES)}
+          />
+        </FormField>
+        <FormField label="Currency">
+          <SelectInput
+            value={form.currency}
+            onChange={(value) => onSet('currency', value)}
+            options={CURRENCY_LIST}
+          />
+        </FormField>
+      </div>
+    </>
+  );
+}
+
+function PropertyValueFields({ form, errors, onSet }: PropertyFormFieldsProps) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Purchase Price" required error={errors.purchasePrice}>
+          <TextInput
+            type="number"
+            value={form.purchasePrice}
+            onChange={(value) => onSet('purchasePrice', value)}
+            error={Boolean(errors.purchasePrice)}
+            placeholder="0"
+          />
+        </FormField>
+        <FormField label="Current Value" required error={errors.currentValue}>
+          <TextInput
+            type="number"
+            value={form.currentValue}
+            onChange={(value) => onSet('currentValue', value)}
+            error={Boolean(errors.currentValue)}
+            placeholder="0"
+          />
+        </FormField>
+      </div>
+      <FormField label="Monthly Rent">
+        <TextInput
+          type="number"
+          value={form.monthlyRent}
+          onChange={(value) => onSet('monthlyRent', value)}
+          placeholder="0"
+        />
+      </FormField>
+    </>
+  );
+}
+
+function PropertyFormFields({ form, errors, onSet }: PropertyFormFieldsProps) {
+  return (
+    <>
+      <PropertyIdentityFields form={form} errors={errors} onSet={onSet} />
+      <PropertyValueFields form={form} errors={errors} onSet={onSet} />
+    </>
+  );
+}
+
+function validatePropertyForm(
+  form: PropertyFormState,
+  parsed: { purchasePrice: number; currentValue: number },
+): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (!form.address.trim()) errs.address = 'Required';
+  if (!form.purchasePrice || parsed.purchasePrice <= 0) errs.purchasePrice = 'Required';
+  if (!form.currentValue || parsed.currentValue <= 0) errs.currentValue = 'Required';
+  return errs;
+}
+
+function useAddPropertyForm() {
+  const [form, setForm] = useState<PropertyFormState>({
     emoji: '🏠',
     address: '',
     propertyType: 'Buy-to-Let',
@@ -84,19 +195,16 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
     monthlyRent: parseFloat(form.monthlyRent) || 0,
   };
 
-  const equity = parsed.currentValue;
-  const appreciation = parsed.currentValue - parsed.purchasePrice;
+  return { form, errors, set, parsed, setErrors };
+}
+
+export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
+  const { fmtNative } = useCurrency();
+  const { form, errors, set, parsed, setErrors } = useAddPropertyForm();
 
   function handleSave() {
-    const errs: Record<string, string> = {};
-    if (!form.address.trim()) errs.address = 'Required';
-    if (!form.purchasePrice || parsed.purchasePrice <= 0) errs.purchasePrice = 'Required';
-    if (!form.currentValue || parsed.currentValue <= 0) errs.currentValue = 'Required';
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-
+    const errs = validatePropertyForm(form, parsed);
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     onSave({
       emoji: form.emoji,
       address: form.address.trim(),
@@ -120,76 +228,11 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
       scrollable
       footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Add Property" />}
     >
-      <div className="flex gap-3">
-        <FormField label="Icon" className="w-20 flex-shrink-0">
-          <TextInput
-            value={form.emoji}
-            onChange={(value) => set('emoji', value)}
-            className="text-center text-lg"
-            maxLength={2}
-          />
-        </FormField>
-        <FormField label="Address" required error={errors.address} className="flex-1">
-          <TextInput
-            value={form.address}
-            onChange={(value) => set('address', value)}
-            error={Boolean(errors.address)}
-            placeholder="e.g. Keizersgracht 12, Amsterdam"
-          />
-        </FormField>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Property Type">
-          <SelectInput
-            value={form.propertyType}
-            onChange={(value) => set('propertyType', value)}
-            options={Array.from(PROPERTY_TYPES)}
-          />
-        </FormField>
-        <FormField label="Currency">
-          <SelectInput
-            value={form.currency}
-            onChange={(value) => set('currency', value)}
-            options={CURRENCY_LIST}
-          />
-        </FormField>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Purchase Price" required error={errors.purchasePrice}>
-          <TextInput
-            type="number"
-            value={form.purchasePrice}
-            onChange={(value) => set('purchasePrice', value)}
-            error={Boolean(errors.purchasePrice)}
-            placeholder="0"
-          />
-        </FormField>
-        <FormField label="Current Value" required error={errors.currentValue}>
-          <TextInput
-            type="number"
-            value={form.currentValue}
-            onChange={(value) => set('currentValue', value)}
-            error={Boolean(errors.currentValue)}
-            placeholder="0"
-          />
-        </FormField>
-      </div>
-
-      <FormField label="Monthly Rent">
-        <TextInput
-          type="number"
-          value={form.monthlyRent}
-          onChange={(value) => set('monthlyRent', value)}
-          placeholder="0"
-        />
-      </FormField>
-
+      <PropertyFormFields form={form} errors={errors} onSet={set} />
       {parsed.currentValue > 0 && (
         <PropertyEquityPreview
-          equity={equity}
-          appreciation={appreciation}
+          equity={parsed.currentValue}
+          appreciation={parsed.currentValue - parsed.purchasePrice}
           currency={form.currency}
           purchasePrice={parsed.purchasePrice}
           fmtNative={fmtNative}

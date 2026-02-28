@@ -76,13 +76,13 @@ function NetPreview({ net, gross, bonus, tax, pension, baseCurrency }: NetPrevie
       {gross > 0 && (
         <div className="flex h-2 rounded-full overflow-hidden gap-px">
           {[
-            { pct: Math.max((net / (gross + bonus)) * 100, 0), color: 'bg-emerald-500' },
-            { pct: (tax / (gross + bonus)) * 100, color: 'bg-rose-400' },
-            { pct: (pension / (gross + bonus)) * 100, color: 'bg-indigo-400' },
+            { id: 'net', pct: Math.max((net / (gross + bonus)) * 100, 0), color: 'bg-emerald-500' },
+            { id: 'tax', pct: (tax / (gross + bonus)) * 100, color: 'bg-rose-400' },
+            { id: 'pension', pct: (pension / (gross + bonus)) * 100, color: 'bg-indigo-400' },
           ]
             .filter((s) => s.pct > 0)
-            .map((s, i) => (
-              <div key={i} className={`h-full ${s.color}`} style={{ width: `${s.pct}%` }} />
+            .map((s) => (
+              <div key={s.id} className={`h-full ${s.color}`} style={{ width: `${s.pct}%` }} />
             ))}
         </div>
       )}
@@ -105,7 +105,6 @@ type TextFieldProps = {
 };
 
 function PayslipTextField({
-  field,
   label,
   placeholder,
   required,

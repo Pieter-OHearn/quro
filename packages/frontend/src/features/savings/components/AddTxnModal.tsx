@@ -48,8 +48,11 @@ function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProp
   );
 }
 
-export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
-  const { fmtNative } = useCurrency();
+function useAddTxnForm(
+  account: SavingsAccount,
+  onSave: (t: Omit<SavingsTransaction, 'id'>) => void,
+  onClose: () => void,
+) {
   const [type, setType] = useState<TxnType>('deposit');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -70,6 +73,14 @@ export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
     onSave({ accountId: account.id, type, amount: parsed, date, note });
     onClose();
   }
+
+  return { type, setType, amount, setAmount, date, setDate, note, setNote, error, setError, parsed, handleSave };
+}
+
+export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
+  const { fmtNative } = useCurrency();
+  const { type, setType, amount, setAmount, date, setDate, note, setNote, error, setError, parsed, handleSave } =
+    useAddTxnForm(account, onSave, onClose);
 
   return (
     <Modal
