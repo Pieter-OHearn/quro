@@ -8,19 +8,19 @@ updates:
     groups:
       safe-updates:
         update-types:
-          - "minor"
-          - "patch"
+          - 'minor'
+          - 'patch'
       react-ecosystem:
         patterns:
-          - "react*"
-          - "@types/react*"
+          - 'react*'
+          - '@types/react*'
       tooling:
         patterns:
-          - "eslint*"
-          - "prettier*"
-          - "vitest*"
-          - "typescript"
-          - "@types/*"
+          - 'eslint*'
+          - 'prettier*'
+          - 'vitest*'
+          - 'typescript'
+          - '@types/*'
 
   - package-ecosystem: 'github-actions'
     directory: '/'
@@ -29,4 +29,4 @@ updates:
     groups:
       github-actions:
         patterns:
-          - "*"
+          - '*'
