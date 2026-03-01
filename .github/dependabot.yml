@@ -1,11 +1,32 @@
 version: 2
+
 updates:
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
       interval: 'weekly'
+    groups:
+      safe-updates:
+        update-types:
+          - "minor"
+          - "patch"
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      tooling:
+        patterns:
+          - "eslint*"
+          - "prettier*"
+          - "vitest*"
+          - "typescript"
+          - "@types/*"
 
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'weekly'
+    groups:
+      github-actions:
+        patterns:
+          - "*"
