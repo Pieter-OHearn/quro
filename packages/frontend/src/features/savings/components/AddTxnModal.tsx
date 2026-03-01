@@ -74,13 +74,38 @@ function useAddTxnForm(
     onClose();
   }
 
-  return { type, setType, amount, setAmount, date, setDate, note, setNote, error, setError, parsed, handleSave };
+  return {
+    type,
+    setType,
+    amount,
+    setAmount,
+    date,
+    setDate,
+    note,
+    setNote,
+    error,
+    setError,
+    parsed,
+    handleSave,
+  };
 }
 
 export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
   const { fmtNative } = useCurrency();
-  const { type, setType, amount, setAmount, date, setDate, note, setNote, error, setError, parsed, handleSave } =
-    useAddTxnForm(account, onSave, onClose);
+  const {
+    type,
+    setType,
+    amount,
+    setAmount,
+    date,
+    setDate,
+    note,
+    setNote,
+    error,
+    setError,
+    parsed,
+    handleSave,
+  } = useAddTxnForm(account, onSave, onClose);
 
   return (
     <Modal

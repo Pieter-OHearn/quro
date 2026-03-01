@@ -172,7 +172,16 @@ function buildHolding(form: HoldingForm, existing: Holding | undefined): Holding
 function buildInitialForm(existing: Holding | undefined): HoldingForm {
   const today = new Date().toISOString().slice(0, 10);
   if (!existing) {
-    return { name: '', ticker: '', currency: 'EUR' as CurrencyCode, sector: 'ETF', currentPrice: '', initShares: '', initPrice: '', initDate: today };
+    return {
+      name: '',
+      ticker: '',
+      currency: 'EUR' as CurrencyCode,
+      sector: 'ETF',
+      currentPrice: '',
+      initShares: '',
+      initPrice: '',
+      initDate: today,
+    };
   }
   return {
     name: existing.name,
@@ -226,7 +235,11 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
       return;
     }
     const initialBuy = isNew
-      ? { shares: parseFloat(form.initShares), price: parseFloat(form.initPrice), date: form.initDate }
+      ? {
+          shares: parseFloat(form.initShares),
+          price: parseFloat(form.initPrice),
+          date: form.initDate,
+        }
       : undefined;
     onSave(buildHolding(form, existing), initialBuy);
     onClose();

@@ -313,13 +313,18 @@ function GoalTypeStep({ onSelect }: Readonly<{ onSelect: (type: GoalType) => voi
 
 // ─── GoalDetailsAmountFields sub-renderers ────────────────────────────────────
 
-const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300';
+const inputCls =
+  'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300';
 
 function AmountFieldsSavingsPortfolio({
   type,
   form,
   set,
-}: Readonly<{ type: GoalType; form: Record<string, string>; set: (k: string, v: string) => void }>) {
+}: Readonly<{
+  type: GoalType;
+  form: Record<string, string>;
+  set: (k: string, v: string) => void;
+}>) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
@@ -389,7 +394,11 @@ function AmountFieldsInvestHabit({
   form,
   set,
   baseCurrency,
-}: Readonly<{ form: Record<string, string>; set: (k: string, v: string) => void; baseCurrency: string }>) {
+}: Readonly<{
+  form: Record<string, string>;
+  set: (k: string, v: string) => void;
+  baseCurrency: string;
+}>) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
@@ -405,7 +414,9 @@ function AmountFieldsInvestHabit({
         />
       </div>
       <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Months in Period</label>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+          Months in Period
+        </label>
         <input
           type="number"
           className={inputCls}
@@ -425,7 +436,9 @@ function AmountFieldsAnnual({
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Current Progress</label>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+          Current Progress
+        </label>
         <input
           type="number"
           className={inputCls}
@@ -650,10 +663,15 @@ function AddGoalModalHeader({
       <div>
         <h2 className="font-bold text-white">Add Goal</h2>
         <p className="text-xs text-indigo-300 mt-0.5">
-          {step === 'type' ? 'Choose a goal type to get started' : `${GOAL_TYPE_META[type].label} - fill in the details`}
+          {step === 'type'
+            ? 'Choose a goal type to get started'
+            : `${GOAL_TYPE_META[type].label} - fill in the details`}
         </p>
       </div>
-      <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+      <button
+        onClick={onClose}
+        className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+      >
         <X size={18} />
       </button>
     </div>
@@ -665,19 +683,39 @@ function useAddGoalModal(onSave: (g: Omit<Goal, 'id'>) => void, onClose: () => v
   const [step, setStep] = useState<'type' | 'details'>('type');
   const [type, setType] = useState<GoalType>('savings');
   const [form, setForm] = useState({
-    name: '', emoji: '🎯', color: COLORS[0], notes: '', deadline: 'Dec 2026',
-    year: String(new Date().getFullYear()), current: '', target: '',
-    monthlyContrib: '', monthlyTarget: '', totalMonths: '12', unit: '',
+    name: '',
+    emoji: '🎯',
+    color: COLORS[0],
+    notes: '',
+    deadline: 'Dec 2026',
+    year: String(new Date().getFullYear()),
+    current: '',
+    target: '',
+    monthlyContrib: '',
+    monthlyTarget: '',
+    totalMonths: '12',
+    unit: '',
   });
   const set = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
   const handleSave = () => {
     if (!form.name.trim()) return;
     const base: Omit<Goal, 'id'> = {
-      type, name: form.name.trim(), emoji: form.emoji, color: form.color, notes: form.notes,
-      deadline: form.deadline, year: parseInt(form.year, 10) || new Date().getFullYear(),
-      currentAmount: 0, targetAmount: 0, monthlyContribution: 0,
-      monthlyTarget: null, monthsCompleted: null, totalMonths: null, unit: null,
-      category: GOAL_TYPE_META[type].label, currency: baseCurrency as Goal['currency'],
+      type,
+      name: form.name.trim(),
+      emoji: form.emoji,
+      color: form.color,
+      notes: form.notes,
+      deadline: form.deadline,
+      year: parseInt(form.year, 10) || new Date().getFullYear(),
+      currentAmount: 0,
+      targetAmount: 0,
+      monthlyContribution: 0,
+      monthlyTarget: null,
+      monthsCompleted: null,
+      totalMonths: null,
+      unit: null,
+      category: GOAL_TYPE_META[type].label,
+      currency: baseCurrency as Goal['currency'],
     };
     onSave(buildGoalPayload(type, base, form));
     onClose();
@@ -686,7 +724,10 @@ function useAddGoalModal(onSave: (g: Omit<Goal, 'id'>) => void, onClose: () => v
 }
 
 function AddGoalModal({ onClose, onSave }: AddGoalModalProps) {
-  const { baseCurrency, step, type, form, set, handleSave, setType, setStep } = useAddGoalModal(onSave, onClose);
+  const { baseCurrency, step, type, form, set, handleSave, setType, setStep } = useAddGoalModal(
+    onSave,
+    onClose,
+  );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -694,9 +735,20 @@ function AddGoalModal({ onClose, onSave }: AddGoalModalProps) {
         <AddGoalModalHeader step={step} type={type} onClose={onClose} />
         <div className="overflow-y-auto flex-1">
           {step === 'type' ? (
-            <GoalTypeStep onSelect={(t) => { setType(t); setStep('details'); }} />
+            <GoalTypeStep
+              onSelect={(t) => {
+                setType(t);
+                setStep('details');
+              }}
+            />
           ) : (
-            <GoalDetailsStep type={type} form={form} set={set} baseCurrency={baseCurrency} onBack={() => setStep('type')} />
+            <GoalDetailsStep
+              type={type}
+              form={form}
+              set={set}
+              baseCurrency={baseCurrency}
+              onBack={() => setStep('type')}
+            />
           )}
         </div>
         {step === 'details' && (
@@ -717,10 +769,7 @@ type CardProps = {
   onUpdateMonths: (id: number, delta: number) => void;
 };
 
-function ProgressBar({
-  pct,
-  color,
-}: Readonly<{ pct: number; color: string }>) {
+function ProgressBar({ pct, color }: Readonly<{ pct: number; color: string }>) {
   return (
     <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
       <div
@@ -737,7 +786,13 @@ function SavingsDetailsRow({
   monthlyContrib,
   status,
   fmtBase,
-}: Readonly<{ currentAmount: number; targetAmount: number; monthlyContrib: number; status: GoalStatus; fmtBase: (n: number) => string }>) {
+}: Readonly<{
+  currentAmount: number;
+  targetAmount: number;
+  monthlyContrib: number;
+  status: GoalStatus;
+  fmtBase: (n: number) => string;
+}>) {
   const remaining = Math.max(0, targetAmount - currentAmount);
   return (
     <div className="flex items-end justify-between">
@@ -782,11 +837,19 @@ function GoalCardSavings({
       <div>
         <div className="flex justify-between mb-1.5">
           <span className="text-xs text-slate-500">Progress</span>
-          <span className="text-xs font-semibold" style={{ color }}>{clampedPct.toFixed(0)}%</span>
+          <span className="text-xs font-semibold" style={{ color }}>
+            {clampedPct.toFixed(0)}%
+          </span>
         </div>
         <ProgressBar pct={clampedPct} color={color} />
       </div>
-      <SavingsDetailsRow currentAmount={currentAmount} targetAmount={targetAmount} monthlyContrib={monthlyContrib} status={status} fmtBase={fmtBase} />
+      <SavingsDetailsRow
+        currentAmount={currentAmount}
+        targetAmount={targetAmount}
+        monthlyContrib={monthlyContrib}
+        status={status}
+        fmtBase={fmtBase}
+      />
     </>
   );
 }
@@ -796,19 +859,26 @@ function SalaryComparisonGrid({
   targetAmount,
   annualGross,
   fmtBase,
-}: Readonly<{ color: string; targetAmount: number; annualGross: number; fmtBase: (n: number) => string }>) {
+}: Readonly<{
+  color: string;
+  targetAmount: number;
+  annualGross: number;
+  fmtBase: (n: number) => string;
+}>) {
   return (
     <div className="grid grid-cols-2 gap-2">
       <div className="bg-slate-50 rounded-xl px-3 py-2.5">
         <p className="text-[10px] text-slate-400 mb-0.5">Current Gross</p>
         <p className="font-bold text-slate-800">
-          {fmtBase(annualGross)}<span className="text-xs font-normal text-slate-400">/yr</span>
+          {fmtBase(annualGross)}
+          <span className="text-xs font-normal text-slate-400">/yr</span>
         </p>
       </div>
       <div className="rounded-xl px-3 py-2.5" style={{ backgroundColor: `${color}18` }}>
         <p className="text-[10px] text-slate-400 mb-0.5">Target Gross</p>
         <p className="font-bold" style={{ color }}>
-          {fmtBase(targetAmount)}<span className="text-xs font-normal opacity-60">/yr</span>
+          {fmtBase(targetAmount)}
+          <span className="text-xs font-normal opacity-60">/yr</span>
         </p>
       </div>
     </div>
@@ -833,17 +903,29 @@ function GoalCardSalary({
       <div>
         <div className="flex justify-between mb-1.5">
           <span className="text-xs text-slate-500">Current - Target</span>
-          <span className="text-xs font-semibold" style={{ color }}>{clampedPct.toFixed(0)}%</span>
+          <span className="text-xs font-semibold" style={{ color }}>
+            {clampedPct.toFixed(0)}%
+          </span>
         </div>
         <ProgressBar pct={clampedPct} color={color} />
       </div>
-      <SalaryComparisonGrid color={color} targetAmount={targetAmount} annualGross={annualGross} fmtBase={fmtBase} />
+      <SalaryComparisonGrid
+        color={color}
+        targetAmount={targetAmount}
+        annualGross={annualGross}
+        fmtBase={fmtBase}
+      />
       <div className="flex items-center gap-2">
         <ArrowUpRight size={13} className="text-emerald-500 flex-shrink-0" />
         <p className="text-xs text-slate-600">
           {annualGross > 0 ? (
-            <><strong>{((targetAmount / annualGross - 1) * 100).toFixed(1)}% raise</strong> -{' '}{fmtBase(Math.max(0, targetAmount - annualGross))} gap</>
-          ) : ('Add a payslip to calculate required raise')}
+            <>
+              <strong>{((targetAmount / annualGross - 1) * 100).toFixed(1)}% raise</strong> -{' '}
+              {fmtBase(Math.max(0, targetAmount - annualGross))} gap
+            </>
+          ) : (
+            'Add a payslip to calculate required raise'
+          )}
         </p>
       </div>
     </>
@@ -878,16 +960,27 @@ function InvestHabitControls({
   monthsCompleted,
   totalMonths,
   onUpdateMonths,
-}: Readonly<{ goalId: number; monthsCompleted: number; totalMonths: number; onUpdateMonths: (id: number, delta: number) => void }>) {
+}: Readonly<{
+  goalId: number;
+  monthsCompleted: number;
+  totalMonths: number;
+  onUpdateMonths: (id: number, delta: number) => void;
+}>) {
   return (
     <div className="flex items-center gap-1">
-      <button onClick={() => onUpdateMonths(goalId, -1)} disabled={monthsCompleted <= 0}
-        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30 transition-colors">
+      <button
+        onClick={() => onUpdateMonths(goalId, -1)}
+        disabled={monthsCompleted <= 0}
+        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30 transition-colors"
+      >
         <Minus size={11} />
       </button>
       <span className="text-xs text-slate-500 px-1">{monthsCompleted}</span>
-      <button onClick={() => onUpdateMonths(goalId, 1)} disabled={monthsCompleted >= totalMonths}
-        className="w-7 h-7 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 disabled:opacity-30 transition-colors">
+      <button
+        onClick={() => onUpdateMonths(goalId, 1)}
+        disabled={monthsCompleted >= totalMonths}
+        className="w-7 h-7 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 disabled:opacity-30 transition-colors"
+      >
         <Check size={11} />
       </button>
     </div>
@@ -918,24 +1011,42 @@ function GoalCardInvestHabit({
       <div>
         <div className="flex justify-between mb-2">
           <span className="text-xs text-slate-500">Monthly hits</span>
-          <span className="text-xs font-semibold" style={{ color }}>{monthsCompleted}/{totalMonths} months</span>
+          <span className="text-xs font-semibold" style={{ color }}>
+            {monthsCompleted}/{totalMonths} months
+          </span>
         </div>
-        <InvestHabitMonthGrid totalMonths={totalMonths} monthsCompleted={monthsCompleted} color={color} />
+        <InvestHabitMonthGrid
+          totalMonths={totalMonths}
+          monthsCompleted={monthsCompleted}
+          color={color}
+        />
       </div>
       <div className="flex items-center justify-between">
         <div>
           <p className="font-bold text-slate-900">{fmtBase(monthlyTarget * monthsCompleted)}</p>
-          <p className="text-xs text-slate-400">invested so far - {fmtBase(monthlyTarget)}/mo target</p>
+          <p className="text-xs text-slate-400">
+            invested so far - {fmtBase(monthlyTarget)}/mo target
+          </p>
         </div>
         {status !== 'complete' && (
-          <InvestHabitControls goalId={goal.id} monthsCompleted={monthsCompleted} totalMonths={totalMonths} onUpdateMonths={onUpdateMonths} />
+          <InvestHabitControls
+            goalId={goal.id}
+            monthsCompleted={monthsCompleted}
+            totalMonths={totalMonths}
+            onUpdateMonths={onUpdateMonths}
+          />
         )}
       </div>
     </>
   );
 }
 
-const getAnnualBarWidth = (lowerIsBetter: boolean, clampedPct: number, currentAmount: number, targetAmount: number): number => {
+const getAnnualBarWidth = (
+  lowerIsBetter: boolean,
+  clampedPct: number,
+  currentAmount: number,
+  targetAmount: number,
+): number => {
   if (lowerIsBetter && clampedPct < 100) {
     return Math.min((targetAmount / Math.max(currentAmount, 1)) * 100, 100);
   }
@@ -949,19 +1060,35 @@ function AnnualAmountRow({
   lowerIsBetter,
   clampedPct,
   status,
-}: Readonly<{ goal: Goal; currentAmount: number; targetAmount: number; lowerIsBetter: boolean; clampedPct: number; status: GoalStatus }>) {
+}: Readonly<{
+  goal: Goal;
+  currentAmount: number;
+  targetAmount: number;
+  lowerIsBetter: boolean;
+  clampedPct: number;
+  status: GoalStatus;
+}>) {
   return (
     <div className="flex items-end justify-between">
       <div>
         <p className="font-bold text-slate-900">
-          {currentAmount}{goal.unit && <span className="text-xs font-normal text-slate-400 ml-1">{goal.unit}</span>}
+          {currentAmount}
+          {goal.unit && (
+            <span className="text-xs font-normal text-slate-400 ml-1">{goal.unit}</span>
+          )}
         </p>
-        <p className="text-xs text-slate-400">target: {targetAmount}{goal.unit ? ` ${goal.unit}` : ''}</p>
+        <p className="text-xs text-slate-400">
+          target: {targetAmount}
+          {goal.unit ? ` ${goal.unit}` : ''}
+        </p>
       </div>
       {lowerIsBetter && clampedPct < 100 && (
         <div className="flex items-center gap-1.5 text-xs text-amber-600">
           <AlertCircle size={12} />
-          <span>Reduce by {Math.max(0, currentAmount - targetAmount)}{goal.unit || ''}</span>
+          <span>
+            Reduce by {Math.max(0, currentAmount - targetAmount)}
+            {goal.unit || ''}
+          </span>
         </div>
       )}
       {status === 'complete' && <p className="text-sm text-emerald-600 font-semibold">Done!</p>}
@@ -992,16 +1119,28 @@ function GoalCardAnnual({
     <>
       <div>
         <div className="flex justify-between mb-1.5">
-          <span className="text-xs text-slate-500">Progress {goal.unit ? `(${goal.unit})` : ''}</span>
+          <span className="text-xs text-slate-500">
+            Progress {goal.unit ? `(${goal.unit})` : ''}
+          </span>
           <span className="text-xs font-semibold" style={{ color: barColor }}>
             {lowerIsBetter ? `${currentAmount} -> ${targetAmount}` : `${clampedPct.toFixed(0)}%`}
           </span>
         </div>
         <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${barWidth}%`, backgroundColor: barColor }} />
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${barWidth}%`, backgroundColor: barColor }}
+          />
         </div>
       </div>
-      <AnnualAmountRow goal={goal} currentAmount={currentAmount} targetAmount={targetAmount} lowerIsBetter={lowerIsBetter} clampedPct={clampedPct} status={status} />
+      <AnnualAmountRow
+        goal={goal}
+        currentAmount={currentAmount}
+        targetAmount={targetAmount}
+        lowerIsBetter={lowerIsBetter}
+        clampedPct={clampedPct}
+        status={status}
+      />
     </>
   );
 }
@@ -1021,15 +1160,22 @@ function GoalNameAndBadges({
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-semibold text-slate-800 leading-tight">{goal.name}</p>
-          {status === 'complete' && <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />}
+          {status === 'complete' && (
+            <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
+          )}
         </div>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusMeta.color}`}>
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusMeta.color}`}
+          >
             <span className={`inline-block w-1.5 h-1.5 rounded-full ${statusMeta.dot} mr-1`} />
             {statusMeta.label}
           </span>
-          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}>
-            <Icon size={10} className="inline-block mr-1" />{meta.label}
+          <span
+            className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}
+          >
+            <Icon size={10} className="inline-block mr-1" />
+            {meta.label}
           </span>
         </div>
       </div>
@@ -1053,8 +1199,10 @@ function GoalCardHeader({
       <GoalNameAndBadges goal={goal} status={status} meta={meta} />
       <div className="flex items-center gap-1 flex-shrink-0">
         <span className="text-xs text-slate-400 mr-1">{`🗓 ${goal.deadline}`}</span>
-        <button onClick={() => onDelete(goal.id)}
-          className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors">
+        <button
+          onClick={() => onDelete(goal.id)}
+          className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors"
+        >
           <Trash2 size={13} />
         </button>
       </div>
@@ -1073,25 +1221,73 @@ type GoalBodyContentProps = {
   onUpdateMonths: (id: number, delta: number) => void;
 };
 
-const isSavingsLike = (type: GoalType) => type === 'savings' || type === 'portfolio' || type === 'net_worth';
-const getInvestHabitNums = (goal: Goal) => ({ monthlyTarget: goal.monthlyTarget || 0, monthsCompleted: goal.monthsCompleted ?? 0, totalMonths: goal.totalMonths ?? 12 });
-const getGoalAmounts = (goal: Goal) => ({ cur: goal.currentAmount || 0, tgt: goal.targetAmount || 0, monthlyContrib: goal.monthlyContribution || 0 });
+const isSavingsLike = (type: GoalType) =>
+  type === 'savings' || type === 'portfolio' || type === 'net_worth';
+const getInvestHabitNums = (goal: Goal) => ({
+  monthlyTarget: goal.monthlyTarget || 0,
+  monthsCompleted: goal.monthsCompleted ?? 0,
+  totalMonths: goal.totalMonths ?? 12,
+});
+const getGoalAmounts = (goal: Goal) => ({
+  cur: goal.currentAmount || 0,
+  tgt: goal.targetAmount || 0,
+  monthlyContrib: goal.monthlyContribution || 0,
+});
 
 function renderGoalTypeContent(props: GoalBodyContentProps) {
   const { goal, type, status, color, clampedPct, annualGross, fmtBase, onUpdateMonths } = props;
   const { cur, tgt, monthlyContrib } = getGoalAmounts(goal);
   if (isSavingsLike(type)) {
-    return <GoalCardSavings color={color} currentAmount={cur} targetAmount={tgt} monthlyContrib={monthlyContrib} clampedPct={clampedPct} status={status} fmtBase={fmtBase} />;
+    return (
+      <GoalCardSavings
+        color={color}
+        currentAmount={cur}
+        targetAmount={tgt}
+        monthlyContrib={monthlyContrib}
+        clampedPct={clampedPct}
+        status={status}
+        fmtBase={fmtBase}
+      />
+    );
   }
   if (type === 'salary') {
-    return <GoalCardSalary color={color} targetAmount={tgt} annualGross={annualGross} clampedPct={clampedPct} fmtBase={fmtBase} />;
+    return (
+      <GoalCardSalary
+        color={color}
+        targetAmount={tgt}
+        annualGross={annualGross}
+        clampedPct={clampedPct}
+        fmtBase={fmtBase}
+      />
+    );
   }
   if (type === 'invest_habit') {
     const { monthlyTarget, monthsCompleted, totalMonths } = getInvestHabitNums(goal);
-    return <GoalCardInvestHabit goal={goal} color={color} monthlyTarget={monthlyTarget} monthsCompleted={monthsCompleted} totalMonths={totalMonths} status={status} fmtBase={fmtBase} onUpdateMonths={onUpdateMonths} />;
+    return (
+      <GoalCardInvestHabit
+        goal={goal}
+        color={color}
+        monthlyTarget={monthlyTarget}
+        monthsCompleted={monthsCompleted}
+        totalMonths={totalMonths}
+        status={status}
+        fmtBase={fmtBase}
+        onUpdateMonths={onUpdateMonths}
+      />
+    );
   }
   if (type === 'annual') {
-    return <GoalCardAnnual goal={goal} color={color} currentAmount={cur} targetAmount={tgt} clampedPct={clampedPct} lowerIsBetter={goal.unit === '€/mo' && cur > tgt} status={status} />;
+    return (
+      <GoalCardAnnual
+        goal={goal}
+        color={color}
+        currentAmount={cur}
+        targetAmount={tgt}
+        clampedPct={clampedPct}
+        lowerIsBetter={goal.unit === '€/mo' && cur > tgt}
+        status={status}
+      />
+    );
   }
   return null;
 }
@@ -1190,17 +1386,43 @@ function GoalsStatsGrid({
   fmtBase: (n: number) => string;
 }>) {
   const cards = [
-    { label: 'Total Goals', value: stats.total.toString(), sub: `${activeYear} plan`, icon: Target, color: 'indigo' },
-    { label: 'On Track', value: stats.onTrack.toString(), sub: `${stats.atRisk} need attention`, icon: CheckCircle2, color: 'emerald' },
-    { label: 'Monthly Commitment', value: fmtBase(stats.monthly), sub: 'Savings + invest habits', icon: Calendar, color: 'sky' },
-    { label: 'Completed', value: stats.completed.toString(), sub: stats.completed > 0 ? 'Great work!' : '-', icon: Trophy, color: 'amber' },
+    {
+      label: 'Total Goals',
+      value: stats.total.toString(),
+      sub: `${activeYear} plan`,
+      icon: Target,
+      color: 'indigo',
+    },
+    {
+      label: 'On Track',
+      value: stats.onTrack.toString(),
+      sub: `${stats.atRisk} need attention`,
+      icon: CheckCircle2,
+      color: 'emerald',
+    },
+    {
+      label: 'Monthly Commitment',
+      value: fmtBase(stats.monthly),
+      sub: 'Savings + invest habits',
+      icon: Calendar,
+      color: 'sky',
+    },
+    {
+      label: 'Completed',
+      value: stats.completed.toString(),
+      sub: stats.completed > 0 ? 'Great work!' : '-',
+      icon: Trophy,
+      color: 'amber',
+    },
   ] as const;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map(({ label, value, sub, icon: Icon, color }) => (
         <div key={label} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-          <div className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center ${STAT_ICON_COLORS[color]}`}>
+          <div
+            className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center ${STAT_ICON_COLORS[color]}`}
+          >
             <Icon size={18} />
           </div>
           <p className="text-xs text-slate-500 mb-1">{label}</p>
@@ -1345,7 +1567,12 @@ function GoalsGlance({
         {[...yearGoals]
           .sort((a, b) => getGoalPct(b, annualGross) - getGoalPct(a, annualGross))
           .map((goal) => (
-            <GlanceItem key={goal.id} goal={goal} annualGross={annualGross} currentYear={currentYear} />
+            <GlanceItem
+              key={goal.id}
+              goal={goal}
+              annualGross={annualGross}
+              currentYear={currentYear}
+            />
           ))}
       </div>
     </div>
@@ -1413,29 +1640,96 @@ function useGoalsPage() {
     () => goals.filter((goal) => parseGoalYear(goal, currentYear) === activeYear),
     [goals, activeYear, currentYear],
   );
-  const filteredGoals = useMemo(() => goals.filter((goal) => {
-    if (parseGoalYear(goal, currentYear) !== activeYear) return false;
-    return activeFilter === 'all' || GOAL_TYPE_META[normalizeGoalType(goal)].filterKey === activeFilter;
-  }), [goals, activeYear, activeFilter, currentYear]);
+  const filteredGoals = useMemo(
+    () =>
+      goals.filter((goal) => {
+        if (parseGoalYear(goal, currentYear) !== activeYear) return false;
+        return (
+          activeFilter === 'all' ||
+          GOAL_TYPE_META[normalizeGoalType(goal)].filterKey === activeFilter
+        );
+      }),
+    [goals, activeYear, activeFilter, currentYear],
+  );
   const stats = useMemo(() => {
-    const count = (s: string) => yearGoals.filter((g) => getGoalStatus(g, annualGross, currentYear) === s).length;
-    const monthly = yearGoals.reduce((sum, g) => sum + (g.monthlyContribution || g.monthlyTarget || 0), 0);
-    return { total: yearGoals.length, completed: count('complete'), onTrack: count('on_track'), atRisk: count('at_risk'), monthly };
+    const count = (s: string) =>
+      yearGoals.filter((g) => getGoalStatus(g, annualGross, currentYear) === s).length;
+    const monthly = yearGoals.reduce(
+      (sum, g) => sum + (g.monthlyContribution || g.monthlyTarget || 0),
+      0,
+    );
+    return {
+      total: yearGoals.length,
+      completed: count('complete'),
+      onTrack: count('on_track'),
+      atRisk: count('at_risk'),
+      monthly,
+    };
   }, [yearGoals, annualGross, currentYear]);
 
-  const handleDelete = (id: number) => { deleteGoal.mutate(id); };
+  const handleDelete = (id: number) => {
+    deleteGoal.mutate(id);
+  };
   const handleUpdateMonths = (id: number, delta: number) => {
     const goal = goals.find((g) => g.id === id);
     if (!goal) return;
-    updateGoal.mutate({ id, monthsCompleted: Math.max(0, Math.min((goal.monthsCompleted ?? 0) + delta, goal.totalMonths ?? 12)) });
+    updateGoal.mutate({
+      id,
+      monthsCompleted: Math.max(
+        0,
+        Math.min((goal.monthsCompleted ?? 0) + delta, goal.totalMonths ?? 12),
+      ),
+    });
   };
-  const handleAddGoal = (goal: Omit<Goal, 'id'>) => { createGoal.mutate(goal); };
+  const handleAddGoal = (goal: Omit<Goal, 'id'>) => {
+    createGoal.mutate(goal);
+  };
 
-  return { fmtBase, goals, loadingGoals, loadingPayslips, currentYear, activeYear, setActiveYear, activeFilter, setActiveFilter, showAdd, setShowAdd, annualGross, years, yearGoals, filteredGoals, stats, handleDelete, handleUpdateMonths, handleAddGoal };
+  return {
+    fmtBase,
+    goals,
+    loadingGoals,
+    loadingPayslips,
+    currentYear,
+    activeYear,
+    setActiveYear,
+    activeFilter,
+    setActiveFilter,
+    showAdd,
+    setShowAdd,
+    annualGross,
+    years,
+    yearGoals,
+    filteredGoals,
+    stats,
+    handleDelete,
+    handleUpdateMonths,
+    handleAddGoal,
+  };
 }
 
 export function Goals() {
-  const { fmtBase, goals, loadingGoals, loadingPayslips, currentYear, activeYear, setActiveYear, activeFilter, setActiveFilter, showAdd, setShowAdd, annualGross, years, yearGoals, filteredGoals, stats, handleDelete, handleUpdateMonths, handleAddGoal } = useGoalsPage();
+  const {
+    fmtBase,
+    goals,
+    loadingGoals,
+    loadingPayslips,
+    currentYear,
+    activeYear,
+    setActiveYear,
+    activeFilter,
+    setActiveFilter,
+    showAdd,
+    setShowAdd,
+    annualGross,
+    years,
+    yearGoals,
+    filteredGoals,
+    stats,
+    handleDelete,
+    handleUpdateMonths,
+    handleAddGoal,
+  } = useGoalsPage();
 
   if (loadingGoals || loadingPayslips) {
     return (
@@ -1448,19 +1742,50 @@ export function Goals() {
   return (
     <div className="p-6 space-y-6">
       {showAdd && <AddGoalModal onClose={() => setShowAdd(false)} onSave={handleAddGoal} />}
-      <GoalsHeader years={years} activeYear={activeYear} currentYear={currentYear} stats={stats} onYearChange={setActiveYear} />
+      <GoalsHeader
+        years={years}
+        activeYear={activeYear}
+        currentYear={currentYear}
+        stats={stats}
+        onYearChange={setActiveYear}
+      />
       <GoalsStatsGrid stats={stats} activeYear={activeYear} fmtBase={fmtBase} />
-      <GoalsFilterBar activeFilter={activeFilter} activeYear={activeYear} currentYear={currentYear} goals={goals} onFilterChange={setActiveFilter} onAdd={() => setShowAdd(true)} />
+      <GoalsFilterBar
+        activeFilter={activeFilter}
+        activeYear={activeYear}
+        currentYear={currentYear}
+        goals={goals}
+        onFilterChange={setActiveFilter}
+        onAdd={() => setShowAdd(true)}
+      />
       {filteredGoals.length === 0 ? (
-        <GoalsEmptyState activeFilter={activeFilter} activeYear={activeYear} onAdd={() => setShowAdd(true)} />
+        <GoalsEmptyState
+          activeFilter={activeFilter}
+          activeYear={activeYear}
+          onAdd={() => setShowAdd(true)}
+        />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {filteredGoals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} annualGross={annualGross} currentYear={currentYear} onDelete={handleDelete} onUpdateMonths={handleUpdateMonths} />
+            <GoalCard
+              key={goal.id}
+              goal={goal}
+              annualGross={annualGross}
+              currentYear={currentYear}
+              onDelete={handleDelete}
+              onUpdateMonths={handleUpdateMonths}
+            />
           ))}
         </div>
       )}
-      {filteredGoals.length > 0 && <GoalsGlance yearGoals={yearGoals} annualGross={annualGross} currentYear={currentYear} activeYear={activeYear} />}
+      {filteredGoals.length > 0 && (
+        <GoalsGlance
+          yearGoals={yearGoals}
+          annualGross={annualGross}
+          currentYear={currentYear}
+          activeYear={activeYear}
+        />
+      )}
     </div>
   );
 }

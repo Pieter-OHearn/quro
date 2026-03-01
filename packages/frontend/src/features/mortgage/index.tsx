@@ -370,7 +370,9 @@ function MortgageRepaymentProgress({
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-slate-900">Mortgage Repayment Progress</h3>
-        <span className="text-sm font-semibold text-indigo-600">{paidPct.toFixed(1)}% paid off</span>
+        <span className="text-sm font-semibold text-indigo-600">
+          {paidPct.toFixed(1)}% paid off
+        </span>
       </div>
       <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-2">
         <div
@@ -462,10 +464,25 @@ function MortgageCharts({ fmt, amortization, paymentBreakdown }: Readonly<Charts
             />
             <Tooltip
               contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-              formatter={(v: number, name) => [fmt(v), name === 'principal' ? 'Principal' : 'Interest']}
+              formatter={(v: number, name) => [
+                fmt(v),
+                name === 'principal' ? 'Principal' : 'Interest',
+              ]}
             />
-            <Bar dataKey="principal" name="principal" fill="#6366f1" stackId="a" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="interest" name="interest" fill="#f59e0b" stackId="a" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="principal"
+              name="principal"
+              fill="#6366f1"
+              stackId="a"
+              radius={[0, 0, 0, 0]}
+            />
+            <Bar
+              dataKey="interest"
+              name="interest"
+              fill="#f59e0b"
+              stackId="a"
+              radius={[4, 4, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
         <div className="flex items-center gap-5 mt-3">
@@ -507,9 +524,9 @@ function MortgageTips({ mortgage, fmt }: Readonly<TipsProps>) {
           <p className="text-sm font-semibold text-emerald-800">Overpayment Opportunity</p>
           <p className="text-xs text-emerald-700 mt-0.5">
             You can overpay up to {mortgage.overpaymentLimit}% (
-            {fmt(mortgage.outstandingBalance * 0.1)}) per year without penalty. An extra{' '}
-            {fmt(200)}/month would save approximately {fmt(12400)} in interest and reduce your term
-            by 3 years.
+            {fmt(mortgage.outstandingBalance * 0.1)}) per year without penalty. An extra {fmt(200)}
+            /month would save approximately {fmt(12400)} in interest and reduce your term by 3
+            years.
           </p>
         </div>
       </div>
@@ -520,10 +537,24 @@ function MortgageTips({ mortgage, fmt }: Readonly<TipsProps>) {
 export function Mortgage() {
   const state = useMortgagePageState();
   const {
-    fmt, mortgages, properties, mortgage, txns, isLoading,
-    showTxnModal, setShowTxnModal, showMortgageModal, setShowMortgageModal,
-    editingMortgage, setEditingMortgage, editingLinkedPropertyId, setActiveMortgageId,
-    handleAddTxn, handleSaveMortgage, handleDeleteTxn, closeMortgageModal,
+    fmt,
+    mortgages,
+    properties,
+    mortgage,
+    txns,
+    isLoading,
+    showTxnModal,
+    setShowTxnModal,
+    showMortgageModal,
+    setShowMortgageModal,
+    editingMortgage,
+    setEditingMortgage,
+    editingLinkedPropertyId,
+    setActiveMortgageId,
+    handleAddTxn,
+    handleSaveMortgage,
+    handleDeleteTxn,
+    closeMortgageModal,
   } = state;
 
   if (isLoading) return <LoadingSpinner className="min-h-[256px]" />;
@@ -598,16 +629,29 @@ export function Mortgage() {
         mortgages={mortgages}
         activeMortgage={mortgage}
         onSelect={setActiveMortgageId}
-        onAddClick={() => { setEditingMortgage(null); setShowMortgageModal(true); }}
+        onAddClick={() => {
+          setEditingMortgage(null);
+          setShowMortgageModal(true);
+        }}
       />
       <MortgageHeroCard
         mortgage={mortgage}
         fmt={fmt}
         yearsRemaining={yearsRemaining}
         monthsRemaining={monthsRemaining}
-        onEdit={() => { setEditingMortgage(mortgage); setShowMortgageModal(true); }}
+        onEdit={() => {
+          setEditingMortgage(mortgage);
+          setShowMortgageModal(true);
+        }}
       />
-      <MortgageStatCards mortgage={mortgage} fmt={fmt} equity={equity} ltv={ltv} paid={paid} paidPct={paidPct} />
+      <MortgageStatCards
+        mortgage={mortgage}
+        fmt={fmt}
+        equity={equity}
+        ltv={ltv}
+        paid={paid}
+        paidPct={paidPct}
+      />
       <MortgageRepaymentProgress mortgage={mortgage} fmt={fmt} paid={paid} paidPct={paidPct} />
       <MortgageCharts fmt={fmt} amortization={amortization} paymentBreakdown={paymentBreakdown} />
       <MortgageTxnHistory

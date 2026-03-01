@@ -62,9 +62,7 @@ const normalizeGoalType = (value: GoalType | string | null | undefined): GoalTyp
 };
 
 const resolveGoalYear = (goal: ApiGoal): number =>
-  toNullableInteger(goal.year) ??
-  inferYearFromDeadline(goal.deadline) ??
-  new Date().getFullYear();
+  toNullableInteger(goal.year) ?? inferYearFromDeadline(goal.deadline) ?? new Date().getFullYear();
 
 const resolveMonthlyTarget = (value: ApiGoal['monthlyTarget']): number | null =>
   value == null ? null : toNumber(value);

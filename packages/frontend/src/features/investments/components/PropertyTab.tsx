@@ -42,15 +42,19 @@ function computePropertyCardStats(
   const equity = property.currentValue - mortgageBalance;
   const appreciation = property.currentValue - property.purchasePrice;
   const appreciationPct = (property.currentValue / property.purchasePrice - 1) * 100;
-  const ltv = mortgageBalance > 0 && property.currentValue > 0
-    ? (mortgageBalance / property.currentValue) * 100 : 0;
+  const ltv =
+    mortgageBalance > 0 && property.currentValue > 0
+      ? (mortgageBalance / property.currentValue) * 100
+      : 0;
 
   const propertyTransactions = propertyTxns.filter((t) => t.propertyId === property.id);
   const txnCount = propertyTransactions.length;
   const totalRent = propertyTransactions
-    .filter((t) => t.type === 'rent_income').reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t.type === 'rent_income')
+    .reduce((sum, t) => sum + t.amount, 0);
   const totalExpenses = propertyTransactions
-    .filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
   const netDisplay = totalRent - totalExpenses;
   const rentMonths = propertyTransactions.filter((t) => t.type === 'rent_income').length;
   const annualRent = rentMonths > 0 ? (totalRent / rentMonths) * 12 : 0;
@@ -59,7 +63,20 @@ function computePropertyCardStats(
   const netYield = property.currentValue > 0 ? (annualNOI / property.currentValue) * 100 : 0;
   const hasPL = totalRent > 0 || totalExpenses > 0;
 
-  return { equity, appreciation, appreciationPct, ltv, mortgageBalance, totalRent, totalExpenses, netDisplay, grossYield, netYield, txnCount, hasPL };
+  return {
+    equity,
+    appreciation,
+    appreciationPct,
+    ltv,
+    mortgageBalance,
+    totalRent,
+    totalExpenses,
+    netDisplay,
+    grossYield,
+    netYield,
+    txnCount,
+    hasPL,
+  };
 }
 
 type PropertyValueGridProps = {
@@ -77,9 +94,13 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
         <p className="font-bold text-slate-900 text-sm">
           {fmtNative(property.currentValue, property.currency, true)}
         </p>
-        <p className={`text-[10px] mt-0.5 font-medium ${stats.appreciation >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-          {stats.appreciation >= 0 ? '+' : ''}{fmtNative(stats.appreciation, property.currency, true)} (
-          {stats.appreciationPct >= 0 ? '+' : ''}{stats.appreciationPct.toFixed(1)}%)
+        <p
+          className={`text-[10px] mt-0.5 font-medium ${stats.appreciation >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+        >
+          {stats.appreciation >= 0 ? '+' : ''}
+          {fmtNative(stats.appreciation, property.currency, true)} (
+          {stats.appreciationPct >= 0 ? '+' : ''}
+          {stats.appreciationPct.toFixed(1)}%)
         </p>
       </div>
       <div className="bg-slate-50 rounded-xl p-3">
@@ -92,7 +113,11 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
         {linkedMortgage && (
           <p className="text-[10px] text-slate-400 mt-0.5">
             LTV{' '}
-            <span className={stats.ltv < 70 ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
+            <span
+              className={
+                stats.ltv < 70 ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'
+              }
+            >
               {stats.ltv.toFixed(1)}%
             </span>
           </p>
@@ -124,7 +149,10 @@ function MortgageLinkRow({ property: _property, linkedMortgage, fmtNative }: Mor
             </p>
           </div>
         </div>
-        <Link to="/mortgage" className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors flex-shrink-0">
+        <Link
+          to="/mortgage"
+          className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors flex-shrink-0"
+        >
           View <ExternalLink size={10} />
         </Link>
       </div>
@@ -139,9 +167,14 @@ function MortgageLinkRow({ property: _property, linkedMortgage, fmtNative }: Mor
         <div className="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
           <Building2 size={11} className="text-slate-400" />
         </div>
-        <p className="text-xs text-slate-400 truncate">No mortgage linked — add one on the Mortgage page</p>
+        <p className="text-xs text-slate-400 truncate">
+          No mortgage linked — add one on the Mortgage page
+        </p>
       </div>
-      <ExternalLink size={11} className="text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+      <ExternalLink
+        size={11}
+        className="text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0"
+      />
     </Link>
   );
 }
@@ -158,19 +191,34 @@ function PropertyPLGrid({ property, stats, fmtNative }: PropertyPLGridProps) {
     <>
       <div className="grid grid-cols-3 gap-2 mb-3">
         <div className="text-center bg-indigo-50 rounded-xl p-2.5">
-          <p className="text-[9px] text-indigo-500 font-medium uppercase tracking-wide mb-0.5">Gross Rent</p>
-          <p className="text-xs font-bold text-indigo-700">+{fmtNative(totalRent, property.currency, true)}</p>
+          <p className="text-[9px] text-indigo-500 font-medium uppercase tracking-wide mb-0.5">
+            Gross Rent
+          </p>
+          <p className="text-xs font-bold text-indigo-700">
+            +{fmtNative(totalRent, property.currency, true)}
+          </p>
         </div>
         <div className="text-center bg-rose-50 rounded-xl p-2.5">
-          <p className="text-[9px] text-rose-500 font-medium uppercase tracking-wide mb-0.5">Expenses</p>
-          <p className="text-xs font-bold text-rose-600">-{fmtNative(totalExpenses, property.currency, true)}</p>
+          <p className="text-[9px] text-rose-500 font-medium uppercase tracking-wide mb-0.5">
+            Expenses
+          </p>
+          <p className="text-xs font-bold text-rose-600">
+            -{fmtNative(totalExpenses, property.currency, true)}
+          </p>
         </div>
-        <div className={`text-center rounded-xl p-2.5 ${netDisplay >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-          <p className={`text-[9px] font-medium uppercase tracking-wide mb-0.5 ${netDisplay >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+        <div
+          className={`text-center rounded-xl p-2.5 ${netDisplay >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}
+        >
+          <p
+            className={`text-[9px] font-medium uppercase tracking-wide mb-0.5 ${netDisplay >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+          >
             Net Income
           </p>
-          <p className={`text-xs font-bold ${netDisplay >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-            {netDisplay >= 0 ? '+' : '-'}{fmtNative(Math.abs(netDisplay), property.currency, true)}
+          <p
+            className={`text-xs font-bold ${netDisplay >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}
+          >
+            {netDisplay >= 0 ? '+' : '-'}
+            {fmtNative(Math.abs(netDisplay), property.currency, true)}
           </p>
         </div>
       </div>
@@ -187,14 +235,20 @@ type PropertyYieldBadgesProps = {
   netYield: number;
 };
 
-function PropertyYieldBadges({ property: _property, grossYield, netYield }: PropertyYieldBadgesProps) {
+function PropertyYieldBadges({
+  property: _property,
+  grossYield,
+  netYield,
+}: PropertyYieldBadgesProps) {
   const linkedMortgage = undefined as Mortgage | undefined;
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">
         Gross yield {grossYield.toFixed(2)}%
       </span>
-      <span className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${netYield >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
+      <span
+        className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${netYield >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}
+      >
         Net yield {netYield.toFixed(2)}%
       </span>
       {linkedMortgage && (
@@ -228,7 +282,12 @@ type PropertyCardHeaderProps = {
 };
 
 function PropertyCardHeader({
-  property, linkedMortgage, isExpanded, txnCount, onUpdateProperty, onToggleExpanded,
+  property,
+  linkedMortgage,
+  isExpanded,
+  txnCount,
+  onUpdateProperty,
+  onToggleExpanded,
 }: PropertyCardHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-3 mb-4">
@@ -237,20 +296,34 @@ function PropertyCardHeader({
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 truncate">{property.address}</p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">{property.propertyType}</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{property.currency}</span>
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+              {property.propertyType}
+            </span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+              {property.currency}
+            </span>
             {!linkedMortgage && (
-              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-medium">Unencumbered</span>
+              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
+                Unencumbered
+              </span>
             )}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">{txnCount} transactions</p>
         </div>
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
-        <button onClick={() => onUpdateProperty(property)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Edit property">
+        <button
+          onClick={() => onUpdateProperty(property)}
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          title="Edit property"
+        >
           <Edit3 size={14} />
         </button>
-        <button onClick={() => onToggleExpanded(property.id)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title={isExpanded ? 'Collapse' : 'View transactions'}>
+        <button
+          onClick={() => onToggleExpanded(property.id)}
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          title={isExpanded ? 'Collapse' : 'View transactions'}
+        >
           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
       </div>
@@ -259,24 +332,51 @@ function PropertyCardHeader({
 }
 
 function PropertyCard({
-  property, propertyTxns, mortgageById, isExpanded, fmtNative,
-  onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onDeleteTxn,
+  property,
+  propertyTxns,
+  mortgageById,
+  isExpanded,
+  fmtNative,
+  onUpdateProperty,
+  onToggleExpanded,
+  onAddTxnForProperty,
+  onDeleteTxn,
 }: PropertyCardProps) {
-  const linkedMortgage = property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
+  const linkedMortgage =
+    property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
   const stats = computePropertyCardStats(property, propertyTxns, mortgageById);
 
   return (
-    <div className={`border border-slate-100 rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${isExpanded ? 'shadow-md' : ''}`}>
+    <div
+      className={`border border-slate-100 rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${isExpanded ? 'shadow-md' : ''}`}
+    >
       <div className="p-5 bg-white">
         <PropertyCardHeader
-          property={property} linkedMortgage={linkedMortgage} isExpanded={isExpanded}
-          txnCount={stats.txnCount} onUpdateProperty={onUpdateProperty} onToggleExpanded={onToggleExpanded}
+          property={property}
+          linkedMortgage={linkedMortgage}
+          isExpanded={isExpanded}
+          txnCount={stats.txnCount}
+          onUpdateProperty={onUpdateProperty}
+          onToggleExpanded={onToggleExpanded}
         />
-        <PropertyValueGrid property={property} linkedMortgage={linkedMortgage} stats={stats} fmtNative={fmtNative} />
-        <MortgageLinkRow property={property} linkedMortgage={linkedMortgage} fmtNative={fmtNative} />
+        <PropertyValueGrid
+          property={property}
+          linkedMortgage={linkedMortgage}
+          stats={stats}
+          fmtNative={fmtNative}
+        />
+        <MortgageLinkRow
+          property={property}
+          linkedMortgage={linkedMortgage}
+          fmtNative={fmtNative}
+        />
         {stats.hasPL && <PropertyPLGrid property={property} stats={stats} fmtNative={fmtNative} />}
         {stats.grossYield > 0 && !stats.hasPL && (
-          <PropertyYieldBadges property={property} grossYield={stats.grossYield} netYield={stats.netYield} />
+          <PropertyYieldBadges
+            property={property}
+            grossYield={stats.grossYield}
+            netYield={stats.netYield}
+          />
         )}
       </div>
       {isExpanded && (
@@ -296,8 +396,15 @@ type PropertyCardsListProps = Omit<PropertyTabProps, 'onAddProperty'> & {
 };
 
 function PropertyCardsList({
-  properties, propertyTxns, mortgageById, expandedPropertyId, fmtNative,
-  onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onDeleteTxn,
+  properties,
+  propertyTxns,
+  mortgageById,
+  expandedPropertyId,
+  fmtNative,
+  onUpdateProperty,
+  onToggleExpanded,
+  onAddTxnForProperty,
+  onDeleteTxn,
 }: PropertyCardsListProps) {
   return (
     <div className="p-6 pt-0 space-y-4">
@@ -320,14 +427,23 @@ function PropertyCardsList({
 }
 
 export function PropertyTab({
-  properties, propertyTxns, mortgageById, expandedPropertyId, fmtNative,
-  onAddProperty, onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onDeleteTxn,
+  properties,
+  propertyTxns,
+  mortgageById,
+  expandedPropertyId,
+  fmtNative,
+  onAddProperty,
+  onUpdateProperty,
+  onToggleExpanded,
+  onAddTxnForProperty,
+  onDeleteTxn,
 }: PropertyTabProps) {
   return (
     <div>
       <div className="px-6 pt-5 pb-3 flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          {properties.length} {properties.length === 1 ? 'property' : 'properties'} · click a card to view transactions
+          {properties.length} {properties.length === 1 ? 'property' : 'properties'} · click a card
+          to view transactions
         </p>
         <button
           onClick={onAddProperty}
@@ -345,10 +461,15 @@ export function PropertyTab({
         />
       ) : (
         <PropertyCardsList
-          properties={properties} propertyTxns={propertyTxns} mortgageById={mortgageById}
-          expandedPropertyId={expandedPropertyId} fmtNative={fmtNative}
-          onUpdateProperty={onUpdateProperty} onToggleExpanded={onToggleExpanded}
-          onAddTxnForProperty={onAddTxnForProperty} onDeleteTxn={onDeleteTxn}
+          properties={properties}
+          propertyTxns={propertyTxns}
+          mortgageById={mortgageById}
+          expandedPropertyId={expandedPropertyId}
+          fmtNative={fmtNative}
+          onUpdateProperty={onUpdateProperty}
+          onToggleExpanded={onToggleExpanded}
+          onAddTxnForProperty={onAddTxnForProperty}
+          onDeleteTxn={onDeleteTxn}
         />
       )}
     </div>

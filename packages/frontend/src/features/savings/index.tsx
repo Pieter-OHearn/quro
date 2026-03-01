@@ -78,7 +78,14 @@ function TotalSavingsCard({
   );
 }
 
-function SavingsStats({ totalInBase, totalInterest, avgRate, accounts, transactions, fmtBase }: StatsProps) {
+function SavingsStats({
+  totalInBase,
+  totalInterest,
+  avgRate,
+  accounts,
+  transactions,
+  fmtBase,
+}: StatsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <TotalSavingsCard
@@ -127,7 +134,11 @@ type ChartsProps = {
   fmtBase: FmtBase;
 };
 
-function GrowthChart({ growthChartData, baseCurrency, fmtBase }: Pick<ChartsProps, 'growthChartData' | 'baseCurrency' | 'fmtBase'>) {
+function GrowthChart({
+  growthChartData,
+  baseCurrency,
+  fmtBase,
+}: Pick<ChartsProps, 'growthChartData' | 'baseCurrency' | 'fmtBase'>) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
       <h3 className="font-semibold text-slate-900 mb-1">Savings Growth</h3>
@@ -141,20 +152,42 @@ function GrowthChart({ growthChartData, baseCurrency, fmtBase }: Pick<ChartsProp
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+          />
           <Tooltip
             formatter={(v: number) => [fmtBase(v), 'Total Savings']}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
           />
-          <Area type="monotone" dataKey="savings" stroke="#6366f1" strokeWidth={2.5} fill="url(#savingsGrad)" dot={{ r: 3, fill: '#6366f1' }} activeDot={{ r: 5 }} />
+          <Area
+            type="monotone"
+            dataKey="savings"
+            stroke="#6366f1"
+            strokeWidth={2.5}
+            fill="url(#savingsGrad)"
+            dot={{ r: 3, fill: '#6366f1' }}
+            activeDot={{ r: 5 }}
+          />
         </AreaChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-function ContribChart({ contribChartData, baseCurrency, fmtBase }: Pick<ChartsProps, 'contribChartData' | 'baseCurrency' | 'fmtBase'>) {
+function ContribChart({
+  contribChartData,
+  baseCurrency,
+  fmtBase,
+}: Pick<ChartsProps, 'contribChartData' | 'baseCurrency' | 'fmtBase'>) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
       <h3 className="font-semibold text-slate-900 mb-1">Contributions vs Interest</h3>
@@ -162,13 +195,29 @@ function ContribChart({ contribChartData, baseCurrency, fmtBase }: Pick<ChartsPr
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={contribChartData} barSize={18}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`} />
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
+          />
           <Tooltip
-            formatter={(v: number, name: string) => [fmtBase(v), name === 'contribution' ? 'Net Contributions' : 'Interest']}
+            formatter={(v: number, name: string) => [
+              fmtBase(v),
+              name === 'contribution' ? 'Net Contributions' : 'Interest',
+            ]}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
           />
-          <Legend wrapperStyle={{ fontSize: '11px' }} formatter={(v) => (v === 'contribution' ? 'Net Contributions' : 'Interest')} />
+          <Legend
+            wrapperStyle={{ fontSize: '11px' }}
+            formatter={(v) => (v === 'contribution' ? 'Net Contributions' : 'Interest')}
+          />
           <Bar dataKey="contribution" fill="#6366f1" radius={[4, 4, 0, 0]} />
           <Bar dataKey="interest" fill="#10b981" radius={[4, 4, 0, 0]} />
         </BarChart>
@@ -180,8 +229,16 @@ function ContribChart({ contribChartData, baseCurrency, fmtBase }: Pick<ChartsPr
 function SavingsCharts({ growthChartData, contribChartData, baseCurrency, fmtBase }: ChartsProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <GrowthChart growthChartData={growthChartData} baseCurrency={baseCurrency} fmtBase={fmtBase} />
-      <ContribChart contribChartData={contribChartData} baseCurrency={baseCurrency} fmtBase={fmtBase} />
+      <GrowthChart
+        growthChartData={growthChartData}
+        baseCurrency={baseCurrency}
+        fmtBase={fmtBase}
+      />
+      <ContribChart
+        contribChartData={contribChartData}
+        baseCurrency={baseCurrency}
+        fmtBase={fmtBase}
+      />
     </div>
   );
 }
@@ -215,13 +272,27 @@ type AccountRowHeaderProps = {
   onEdit: () => void;
 };
 
-function AccountRowMeta({ acc, accTxns, pct, foreign }: { acc: SavingsAccount; accTxns: SavingsTransaction[]; pct: number; foreign: boolean }) {
+function AccountRowMeta({
+  acc,
+  accTxns,
+  pct,
+  foreign,
+}: {
+  acc: SavingsAccount;
+  accTxns: SavingsTransaction[];
+  pct: number;
+  foreign: boolean;
+}) {
   return (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-0.5 flex-wrap">
         <p className="text-sm font-semibold text-slate-800">{acc.name}</p>
-        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{acc.accountType}</span>
-        <span className={`text-[10px] px-2 py-0.5 rounded-full ${foreign ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+          {acc.accountType}
+        </span>
+        <span
+          className={`text-[10px] px-2 py-0.5 rounded-full ${foreign ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
+        >
           {acc.currency}
         </span>
       </div>
@@ -229,7 +300,10 @@ function AccountRowMeta({ acc, accTxns, pct, foreign }: { acc: SavingsAccount; a
         {acc.bank} · {accTxns.length} transactions
       </p>
       <div className="mt-2 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: acc.color }} />
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, backgroundColor: acc.color }}
+        />
       </div>
     </div>
   );
@@ -259,7 +333,9 @@ function AccountRowBalance({
         </p>
       )}
       <p className="text-xs text-emerald-600">{acc.interestRate}% APY</p>
-      <p className="text-xs text-slate-400">{fmtNative(monthlyInterest, acc.currency, true)}/mo interest</p>
+      <p className="text-xs text-slate-400">
+        {fmtNative(monthlyInterest, acc.currency, true)}/mo interest
+      </p>
     </div>
   );
 }
@@ -295,10 +371,18 @@ function AccountRowHeader({
         fmtNative={fmtNative}
       />
       <div className="flex items-center gap-1 flex-shrink-0">
-        <button onClick={onEdit} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Edit account">
+        <button
+          onClick={onEdit}
+          className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          title="Edit account"
+        >
           <Edit3 size={14} />
         </button>
-        <button onClick={onToggleExpand} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors" title={isExpanded ? 'Hide transactions' : 'Show transactions'}>
+        <button
+          onClick={onToggleExpand}
+          className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+          title={isExpanded ? 'Hide transactions' : 'Show transactions'}
+        >
           {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
       </div>
@@ -342,7 +426,12 @@ function AccountRow({
         onEdit={onEdit}
       />
       {isExpanded && (
-        <TxnHistory account={acc} transactions={transactions} onAdd={onAddTxn} onDelete={onDeleteTxn} />
+        <TxnHistory
+          account={acc}
+          transactions={transactions}
+          onAdd={onAddTxn}
+          onDelete={onDeleteTxn}
+        />
       )}
     </div>
   );
@@ -365,7 +454,13 @@ type AccountsListProps = {
   onDeleteTxn: (id: number) => void;
 };
 
-function AccountsListHeader({ accounts, onAddAccount }: { accounts: SavingsAccount[]; onAddAccount: () => void }) {
+function AccountsListHeader({
+  accounts,
+  onAddAccount,
+}: {
+  accounts: SavingsAccount[];
+  onAddAccount: () => void;
+}) {
   return (
     <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
       <div>
@@ -459,10 +554,21 @@ function useContribChartData(
     }
     return MONTH_PREFIXES.map(({ label, prefix }) => {
       const monthTxns = transactions.filter((t) => t.date.startsWith(prefix));
-      const deposits = monthTxns.filter((t) => t.type === 'deposit').reduce((s, t) => s + getBase(t), 0);
-      const withdrawals = monthTxns.filter((t) => t.type === 'withdrawal').reduce((s, t) => s + getBase(t), 0);
-      const interest = monthTxns.filter((t) => t.type === 'interest').reduce((s, t) => s + getBase(t), 0);
-      return { month: label, contribution: Math.round(deposits - withdrawals), interest: Math.round(interest), withdrawals: Math.round(withdrawals) };
+      const deposits = monthTxns
+        .filter((t) => t.type === 'deposit')
+        .reduce((s, t) => s + getBase(t), 0);
+      const withdrawals = monthTxns
+        .filter((t) => t.type === 'withdrawal')
+        .reduce((s, t) => s + getBase(t), 0);
+      const interest = monthTxns
+        .filter((t) => t.type === 'interest')
+        .reduce((s, t) => s + getBase(t), 0);
+      return {
+        month: label,
+        contribution: Math.round(deposits - withdrawals),
+        interest: Math.round(interest),
+        withdrawals: Math.round(withdrawals),
+      };
     });
   }, [transactions, accounts, convertToBase]);
 }
@@ -495,7 +601,17 @@ function useSavingsData() {
   const deleteAccount = useDeleteSavingsAccount();
   const createTxn = useCreateSavingsTransaction();
   const deleteTxn = useDeleteSavingsTransaction();
-  return { accounts, transactions, loadingAccounts, loadingTxns, createAccount, updateAccount, deleteAccount, createTxn, deleteTxn };
+  return {
+    accounts,
+    transactions,
+    loadingAccounts,
+    loadingTxns,
+    createAccount,
+    updateAccount,
+    deleteAccount,
+    createTxn,
+    deleteTxn,
+  };
 }
 
 function useSavingsMetrics(
@@ -507,13 +623,20 @@ function useSavingsMetrics(
     [accounts, convertToBase],
   );
   const totalInterest = useMemo(
-    () => accounts.reduce((s, a) => s + convertToBase((a.balance * a.interestRate) / 100 / 12, a.currency), 0),
+    () =>
+      accounts.reduce(
+        (s, a) => s + convertToBase((a.balance * a.interestRate) / 100 / 12, a.currency),
+        0,
+      ),
     [accounts, convertToBase],
   );
   const avgRate = useMemo(
     () =>
       accounts.length && totalInBase > 0
-        ? accounts.reduce((s, a) => s + a.interestRate * (convertToBase(a.balance, a.currency) / totalInBase), 0)
+        ? accounts.reduce(
+            (s, a) => s + a.interestRate * (convertToBase(a.balance, a.currency) / totalInBase),
+            0,
+          )
         : 0,
     [accounts, totalInBase, convertToBase],
   );
@@ -522,7 +645,17 @@ function useSavingsMetrics(
 
 export function Savings() {
   const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
-  const { accounts, transactions, loadingAccounts, loadingTxns, createAccount, updateAccount, deleteAccount, createTxn, deleteTxn } = useSavingsData();
+  const {
+    accounts,
+    transactions,
+    loadingAccounts,
+    loadingTxns,
+    createAccount,
+    updateAccount,
+    deleteAccount,
+    createTxn,
+    deleteTxn,
+  } = useSavingsData();
 
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [editing, setEditing] = useState<SavingsAccount | undefined>(undefined);
@@ -545,16 +678,35 @@ export function Savings() {
       {(showAccountModal || editing) && (
         <AccountModal
           existing={editing}
-          onClose={() => { setShowAccountModal(false); setEditing(undefined); }}
+          onClose={() => {
+            setShowAccountModal(false);
+            setEditing(undefined);
+          }}
           onSave={handleSaveAccount}
           onDelete={(id) => deleteAccount.mutate(id)}
         />
       )}
       {addTxnFor && (
-        <AddTxnModal account={addTxnFor} onClose={() => setAddTxnFor(null)} onSave={(t) => createTxn.mutate(t)} />
+        <AddTxnModal
+          account={addTxnFor}
+          onClose={() => setAddTxnFor(null)}
+          onSave={(t) => createTxn.mutate(t)}
+        />
       )}
-      <SavingsStats totalInBase={totalInBase} totalInterest={totalInterest} avgRate={avgRate} accounts={accounts} transactions={transactions} fmtBase={fmtBase} />
-      <SavingsCharts growthChartData={growthChartData} contribChartData={contribChartData} baseCurrency={baseCurrency} fmtBase={fmtBase} />
+      <SavingsStats
+        totalInBase={totalInBase}
+        totalInterest={totalInterest}
+        avgRate={avgRate}
+        accounts={accounts}
+        transactions={transactions}
+        fmtBase={fmtBase}
+      />
+      <SavingsCharts
+        growthChartData={growthChartData}
+        contribChartData={contribChartData}
+        baseCurrency={baseCurrency}
+        fmtBase={fmtBase}
+      />
       <AccountsList
         accounts={accounts}
         transactions={transactions}
@@ -567,7 +719,10 @@ export function Savings() {
         fmtNative={fmtNative}
         onToggleExpand={(id) => setExpandedId(expandedId === id ? null : id)}
         onEdit={(acc) => setEditing(acc)}
-        onAddAccount={() => { setEditing(undefined); setShowAccountModal(true); }}
+        onAddAccount={() => {
+          setEditing(undefined);
+          setShowAccountModal(true);
+        }}
         onAddTxn={(acc) => setAddTxnFor(acc)}
         onDeleteTxn={(id) => deleteTxn.mutate(id)}
       />

@@ -63,7 +63,18 @@ function useUpdatePropertyForm(property: Property) {
     setErrors((previous) => ({ ...previous, value: '' }));
   }
 
-  return { value, rent, errors, numericValue, equity, appreciation, appreciationPct, setRent, setErrors, handleValueChange };
+  return {
+    value,
+    rent,
+    errors,
+    numericValue,
+    equity,
+    appreciation,
+    appreciationPct,
+    setRent,
+    setErrors,
+    handleValueChange,
+  };
 }
 
 type MortgageBalanceFieldProps = {
@@ -123,7 +134,11 @@ export function UpdatePropertyModal({
           Previously {fmtNative(property.currentValue, property.currency)}
         </p>
       </FormField>
-      <MortgageBalanceField mortgageBalance={mortgageBalance} currency={property.currency} fmtNative={fmtNative} />
+      <MortgageBalanceField
+        mortgageBalance={mortgageBalance}
+        currency={property.currency}
+        fmtNative={fmtNative}
+      />
       <FormField label={`Monthly Rent (${property.currency})`}>
         <TextInput type="number" value={form.rent} onChange={form.setRent} />
       </FormField>

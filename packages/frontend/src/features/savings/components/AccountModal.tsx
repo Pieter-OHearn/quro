@@ -56,7 +56,15 @@ function validateAccountForm(form: FormState): Record<string, string> {
 
 function initialFormState(existing?: SavingsAccount): FormState {
   if (!existing) {
-    return { name: '', bank: '', balance: '', currency: 'EUR', rate: '', type: 'Easy Access', emoji: '\ud83c\udfe6' };
+    return {
+      name: '',
+      bank: '',
+      balance: '',
+      currency: 'EUR',
+      rate: '',
+      type: 'Easy Access',
+      emoji: '\ud83c\udfe6',
+    };
   }
   return {
     name: existing.name,

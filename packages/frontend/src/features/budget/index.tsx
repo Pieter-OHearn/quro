@@ -116,7 +116,13 @@ function SavingsRateCard({ savingsRate }: Readonly<{ savingsRate: number }>) {
   );
 }
 
-function BudgetSummaryCards({ totalBudgeted, totalSpent, remaining, savingsRate, fmt }: SummaryCardsProps) {
+function BudgetSummaryCards({
+  totalBudgeted,
+  totalSpent,
+  remaining,
+  savingsRate,
+  fmt,
+}: SummaryCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <TotalBudgetCard totalBudgeted={totalBudgeted} fmt={fmt} />
@@ -523,7 +529,20 @@ function useBudgetPage() {
 }
 
 export function Budget() {
-  const { fmtDec, fmt, baseCurrency, categories, budgetTransactions, loadingCats, loadingTxns, showAdd, newCat, setShowAdd, setNewCat, handleAddCategory } = useBudgetPage();
+  const {
+    fmtDec,
+    fmt,
+    baseCurrency,
+    categories,
+    budgetTransactions,
+    loadingCats,
+    loadingTxns,
+    showAdd,
+    newCat,
+    setShowAdd,
+    setNewCat,
+    handleAddCategory,
+  } = useBudgetPage();
 
   if (loadingCats || loadingTxns) {
     return (

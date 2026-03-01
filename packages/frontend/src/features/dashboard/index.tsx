@@ -150,7 +150,11 @@ function AllocationLegend({
   data,
   totalAlloc,
   fmtBase,
-}: Readonly<{ data: readonly AllocationItem[]; totalAlloc: number; fmtBase: (n: number) => string }>) {
+}: Readonly<{
+  data: readonly AllocationItem[];
+  totalAlloc: number;
+  fmtBase: (n: number) => string;
+}>) {
   return (
     <div className="space-y-2">
       {data.map((item) => (
@@ -214,7 +218,9 @@ function TransactionItem({
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${txIconClass(tx.type)}`}>
+        <div
+          className={`w-9 h-9 rounded-xl flex items-center justify-center ${txIconClass(tx.type)}`}
+        >
           <CreditCard size={15} />
         </div>
         <div>
@@ -224,7 +230,9 @@ function TransactionItem({
           </p>
         </div>
       </div>
-      <span className={`text-sm font-semibold ${tx.amount > 0 ? 'text-emerald-600' : 'text-slate-700'}`}>
+      <span
+        className={`text-sm font-semibold ${tx.amount > 0 ? 'text-emerald-600' : 'text-slate-700'}`}
+      >
         {tx.amount > 0 ? '+' : ''}
         {fmtBase(Math.abs(tx.amount), undefined, true)}
       </span>
@@ -463,7 +471,9 @@ const getMonthKeys = (d: Date) => {
 const computeSalary = (txns: readonly DashboardTx[], monthKey: string, prevKey: string) => {
   const monthlySalary = txns.filter((t) => t.category === 'Salary' && t.date.startsWith(monthKey));
   const thisMonth = monthlySalary.reduce((s, t) => s + Math.abs(t.amount), 0);
-  const lastMonth = txns.filter((t) => t.category === 'Salary' && t.date.startsWith(prevKey)).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const lastMonth = txns
+    .filter((t) => t.category === 'Salary' && t.date.startsWith(prevKey))
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
   const latest = txns.find((t) => t.category === 'Salary');
   const value = thisMonth > 0 ? thisMonth : latest ? Math.abs(latest.amount) : 0;
   return { monthlySalaryValue: value, monthlySalaryChange: lastMonth > 0 ? value - lastMonth : 0 };
@@ -473,13 +483,42 @@ const computeNWMetrics = (chartData: readonly { value: number }[], totalAlloc: n
   const currentNW = chartData.length > 0 ? chartData[chartData.length - 1].value : totalAlloc;
   const prevNW = chartData.length > 1 ? chartData[chartData.length - 2].value : currentNW;
   const firstNW = chartData.length > 0 ? chartData[0].value : currentNW;
-  return { netWorth: currentNW, monthChange: currentNW - prevNW, ytdPct: firstNW > 0 ? ((currentNW - firstNW) / firstNW) * 100 : 0 };
+  return {
+    netWorth: currentNW,
+    monthChange: currentNW - prevNW,
+    ytdPct: firstNW > 0 ? ((currentNW - firstNW) / firstNW) * 100 : 0,
+  };
 };
 
-const buildMonthlySummaryItems = (income: number, expenses: number, fmtBase: (n: number, u?: undefined, c?: boolean) => string): MonthlySummaryItem[] => [
-  { label: 'Total Income', value: fmtBase(income, undefined, true), icon: '\ud83d\udcb0', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100' },
-  { label: 'Total Expenses', value: fmtBase(expenses, undefined, true), icon: '\ud83d\udce4', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-100' },
-  { label: 'Monthly Savings', value: fmtBase(income - expenses, undefined, true), icon: '\ud83c\udfe6', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-100' },
+const buildMonthlySummaryItems = (
+  income: number,
+  expenses: number,
+  fmtBase: (n: number, u?: undefined, c?: boolean) => string,
+): MonthlySummaryItem[] => [
+  {
+    label: 'Total Income',
+    value: fmtBase(income, undefined, true),
+    icon: '\ud83d\udcb0',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    border: 'border-emerald-100',
+  },
+  {
+    label: 'Total Expenses',
+    value: fmtBase(expenses, undefined, true),
+    icon: '\ud83d\udce4',
+    bg: 'bg-rose-50',
+    text: 'text-rose-700',
+    border: 'border-rose-100',
+  },
+  {
+    label: 'Monthly Savings',
+    value: fmtBase(income - expenses, undefined, true),
+    icon: '\ud83c\udfe6',
+    bg: 'bg-indigo-50',
+    text: 'text-indigo-700',
+    border: 'border-indigo-100',
+  },
 ];
 
 function useDashboardData(fmtBase: (n: number, u?: undefined, c?: boolean) => string) {
@@ -492,25 +531,50 @@ function useDashboardData(fmtBase: (n: number, u?: undefined, c?: boolean) => st
   const chartData = netWorthData.map((s) => ({ month: s.month, value: s.totalValue }));
   const allocationData = allocations.map((a) => ({ name: a.name, value: a.value, color: a.color }));
   const totalAlloc = allocationData.reduce((s, d) => s + d.value, 0);
-  const allocationByName = allocationData.reduce<Record<string, number>>((acc, item) => { acc[item.name] = item.value; return acc; }, {});
+  const allocationByName = allocationData.reduce<Record<string, number>>((acc, item) => {
+    acc[item.name] = item.value;
+    return acc;
+  }, {});
 
   const { currentKey, prevKey } = getMonthKeys(new Date());
   const monthTxns = recentTransactions.filter((tx) => tx.date.startsWith(currentKey));
   const monthlyCategoryChange = (category: string) =>
-    monthTxns.filter((tx) => tx.category === category).reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
+    monthTxns
+      .filter((tx) => tx.category === category)
+      .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
 
-  const { monthlySalaryValue, monthlySalaryChange } = computeSalary(recentTransactions, currentKey, prevKey);
+  const { monthlySalaryValue, monthlySalaryChange } = computeSalary(
+    recentTransactions,
+    currentKey,
+    prevKey,
+  );
   const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, totalAlloc);
 
-  const totalIncome = recentTransactions.filter((tx) => tx.type === 'income').reduce((s, tx) => s + Math.abs(tx.amount), 0);
-  const totalExpenses = recentTransactions.filter((tx) => tx.type === 'expense').reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const totalIncome = recentTransactions
+    .filter((tx) => tx.type === 'income')
+    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const totalExpenses = recentTransactions
+    .filter((tx) => tx.type === 'expense')
+    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
 
   return {
-    isLoading, chartData, allocationData, totalAlloc, goals, recentTransactions,
-    monthlySalaryValue, monthlyCategoryChange, monthlySalaryChange, allocationByName,
-    netWorth, monthChange, ytdPct,
+    isLoading,
+    chartData,
+    allocationData,
+    totalAlloc,
+    goals,
+    recentTransactions,
+    monthlySalaryValue,
+    monthlyCategoryChange,
+    monthlySalaryChange,
+    allocationByName,
+    netWorth,
+    monthChange,
+    ytdPct,
     displayedGoals: goals.map((g) => deriveGoalDisplay(g, monthlySalaryValue)).slice(0, 4),
-    displayedRecentTransactions: [...recentTransactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6),
+    displayedRecentTransactions: [...recentTransactions]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 6),
     monthlySummaryItems: buildMonthlySummaryItems(totalIncome, totalExpenses, fmtBase),
   };
 }
@@ -521,9 +585,21 @@ export function Dashboard() {
   const { fmtBase, baseCurrency } = useCurrency();
   const { user } = useAuth();
   const {
-    isLoading, chartData, allocationData, totalAlloc, recentTransactions,
-    monthlySalaryValue, monthlyCategoryChange, monthlySalaryChange, allocationByName,
-    netWorth, monthChange, ytdPct, displayedGoals, displayedRecentTransactions, monthlySummaryItems,
+    isLoading,
+    chartData,
+    allocationData,
+    totalAlloc,
+    recentTransactions,
+    monthlySalaryValue,
+    monthlyCategoryChange,
+    monthlySalaryChange,
+    allocationByName,
+    netWorth,
+    monthChange,
+    ytdPct,
+    displayedGoals,
+    displayedRecentTransactions,
+    monthlySummaryItems,
   } = useDashboardData(fmtBase);
 
   const hour = new Date().getHours();
@@ -531,40 +607,80 @@ export function Dashboard() {
   const greetingName = user?.name ?? 'there';
 
   const dashboardCards = buildDashboardCards(
-    allocationByName, monthlySalaryValue, monthlySalaryChange, monthlyCategoryChange,
+    allocationByName,
+    monthlySalaryValue,
+    monthlySalaryChange,
+    monthlyCategoryChange,
   );
 
   if (isLoading) return <LoadingSpinner />;
 
   return (
     <div className="p-6 space-y-6">
-      <WelcomeBanner greeting={greeting} greetingName={greetingName} netWorth={netWorth} monthChange={monthChange} baseCurrency={baseCurrency} fmtBase={fmtBase} />
+      <WelcomeBanner
+        greeting={greeting}
+        greetingName={greetingName}
+        netWorth={netWorth}
+        monthChange={monthChange}
+        baseCurrency={baseCurrency}
+        fmtBase={fmtBase}
+      />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {dashboardCards.map((card) => {
           const Icon = card.icon;
           return (
-            <StatCard key={card.label} label={card.label} value={fmtBase(card.value)} icon={Icon} color={card.color} href={card.path}
-              change={{ value: `${card.monthlyChange >= 0 ? '+' : '-'}${fmtBase(Math.abs(card.monthlyChange), undefined, true)} this month`, positive: card.monthlyChange >= 0 }}
+            <StatCard
+              key={card.label}
+              label={card.label}
+              value={fmtBase(card.value)}
+              icon={Icon}
+              color={card.color}
+              href={card.path}
+              change={{
+                value: `${card.monthlyChange >= 0 ? '+' : '-'}${fmtBase(Math.abs(card.monthlyChange), undefined, true)} this month`,
+                positive: card.monthlyChange >= 0,
+              }}
             />
           );
         })}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <AreaChartCard title="Net Worth Growth" subtitle={`Last ${chartData.length} months in ${baseCurrency}`}
-            data={chartData} dataKey="value" xKey="month" color="#6366f1" height={220} formatValue={fmtBase}
-            badge={ytdPct !== 0 ? (
-              <span className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                {ytdPct >= 0 ? '+' : ''}{ytdPct.toFixed(1)}%
-              </span>
-            ) : undefined}
+          <AreaChartCard
+            title="Net Worth Growth"
+            subtitle={`Last ${chartData.length} months in ${baseCurrency}`}
+            data={chartData}
+            dataKey="value"
+            xKey="month"
+            color="#6366f1"
+            height={220}
+            formatValue={fmtBase}
+            badge={
+              ytdPct !== 0 ? (
+                <span
+                  className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
+                >
+                  {ytdPct >= 0 ? '+' : ''}
+                  {ytdPct.toFixed(1)}%
+                </span>
+              ) : undefined
+            }
             emptyMessage="No net worth data yet."
           />
         </div>
-        <AssetAllocationCard allocationData={allocationData} totalAlloc={totalAlloc} baseCurrency={baseCurrency} fmtBase={fmtBase} />
+        <AssetAllocationCard
+          allocationData={allocationData}
+          totalAlloc={totalAlloc}
+          baseCurrency={baseCurrency}
+          fmtBase={fmtBase}
+        />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentTransactionsCard transactions={displayedRecentTransactions} baseCurrency={baseCurrency} fmtBase={fmtBase} />
+        <RecentTransactionsCard
+          transactions={displayedRecentTransactions}
+          baseCurrency={baseCurrency}
+          fmtBase={fmtBase}
+        />
         <GoalsOverviewCard goals={displayedGoals} fmtBase={fmtBase} />
       </div>
       {recentTransactions.length > 0 && <MonthlySummary items={monthlySummaryItems} />}

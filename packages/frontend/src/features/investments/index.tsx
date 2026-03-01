@@ -141,7 +141,14 @@ function computePropertyEquityForMonth(
 ) {
   return properties.reduce(
     (sum, property) =>
-      sum + getPropertyEquity(property, propertyTxnMap.get(property.id) ?? [], cutoff, mortgageById, convertToBase),
+      sum +
+      getPropertyEquity(
+        property,
+        propertyTxnMap.get(property.id) ?? [],
+        cutoff,
+        mortgageById,
+        convertToBase,
+      ),
     0,
   );
 }
@@ -226,15 +233,25 @@ type HoldingModalsProps = {
   addTxnForHolding: Holding | null;
   positions: Record<number, Position>;
   onCloseEditHolding: () => void;
-  onSaveHolding: (holding: Holding, initialBuy?: { shares: number; price: number; date: string }) => void;
+  onSaveHolding: (
+    holding: Holding,
+    initialBuy?: { shares: number; price: number; date: string },
+  ) => void;
   onDeleteHolding: (id: number) => void;
   onCloseAddHoldingTxn: () => void;
   onSaveHoldingTxn: (t: Omit<HoldingTransaction, 'id'>) => void;
 };
 
 function HoldingModals({
-  showAddHolding, editingHolding, addTxnForHolding, positions,
-  onCloseEditHolding, onSaveHolding, onDeleteHolding, onCloseAddHoldingTxn, onSaveHoldingTxn,
+  showAddHolding,
+  editingHolding,
+  addTxnForHolding,
+  positions,
+  onCloseEditHolding,
+  onSaveHolding,
+  onDeleteHolding,
+  onCloseAddHoldingTxn,
+  onSaveHoldingTxn,
 }: HoldingModalsProps) {
   return (
     <>
@@ -272,9 +289,16 @@ type PropertyModalsProps = {
 };
 
 function PropertyModals({
-  updatingProperty, showAddProperty, addTxnForProperty, mortgageById,
-  onCloseUpdateProperty, onSaveUpdateProperty, onCloseAddProperty, onSaveAddProperty,
-  onCloseAddPropertyTxn, onSavePropertyTxn,
+  updatingProperty,
+  showAddProperty,
+  addTxnForProperty,
+  mortgageById,
+  onCloseUpdateProperty,
+  onSaveUpdateProperty,
+  onCloseAddProperty,
+  onSaveAddProperty,
+  onCloseAddPropertyTxn,
+  onSavePropertyTxn,
 }: PropertyModalsProps) {
   return (
     <>
@@ -379,10 +403,24 @@ function useInvestmentUIState(): InvestmentUIState {
   const [addTxnForProperty, setAddTxnForProperty] = useState<Property | null>(null);
   const [expandedPropertyId, setExpandedPropertyId] = useState<number | null>(null);
   return {
-    tab, editingHolding, showAddHolding, addTxnForHolding, expandedHoldingId,
-    updatingProperty, showAddProperty, addTxnForProperty, expandedPropertyId,
-    setTab, setEditingHolding, setShowAddHolding, setAddTxnForHolding, setExpandedHoldingId,
-    setUpdatingProperty, setShowAddProperty, setAddTxnForProperty, setExpandedPropertyId,
+    tab,
+    editingHolding,
+    showAddHolding,
+    addTxnForHolding,
+    expandedHoldingId,
+    updatingProperty,
+    showAddProperty,
+    addTxnForProperty,
+    expandedPropertyId,
+    setTab,
+    setEditingHolding,
+    setShowAddHolding,
+    setAddTxnForHolding,
+    setExpandedHoldingId,
+    setUpdatingProperty,
+    setShowAddProperty,
+    setAddTxnForProperty,
+    setExpandedPropertyId,
   };
 }
 
@@ -395,23 +433,39 @@ function useInvestmentPortfolioStats(
   convertToBase: (value: number, currency: string) => number,
 ) {
   const totalBrokerageBase = useMemo(
-    () => holdings.reduce((sum, h) => sum + convertToBase(positions[h.id].shares * h.currentPrice, h.currency), 0),
+    () =>
+      holdings.reduce(
+        (sum, h) => sum + convertToBase(positions[h.id].shares * h.currentPrice, h.currency),
+        0,
+      ),
     [holdings, positions, convertToBase],
   );
   const totalCostBase = useMemo(
-    () => holdings.reduce((sum, h) => sum + convertToBase(positions[h.id].shares * positions[h.id].avgCost, h.currency), 0),
+    () =>
+      holdings.reduce(
+        (sum, h) =>
+          sum + convertToBase(positions[h.id].shares * positions[h.id].avgCost, h.currency),
+        0,
+      ),
     [holdings, positions, convertToBase],
   );
   const totalDividendsBase = useMemo(
-    () => holdings.reduce((sum, h) => sum + convertToBase(positions[h.id].totalDividends, h.currency), 0),
+    () =>
+      holdings.reduce(
+        (sum, h) => sum + convertToBase(positions[h.id].totalDividends, h.currency),
+        0,
+      ),
     [holdings, positions, convertToBase],
   );
   const totalRealizedBase = useMemo(
-    () => holdings.reduce((sum, h) => sum + convertToBase(positions[h.id].realizedGain, h.currency), 0),
+    () =>
+      holdings.reduce((sum, h) => sum + convertToBase(positions[h.id].realizedGain, h.currency), 0),
     [holdings, positions, convertToBase],
   );
   const totalPropertyEquityBase = properties.reduce((sum, p) => {
-    return sum + convertToBase(p.currentValue - getPropertyMortgageBalance(p, mortgageById), p.currency);
+    return (
+      sum + convertToBase(p.currentValue - getPropertyMortgageBalance(p, mortgageById), p.currency)
+    );
   }, 0);
   const totalRentalBase = useMemo(
     () => computeTotalRental(propertyTxns, properties, convertToBase),
@@ -420,8 +474,14 @@ function useInvestmentPortfolioStats(
   const totalGainBase = totalBrokerageBase - totalCostBase;
   const gainPct = totalCostBase > 0 ? (totalGainBase / totalCostBase) * 100 : 0;
   return {
-    totalBrokerageBase, totalCostBase, totalGainBase, gainPct,
-    totalDividendsBase, totalRealizedBase, totalPropertyEquityBase, totalRentalBase,
+    totalBrokerageBase,
+    totalCostBase,
+    totalGainBase,
+    gainPct,
+    totalDividendsBase,
+    totalRealizedBase,
+    totalPropertyEquityBase,
+    totalRentalBase,
   };
 }
 
@@ -438,35 +498,61 @@ type InvestmentStatCardsProps = {
 };
 
 function InvestmentStatCards({
-  totalBrokerageBase, totalGainBase, totalCostBase, gainPct,
-  totalDividendsBase, totalRealizedBase, totalPropertyEquityBase, totalRentalBase, fmtBase,
+  totalBrokerageBase,
+  totalGainBase,
+  totalCostBase,
+  gainPct,
+  totalDividendsBase,
+  totalRealizedBase,
+  totalPropertyEquityBase,
+  totalRentalBase,
+  fmtBase,
 }: InvestmentStatCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard
-        label="Brokerage Value" value={fmtBase(totalBrokerageBase)}
+        label="Brokerage Value"
+        value={fmtBase(totalBrokerageBase)}
         subtitle={`${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}% unrealized`}
-        icon={BarChart2} color="indigo"
-        change={{ value: `${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}%`, positive: gainPct >= 0 }}
+        icon={BarChart2}
+        color="indigo"
+        change={{
+          value: `${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}%`,
+          positive: gainPct >= 0,
+        }}
       />
       <StatCard
         label="Unrealized Gain"
         value={`${totalGainBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalGainBase))}`}
         subtitle={`Cost basis ${fmtBase(totalCostBase)}`}
-        icon={TrendingUp} color="emerald"
-        change={{ value: `${totalGainBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalGainBase), undefined, true)}`, positive: totalGainBase >= 0 }}
+        icon={TrendingUp}
+        color="emerald"
+        change={{
+          value: `${totalGainBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalGainBase), undefined, true)}`,
+          positive: totalGainBase >= 0,
+        }}
       />
       <StatCard
-        label="Dividends Received" value={`+${fmtBase(totalDividendsBase)}`}
+        label="Dividends Received"
+        value={`+${fmtBase(totalDividendsBase)}`}
         subtitle={`${totalRealizedBase >= 0 ? '+' : ''}${fmtBase(totalRealizedBase)} realized`}
-        icon={DollarSign} color="sky"
-        change={{ value: `${totalRealizedBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalRealizedBase), undefined, true)}`, positive: totalRealizedBase >= 0 }}
+        icon={DollarSign}
+        color="sky"
+        change={{
+          value: `${totalRealizedBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalRealizedBase), undefined, true)}`,
+          positive: totalRealizedBase >= 0,
+        }}
       />
       <StatCard
-        label="Property Equity" value={fmtBase(totalPropertyEquityBase)}
+        label="Property Equity"
+        value={fmtBase(totalPropertyEquityBase)}
         subtitle={`${fmtBase(totalRentalBase)}/mo rental`}
-        icon={Building2} color="amber"
-        change={{ value: `${fmtBase(totalRentalBase, undefined, true)}/mo`, positive: totalRentalBase >= 0 }}
+        icon={Building2}
+        color="amber"
+        change={{
+          value: `${fmtBase(totalRentalBase, undefined, true)}/mo`,
+          positive: totalRentalBase >= 0,
+        }}
       />
     </div>
   );
@@ -479,13 +565,26 @@ function useHoldingActions(holdings: Holding[], ui: InvestmentUIState) {
   const createHoldingTxn = useCreateHoldingTransaction();
   const deleteHoldingTxn = useDeleteHoldingTransaction();
 
-  function handleSaveHolding(holding: Holding, initialBuy?: { shares: number; price: number; date: string }) {
-    if (holdings.find((entry) => entry.id === holding.id)) { updateHolding.mutate(holding); return; }
+  function handleSaveHolding(
+    holding: Holding,
+    initialBuy?: { shares: number; price: number; date: string },
+  ) {
+    if (holdings.find((entry) => entry.id === holding.id)) {
+      updateHolding.mutate(holding);
+      return;
+    }
     const { id: _id, ...body } = holding;
     createHolding.mutate(body, {
       onSuccess: (created: Holding) => {
         if (!initialBuy) return;
-        createHoldingTxn.mutate({ holdingId: created.id, type: 'buy', shares: initialBuy.shares, price: initialBuy.price, date: initialBuy.date, note: 'Initial position' });
+        createHoldingTxn.mutate({
+          holdingId: created.id,
+          type: 'buy',
+          shares: initialBuy.shares,
+          price: initialBuy.price,
+          date: initialBuy.date,
+          note: 'Initial position',
+        });
         ui.setExpandedHoldingId(created.id);
       },
     });
@@ -493,7 +592,10 @@ function useHoldingActions(holdings: Holding[], ui: InvestmentUIState) {
 
   return {
     handleSaveHolding,
-    handleDeleteHolding: (id: number) => { deleteHolding.mutate(id); if (ui.expandedHoldingId === id) ui.setExpandedHoldingId(null); },
+    handleDeleteHolding: (id: number) => {
+      deleteHolding.mutate(id);
+      if (ui.expandedHoldingId === id) ui.setExpandedHoldingId(null);
+    },
     handleAddHoldingTxn: (t: Omit<HoldingTransaction, 'id'>) => createHoldingTxn.mutate(t),
     handleDeleteHoldingTxn: (id: number) => deleteHoldingTxn.mutate(id),
   };
@@ -509,9 +611,13 @@ function usePropertyActions(properties: Property[], ui: InvestmentUIState) {
   return {
     handleUpdateProperty: (id: number, value: number, rent: number) => {
       const existing = properties.find((p) => p.id === id);
-      if (existing) updatePropertyMut.mutate({ ...existing, currentValue: value, monthlyRent: rent });
+      if (existing)
+        updatePropertyMut.mutate({ ...existing, currentValue: value, monthlyRent: rent });
     },
-    handleSaveProperty: (property: Omit<Property, 'id'>) => { createProperty.mutate(property); ui.setShowAddProperty(false); },
+    handleSaveProperty: (property: Omit<Property, 'id'>) => {
+      createProperty.mutate(property);
+      ui.setShowAddProperty(false);
+    },
     handleAddPropertyTxn: (t: Omit<PropertyTransaction, 'id'>) => createPropertyTxn.mutate(t),
     handleDeletePropertyTxn: (id: number) => deletePropertyTxn.mutate(id),
   };
@@ -529,7 +635,12 @@ function useInvestmentData() {
   const { data: properties = [], isLoading: loadingProperties } = useProperties();
   const { data: propertyTxns = [], isLoading: loadingPropertyTxns } = usePropertyTransactions();
   const { data: mortgages = [], isLoading: loadingMortgages } = useMortgages();
-  const isLoading = loadingHoldings || loadingHoldingTxns || loadingProperties || loadingPropertyTxns || loadingMortgages;
+  const isLoading =
+    loadingHoldings ||
+    loadingHoldingTxns ||
+    loadingProperties ||
+    loadingPropertyTxns ||
+    loadingMortgages;
   return { holdings, holdingTxns, properties, propertyTxns, mortgages, isLoading };
 }
 
@@ -552,74 +663,143 @@ type InvestmentPageBodyProps = {
 };
 
 function InvestmentTabPanel({
-  tab, holdings, holdingTxns, properties, propertyTxns, mortgageById, positions, stats, ui, actions,
-  baseCurrency, fmtBase, fmtNative, convertToBase, isForeign,
+  tab,
+  holdings,
+  holdingTxns,
+  properties,
+  propertyTxns,
+  mortgageById,
+  positions,
+  stats,
+  ui,
+  actions,
+  baseCurrency,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
 }: Omit<InvestmentPageBodyProps, 'portfolioHistory'> & { tab: Tab }) {
   if (tab === 'brokerage') {
     return (
       <BrokerageTab
-        holdings={holdings} holdingTxns={holdingTxns} positions={positions}
+        holdings={holdings}
+        holdingTxns={holdingTxns}
+        positions={positions}
         baseCurrency={baseCurrency}
-        totalDividendsBase={stats.totalDividendsBase} totalRealizedBase={stats.totalRealizedBase}
-        totalBrokerageBase={stats.totalBrokerageBase} totalGainBase={stats.totalGainBase}
-        gainPct={stats.gainPct} expandedHoldingId={ui.expandedHoldingId}
-        fmtBase={fmtBase} fmtNative={fmtNative} convertToBase={convertToBase} isForeign={isForeign}
-        onAddHolding={() => { ui.setEditingHolding(null); ui.setShowAddHolding(true); }}
+        totalDividendsBase={stats.totalDividendsBase}
+        totalRealizedBase={stats.totalRealizedBase}
+        totalBrokerageBase={stats.totalBrokerageBase}
+        totalGainBase={stats.totalGainBase}
+        gainPct={stats.gainPct}
+        expandedHoldingId={ui.expandedHoldingId}
+        fmtBase={fmtBase}
+        fmtNative={fmtNative}
+        convertToBase={convertToBase}
+        isForeign={isForeign}
+        onAddHolding={() => {
+          ui.setEditingHolding(null);
+          ui.setShowAddHolding(true);
+        }}
         onEditHolding={ui.setEditingHolding}
         onToggleExpanded={(id) => ui.setExpandedHoldingId(ui.expandedHoldingId === id ? null : id)}
-        onAddTxnForHolding={ui.setAddTxnForHolding} onDeleteTxn={actions.handleDeleteHoldingTxn}
+        onAddTxnForHolding={ui.setAddTxnForHolding}
+        onDeleteTxn={actions.handleDeleteHoldingTxn}
       />
     );
   }
   return (
     <PropertyTab
-      properties={properties} propertyTxns={propertyTxns} mortgageById={mortgageById}
-      expandedPropertyId={ui.expandedPropertyId} fmtNative={fmtNative}
-      onAddProperty={() => ui.setShowAddProperty(true)} onUpdateProperty={ui.setUpdatingProperty}
+      properties={properties}
+      propertyTxns={propertyTxns}
+      mortgageById={mortgageById}
+      expandedPropertyId={ui.expandedPropertyId}
+      fmtNative={fmtNative}
+      onAddProperty={() => ui.setShowAddProperty(true)}
+      onUpdateProperty={ui.setUpdatingProperty}
       onToggleExpanded={(id) => ui.setExpandedPropertyId(ui.expandedPropertyId === id ? null : id)}
-      onAddTxnForProperty={ui.setAddTxnForProperty} onDeleteTxn={actions.handleDeletePropertyTxn}
+      onAddTxnForProperty={ui.setAddTxnForProperty}
+      onDeleteTxn={actions.handleDeletePropertyTxn}
     />
   );
 }
 
 function InvestmentPageBody({
-  holdings, holdingTxns, properties, propertyTxns, mortgageById, positions,
-  stats, portfolioHistory, ui, actions, baseCurrency, fmtBase, fmtNative, convertToBase, isForeign,
+  holdings,
+  holdingTxns,
+  properties,
+  propertyTxns,
+  mortgageById,
+  positions,
+  stats,
+  portfolioHistory,
+  ui,
+  actions,
+  baseCurrency,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
 }: InvestmentPageBodyProps) {
   return (
     <div className="p-6 space-y-6">
       <InvestmentModals
         holdingModals={{
-          showAddHolding: ui.showAddHolding, editingHolding: ui.editingHolding,
-          addTxnForHolding: ui.addTxnForHolding, positions,
-          onCloseEditHolding: () => { ui.setShowAddHolding(false); ui.setEditingHolding(null); },
-          onSaveHolding: actions.handleSaveHolding, onDeleteHolding: actions.handleDeleteHolding,
-          onCloseAddHoldingTxn: () => ui.setAddTxnForHolding(null), onSaveHoldingTxn: actions.handleAddHoldingTxn,
+          showAddHolding: ui.showAddHolding,
+          editingHolding: ui.editingHolding,
+          addTxnForHolding: ui.addTxnForHolding,
+          positions,
+          onCloseEditHolding: () => {
+            ui.setShowAddHolding(false);
+            ui.setEditingHolding(null);
+          },
+          onSaveHolding: actions.handleSaveHolding,
+          onDeleteHolding: actions.handleDeleteHolding,
+          onCloseAddHoldingTxn: () => ui.setAddTxnForHolding(null),
+          onSaveHoldingTxn: actions.handleAddHoldingTxn,
         }}
         propertyModals={{
-          updatingProperty: ui.updatingProperty, showAddProperty: ui.showAddProperty,
-          addTxnForProperty: ui.addTxnForProperty, mortgageById,
-          onCloseUpdateProperty: () => ui.setUpdatingProperty(null), onSaveUpdateProperty: actions.handleUpdateProperty,
-          onCloseAddProperty: () => ui.setShowAddProperty(false), onSaveAddProperty: actions.handleSaveProperty,
-          onCloseAddPropertyTxn: () => ui.setAddTxnForProperty(null), onSavePropertyTxn: actions.handleAddPropertyTxn,
+          updatingProperty: ui.updatingProperty,
+          showAddProperty: ui.showAddProperty,
+          addTxnForProperty: ui.addTxnForProperty,
+          mortgageById,
+          onCloseUpdateProperty: () => ui.setUpdatingProperty(null),
+          onSaveUpdateProperty: actions.handleUpdateProperty,
+          onCloseAddProperty: () => ui.setShowAddProperty(false),
+          onSaveAddProperty: actions.handleSaveProperty,
+          onCloseAddPropertyTxn: () => ui.setAddTxnForProperty(null),
+          onSavePropertyTxn: actions.handleAddPropertyTxn,
         }}
       />
       <InvestmentStatCards
-        totalBrokerageBase={stats.totalBrokerageBase} totalGainBase={stats.totalGainBase}
-        totalCostBase={stats.totalCostBase} gainPct={stats.gainPct}
-        totalDividendsBase={stats.totalDividendsBase} totalRealizedBase={stats.totalRealizedBase}
-        totalPropertyEquityBase={stats.totalPropertyEquityBase} totalRentalBase={stats.totalRentalBase}
+        totalBrokerageBase={stats.totalBrokerageBase}
+        totalGainBase={stats.totalGainBase}
+        totalCostBase={stats.totalCostBase}
+        gainPct={stats.gainPct}
+        totalDividendsBase={stats.totalDividendsBase}
+        totalRealizedBase={stats.totalRealizedBase}
+        totalPropertyEquityBase={stats.totalPropertyEquityBase}
+        totalRentalBase={stats.totalRentalBase}
         fmtBase={fmtBase}
       />
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <TabSwitcher tab={ui.tab} onSetTab={ui.setTab} />
         <InvestmentTabPanel
-          tab={ui.tab} holdings={holdings} holdingTxns={holdingTxns} properties={properties}
-          propertyTxns={propertyTxns} mortgageById={mortgageById} positions={positions}
-          stats={stats} ui={ui} actions={actions}
-          baseCurrency={baseCurrency} fmtBase={fmtBase} fmtNative={fmtNative}
-          convertToBase={convertToBase} isForeign={isForeign}
+          tab={ui.tab}
+          holdings={holdings}
+          holdingTxns={holdingTxns}
+          properties={properties}
+          propertyTxns={propertyTxns}
+          mortgageById={mortgageById}
+          positions={positions}
+          stats={stats}
+          ui={ui}
+          actions={actions}
+          baseCurrency={baseCurrency}
+          fmtBase={fmtBase}
+          fmtNative={fmtNative}
+          convertToBase={convertToBase}
+          isForeign={isForeign}
         />
       </div>
     </div>
@@ -628,7 +808,8 @@ function InvestmentPageBody({
 
 export function Investments() {
   const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
-  const { holdings, holdingTxns, properties, propertyTxns, mortgages, isLoading } = useInvestmentData();
+  const { holdings, holdingTxns, properties, propertyTxns, mortgages, isLoading } =
+    useInvestmentData();
   const ui = useInvestmentUIState();
 
   const mortgageById = useMemo(() => {
@@ -639,14 +820,31 @@ export function Investments() {
 
   const positions = useMemo<Record<number, Position>>(() => {
     const result: Record<number, Position> = {};
-    holdings.forEach((h) => { result[h.id] = computePosition(h.id, holdingTxns); });
+    holdings.forEach((h) => {
+      result[h.id] = computePosition(h.id, holdingTxns);
+    });
     return result;
   }, [holdings, holdingTxns]);
 
-  const stats = useInvestmentPortfolioStats(holdings, positions, properties, propertyTxns, mortgageById, convertToBase);
+  const stats = useInvestmentPortfolioStats(
+    holdings,
+    positions,
+    properties,
+    propertyTxns,
+    mortgageById,
+    convertToBase,
+  );
   const actions = useInvestmentActions(holdings, properties, ui);
   const portfolioHistory = useMemo(
-    () => computePortfolioHistory(holdings, holdingTxns, properties, propertyTxns, mortgageById, convertToBase),
+    () =>
+      computePortfolioHistory(
+        holdings,
+        holdingTxns,
+        properties,
+        propertyTxns,
+        mortgageById,
+        convertToBase,
+      ),
     [holdings, holdingTxns, properties, propertyTxns, convertToBase, mortgageById],
   );
 
@@ -654,11 +852,21 @@ export function Investments() {
 
   return (
     <InvestmentPageBody
-      holdings={holdings} holdingTxns={holdingTxns} properties={properties}
-      propertyTxns={propertyTxns} mortgageById={mortgageById} positions={positions}
-      stats={stats} portfolioHistory={portfolioHistory} ui={ui} actions={actions}
-      baseCurrency={baseCurrency} fmtBase={fmtBase} fmtNative={fmtNative}
-      convertToBase={convertToBase} isForeign={isForeign}
+      holdings={holdings}
+      holdingTxns={holdingTxns}
+      properties={properties}
+      propertyTxns={propertyTxns}
+      mortgageById={mortgageById}
+      positions={positions}
+      stats={stats}
+      portfolioHistory={portfolioHistory}
+      ui={ui}
+      actions={actions}
+      baseCurrency={baseCurrency}
+      fmtBase={fmtBase}
+      fmtNative={fmtNative}
+      convertToBase={convertToBase}
+      isForeign={isForeign}
     />
   );
 }

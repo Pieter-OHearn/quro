@@ -158,13 +158,33 @@ function usePensionPageState(): PensionPageState {
   }, [pensionGrowthData]);
 
   return {
-    fmtBase, fmtNative, convertToBase, isForeign, baseCurrency,
-    pensions, pensionTxns, isLoading: loadingPots || loadingTxns,
-    showModal, setShowModal, editing, setEditing,
-    expanded, setExpanded, addTxnForPot, setAddTxnForPot,
-    totalInBase, totalMonthlyContribInBase, projected, monthlyDrawdown, yearsToRetirement,
-    pensionGrowthData, pensionGrowthPct,
-    handleSave, handleAddPensionTxn, handleDeletePensionTxn, deletePot,
+    fmtBase,
+    fmtNative,
+    convertToBase,
+    isForeign,
+    baseCurrency,
+    pensions,
+    pensionTxns,
+    isLoading: loadingPots || loadingTxns,
+    showModal,
+    setShowModal,
+    editing,
+    setEditing,
+    expanded,
+    setExpanded,
+    addTxnForPot,
+    setAddTxnForPot,
+    totalInBase,
+    totalMonthlyContribInBase,
+    projected,
+    monthlyDrawdown,
+    yearsToRetirement,
+    pensionGrowthData,
+    pensionGrowthPct,
+    handleSave,
+    handleAddPensionTxn,
+    handleDeletePensionTxn,
+    deletePot,
   };
 }
 
@@ -179,7 +199,11 @@ type HeroBannerProps = {
 };
 
 function PensionHeroBanner({
-  pensions, totalInBase, projected, fmtBase, baseCurrency,
+  pensions,
+  totalInBase,
+  projected,
+  fmtBase,
+  baseCurrency,
 }: Readonly<HeroBannerProps>) {
   return (
     <div className="rounded-2xl bg-gradient-to-r from-[#0a0f1e] via-[#16213e] to-[#1a1448] p-6 text-white relative overflow-hidden">
@@ -199,7 +223,9 @@ function PensionHeroBanner({
         </div>
         <div className="flex gap-3">
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-4 text-center">
-            <p className="text-amber-300 text-[10px] uppercase tracking-widest mb-1">Total Balance</p>
+            <p className="text-amber-300 text-[10px] uppercase tracking-widest mb-1">
+              Total Balance
+            </p>
             <p className="text-2xl font-bold">{fmtBase(totalInBase)}</p>
             <p className="text-slate-400 text-xs mt-0.5">in {baseCurrency}</p>
           </div>
@@ -223,7 +249,11 @@ type SummaryStatsProps = {
 };
 
 function PensionSummaryStats({
-  totalInBase, totalMonthlyContribInBase, monthlyDrawdown, pensionsCount, fmtBase,
+  totalInBase,
+  totalMonthlyContribInBase,
+  monthlyDrawdown,
+  pensionsCount,
+  fmtBase,
 }: Readonly<SummaryStatsProps>) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -267,7 +297,10 @@ type GrowthChartProps = {
 };
 
 function PensionGrowthChart({
-  pensionGrowthData, pensionGrowthPct, fmtBase, baseCurrency,
+  pensionGrowthData,
+  pensionGrowthPct,
+  fmtBase,
+  baseCurrency,
 }: Readonly<GrowthChartProps>) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
@@ -352,8 +385,19 @@ type PensionPotCardProps = {
 };
 
 function PensionPotCard({
-  pot, isOpen, pensionTxns, fmtBase, fmtNative, convertToBase, isForeign, baseCurrency,
-  onEdit, onToggle, onDelete, onAddTxn, onDeleteTxn,
+  pot,
+  isOpen,
+  pensionTxns,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
+  baseCurrency,
+  onEdit,
+  onToggle,
+  onDelete,
+  onAddTxn,
+  onDeleteTxn,
 }: Readonly<PensionPotCardProps>) {
   const totalMonthly = pot.employeeMonthly + pot.employerMonthly;
   const balanceInBase = convertToBase(pot.balance, pot.currency);
@@ -393,7 +437,9 @@ function PensionPotCard({
           {foreign && (
             <p className="text-xs text-amber-600 font-medium">&asymp; {fmtBase(balanceInBase)}</p>
           )}
-          <p className="text-xs text-emerald-600">+{fmtNative(totalMonthly * 12, pot.currency)}/yr</p>
+          <p className="text-xs text-emerald-600">
+            +{fmtNative(totalMonthly * 12, pot.currency)}/yr
+          </p>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
@@ -477,9 +523,20 @@ type PotsListProps = {
 };
 
 function PensionPotsList({
-  pensions, pensionTxns, expanded, setExpanded, setEditing, setShowModal,
-  setAddTxnForPot, deletePot, handleDeletePensionTxn,
-  fmtBase, fmtNative, convertToBase, isForeign, baseCurrency,
+  pensions,
+  pensionTxns,
+  expanded,
+  setExpanded,
+  setEditing,
+  setShowModal,
+  setAddTxnForPot,
+  deletePot,
+  handleDeletePensionTxn,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
+  baseCurrency,
 }: Readonly<PotsListProps>) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -489,7 +546,10 @@ function PensionPotsList({
           <p className="text-xs text-slate-400 mt-0.5">Click a pot to view transactions</p>
         </div>
         <button
-          onClick={() => { setEditing(undefined); setShowModal(true); }}
+          onClick={() => {
+            setEditing(undefined);
+            setShowModal(true);
+          }}
           className="flex items-center gap-2 text-sm bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl transition-colors"
         >
           <Plus size={15} /> Add Pot
@@ -534,13 +594,22 @@ type RetirementProjectionProps = {
 };
 
 function PensionRetirementProjection({
-  totalInBase, projected, monthlyDrawdown, yearsToRetirement, fmtBase, baseCurrency,
+  totalInBase,
+  projected,
+  monthlyDrawdown,
+  yearsToRetirement,
+  fmtBase,
+  baseCurrency,
 }: Readonly<RetirementProjectionProps>) {
   const items = [
     { label: 'Current Total', value: fmtBase(totalInBase), note: `in ${baseCurrency}` },
     { label: 'Years to Retirement', value: `${yearsToRetirement} years`, note: 'Target age 65' },
     { label: 'Projected at 65', value: fmtBase(projected), note: 'Assumes 5% growth p.a.' },
-    { label: 'Est. Monthly Income', value: fmtBase(monthlyDrawdown), note: 'Over 25-year drawdown' },
+    {
+      label: 'Est. Monthly Income',
+      value: fmtBase(monthlyDrawdown),
+      note: 'Over 25-year drawdown',
+    },
   ];
   return (
     <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-100">
@@ -563,13 +632,33 @@ function PensionRetirementProjection({
 export function Pension(): JSX.Element {
   const state = usePensionPageState();
   const {
-    fmtBase, fmtNative, convertToBase, isForeign, baseCurrency,
-    pensions, pensionTxns, isLoading,
-    showModal, setShowModal, editing, setEditing,
-    expanded, setExpanded, addTxnForPot, setAddTxnForPot,
-    totalInBase, totalMonthlyContribInBase, projected, monthlyDrawdown, yearsToRetirement,
-    pensionGrowthData, pensionGrowthPct,
-    handleSave, handleAddPensionTxn, handleDeletePensionTxn, deletePot,
+    fmtBase,
+    fmtNative,
+    convertToBase,
+    isForeign,
+    baseCurrency,
+    pensions,
+    pensionTxns,
+    isLoading,
+    showModal,
+    setShowModal,
+    editing,
+    setEditing,
+    expanded,
+    setExpanded,
+    addTxnForPot,
+    setAddTxnForPot,
+    totalInBase,
+    totalMonthlyContribInBase,
+    projected,
+    monthlyDrawdown,
+    yearsToRetirement,
+    pensionGrowthData,
+    pensionGrowthPct,
+    handleSave,
+    handleAddPensionTxn,
+    handleDeletePensionTxn,
+    deletePot,
   } = state;
 
   if (isLoading) return <LoadingSpinner />;
@@ -579,7 +668,10 @@ export function Pension(): JSX.Element {
       {(showModal || editing) && (
         <PensionModal
           existing={editing}
-          onClose={() => { setShowModal(false); setEditing(undefined); }}
+          onClose={() => {
+            setShowModal(false);
+            setEditing(undefined);
+          }}
           onSave={handleSave}
         />
       )}

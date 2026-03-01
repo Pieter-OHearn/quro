@@ -110,28 +110,53 @@ function buildPropertyTxnStats(
   fmtNative: (value: number, currency: string, compact?: boolean) => string,
 ) {
   const totalRepaid = transactions
-    .filter((t) => t.type === 'repayment').reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t.type === 'repayment')
+    .reduce((sum, t) => sum + t.amount, 0);
   const totalPrincipal = transactions
-    .filter((t) => t.type === 'repayment').reduce((sum, t) => sum + (t.principal ?? 0), 0);
+    .filter((t) => t.type === 'repayment')
+    .reduce((sum, t) => sum + (t.principal ?? 0), 0);
   const totalInterest = transactions
-    .filter((t) => t.type === 'repayment').reduce((sum, t) => sum + (t.interest ?? 0), 0);
+    .filter((t) => t.type === 'repayment')
+    .reduce((sum, t) => sum + (t.interest ?? 0), 0);
   const valuationCount = transactions.filter((t) => t.type === 'valuation').length;
   const totalRentIncome = transactions
-    .filter((t) => t.type === 'rent_income').reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t.type === 'rent_income')
+    .reduce((sum, t) => sum + t.amount, 0);
   const totalExpenses = transactions
-    .filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
 
   const base = [
-    { label: 'Total Repaid', value: fmtNative(totalRepaid, currency, true), color: 'text-slate-800' },
-    { label: 'Principal', value: fmtNative(totalPrincipal, currency, true), color: 'text-indigo-600' },
-    { label: 'Interest Paid', value: fmtNative(totalInterest, currency, true), color: 'text-rose-500' },
+    {
+      label: 'Total Repaid',
+      value: fmtNative(totalRepaid, currency, true),
+      color: 'text-slate-800',
+    },
+    {
+      label: 'Principal',
+      value: fmtNative(totalPrincipal, currency, true),
+      color: 'text-indigo-600',
+    },
+    {
+      label: 'Interest Paid',
+      value: fmtNative(totalInterest, currency, true),
+      color: 'text-rose-500',
+    },
     { label: 'Valuations', value: `${valuationCount}`, color: 'text-emerald-600' },
   ];
   if (!supportsCashflowTxns) return base;
   return [
     ...base,
-    { label: 'Rent Income', value: `+${fmtNative(totalRentIncome, currency, true)}`, color: 'text-sky-600' },
-    { label: 'Expenses', value: `-${fmtNative(totalExpenses, currency, true)}`, color: 'text-rose-500' },
+    {
+      label: 'Rent Income',
+      value: `+${fmtNative(totalRentIncome, currency, true)}`,
+      color: 'text-sky-600',
+    },
+    {
+      label: 'Expenses',
+      value: `-${fmtNative(totalExpenses, currency, true)}`,
+      color: 'text-rose-500',
+    },
   ];
 }
 
@@ -158,11 +183,19 @@ export function PropertyTxnHistory({
     .filter((transaction) => filter === 'all' || transaction.type === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const stats = buildPropertyTxnStats(transactions, property.currency, supportsCashflowTxns, fmtNative);
+  const stats = buildPropertyTxnStats(
+    transactions,
+    property.currency,
+    supportsCashflowTxns,
+    fmtNative,
+  );
 
   return (
     <TxnHistoryPanel
-      filterOptions={filterOptions.map((option) => ({ key: option, label: getFilterLabel(option) }))}
+      filterOptions={filterOptions.map((option) => ({
+        key: option,
+        label: getFilterLabel(option),
+      }))}
       filter={filter}
       onFilterChange={(key) => setFilter(key as PropertyTxnType | 'all')}
       stats={stats}
@@ -180,7 +213,13 @@ export function PropertyTxnHistory({
             iconBg={meta.bg}
             label={transaction.note || meta.label}
             date={transaction.date}
-            amount={<PropertyTxnAmount transaction={transaction} currency={property.currency} fmtNative={fmtNative} />}
+            amount={
+              <PropertyTxnAmount
+                transaction={transaction}
+                currency={property.currency}
+                fmtNative={fmtNative}
+              />
+            }
             onDelete={() => onDelete(transaction.id)}
           />
         );

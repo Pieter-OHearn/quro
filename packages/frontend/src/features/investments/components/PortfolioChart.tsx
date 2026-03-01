@@ -41,7 +41,12 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize: 12, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+          />
           <YAxis
             tick={{ fontSize: 12, fill: '#94a3b8' }}
             axisLine={false}
@@ -49,11 +54,30 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
             tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
           />
           <Tooltip
-            formatter={(value, name) => [fmtBase(Number(value) || 0), name === 'brokerage' ? 'Brokerage' : 'Property Equity']}
+            formatter={(value, name) => [
+              fmtBase(Number(value) || 0),
+              name === 'brokerage' ? 'Brokerage' : 'Property Equity',
+            ]}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
           />
-          <Area type="monotone" dataKey="propertyEquity" stroke="#10b981" strokeWidth={3} fill="url(#investmentsPropertyGrad)" dot={false} activeDot={{ r: 4, fill: '#10b981' }} />
-          <Area type="monotone" dataKey="brokerage" stroke="#6366f1" strokeWidth={3} fill="url(#investmentsBrokerageGrad)" dot={false} activeDot={{ r: 4, fill: '#6366f1' }} />
+          <Area
+            type="monotone"
+            dataKey="propertyEquity"
+            stroke="#10b981"
+            strokeWidth={3}
+            fill="url(#investmentsPropertyGrad)"
+            dot={false}
+            activeDot={{ r: 4, fill: '#10b981' }}
+          />
+          <Area
+            type="monotone"
+            dataKey="brokerage"
+            stroke="#6366f1"
+            strokeWidth={3}
+            fill="url(#investmentsBrokerageGrad)"
+            dot={false}
+            activeDot={{ r: 4, fill: '#6366f1' }}
+          />
         </AreaChart>
       </ResponsiveContainer>
       <div className="flex flex-wrap items-center gap-8 mt-4 text-sm text-slate-600">

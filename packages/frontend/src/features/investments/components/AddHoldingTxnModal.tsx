@@ -260,9 +260,7 @@ function SharesFormField({
 }: SharesFormFieldProps) {
   return (
     <FormField
-      label={
-        type === 'sell' ? `Shares to Sell (max: ${currentPosition.shares})` : 'Shares to Buy'
-      }
+      label={type === 'sell' ? `Shares to Sell (max: ${currentPosition.shares})` : 'Shares to Buy'}
       error={error && parsedShares <= 0 ? error : undefined}
     >
       <TextInput
@@ -356,10 +354,22 @@ type TxnFormBodyProps = {
 };
 
 function TxnFormBodyFields({
-  type, shares, price, date, note, error,
-  parsedShares, parsedPrice,
-  holding, currentPosition, fmtNative,
-  onTypeChange, onSharesChange, onPriceChange, onDateChange, onNoteChange,
+  type,
+  shares,
+  price,
+  date,
+  note,
+  error,
+  parsedShares,
+  parsedPrice,
+  holding,
+  currentPosition,
+  fmtNative,
+  onTypeChange,
+  onSharesChange,
+  onPriceChange,
+  onDateChange,
+  onNoteChange,
 }: Omit<TxnFormBodyProps, 'newAvgCost' | 'realizedGain'> & { parsedPrice: number }) {
   const needsShares = type === 'buy' || type === 'sell';
   return (
@@ -403,19 +413,44 @@ function TxnFormBodyFields({
 }
 
 function TxnFormBody({
-  type, shares, price, date, note, error,
-  parsedShares, parsedPrice, newAvgCost, realizedGain,
-  holding, currentPosition, fmtNative,
-  onTypeChange, onSharesChange, onPriceChange, onDateChange, onNoteChange,
+  type,
+  shares,
+  price,
+  date,
+  note,
+  error,
+  parsedShares,
+  parsedPrice,
+  newAvgCost,
+  realizedGain,
+  holding,
+  currentPosition,
+  fmtNative,
+  onTypeChange,
+  onSharesChange,
+  onPriceChange,
+  onDateChange,
+  onNoteChange,
 }: TxnFormBodyProps) {
   return (
     <>
       <TxnFormBodyFields
-        type={type} shares={shares} price={price} date={date} note={note} error={error}
-        parsedShares={parsedShares} parsedPrice={parsedPrice}
-        holding={holding} currentPosition={currentPosition} fmtNative={fmtNative}
-        onTypeChange={onTypeChange} onSharesChange={onSharesChange} onPriceChange={onPriceChange}
-        onDateChange={onDateChange} onNoteChange={onNoteChange}
+        type={type}
+        shares={shares}
+        price={price}
+        date={date}
+        note={note}
+        error={error}
+        parsedShares={parsedShares}
+        parsedPrice={parsedPrice}
+        holding={holding}
+        currentPosition={currentPosition}
+        fmtNative={fmtNative}
+        onTypeChange={onTypeChange}
+        onSharesChange={onSharesChange}
+        onPriceChange={onPriceChange}
+        onDateChange={onDateChange}
+        onNoteChange={onNoteChange}
       />
       {parsedPrice > 0 && (
         <TxnPreview
@@ -463,8 +498,22 @@ function useHoldingTxnForm(currentPosition: Position) {
   }
 
   return {
-    type, shares, price, date, note, error, parsedShares, parsedPrice, newAvgCost, realizedGain,
-    setDate, setNote, setError, setShares, setPrice, handleTypeChange,
+    type,
+    shares,
+    price,
+    date,
+    note,
+    error,
+    parsedShares,
+    parsedPrice,
+    newAvgCost,
+    realizedGain,
+    setDate,
+    setNote,
+    setError,
+    setShares,
+    setPrice,
+    handleTypeChange,
   };
 }
 
@@ -479,9 +528,15 @@ export function AddHoldingTxnModal({
 
   function handleSave() {
     const validationError = validateHoldingTxn(
-      form.type, form.parsedPrice, form.parsedShares, currentPosition,
+      form.type,
+      form.parsedPrice,
+      form.parsedShares,
+      currentPosition,
     );
-    if (validationError) { form.setError(validationError); return; }
+    if (validationError) {
+      form.setError(validationError);
+      return;
+    }
     onSave({
       holdingId: holding.id,
       type: form.type,
@@ -501,14 +556,28 @@ export function AddHoldingTxnModal({
       footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Record" />}
     >
       <TxnFormBody
-        type={form.type} shares={form.shares} price={form.price}
-        date={form.date} note={form.note} error={form.error}
-        parsedShares={form.parsedShares} parsedPrice={form.parsedPrice}
-        newAvgCost={form.newAvgCost} realizedGain={form.realizedGain}
-        holding={holding} currentPosition={currentPosition} fmtNative={fmtNative}
+        type={form.type}
+        shares={form.shares}
+        price={form.price}
+        date={form.date}
+        note={form.note}
+        error={form.error}
+        parsedShares={form.parsedShares}
+        parsedPrice={form.parsedPrice}
+        newAvgCost={form.newAvgCost}
+        realizedGain={form.realizedGain}
+        holding={holding}
+        currentPosition={currentPosition}
+        fmtNative={fmtNative}
         onTypeChange={form.handleTypeChange}
-        onSharesChange={(value) => { form.setShares(value); form.setError(''); }}
-        onPriceChange={(value) => { form.setPrice(value); form.setError(''); }}
+        onSharesChange={(value) => {
+          form.setShares(value);
+          form.setError('');
+        }}
+        onPriceChange={(value) => {
+          form.setPrice(value);
+          form.setError('');
+        }}
         onDateChange={form.setDate}
         onNoteChange={form.setNote}
       />

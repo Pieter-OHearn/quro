@@ -191,7 +191,10 @@ function useSignInState() {
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
     setLoading(true);
     try {
       await signIn(email, password);
@@ -203,15 +206,45 @@ function useSignInState() {
     }
   };
 
-  return { email, setEmail, password, setPassword, showPw, setShowPw, loading, errors, setErrors, handleSubmit };
+  return {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    showPw,
+    setShowPw,
+    loading,
+    errors,
+    setErrors,
+    handleSubmit,
+  };
 }
 
-type SignInFormProps = Readonly<{ state: ReturnType<typeof useSignInState>; onSwitchToSignUp: () => void }>;
+type SignInFormProps = Readonly<{
+  state: ReturnType<typeof useSignInState>;
+  onSwitchToSignUp: () => void;
+}>;
 
 function SignInForm({ state, onSwitchToSignUp }: SignInFormProps) {
-  const { email, setEmail, password, setPassword, showPw, setShowPw, loading, errors, setErrors, handleSubmit } = state;
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    showPw,
+    setShowPw,
+    loading,
+    errors,
+    setErrors,
+    handleSubmit,
+  } = state;
   return (
-    <form onSubmit={(e) => { void handleSubmit(e); }} className="px-8 py-7 space-y-4 text-slate-900">
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      className="px-8 py-7 space-y-4 text-slate-900"
+    >
       <FormField label="Email address" error={errors.email}>
         <input
           type="email"
@@ -219,7 +252,10 @@ function SignInForm({ state, onSwitchToSignUp }: SignInFormProps) {
           placeholder="you@example.com"
           className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.email ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
           value={email}
-          onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: '' })); }}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setErrors((x) => ({ ...x, email: '' }));
+          }}
         />
       </FormField>
       <FormField label="Password" error={errors.password}>
@@ -228,14 +264,30 @@ function SignInForm({ state, onSwitchToSignUp }: SignInFormProps) {
           placeholder="••••••••"
           show={showPw}
           onToggle={() => setShowPw(!showPw)}
-          onChange={(v) => { setPassword(v); setErrors((x) => ({ ...x, password: '' })); }}
+          onChange={(v) => {
+            setPassword(v);
+            setErrors((x) => ({ ...x, password: '' }));
+          }}
           error={errors.password}
         />
       </FormField>
-      <SubmitButton loading={loading} loadingText="Signing in…" idleContent={<><span>Sign In</span><ArrowRight size={15} /></>} />
+      <SubmitButton
+        loading={loading}
+        loadingText="Signing in…"
+        idleContent={
+          <>
+            <span>Sign In</span>
+            <ArrowRight size={15} />
+          </>
+        }
+      />
       <p className="text-center text-sm text-slate-500 pt-1">
         Don't have an account?{' '}
-        <button type="button" onClick={onSwitchToSignUp} className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">
+        <button
+          type="button"
+          onClick={onSwitchToSignUp}
+          className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
+        >
           Sign up free
         </button>
       </p>
@@ -252,7 +304,11 @@ function SignInModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-        <ModalHeader onClose={onClose} title="Welcome back" subtitle="Sign in to your Quro account" />
+        <ModalHeader
+          onClose={onClose}
+          title="Welcome back"
+          subtitle="Sign in to your Quro account"
+        />
         <SignInForm state={state} onSwitchToSignUp={onSwitchToSignUp} />
       </div>
     </div>
@@ -261,7 +317,12 @@ function SignInModal({
 
 // ─── Sign Up Modal ────────────────────────────────────────────────────────────
 
-const validateSignUp = (form: { name: string; email: string; password: string; confirm: string }) => {
+const validateSignUp = (form: {
+  name: string;
+  email: string;
+  password: string;
+  confirm: string;
+}) => {
   const e: Record<string, string> = {};
   if (!form.name.trim()) e.name = 'Full name is required';
   if (!form.email.trim()) e.email = 'Email is required';
@@ -289,7 +350,10 @@ function useSignUpState() {
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     const e = validateSignUp(form);
-    if (Object.keys(e).length) { setErrors(e); return; }
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
     setLoading(true);
     try {
       await signUp(form.name, form.email, form.password);
@@ -301,39 +365,100 @@ function useSignUpState() {
     }
   };
 
-  return { form, set, showPw, setShowPw, showConfirm, setShowConfirm, loading, errors, handleSubmit };
+  return {
+    form,
+    set,
+    showPw,
+    setShowPw,
+    showConfirm,
+    setShowConfirm,
+    loading,
+    errors,
+    handleSubmit,
+  };
 }
 
-type SignUpFormProps = Readonly<{ state: ReturnType<typeof useSignUpState>; onSwitchToSignIn: () => void }>;
+type SignUpFormProps = Readonly<{
+  state: ReturnType<typeof useSignUpState>;
+  onSwitchToSignIn: () => void;
+}>;
 
 function SignUpForm({ state, onSwitchToSignIn }: SignUpFormProps) {
-  const { form, set, showPw, setShowPw, showConfirm, setShowConfirm, loading, errors, handleSubmit } = state;
+  const {
+    form,
+    set,
+    showPw,
+    setShowPw,
+    showConfirm,
+    setShowConfirm,
+    loading,
+    errors,
+    handleSubmit,
+  } = state;
   return (
-    <form onSubmit={(e) => { void handleSubmit(e); }} className="px-8 py-7 space-y-4 overflow-y-auto text-slate-900">
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      className="px-8 py-7 space-y-4 overflow-y-auto text-slate-900"
+    >
       <FormField label="Full name" error={errors.name}>
-        <input type="text" autoFocus placeholder="e.g. John Smith"
+        <input
+          type="text"
+          autoFocus
+          placeholder="e.g. John Smith"
           className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.name ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-          value={form.name} onChange={(e) => set('name', e.target.value)} />
+          value={form.name}
+          onChange={(e) => set('name', e.target.value)}
+        />
       </FormField>
       <FormField label="Email address" error={errors.email}>
-        <input type="email" placeholder="you@example.com"
+        <input
+          type="email"
+          placeholder="you@example.com"
           className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.email ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-          value={form.email} onChange={(e) => set('email', e.target.value)} />
+          value={form.email}
+          onChange={(e) => set('email', e.target.value)}
+        />
       </FormField>
       <FormField label="Password" error={errors.password}>
-        <PasswordInput value={form.password} placeholder="Min. 8 characters" show={showPw}
-          onToggle={() => setShowPw(!showPw)} onChange={(v) => set('password', v)} error={errors.password} />
+        <PasswordInput
+          value={form.password}
+          placeholder="Min. 8 characters"
+          show={showPw}
+          onToggle={() => setShowPw(!showPw)}
+          onChange={(v) => set('password', v)}
+          error={errors.password}
+        />
         <PasswordStrengthMeter password={form.password} />
       </FormField>
       <FormField label="Confirm password" error={errors.confirm}>
-        <PasswordInput value={form.confirm} placeholder="Re-enter password" show={showConfirm}
-          onToggle={() => setShowConfirm(!showConfirm)} onChange={(v) => set('confirm', v)} error={errors.confirm} />
+        <PasswordInput
+          value={form.confirm}
+          placeholder="Re-enter password"
+          show={showConfirm}
+          onToggle={() => setShowConfirm(!showConfirm)}
+          onChange={(v) => set('confirm', v)}
+          error={errors.confirm}
+        />
       </FormField>
-      <SubmitButton loading={loading} loadingText="Creating account…"
-        idleContent={<><Sparkles size={15} /><span>Create Free Account</span></>} />
+      <SubmitButton
+        loading={loading}
+        loadingText="Creating account…"
+        idleContent={
+          <>
+            <Sparkles size={15} />
+            <span>Create Free Account</span>
+          </>
+        }
+      />
       <p className="text-center text-sm text-slate-500 pb-1">
         Already have an account?{' '}
-        <button type="button" onClick={onSwitchToSignIn} className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">
+        <button
+          type="button"
+          onClick={onSwitchToSignIn}
+          className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
+        >
           Sign in
         </button>
       </p>
@@ -350,7 +475,11 @@ function SignUpModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden max-h-[95vh] flex flex-col">
-        <ModalHeader onClose={onClose} title="Create your account" subtitle="Start tracking your finances for free" />
+        <ModalHeader
+          onClose={onClose}
+          title="Create your account"
+          subtitle="Start tracking your finances for free"
+        />
         <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
       </div>
     </div>
@@ -425,7 +554,9 @@ function AppPreviewWindow() {
       </div>
       <div className="p-4 space-y-3">
         <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-4">
-          <p className="text-indigo-200 text-[10px] font-medium mb-1 uppercase tracking-wider">Total Net Worth</p>
+          <p className="text-indigo-200 text-[10px] font-medium mb-1 uppercase tracking-wider">
+            Total Net Worth
+          </p>
           <p className="text-white text-2xl font-black tracking-tight">€487,250</p>
           <div className="flex items-center gap-1 mt-1">
             <span className="text-emerald-300 text-[10px] font-semibold">↑ +€12,340</span>
@@ -564,13 +695,19 @@ function NavMobileMenu({
       ))}
       <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
         <button
-          onClick={() => { onSignIn(); onClose(); }}
+          onClick={() => {
+            onSignIn();
+            onClose();
+          }}
           className="text-sm font-medium text-white border border-white/20 py-2.5 rounded-xl hover:bg-white/5 transition-all"
         >
           Sign In
         </button>
         <button
-          onClick={() => { onSignUp(); onClose(); }}
+          onClick={() => {
+            onSignUp();
+            onClose();
+          }}
           className="text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl transition-all"
         >
           Get Started Free
@@ -637,14 +774,25 @@ const HERO_TRUST_BADGES = [
   { icon: Check, text: 'No credit card required' },
 ];
 
-function HeroCtaButtons({ onSignUp, onSignIn }: Readonly<{ onSignUp: () => void; onSignIn: () => void }>) {
+function HeroCtaButtons({
+  onSignUp,
+  onSignIn,
+}: Readonly<{ onSignUp: () => void; onSignIn: () => void }>) {
   return (
     <>
       <div className="flex flex-col sm:flex-row gap-3 mb-10">
-        <button onClick={onSignUp} className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-7 py-3.5 rounded-xl font-semibold transition-all shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5">
-          <Sparkles size={16} />Get started free<ArrowRight size={16} />
+        <button
+          onClick={onSignUp}
+          className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-7 py-3.5 rounded-xl font-semibold transition-all shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
+        >
+          <Sparkles size={16} />
+          Get started free
+          <ArrowRight size={16} />
         </button>
-        <button onClick={onSignIn} className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/40 text-slate-300 hover:text-white px-7 py-3.5 rounded-xl font-medium transition-all hover:bg-white/5">
+        <button
+          onClick={onSignIn}
+          className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/40 text-slate-300 hover:text-white px-7 py-3.5 rounded-xl font-medium transition-all hover:bg-white/5"
+        >
           Sign in to your account
         </button>
       </div>
@@ -660,7 +808,10 @@ function HeroCtaButtons({ onSignUp, onSignIn }: Readonly<{ onSignUp: () => void;
   );
 }
 
-function HeroSection({ onSignUp, onSignIn }: Readonly<{ onSignUp: () => void; onSignIn: () => void }>) {
+function HeroSection({
+  onSignUp,
+  onSignIn,
+}: Readonly<{ onSignUp: () => void; onSignIn: () => void }>) {
   return (
     <section className="relative overflow-hidden">
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-700/20 rounded-full blur-3xl pointer-events-none" />
@@ -670,11 +821,15 @@ function HeroSection({ onSignUp, onSignIn }: Readonly<{ onSignUp: () => void; on
         <div>
           <div className="inline-flex items-center gap-2 bg-indigo-600/20 border border-indigo-500/30 rounded-full px-4 py-1.5 mb-8">
             <Sparkles size={13} className="text-indigo-400" />
-            <span className="text-indigo-300 text-xs font-semibold">Personal finance, beautifully simplified</span>
+            <span className="text-indigo-300 text-xs font-semibold">
+              Personal finance, beautifully simplified
+            </span>
           </div>
           <h1 className="font-black text-5xl lg:text-6xl tracking-tight leading-[1.05] mb-6">
             Your finances,{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">beautifully</span>{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+              beautifully
+            </span>{' '}
             organised.
           </h1>
           <p className="text-slate-400 text-lg leading-relaxed mb-8 max-w-lg">
@@ -713,7 +868,9 @@ function FeaturesSection() {
               key={label}
               className={`bg-white border border-slate-100 rounded-2xl p-5 hover:shadow-lg transition-all duration-200 cursor-default ${border}`}
             >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${color}`}>
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${color}`}
+              >
                 <Icon size={18} />
               </div>
               <p className="font-bold text-slate-800 mb-1.5">{label}</p>
@@ -755,16 +912,24 @@ function HowItWorksSection() {
     <section id="how-it-works" className="bg-slate-50 text-slate-900 py-20">
       <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-14">
-          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">Simple by design</p>
-          <h2 className="font-black text-4xl tracking-tight text-slate-900">Up and running in minutes</h2>
+          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-widest mb-3">
+            Simple by design
+          </p>
+          <h2 className="font-black text-4xl tracking-tight text-slate-900">
+            Up and running in minutes
+          </h2>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {HOW_IT_WORKS_STEPS.map(({ step, title, desc, icon: Icon, color }) => (
             <div key={step}>
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${color}`}>
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${color}`}
+              >
                 <Icon size={22} />
               </div>
-              <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-1.5">Step {step}</p>
+              <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-1.5">
+                Step {step}
+              </p>
               <h3 className="font-bold text-slate-900 mb-2">{title}</h3>
               <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
             </div>
@@ -801,8 +966,13 @@ function PillarsSection() {
       <div className="max-w-5xl mx-auto px-6">
         <div className="grid md:grid-cols-3 gap-6">
           {pillars.map(({ icon: Icon, title, desc, color }) => (
-            <div key={title} className="rounded-2xl border border-slate-100 p-6 hover:shadow-md transition-shadow">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${color}`}>
+            <div
+              key={title}
+              className="rounded-2xl border border-slate-100 p-6 hover:shadow-md transition-shadow"
+            >
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${color}`}
+              >
                 <Icon size={18} className="text-white" />
               </div>
               <h3 className="font-bold text-slate-900 mb-2">{title}</h3>
@@ -815,7 +985,10 @@ function PillarsSection() {
   );
 }
 
-function CtaSection({ onSignUp, onSignIn }: Readonly<{ onSignUp: () => void; onSignIn: () => void }>) {
+function CtaSection({
+  onSignUp,
+  onSignIn,
+}: Readonly<{ onSignUp: () => void; onSignIn: () => void }>) {
   return (
     <section className="relative bg-[#0a0f1e] py-24 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">

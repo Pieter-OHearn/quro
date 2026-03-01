@@ -74,7 +74,8 @@ async function resolveLinkedProperty(
   | { ok: false; error: string; status: number }
 > {
   const nextIdResult = resolveNextPropertyId(rawLinkedPropertyId, currentPropertyId);
-  if (!nextIdResult.ok) return { ok: false, error: nextIdResult.error, status: HTTP_STATUS.BAD_REQUEST };
+  if (!nextIdResult.ok)
+    return { ok: false, error: nextIdResult.error, status: HTTP_STATUS.BAD_REQUEST };
   const nextId = nextIdResult.id;
   if (nextId == null) return { ok: true, nextId: null, property: null };
   const result = await fetchLinkedProperty(userId, nextId, mortgageId);

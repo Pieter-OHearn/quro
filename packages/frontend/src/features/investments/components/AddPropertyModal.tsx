@@ -204,7 +204,10 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
 
   function handleSave() {
     const errs = validatePropertyForm(form, parsed);
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
     onSave({
       emoji: form.emoji,
       address: form.address.trim(),

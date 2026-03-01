@@ -85,7 +85,9 @@ function HoldingAssetCell({ holding, foreign, txnCount }: HoldingAssetCellProps)
           <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded-full">
             {holding.sector}
           </span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${foreign ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded-full ${foreign ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
+          >
             {holding.currency}
           </span>
         </div>
@@ -108,10 +110,14 @@ function HoldingGainCell({ gain, gainPctHolding, holding, fmtNative }: HoldingGa
       <div className="flex items-center justify-end gap-0.5">
         {gain >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
         <p className="text-sm font-semibold">
-          {gain >= 0 ? '+' : ''}{fmtNative(gain, holding.currency, true)}
+          {gain >= 0 ? '+' : ''}
+          {fmtNative(gain, holding.currency, true)}
         </p>
       </div>
-      <p className="text-xs">{gainPctHolding >= 0 ? '+' : ''}{gainPctHolding.toFixed(1)}%</p>
+      <p className="text-xs">
+        {gainPctHolding >= 0 ? '+' : ''}
+        {gainPctHolding.toFixed(1)}%
+      </p>
     </div>
   );
 }
@@ -126,29 +132,54 @@ type HoldingValueCellsProps = {
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
-function HoldingValueCells({ holding, position, nativeValue, valueInBase, foreign, fmtBase, fmtNative }: HoldingValueCellsProps) {
+function HoldingValueCells({
+  holding,
+  position,
+  nativeValue,
+  valueInBase,
+  foreign,
+  fmtBase,
+  fmtNative,
+}: HoldingValueCellsProps) {
   return (
     <>
       <div className="col-span-2 text-right">
-        <p className="text-sm font-semibold text-slate-800">{position.shares.toFixed(4).replace(/\.?0+$/, '')}</p>
-        <p className="text-xs text-slate-400">@ {fmtNative(position.avgCost, holding.currency, true)}</p>
+        <p className="text-sm font-semibold text-slate-800">
+          {position.shares.toFixed(4).replace(/\.?0+$/, '')}
+        </p>
+        <p className="text-xs text-slate-400">
+          @ {fmtNative(position.avgCost, holding.currency, true)}
+        </p>
       </div>
       <div className="col-span-2 text-right">
-        <p className="text-sm font-semibold text-slate-800">{fmtNative(holding.currentPrice, holding.currency, true)}</p>
+        <p className="text-sm font-semibold text-slate-800">
+          {fmtNative(holding.currentPrice, holding.currency, true)}
+        </p>
         <p className="text-xs text-slate-400">{holding.currency}</p>
       </div>
       <div className="col-span-2 text-right">
         <p className="text-sm font-semibold text-slate-800">{fmtBase(valueInBase)}</p>
-        {foreign && <p className="text-xs text-amber-600">{fmtNative(nativeValue, holding.currency, true)}</p>}
+        {foreign && (
+          <p className="text-xs text-amber-600">{fmtNative(nativeValue, holding.currency, true)}</p>
+        )}
       </div>
     </>
   );
 }
 
 function HoldingRow({
-  holding, holdingTxns, position, isExpanded,
-  fmtBase, fmtNative, convertToBase, isForeign,
-  onEditHolding, onToggleExpanded, onAddTxnForHolding, onDeleteTxn,
+  holding,
+  holdingTxns,
+  position,
+  isExpanded,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
+  onEditHolding,
+  onToggleExpanded,
+  onAddTxnForHolding,
+  onDeleteTxn,
 }: HoldingRowProps) {
   const { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount } =
     computeHoldingRowMetrics(holding, holdingTxns, position, convertToBase, isForeign);
@@ -157,19 +188,46 @@ function HoldingRow({
     <div key={holding.id}>
       <div className="grid grid-cols-12 gap-2 px-6 py-3.5 hover:bg-slate-50/60 transition-colors items-center">
         <HoldingAssetCell holding={holding} foreign={foreign} txnCount={txnCount} />
-        <HoldingValueCells holding={holding} position={position} nativeValue={nativeValue} valueInBase={valueInBase} foreign={foreign} fmtBase={fmtBase} fmtNative={fmtNative} />
-        <HoldingGainCell gain={gain} gainPctHolding={gainPctHolding} holding={holding} fmtNative={fmtNative} />
+        <HoldingValueCells
+          holding={holding}
+          position={position}
+          nativeValue={nativeValue}
+          valueInBase={valueInBase}
+          foreign={foreign}
+          fmtBase={fmtBase}
+          fmtNative={fmtNative}
+        />
+        <HoldingGainCell
+          gain={gain}
+          gainPctHolding={gainPctHolding}
+          holding={holding}
+          fmtNative={fmtNative}
+        />
         <div className="col-span-1 flex items-center justify-end gap-0.5">
-          <button onClick={() => onEditHolding(holding)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Edit holding">
+          <button
+            onClick={() => onEditHolding(holding)}
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            title="Edit holding"
+          >
             <Edit3 size={13} />
           </button>
-          <button onClick={() => onToggleExpanded(holding.id)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors" title={isExpanded ? 'Collapse' : 'View transactions'}>
+          <button
+            onClick={() => onToggleExpanded(holding.id)}
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+            title={isExpanded ? 'Collapse' : 'View transactions'}
+          >
             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
       </div>
       {isExpanded && (
-        <HoldingTxnHistory holding={holding} position={position} transactions={holdingTxns} onAdd={() => onAddTxnForHolding(holding)} onDelete={onDeleteTxn} />
+        <HoldingTxnHistory
+          holding={holding}
+          position={position}
+          transactions={holdingTxns}
+          onAdd={() => onAddTxnForHolding(holding)}
+          onDelete={onDeleteTxn}
+        />
       )}
     </div>
   );
@@ -185,7 +243,12 @@ type BrokerageSummaryProps = {
 };
 
 function BrokerageSummary({
-  totalBrokerageBase, totalDividendsBase, totalRealizedBase, totalGainBase, gainPct, fmtBase,
+  totalBrokerageBase,
+  totalDividendsBase,
+  totalRealizedBase,
+  totalGainBase,
+  gainPct,
+  fmtBase,
 }: BrokerageSummaryProps) {
   return (
     <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/60">
@@ -198,7 +261,9 @@ function BrokerageSummary({
       </div>
       <div className="flex items-center gap-6">
         <p className="font-bold text-slate-900">{fmtBase(totalBrokerageBase)}</p>
-        <div className={`flex items-center gap-1 ${totalGainBase >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+        <div
+          className={`flex items-center gap-1 ${totalGainBase >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+        >
           {totalGainBase >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
           <p className="font-bold">
             {totalGainBase >= 0 ? '+' : ''}
@@ -226,9 +291,18 @@ type BrokerageHoldingsListProps = {
 };
 
 function BrokerageHoldingsList({
-  holdings, holdingTxns, positions, expandedHoldingId,
-  fmtBase, fmtNative, convertToBase, isForeign,
-  onEditHolding, onToggleExpanded, onAddTxnForHolding, onDeleteTxn,
+  holdings,
+  holdingTxns,
+  positions,
+  expandedHoldingId,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
+  onEditHolding,
+  onToggleExpanded,
+  onAddTxnForHolding,
+  onDeleteTxn,
 }: BrokerageHoldingsListProps) {
   return (
     <div className="divide-y divide-slate-50">
@@ -254,10 +328,25 @@ function BrokerageHoldingsList({
 }
 
 export function BrokerageTab({
-  holdings, holdingTxns, positions, baseCurrency,
-  totalDividendsBase, totalRealizedBase, totalBrokerageBase, totalGainBase, gainPct,
-  expandedHoldingId, fmtBase, fmtNative, convertToBase, isForeign,
-  onAddHolding, onEditHolding, onToggleExpanded, onAddTxnForHolding, onDeleteTxn,
+  holdings,
+  holdingTxns,
+  positions,
+  baseCurrency,
+  totalDividendsBase,
+  totalRealizedBase,
+  totalBrokerageBase,
+  totalGainBase,
+  gainPct,
+  expandedHoldingId,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
+  onAddHolding,
+  onEditHolding,
+  onToggleExpanded,
+  onAddTxnForHolding,
+  onDeleteTxn,
 }: BrokerageTabProps) {
   return (
     <div>
@@ -281,11 +370,18 @@ export function BrokerageTab({
         <span className="col-span-1"></span>
       </div>
       <BrokerageHoldingsList
-        holdings={holdings} holdingTxns={holdingTxns} positions={positions}
-        expandedHoldingId={expandedHoldingId} fmtBase={fmtBase} fmtNative={fmtNative}
-        convertToBase={convertToBase} isForeign={isForeign}
-        onEditHolding={onEditHolding} onToggleExpanded={onToggleExpanded}
-        onAddTxnForHolding={onAddTxnForHolding} onDeleteTxn={onDeleteTxn}
+        holdings={holdings}
+        holdingTxns={holdingTxns}
+        positions={positions}
+        expandedHoldingId={expandedHoldingId}
+        fmtBase={fmtBase}
+        fmtNative={fmtNative}
+        convertToBase={convertToBase}
+        isForeign={isForeign}
+        onEditHolding={onEditHolding}
+        onToggleExpanded={onToggleExpanded}
+        onAddTxnForHolding={onAddTxnForHolding}
+        onDeleteTxn={onDeleteTxn}
       />
       {holdings.length > 0 && (
         <BrokerageSummary
