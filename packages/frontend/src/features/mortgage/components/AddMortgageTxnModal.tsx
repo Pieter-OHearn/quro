@@ -247,11 +247,7 @@ function LivePreview(props: LivePreviewProps) {
 
 // ─── Custom Hook ─────────────────────────────────────────────────────────────
 
-function useMortgageTxnModal(
-  mortgage: MortgageType,
-  onSave: AddMortgageTxnModalProps['onSave'],
-  onClose: () => void,
-) {
+function useMortgageTxnFormState() {
   const [type, setType] = useState<MortgageTxnType>('repayment');
   const [amount, setAmount] = useState('');
   const [interest, setInterest] = useState('');
@@ -259,6 +255,32 @@ function useMortgageTxnModal(
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  return {
+    type,
+    setType,
+    amount,
+    setAmount,
+    interest,
+    setInterest,
+    fixedYears,
+    setFixedYears,
+    date,
+    setDate,
+    note,
+    setNote,
+    error,
+    setError,
+  };
+}
+
+function useMortgageTxnModal(
+  mortgage: MortgageType,
+  onSave: AddMortgageTxnModalProps['onSave'],
+  onClose: () => void,
+) {
+  const formState = useMortgageTxnFormState();
+  const { type, amount, interest, fixedYears, date, note } = formState;
+  const { setType, setError, setAmount, setInterest, setFixedYears } = formState;
   const parsedAmount = parseFloat(amount) || 0;
   const parsedInterest = parseFloat(interest) || 0;
   const parsedFixedYears = parseFloat(fixedYears) || 0;
@@ -290,19 +312,7 @@ function useMortgageTxnModal(
     onClose();
   };
   return {
-    type,
-    amount,
-    setAmount,
-    interest,
-    setInterest,
-    fixedYears,
-    setFixedYears,
-    date,
-    setDate,
-    note,
-    setNote,
-    error,
-    setError,
+    ...formState,
     parsedAmount,
     parsedInterest,
     parsedFixedYears,
@@ -470,40 +480,49 @@ type TxnModalFormBodyProps = {
   mortgage: MortgageType;
   fmt: (n: number) => string;
 };
-function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
-  const {
-    type,
-    amount,
-    setAmount,
-    interest,
-    setInterest,
-    fixedYears,
-    setFixedYears,
-    date,
-    setDate,
-    note,
-    setNote,
-    error,
-    setError,
-    parsedAmount,
-    parsedInterest,
-    parsedFixedYears,
-    derivedPrincipal,
-    computedFixedUntil,
-    handleTypeChange,
-  } = state;
+function TxnDateNoteRow({
+  date,
+  note,
+  setDate,
+  setNote,
+}: Readonly<{
+  date: string;
+  note: string;
+  setDate: (v: string) => void;
+  setNote: (v: string) => void;
+}>) {
   return (
-    <div className="p-6 space-y-5">
-      <TxnTypeSelector type={type} onTypeChange={handleTypeChange} />
-      <ContextPill type={type} mortgage={mortgage} fmt={fmt} />
-      <TxnAmountField
-        type={type}
-        error={error}
-        amount={amount}
-        mortgage={mortgage}
-        setAmount={setAmount}
-        setError={setError}
-      />
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Date</label>
+        <input
+          type="date"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+          Note <span className="text-slate-400 font-normal">optional</span>
+        </label>
+        <input
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          placeholder="e.g. Monthly repayment…"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TxnConditionalFields({ state, mortgage, fmt }: TxnModalFormBodyProps) {
+  const { type, error, parsedFixedYears, fixedYears, computedFixedUntil, setFixedYears, setError } =
+    state;
+  const { parsedInterest, parsedAmount, derivedPrincipal, interest, setInterest } = state;
+  return (
+    <>
       {type === 'rate_change' && (
         <RateChangeFields
           error={error}
@@ -527,35 +546,37 @@ function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
           setError={setError}
         />
       )}
-      {error && <p className="text-xs text-rose-500">{error}</p>}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Date</label>
-          <input
-            type="date"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Note <span className="text-slate-400 font-normal">optional</span>
-          </label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            placeholder="e.g. Monthly repayment…"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-      </div>
+    </>
+  );
+}
+
+function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
+  return (
+    <div className="p-6 space-y-5">
+      <TxnTypeSelector type={state.type} onTypeChange={state.handleTypeChange} />
+      <ContextPill type={state.type} mortgage={mortgage} fmt={fmt} />
+      <TxnAmountField
+        type={state.type}
+        error={state.error}
+        amount={state.amount}
+        mortgage={mortgage}
+        setAmount={state.setAmount}
+        setError={state.setError}
+      />
+      <TxnConditionalFields state={state} mortgage={mortgage} fmt={fmt} />
+      {state.error && <p className="text-xs text-rose-500">{state.error}</p>}
+      <TxnDateNoteRow
+        date={state.date}
+        note={state.note}
+        setDate={state.setDate}
+        setNote={state.setNote}
+      />
       <LivePreview
-        type={type}
-        parsedAmount={parsedAmount}
-        parsedInterest={parsedInterest}
-        derivedPrincipal={derivedPrincipal}
-        computedFixedUntil={computedFixedUntil}
+        type={state.type}
+        parsedAmount={state.parsedAmount}
+        parsedInterest={state.parsedInterest}
+        derivedPrincipal={state.derivedPrincipal}
+        computedFixedUntil={state.computedFixedUntil}
         mortgage={mortgage}
         fmt={fmt}
       />

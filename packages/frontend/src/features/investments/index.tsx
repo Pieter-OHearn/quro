@@ -424,12 +424,9 @@ function useInvestmentUIState(): InvestmentUIState {
   };
 }
 
-function useInvestmentPortfolioStats(
+function useBrokerageStats(
   holdings: Holding[],
   positions: Record<number, Position>,
-  properties: Property[],
-  propertyTxns: PropertyTransaction[],
-  mortgageById: Map<number, Mortgage>,
   convertToBase: (value: number, currency: string) => number,
 ) {
   const totalBrokerageBase = useMemo(
@@ -462,6 +459,19 @@ function useInvestmentPortfolioStats(
       holdings.reduce((sum, h) => sum + convertToBase(positions[h.id].realizedGain, h.currency), 0),
     [holdings, positions, convertToBase],
   );
+  return { totalBrokerageBase, totalCostBase, totalDividendsBase, totalRealizedBase };
+}
+
+function useInvestmentPortfolioStats(
+  holdings: Holding[],
+  positions: Record<number, Position>,
+  properties: Property[],
+  propertyTxns: PropertyTransaction[],
+  mortgageById: Map<number, Mortgage>,
+  convertToBase: (value: number, currency: string) => number,
+) {
+  const { totalBrokerageBase, totalCostBase, totalDividendsBase, totalRealizedBase } =
+    useBrokerageStats(holdings, positions, convertToBase);
   const totalPropertyEquityBase = properties.reduce((sum, p) => {
     return (
       sum + convertToBase(p.currentValue - getPropertyMortgageBalance(p, mortgageById), p.currency)
@@ -497,19 +507,10 @@ type InvestmentStatCardsProps = {
   fmtBase: (value: number, currency?: string, compact?: boolean) => string;
 };
 
-function InvestmentStatCards({
-  totalBrokerageBase,
-  totalGainBase,
-  totalCostBase,
-  gainPct,
-  totalDividendsBase,
-  totalRealizedBase,
-  totalPropertyEquityBase,
-  totalRentalBase,
-  fmtBase,
-}: InvestmentStatCardsProps) {
+function BrokerageStatCards(props: InvestmentStatCardsProps) {
+  const { totalBrokerageBase, totalGainBase, totalCostBase, gainPct, fmtBase } = props;
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <>
       <StatCard
         label="Brokerage Value"
         value={fmtBase(totalBrokerageBase)}
@@ -532,6 +533,21 @@ function InvestmentStatCards({
           positive: totalGainBase >= 0,
         }}
       />
+    </>
+  );
+}
+
+function InvestmentStatCards(props: InvestmentStatCardsProps) {
+  const {
+    totalDividendsBase,
+    totalRealizedBase,
+    totalPropertyEquityBase,
+    totalRentalBase,
+    fmtBase,
+  } = props;
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <BrokerageStatCards {...props} />
       <StatCard
         label="Dividends Received"
         value={`+${fmtBase(totalDividendsBase)}`}
@@ -662,23 +678,11 @@ type InvestmentPageBodyProps = {
   isForeign: (currency: string) => boolean;
 };
 
-function InvestmentTabPanel({
-  tab,
-  holdings,
-  holdingTxns,
-  properties,
-  propertyTxns,
-  mortgageById,
-  positions,
-  stats,
-  ui,
-  actions,
-  baseCurrency,
-  fmtBase,
-  fmtNative,
-  convertToBase,
-  isForeign,
-}: Omit<InvestmentPageBodyProps, 'portfolioHistory'> & { tab: Tab }) {
+function InvestmentTabPanel(
+  props: Omit<InvestmentPageBodyProps, 'portfolioHistory'> & { tab: Tab },
+) {
+  const { tab, holdings, holdingTxns, properties, propertyTxns, mortgageById, positions } = props;
+  const { stats, ui, actions, baseCurrency, fmtBase, fmtNative, convertToBase, isForeign } = props;
   if (tab === 'brokerage') {
     return (
       <BrokerageTab
@@ -723,64 +727,66 @@ function InvestmentTabPanel({
   );
 }
 
-function InvestmentPageBody({
-  holdings,
-  holdingTxns,
-  properties,
-  propertyTxns,
-  mortgageById,
-  positions,
-  stats,
-  portfolioHistory,
-  ui,
-  actions,
-  baseCurrency,
-  fmtBase,
-  fmtNative,
-  convertToBase,
-  isForeign,
-}: InvestmentPageBodyProps) {
+function buildHoldingModalsProps(
+  ui: InvestmentUIState,
+  actions: ReturnType<typeof useInvestmentActions>,
+  positions: Record<number, Position>,
+): HoldingModalsProps {
+  return {
+    showAddHolding: ui.showAddHolding,
+    editingHolding: ui.editingHolding,
+    addTxnForHolding: ui.addTxnForHolding,
+    positions,
+    onCloseEditHolding: () => {
+      ui.setShowAddHolding(false);
+      ui.setEditingHolding(null);
+    },
+    onSaveHolding: actions.handleSaveHolding,
+    onDeleteHolding: actions.handleDeleteHolding,
+    onCloseAddHoldingTxn: () => ui.setAddTxnForHolding(null),
+    onSaveHoldingTxn: actions.handleAddHoldingTxn,
+  };
+}
+
+function buildPropertyModalsProps(
+  ui: InvestmentUIState,
+  actions: ReturnType<typeof useInvestmentActions>,
+  mortgageById: Map<number, Mortgage>,
+): PropertyModalsProps {
+  return {
+    updatingProperty: ui.updatingProperty,
+    showAddProperty: ui.showAddProperty,
+    addTxnForProperty: ui.addTxnForProperty,
+    mortgageById,
+    onCloseUpdateProperty: () => ui.setUpdatingProperty(null),
+    onSaveUpdateProperty: actions.handleUpdateProperty,
+    onCloseAddProperty: () => ui.setShowAddProperty(false),
+    onSaveAddProperty: actions.handleSaveProperty,
+    onCloseAddPropertyTxn: () => ui.setAddTxnForProperty(null),
+    onSavePropertyTxn: actions.handleAddPropertyTxn,
+  };
+}
+
+function InvestmentPageBody(props: InvestmentPageBodyProps) {
+  const { holdings, holdingTxns, properties, propertyTxns, mortgageById, positions } = props;
+  const {
+    stats,
+    portfolioHistory,
+    ui,
+    actions,
+    baseCurrency,
+    fmtBase,
+    fmtNative,
+    convertToBase,
+    isForeign,
+  } = props;
   return (
     <div className="p-6 space-y-6">
       <InvestmentModals
-        holdingModals={{
-          showAddHolding: ui.showAddHolding,
-          editingHolding: ui.editingHolding,
-          addTxnForHolding: ui.addTxnForHolding,
-          positions,
-          onCloseEditHolding: () => {
-            ui.setShowAddHolding(false);
-            ui.setEditingHolding(null);
-          },
-          onSaveHolding: actions.handleSaveHolding,
-          onDeleteHolding: actions.handleDeleteHolding,
-          onCloseAddHoldingTxn: () => ui.setAddTxnForHolding(null),
-          onSaveHoldingTxn: actions.handleAddHoldingTxn,
-        }}
-        propertyModals={{
-          updatingProperty: ui.updatingProperty,
-          showAddProperty: ui.showAddProperty,
-          addTxnForProperty: ui.addTxnForProperty,
-          mortgageById,
-          onCloseUpdateProperty: () => ui.setUpdatingProperty(null),
-          onSaveUpdateProperty: actions.handleUpdateProperty,
-          onCloseAddProperty: () => ui.setShowAddProperty(false),
-          onSaveAddProperty: actions.handleSaveProperty,
-          onCloseAddPropertyTxn: () => ui.setAddTxnForProperty(null),
-          onSavePropertyTxn: actions.handleAddPropertyTxn,
-        }}
+        holdingModals={buildHoldingModalsProps(ui, actions, positions)}
+        propertyModals={buildPropertyModalsProps(ui, actions, mortgageById)}
       />
-      <InvestmentStatCards
-        totalBrokerageBase={stats.totalBrokerageBase}
-        totalGainBase={stats.totalGainBase}
-        totalCostBase={stats.totalCostBase}
-        gainPct={stats.gainPct}
-        totalDividendsBase={stats.totalDividendsBase}
-        totalRealizedBase={stats.totalRealizedBase}
-        totalPropertyEquityBase={stats.totalPropertyEquityBase}
-        totalRentalBase={stats.totalRentalBase}
-        fmtBase={fmtBase}
-      />
+      <InvestmentStatCards {...stats} fmtBase={fmtBase} />
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <TabSwitcher tab={ui.tab} onSetTab={ui.setTab} />
@@ -806,36 +812,15 @@ function InvestmentPageBody({
   );
 }
 
-export function Investments() {
-  const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
-  const { holdings, holdingTxns, properties, propertyTxns, mortgages, isLoading } =
-    useInvestmentData();
-  const ui = useInvestmentUIState();
-
-  const mortgageById = useMemo(() => {
-    const map = new Map<number, Mortgage>();
-    for (const mortgage of mortgages) map.set(mortgage.id, mortgage);
-    return map;
-  }, [mortgages]);
-
-  const positions = useMemo<Record<number, Position>>(() => {
-    const result: Record<number, Position> = {};
-    holdings.forEach((h) => {
-      result[h.id] = computePosition(h.id, holdingTxns);
-    });
-    return result;
-  }, [holdings, holdingTxns]);
-
-  const stats = useInvestmentPortfolioStats(
-    holdings,
-    positions,
-    properties,
-    propertyTxns,
-    mortgageById,
-    convertToBase,
-  );
-  const actions = useInvestmentActions(holdings, properties, ui);
-  const portfolioHistory = useMemo(
+function usePortfolioHistory(
+  holdings: Holding[],
+  holdingTxns: HoldingTransaction[],
+  properties: Property[],
+  propertyTxns: PropertyTransaction[],
+  mortgageById: Map<number, Mortgage>,
+  convertToBase: (value: number, currency: string) => number,
+) {
+  return useMemo(
     () =>
       computePortfolioHistory(
         holdings,
@@ -845,7 +830,37 @@ export function Investments() {
         mortgageById,
         convertToBase,
       ),
-    [holdings, holdingTxns, properties, propertyTxns, convertToBase, mortgageById],
+    [holdings, holdingTxns, properties, propertyTxns, mortgageById, convertToBase],
+  );
+}
+
+export function Investments() {
+  const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
+  const { holdings, holdingTxns, properties, propertyTxns, mortgages, isLoading } =
+    useInvestmentData();
+  const ui = useInvestmentUIState();
+
+  const mortgageById = useMemo(() => new Map(mortgages.map((m) => [m.id, m])), [mortgages]);
+  const positions = useMemo<Record<number, Position>>(
+    () => Object.fromEntries(holdings.map((h) => [h.id, computePosition(h.id, holdingTxns)])),
+    [holdings, holdingTxns],
+  );
+  const stats = useInvestmentPortfolioStats(
+    holdings,
+    positions,
+    properties,
+    propertyTxns,
+    mortgageById,
+    convertToBase,
+  );
+  const actions = useInvestmentActions(holdings, properties, ui);
+  const portfolioHistory = usePortfolioHistory(
+    holdings,
+    holdingTxns,
+    properties,
+    propertyTxns,
+    mortgageById,
+    convertToBase,
   );
 
   if (isLoading) return <LoadingSpinner />;

@@ -76,40 +76,55 @@ type MortgagePageState = {
   closeMortgageModal: () => void;
 };
 
-function useMortgagePageState(): MortgagePageState & { isLoading: boolean } {
-  const { fmtBase } = useCurrency();
-  const fmt = (n: number) => fmtBase(n);
+function buildLinkedPropertyMap(properties: Property[]): Map<number, Property> {
+  const map = new Map<number, Property>();
+  for (const property of properties) {
+    if (property.mortgageId != null) map.set(property.mortgageId, property);
+  }
+  return map;
+}
 
+function useMortgageModals() {
+  const [showTxnModal, setShowTxnModal] = useState(false);
+  const [showMortgageModal, setShowMortgageModal] = useState(false);
+  const [editingMortgage, setEditingMortgage] = useState<MortgageType | null>(null);
+  const closeMortgageModal = () => {
+    setShowMortgageModal(false);
+    setEditingMortgage(null);
+  };
+  return {
+    showTxnModal,
+    setShowTxnModal,
+    showMortgageModal,
+    setShowMortgageModal,
+    editingMortgage,
+    setEditingMortgage,
+    closeMortgageModal,
+  };
+}
+
+function useMortgagePageState(): MortgagePageState & { isLoading: boolean } {
+  const { fmtBase: fmt } = useCurrency();
   const { data: mortgages = [], isLoading: loadingMortgages } = useMortgages();
   const { data: properties = [], isLoading: loadingProperties } = useProperties();
   const [activeMortgageId, setActiveMortgageId] = useState<number | null>(null);
   const mortgage = mortgages.find((entry) => entry.id === activeMortgageId) ?? mortgages[0];
   const { data: txns = [], isLoading: loadingTxns } = useMortgageTransactions(mortgage?.id);
-
   const createMortgageMut = useCreateMortgage();
   const updateMortgageMut = useUpdateMortgage();
   const createTxn = useCreateMortgageTransaction();
   const deleteTxnMut = useDeleteMortgageTransaction();
-
-  const [showTxnModal, setShowTxnModal] = useState(false);
-  const [showMortgageModal, setShowMortgageModal] = useState(false);
-  const [editingMortgage, setEditingMortgage] = useState<MortgageType | null>(null);
-
-  const linkedPropertyByMortgageId = useMemo(() => {
-    const linkedMap = new Map<number, Property>();
-    for (const property of properties) {
-      if (property.mortgageId != null) linkedMap.set(property.mortgageId, property);
-    }
-    return linkedMap;
-  }, [properties]);
-
-  const editingLinkedPropertyId = editingMortgage
-    ? (linkedPropertyByMortgageId.get(editingMortgage.id)?.id ?? null)
+  const modals = useMortgageModals();
+  const linkedPropertyByMortgageId = useMemo(
+    () => buildLinkedPropertyMap(properties),
+    [properties],
+  );
+  const editingLinkedPropertyId = modals.editingMortgage
+    ? (linkedPropertyByMortgageId.get(modals.editingMortgage.id)?.id ?? null)
     : null;
-
-  function handleAddTxn(transaction: Omit<MortgageTransaction, 'id'>) {
+  const handleAddTxn = (transaction: Omit<MortgageTransaction, 'id'>) =>
     createTxn.mutate(transaction);
-  }
+  const handleDeleteTxn = (id: number) => deleteTxnMut.mutate(id);
 
   async function handleSaveMortgage(payload: MortgageFormPayload) {
     const { id, ...body } = payload;
@@ -122,34 +137,19 @@ function useMortgagePageState(): MortgagePageState & { isLoading: boolean } {
     setActiveMortgageId((created as MortgageType).id);
   }
 
-  function handleDeleteTxn(id: number) {
-    deleteTxnMut.mutate(id);
-  }
-
-  function closeMortgageModal() {
-    setShowMortgageModal(false);
-    setEditingMortgage(null);
-  }
-
   return {
     fmt,
     mortgages,
     properties,
     mortgage,
     txns,
-    showTxnModal,
-    setShowTxnModal,
-    showMortgageModal,
-    setShowMortgageModal,
-    editingMortgage,
-    setEditingMortgage,
+    ...modals,
     editingLinkedPropertyId,
     setActiveMortgageId,
     handleAddTxn,
     handleSaveMortgage,
     handleDeleteTxn,
-    closeMortgageModal,
-    isLoading: loadingMortgages || loadingProperties || loadingTxns,
+    isLoading: [loadingMortgages, loadingProperties, loadingTxns].some(Boolean),
   };
 }
 
@@ -243,14 +243,13 @@ type HeroCardProps = {
   onEdit: () => void;
 };
 
-function MortgageHeroCard({
-  mortgage,
-  fmt,
-  yearsRemaining,
-  monthsRemaining,
-  onEdit,
-}: Readonly<HeroCardProps>) {
-  const metrics = [
+function buildMortgageMetrics(
+  mortgage: MortgageType,
+  fmt: (n: number) => string,
+  yearsRemaining: number,
+  monthsRemaining: number,
+) {
+  return [
     {
       label: 'Outstanding Balance',
       value: fmt(mortgage.outstandingBalance),
@@ -262,12 +261,13 @@ function MortgageHeroCard({
       value: `${mortgage.interestRate}%`,
       sub: `${mortgage.rateType} (until ${mortgage.fixedUntil})`,
     },
-    {
-      label: 'Years Remaining',
-      value: `${yearsRemaining} yrs`,
-      sub: `~${monthsRemaining} months`,
-    },
+    { label: 'Years Remaining', value: `${yearsRemaining} yrs`, sub: `~${monthsRemaining} months` },
   ];
+}
+
+function MortgageHeroCard(props: Readonly<HeroCardProps>) {
+  const { mortgage, fmt, yearsRemaining, monthsRemaining, onEdit } = props;
+  const metrics = buildMortgageMetrics(mortgage, fmt, yearsRemaining, monthsRemaining);
   return (
     <div className="bg-gradient-to-br from-[#0a0f1e] to-[#1a2040] rounded-2xl p-6 text-white">
       <div className="flex items-start justify-between gap-4 mb-6">
@@ -402,100 +402,124 @@ type ChartsProps = {
   paymentBreakdown: PaymentBreakdownRow[];
 };
 
+function MortgageBalanceChart({
+  amortization,
+  fmt,
+}: Readonly<{ amortization: AmortizationRow[]; fmt: (n: number) => string }>) {
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+      <h3 className="font-semibold text-slate-900 mb-1">Balance Projection</h3>
+      <p className="text-xs text-slate-400 mb-5">Remaining balance over loan term</p>
+      <ResponsiveContainer width="100%" height={200}>
+        <AreaChart data={amortization}>
+          <defs>
+            <linearGradient id="mortGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
+              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis
+            dataKey="year"
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+          />
+          <Tooltip
+            formatter={(v: number) => [fmt(v), 'Balance']}
+            contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+          />
+          <Area
+            type="monotone"
+            dataKey="balance"
+            stroke="#6366f1"
+            strokeWidth={2.5}
+            fill="url(#mortGrad)"
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function PaymentChartLegend() {
+  return (
+    <div className="flex items-center gap-5 mt-3">
+      <div className="flex items-center gap-1.5">
+        <div className="w-3 h-3 rounded-sm bg-indigo-500" />
+        <span className="text-xs text-slate-500">Principal</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div className="w-3 h-3 rounded-sm bg-amber-400" />
+        <span className="text-xs text-slate-500">Interest</span>
+      </div>
+    </div>
+  );
+}
+
+function MortgagePaymentChart({
+  paymentBreakdown,
+  fmt,
+}: Readonly<{ paymentBreakdown: PaymentBreakdownRow[]; fmt: (n: number) => string }>) {
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+      <h3 className="font-semibold text-slate-900 mb-1">Payment Breakdown</h3>
+      <p className="text-xs text-slate-400 mb-5">Principal vs Interest per month</p>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={paymentBreakdown} barSize={22}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
+          />
+          <Tooltip
+            contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+            formatter={(v: number, name) => [
+              fmt(v),
+              name === 'principal' ? 'Principal' : 'Interest',
+            ]}
+          />
+          <Bar
+            dataKey="principal"
+            name="principal"
+            fill="#6366f1"
+            stackId="a"
+            radius={[0, 0, 0, 0]}
+          />
+          <Bar
+            dataKey="interest"
+            name="interest"
+            fill="#f59e0b"
+            stackId="a"
+            radius={[4, 4, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+      <PaymentChartLegend />
+    </div>
+  );
+}
+
 function MortgageCharts({ fmt, amortization, paymentBreakdown }: Readonly<ChartsProps>) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-        <h3 className="font-semibold text-slate-900 mb-1">Balance Projection</h3>
-        <p className="text-xs text-slate-400 mb-5">Remaining balance over loan term</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={amortization}>
-            <defs>
-              <linearGradient id="mortGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis
-              dataKey="year"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-            />
-            <Tooltip
-              formatter={(v: number) => [fmt(v), 'Balance']}
-              contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-            />
-            <Area
-              type="monotone"
-              dataKey="balance"
-              stroke="#6366f1"
-              strokeWidth={2.5}
-              fill="url(#mortGrad)"
-              dot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-        <h3 className="font-semibold text-slate-900 mb-1">Payment Breakdown</h3>
-        <p className="text-xs text-slate-400 mb-5">Principal vs Interest per month</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={paymentBreakdown} barSize={22}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis
-              dataKey="month"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
-            />
-            <Tooltip
-              contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-              formatter={(v: number, name) => [
-                fmt(v),
-                name === 'principal' ? 'Principal' : 'Interest',
-              ]}
-            />
-            <Bar
-              dataKey="principal"
-              name="principal"
-              fill="#6366f1"
-              stackId="a"
-              radius={[0, 0, 0, 0]}
-            />
-            <Bar
-              dataKey="interest"
-              name="interest"
-              fill="#f59e0b"
-              stackId="a"
-              radius={[4, 4, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-        <div className="flex items-center gap-5 mt-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-indigo-500" />
-            <span className="text-xs text-slate-500">Principal</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-amber-400" />
-            <span className="text-xs text-slate-500">Interest</span>
-          </div>
-        </div>
-      </div>
+      <MortgageBalanceChart amortization={amortization} fmt={fmt} />
+      <MortgagePaymentChart paymentBreakdown={paymentBreakdown} fmt={fmt} />
     </div>
   );
 }
@@ -534,28 +558,125 @@ function MortgageTips({ mortgage, fmt }: Readonly<TipsProps>) {
   );
 }
 
-export function Mortgage() {
-  const state = useMortgagePageState();
+const computeMortgageMetrics = (mortgage: MortgageType) => {
+  const monthlyRate = mortgage.interestRate / 100 / 12;
+  const monthsRemaining = Math.round(
+    -Math.log(1 - (mortgage.outstandingBalance * monthlyRate) / mortgage.monthlyPayment) /
+      Math.log(1 + monthlyRate),
+  );
+  const paid = mortgage.originalAmount - mortgage.outstandingBalance;
+  const paymentBreakdown = Array.from({ length: 6 }, (_, i) => {
+    const date = new Date(2025, 8 + i, 1);
+    const bal = mortgage.outstandingBalance - i * 600;
+    const interest = Math.round(bal * monthlyRate);
+    return {
+      month: date.toLocaleDateString('en-GB', { month: 'short' }),
+      principal: mortgage.monthlyPayment - interest,
+      interest,
+    };
+  });
+  return {
+    ltv: (mortgage.outstandingBalance / mortgage.propertyValue) * 100,
+    equity: mortgage.propertyValue - mortgage.outstandingBalance,
+    paid,
+    paidPct: (paid / mortgage.originalAmount) * 100,
+    monthsRemaining,
+    yearsRemaining: Math.floor(monthsRemaining / 12),
+    amortization: generateSchedule(
+      mortgage.outstandingBalance,
+      mortgage.interestRate,
+      mortgage.monthlyPayment,
+    ),
+    paymentBreakdown,
+  };
+};
+
+type MortgagePageStateAll = ReturnType<typeof useMortgagePageState>;
+
+function MortgagePageTopControls({ s }: Readonly<{ s: MortgagePageStateAll }>) {
+  return (
+    <>
+      <MortgageModals
+        showTxnModal={s.showTxnModal}
+        showMortgageModal={s.showMortgageModal}
+        mortgage={s.mortgage!}
+        editingMortgage={s.editingMortgage}
+        properties={s.properties}
+        editingLinkedPropertyId={s.editingLinkedPropertyId}
+        onCloseTxnModal={() => s.setShowTxnModal(false)}
+        onCloseMortgageModal={s.closeMortgageModal}
+        onSaveTxn={s.handleAddTxn}
+        onSaveMortgage={s.handleSaveMortgage}
+      />
+      <MortgageTabSelector
+        mortgages={s.mortgages}
+        activeMortgage={s.mortgage!}
+        onSelect={s.setActiveMortgageId}
+        onAddClick={() => {
+          s.setEditingMortgage(null);
+          s.setShowMortgageModal(true);
+        }}
+      />
+    </>
+  );
+}
+
+function MortgagePageContent({ s }: Readonly<{ s: MortgagePageStateAll }>) {
   const {
-    fmt,
-    mortgages,
+    ltv,
+    equity,
+    paid,
+    paidPct,
+    monthsRemaining,
+    yearsRemaining,
+    amortization,
+    paymentBreakdown,
+  } = computeMortgageMetrics(s.mortgage!);
+  return (
+    <div className="p-6 space-y-6">
+      <MortgagePageTopControls s={s} />
+      <MortgageHeroCard
+        mortgage={s.mortgage!}
+        fmt={s.fmt}
+        yearsRemaining={yearsRemaining}
+        monthsRemaining={monthsRemaining}
+        onEdit={() => {
+          s.setEditingMortgage(s.mortgage!);
+          s.setShowMortgageModal(true);
+        }}
+      />
+      <MortgageStatCards
+        mortgage={s.mortgage!}
+        fmt={s.fmt}
+        equity={equity}
+        ltv={ltv}
+        paid={paid}
+        paidPct={paidPct}
+      />
+      <MortgageRepaymentProgress mortgage={s.mortgage!} fmt={s.fmt} paid={paid} paidPct={paidPct} />
+      <MortgageCharts fmt={s.fmt} amortization={amortization} paymentBreakdown={paymentBreakdown} />
+      <MortgageTxnHistory
+        mortgage={s.mortgage!}
+        transactions={s.txns}
+        onAdd={() => s.setShowTxnModal(true)}
+        onDelete={s.handleDeleteTxn}
+      />
+      <MortgageTips mortgage={s.mortgage!} fmt={s.fmt} />
+    </div>
+  );
+}
+
+export function Mortgage() {
+  const state: MortgagePageStateAll = useMortgagePageState();
+  const {
     properties,
-    mortgage,
-    txns,
     isLoading,
-    showTxnModal,
-    setShowTxnModal,
     showMortgageModal,
     setShowMortgageModal,
-    editingMortgage,
-    setEditingMortgage,
-    editingLinkedPropertyId,
-    setActiveMortgageId,
-    handleAddTxn,
     handleSaveMortgage,
-    handleDeleteTxn,
     closeMortgageModal,
   } = state;
+  const mortgage = state.mortgage;
 
   if (isLoading) return <LoadingSpinner className="min-h-[256px]" />;
 
@@ -585,82 +706,5 @@ export function Mortgage() {
     );
   }
 
-  const ltv = (mortgage.outstandingBalance / mortgage.propertyValue) * 100;
-  const equity = mortgage.propertyValue - mortgage.outstandingBalance;
-  const paid = mortgage.originalAmount - mortgage.outstandingBalance;
-  const paidPct = (paid / mortgage.originalAmount) * 100;
-  const monthlyRate = mortgage.interestRate / 100 / 12;
-  const monthsRemaining = Math.round(
-    -Math.log(1 - (mortgage.outstandingBalance * monthlyRate) / mortgage.monthlyPayment) /
-      Math.log(1 + monthlyRate),
-  );
-  const yearsRemaining = Math.floor(monthsRemaining / 12);
-  const amortization = generateSchedule(
-    mortgage.outstandingBalance,
-    mortgage.interestRate,
-    mortgage.monthlyPayment,
-  );
-  const paymentBreakdown = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date(2025, 8 + i, 1);
-    const bal = mortgage.outstandingBalance - i * 600;
-    const interest = Math.round(bal * monthlyRate);
-    return {
-      month: date.toLocaleDateString('en-GB', { month: 'short' }),
-      principal: mortgage.monthlyPayment - interest,
-      interest,
-    };
-  });
-
-  return (
-    <div className="p-6 space-y-6">
-      <MortgageModals
-        showTxnModal={showTxnModal}
-        showMortgageModal={showMortgageModal}
-        mortgage={mortgage}
-        editingMortgage={editingMortgage}
-        properties={properties}
-        editingLinkedPropertyId={editingLinkedPropertyId}
-        onCloseTxnModal={() => setShowTxnModal(false)}
-        onCloseMortgageModal={closeMortgageModal}
-        onSaveTxn={handleAddTxn}
-        onSaveMortgage={handleSaveMortgage}
-      />
-      <MortgageTabSelector
-        mortgages={mortgages}
-        activeMortgage={mortgage}
-        onSelect={setActiveMortgageId}
-        onAddClick={() => {
-          setEditingMortgage(null);
-          setShowMortgageModal(true);
-        }}
-      />
-      <MortgageHeroCard
-        mortgage={mortgage}
-        fmt={fmt}
-        yearsRemaining={yearsRemaining}
-        monthsRemaining={monthsRemaining}
-        onEdit={() => {
-          setEditingMortgage(mortgage);
-          setShowMortgageModal(true);
-        }}
-      />
-      <MortgageStatCards
-        mortgage={mortgage}
-        fmt={fmt}
-        equity={equity}
-        ltv={ltv}
-        paid={paid}
-        paidPct={paidPct}
-      />
-      <MortgageRepaymentProgress mortgage={mortgage} fmt={fmt} paid={paid} paidPct={paidPct} />
-      <MortgageCharts fmt={fmt} amortization={amortization} paymentBreakdown={paymentBreakdown} />
-      <MortgageTxnHistory
-        mortgage={mortgage}
-        transactions={txns}
-        onAdd={() => setShowTxnModal(true)}
-        onDelete={handleDeleteTxn}
-      />
-      <MortgageTips mortgage={mortgage} fmt={fmt} />
-    </div>
-  );
+  return <MortgagePageContent s={state} />;
 }

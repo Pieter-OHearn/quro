@@ -643,56 +643,112 @@ function useSavingsMetrics(
   return { totalInBase, totalInterest, avgRate };
 }
 
-export function Savings() {
-  const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
-  const {
-    accounts,
-    transactions,
-    loadingAccounts,
-    loadingTxns,
-    createAccount,
-    updateAccount,
-    deleteAccount,
-    createTxn,
-    deleteTxn,
-  } = useSavingsData();
+type SavingsModalsProps = {
+  showAccountModal: boolean;
+  editing: SavingsAccount | undefined;
+  addTxnFor: SavingsAccount | null;
+  onCloseAccountModal: () => void;
+  onSaveAccount: (a: Omit<SavingsAccount, 'id'> & { id?: number }) => void;
+  onDeleteAccount: (id: number) => void;
+  onCloseTxnModal: () => void;
+  onSaveTxn: (t: Omit<SavingsTransaction, 'id'>) => void;
+};
 
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [editing, setEditing] = useState<SavingsAccount | undefined>(undefined);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [addTxnFor, setAddTxnFor] = useState<SavingsAccount | null>(null);
-
-  function handleSaveAccount(a: Omit<SavingsAccount, 'id'> & { id?: number }): void {
-    if (a.id) updateAccount.mutate(a as SavingsAccount);
-    else createAccount.mutate(a);
-  }
-
-  const { totalInBase, totalInterest, avgRate } = useSavingsMetrics(accounts, convertToBase);
-  const contribChartData = useContribChartData(transactions, accounts, convertToBase);
-  const growthChartData = useGrowthChartData(transactions, accounts, totalInBase, convertToBase);
-
-  if (loadingAccounts || loadingTxns) return <LoadingSpinner />;
-
+function SavingsModals({
+  showAccountModal,
+  editing,
+  addTxnFor,
+  onCloseAccountModal,
+  onSaveAccount,
+  onDeleteAccount,
+  onCloseTxnModal,
+  onSaveTxn,
+}: Readonly<SavingsModalsProps>) {
   return (
-    <div className="p-6 space-y-6">
+    <>
       {(showAccountModal || editing) && (
         <AccountModal
           existing={editing}
-          onClose={() => {
-            setShowAccountModal(false);
-            setEditing(undefined);
-          }}
-          onSave={handleSaveAccount}
-          onDelete={(id) => deleteAccount.mutate(id)}
+          onClose={onCloseAccountModal}
+          onSave={onSaveAccount}
+          onDelete={onDeleteAccount}
         />
       )}
       {addTxnFor && (
-        <AddTxnModal
-          account={addTxnFor}
-          onClose={() => setAddTxnFor(null)}
-          onSave={(t) => createTxn.mutate(t)}
-        />
+        <AddTxnModal account={addTxnFor} onClose={onCloseTxnModal} onSave={onSaveTxn} />
       )}
+    </>
+  );
+}
+
+type SavingsPageBodyProps = {
+  accounts: SavingsAccount[];
+  transactions: SavingsTransaction[];
+  totalInBase: number;
+  totalInterest: number;
+  avgRate: number;
+  expandedId: number | null;
+  setExpandedId: (id: number | null) => void;
+  setEditing: (a: SavingsAccount | undefined) => void;
+  setShowAccountModal: (v: boolean) => void;
+  setAddTxnFor: (a: SavingsAccount | null) => void;
+  showAccountModal: boolean;
+  editing: SavingsAccount | undefined;
+  addTxnFor: SavingsAccount | null;
+  handleSaveAccount: (a: Omit<SavingsAccount, 'id'> & { id?: number }) => void;
+  deleteAccount: { mutate: (id: number) => void };
+  createTxn: { mutate: (t: Omit<SavingsTransaction, 'id'>) => void };
+  deleteTxn: { mutate: (id: number) => void };
+  contribChartData: ChartsProps['contribChartData'];
+  growthChartData: ChartsProps['growthChartData'];
+  fmtBase: FmtBase;
+  fmtNative: FmtNative;
+  convertToBase: AccountsListProps['convertToBase'];
+  isForeign: AccountsListProps['isForeign'];
+  baseCurrency: string;
+};
+
+function SavingsPageBody({
+  accounts,
+  transactions,
+  totalInBase,
+  totalInterest,
+  avgRate,
+  expandedId,
+  setExpandedId,
+  setEditing,
+  setShowAccountModal,
+  setAddTxnFor,
+  showAccountModal,
+  editing,
+  addTxnFor,
+  handleSaveAccount,
+  deleteAccount,
+  createTxn,
+  deleteTxn,
+  contribChartData,
+  growthChartData,
+  fmtBase,
+  fmtNative,
+  convertToBase,
+  isForeign,
+  baseCurrency,
+}: Readonly<SavingsPageBodyProps>) {
+  return (
+    <div className="p-6 space-y-6">
+      <SavingsModals
+        showAccountModal={showAccountModal}
+        editing={editing}
+        addTxnFor={addTxnFor}
+        onCloseAccountModal={() => {
+          setShowAccountModal(false);
+          setEditing(undefined);
+        }}
+        onSaveAccount={handleSaveAccount}
+        onDeleteAccount={(id) => deleteAccount.mutate(id)}
+        onCloseTxnModal={() => setAddTxnFor(null)}
+        onSaveTxn={(t) => createTxn.mutate(t)}
+      />
       <SavingsStats
         totalInBase={totalInBase}
         totalInterest={totalInterest}
@@ -727,5 +783,60 @@ export function Savings() {
         onDeleteTxn={(id) => deleteTxn.mutate(id)}
       />
     </div>
+  );
+}
+
+export function Savings() {
+  const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
+  const {
+    accounts,
+    transactions,
+    loadingAccounts,
+    loadingTxns,
+    createAccount,
+    updateAccount,
+    deleteAccount,
+    createTxn,
+    deleteTxn,
+  } = useSavingsData();
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [editing, setEditing] = useState<SavingsAccount | undefined>(undefined);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [addTxnFor, setAddTxnFor] = useState<SavingsAccount | null>(null);
+  const handleSaveAccount = (a: Omit<SavingsAccount, 'id'> & { id?: number }): void => {
+    if (a.id) updateAccount.mutate(a as SavingsAccount);
+    else createAccount.mutate(a);
+  };
+  const { totalInBase, totalInterest, avgRate } = useSavingsMetrics(accounts, convertToBase);
+  const contribChartData = useContribChartData(transactions, accounts, convertToBase);
+  const growthChartData = useGrowthChartData(transactions, accounts, totalInBase, convertToBase);
+  if (loadingAccounts || loadingTxns) return <LoadingSpinner />;
+  return (
+    <SavingsPageBody
+      accounts={accounts}
+      transactions={transactions}
+      totalInBase={totalInBase}
+      totalInterest={totalInterest}
+      avgRate={avgRate}
+      expandedId={expandedId}
+      setExpandedId={setExpandedId}
+      setEditing={setEditing}
+      setShowAccountModal={setShowAccountModal}
+      setAddTxnFor={setAddTxnFor}
+      showAccountModal={showAccountModal}
+      editing={editing}
+      addTxnFor={addTxnFor}
+      handleSaveAccount={handleSaveAccount}
+      deleteAccount={deleteAccount}
+      createTxn={createTxn}
+      deleteTxn={deleteTxn}
+      contribChartData={contribChartData}
+      growthChartData={growthChartData}
+      fmtBase={fmtBase}
+      fmtNative={fmtNative}
+      convertToBase={convertToBase}
+      isForeign={isForeign}
+      baseCurrency={baseCurrency}
+    />
   );
 }

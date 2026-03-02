@@ -103,11 +103,38 @@ function PropertyTxnAmount({ transaction, currency, fmtNative }: PropertyTxnAmou
   );
 }
 
+type FmtNativeFn = (value: number, currency: string, compact?: boolean) => string;
+
+function buildCashflowTxnStats(
+  transactions: PropertyTransaction[],
+  currency: string,
+  fmtNative: FmtNativeFn,
+) {
+  const totalRentIncome = transactions
+    .filter((t) => t.type === 'rent_income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalExpenses = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+  return [
+    {
+      label: 'Rent Income',
+      value: `+${fmtNative(totalRentIncome, currency, true)}`,
+      color: 'text-sky-600',
+    },
+    {
+      label: 'Expenses',
+      value: `-${fmtNative(totalExpenses, currency, true)}`,
+      color: 'text-rose-500',
+    },
+  ];
+}
+
 function buildPropertyTxnStats(
   transactions: PropertyTransaction[],
   currency: string,
   supportsCashflowTxns: boolean,
-  fmtNative: (value: number, currency: string, compact?: boolean) => string,
+  fmtNative: FmtNativeFn,
 ) {
   const totalRepaid = transactions
     .filter((t) => t.type === 'repayment')
@@ -119,13 +146,6 @@ function buildPropertyTxnStats(
     .filter((t) => t.type === 'repayment')
     .reduce((sum, t) => sum + (t.interest ?? 0), 0);
   const valuationCount = transactions.filter((t) => t.type === 'valuation').length;
-  const totalRentIncome = transactions
-    .filter((t) => t.type === 'rent_income')
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = transactions
-    .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
   const base = [
     {
       label: 'Total Repaid',
@@ -145,19 +165,7 @@ function buildPropertyTxnStats(
     { label: 'Valuations', value: `${valuationCount}`, color: 'text-emerald-600' },
   ];
   if (!supportsCashflowTxns) return base;
-  return [
-    ...base,
-    {
-      label: 'Rent Income',
-      value: `+${fmtNative(totalRentIncome, currency, true)}`,
-      color: 'text-sky-600',
-    },
-    {
-      label: 'Expenses',
-      value: `-${fmtNative(totalExpenses, currency, true)}`,
-      color: 'text-rose-500',
-    },
-  ];
+  return [...base, ...buildCashflowTxnStats(transactions, currency, fmtNative)];
 }
 
 function getFilterLabel(option: string): string {
@@ -166,30 +174,60 @@ function getFilterLabel(option: string): string {
   return `${PROPERTY_TXN_META[option as PropertyTxnType].label}s`;
 }
 
-export function PropertyTxnHistory({
-  property,
-  transactions,
-  onAdd,
-  onDelete,
-}: PropertyTxnHistoryProps) {
-  const { fmtNative } = useCurrency();
-  const supportsCashflowTxns = isInvestmentProperty(property.propertyType);
-  const filterOptions = supportsCashflowTxns
+function getPropertyFilterOptions(supportsCashflowTxns: boolean) {
+  return supportsCashflowTxns
     ? (['all', 'repayment', 'valuation', 'rent_income', 'expense'] as const)
     : (['all', 'repayment', 'valuation'] as const);
-  const [filter, setFilter] = useState<PropertyTxnType | 'all'>('all');
+}
 
-  const sorted = [...transactions]
-    .filter((transaction) => filter === 'all' || transaction.type === filter)
+function sortPropertyTxns(transactions: PropertyTransaction[], filter: PropertyTxnType | 'all') {
+  return [...transactions]
+    .filter((t) => filter === 'all' || t.type === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
+}
 
+type PropertyTxnRowProps = {
+  transaction: PropertyTransaction;
+  property: Property;
+  fmtNative: (v: number, c: string) => string;
+  onDelete: (id: number) => void;
+};
+
+function PropertyTxnRow({ transaction, property, fmtNative, onDelete }: PropertyTxnRowProps) {
+  const meta = PROPERTY_TXN_META[transaction.type];
+  return (
+    <TxnRow
+      key={transaction.id}
+      icon={meta.icon}
+      iconColor={meta.color}
+      iconBg={meta.bg}
+      label={transaction.note || meta.label}
+      date={transaction.date}
+      amount={
+        <PropertyTxnAmount
+          transaction={transaction}
+          currency={property.currency}
+          fmtNative={fmtNative}
+        />
+      }
+      onDelete={() => onDelete(transaction.id)}
+    />
+  );
+}
+
+export function PropertyTxnHistory(props: PropertyTxnHistoryProps) {
+  const { property, transactions, onAdd, onDelete } = props;
+  const { fmtNative } = useCurrency();
+  const supportsCashflowTxns = isInvestmentProperty(property.propertyType);
+  const filterOptions = getPropertyFilterOptions(supportsCashflowTxns);
+  const [filter, setFilter] = useState<PropertyTxnType | 'all'>('all');
+  const sorted = sortPropertyTxns(transactions, filter);
   const stats = buildPropertyTxnStats(
     transactions,
     property.currency,
     supportsCashflowTxns,
     fmtNative,
   );
-
   return (
     <TxnHistoryPanel
       filterOptions={filterOptions.map((option) => ({
@@ -203,27 +241,15 @@ export function PropertyTxnHistory({
       onAdd={onAdd}
       isEmpty={sorted.length === 0}
     >
-      {sorted.map((transaction) => {
-        const meta = PROPERTY_TXN_META[transaction.type];
-        return (
-          <TxnRow
-            key={transaction.id}
-            icon={meta.icon}
-            iconColor={meta.color}
-            iconBg={meta.bg}
-            label={transaction.note || meta.label}
-            date={transaction.date}
-            amount={
-              <PropertyTxnAmount
-                transaction={transaction}
-                currency={property.currency}
-                fmtNative={fmtNative}
-              />
-            }
-            onDelete={() => onDelete(transaction.id)}
-          />
-        );
-      })}
+      {sorted.map((t) => (
+        <PropertyTxnRow
+          key={t.id}
+          transaction={t}
+          property={property}
+          fmtNative={fmtNative}
+          onDelete={onDelete}
+        />
+      ))}
     </TxnHistoryPanel>
   );
 }

@@ -25,21 +25,42 @@ type PortfolioAreaChartProps = {
   fmtBase: (value: number, currency?: string, compact?: boolean) => string;
 };
 
+function PortfolioChartDefs() {
+  return (
+    <defs>
+      <linearGradient id="investmentsBrokerageGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.16} />
+        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+      </linearGradient>
+      <linearGradient id="investmentsPropertyGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor="#10b981" stopOpacity={0.16} />
+        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+      </linearGradient>
+    </defs>
+  );
+}
+
+function PortfolioChartLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-8 mt-4 text-sm text-slate-600">
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+        Brokerage
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+        Property Equity
+      </div>
+    </div>
+  );
+}
+
 function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
   return (
     <>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-          <defs>
-            <linearGradient id="investmentsBrokerageGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.16} />
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="investmentsPropertyGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.16} />
-              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+          <PortfolioChartDefs />
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
           <XAxis
             dataKey="month"
@@ -80,16 +101,7 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
           />
         </AreaChart>
       </ResponsiveContainer>
-      <div className="flex flex-wrap items-center gap-8 mt-4 text-sm text-slate-600">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-          Brokerage
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-          Property Equity
-        </div>
-      </div>
+      <PortfolioChartLegend />
     </>
   );
 }

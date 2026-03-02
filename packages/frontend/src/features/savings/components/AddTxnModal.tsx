@@ -92,60 +92,55 @@ function useAddTxnForm(
 
 export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
   const { fmtNative } = useCurrency();
-  const {
-    type,
-    setType,
-    amount,
-    setAmount,
-    date,
-    setDate,
-    note,
-    setNote,
-    error,
-    setError,
-    parsed,
-    handleSave,
-  } = useAddTxnForm(account, onSave, onClose);
-
+  const form = useAddTxnForm(account, onSave, onClose);
   return (
     <Modal
       title="Add Transaction"
       subtitle={`${account.emoji} ${account.name}`}
       onClose={onClose}
       footer={
-        <ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Record Transaction" />
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={form.handleSave}
+          confirmLabel="Record Transaction"
+        />
       }
     >
       <FormField label="Transaction Type">
         <TxnTypeSelector
           types={TXN_TYPE_LIST}
-          value={type}
+          value={form.type}
           onChange={(t) => {
-            setType(t as TxnType);
-            setError('');
+            form.setType(t as TxnType);
+            form.setError('');
           }}
         />
       </FormField>
-      <FormField label={`Amount (${account.currency})`} error={error}>
+      <FormField label={`Amount (${account.currency})`} error={form.error}>
         <CurrencyInput
           currency={account.currency}
-          value={amount}
+          value={form.amount}
           onChange={(v) => {
-            setAmount(v);
-            setError('');
+            form.setAmount(v);
+            form.setError('');
           }}
-          error={Boolean(error)}
+          error={Boolean(form.error)}
         />
       </FormField>
       <DateNoteRow
-        date={date}
-        note={note}
-        onDateChange={setDate}
-        onNoteChange={setNote}
+        date={form.date}
+        note={form.note}
+        onDateChange={form.setDate}
+        onNoteChange={form.setNote}
         notePlaceholder="e.g. Monthly transfer, Quarterly interest..."
       />
-      {parsed > 0 && (
-        <BalancePreview type={type} parsed={parsed} account={account} fmtNative={fmtNative} />
+      {form.parsed > 0 && (
+        <BalancePreview
+          type={form.type}
+          parsed={form.parsed}
+          account={account}
+          fmtNative={fmtNative}
+        />
       )}
     </Modal>
   );

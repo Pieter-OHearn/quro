@@ -35,6 +35,9 @@ type PayslipFormState = {
   bonus: string;
 };
 
+const isInvalidAmount = (raw: string, parsed: number, allowZero: boolean) =>
+  !raw || isNaN(parsed) || (allowZero ? parsed < 0 : parsed <= 0);
+
 function validatePayslipForm(
   form: PayslipFormState,
   gross: number,
@@ -44,9 +47,9 @@ function validatePayslipForm(
   const errs: Record<string, string> = {};
   if (!form.month.trim()) errs.month = 'Required';
   if (!form.date.trim()) errs.date = 'Required';
-  if (!form.gross || isNaN(gross) || gross <= 0) errs.gross = 'Enter a valid amount';
-  if (!form.tax || isNaN(tax) || tax < 0) errs.tax = 'Enter a valid amount';
-  if (!form.pension || isNaN(pension) || pension < 0) errs.pension = 'Enter a valid amount';
+  if (isInvalidAmount(form.gross, gross, false)) errs.gross = 'Enter a valid amount';
+  if (isInvalidAmount(form.tax, tax, true)) errs.tax = 'Enter a valid amount';
+  if (isInvalidAmount(form.pension, pension, true)) errs.pension = 'Enter a valid amount';
   return errs;
 }
 
@@ -142,6 +145,99 @@ type PayslipFormBodyProps = {
   baseCurrency: string;
 };
 
+type PayslipFormPartProps = {
+  form: PayslipFormState;
+  errors: Record<string, string>;
+  set: (field: string, value: string) => void;
+};
+
+function PayslipPeriodRow({ form, errors, set }: Readonly<PayslipFormPartProps>) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <PayslipTextField
+        field="month"
+        label="Pay Period"
+        placeholder="e.g. Mar 2026"
+        required
+        value={form.month}
+        error={errors.month}
+        onChange={(v) => set('month', v)}
+      />
+      <PayslipTextField
+        field="date"
+        label="Pay Date"
+        placeholder="e.g. 31 Mar 2026"
+        required
+        value={form.date}
+        error={errors.date}
+        onChange={(v) => set('date', v)}
+      />
+    </div>
+  );
+}
+
+function PayslipGrossBonusRow({ form, errors, set }: Readonly<PayslipFormPartProps>) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <PayslipTextField
+        field="gross"
+        label="Gross Pay"
+        placeholder="6500"
+        required
+        type="number"
+        value={form.gross}
+        error={errors.gross}
+        onChange={(v) => set('gross', v)}
+      />
+      <div>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+          Bonus <span className="text-slate-400 font-normal">optional</span>
+        </label>
+        <input
+          type="number"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          placeholder="0"
+          value={form.bonus}
+          onChange={(e) => set('bonus', e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PayslipDeductionsRow({ form, errors, set }: Readonly<PayslipFormPartProps>) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Deductions</p>
+        <div className="flex-1 h-px bg-slate-100" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <PayslipTextField
+          field="tax"
+          label="Income Tax"
+          placeholder="1680"
+          required
+          type="number"
+          value={form.tax}
+          error={errors.tax}
+          onChange={(v) => set('tax', v)}
+        />
+        <PayslipTextField
+          field="pension"
+          label="Pension"
+          placeholder="325"
+          required
+          type="number"
+          value={form.pension}
+          error={errors.pension}
+          onChange={(v) => set('pension', v)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function PayslipFormBody({
   form,
   errors,
@@ -155,78 +251,9 @@ function PayslipFormBody({
 }: PayslipFormBodyProps) {
   return (
     <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
-      <div className="grid grid-cols-2 gap-4">
-        <PayslipTextField
-          field="month"
-          label="Pay Period"
-          placeholder="e.g. Mar 2026"
-          required
-          value={form.month}
-          error={errors.month}
-          onChange={(v) => set('month', v)}
-        />
-        <PayslipTextField
-          field="date"
-          label="Pay Date"
-          placeholder="e.g. 31 Mar 2026"
-          required
-          value={form.date}
-          error={errors.date}
-          onChange={(v) => set('date', v)}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <PayslipTextField
-          field="gross"
-          label="Gross Pay"
-          placeholder="6500"
-          required
-          type="number"
-          value={form.gross}
-          error={errors.gross}
-          onChange={(v) => set('gross', v)}
-        />
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Bonus <span className="text-slate-400 font-normal">optional</span>
-          </label>
-          <input
-            type="number"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            placeholder="0"
-            value={form.bonus}
-            onChange={(e) => set('bonus', e.target.value)}
-          />
-        </div>
-      </div>
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Deductions</p>
-          <div className="flex-1 h-px bg-slate-100" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <PayslipTextField
-            field="tax"
-            label="Income Tax"
-            placeholder="1680"
-            required
-            type="number"
-            value={form.tax}
-            error={errors.tax}
-            onChange={(v) => set('tax', v)}
-          />
-          <PayslipTextField
-            field="pension"
-            label="Pension"
-            placeholder="325"
-            required
-            type="number"
-            value={form.pension}
-            error={errors.pension}
-            onChange={(v) => set('pension', v)}
-          />
-        </div>
-      </div>
+      <PayslipPeriodRow form={form} errors={errors} set={set} />
+      <PayslipGrossBonusRow form={form} errors={errors} set={set} />
+      <PayslipDeductionsRow form={form} errors={errors} set={set} />
       <NetPreview
         net={net}
         gross={gross}
@@ -239,7 +266,11 @@ function PayslipFormBody({
   );
 }
 
-function AddPayslipModal({ onClose, onSave, baseCurrency }: AddPayslipModalProps) {
+function useAddPayslipForm(
+  onSave: AddPayslipModalProps['onSave'],
+  onClose: () => void,
+  baseCurrency: string,
+) {
   const [form, setForm] = useState<PayslipFormState>({
     month: '',
     date: '',
@@ -249,13 +280,11 @@ function AddPayslipModal({ onClose, onSave, baseCurrency }: AddPayslipModalProps
     bonus: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const gross = parseFloat(form.gross) || 0;
-  const tax = parseFloat(form.tax) || 0;
-  const pension = parseFloat(form.pension) || 0;
-  const bonus = parseFloat(form.bonus) || 0;
+  const gross = parseFloat(form.gross) || 0,
+    tax = parseFloat(form.tax) || 0;
+  const pension = parseFloat(form.pension) || 0,
+    bonus = parseFloat(form.bonus) || 0;
   const net = gross + bonus - tax - pension;
-
   const set = (field: string, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
     if (errors[field])
@@ -265,7 +294,6 @@ function AddPayslipModal({ onClose, onSave, baseCurrency }: AddPayslipModalProps
         return n;
       });
   };
-
   const handleSave = () => {
     const errs = validatePayslipForm(form, gross, tax, pension);
     if (Object.keys(errs).length) {
@@ -284,23 +312,40 @@ function AddPayslipModal({ onClose, onSave, baseCurrency }: AddPayslipModalProps
     });
     onClose();
   };
+  return { form, errors, set, gross, tax, pension, bonus, net, handleSave };
+}
 
+function PayslipModalHeader({
+  baseCurrency,
+  onClose,
+}: Readonly<{ baseCurrency: string; onClose: () => void }>) {
+  return (
+    <div className="bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between">
+      <div>
+        <h2 className="font-bold text-white">Add Payslip</h2>
+        <p className="text-xs text-indigo-300 mt-0.5">Amounts in {baseCurrency}</p>
+      </div>
+      <button
+        onClick={onClose}
+        className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"
+      >
+        <X size={18} />
+      </button>
+    </div>
+  );
+}
+
+function AddPayslipModal({ onClose, onSave, baseCurrency }: AddPayslipModalProps) {
+  const { form, errors, set, gross, tax, pension, bonus, net, handleSave } = useAddPayslipForm(
+    onSave,
+    onClose,
+    baseCurrency,
+  );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        <div className="bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-white">Add Payslip</h2>
-            <p className="text-xs text-indigo-300 mt-0.5">Amounts in {baseCurrency}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white"
-          >
-            <X size={18} />
-          </button>
-        </div>
+        <PayslipModalHeader baseCurrency={baseCurrency} onClose={onClose} />
         <PayslipFormBody
           form={form}
           errors={errors}
@@ -372,6 +417,91 @@ function SalaryStatsCards({ cards }: { cards: StatCard[] }) {
 
 type PayBreakdownPanelProps = { selected: Payslip | null; fmtBase: FmtFn };
 
+const buildBreakdownItems = (p: Payslip) => [
+  {
+    label: 'Gross Pay',
+    val: p.gross,
+    color: 'bg-slate-200',
+    tc: 'text-slate-700',
+    pct: undefined as number | undefined,
+  },
+  ...(p.bonus
+    ? [
+        {
+          label: 'Bonus',
+          val: p.bonus,
+          color: 'bg-amber-200',
+          tc: 'text-amber-700',
+          pct: undefined as number | undefined,
+        },
+      ]
+    : []),
+  {
+    label: 'Take-Home Pay',
+    val: p.net,
+    color: 'bg-emerald-500',
+    tc: 'text-emerald-700',
+    pct: (p.net / p.gross) * 100,
+  },
+  {
+    label: 'Income Tax',
+    val: -p.tax,
+    color: 'bg-rose-400',
+    tc: 'text-rose-600',
+    pct: (p.tax / p.gross) * 100,
+  },
+  {
+    label: 'Pension',
+    val: -p.pension,
+    color: 'bg-indigo-400',
+    tc: 'text-indigo-600',
+    pct: (p.pension / p.gross) * 100,
+  },
+];
+
+function PayBreakdownDetail({
+  selected,
+  fmtBase,
+}: Readonly<{ selected: Payslip; fmtBase: FmtFn }>) {
+  return (
+    <>
+      <div className="flex h-7 rounded-xl overflow-hidden mb-5 gap-px">
+        <div
+          className="bg-emerald-500 h-full"
+          style={{ width: `${(selected.net / selected.gross) * 100}%` }}
+        />
+        <div
+          className="bg-rose-400 h-full"
+          style={{ width: `${(selected.tax / selected.gross) * 100}%` }}
+        />
+        <div
+          className="bg-indigo-400 h-full"
+          style={{ width: `${(selected.pension / selected.gross) * 100}%` }}
+        />
+      </div>
+      <div className="space-y-2.5">
+        {buildBreakdownItems(selected).map(({ label, val, color, tc, pct }) => (
+          <div key={label} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-sm ${color}`} />
+              <span className="text-sm text-slate-600">{label}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {pct !== undefined && (
+                <span className="text-xs text-slate-400">{pct.toFixed(0)}%</span>
+              )}
+              <span className={`text-sm font-semibold ${tc}`}>
+                {val >= 0 ? '+' : '\u2212'}
+                {fmtBase(Math.abs(val))}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function PayBreakdownPanel({ selected, fmtBase }: PayBreakdownPanelProps) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
@@ -379,82 +509,11 @@ function PayBreakdownPanel({ selected, fmtBase }: PayBreakdownPanelProps) {
       <p className="text-xs text-slate-400 mb-4">
         {selected?.month ?? '—'} — click a payslip row to switch month
       </p>
-      {selected && (
-        <>
-          <div className="flex h-7 rounded-xl overflow-hidden mb-5 gap-px">
-            <div
-              className="bg-emerald-500 h-full"
-              style={{ width: `${(selected.net / selected.gross) * 100}%` }}
-            />
-            <div
-              className="bg-rose-400   h-full"
-              style={{ width: `${(selected.tax / selected.gross) * 100}%` }}
-            />
-            <div
-              className="bg-indigo-400 h-full"
-              style={{ width: `${(selected.pension / selected.gross) * 100}%` }}
-            />
-          </div>
-          <div className="space-y-2.5">
-            {[
-              {
-                label: 'Gross Pay',
-                val: selected.gross,
-                color: 'bg-slate-200',
-                tc: 'text-slate-700',
-              },
-              ...(selected.bonus
-                ? [
-                    {
-                      label: 'Bonus',
-                      val: selected.bonus,
-                      color: 'bg-amber-200',
-                      tc: 'text-amber-700',
-                    },
-                  ]
-                : []),
-              {
-                label: 'Take-Home Pay',
-                val: selected.net,
-                color: 'bg-emerald-500',
-                tc: 'text-emerald-700',
-                pct: (selected.net / selected.gross) * 100,
-              },
-              {
-                label: 'Income Tax',
-                val: -selected.tax,
-                color: 'bg-rose-400',
-                tc: 'text-rose-600',
-                pct: (selected.tax / selected.gross) * 100,
-              },
-              {
-                label: 'Pension',
-                val: -selected.pension,
-                color: 'bg-indigo-400',
-                tc: 'text-indigo-600',
-                pct: (selected.pension / selected.gross) * 100,
-              },
-            ].map(({ label, val, color, tc, pct }) => (
-              <div key={label} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-sm ${color}`} />
-                  <span className="text-sm text-slate-600">{label}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  {pct !== undefined && (
-                    <span className="text-xs text-slate-400">{pct.toFixed(0)}%</span>
-                  )}
-                  <span className={`text-sm font-semibold ${tc}`}>
-                    {val >= 0 ? '+' : '\u2212'}
-                    {fmtBase(Math.abs(val))}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+      {selected ? (
+        <PayBreakdownDetail selected={selected} fmtBase={fmtBase} />
+      ) : (
+        <p className="text-sm text-slate-400 py-8 text-center">No payslips yet.</p>
       )}
-      {!selected && <p className="text-sm text-slate-400 py-8 text-center">No payslips yet.</p>}
     </div>
   );
 }
@@ -526,6 +585,93 @@ type PayslipTableProps = {
   onDelete: (id: number) => void;
 };
 
+function PayslipRowActions({
+  id,
+  onDelete,
+}: Readonly<{ id: number; onDelete: (id: number) => void }>) {
+  return (
+    <div className="flex items-center gap-1">
+      <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
+        <Download size={14} />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(id);
+        }}
+        className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+function PayslipTableRow({
+  p,
+  isSelected,
+  fmtBase,
+  onSelect,
+  onDelete,
+}: Readonly<{
+  p: Payslip;
+  isSelected: boolean;
+  fmtBase: FmtFn;
+  onSelect: (id: number) => void;
+  onDelete: (id: number) => void;
+}>) {
+  return (
+    <tr
+      onClick={() => onSelect(p.id)}
+      className={`border-b border-slate-50 cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
+    >
+      <td className="py-3 px-4">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-slate-800">{p.month}</span>
+          {p.bonus && (
+            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+              +Bonus
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-slate-400">{p.date}</p>
+      </td>
+      <td className="py-3 px-4 font-semibold text-slate-800">{fmtBase(p.gross)}</td>
+      <td className="py-3 px-4 text-rose-500">
+        {'\u2212'}
+        {fmtBase(p.tax)}
+      </td>
+      <td className="py-3 px-4 text-indigo-600">
+        {'\u2212'}
+        {fmtBase(p.pension)}
+      </td>
+      <td className="py-3 px-4 font-bold text-emerald-600">{fmtBase(p.net)}</td>
+      <td className="py-3 px-4">
+        <PayslipRowActions id={p.id} onDelete={onDelete} />
+      </td>
+    </tr>
+  );
+}
+
+function PayslipTableHeader({ count, onAdd }: Readonly<{ count: number; onAdd: () => void }>) {
+  return (
+    <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+      <div>
+        <h3 className="font-semibold text-slate-900">Payslip History</h3>
+        <p className="text-xs text-slate-400 mt-0.5">
+          {count} payslips · click a row to view breakdown
+        </p>
+      </div>
+      <button
+        onClick={onAdd}
+        className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
+      >
+        <Plus size={15} /> Add Payslip
+      </button>
+    </div>
+  );
+}
+
 function PayslipHistoryTable({
   payslips,
   selected,
@@ -536,20 +682,7 @@ function PayslipHistoryTable({
 }: PayslipTableProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-        <div>
-          <h3 className="font-semibold text-slate-900">Payslip History</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {payslips.length} payslips · click a row to view breakdown
-          </p>
-        </div>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-        >
-          <Plus size={15} /> Add Payslip
-        </button>
-      </div>
+      <PayslipTableHeader count={payslips.length} onAdd={onAdd} />
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -566,49 +699,14 @@ function PayslipHistoryTable({
           </thead>
           <tbody>
             {payslips.map((p) => (
-              <tr
+              <PayslipTableRow
                 key={p.id}
-                onClick={() => onSelect(p.id)}
-                className={`border-b border-slate-50 cursor-pointer transition-colors ${selected?.id === p.id ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
-              >
-                <td className="py-3 px-4">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">{p.month}</span>
-                    {p.bonus && (
-                      <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                        +Bonus
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400">{p.date}</p>
-                </td>
-                <td className="py-3 px-4 font-semibold text-slate-800">{fmtBase(p.gross)}</td>
-                <td className="py-3 px-4 text-rose-500">
-                  {'\u2212'}
-                  {fmtBase(p.tax)}
-                </td>
-                <td className="py-3 px-4 text-indigo-600">
-                  {'\u2212'}
-                  {fmtBase(p.pension)}
-                </td>
-                <td className="py-3 px-4 font-bold text-emerald-600">{fmtBase(p.net)}</td>
-                <td className="py-3 px-4">
-                  <div className="flex items-center gap-1">
-                    <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors">
-                      <Download size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(p.id);
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                p={p}
+                isSelected={selected?.id === p.id}
+                fmtBase={fmtBase}
+                onSelect={onSelect}
+                onDelete={onDelete}
+              />
             ))}
             {payslips.length === 0 && (
               <tr>
@@ -626,30 +724,75 @@ function PayslipHistoryTable({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export function Salary() {
-  const { fmtBase, baseCurrency } = useCurrency();
-  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
-  const { data: salaryHistory = [], isLoading: loadingHistory } = useSalaryHistory();
-  const createPayslip = useCreatePayslip();
-  const deletePayslip = useDeletePayslip();
+const buildSalaryStatCards = (
+  fmtBase: FmtFn,
+  gross: number,
+  net: number,
+  tax: number,
+  pension: number,
+): StatCard[] => [
+  {
+    label: 'Annual Gross',
+    value: fmtBase(gross),
+    sub: 'Total this year',
+    icon: Briefcase,
+    color: 'indigo',
+  },
+  {
+    label: 'Annual Net',
+    value: fmtBase(net),
+    sub: 'After all deductions',
+    icon: ArrowUpRight,
+    color: 'emerald',
+  },
+  {
+    label: 'Tax Paid (YTD)',
+    value: fmtBase(tax),
+    sub: 'Income tax',
+    icon: Calculator,
+    color: 'rose',
+  },
+  {
+    label: 'Pension Contrib.',
+    value: fmtBase(pension),
+    sub: 'Your contributions YTD',
+    icon: ShieldCheck,
+    color: 'amber',
+  },
+];
 
-  const [showAdd, setShowAdd] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+function PensionTrackerLink() {
+  return (
+    <Link
+      to="/pension"
+      className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-5 hover:shadow-md transition-shadow group"
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <ShieldCheck size={22} />
+        </div>
+        <div>
+          <p className="font-semibold text-slate-800">Pension Tracker</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            View and manage your pension pots across currencies
+          </p>
+        </div>
+      </div>
+      <ArrowRight
+        size={18}
+        className="text-amber-500 group-hover:translate-x-1 transition-transform"
+      />
+    </Link>
+  );
+}
 
-  const selected = payslips.find((p) => p.id === selectedId) ?? payslips[0] ?? null;
+type SalaryHistoryEntry = { year: number; annualSalary: number };
 
-  const handleAdd = (p: Omit<Payslip, 'id'>) => {
-    createPayslip.mutate(p);
-  };
-  const handleDelete = (id: number) => {
-    deletePayslip.mutate(id);
-  };
-
+function useSalaryComputations(payslips: Payslip[], salaryHistory: SalaryHistoryEntry[]) {
   const annualGross = useMemo(() => payslips.reduce((s, p) => s + p.gross, 0), [payslips]);
   const annualNet = useMemo(() => payslips.reduce((s, p) => s + p.net, 0), [payslips]);
   const annualTax = useMemo(() => payslips.reduce((s, p) => s + p.tax, 0), [payslips]);
   const annualPension = useMemo(() => payslips.reduce((s, p) => s + p.pension, 0), [payslips]);
-
   const salaryChartData = salaryHistory.map((h) => ({
     year: String(h.year),
     gross: h.annualSalary,
@@ -660,10 +803,28 @@ export function Salary() {
           salaryChartData[0].gross) *
         100
       : 0;
+  return { annualGross, annualNet, annualTax, annualPension, salaryChartData, salaryGrowthPct };
+}
 
-  const isLoading = loadingPayslips || loadingHistory;
+export function Salary() {
+  const { fmtBase, baseCurrency } = useCurrency();
+  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
+  const { data: salaryHistory = [], isLoading: loadingHistory } = useSalaryHistory();
+  const createPayslip = useCreatePayslip();
+  const deletePayslip = useDeletePayslip();
+  const [showAdd, setShowAdd] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = payslips.find((p) => p.id === selectedId) ?? payslips[0] ?? null;
+  const handleAdd = (p: Omit<Payslip, 'id'>) => {
+    createPayslip.mutate(p);
+  };
+  const handleDelete = (id: number) => {
+    deletePayslip.mutate(id);
+  };
+  const { annualGross, annualNet, annualTax, annualPension, salaryChartData, salaryGrowthPct } =
+    useSalaryComputations(payslips, salaryHistory);
 
-  if (isLoading) {
+  if (loadingPayslips || loadingHistory) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
@@ -671,37 +832,7 @@ export function Salary() {
     );
   }
 
-  const statCards: StatCard[] = [
-    {
-      label: 'Annual Gross',
-      value: fmtBase(annualGross),
-      sub: 'Total this year',
-      icon: Briefcase,
-      color: 'indigo',
-    },
-    {
-      label: 'Annual Net',
-      value: fmtBase(annualNet),
-      sub: 'After all deductions',
-      icon: ArrowUpRight,
-      color: 'emerald',
-    },
-    {
-      label: 'Tax Paid (YTD)',
-      value: fmtBase(annualTax),
-      sub: 'Income tax',
-      icon: Calculator,
-      color: 'rose',
-    },
-    {
-      label: 'Pension Contrib.',
-      value: fmtBase(annualPension),
-      sub: 'Your contributions YTD',
-      icon: ShieldCheck,
-      color: 'amber',
-    },
-  ];
-
+  const statCards = buildSalaryStatCards(fmtBase, annualGross, annualNet, annualTax, annualPension);
   return (
     <div className="p-6 space-y-6">
       {showAdd && (
@@ -729,26 +860,7 @@ export function Salary() {
         onAdd={() => setShowAdd(true)}
         onDelete={handleDelete}
       />
-      <Link
-        to="/pension"
-        className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-5 hover:shadow-md transition-shadow group"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
-            <ShieldCheck size={22} />
-          </div>
-          <div>
-            <p className="font-semibold text-slate-800">Pension Tracker</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              View and manage your pension pots across currencies
-            </p>
-          </div>
-        </div>
-        <ArrowRight
-          size={18}
-          className="text-amber-500 group-hover:translate-x-1 transition-transform"
-        />
-      </Link>
+      <PensionTrackerLink />
     </div>
   );
 }

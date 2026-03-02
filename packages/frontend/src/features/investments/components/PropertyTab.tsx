@@ -331,17 +331,9 @@ function PropertyCardHeader({
   );
 }
 
-function PropertyCard({
-  property,
-  propertyTxns,
-  mortgageById,
-  isExpanded,
-  fmtNative,
-  onUpdateProperty,
-  onToggleExpanded,
-  onAddTxnForProperty,
-  onDeleteTxn,
-}: PropertyCardProps) {
+function PropertyCard(props: PropertyCardProps) {
+  const { property, propertyTxns, mortgageById, isExpanded, fmtNative } = props;
+  const { onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onDeleteTxn } = props;
   const linkedMortgage =
     property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
   const stats = computePropertyCardStats(property, propertyTxns, mortgageById);

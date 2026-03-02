@@ -501,19 +501,41 @@ type BudgetBodyProps = {
 };
 
 function BudgetBody({
-  categories, budgetTransactions, showAdd, newCat, baseCurrency,
-  fmt, fmtDec, onToggleAdd, onNewCatChange, onAddCategory,
+  categories,
+  budgetTransactions,
+  showAdd,
+  newCat,
+  baseCurrency,
+  fmt,
+  fmtDec,
+  onToggleAdd,
+  onNewCatChange,
+  onAddCategory,
 }: BudgetBodyProps) {
-  const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } = deriveBudgetStats(categories);
+  const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } =
+    deriveBudgetStats(categories);
   const recentTransactions = mapRecentTransactions(budgetTransactions, categories);
   return (
     <div className="p-6 space-y-6">
-      <BudgetSummaryCards totalBudgeted={totalBudgeted} totalSpent={totalSpent} remaining={remaining} savingsRate={savingsRate} fmt={fmt} />
+      <BudgetSummaryCards
+        totalBudgeted={totalBudgeted}
+        totalSpent={totalSpent}
+        remaining={remaining}
+        savingsRate={savingsRate}
+        fmt={fmt}
+      />
       <BudgetChartsRow pieData={pieData} categories={categories} fmtDec={fmtDec} fmt={fmt} />
       <BudgetCategoriesSection
-        categories={categories} overBudget={overBudget} showAdd={showAdd} newCat={newCat}
-        baseCurrency={baseCurrency} fmt={fmt} fmtDec={fmtDec}
-        onToggleAdd={onToggleAdd} onNewCatChange={onNewCatChange} onAddCategory={onAddCategory}
+        categories={categories}
+        overBudget={overBudget}
+        showAdd={showAdd}
+        newCat={newCat}
+        baseCurrency={baseCurrency}
+        fmt={fmt}
+        fmtDec={fmtDec}
+        onToggleAdd={onToggleAdd}
+        onNewCatChange={onNewCatChange}
+        onAddCategory={onAddCategory}
       />
       <RecentTransactionsList transactions={recentTransactions} fmtDec={fmtDec} />
     </div>
@@ -563,8 +585,18 @@ function useBudgetPage() {
 
 export function Budget() {
   const {
-    fmtDec, fmt, baseCurrency, categories, budgetTransactions,
-    loadingCats, loadingTxns, showAdd, newCat, setShowAdd, setNewCat, handleAddCategory,
+    fmtDec,
+    fmt,
+    baseCurrency,
+    categories,
+    budgetTransactions,
+    loadingCats,
+    loadingTxns,
+    showAdd,
+    newCat,
+    setShowAdd,
+    setNewCat,
+    handleAddCategory,
   } = useBudgetPage();
 
   if (loadingCats || loadingTxns) {

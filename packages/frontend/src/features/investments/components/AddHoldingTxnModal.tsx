@@ -353,115 +353,66 @@ type TxnFormBodyProps = {
   onNoteChange: (v: string) => void;
 };
 
-function TxnFormBodyFields({
-  type,
-  shares,
-  price,
-  date,
-  note,
-  error,
-  parsedShares,
-  parsedPrice,
-  holding,
-  currentPosition,
-  fmtNative,
-  onTypeChange,
-  onSharesChange,
-  onPriceChange,
-  onDateChange,
-  onNoteChange,
-}: Omit<TxnFormBodyProps, 'newAvgCost' | 'realizedGain'> & { parsedPrice: number }) {
-  const needsShares = type === 'buy' || type === 'sell';
+function TxnFormBodyFields(props: TxnFormBodyProps) {
+  const needsShares = props.type === 'buy' || props.type === 'sell';
   return (
     <>
       <FormField label="Transaction Type">
         <TxnTypeSelector<HoldingTxnType>
           types={TXN_TYPES.map((txnType) => TXN_META[txnType])}
-          value={type}
-          onChange={onTypeChange}
+          value={props.type}
+          onChange={props.onTypeChange}
         />
       </FormField>
-      <PositionInfoBar currentPosition={currentPosition} holding={holding} fmtNative={fmtNative} />
+      <PositionInfoBar
+        currentPosition={props.currentPosition}
+        holding={props.holding}
+        fmtNative={props.fmtNative}
+      />
       {needsShares && (
         <SharesFormField
-          type={type}
-          shares={shares}
-          parsedShares={parsedShares}
-          error={error}
-          currentPosition={currentPosition}
-          onChange={onSharesChange}
+          type={props.type}
+          shares={props.shares}
+          parsedShares={props.parsedShares}
+          error={props.error}
+          currentPosition={props.currentPosition}
+          onChange={props.onSharesChange}
         />
       )}
       <PriceFormField
-        type={type}
-        price={price}
-        parsedPrice={parsedPrice}
+        type={props.type}
+        price={props.price}
+        parsedPrice={props.parsedPrice}
         needsShares={needsShares}
-        error={error}
-        holding={holding}
-        onChange={onPriceChange}
+        error={props.error}
+        holding={props.holding}
+        onChange={props.onPriceChange}
       />
       <DateNoteRow
-        date={date}
-        note={note}
-        onDateChange={onDateChange}
-        onNoteChange={onNoteChange}
+        date={props.date}
+        note={props.note}
+        onDateChange={props.onDateChange}
+        onNoteChange={props.onNoteChange}
         notePlaceholder="e.g. DCA top-up..."
       />
     </>
   );
 }
 
-function TxnFormBody({
-  type,
-  shares,
-  price,
-  date,
-  note,
-  error,
-  parsedShares,
-  parsedPrice,
-  newAvgCost,
-  realizedGain,
-  holding,
-  currentPosition,
-  fmtNative,
-  onTypeChange,
-  onSharesChange,
-  onPriceChange,
-  onDateChange,
-  onNoteChange,
-}: TxnFormBodyProps) {
+function TxnFormBody(props: TxnFormBodyProps) {
   return (
     <>
-      <TxnFormBodyFields
-        type={type}
-        shares={shares}
-        price={price}
-        date={date}
-        note={note}
-        error={error}
-        parsedShares={parsedShares}
-        parsedPrice={parsedPrice}
-        holding={holding}
-        currentPosition={currentPosition}
-        fmtNative={fmtNative}
-        onTypeChange={onTypeChange}
-        onSharesChange={onSharesChange}
-        onPriceChange={onPriceChange}
-        onDateChange={onDateChange}
-        onNoteChange={onNoteChange}
-      />
-      {parsedPrice > 0 && (
+      <TxnFormBodyFields {...props} />
+      {props.parsedPrice > 0 && (
         <TxnPreview
-          type={type}
-          parsedShares={parsedShares}
-          parsedPrice={parsedPrice}
-          holding={holding}
-          currentPosition={currentPosition}
-          newAvgCost={newAvgCost}
-          realizedGain={realizedGain}
-          fmtNative={fmtNative}
+          type={props.type}
+          parsedShares={props.parsedShares}
+          parsedPrice={props.parsedPrice}
+          holding={props.holding}
+          currentPosition={props.currentPosition}
+          newAvgCost={props.newAvgCost}
+          realizedGain={props.realizedGain}
+          fmtNative={props.fmtNative}
         />
       )}
     </>
@@ -517,16 +468,14 @@ function useHoldingTxnForm(currentPosition: Position) {
   };
 }
 
-export function AddHoldingTxnModal({
-  holding,
-  currentPosition,
-  onClose,
-  onSave,
-}: AddHoldingTxnModalProps) {
-  const { fmtNative } = useCurrency();
-  const form = useHoldingTxnForm(currentPosition);
-
-  function handleSave() {
+function buildHoldingTxnSaveHandler(
+  form: ReturnType<typeof useHoldingTxnForm>,
+  holding: Holding,
+  currentPosition: Position,
+  onSave: AddHoldingTxnModalProps['onSave'],
+  onClose: () => void,
+) {
+  return () => {
     const validationError = validateHoldingTxn(
       form.type,
       form.parsedPrice,
@@ -546,7 +495,26 @@ export function AddHoldingTxnModal({
       note: form.note,
     });
     onClose();
-  }
+  };
+}
+
+export function AddHoldingTxnModal({
+  holding,
+  currentPosition,
+  onClose,
+  onSave,
+}: AddHoldingTxnModalProps) {
+  const { fmtNative } = useCurrency();
+  const form = useHoldingTxnForm(currentPosition);
+  const handleSave = buildHoldingTxnSaveHandler(form, holding, currentPosition, onSave, onClose);
+  const onSharesChange = (value: string) => {
+    form.setShares(value);
+    form.setError('');
+  };
+  const onPriceChange = (value: string) => {
+    form.setPrice(value);
+    form.setError('');
+  };
 
   return (
     <Modal
@@ -570,14 +538,8 @@ export function AddHoldingTxnModal({
         currentPosition={currentPosition}
         fmtNative={fmtNative}
         onTypeChange={form.handleTypeChange}
-        onSharesChange={(value) => {
-          form.setShares(value);
-          form.setError('');
-        }}
-        onPriceChange={(value) => {
-          form.setPrice(value);
-          form.setError('');
-        }}
+        onSharesChange={onSharesChange}
+        onPriceChange={onPriceChange}
         onDateChange={form.setDate}
         onNoteChange={form.setNote}
       />

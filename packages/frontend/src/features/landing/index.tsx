@@ -225,26 +225,10 @@ type SignInFormProps = Readonly<{
   onSwitchToSignUp: () => void;
 }>;
 
-function SignInForm({ state, onSwitchToSignUp }: SignInFormProps) {
-  const {
-    email,
-    setEmail,
-    password,
-    setPassword,
-    showPw,
-    setShowPw,
-    loading,
-    errors,
-    setErrors,
-    handleSubmit,
-  } = state;
+function SignInFormFields({ state }: Readonly<{ state: ReturnType<typeof useSignInState> }>) {
+  const { email, setEmail, password, setPassword, showPw, setShowPw, errors, setErrors } = state;
   return (
-    <form
-      onSubmit={(e) => {
-        void handleSubmit(e);
-      }}
-      className="px-8 py-7 space-y-4 text-slate-900"
-    >
+    <>
       <FormField label="Email address" error={errors.email}>
         <input
           type="email"
@@ -271,6 +255,20 @@ function SignInForm({ state, onSwitchToSignUp }: SignInFormProps) {
           error={errors.password}
         />
       </FormField>
+    </>
+  );
+}
+
+function SignInForm({ state, onSwitchToSignUp }: SignInFormProps) {
+  const { loading, handleSubmit } = state;
+  return (
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      className="px-8 py-7 space-y-4 text-slate-900"
+    >
+      <SignInFormFields state={state} />
       <SubmitButton
         loading={loading}
         loadingText="Signing in…"
@@ -383,25 +381,10 @@ type SignUpFormProps = Readonly<{
   onSwitchToSignIn: () => void;
 }>;
 
-function SignUpForm({ state, onSwitchToSignIn }: SignUpFormProps) {
-  const {
-    form,
-    set,
-    showPw,
-    setShowPw,
-    showConfirm,
-    setShowConfirm,
-    loading,
-    errors,
-    handleSubmit,
-  } = state;
+function SignUpFormFields({ state }: Readonly<{ state: ReturnType<typeof useSignUpState> }>) {
+  const { form, set, showPw, setShowPw, showConfirm, setShowConfirm, errors } = state;
   return (
-    <form
-      onSubmit={(e) => {
-        void handleSubmit(e);
-      }}
-      className="px-8 py-7 space-y-4 overflow-y-auto text-slate-900"
-    >
+    <>
       <FormField label="Full name" error={errors.name}>
         <input
           type="text"
@@ -442,6 +425,20 @@ function SignUpForm({ state, onSwitchToSignIn }: SignUpFormProps) {
           error={errors.confirm}
         />
       </FormField>
+    </>
+  );
+}
+
+function SignUpForm({ state, onSwitchToSignIn }: SignUpFormProps) {
+  const { loading, handleSubmit } = state;
+  return (
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      className="px-8 py-7 space-y-4 overflow-y-auto text-slate-900"
+    >
+      <SignUpFormFields state={state} />
       <SubmitButton
         loading={loading}
         loadingText="Creating account…"

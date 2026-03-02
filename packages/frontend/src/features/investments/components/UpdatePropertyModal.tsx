@@ -96,6 +96,22 @@ function MortgageBalanceField({ mortgageBalance, currency, fmtNative }: Mortgage
   );
 }
 
+function buildUpdateSaveHandler(
+  form: ReturnType<typeof useUpdatePropertyForm>,
+  property: Property,
+  onSave: (id: number, value: number, rent: number) => void,
+  onClose: () => void,
+) {
+  return () => {
+    if (!form.value || isNaN(parseFloat(form.value))) {
+      form.setErrors({ value: 'Required' });
+      return;
+    }
+    onSave(property.id, form.numericValue, parseFloat(form.rent) || 0);
+    onClose();
+  };
+}
+
 export function UpdatePropertyModal({
   property,
   mortgageBalance,
@@ -105,15 +121,7 @@ export function UpdatePropertyModal({
   const { fmtNative } = useCurrency();
   const form = useUpdatePropertyForm(property);
   const equity = form.numericValue - mortgageBalance;
-
-  function handleSave() {
-    if (!form.value || isNaN(parseFloat(form.value))) {
-      form.setErrors({ value: 'Required' });
-      return;
-    }
-    onSave(property.id, form.numericValue, parseFloat(form.rent) || 0);
-    onClose();
-  }
+  const handleSave = buildUpdateSaveHandler(form, property, onSave, onClose);
 
   return (
     <Modal

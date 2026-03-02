@@ -437,39 +437,16 @@ type PropertyTxnFormBodyProps = {
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
-function PropertyTxnFormBody({
-  form,
-  property,
-  mortgageBalance,
-  fmtNative,
-}: PropertyTxnFormBodyProps) {
-  const {
-    type,
-    amount,
-    interest,
-    date,
-    note,
-    error,
-    parsedAmount,
-    parsedInterest,
-    derivedPrincipal,
-  } = form;
+type AmountAndRepaymentProps = {
+  form: ReturnType<typeof usePropertyTxnForm>;
+  property: Property;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+function AmountAndRepaymentFields({ form, property, fmtNative }: AmountAndRepaymentProps) {
+  const { type, amount, interest, error, parsedAmount, parsedInterest, derivedPrincipal } = form;
   return (
     <>
-      <FormField label="Transaction Type">
-        <TxnTypeSelector<PropertyTxnType>
-          types={form.transactionTypes.map((txnType) => PROPERTY_TXN_META[txnType])}
-          value={type}
-          onChange={form.handleTypeChange}
-          columns={2}
-        />
-      </FormField>
-      <PropertyTxnInfoBar
-        type={type}
-        property={property}
-        mortgageBalance={mortgageBalance}
-        fmtNative={fmtNative}
-      />
       <FormField
         label={getAmountLabel(type, property.currency)}
         error={error && parsedAmount <= 0 ? error : undefined}
@@ -500,19 +477,46 @@ function PropertyTxnFormBody({
         />
       )}
       {error && parsedAmount > 0 && <p className="text-xs text-rose-500">{error}</p>}
+    </>
+  );
+}
+
+function PropertyTxnFormBody({
+  form,
+  property,
+  mortgageBalance,
+  fmtNative,
+}: PropertyTxnFormBodyProps) {
+  return (
+    <>
+      <FormField label="Transaction Type">
+        <TxnTypeSelector<PropertyTxnType>
+          types={form.transactionTypes.map((txnType) => PROPERTY_TXN_META[txnType])}
+          value={form.type}
+          onChange={form.handleTypeChange}
+          columns={2}
+        />
+      </FormField>
+      <PropertyTxnInfoBar
+        type={form.type}
+        property={property}
+        mortgageBalance={mortgageBalance}
+        fmtNative={fmtNative}
+      />
+      <AmountAndRepaymentFields form={form} property={property} fmtNative={fmtNative} />
       <DateNoteRow
-        date={date}
-        note={note}
+        date={form.date}
+        note={form.note}
         onDateChange={form.setDate}
         onNoteChange={form.setNote}
-        notePlaceholder={getNotePlaceholder(type)}
+        notePlaceholder={getNotePlaceholder(form.type)}
       />
-      {parsedAmount > 0 && (
+      {form.parsedAmount > 0 && (
         <PropertyTxnPreview
-          type={type}
-          parsedAmount={parsedAmount}
-          parsedInterest={parsedInterest}
-          derivedPrincipal={derivedPrincipal}
+          type={form.type}
+          parsedAmount={form.parsedAmount}
+          parsedInterest={form.parsedInterest}
+          derivedPrincipal={form.derivedPrincipal}
           property={property}
           mortgageBalance={mortgageBalance}
           fmtNative={fmtNative}

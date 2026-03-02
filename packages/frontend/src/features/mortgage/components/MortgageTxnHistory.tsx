@@ -90,6 +90,29 @@ function MortgageSummaryStats({ transactions, fmt }: MortgageSummaryStatsProps) 
   );
 }
 
+type TxnFilterBarProps = {
+  filter: MortgageTxnType | 'all';
+  onFilterChange: (f: MortgageTxnType | 'all') => void;
+};
+
+function TxnFilterBar({ filter, onFilterChange }: TxnFilterBarProps) {
+  return (
+    <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-50">
+      <Filter size={12} className="text-slate-400 mr-1" />
+      <span className="text-xs text-slate-400 mr-2">Filter:</span>
+      {(['all', 'repayment', 'valuation', 'rate_change'] as const).map((f) => (
+        <button
+          key={f}
+          onClick={() => onFilterChange(f)}
+          className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${filter === f ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-100'}`}
+        >
+          {f === 'all' ? 'All' : TXN_META[f].label + 's'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function MortgageTxnHistory({
   mortgage: _mortgage,
   transactions,
@@ -121,19 +144,7 @@ export function MortgageTxnHistory({
         </button>
       </div>
       <MortgageSummaryStats transactions={transactions} fmt={fmt} />
-      <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-50">
-        <Filter size={12} className="text-slate-400 mr-1" />
-        <span className="text-xs text-slate-400 mr-2">Filter:</span>
-        {(['all', 'repayment', 'valuation', 'rate_change'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${filter === f ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-100'}`}
-          >
-            {f === 'all' ? 'All' : TXN_META[f].label + 's'}
-          </button>
-        ))}
-      </div>
+      <TxnFilterBar filter={filter} onFilterChange={setFilter} />
       <div className="divide-y divide-slate-50">
         {sorted.length === 0 && (
           <p className="text-center py-10 text-slate-400 text-sm">

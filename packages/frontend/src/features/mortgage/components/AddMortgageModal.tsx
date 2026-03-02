@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { CURRENCY_LIST, type CurrencyCode } from '@/lib/CurrencyContext';
 import type { Mortgage as MortgageType, Property } from '@quro/shared';
@@ -208,6 +208,39 @@ type Errors = Record<string, string>;
 
 type PropertySectionProps = { form: FormState; errors: Errors; setField: SetFieldFn };
 
+function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      <div className="col-span-2">
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+          Lender <span className="text-rose-500">*</span>
+        </label>
+        <input
+          className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.lender ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+          placeholder="e.g. ABN AMRO"
+          value={form.lender}
+          onChange={(e) => setField('lender', e.target.value)}
+        />
+        {errors.lender && <p className="text-xs text-rose-500 mt-1">{errors.lender}</p>}
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Currency</label>
+        <select
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          value={form.currency}
+          onChange={(e) => setField('currency', e.target.value as CurrencyCode)}
+        >
+          {CURRENCY_LIST.map((currency) => (
+            <option key={currency} value={currency}>
+              {currency}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function PropertySection({ form, errors, setField }: PropertySectionProps) {
   return (
     <div>
@@ -229,34 +262,7 @@ function PropertySection({ form, errors, setField }: PropertySectionProps) {
             <p className="text-xs text-rose-500 mt-1">{errors.propertyAddress}</p>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2">
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Lender <span className="text-rose-500">*</span>
-            </label>
-            <input
-              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.lender ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-              placeholder="e.g. ABN AMRO"
-              value={form.lender}
-              onChange={(e) => setField('lender', e.target.value)}
-            />
-            {errors.lender && <p className="text-xs text-rose-500 mt-1">{errors.lender}</p>}
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Currency</label>
-            <select
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              value={form.currency}
-              onChange={(e) => setField('currency', e.target.value as CurrencyCode)}
-            >
-              {CURRENCY_LIST.map((currency) => (
-                <option key={currency} value={currency}>
-                  {currency}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <LenderCurrencyGrid form={form} errors={errors} setField={setField} />
       </div>
     </div>
   );
@@ -382,6 +388,51 @@ function InterestRateField({ form, errors, setField }: RateTermSectionProps) {
   );
 }
 
+function LoanTermField({ form, errors, setField }: RateTermSectionProps) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+        Loan Term <span className="text-rose-500">*</span>
+      </label>
+      <div className="relative">
+        <input
+          type="number"
+          className={`w-full rounded-xl border pl-3 pr-14 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.termYears ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+          placeholder="25"
+          value={form.termYears}
+          onChange={(e) => setField('termYears', e.target.value)}
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+          years
+        </span>
+      </div>
+      {errors.termYears && <p className="text-xs text-rose-500 mt-1">{errors.termYears}</p>}
+    </div>
+  );
+}
+
+function OverpaymentLimitField({ form, setField }: { form: FormState; setField: SetFieldFn }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+        Overpayment Limit (%)
+      </label>
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
+          %
+        </span>
+        <input
+          type="number"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          placeholder="10"
+          value={form.overpaymentLimit}
+          onChange={(e) => setField('overpaymentLimit', e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
   return (
     <div>
@@ -402,41 +453,8 @@ function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Loan Term <span className="text-rose-500">*</span>
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              className={`w-full rounded-xl border pl-3 pr-14 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.termYears ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-              placeholder="25"
-              value={form.termYears}
-              onChange={(e) => setField('termYears', e.target.value)}
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-              years
-            </span>
-          </div>
-          {errors.termYears && <p className="text-xs text-rose-500 mt-1">{errors.termYears}</p>}
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Overpayment Limit (%)
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
-              %
-            </span>
-            <input
-              type="number"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              placeholder="10"
-              value={form.overpaymentLimit}
-              onChange={(e) => setField('overpaymentLimit', e.target.value)}
-            />
-          </div>
-        </div>
+        <LoanTermField form={form} errors={errors} setField={setField} />
+        <OverpaymentLimitField form={form} setField={setField} />
       </div>
     </div>
   );
@@ -563,13 +581,46 @@ function MortgageModalFooter({
   );
 }
 
-export function AddMortgageModal({
+type MortgageFormBodyProps = {
+  form: MortgageFormState;
+  errors: Record<string, string>;
+  setField: (f: string, v: string) => void;
+  availableProperties: Property[];
+  selectedProperty: Property | undefined;
+  existing: MortgageType | undefined;
+  ltvPreview: string | null;
+};
+
+function MortgageFormBody({
+  form,
+  errors,
+  setField,
+  availableProperties,
+  selectedProperty,
   existing,
-  properties,
-  linkedPropertyId,
-  onClose,
-  onSave,
-}: AddMortgageModalProps) {
+  ltvPreview,
+}: MortgageFormBodyProps) {
+  return (
+    <div className="p-6 space-y-5 overflow-y-auto">
+      <PropertySection form={form} errors={errors} setField={setField} />
+      <PropertyLinkSection
+        form={form}
+        errors={errors}
+        setField={setField}
+        availableProperties={availableProperties}
+        selectedProperty={selectedProperty}
+        existing={existing}
+      />
+      <LoanFinancialsSection form={form} errors={errors} setField={setField} />
+      <RateTermSection form={form} errors={errors} setField={setField} />
+      <DatesSection form={form} setField={setField} />
+      {ltvPreview && <LtvPreview ltvPreview={ltvPreview} form={form} />}
+    </div>
+  );
+}
+
+export function AddMortgageModal(props: AddMortgageModalProps) {
+  const { existing, properties, linkedPropertyId, onClose, onSave } = props;
   const { form, errors, saving, setField, handleSave } = useAddMortgageModal(
     existing,
     properties,
@@ -581,41 +632,30 @@ export function AddMortgageModal({
     ? Number.parseInt(form.linkedPropertyId, 10)
     : NaN;
   const selectedProperty = Number.isInteger(linkedPropertyIdNum)
-    ? properties.find((property) => property.id === linkedPropertyIdNum)
+    ? properties.find((p) => p.id === linkedPropertyIdNum)
     : undefined;
-  const availableProperties = useMemo(
-    () =>
-      properties.filter(
-        (property) => property.mortgageId == null || property.id === linkedPropertyId,
-      ),
-    [properties, linkedPropertyId],
+  const availableProperties = properties.filter(
+    (p) => p.mortgageId == null || p.id === linkedPropertyId,
   );
   const ltvPreview =
     n(form.propertyValue) > 0
       ? ((n(form.outstandingBalance) / n(form.propertyValue)) * 100).toFixed(1)
       : null;
   const disableSave = saving || (!existing && availableProperties.length === 0);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
         <MortgageModalHeader existing={existing} onClose={onClose} />
-        <div className="p-6 space-y-5 overflow-y-auto">
-          <PropertySection form={form} errors={errors} setField={setField} />
-          <PropertyLinkSection
-            form={form}
-            errors={errors}
-            setField={setField}
-            availableProperties={availableProperties}
-            selectedProperty={selectedProperty}
-            existing={existing}
-          />
-          <LoanFinancialsSection form={form} errors={errors} setField={setField} />
-          <RateTermSection form={form} errors={errors} setField={setField} />
-          <DatesSection form={form} setField={setField} />
-          {ltvPreview && <LtvPreview ltvPreview={ltvPreview} form={form} />}
-        </div>
+        <MortgageFormBody
+          form={form}
+          errors={errors}
+          setField={setField}
+          availableProperties={availableProperties}
+          selectedProperty={selectedProperty}
+          existing={existing}
+          ltvPreview={ltvPreview}
+        />
         <MortgageModalFooter
           saving={saving}
           existing={existing}

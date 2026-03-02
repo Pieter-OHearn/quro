@@ -987,6 +987,52 @@ function InvestHabitControls({
   );
 }
 
+type InvestHabitCardProps = Readonly<{
+  goal: Goal;
+  color: string;
+  monthlyTarget: number;
+  monthsCompleted: number;
+  totalMonths: number;
+  status: GoalStatus;
+  fmtBase: (n: number) => string;
+  onUpdateMonths: (id: number, delta: number) => void;
+}>;
+
+function InvestHabitProgress({
+  color,
+  monthlyTarget,
+  monthsCompleted,
+  totalMonths,
+  fmtBase,
+}: Readonly<
+  Pick<
+    InvestHabitCardProps,
+    'color' | 'monthlyTarget' | 'monthsCompleted' | 'totalMonths' | 'fmtBase'
+  >
+>) {
+  return (
+    <div>
+      <div className="flex justify-between mb-2">
+        <span className="text-xs text-slate-500">Monthly hits</span>
+        <span className="text-xs font-semibold" style={{ color }}>
+          {monthsCompleted}/{totalMonths} months
+        </span>
+      </div>
+      <InvestHabitMonthGrid
+        totalMonths={totalMonths}
+        monthsCompleted={monthsCompleted}
+        color={color}
+      />
+      <div className="mt-3">
+        <p className="font-bold text-slate-900">{fmtBase(monthlyTarget * monthsCompleted)}</p>
+        <p className="text-xs text-slate-400">
+          invested so far - {fmtBase(monthlyTarget)}/mo target
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function GoalCardInvestHabit({
   goal,
   color,
@@ -996,47 +1042,26 @@ function GoalCardInvestHabit({
   status,
   fmtBase,
   onUpdateMonths,
-}: Readonly<{
-  goal: Goal;
-  color: string;
-  monthlyTarget: number;
-  monthsCompleted: number;
-  totalMonths: number;
-  status: GoalStatus;
-  fmtBase: (n: number) => string;
-  onUpdateMonths: (id: number, delta: number) => void;
-}>) {
+}: InvestHabitCardProps) {
   return (
     <>
-      <div>
-        <div className="flex justify-between mb-2">
-          <span className="text-xs text-slate-500">Monthly hits</span>
-          <span className="text-xs font-semibold" style={{ color }}>
-            {monthsCompleted}/{totalMonths} months
-          </span>
-        </div>
-        <InvestHabitMonthGrid
-          totalMonths={totalMonths}
-          monthsCompleted={monthsCompleted}
-          color={color}
-        />
-      </div>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-bold text-slate-900">{fmtBase(monthlyTarget * monthsCompleted)}</p>
-          <p className="text-xs text-slate-400">
-            invested so far - {fmtBase(monthlyTarget)}/mo target
-          </p>
-        </div>
-        {status !== 'complete' && (
+      <InvestHabitProgress
+        color={color}
+        monthlyTarget={monthlyTarget}
+        monthsCompleted={monthsCompleted}
+        totalMonths={totalMonths}
+        fmtBase={fmtBase}
+      />
+      {status !== 'complete' && (
+        <div className="flex items-center justify-end">
           <InvestHabitControls
             goalId={goal.id}
             monthsCompleted={monthsCompleted}
             totalMonths={totalMonths}
             onUpdateMonths={onUpdateMonths}
           />
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1234,10 +1259,26 @@ const getGoalAmounts = (goal: Goal) => ({
   monthlyContrib: goal.monthlyContribution || 0,
 });
 
+function renderAnnualGoal(props: GoalBodyContentProps) {
+  const { goal, color, clampedPct, status } = props;
+  const { cur, tgt } = getGoalAmounts(goal);
+  return (
+    <GoalCardAnnual
+      goal={goal}
+      color={color}
+      currentAmount={cur}
+      targetAmount={tgt}
+      clampedPct={clampedPct}
+      lowerIsBetter={goal.unit === '€/mo' && cur > tgt}
+      status={status}
+    />
+  );
+}
+
 function renderGoalTypeContent(props: GoalBodyContentProps) {
   const { goal, type, status, color, clampedPct, annualGross, fmtBase, onUpdateMonths } = props;
   const { cur, tgt, monthlyContrib } = getGoalAmounts(goal);
-  if (isSavingsLike(type)) {
+  if (isSavingsLike(type))
     return (
       <GoalCardSavings
         color={color}
@@ -1249,8 +1290,7 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
         fmtBase={fmtBase}
       />
     );
-  }
-  if (type === 'salary') {
+  if (type === 'salary')
     return (
       <GoalCardSalary
         color={color}
@@ -1260,7 +1300,6 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
         fmtBase={fmtBase}
       />
     );
-  }
   if (type === 'invest_habit') {
     const { monthlyTarget, monthsCompleted, totalMonths } = getInvestHabitNums(goal);
     return (
@@ -1276,19 +1315,7 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
       />
     );
   }
-  if (type === 'annual') {
-    return (
-      <GoalCardAnnual
-        goal={goal}
-        color={color}
-        currentAmount={cur}
-        targetAmount={tgt}
-        clampedPct={clampedPct}
-        lowerIsBetter={goal.unit === '€/mo' && cur > tgt}
-        status={status}
-      />
-    );
-  }
+  if (type === 'annual') return renderAnnualGoal(props);
   return null;
 }
 
@@ -1376,16 +1403,20 @@ const STAT_ICON_COLORS: Record<string, string> = {
   amber: 'bg-amber-50 text-amber-600',
 };
 
-function GoalsStatsGrid({
-  stats,
-  activeYear,
-  fmtBase,
-}: Readonly<{
-  stats: { total: number; completed: number; onTrack: number; atRisk: number; monthly: number };
-  activeYear: number;
-  fmtBase: (n: number) => string;
-}>) {
-  const cards = [
+type GoalStatsData = {
+  total: number;
+  completed: number;
+  onTrack: number;
+  atRisk: number;
+  monthly: number;
+};
+
+function buildGoalStatCards(
+  stats: GoalStatsData,
+  activeYear: number,
+  fmtBase: (n: number) => string,
+) {
+  return [
     {
       label: 'Total Goals',
       value: stats.total.toString(),
@@ -1415,7 +1446,14 @@ function GoalsStatsGrid({
       color: 'amber',
     },
   ] as const;
+}
 
+function GoalsStatsGrid({
+  stats,
+  activeYear,
+  fmtBase,
+}: Readonly<{ stats: GoalStatsData; activeYear: number; fmtBase: (n: number) => string }>) {
+  const cards = buildGoalStatCards(stats, activeYear, fmtBase);
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map(({ label, value, sub, icon: Icon, color }) => (
@@ -1607,35 +1645,54 @@ function GoalsEmptyState({
 
 // ─── Goals (main) ─────────────────────────────────────────────────────────────
 
-function useGoalsPage() {
-  const { fmtBase } = useCurrency();
-  const { data: goals = [], isLoading: loadingGoals } = useGoals();
-  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
-  const createGoal = useCreateGoal();
-  const updateGoal = useUpdateGoal();
-  const deleteGoal = useDeleteGoal();
-  const currentYear = new Date().getFullYear();
-  const [activeYear, setActiveYear] = useState(currentYear);
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
-  const [showAdd, setShowAdd] = useState(false);
+const computeGoalStats = (yearGoals: readonly Goal[], annualGross: number, currentYear: number) => {
+  const count = (s: string) =>
+    yearGoals.filter((g) => getGoalStatus(g, annualGross, currentYear) === s).length;
+  const monthly = yearGoals.reduce(
+    (sum, g) => sum + (g.monthlyContribution || g.monthlyTarget || 0),
+    0,
+  );
+  return {
+    total: yearGoals.length,
+    completed: count('complete'),
+    onTrack: count('on_track'),
+    atRisk: count('at_risk'),
+    monthly,
+  };
+};
 
+const computeGoalYears = (goals: readonly Goal[], currentYear: number): number[] => {
+  const uniqueYears = new Set<number>();
+  for (const goal of goals) uniqueYears.add(parseGoalYear(goal, currentYear));
+  uniqueYears.add(currentYear);
+  return [...uniqueYears].sort((a, b) => a - b);
+};
+
+type GoalsComputations = {
+  annualGross: number;
+  years: number[];
+  yearGoals: Goal[];
+  filteredGoals: Goal[];
+  stats: ReturnType<typeof computeGoalStats>;
+};
+
+function useGoalsComputations(
+  goals: Goal[],
+  payslips: { gross: number; date: string }[],
+  currentYear: number,
+  activeYear: number,
+  activeFilter: FilterKey,
+  setActiveYear: (y: number) => void,
+): GoalsComputations {
   const annualGross = useMemo(() => {
     if (payslips.length === 0) return 6500 * 12;
     const latest = [...payslips].sort((a, b) => b.date.localeCompare(a.date))[0];
     return (latest?.gross || 6500) * 12;
   }, [payslips]);
-
-  const years = useMemo(() => {
-    const uniqueYears = new Set<number>();
-    for (const goal of goals) uniqueYears.add(parseGoalYear(goal, currentYear));
-    uniqueYears.add(currentYear);
-    return [...uniqueYears].sort((a, b) => a - b);
-  }, [goals, currentYear]);
-
+  const years = useMemo(() => computeGoalYears(goals, currentYear), [goals, currentYear]);
   useEffect(() => {
     if (!years.includes(activeYear)) setActiveYear(years[years.length - 1] ?? currentYear);
-  }, [activeYear, years, currentYear]);
-
+  }, [activeYear, years, currentYear, setActiveYear]);
   const yearGoals = useMemo(
     () => goals.filter((goal) => parseGoalYear(goal, currentYear) === activeYear),
     [goals, activeYear, currentYear],
@@ -1651,38 +1708,49 @@ function useGoalsPage() {
       }),
     [goals, activeYear, activeFilter, currentYear],
   );
-  const stats = useMemo(() => {
-    const count = (s: string) =>
-      yearGoals.filter((g) => getGoalStatus(g, annualGross, currentYear) === s).length;
-    const monthly = yearGoals.reduce(
-      (sum, g) => sum + (g.monthlyContribution || g.monthlyTarget || 0),
-      0,
-    );
-    return {
-      total: yearGoals.length,
-      completed: count('complete'),
-      onTrack: count('on_track'),
-      atRisk: count('at_risk'),
-      monthly,
-    };
-  }, [yearGoals, annualGross, currentYear]);
+  const stats = useMemo(
+    () => computeGoalStats(yearGoals, annualGross, currentYear),
+    [yearGoals, annualGross, currentYear],
+  );
+  return { annualGross, years, yearGoals, filteredGoals, stats };
+}
+
+function useGoalsPage() {
+  const { fmtBase } = useCurrency();
+  const { data: goals = [], isLoading: loadingGoals } = useGoals();
+  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
+  const createGoal = useCreateGoal();
+  const updateGoal = useUpdateGoal();
+  const deleteGoal = useDeleteGoal();
+  const currentYear = new Date().getFullYear();
+  const [activeYear, setActiveYear] = useState(currentYear);
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const [showAdd, setShowAdd] = useState(false);
+  const { annualGross, years, yearGoals, filteredGoals, stats } = useGoalsComputations(
+    goals,
+    payslips,
+    currentYear,
+    activeYear,
+    activeFilter,
+    setActiveYear,
+  );
 
   const handleDelete = (id: number) => {
     deleteGoal.mutate(id);
   };
-  const handleUpdateMonths = (id: number, delta: number) => {
-    const goal = goals.find((g) => g.id === id);
-    if (!goal) return;
-    updateGoal.mutate({
-      id,
-      monthsCompleted: Math.max(
-        0,
-        Math.min((goal.monthsCompleted ?? 0) + delta, goal.totalMonths ?? 12),
-      ),
-    });
-  };
   const handleAddGoal = (goal: Omit<Goal, 'id'>) => {
     createGoal.mutate(goal);
+  };
+  const handleUpdateMonths = (id: number, delta: number) => {
+    const goal = goals.find((g) => g.id === id);
+    if (goal)
+      updateGoal.mutate({
+        id,
+        monthsCompleted: Math.max(
+          0,
+          Math.min((goal.monthsCompleted ?? 0) + delta, goal.totalMonths ?? 12),
+        ),
+      });
   };
 
   return {
@@ -1708,30 +1776,99 @@ function useGoalsPage() {
   };
 }
 
-export function Goals() {
-  const {
-    fmtBase,
-    goals,
-    loadingGoals,
-    loadingPayslips,
-    currentYear,
-    activeYear,
-    setActiveYear,
-    activeFilter,
-    setActiveFilter,
-    showAdd,
-    setShowAdd,
-    annualGross,
-    years,
-    yearGoals,
-    filteredGoals,
-    stats,
-    handleDelete,
-    handleUpdateMonths,
-    handleAddGoal,
-  } = useGoalsPage();
+type GoalsPageState = ReturnType<typeof useGoalsPage>;
 
-  if (loadingGoals || loadingPayslips) {
+type GoalsCardGridProps = {
+  filteredGoals: Goal[];
+  annualGross: number;
+  currentYear: number;
+  activeFilter: FilterKey;
+  activeYear: number;
+  yearGoals: Goal[];
+  onDelete: (id: number) => void;
+  onUpdateMonths: (id: number, delta: number) => void;
+  onAdd: () => void;
+};
+
+function GoalsCardGrid({
+  filteredGoals,
+  annualGross,
+  currentYear,
+  activeFilter,
+  activeYear,
+  yearGoals,
+  onDelete,
+  onUpdateMonths,
+  onAdd,
+}: Readonly<GoalsCardGridProps>) {
+  if (filteredGoals.length === 0) {
+    return <GoalsEmptyState activeFilter={activeFilter} activeYear={activeYear} onAdd={onAdd} />;
+  }
+  return (
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {filteredGoals.map((goal) => (
+          <GoalCard
+            key={goal.id}
+            goal={goal}
+            annualGross={annualGross}
+            currentYear={currentYear}
+            onDelete={onDelete}
+            onUpdateMonths={onUpdateMonths}
+          />
+        ))}
+      </div>
+      <GoalsGlance
+        yearGoals={yearGoals}
+        annualGross={annualGross}
+        currentYear={currentYear}
+        activeYear={activeYear}
+      />
+    </>
+  );
+}
+
+function GoalsMainContent({ state }: Readonly<{ state: GoalsPageState }>) {
+  return (
+    <div className="p-6 space-y-6">
+      {state.showAdd && (
+        <AddGoalModal onClose={() => state.setShowAdd(false)} onSave={state.handleAddGoal} />
+      )}
+      <GoalsHeader
+        years={state.years}
+        activeYear={state.activeYear}
+        currentYear={state.currentYear}
+        stats={state.stats}
+        onYearChange={state.setActiveYear}
+      />
+      <GoalsStatsGrid stats={state.stats} activeYear={state.activeYear} fmtBase={state.fmtBase} />
+      <GoalsFilterBar
+        activeFilter={state.activeFilter}
+        activeYear={state.activeYear}
+        currentYear={state.currentYear}
+        goals={state.goals}
+        onFilterChange={state.setActiveFilter}
+        onAdd={() => state.setShowAdd(true)}
+      />
+      <GoalsCardGrid
+        filteredGoals={state.filteredGoals}
+        annualGross={state.annualGross}
+        currentYear={state.currentYear}
+        activeFilter={state.activeFilter}
+        activeYear={state.activeYear}
+        yearGoals={state.yearGoals}
+        onDelete={state.handleDelete}
+        onUpdateMonths={state.handleUpdateMonths}
+        onAdd={() => state.setShowAdd(true)}
+      />
+    </div>
+  );
+}
+
+export function Goals() {
+  const state = useGoalsPage();
+
+  if (state.loadingGoals || state.loadingPayslips) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
@@ -1739,53 +1876,5 @@ export function Goals() {
     );
   }
 
-  return (
-    <div className="p-6 space-y-6">
-      {showAdd && <AddGoalModal onClose={() => setShowAdd(false)} onSave={handleAddGoal} />}
-      <GoalsHeader
-        years={years}
-        activeYear={activeYear}
-        currentYear={currentYear}
-        stats={stats}
-        onYearChange={setActiveYear}
-      />
-      <GoalsStatsGrid stats={stats} activeYear={activeYear} fmtBase={fmtBase} />
-      <GoalsFilterBar
-        activeFilter={activeFilter}
-        activeYear={activeYear}
-        currentYear={currentYear}
-        goals={goals}
-        onFilterChange={setActiveFilter}
-        onAdd={() => setShowAdd(true)}
-      />
-      {filteredGoals.length === 0 ? (
-        <GoalsEmptyState
-          activeFilter={activeFilter}
-          activeYear={activeYear}
-          onAdd={() => setShowAdd(true)}
-        />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {filteredGoals.map((goal) => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              annualGross={annualGross}
-              currentYear={currentYear}
-              onDelete={handleDelete}
-              onUpdateMonths={handleUpdateMonths}
-            />
-          ))}
-        </div>
-      )}
-      {filteredGoals.length > 0 && (
-        <GoalsGlance
-          yearGoals={yearGoals}
-          annualGross={annualGross}
-          currentYear={currentYear}
-          activeYear={activeYear}
-        />
-      )}
-    </div>
-  );
+  return <GoalsMainContent state={state} />;
 }

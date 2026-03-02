@@ -167,20 +167,64 @@ function HoldingValueCells({
   );
 }
 
-function HoldingRow({
+type HoldingRowActionsProps = {
+  holding: Holding;
+  isExpanded: boolean;
+  onEditHolding: (holding: Holding) => void;
+  onToggleExpanded: (id: number) => void;
+};
+
+function HoldingRowActions({
   holding,
-  holdingTxns,
-  position,
   isExpanded,
-  fmtBase,
-  fmtNative,
-  convertToBase,
-  isForeign,
   onEditHolding,
   onToggleExpanded,
-  onAddTxnForHolding,
-  onDeleteTxn,
-}: HoldingRowProps) {
+}: HoldingRowActionsProps) {
+  return (
+    <div className="col-span-1 flex items-center justify-end gap-0.5">
+      <button
+        onClick={() => onEditHolding(holding)}
+        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+        title="Edit holding"
+      >
+        <Edit3 size={13} />
+      </button>
+      <button
+        onClick={() => onToggleExpanded(holding.id)}
+        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+        title={isExpanded ? 'Collapse' : 'View transactions'}
+      >
+        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+    </div>
+  );
+}
+
+function HoldingHistory(props: HoldingRowProps) {
+  const { holding, holdingTxns, position, onAddTxnForHolding, onDeleteTxn } = props;
+  return (
+    <HoldingTxnHistory
+      holding={holding}
+      position={position}
+      transactions={holdingTxns}
+      onAdd={() => onAddTxnForHolding(holding)}
+      onDelete={onDeleteTxn}
+    />
+  );
+}
+
+function HoldingRow(props: HoldingRowProps) {
+  const {
+    holding,
+    holdingTxns,
+    position,
+    isExpanded,
+    fmtBase,
+    fmtNative,
+    convertToBase,
+    isForeign,
+  } = props;
+  const { onEditHolding, onToggleExpanded } = props;
   const { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount } =
     computeHoldingRowMetrics(holding, holdingTxns, position, convertToBase, isForeign);
 
@@ -203,32 +247,14 @@ function HoldingRow({
           holding={holding}
           fmtNative={fmtNative}
         />
-        <div className="col-span-1 flex items-center justify-end gap-0.5">
-          <button
-            onClick={() => onEditHolding(holding)}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-            title="Edit holding"
-          >
-            <Edit3 size={13} />
-          </button>
-          <button
-            onClick={() => onToggleExpanded(holding.id)}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
-            title={isExpanded ? 'Collapse' : 'View transactions'}
-          >
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
-      </div>
-      {isExpanded && (
-        <HoldingTxnHistory
+        <HoldingRowActions
           holding={holding}
-          position={position}
-          transactions={holdingTxns}
-          onAdd={() => onAddTxnForHolding(holding)}
-          onDelete={onDeleteTxn}
+          isExpanded={isExpanded}
+          onEditHolding={onEditHolding}
+          onToggleExpanded={onToggleExpanded}
         />
-      )}
+      </div>
+      {isExpanded && <HoldingHistory {...props} />}
     </div>
   );
 }
@@ -327,32 +353,18 @@ function BrokerageHoldingsList({
   );
 }
 
-export function BrokerageTab({
-  holdings,
-  holdingTxns,
-  positions,
-  baseCurrency,
-  totalDividendsBase,
-  totalRealizedBase,
-  totalBrokerageBase,
-  totalGainBase,
-  gainPct,
-  expandedHoldingId,
-  fmtBase,
-  fmtNative,
-  convertToBase,
-  isForeign,
-  onAddHolding,
-  onEditHolding,
-  onToggleExpanded,
-  onAddTxnForHolding,
-  onDeleteTxn,
-}: BrokerageTabProps) {
+type BrokerageHeaderProps = {
+  holdingsCount: number;
+  baseCurrency: string;
+  onAddHolding: () => void;
+};
+
+function BrokerageHeader({ holdingsCount, baseCurrency, onAddHolding }: BrokerageHeaderProps) {
   return (
-    <div>
+    <>
       <div className="flex justify-between items-center px-6 pt-5 pb-3">
         <p className="text-xs text-slate-400">
-          {holdings.length} holdings · click row to view & record transactions
+          {holdingsCount} holdings · click row to view & record transactions
         </p>
         <button
           onClick={onAddHolding}
@@ -369,6 +381,24 @@ export function BrokerageTab({
         <span className="col-span-2 text-right">Gain / Loss</span>
         <span className="col-span-1"></span>
       </div>
+    </>
+  );
+}
+
+export function BrokerageTab(props: BrokerageTabProps) {
+  const { holdings, holdingTxns, positions, baseCurrency, totalDividendsBase, totalRealizedBase } =
+    props;
+  const { totalBrokerageBase, totalGainBase, gainPct, expandedHoldingId, fmtBase, fmtNative } =
+    props;
+  const { convertToBase, isForeign, onAddHolding, onEditHolding, onToggleExpanded } = props;
+  const { onAddTxnForHolding, onDeleteTxn } = props;
+  return (
+    <div>
+      <BrokerageHeader
+        holdingsCount={holdings.length}
+        baseCurrency={baseCurrency}
+        onAddHolding={onAddHolding}
+      />
       <BrokerageHoldingsList
         holdings={holdings}
         holdingTxns={holdingTxns}

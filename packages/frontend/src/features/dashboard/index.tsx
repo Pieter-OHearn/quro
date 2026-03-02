@@ -521,6 +521,43 @@ const buildMonthlySummaryItems = (
   },
 ];
 
+type DashboardTxnStats = {
+  monthlyCategoryChange: (category: string) => number;
+  monthlySalaryValue: number;
+  monthlySalaryChange: number;
+  totalIncome: number;
+  totalExpenses: number;
+};
+
+function computeDashboardTxnStats(
+  recentTransactions: readonly DashboardTransaction[],
+): DashboardTxnStats {
+  const { currentKey, prevKey } = getMonthKeys(new Date());
+  const monthTxns = recentTransactions.filter((tx) => tx.date.startsWith(currentKey));
+  const monthlyCategoryChange = (category: string) =>
+    monthTxns
+      .filter((tx) => tx.category === category)
+      .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
+  const { monthlySalaryValue, monthlySalaryChange } = computeSalary(
+    recentTransactions,
+    currentKey,
+    prevKey,
+  );
+  const totalIncome = recentTransactions
+    .filter((tx) => tx.type === 'income')
+    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const totalExpenses = recentTransactions
+    .filter((tx) => tx.type === 'expense')
+    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  return {
+    monthlyCategoryChange,
+    monthlySalaryValue,
+    monthlySalaryChange,
+    totalIncome,
+    totalExpenses,
+  };
+}
+
 function useDashboardData(fmtBase: (n: number, u?: undefined, c?: boolean) => string) {
   const { data: netWorthData = [], isLoading: loadingNW } = useNetWorthSnapshots();
   const { data: allocations = [], isLoading: loadingAlloc } = useAssetAllocations();
@@ -535,27 +572,14 @@ function useDashboardData(fmtBase: (n: number, u?: undefined, c?: boolean) => st
     acc[item.name] = item.value;
     return acc;
   }, {});
-
-  const { currentKey, prevKey } = getMonthKeys(new Date());
-  const monthTxns = recentTransactions.filter((tx) => tx.date.startsWith(currentKey));
-  const monthlyCategoryChange = (category: string) =>
-    monthTxns
-      .filter((tx) => tx.category === category)
-      .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
-
-  const { monthlySalaryValue, monthlySalaryChange } = computeSalary(
-    recentTransactions,
-    currentKey,
-    prevKey,
-  );
   const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, totalAlloc);
-
-  const totalIncome = recentTransactions
-    .filter((tx) => tx.type === 'income')
-    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
-  const totalExpenses = recentTransactions
-    .filter((tx) => tx.type === 'expense')
-    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const {
+    monthlyCategoryChange,
+    monthlySalaryValue,
+    monthlySalaryChange,
+    totalIncome,
+    totalExpenses,
+  } = computeDashboardTxnStats(recentTransactions);
 
   return {
     isLoading,
@@ -579,102 +603,105 @@ function useDashboardData(fmtBase: (n: number, u?: undefined, c?: boolean) => st
   };
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+// ─── Dashboard sub-sections ───────────────────────────────────────────────────
 
-export function Dashboard() {
-  const { fmtBase, baseCurrency } = useCurrency();
-  const { user } = useAuth();
-  const {
-    isLoading,
-    chartData,
-    allocationData,
-    totalAlloc,
-    recentTransactions,
-    monthlySalaryValue,
-    monthlyCategoryChange,
-    monthlySalaryChange,
-    allocationByName,
-    netWorth,
-    monthChange,
-    ytdPct,
-    displayedGoals,
-    displayedRecentTransactions,
-    monthlySummaryItems,
-  } = useDashboardData(fmtBase);
+type DashboardCard = ReturnType<typeof buildDashboardCards>[number];
 
-  const hour = new Date().getHours();
-  const greeting = getGreeting(hour);
-  const greetingName = user?.name ?? 'there';
-
-  const dashboardCards = buildDashboardCards(
-    allocationByName,
-    monthlySalaryValue,
-    monthlySalaryChange,
-    monthlyCategoryChange,
-  );
-
-  if (isLoading) return <LoadingSpinner />;
-
+function DashboardStatCards({
+  cards,
+  fmtBase,
+}: Readonly<{
+  cards: readonly DashboardCard[];
+  fmtBase: (n: number, u?: undefined, c?: boolean) => string;
+}>) {
   return (
-    <div className="p-6 space-y-6">
-      <WelcomeBanner
-        greeting={greeting}
-        greetingName={greetingName}
-        netWorth={netWorth}
-        monthChange={monthChange}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={fmtBase(card.value)}
+            icon={Icon}
+            color={card.color}
+            href={card.path}
+            change={{
+              value: `${card.monthlyChange >= 0 ? '+' : '-'}${fmtBase(Math.abs(card.monthlyChange), undefined, true)} this month`,
+              positive: card.monthlyChange >= 0,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function DashboardChartsGrid({
+  chartData,
+  allocationData,
+  totalAlloc,
+  baseCurrency,
+  ytdPct,
+  fmtBase,
+}: Readonly<{
+  chartData: readonly { month: string; value: number }[];
+  allocationData: readonly AllocationItem[];
+  totalAlloc: number;
+  baseCurrency: string;
+  ytdPct: number;
+  fmtBase: (n: number, u?: undefined, c?: boolean) => string;
+}>) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
+        <AreaChartCard
+          title="Net Worth Growth"
+          subtitle={`Last ${chartData.length} months in ${baseCurrency}`}
+          data={chartData}
+          dataKey="value"
+          xKey="month"
+          color="#6366f1"
+          height={220}
+          formatValue={fmtBase}
+          badge={
+            ytdPct !== 0 ? (
+              <span
+                className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
+              >
+                {ytdPct >= 0 ? '+' : ''}
+                {ytdPct.toFixed(1)}%
+              </span>
+            ) : undefined
+          }
+          emptyMessage="No net worth data yet."
+        />
+      </div>
+      <AssetAllocationCard
+        allocationData={allocationData}
+        totalAlloc={totalAlloc}
         baseCurrency={baseCurrency}
         fmtBase={fmtBase}
       />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {dashboardCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <StatCard
-              key={card.label}
-              label={card.label}
-              value={fmtBase(card.value)}
-              icon={Icon}
-              color={card.color}
-              href={card.path}
-              change={{
-                value: `${card.monthlyChange >= 0 ? '+' : '-'}${fmtBase(Math.abs(card.monthlyChange), undefined, true)} this month`,
-                positive: card.monthlyChange >= 0,
-              }}
-            />
-          );
-        })}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <AreaChartCard
-            title="Net Worth Growth"
-            subtitle={`Last ${chartData.length} months in ${baseCurrency}`}
-            data={chartData}
-            dataKey="value"
-            xKey="month"
-            color="#6366f1"
-            height={220}
-            formatValue={fmtBase}
-            badge={
-              ytdPct !== 0 ? (
-                <span
-                  className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
-                >
-                  {ytdPct >= 0 ? '+' : ''}
-                  {ytdPct.toFixed(1)}%
-                </span>
-              ) : undefined
-            }
-            emptyMessage="No net worth data yet."
-          />
-        </div>
-        <AssetAllocationCard
-          allocationData={allocationData}
-          totalAlloc={totalAlloc}
-          baseCurrency={baseCurrency}
-          fmtBase={fmtBase}
-        />
-      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+type DashboardPageBodyProps = {
+  data: ReturnType<typeof useDashboardData>;
+  userName: string;
+  baseCurrency: string;
+  fmtBase: (n: number, u?: undefined, c?: boolean) => string;
+};
+
+function DashboardBottomCards({ data }: { data: DashboardPageBodyProps['data'] }) {
+  const { fmtBase, baseCurrency } = useCurrency();
+  const { displayedRecentTransactions, displayedGoals, recentTransactions, monthlySummaryItems } =
+    data;
+  return (
+    <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RecentTransactionsCard
           transactions={displayedRecentTransactions}
@@ -684,6 +711,70 @@ export function Dashboard() {
         <GoalsOverviewCard goals={displayedGoals} fmtBase={fmtBase} />
       </div>
       {recentTransactions.length > 0 && <MonthlySummary items={monthlySummaryItems} />}
+    </>
+  );
+}
+
+function DashboardPageBody({
+  data,
+  userName,
+  baseCurrency,
+  fmtBase,
+}: Readonly<DashboardPageBodyProps>) {
+  const {
+    chartData,
+    allocationData,
+    totalAlloc,
+    monthlySalaryValue,
+    monthlyCategoryChange,
+    monthlySalaryChange,
+    allocationByName,
+    netWorth,
+    monthChange,
+    ytdPct,
+  } = data;
+  const hour = new Date().getHours();
+  const dashboardCards = buildDashboardCards(
+    allocationByName,
+    monthlySalaryValue,
+    monthlySalaryChange,
+    monthlyCategoryChange,
+  );
+  return (
+    <div className="p-6 space-y-6">
+      <WelcomeBanner
+        greeting={getGreeting(hour)}
+        greetingName={userName}
+        netWorth={netWorth}
+        monthChange={monthChange}
+        baseCurrency={baseCurrency}
+        fmtBase={fmtBase}
+      />
+      <DashboardStatCards cards={dashboardCards} fmtBase={fmtBase} />
+      <DashboardChartsGrid
+        chartData={chartData}
+        allocationData={allocationData}
+        totalAlloc={totalAlloc}
+        baseCurrency={baseCurrency}
+        ytdPct={ytdPct}
+        fmtBase={fmtBase}
+      />
+      <DashboardBottomCards data={data} />
     </div>
+  );
+}
+
+export function Dashboard() {
+  const { fmtBase, baseCurrency } = useCurrency();
+  const { user } = useAuth();
+  const data = useDashboardData(fmtBase);
+  if (data.isLoading) return <LoadingSpinner />;
+  return (
+    <DashboardPageBody
+      data={data}
+      userName={user?.name ?? 'there'}
+      baseCurrency={baseCurrency}
+      fmtBase={fmtBase}
+    />
   );
 }

@@ -22,17 +22,117 @@ const TXN_TYPE_OPTIONS = Object.entries(PENSION_TXN_META).map(([key, meta]) => (
   ...meta,
 }));
 
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function EmployerToggle({
+  isEmployer,
+  setIsEmployer,
+}: Readonly<{ isEmployer: boolean; setIsEmployer: (v: boolean) => void }>) {
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => setIsEmployer(false)}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+      >
+        Employee
+      </button>
+      <button
+        onClick={() => setIsEmployer(true)}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${isEmployer ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+      >
+        Employer
+      </button>
+    </div>
+  );
+}
+
+// ─── Form Body ────────────────────────────────────────────────────────────────
+
+type PensionTxnFormBodyProps = {
+  form: ReturnType<typeof useAddPensionTxnForm>;
+  pot: PensionPot;
+};
+
+function PensionTxnFormBody({ form, pot }: PensionTxnFormBodyProps) {
+  const amountLabel =
+    form.type === 'contribution' ? `Amount (${pot.currency})` : `Fee Amount (${pot.currency})`;
+  return (
+    <>
+      <FormField label="Transaction Type">
+        <TxnTypeSelector<PensionTxnType>
+          types={TXN_TYPE_OPTIONS}
+          value={form.type}
+          onChange={form.handleTypeChange}
+          columns={2}
+        />
+      </FormField>
+      {form.type === 'contribution' && (
+        <EmployerToggle isEmployer={form.isEmployer} setIsEmployer={form.setIsEmployer} />
+      )}
+      <FormField label={amountLabel} error={form.error}>
+        <CurrencyInput
+          currency={pot.currency}
+          value={form.amount}
+          onChange={(v) => {
+            form.setAmount(v);
+            form.setError('');
+          }}
+          error={Boolean(form.error)}
+        />
+      </FormField>
+      <DateNoteRow
+        date={form.date}
+        note={form.note}
+        onDateChange={form.setDate}
+        onNoteChange={form.setNote}
+        notePlaceholder="e.g. Monthly SG..."
+      />
+      {form.parsedAmount > 0 && (
+        <PreviewBanner
+          type={form.type}
+          isEmployer={form.isEmployer}
+          amount={form.parsedAmount}
+          currency={pot.currency}
+          fmtNative={form.fmtNative}
+        />
+      )}
+    </>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function AddPensionTxnModal({ pot, onClose, onSave }: AddPensionTxnModalProps): JSX.Element {
-  const { fmtNative } = useCurrency();
+function usePensionTxnFormState() {
   const [type, setType] = useState<PensionTxnType>('contribution');
   const [amount, setAmount] = useState('');
   const [isEmployer, setIsEmployer] = useState(false);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  return {
+    type,
+    setType,
+    amount,
+    setAmount,
+    isEmployer,
+    setIsEmployer,
+    date,
+    setDate,
+    note,
+    setNote,
+    error,
+    setError,
+  };
+}
 
+function useAddPensionTxnForm(
+  pot: PensionPot,
+  onSave: AddPensionTxnModalProps['onSave'],
+  onClose: () => void,
+) {
+  const { fmtNative } = useCurrency();
+  const formState = usePensionTxnFormState();
+  const { type, setType, amount, setAmount, isEmployer, setIsEmployer, setError } = formState;
   const parsedAmount = parseFloat(amount) || 0;
 
   function handleTypeChange(t: PensionTxnType): void {
@@ -51,83 +151,26 @@ export function AddPensionTxnModal({ pot, onClose, onSave }: AddPensionTxnModalP
       potId: pot.id,
       type,
       amount: parsedAmount,
-      date,
-      note,
+      date: formState.date,
+      note: formState.note,
       isEmployer: type === 'contribution' ? isEmployer : null,
     });
     onClose();
   }
 
-  const amountLabel =
-    type === 'contribution' ? `Amount (${pot.currency})` : `Fee Amount (${pot.currency})`;
+  return { fmtNative, ...formState, parsedAmount, handleTypeChange, handleSave };
+}
 
+export function AddPensionTxnModal({ pot, onClose, onSave }: AddPensionTxnModalProps): JSX.Element {
+  const form = useAddPensionTxnForm(pot, onSave, onClose);
   return (
     <Modal
       title="Record Transaction"
       subtitle={`${pot.emoji} ${pot.name}`}
       onClose={onClose}
-      footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Record" />}
+      footer={<ModalFooter onCancel={onClose} onConfirm={form.handleSave} confirmLabel="Record" />}
     >
-      {/* Type selector */}
-      <FormField label="Transaction Type">
-        <TxnTypeSelector<PensionTxnType>
-          types={TXN_TYPE_OPTIONS}
-          value={type}
-          onChange={handleTypeChange}
-          columns={2}
-        />
-      </FormField>
-
-      {/* Employer toggle for contributions */}
-      {type === 'contribution' && (
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsEmployer(false)}
-            className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-          >
-            Employee
-          </button>
-          <button
-            onClick={() => setIsEmployer(true)}
-            className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${isEmployer ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-          >
-            Employer
-          </button>
-        </div>
-      )}
-
-      {/* Amount */}
-      <FormField label={amountLabel} error={error}>
-        <CurrencyInput
-          currency={pot.currency}
-          value={amount}
-          onChange={(v) => {
-            setAmount(v);
-            setError('');
-          }}
-          error={Boolean(error)}
-        />
-      </FormField>
-
-      {/* Date + Note */}
-      <DateNoteRow
-        date={date}
-        note={note}
-        onDateChange={setDate}
-        onNoteChange={setNote}
-        notePlaceholder="e.g. Monthly SG..."
-      />
-
-      {/* Preview */}
-      {parsedAmount > 0 && (
-        <PreviewBanner
-          type={type}
-          isEmployer={isEmployer}
-          amount={parsedAmount}
-          currency={pot.currency}
-          fmtNative={fmtNative}
-        />
-      )}
+      <PensionTxnFormBody form={form} pot={pot} />
     </Modal>
   );
 }
