@@ -35,10 +35,14 @@ export const TXN_META: Record<
   },
 };
 
+const SCHEDULE_START_YEAR = 2026;
+const SCHEDULE_END_YEAR = 2047;
+const SCHEDULE_YEAR_STEP = 2;
+
 export function generateSchedule(balance: number, rate: number, monthlyPayment: number) {
   const schedule = [];
   const monthlyRate = rate / 100 / 12;
-  for (let year = 2026; year <= 2047; year += 2) {
+  for (let year = SCHEDULE_START_YEAR; year <= SCHEDULE_END_YEAR; year += SCHEDULE_YEAR_STEP) {
     const interest = balance * monthlyRate * 12;
     const principal = monthlyPayment * 12 - interest;
     balance = Math.max(0, balance - principal);

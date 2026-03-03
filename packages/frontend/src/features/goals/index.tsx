@@ -1689,9 +1689,9 @@ function useGoalsComputations(
   setActiveYear: (y: number) => void,
 ): GoalsComputations {
   const annualGross = useMemo(() => {
-    if (payslips.length === 0) return 6500 * 12;
+    if (payslips.length === 0) return 0;
     const latest = [...payslips].sort((a, b) => b.date.localeCompare(a.date))[0];
-    return (latest?.gross || 6500) * 12;
+    return (latest?.gross ?? 0) * 12;
   }, [payslips]);
   const years = useMemo(() => computeGoalYears(goals, currentYear), [goals, currentYear]);
   useEffect(() => {

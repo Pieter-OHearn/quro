@@ -33,6 +33,8 @@ type PropertyCardStats = {
   hasPL: boolean;
 };
 
+const HEALTHY_LTV_THRESHOLD = 70;
+
 function computePropertyCardStats(
   property: Property,
   propertyTxns: PropertyTransaction[],
@@ -115,7 +117,9 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
             LTV{' '}
             <span
               className={
-                stats.ltv < 70 ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'
+                stats.ltv < HEALTHY_LTV_THRESHOLD
+                  ? 'text-emerald-600 font-medium'
+                  : 'text-amber-600 font-medium'
               }
             >
               {stats.ltv.toFixed(1)}%

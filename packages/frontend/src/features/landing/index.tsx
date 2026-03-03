@@ -24,6 +24,7 @@ import {
 import { useAuth } from '@/lib/AuthContext';
 
 type ModalType = 'signin' | 'signup' | null;
+const MIN_PASSWORD_LENGTH = 8;
 
 // ─── Shared modal header ──────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ function PasswordInput({
 
 const computeStrength = (password: string) => {
   const score = [
-    password.length >= 8,
+    password.length >= MIN_PASSWORD_LENGTH,
     /[A-Z]/.test(password),
     /[0-9]/.test(password),
     /[^A-Za-z0-9]/.test(password),
@@ -326,7 +327,7 @@ const validateSignUp = (form: {
   if (!form.email.trim()) e.email = 'Email is required';
   else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email';
   if (!form.password) e.password = 'Password is required';
-  else if (form.password.length < 8) e.password = 'At least 8 characters';
+  else if (form.password.length < MIN_PASSWORD_LENGTH) e.password = 'At least 8 characters';
   if (form.confirm !== form.password) e.confirm = "Passwords don't match";
   return e;
 };

@@ -182,7 +182,7 @@ function PayslipGrossBonusRow({ form, errors, set }: Readonly<PayslipFormPartPro
       <PayslipTextField
         field="gross"
         label="Gross Pay"
-        placeholder="6500"
+        placeholder="Enter gross pay"
         required
         type="number"
         value={form.gross}
@@ -216,7 +216,7 @@ function PayslipDeductionsRow({ form, errors, set }: Readonly<PayslipFormPartPro
         <PayslipTextField
           field="tax"
           label="Income Tax"
-          placeholder="1680"
+          placeholder="Enter tax amount"
           required
           type="number"
           value={form.tax}
@@ -226,7 +226,7 @@ function PayslipDeductionsRow({ form, errors, set }: Readonly<PayslipFormPartPro
         <PayslipTextField
           field="pension"
           label="Pension"
-          placeholder="325"
+          placeholder="Enter pension amount"
           required
           type="number"
           value={form.pension}

@@ -15,6 +15,11 @@ type EmojiPickerFieldProps = {
   buttonClassName?: string;
 };
 
+const PICKER_FLIP_MARGIN = 12;
+const PICKER_VERTICAL_OFFSET = 6;
+const DEFAULT_PICKER_HEIGHT = 380;
+const DEFAULT_PICKER_WIDTH = 300;
+
 function getPickerPos(buttonEl: HTMLButtonElement, pickerWidth: number, pickerHeight: number) {
   const rect = buttonEl.getBoundingClientRect();
   const spaceBelow = window.innerHeight - rect.bottom;
@@ -25,16 +30,21 @@ function getPickerPos(buttonEl: HTMLButtonElement, pickerWidth: number, pickerHe
     left = Math.max(viewportPadding, window.innerWidth - pickerWidth - viewportPadding);
   }
 
-  if (spaceBelow < pickerHeight + 12) {
+  if (spaceBelow < pickerHeight + PICKER_FLIP_MARGIN) {
     return {
       position: 'fixed' as const,
-      bottom: window.innerHeight - rect.top + 6,
+      bottom: window.innerHeight - rect.top + PICKER_VERTICAL_OFFSET,
       left,
       zIndex: 9999,
     };
   }
 
-  return { position: 'fixed' as const, top: rect.bottom + 6, left, zIndex: 9999 };
+  return {
+    position: 'fixed' as const,
+    top: rect.bottom + PICKER_VERTICAL_OFFSET,
+    left,
+    zIndex: 9999,
+  };
 }
 
 function getButtonBorderClass(error: string | undefined, open: boolean): string {
@@ -101,8 +111,8 @@ export function EmojiPickerField({
   onChange,
   error,
   title = 'Pick an emoji',
-  pickerHeight = 380,
-  pickerWidth = 300,
+  pickerHeight = DEFAULT_PICKER_HEIGHT,
+  pickerWidth = DEFAULT_PICKER_WIDTH,
   containerClassName,
   buttonClassName,
 }: EmojiPickerFieldProps) {

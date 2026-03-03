@@ -33,6 +33,9 @@ type MortgageFormState = {
 };
 
 const RATE_TYPES = ['Fixed', 'Variable', 'Tracker', 'Offset'];
+const DEFAULT_OVERPAYMENT_LIMIT_PERCENT = 10;
+const LOW_LTV_THRESHOLD = 70;
+const MEDIUM_LTV_THRESHOLD = 85;
 
 const n = (value: string) => parseFloat(value) || 0;
 
@@ -88,7 +91,7 @@ function buildPayload(form: MortgageFormState, existing?: MortgageType): Mortgag
     termYears: n(form.termYears),
     startDate: form.startDate.trim() || 'N/A',
     endDate: form.endDate.trim() || 'N/A',
-    overpaymentLimit: n(form.overpaymentLimit) || 10,
+    overpaymentLimit: n(form.overpaymentLimit) || DEFAULT_OVERPAYMENT_LIMIT_PERCENT,
     ...(existing ? { id: existing.id } : {}),
   };
 }
@@ -501,8 +504,10 @@ function DatesSection({ form, setField }: DatesSectionProps) {
 }
 
 function getLtvColor(ltv: number) {
-  if (ltv < 70) return { border: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-600' };
-  if (ltv < 85) return { border: 'bg-amber-50 border-amber-100', text: 'text-amber-600' };
+  if (ltv < LOW_LTV_THRESHOLD)
+    return { border: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-600' };
+  if (ltv < MEDIUM_LTV_THRESHOLD)
+    return { border: 'bg-amber-50 border-amber-100', text: 'text-amber-600' };
   return { border: 'bg-rose-50 border-rose-100', text: 'text-rose-500' };
 }
 

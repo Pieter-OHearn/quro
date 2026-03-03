@@ -10,6 +10,8 @@ type AddMortgageTxnModalProps = {
   onSave: (t: Omit<MortgageTransaction, 'id'>) => void;
 };
 
+const MAX_RATE_CHANGE_PERCENT = 25;
+
 function validateTxn(
   type: MortgageTxnType,
   parsedAmount: number,
@@ -19,8 +21,8 @@ function validateTxn(
   if (parsedAmount <= 0) return 'Enter a valid amount';
   if (type === 'repayment' && parsedInterest > parsedAmount)
     return 'Interest cannot exceed total repayment';
-  if (type === 'rate_change' && (parsedAmount <= 0 || parsedAmount > 25))
-    return 'Enter a valid interest rate (0-25%)';
+  if (type === 'rate_change' && (parsedAmount <= 0 || parsedAmount > MAX_RATE_CHANGE_PERCENT))
+    return `Enter a valid interest rate (0-${MAX_RATE_CHANGE_PERCENT}%)`;
   if (type === 'rate_change' && parsedFixedYears <= 0)
     return 'Enter the number of years the rate is fixed for';
   return '';

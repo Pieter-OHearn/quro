@@ -66,9 +66,11 @@ type PensionPageState = {
   setAddTxnForPot: (v: PensionPot | null) => void;
   totalInBase: number;
   totalMonthlyContribInBase: number;
-  projected: number;
-  monthlyDrawdown: number;
-  yearsToRetirement: number;
+  projected: number | null;
+  monthlyDrawdown: number | null;
+  yearsToRetirement: number | null;
+  retirementYearsInput: string;
+  setRetirementYearsInput: (v: string) => void;
   pensionGrowthData: { year: string; value: number }[];
   pensionGrowthPct: number | null;
   handleSave: (pot: PensionPot | Omit<PensionPot, 'id'>) => void;
@@ -107,9 +109,9 @@ const computePensionGrowthData = (
 type PensionComputations = {
   totalInBase: number;
   totalMonthlyContribInBase: number;
-  projected: number;
-  monthlyDrawdown: number;
-  yearsToRetirement: number;
+  projected: number | null;
+  monthlyDrawdown: number | null;
+  yearsToRetirement: number | null;
   pensionGrowthData: { year: string; value: number }[];
   pensionGrowthPct: number | null;
 };
@@ -118,19 +120,24 @@ function usePensionComputations(
   pensions: PensionPot[],
   pensionTxns: PensionTransaction[],
   convertToBase: (n: number, currency: string) => number,
+  yearsToRetirement: number | null,
 ): PensionComputations {
   const totalInBase = pensions.reduce((s, p) => s + convertToBase(p.balance, p.currency), 0);
   const totalMonthlyContribInBase = pensions.reduce(
     (s, p) => s + convertToBase(p.employeeMonthly + p.employerMonthly, p.currency),
     0,
   );
-  const yearsToRetirement = 29;
-  const r = ANNUAL_GROWTH_RATE / 12,
-    months = yearsToRetirement * 12;
-  const projected =
-    totalInBase * Math.pow(1 + ANNUAL_GROWTH_RATE, yearsToRetirement) +
-    totalMonthlyContribInBase * ((Math.pow(1 + r, months) - 1) / r);
-  const monthlyDrawdown = projected / (DRAWDOWN_YEARS * 12);
+  const projected = useMemo(() => {
+    if (yearsToRetirement == null) return null;
+    const monthlyGrowthRate = ANNUAL_GROWTH_RATE / 12;
+    const projectionMonths = yearsToRetirement * 12;
+    return (
+      totalInBase * Math.pow(1 + ANNUAL_GROWTH_RATE, yearsToRetirement) +
+      totalMonthlyContribInBase *
+        ((Math.pow(1 + monthlyGrowthRate, projectionMonths) - 1) / monthlyGrowthRate)
+    );
+  }, [yearsToRetirement, totalInBase, totalMonthlyContribInBase]);
+  const monthlyDrawdown = projected == null ? null : projected / (DRAWDOWN_YEARS * 12);
   const pensionGrowthData = useMemo(
     () => computePensionGrowthData(pensions, pensionTxns, convertToBase),
     [pensions, pensionTxns, convertToBase],
@@ -165,7 +172,18 @@ function usePensionPageState(): PensionPageState {
   const [editing, setEditing] = useState<PensionPot | undefined>(undefined);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [addTxnForPot, setAddTxnForPot] = useState<PensionPot | null>(null);
-  const computations = usePensionComputations(pensions, pensionTxns, convertToBase);
+  const [retirementYearsInput, setRetirementYearsInput] = useState('');
+  const parsedRetirementYears = Number.parseInt(retirementYearsInput, 10);
+  const yearsToRetirement =
+    Number.isFinite(parsedRetirementYears) && parsedRetirementYears > 0
+      ? parsedRetirementYears
+      : null;
+  const computations = usePensionComputations(
+    pensions,
+    pensionTxns,
+    convertToBase,
+    yearsToRetirement,
+  );
 
   const handleSave = (pot: PensionPot | Omit<PensionPot, 'id'>): void => {
     if ('id' in pot) updatePot.mutate(pot as PensionPot);
@@ -195,6 +213,8 @@ function usePensionPageState(): PensionPageState {
     setExpanded,
     addTxnForPot,
     setAddTxnForPot,
+    retirementYearsInput,
+    setRetirementYearsInput,
     ...computations,
     handleSave,
     handleAddPensionTxn,
@@ -208,7 +228,8 @@ function usePensionPageState(): PensionPageState {
 type HeroBannerProps = {
   pensions: PensionPot[];
   totalInBase: number;
-  projected: number;
+  projected: number | null;
+  yearsToRetirement: number | null;
   fmtBase: (n: number) => string;
   baseCurrency: string;
 };
@@ -217,6 +238,7 @@ function PensionHeroBanner({
   pensions,
   totalInBase,
   projected,
+  yearsToRetirement,
   fmtBase,
   baseCurrency,
 }: Readonly<HeroBannerProps>) {
@@ -245,9 +267,13 @@ function PensionHeroBanner({
             <p className="text-slate-400 text-xs mt-0.5">in {baseCurrency}</p>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-4 text-center">
-            <p className="text-amber-300 text-[10px] uppercase tracking-widest mb-1">At 65</p>
-            <p className="text-2xl font-bold">{fmtBase(projected)}</p>
-            <p className="text-slate-400 text-xs mt-0.5">projected (5% growth)</p>
+            <p className="text-amber-300 text-[10px] uppercase tracking-widest mb-1">
+              {yearsToRetirement == null ? 'Projection' : `In ${yearsToRetirement} Years`}
+            </p>
+            <p className="text-2xl font-bold">{projected == null ? '—' : fmtBase(projected)}</p>
+            <p className="text-slate-400 text-xs mt-0.5">
+              {projected == null ? 'Set retirement horizon below' : 'Projected from current data'}
+            </p>
           </div>
         </div>
       </div>
@@ -258,7 +284,7 @@ function PensionHeroBanner({
 type SummaryStatsProps = {
   totalInBase: number;
   totalMonthlyContribInBase: number;
-  monthlyDrawdown: number;
+  monthlyDrawdown: number | null;
   pensionsCount: number;
   fmtBase: (n: number) => string;
 };
@@ -295,8 +321,8 @@ function PensionSummaryStats({
       />
       <StatCard
         label="Monthly Drawdown Est."
-        value={fmtBase(monthlyDrawdown)}
-        subtitle="at 65 over 25 years"
+        value={monthlyDrawdown == null ? '—' : fmtBase(monthlyDrawdown)}
+        subtitle={monthlyDrawdown == null ? 'Set retirement horizon' : 'Over 25-year drawdown'}
         icon={Clock}
         color="sky"
       />
@@ -748,9 +774,11 @@ function PensionPotsList(props: Readonly<PotsListProps>) {
 
 type RetirementProjectionProps = {
   totalInBase: number;
-  projected: number;
-  monthlyDrawdown: number;
-  yearsToRetirement: number;
+  projected: number | null;
+  monthlyDrawdown: number | null;
+  yearsToRetirement: number | null;
+  retirementYearsInput: string;
+  onRetirementYearsChange: (value: string) => void;
   fmtBase: (n: number) => string;
   baseCurrency: string;
 };
@@ -760,22 +788,45 @@ function PensionRetirementProjection({
   projected,
   monthlyDrawdown,
   yearsToRetirement,
+  retirementYearsInput,
+  onRetirementYearsChange,
   fmtBase,
   baseCurrency,
 }: Readonly<RetirementProjectionProps>) {
   const items = [
     { label: 'Current Total', value: fmtBase(totalInBase), note: `in ${baseCurrency}` },
-    { label: 'Years to Retirement', value: `${yearsToRetirement} years`, note: 'Target age 65' },
-    { label: 'Projected at 65', value: fmtBase(projected), note: 'Assumes 5% growth p.a.' },
+    {
+      label: 'Years to Retirement',
+      value: yearsToRetirement == null ? '—' : `${yearsToRetirement} years`,
+      note: yearsToRetirement == null ? 'Enter horizon below' : 'User-defined horizon',
+    },
+    {
+      label: 'Projected Value',
+      value: projected == null ? '—' : fmtBase(projected),
+      note: projected == null ? 'Awaiting horizon' : 'Based on current trend',
+    },
     {
       label: 'Est. Monthly Income',
-      value: fmtBase(monthlyDrawdown),
-      note: 'Over 25-year drawdown',
+      value: monthlyDrawdown == null ? '—' : fmtBase(monthlyDrawdown),
+      note: monthlyDrawdown == null ? 'Awaiting horizon' : 'Over 25-year drawdown',
     },
   ];
   return (
     <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-100">
       <h3 className="font-semibold text-slate-900 mb-4">Retirement Projection</h3>
+      <div className="mb-4 max-w-xs">
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+          Years to Retirement
+        </label>
+        <input
+          type="number"
+          min="1"
+          value={retirementYearsInput}
+          onChange={(event) => onRetirementYearsChange(event.target.value)}
+          placeholder="e.g. 25"
+          className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+        />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {items.map(({ label, value, note }) => (
           <div key={label} className="bg-white/80 rounded-xl p-4">
@@ -857,6 +908,8 @@ function PensionDataSection({ s }: Readonly<{ s: PensionPageStateAll }>) {
         projected={s.projected}
         monthlyDrawdown={s.monthlyDrawdown}
         yearsToRetirement={s.yearsToRetirement}
+        retirementYearsInput={s.retirementYearsInput}
+        onRetirementYearsChange={s.setRetirementYearsInput}
         fmtBase={s.fmtBase}
         baseCurrency={s.baseCurrency}
       />
@@ -872,6 +925,7 @@ function PensionPageContent({ s }: Readonly<{ s: PensionPageStateAll }>) {
         pensions={s.pensions}
         totalInBase={s.totalInBase}
         projected={s.projected}
+        yearsToRetirement={s.yearsToRetirement}
         fmtBase={s.fmtBase}
         baseCurrency={s.baseCurrency}
       />

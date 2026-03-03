@@ -38,10 +38,18 @@ import { AddMortgageModal, type MortgageFormPayload } from './components/AddMort
 import { AddMortgageTxnModal } from './components/AddMortgageTxnModal';
 import { MortgageTxnHistory } from './components/MortgageTxnHistory';
 
+const SCHEDULE_START_YEAR = 2026;
+const SCHEDULE_END_YEAR = 2047;
+const SCHEDULE_YEAR_STEP = 2;
+const GOOD_LTV_THRESHOLD = 70;
+const MONTHS_PER_YEAR = 12;
+const PAYMENT_BREAKDOWN_LIMIT = 6;
+const ISO_YEAR_MONTH_LENGTH = 7;
+
 function generateSchedule(balance: number, rate: number, monthlyPayment: number) {
   const schedule = [];
   const monthlyRate = rate / 100 / 12;
-  for (let year = 2026; year <= 2047; year += 2) {
+  for (let year = SCHEDULE_START_YEAR; year <= SCHEDULE_END_YEAR; year += SCHEDULE_YEAR_STEP) {
     const interest = balance * monthlyRate * 12;
     const principal = monthlyPayment * 12 - interest;
     balance = Math.max(0, balance - principal);
@@ -338,7 +346,7 @@ function MortgageStatCards({
       <StatCard
         label="Loan-to-Value"
         value={`${ltv.toFixed(1)}%`}
-        subtitle={ltv < 70 ? 'Good — below 70%' : 'High LTV'}
+        subtitle={ltv < GOOD_LTV_THRESHOLD ? `Good — below ${GOOD_LTV_THRESHOLD}%` : 'High LTV'}
         icon={Percent}
         color="sky"
       />
@@ -395,6 +403,94 @@ function MortgageRepaymentProgress({
 
 type AmortizationRow = { year: string; balance: number; principal: number; interest: number };
 type PaymentBreakdownRow = { month: string; principal: number; interest: number };
+type OverpaymentImpact = {
+  annualAllowance: number;
+  extraMonthly: number;
+  interestSaved: number;
+  monthsReduced: number;
+};
+
+function calculateRemainingMonths(
+  balance: number,
+  monthlyRate: number,
+  monthlyPayment: number,
+): number | null {
+  const inputs = [balance, monthlyRate, monthlyPayment];
+  if (inputs.some((value) => !Number.isFinite(value))) return null;
+  if (balance <= 0 || monthlyPayment <= 0) return null;
+  if (monthlyRate <= 0) return balance / monthlyPayment;
+
+  const ratio = 1 - (balance * monthlyRate) / monthlyPayment;
+  if (!(ratio > 0 && ratio < 1)) return null;
+
+  const months = -Math.log(ratio) / Math.log(1 + monthlyRate);
+  if (!(Number.isFinite(months) && months > 0)) return null;
+  return months;
+}
+
+function computePaymentBreakdownRows(txns: MortgageTransaction[]): PaymentBreakdownRow[] {
+  const byMonth = new Map<string, { principal: number; interest: number; timestamp: number }>();
+
+  for (const txn of txns) {
+    if (txn.type !== 'repayment') continue;
+    const monthKey = txn.date.slice(0, ISO_YEAR_MONTH_LENGTH);
+    const monthTimestamp = Date.parse(`${monthKey}-01T00:00:00Z`);
+    if (!Number.isFinite(monthTimestamp)) continue;
+
+    const interest = txn.interest ?? 0;
+    const principal = txn.principal ?? Math.max(0, txn.amount - interest);
+    const month = byMonth.get(monthKey) ?? { principal: 0, interest: 0, timestamp: monthTimestamp };
+    month.principal += principal;
+    month.interest += interest;
+    byMonth.set(monthKey, month);
+  }
+
+  return [...byMonth.values()]
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .slice(-PAYMENT_BREAKDOWN_LIMIT)
+    .map((month) => ({
+      month: new Date(month.timestamp).toLocaleDateString('en-GB', { month: 'short' }),
+      principal: Math.round(month.principal),
+      interest: Math.round(month.interest),
+    }));
+}
+
+function computeOverpaymentImpact(
+  mortgage: MortgageType,
+  monthlyRate: number,
+  monthsRemainingRaw: number | null,
+): OverpaymentImpact | null {
+  if (monthsRemainingRaw == null) return null;
+  const annualAllowance = (mortgage.outstandingBalance * mortgage.overpaymentLimit) / 100;
+  if (!Number.isFinite(annualAllowance) || annualAllowance <= 0) return null;
+
+  const extraMonthly = annualAllowance / MONTHS_PER_YEAR;
+  const acceleratedPayment = mortgage.monthlyPayment + extraMonthly;
+  const acceleratedMonthsRaw = calculateRemainingMonths(
+    mortgage.outstandingBalance,
+    monthlyRate,
+    acceleratedPayment,
+  );
+  if (acceleratedMonthsRaw == null) return null;
+
+  const baselineInterest =
+    mortgage.monthlyPayment * monthsRemainingRaw - mortgage.outstandingBalance;
+  const acceleratedInterest =
+    acceleratedPayment * acceleratedMonthsRaw - mortgage.outstandingBalance;
+  return {
+    annualAllowance,
+    extraMonthly,
+    interestSaved: Math.max(0, baselineInterest - acceleratedInterest),
+    monthsReduced: Math.max(0, Math.round(monthsRemainingRaw - acceleratedMonthsRaw)),
+  };
+}
+
+function formatTermReduction(monthsReduced: number): string {
+  if (monthsReduced < MONTHS_PER_YEAR) {
+    return `${monthsReduced} month${monthsReduced === 1 ? '' : 's'}`;
+  }
+  return `${(monthsReduced / MONTHS_PER_YEAR).toFixed(1)} years`;
+}
 
 type ChartsProps = {
   fmt: (n: number) => string;
@@ -472,45 +568,57 @@ function MortgagePaymentChart({
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
       <h3 className="font-semibold text-slate-900 mb-1">Payment Breakdown</h3>
       <p className="text-xs text-slate-400 mb-5">Principal vs Interest per month</p>
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={paymentBreakdown} barSize={22}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis
-            dataKey="month"
-            tick={{ fontSize: 11, fill: '#94a3b8' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: '#94a3b8' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
-          />
-          <Tooltip
-            contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-            formatter={(v: number, name) => [
-              fmt(v),
-              name === 'principal' ? 'Principal' : 'Interest',
-            ]}
-          />
-          <Bar
-            dataKey="principal"
-            name="principal"
-            fill="#6366f1"
-            stackId="a"
-            radius={[0, 0, 0, 0]}
-          />
-          <Bar
-            dataKey="interest"
-            name="interest"
-            fill="#f59e0b"
-            stackId="a"
-            radius={[4, 4, 0, 0]}
-          />
-        </BarChart>
-      </ResponsiveContainer>
-      <PaymentChartLegend />
+      {paymentBreakdown.length > 0 ? (
+        <>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={paymentBreakdown} barSize={22}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '12px',
+                }}
+                formatter={(v: number, name) => [
+                  fmt(v),
+                  name === 'principal' ? 'Principal' : 'Interest',
+                ]}
+              />
+              <Bar
+                dataKey="principal"
+                name="principal"
+                fill="#6366f1"
+                stackId="a"
+                radius={[0, 0, 0, 0]}
+              />
+              <Bar
+                dataKey="interest"
+                name="interest"
+                fill="#f59e0b"
+                stackId="a"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+          <PaymentChartLegend />
+        </>
+      ) : (
+        <div className="flex items-center justify-center py-12 text-sm text-slate-400">
+          No repayment transactions yet.
+        </div>
+      )}
     </div>
   );
 }
@@ -527,9 +635,10 @@ function MortgageCharts({ fmt, amortization, paymentBreakdown }: Readonly<Charts
 type TipsProps = {
   mortgage: MortgageType;
   fmt: (n: number) => string;
+  overpaymentImpact: OverpaymentImpact | null;
 };
 
-function MortgageTips({ mortgage, fmt }: Readonly<TipsProps>) {
+function MortgageTips({ mortgage, fmt, overpaymentImpact }: Readonly<TipsProps>) {
   return (
     <div className="space-y-3">
       <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl">
@@ -548,9 +657,11 @@ function MortgageTips({ mortgage, fmt }: Readonly<TipsProps>) {
           <p className="text-sm font-semibold text-emerald-800">Overpayment Opportunity</p>
           <p className="text-xs text-emerald-700 mt-0.5">
             You can overpay up to {mortgage.overpaymentLimit}% (
-            {fmt(mortgage.outstandingBalance * 0.1)}) per year without penalty. An extra {fmt(200)}
-            /month would save approximately {fmt(12400)} in interest and reduce your term by 3
-            years.
+            {fmt((mortgage.outstandingBalance * mortgage.overpaymentLimit) / 100)}) per year without
+            penalty.
+            {overpaymentImpact
+              ? ` Spreading that allowance as ${fmt(overpaymentImpact.extraMonthly)}/month could save approximately ${fmt(overpaymentImpact.interestSaved)} in interest and reduce your term by ${formatTermReduction(overpaymentImpact.monthsReduced)}.`
+              : ' Add complete mortgage payment details to estimate overpayment impact.'}
           </p>
         </div>
       </div>
@@ -558,23 +669,17 @@ function MortgageTips({ mortgage, fmt }: Readonly<TipsProps>) {
   );
 }
 
-const computeMortgageMetrics = (mortgage: MortgageType) => {
+const computeMortgageMetrics = (mortgage: MortgageType, txns: MortgageTransaction[]) => {
   const monthlyRate = mortgage.interestRate / 100 / 12;
-  const monthsRemaining = Math.round(
-    -Math.log(1 - (mortgage.outstandingBalance * monthlyRate) / mortgage.monthlyPayment) /
-      Math.log(1 + monthlyRate),
+  const monthsRemainingRaw = calculateRemainingMonths(
+    mortgage.outstandingBalance,
+    monthlyRate,
+    mortgage.monthlyPayment,
   );
+  const monthsRemaining = Math.round(monthsRemainingRaw ?? 0);
   const paid = mortgage.originalAmount - mortgage.outstandingBalance;
-  const paymentBreakdown = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date(2025, 8 + i, 1);
-    const bal = mortgage.outstandingBalance - i * 600;
-    const interest = Math.round(bal * monthlyRate);
-    return {
-      month: date.toLocaleDateString('en-GB', { month: 'short' }),
-      principal: mortgage.monthlyPayment - interest,
-      interest,
-    };
-  });
+  const paymentBreakdown = computePaymentBreakdownRows(txns);
+  const overpaymentImpact = computeOverpaymentImpact(mortgage, monthlyRate, monthsRemainingRaw);
   return {
     ltv: (mortgage.outstandingBalance / mortgage.propertyValue) * 100,
     equity: mortgage.propertyValue - mortgage.outstandingBalance,
@@ -588,6 +693,7 @@ const computeMortgageMetrics = (mortgage: MortgageType) => {
       mortgage.monthlyPayment,
     ),
     paymentBreakdown,
+    overpaymentImpact,
   };
 };
 
@@ -631,7 +737,8 @@ function MortgagePageContent({ s }: Readonly<{ s: MortgagePageStateAll }>) {
     yearsRemaining,
     amortization,
     paymentBreakdown,
-  } = computeMortgageMetrics(s.mortgage!);
+    overpaymentImpact,
+  } = computeMortgageMetrics(s.mortgage!, s.txns);
   return (
     <div className="p-6 space-y-6">
       <MortgagePageTopControls s={s} />
@@ -661,7 +768,7 @@ function MortgagePageContent({ s }: Readonly<{ s: MortgagePageStateAll }>) {
         onAdd={() => s.setShowTxnModal(true)}
         onDelete={s.handleDeleteTxn}
       />
-      <MortgageTips mortgage={s.mortgage!} fmt={s.fmt} />
+      <MortgageTips mortgage={s.mortgage!} fmt={s.fmt} overpaymentImpact={overpaymentImpact} />
     </div>
   );
 }
