@@ -1,4 +1,7 @@
 import { LoadingSpinner } from '@/components/ui';
+import { useGoals } from '@/features/goals/hooks';
+import { parseGoalYear } from '@/features/goals/utils/goal-utils';
+import { usePayslips } from '@/features/salary/hooks';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
@@ -14,24 +17,31 @@ import {
   buildMonthlySummaryItems,
   computeDashboardTxnStats,
   computeNWMetrics,
-  deriveGoalDisplay,
   getGreeting,
 } from './utils/dashboard-data';
 import type { DashboardFormatFn } from './types';
-import {
-  useAssetAllocations,
-  useDashboardTransactions,
-  useGoalsSummary,
-  useNetWorthSnapshots,
-} from './hooks';
+import { useAssetAllocations, useDashboardTransactions, useNetWorthSnapshots } from './hooks';
+
+const DASHBOARD_GOAL_LIMIT = 4;
+const DASHBOARD_TXN_LIMIT = 6;
+
+const computeAnnualGross = (payslips: ReadonlyArray<{ gross: number; date: string }>): number => {
+  if (payslips.length === 0) return 0;
+  const latest = [...payslips].sort((a, b) => b.date.localeCompare(a.date))[0];
+  return (latest?.gross ?? 0) * 12;
+};
 
 function useDashboardData(fmtBase: DashboardFormatFn) {
   const { data: netWorthData = [], isLoading: loadingNW } = useNetWorthSnapshots();
   const { data: allocations = [], isLoading: loadingAlloc } = useAssetAllocations();
   const { data: recentTransactions = [], isLoading: loadingTxns } = useDashboardTransactions();
-  const { data: goals = [], isLoading: loadingGoals } = useGoalsSummary();
+  const { data: goals = [], isLoading: loadingGoals } = useGoals();
+  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
 
-  const isLoading = loadingNW || loadingAlloc || loadingTxns || loadingGoals;
+  const isLoading = loadingNW || loadingAlloc || loadingTxns || loadingGoals || loadingPayslips;
+  const currentYear = new Date().getFullYear();
+  const annualGross = computeAnnualGross(payslips);
+  const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
   const chartData = netWorthData.map((snapshot) => ({
     month: snapshot.month,
     value: snapshot.totalValue,
@@ -70,10 +80,12 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
     netWorth,
     monthChange,
     ytdPct,
-    displayedGoals: goals.map((goal) => deriveGoalDisplay(goal, monthlySalaryValue)).slice(0, 4),
+    annualGross,
+    currentYear,
+    displayedGoals: yearGoals.slice(0, DASHBOARD_GOAL_LIMIT),
     displayedRecentTransactions: [...recentTransactions]
       .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 6),
+      .slice(0, DASHBOARD_TXN_LIMIT),
     monthlySummaryItems: buildMonthlySummaryItems(totalIncome, totalExpenses, fmtBase),
   };
 }
@@ -89,8 +101,14 @@ type DashboardPageBodyProps = {
 
 function DashboardBottomCards({ data }: { data: DashboardData }) {
   const { fmtBase, baseCurrency } = useCurrency();
-  const { displayedRecentTransactions, displayedGoals, recentTransactions, monthlySummaryItems } =
-    data;
+  const {
+    displayedRecentTransactions,
+    displayedGoals,
+    recentTransactions,
+    monthlySummaryItems,
+    annualGross,
+    currentYear,
+  } = data;
 
   return (
     <>
@@ -100,7 +118,12 @@ function DashboardBottomCards({ data }: { data: DashboardData }) {
           baseCurrency={baseCurrency}
           fmtBase={fmtBase}
         />
-        <GoalsOverviewCard goals={displayedGoals} fmtBase={fmtBase} />
+        <GoalsOverviewCard
+          goals={displayedGoals}
+          annualGross={annualGross}
+          currentYear={currentYear}
+          fmtBase={fmtBase}
+        />
       </div>
       {recentTransactions.length > 0 && <MonthlySummary items={monthlySummaryItems} />}
     </>

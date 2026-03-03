@@ -36,7 +36,7 @@ export function DashboardChartsGrid({
                 className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
               >
                 {ytdPct >= 0 ? '+' : ''}
-                {ytdPct.toFixed(1)}%
+                {ytdPct.toFixed(1)}% YTD
               </span>
             ) : undefined
           }
