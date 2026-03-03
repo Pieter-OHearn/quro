@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Trash2 } from 'lucide-react';
-import { CURRENCY_LIST, type CurrencyCode } from '@/lib/CurrencyContext';
+import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
 import type { Holding } from '@quro/shared';
 
@@ -141,7 +141,7 @@ function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
         <SelectInput
           value={form.currency}
           onChange={(value) => onChange('currency', value)}
-          options={CURRENCY_LIST}
+          options={[...CURRENCY_CODES]}
         />
       </FormField>
       <FormField label="Current Price" required error={errors.currentPrice}>

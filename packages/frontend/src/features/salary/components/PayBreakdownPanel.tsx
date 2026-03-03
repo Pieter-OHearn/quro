@@ -1,6 +1,6 @@
 import type { Payslip } from '@quro/shared';
 import type { FmtFn } from '../types';
-import { buildBreakdownItems } from '../utils/salary-data';
+import { buildBreakdownItems, getPayslipBreakdownTotal } from '../utils/salary-data';
 
 type PayBreakdownPanelProps = {
   selected: Payslip | null;
@@ -11,20 +11,24 @@ function PayBreakdownDetail({
   selected,
   fmtBase,
 }: Readonly<{ selected: Payslip; fmtBase: FmtFn }>) {
+  const totalPay = getPayslipBreakdownTotal(selected);
+  const percentageOfTotal = (value: number): number =>
+    totalPay > 0 ? (value / totalPay) * 100 : 0;
+
   return (
     <>
       <div className="flex h-7 rounded-xl overflow-hidden mb-5 gap-px">
         <div
           className="bg-emerald-500 h-full"
-          style={{ width: `${(selected.net / selected.gross) * 100}%` }}
+          style={{ width: `${percentageOfTotal(selected.net)}%` }}
         />
         <div
           className="bg-rose-400 h-full"
-          style={{ width: `${(selected.tax / selected.gross) * 100}%` }}
+          style={{ width: `${percentageOfTotal(selected.tax)}%` }}
         />
         <div
           className="bg-indigo-400 h-full"
-          style={{ width: `${(selected.pension / selected.gross) * 100}%` }}
+          style={{ width: `${percentageOfTotal(selected.pension)}%` }}
         />
       </div>
       <div className="space-y-2.5">
@@ -40,7 +44,7 @@ function PayBreakdownDetail({
               )}
               <span className={`text-sm font-semibold ${tc}`}>
                 {val >= 0 ? '+' : '\u2212'}
-                {fmtBase(Math.abs(val))}
+                {fmtBase(Math.abs(val), selected.currency)}
               </span>
             </div>
           </div>

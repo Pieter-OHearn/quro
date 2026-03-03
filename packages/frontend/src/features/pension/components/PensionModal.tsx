@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CURRENCY_LIST, type CurrencyCode } from '@/lib/CurrencyContext';
+import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { FormField, TextInput, SelectInput } from '@/components/ui/FormField';
@@ -119,7 +119,7 @@ function PensionBalanceCurrencyRow({ form, errors, set }: Readonly<PensionFormFi
         <SelectInput
           value={form.currency}
           onChange={(v) => set('currency', v)}
-          options={CURRENCY_LIST.map((c) => c)}
+          options={CURRENCY_CODES.map((c) => c)}
         />
       </FormField>
     </div>

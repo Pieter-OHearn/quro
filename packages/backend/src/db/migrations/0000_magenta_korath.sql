@@ -1,3 +1,4 @@
+CREATE TYPE "public"."currency_code" AS ENUM('EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD');--> statement-breakpoint
 CREATE TABLE "asset_allocations" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer,
@@ -25,14 +26,14 @@ CREATE TABLE "budget_transactions" (
 	"category_id" integer NOT NULL,
 	"description" text NOT NULL,
 	"amount" numeric NOT NULL,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"merchant" text NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "currency_rates" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"from_currency" text NOT NULL,
-	"to_currency" text NOT NULL,
+	"from_currency" "currency_code" NOT NULL,
+	"to_currency" "currency_code" NOT NULL,
 	"rate" numeric NOT NULL,
 	"updated_at" text NOT NULL
 );
@@ -43,7 +44,7 @@ CREATE TABLE "dashboard_transactions" (
 	"name" text NOT NULL,
 	"type" text NOT NULL,
 	"amount" numeric NOT NULL,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"category" text NOT NULL
 );
 --> statement-breakpoint
@@ -65,7 +66,7 @@ CREATE TABLE "goals" (
 	"unit" text,
 	"color" text,
 	"notes" text,
-	"currency" text DEFAULT 'EUR' NOT NULL
+	"currency" "currency_code" DEFAULT 'EUR' NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "holding_transactions" (
@@ -75,7 +76,7 @@ CREATE TABLE "holding_transactions" (
 	"type" text NOT NULL,
 	"shares" numeric,
 	"price" numeric NOT NULL,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"note" text
 );
 --> statement-breakpoint
@@ -85,7 +86,7 @@ CREATE TABLE "holdings" (
 	"name" text NOT NULL,
 	"ticker" text NOT NULL,
 	"current_price" numeric NOT NULL,
-	"currency" text NOT NULL,
+	"currency" "currency_code" NOT NULL,
 	"sector" text NOT NULL
 );
 --> statement-breakpoint
@@ -97,7 +98,7 @@ CREATE TABLE "mortgage_transactions" (
 	"amount" numeric NOT NULL,
 	"interest" numeric,
 	"principal" numeric,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"note" text,
 	"fixed_years" numeric
 );
@@ -107,7 +108,7 @@ CREATE TABLE "mortgages" (
 	"user_id" integer,
 	"property_address" text NOT NULL,
 	"lender" text NOT NULL,
-	"currency" text NOT NULL,
+	"currency" "currency_code" NOT NULL,
 	"original_amount" numeric NOT NULL,
 	"outstanding_balance" numeric NOT NULL,
 	"property_value" numeric NOT NULL,
@@ -127,20 +128,20 @@ CREATE TABLE "net_worth_snapshots" (
 	"month" text NOT NULL,
 	"year" integer NOT NULL,
 	"total_value" numeric NOT NULL,
-	"currency" text DEFAULT 'EUR' NOT NULL
+	"currency" "currency_code" DEFAULT 'EUR' NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "payslips" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer,
 	"month" text NOT NULL,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"gross" numeric NOT NULL,
 	"tax" numeric NOT NULL,
 	"pension" numeric NOT NULL,
 	"net" numeric NOT NULL,
 	"bonus" numeric,
-	"currency" text DEFAULT 'EUR' NOT NULL
+	"currency" "currency_code" DEFAULT 'EUR' NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "pension_pots" (
@@ -150,7 +151,7 @@ CREATE TABLE "pension_pots" (
 	"provider" text NOT NULL,
 	"type" text NOT NULL,
 	"balance" numeric NOT NULL,
-	"currency" text NOT NULL,
+	"currency" "currency_code" NOT NULL,
 	"employee_monthly" numeric NOT NULL,
 	"employer_monthly" numeric NOT NULL,
 	"color" text,
@@ -164,7 +165,7 @@ CREATE TABLE "pension_transactions" (
 	"pot_id" integer NOT NULL,
 	"type" text NOT NULL,
 	"amount" numeric NOT NULL,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"note" text,
 	"is_employer" boolean
 );
@@ -179,7 +180,7 @@ CREATE TABLE "properties" (
 	"mortgage" numeric NOT NULL,
 	"mortgage_id" integer,
 	"monthly_rent" numeric NOT NULL,
-	"currency" text NOT NULL,
+	"currency" "currency_code" NOT NULL,
 	"emoji" text
 );
 --> statement-breakpoint
@@ -191,16 +192,8 @@ CREATE TABLE "property_transactions" (
 	"amount" numeric NOT NULL,
 	"interest" numeric,
 	"principal" numeric,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"note" text
-);
---> statement-breakpoint
-CREATE TABLE "salary_history" (
-	"id" serial PRIMARY KEY NOT NULL,
-	"user_id" integer,
-	"year" integer NOT NULL,
-	"annual_salary" numeric NOT NULL,
-	"currency" text DEFAULT 'EUR' NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "savings_accounts" (
@@ -209,7 +202,7 @@ CREATE TABLE "savings_accounts" (
 	"name" text NOT NULL,
 	"bank" text NOT NULL,
 	"balance" numeric NOT NULL,
-	"currency" text NOT NULL,
+	"currency" "currency_code" NOT NULL,
 	"interest_rate" numeric NOT NULL,
 	"account_type" text NOT NULL,
 	"color" text,
@@ -222,7 +215,7 @@ CREATE TABLE "savings_transactions" (
 	"account_id" integer NOT NULL,
 	"type" text NOT NULL,
 	"amount" numeric NOT NULL,
-	"date" text NOT NULL,
+	"date" date NOT NULL,
 	"note" text
 );
 --> statement-breakpoint
@@ -263,7 +256,6 @@ ALTER TABLE "pension_transactions" ADD CONSTRAINT "pension_transactions_pot_id_p
 ALTER TABLE "properties" ADD CONSTRAINT "properties_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property_transactions" ADD CONSTRAINT "property_transactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "property_transactions" ADD CONSTRAINT "property_transactions_property_id_properties_id_fk" FOREIGN KEY ("property_id") REFERENCES "public"."properties"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "salary_history" ADD CONSTRAINT "salary_history_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "savings_accounts" ADD CONSTRAINT "savings_accounts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "savings_transactions" ADD CONSTRAINT "savings_transactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "savings_transactions" ADD CONSTRAINT "savings_transactions_account_id_savings_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."savings_accounts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -291,7 +283,6 @@ CREATE INDEX "properties_user_id_idx" ON "properties" USING btree ("user_id");--
 CREATE INDEX "properties_mortgage_id_idx" ON "properties" USING btree ("mortgage_id");--> statement-breakpoint
 CREATE INDEX "property_transactions_user_id_idx" ON "property_transactions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "property_transactions_user_date_idx" ON "property_transactions" USING btree ("user_id","date");--> statement-breakpoint
-CREATE INDEX "salary_history_user_id_idx" ON "salary_history" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "savings_accounts_user_id_idx" ON "savings_accounts" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "savings_transactions_user_id_idx" ON "savings_transactions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "savings_transactions_user_date_idx" ON "savings_transactions" USING btree ("user_id","date");

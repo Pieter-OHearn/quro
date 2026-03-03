@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Payslip } from '@quro/shared';
+import type { CurrencyCode, Payslip } from '@quro/shared';
 import type { PayslipFieldErrorMap, PayslipFormState } from '../types';
 import {
   computePayslipDraftAmounts,
@@ -10,15 +10,15 @@ import {
 type UseAddPayslipFormArgs = {
   onSave: (payslip: Omit<Payslip, 'id'>) => void;
   onClose: () => void;
-  baseCurrency: string;
+  baseCurrency: CurrencyCode;
 };
 
 export function useAddPayslipForm({ onSave, onClose, baseCurrency }: UseAddPayslipFormArgs) {
-  const [form, setForm] = useState<PayslipFormState>(createEmptyPayslipForm);
+  const [form, setForm] = useState<PayslipFormState>(() => createEmptyPayslipForm(baseCurrency));
   const [errors, setErrors] = useState<PayslipFieldErrorMap>({});
   const { gross, tax, pension, bonus, net } = computePayslipDraftAmounts(form);
 
-  const set = (field: keyof PayslipFormState, value: string) => {
+  const set = <K extends keyof PayslipFormState>(field: K, value: PayslipFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
     if (errors[field]) {
       setErrors((current) => {
@@ -44,7 +44,7 @@ export function useAddPayslipForm({ onSave, onClose, baseCurrency }: UseAddPaysl
       pension,
       net,
       bonus: bonus > 0 ? bonus : null,
-      currency: baseCurrency as Payslip['currency'],
+      currency: form.currency,
     });
     onClose();
   };

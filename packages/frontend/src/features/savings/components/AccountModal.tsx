@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Trash2, Check } from 'lucide-react';
-import { CURRENCY_LIST } from '@/lib/CurrencyContext';
+import { CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
 import {
@@ -138,11 +138,16 @@ function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
   );
 }
 
-function AccountAmountFields({ form, errors, set }: AccountFormBodyProps) {
+function AccountAmountFields({
+  form,
+  errors,
+  set,
+  balanceLabel,
+}: AccountFormBodyProps & { balanceLabel: string }) {
   return (
     <>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Opening Balance" required error={errors.balance}>
+        <FormField label={balanceLabel} required error={errors.balance}>
           <TextInput
             type="number"
             value={form.balance}
@@ -155,7 +160,7 @@ function AccountAmountFields({ form, errors, set }: AccountFormBodyProps) {
           <SelectInput
             value={form.currency}
             onChange={(v) => set('currency', v)}
-            options={CURRENCY_LIST.map((c) => ({ value: c, label: c }))}
+            options={CURRENCY_CODES.map((c) => ({ value: c, label: c }))}
           />
         </FormField>
       </div>
@@ -178,11 +183,21 @@ function AccountAmountFields({ form, errors, set }: AccountFormBodyProps) {
   );
 }
 
-function AccountFormBody({ form, errors, set }: AccountFormBodyProps) {
+function AccountFormBody({
+  form,
+  errors,
+  set,
+  isEdit,
+}: AccountFormBodyProps & { isEdit: boolean }) {
   return (
     <>
       <AccountBasicFields form={form} errors={errors} set={set} />
-      <AccountAmountFields form={form} errors={errors} set={set} />
+      <AccountAmountFields
+        form={form}
+        errors={errors}
+        set={set}
+        balanceLabel={isEdit ? 'Balance' : 'Opening Balance'}
+      />
       <InterestPreview balance={form.balance} rate={form.rate} currency={form.currency} />
     </>
   );
@@ -231,6 +246,7 @@ function useAccountModalForm(
 
 export function AccountModal({ existing, onClose, onSave, onDelete }: AccountModalProps) {
   const { form, errors, set, handleSave } = useAccountModalForm(existing, onSave, onClose);
+  const isEdit = Boolean(existing);
 
   const deleteButton =
     existing && onDelete ? (
@@ -248,19 +264,19 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
 
   return (
     <Modal
-      title={existing ? 'Edit Account' : 'Add Savings Account'}
-      subtitle={existing ? 'Update account details' : 'Link a new account'}
+      title={isEdit ? 'Edit Account' : 'Add Savings Account'}
+      subtitle={isEdit ? 'Update account details' : 'Link a new account'}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel={existing ? 'Save Changes' : 'Add Account'}
+          confirmLabel={isEdit ? 'Save Changes' : 'Add Account'}
           danger={deleteButton}
         />
       }
     >
-      <AccountFormBody form={form} errors={errors} set={set} />
+      <AccountFormBody form={form} errors={errors} set={set} isEdit={isEdit} />
     </Modal>
   );
 }

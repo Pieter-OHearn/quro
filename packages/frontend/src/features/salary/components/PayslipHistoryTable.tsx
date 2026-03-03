@@ -1,4 +1,5 @@
-import type { Payslip } from '@quro/shared';
+import { CURRENCY_META, type Payslip } from '@quro/shared';
+import { formatDate } from '@/lib/utils';
 import { Download, Plus, Trash2 } from 'lucide-react';
 import type { FmtFn } from '../types';
 
@@ -49,6 +50,8 @@ function PayslipTableRow({
   onSelect: (id: number) => void;
   onDelete: (id: number) => void;
 }>) {
+  const currencyMeta = CURRENCY_META[payslip.currency];
+
   return (
     <tr
       onClick={() => onSelect(payslip.id)}
@@ -57,24 +60,32 @@ function PayslipTableRow({
       <td className="py-3 px-4">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-slate-800">{payslip.month}</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+            <span aria-hidden>{currencyMeta.flag}</span>
+            <span>{payslip.currency}</span>
+          </span>
           {payslip.bonus && (
             <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
               +Bonus
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-400">{payslip.date}</p>
+        <p className="text-xs text-slate-400">{formatDate(payslip.date)}</p>
       </td>
-      <td className="py-3 px-4 font-semibold text-slate-800">{fmtBase(payslip.gross)}</td>
+      <td className="py-3 px-4 font-semibold text-slate-800">
+        {fmtBase(payslip.gross, payslip.currency)}
+      </td>
       <td className="py-3 px-4 text-rose-500">
         {'\u2212'}
-        {fmtBase(payslip.tax)}
+        {fmtBase(payslip.tax, payslip.currency)}
       </td>
       <td className="py-3 px-4 text-indigo-600">
         {'\u2212'}
-        {fmtBase(payslip.pension)}
+        {fmtBase(payslip.pension, payslip.currency)}
       </td>
-      <td className="py-3 px-4 font-bold text-emerald-600">{fmtBase(payslip.net)}</td>
+      <td className="py-3 px-4 font-bold text-emerald-600">
+        {fmtBase(payslip.net, payslip.currency)}
+      </td>
       <td className="py-3 px-4">
         <PayslipRowActions id={payslip.id} onDelete={onDelete} />
       </td>

@@ -1,5 +1,5 @@
 {
-  "id": "30b370e5-a0cd-45cb-8145-73b00157b6c1",
+  "id": "8190428a-b2e4-4e9f-b251-14422bcd06ad",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -217,7 +217,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -304,13 +304,15 @@
         },
         "from_currency": {
           "name": "from_currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
         "to_currency": {
           "name": "to_currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -371,7 +373,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -545,7 +547,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
           "default": "'EUR'"
@@ -627,7 +630,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -738,7 +741,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -831,7 +835,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -942,7 +946,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -1083,7 +1088,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
           "default": "'EUR'"
@@ -1147,7 +1153,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -1183,7 +1189,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
           "default": "'EUR'"
@@ -1286,7 +1293,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -1391,7 +1399,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -1532,7 +1540,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -1640,7 +1649,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -1715,76 +1724,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.salary_history": {
-      "name": "salary_history",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "year": {
-          "name": "year",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "annual_salary": {
-          "name": "annual_salary",
-          "type": "numeric",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'EUR'"
-        }
-      },
-      "indexes": {
-        "salary_history_user_id_idx": {
-          "name": "salary_history_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "salary_history_user_id_users_id_fk": {
-          "name": "salary_history_user_id_users_id_fk",
-          "tableFrom": "salary_history",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.savings_accounts": {
       "name": "savings_accounts",
       "schema": "",
@@ -1821,7 +1760,8 @@
         },
         "currency": {
           "name": "currency",
-          "type": "text",
+          "type": "currency_code",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -1920,7 +1860,7 @@
         },
         "date": {
           "name": "date",
-          "type": "text",
+          "type": "date",
           "primaryKey": false,
           "notNull": true
         },
@@ -2094,7 +2034,13 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.currency_code": {
+      "name": "currency_code",
+      "schema": "public",
+      "values": ["EUR", "GBP", "USD", "AUD", "NZD", "CAD", "CHF", "SGD"]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

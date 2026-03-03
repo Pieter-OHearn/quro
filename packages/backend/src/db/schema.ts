@@ -1,13 +1,18 @@
 import {
   pgTable,
+  pgEnum,
   serial,
   text,
+  date,
   numeric,
   integer,
   boolean,
   timestamp,
   index,
 } from 'drizzle-orm/pg-core';
+
+const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
+export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
 
 // ── Users ───────────────────────────────────────────────────────────────────
 
@@ -40,7 +45,7 @@ export const savingsAccounts = pgTable(
     name: text('name').notNull(),
     bank: text('bank').notNull(),
     balance: numeric('balance').notNull(),
-    currency: text('currency').notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
     interestRate: numeric('interest_rate').notNull(),
     accountType: text('account_type').notNull(),
     color: text('color'),
@@ -61,7 +66,7 @@ export const savingsTransactions = pgTable(
       .notNull(),
     type: text('type').notNull(), // deposit | withdrawal | interest
     amount: numeric('amount').notNull(),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
   (table) => ({
@@ -80,7 +85,7 @@ export const holdings = pgTable(
     name: text('name').notNull(),
     ticker: text('ticker').notNull(),
     currentPrice: numeric('current_price').notNull(),
-    currency: text('currency').notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
     sector: text('sector').notNull(),
   },
   (table) => ({
@@ -99,7 +104,7 @@ export const holdingTransactions = pgTable(
     type: text('type').notNull(), // buy | sell | dividend
     shares: numeric('shares'),
     price: numeric('price').notNull(),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
   (table) => ({
@@ -122,7 +127,7 @@ export const properties = pgTable(
     mortgage: numeric('mortgage').notNull(),
     mortgageId: integer('mortgage_id'),
     monthlyRent: numeric('monthly_rent').notNull(),
-    currency: text('currency').notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
     emoji: text('emoji'),
   },
   (table) => ({
@@ -143,7 +148,7 @@ export const propertyTransactions = pgTable(
     amount: numeric('amount').notNull(),
     interest: numeric('interest'),
     principal: numeric('principal'),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
   (table) => ({
@@ -163,7 +168,7 @@ export const pensionPots = pgTable(
     provider: text('provider').notNull(),
     type: text('type').notNull(),
     balance: numeric('balance').notNull(),
-    currency: text('currency').notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
     employeeMonthly: numeric('employee_monthly').notNull(),
     employerMonthly: numeric('employer_monthly').notNull(),
     color: text('color'),
@@ -185,7 +190,7 @@ export const pensionTransactions = pgTable(
       .notNull(),
     type: text('type').notNull(), // contribution | fee
     amount: numeric('amount').notNull(),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     isEmployer: boolean('is_employer'),
   },
@@ -204,7 +209,7 @@ export const mortgages = pgTable(
     userId: integer('user_id').references(() => users.id),
     propertyAddress: text('property_address').notNull(),
     lender: text('lender').notNull(),
-    currency: text('currency').notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
     originalAmount: numeric('original_amount').notNull(),
     outstandingBalance: numeric('outstanding_balance').notNull(),
     propertyValue: numeric('property_value').notNull(),
@@ -234,7 +239,7 @@ export const mortgageTransactions = pgTable(
     amount: numeric('amount').notNull(),
     interest: numeric('interest'),
     principal: numeric('principal'),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     fixedYears: numeric('fixed_years'),
   },
@@ -252,31 +257,17 @@ export const payslips = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     month: text('month').notNull(),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     gross: numeric('gross').notNull(),
     tax: numeric('tax').notNull(),
     pension: numeric('pension').notNull(),
     net: numeric('net').notNull(),
     bonus: numeric('bonus'),
-    currency: text('currency').default('EUR').notNull(),
+    currency: currencyCodeEnum('currency').default('EUR').notNull(),
   },
   (table) => ({
     userIdx: index('payslips_user_id_idx').on(table.userId),
     userDateIdx: index('payslips_user_date_idx').on(table.userId, table.date),
-  }),
-);
-
-export const salaryHistory = pgTable(
-  'salary_history',
-  {
-    id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
-    year: integer('year').notNull(),
-    annualSalary: numeric('annual_salary').notNull(),
-    currency: text('currency').default('EUR').notNull(),
-  },
-  (table) => ({
-    userIdx: index('salary_history_user_id_idx').on(table.userId),
   }),
 );
 
@@ -302,7 +293,7 @@ export const goals = pgTable(
     unit: text('unit'),
     color: text('color'),
     notes: text('notes'),
-    currency: text('currency').default('EUR').notNull(),
+    currency: currencyCodeEnum('currency').default('EUR').notNull(),
   },
   (table) => ({
     userIdx: index('goals_user_id_idx').on(table.userId),
@@ -339,7 +330,7 @@ export const budgetTransactions = pgTable(
       .notNull(),
     description: text('description').notNull(),
     amount: numeric('amount').notNull(),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     merchant: text('merchant').notNull(),
   },
   (table) => ({
@@ -358,7 +349,7 @@ export const netWorthSnapshots = pgTable(
     month: text('month').notNull(),
     year: integer('year').notNull(),
     totalValue: numeric('total_value').notNull(),
-    currency: text('currency').default('EUR').notNull(),
+    currency: currencyCodeEnum('currency').default('EUR').notNull(),
   },
   (table) => ({
     userIdx: index('net_worth_snapshots_user_id_idx').on(table.userId),
@@ -386,8 +377,8 @@ export const assetAllocations = pgTable(
 
 export const currencyRates = pgTable('currency_rates', {
   id: serial('id').primaryKey(),
-  fromCurrency: text('from_currency').notNull(),
-  toCurrency: text('to_currency').notNull(),
+  fromCurrency: currencyCodeEnum('from_currency').notNull(),
+  toCurrency: currencyCodeEnum('to_currency').notNull(),
   rate: numeric('rate').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
@@ -402,7 +393,7 @@ export const dashboardTransactions = pgTable(
     name: text('name').notNull(),
     type: text('type').notNull(),
     amount: numeric('amount').notNull(),
-    date: text('date').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
     category: text('category').notNull(),
   },
   (table) => ({

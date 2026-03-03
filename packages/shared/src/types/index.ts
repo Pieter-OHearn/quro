@@ -1,4 +1,6 @@
-export type CurrencyCode = 'EUR' | 'GBP' | 'USD' | 'AUD' | 'NZD' | 'CAD' | 'CHF' | 'SGD';
+export const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
+
+export type CurrencyCode = (typeof CURRENCY_CODES)[number];
 
 export type User = {
   id: number;
@@ -236,4 +238,8 @@ export const CURRENCY_META: Record<CurrencyCode, CurrencyMeta> = {
   SGD: { symbol: 'S$', name: 'Singapore Dollar', flag: '\ud83c\uddf8\ud83c\uddec' },
 };
 
-export const CURRENCY_LIST = Object.keys(CURRENCY_META) as CurrencyCode[];
+const CURRENCY_SET = new Set<CurrencyCode>(CURRENCY_CODES);
+
+export function isCurrencyCode(value: unknown): value is CurrencyCode {
+  return typeof value === 'string' && CURRENCY_SET.has(value as CurrencyCode);
+}

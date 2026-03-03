@@ -1,15 +1,17 @@
+import { isCurrencyCode, type CurrencyCode } from '@quro/shared';
 import type { PayslipFieldErrorMap, PayslipFormState } from '../types';
 
 const isInvalidAmount = (raw: string, parsed: number, allowZero: boolean) =>
   !raw || Number.isNaN(parsed) || (allowZero ? parsed < 0 : parsed <= 0);
 
-export const createEmptyPayslipForm = (): PayslipFormState => ({
+export const createEmptyPayslipForm = (currency: CurrencyCode): PayslipFormState => ({
   month: '',
   date: '',
   gross: '',
   tax: '',
   pension: '',
   bonus: '',
+  currency,
 });
 
 export const computePayslipDraftAmounts = (form: PayslipFormState) => {
@@ -35,6 +37,7 @@ export function validatePayslipForm(
   if (isInvalidAmount(form.gross, gross, false)) errors.gross = 'Enter a valid amount';
   if (isInvalidAmount(form.tax, tax, true)) errors.tax = 'Enter a valid amount';
   if (isInvalidAmount(form.pension, pension, true)) errors.pension = 'Enter a valid amount';
+  if (!isCurrencyCode(form.currency)) errors.currency = 'Select a currency';
 
   return errors;
 }

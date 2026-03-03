@@ -13,7 +13,6 @@ import {
   mortgages,
   mortgageTransactions,
   payslips,
-  salaryHistory,
   goals,
   budgetCategories,
   budgetTransactions,
@@ -65,8 +64,8 @@ async function ensureDemoUser(): Promise<SeedUser> {
 
 const seedUser = await ensureDemoUser();
 const seedUserId = seedUser.id;
-const withUser = <T extends Record<string, unknown>>(rows: T[]) =>
-  rows.map((row) => ({ ...row, userId: seedUserId }));
+const withUser = <const T extends Record<string, unknown>>(rows: readonly T[]) =>
+  rows.map((row) => ({ ...row, userId: seedUserId })) as Array<T & { userId: number }>;
 
 console.log(`Seeding data for user ${seedUser.email} (id: ${seedUser.id})`);
 if (seedUser.created)
@@ -92,7 +91,6 @@ await db.delete(pensionPots);
 await db.delete(mortgageTransactions);
 await db.delete(mortgages);
 await db.delete(payslips);
-await db.delete(salaryHistory);
 await db.delete(goals);
 console.log('All tables cleared.');
 
@@ -737,10 +735,10 @@ const insertedMortgages = await db
         monthlyPayment: '1280',
         interestRate: '4.25',
         rateType: 'Fixed',
-        fixedUntil: 'March 2027',
+        fixedUntil: '2027-03-01',
         termYears: 25,
-        startDate: 'March 2022',
-        endDate: 'March 2047',
+        startDate: '2022-03-01',
+        endDate: '2047-03-01',
         overpaymentLimit: '10',
       },
     ]),
@@ -871,20 +869,6 @@ await db.insert(payslips).values(
   ]),
 );
 
-// ── Salary History ───────────────────────────────────────────────────────────
-
-console.log('Seeding salary history...');
-await db.insert(salaryHistory).values(
-  withUser([
-    { year: 2021, annualSalary: '48000', currency: 'EUR' },
-    { year: 2022, annualSalary: '54000', currency: 'EUR' },
-    { year: 2023, annualSalary: '60000', currency: 'EUR' },
-    { year: 2024, annualSalary: '68000', currency: 'EUR' },
-    { year: 2025, annualSalary: '74000', currency: 'EUR' },
-    { year: 2026, annualSalary: '78000', currency: 'EUR' },
-  ]),
-);
-
 // ── Goals ────────────────────────────────────────────────────────────────────
 
 console.log('Seeding goals...');
@@ -897,7 +881,7 @@ await db.insert(goals).values(
       emoji: '\u{1F6E1}\u{FE0F}',
       currentAmount: '12500',
       targetAmount: '15600',
-      deadline: 'Jun 2026',
+      deadline: '2026-06-30',
       year: 2026,
       category: 'Savings',
       monthlyContribution: '500',
@@ -911,7 +895,7 @@ await db.insert(goals).values(
       emoji: '\u{2708}\u{FE0F}',
       currentAmount: '2800',
       targetAmount: '4000',
-      deadline: 'Jul 2026',
+      deadline: '2026-07-31',
       year: 2026,
       category: 'Savings',
       monthlyContribution: '300',
@@ -926,7 +910,7 @@ await db.insert(goals).values(
       emoji: '\u{1F4BC}',
       currentAmount: '78000',
       targetAmount: '90000',
-      deadline: 'Dec 2026',
+      deadline: '2026-12-31',
       year: 2026,
       category: 'Career',
       monthlyContribution: '0',
@@ -941,7 +925,7 @@ await db.insert(goals).values(
       emoji: '\u{1F4C8}',
       currentAmount: '1000',
       targetAmount: '6000',
-      deadline: 'Dec 2026',
+      deadline: '2026-12-31',
       year: 2026,
       category: 'Investing',
       monthlyContribution: '0',
@@ -959,7 +943,7 @@ await db.insert(goals).values(
       emoji: '\u{1F4CA}',
       currentAmount: '52700',
       targetAmount: '75000',
-      deadline: 'Dec 2026',
+      deadline: '2026-12-31',
       year: 2026,
       category: 'Investing',
       monthlyContribution: '0',
@@ -974,7 +958,7 @@ await db.insert(goals).values(
       emoji: '\u{1F3C6}',
       currentAmount: '445000',
       targetAmount: '500000',
-      deadline: 'Dec 2026',
+      deadline: '2026-12-31',
       year: 2026,
       category: 'Wealth',
       monthlyContribution: '0',
@@ -989,7 +973,7 @@ await db.insert(goals).values(
       emoji: '\u{1F4DA}',
       currentAmount: '1',
       targetAmount: '4',
-      deadline: 'Dec 2026',
+      deadline: '2026-12-31',
       year: 2026,
       category: 'Annual',
       monthlyContribution: '0',
@@ -1004,7 +988,7 @@ await db.insert(goals).values(
       emoji: '\u{1F37D}\u{FE0F}',
       currentAmount: '187',
       targetAmount: '150',
-      deadline: 'Dec 2026',
+      deadline: '2026-12-31',
       year: 2026,
       category: 'Annual',
       monthlyContribution: '0',
@@ -1020,7 +1004,7 @@ await db.insert(goals).values(
       emoji: '\u{1F334}',
       currentAmount: '5000',
       targetAmount: '5000',
-      deadline: 'Dec 2025',
+      deadline: '2025-12-31',
       year: 2025,
       category: 'Savings',
       monthlyContribution: '400',
@@ -1034,7 +1018,7 @@ await db.insert(goals).values(
       emoji: '\u{1F1E6}\u{1F1FA}',
       currentAmount: '3600',
       targetAmount: '3600',
-      deadline: 'Dec 2025',
+      deadline: '2025-12-31',
       year: 2025,
       category: 'Investing',
       monthlyContribution: '0',

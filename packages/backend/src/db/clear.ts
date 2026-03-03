@@ -11,7 +11,6 @@ import {
   mortgages,
   mortgageTransactions,
   payslips,
-  salaryHistory,
   goals,
   budgetCategories,
   budgetTransactions,
@@ -39,7 +38,6 @@ await db.delete(pensionPots);
 await db.delete(mortgageTransactions);
 await db.delete(mortgages);
 await db.delete(payslips);
-await db.delete(salaryHistory);
 await db.delete(goals);
 console.log('All tables cleared.');
 process.exit(0);

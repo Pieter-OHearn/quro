@@ -1,17 +1,8 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { CURRENCY_CODES, CURRENCY_META, type CurrencyCode } from '@quro/shared';
 
-export type CurrencyCode = 'EUR' | 'GBP' | 'USD' | 'AUD' | 'NZD' | 'CAD' | 'CHF' | 'SGD';
-
-export const CURRENCY_META: Record<CurrencyCode, { symbol: string; name: string; flag: string }> = {
-  EUR: { symbol: '€', name: 'Euro', flag: '🇪🇺' },
-  GBP: { symbol: '£', name: 'British Pound', flag: '🇬🇧' },
-  USD: { symbol: '$', name: 'US Dollar', flag: '🇺🇸' },
-  AUD: { symbol: 'A$', name: 'Australian Dollar', flag: '🇦🇺' },
-  NZD: { symbol: 'NZ$', name: 'New Zealand Dollar', flag: '🇳🇿' },
-  CAD: { symbol: 'CA$', name: 'Canadian Dollar', flag: '🇨🇦' },
-  CHF: { symbol: 'CHF', name: 'Swiss Franc', flag: '🇨🇭' },
-  SGD: { symbol: 'S$', name: 'Singapore Dollar', flag: '🇸🇬' },
-};
+export { CURRENCY_CODES, CURRENCY_META };
+export type { CurrencyCode };
 
 /**
  * Rates expressed as: 1 unit of this currency = X EUR
@@ -31,50 +22,55 @@ export const RATES_TO_EUR: Record<CurrencyCode, number> = {
   SGD: 0.68,
 };
 
-export const CURRENCY_LIST = Object.keys(CURRENCY_META) as CurrencyCode[];
-
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 type CurrencyContextType = {
   baseCurrency: CurrencyCode;
   setBaseCurrency: (c: CurrencyCode) => void;
   /** Convert an amount from any currency into the base currency */
-  convertToBase: (amount: number, fromCurrency: CurrencyCode) => number;
+  convertToBase: (amount: number, fromCurrency: string) => number;
   /** Format an amount (already in `fromCurrency`) displayed in the base currency */
-  fmtBase: (amount: number, fromCurrency?: CurrencyCode, decimals?: boolean) => string;
+  fmtBase: (amount: number, fromCurrency?: string, decimals?: boolean) => string;
   /** Format an amount in its own native currency */
-  fmtNative: (amount: number, currency: CurrencyCode, decimals?: boolean) => string;
+  fmtNative: (amount: number, currency: string, decimals?: boolean) => string;
   /** True when fromCurrency ≠ baseCurrency */
-  isForeign: (currency: CurrencyCode) => boolean;
+  isForeign: (currency: string) => boolean;
 };
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
+const CURRENCY_SET = new Set<CurrencyCode>(CURRENCY_CODES);
+
+function normalizeCurrency(currency: string): CurrencyCode {
+  if (CURRENCY_SET.has(currency as CurrencyCode)) return currency as CurrencyCode;
+  return 'EUR';
+}
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>('EUR');
 
-  const convertToBase = (amount: number, fromCurrency: CurrencyCode): number => {
-    const amountInEUR = amount * RATES_TO_EUR[fromCurrency];
+  const convertToBase = (amount: number, fromCurrency: string): number => {
+    const safeCurrency = normalizeCurrency(fromCurrency);
+    const amountInEUR = amount * RATES_TO_EUR[safeCurrency];
     return amountInEUR / RATES_TO_EUR[baseCurrency];
   };
 
-  const fmtCurrency = (amount: number, currency: CurrencyCode, decimals = false): string =>
+  const fmtCurrency = (amount: number, currency: string, decimals = false): string =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency,
+      currency: normalizeCurrency(currency),
       minimumFractionDigits: decimals ? 2 : 0,
       maximumFractionDigits: decimals ? 2 : 0,
     }).format(amount);
 
-  const fmtBase = (amount: number, fromCurrency?: CurrencyCode, decimals = false): string => {
+  const fmtBase = (amount: number, fromCurrency?: string, decimals = false): string => {
     const converted = fromCurrency ? convertToBase(amount, fromCurrency) : amount;
     return fmtCurrency(converted, baseCurrency, decimals);
   };
 
-  const fmtNative = (amount: number, currency: CurrencyCode, decimals = false): string =>
+  const fmtNative = (amount: number, currency: string, decimals = false): string =>
     fmtCurrency(amount, currency, decimals);
 
-  const isForeign = (currency: CurrencyCode) => currency !== baseCurrency;
+  const isForeign = (currency: string) => normalizeCurrency(currency) !== baseCurrency;
 
   return (
     <CurrencyContext.Provider

@@ -20,7 +20,8 @@ import {
   ChevronDown,
   Check,
 } from 'lucide-react';
-import { useCurrency, CURRENCY_META, CURRENCY_LIST, CurrencyCode } from '@/lib/CurrencyContext';
+import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContext';
+import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { useAuth } from '@/lib/AuthContext';
 import { QuroLogo } from '@/components/ui/QuroLogo';
 
@@ -49,7 +50,7 @@ function CurrencyDropdown({ baseCurrency, onSelect }: CurrencyDropdownProps) {
         <p className="text-xs text-slate-500 mt-0.5">All totals convert to this</p>
       </div>
       <div className="py-1.5 max-h-72 overflow-y-auto">
-        {CURRENCY_LIST.map((code: CurrencyCode) => {
+        {CURRENCY_CODES.map((code: CurrencyCode) => {
           const m = CURRENCY_META[code];
           const isSelected = code === baseCurrency;
           return (

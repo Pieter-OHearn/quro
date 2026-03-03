@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { CURRENCY_LIST, type CurrencyCode } from '@/lib/CurrencyContext';
+import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import type { Mortgage as MortgageType, Property } from '@quro/shared';
 import { useAddMortgageForm } from '../hooks';
 import type { MortgageFormPayload, MortgageFormState } from '../types';
@@ -50,7 +50,7 @@ function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
           value={form.currency}
           onChange={(e) => setField('currency', e.target.value as CurrencyCode)}
         >
-          {CURRENCY_LIST.map((currency) => (
+          {CURRENCY_CODES.map((currency) => (
             <option key={currency} value={currency}>
               {currency}
             </option>

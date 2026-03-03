@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CURRENCY_LIST, type CurrencyCode, useCurrency } from '@/lib/CurrencyContext';
+import { CURRENCY_CODES, type CurrencyCode, useCurrency } from '@/lib/CurrencyContext';
 import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
 import type { Property } from '@quro/shared';
 
@@ -103,7 +103,7 @@ function PropertyIdentityFields({ form, errors, onSet }: PropertyFormFieldsProps
           <SelectInput
             value={form.currency}
             onChange={(value) => onSet('currency', value)}
-            options={CURRENCY_LIST}
+            options={[...CURRENCY_CODES]}
           />
         </FormField>
       </div>

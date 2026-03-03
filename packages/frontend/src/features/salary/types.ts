@@ -1,7 +1,7 @@
-import type { Payslip, SalaryHistory } from '@quro/shared';
+import type { CurrencyCode, Payslip, SalaryHistory } from '@quro/shared';
 import type { LucideIcon } from 'lucide-react';
 
-export type FmtFn = (value: number) => string;
+export type FmtFn = (value: number, fromCurrency?: CurrencyCode) => string;
 
 export type SalaryStatCard = {
   label: string;
@@ -16,7 +16,7 @@ export type SalaryChartEntry = {
   gross: number;
 };
 
-export type SalaryHistoryEntry = Pick<SalaryHistory, 'year' | 'annualSalary'>;
+export type SalaryHistoryEntry = Pick<SalaryHistory, 'year' | 'annualSalary' | 'currency'>;
 
 export type PayslipFormState = {
   month: string;
@@ -25,6 +25,7 @@ export type PayslipFormState = {
   tax: string;
   pension: string;
   bonus: string;
+  currency: CurrencyCode;
 };
 
 export type PayslipFieldErrorMap = Record<string, string>;

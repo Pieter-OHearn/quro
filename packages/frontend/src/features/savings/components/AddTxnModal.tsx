@@ -12,6 +12,11 @@ import type { SavingsAccount } from '@quro/shared';
 import { TXN_META, TXN_TYPE_LIST } from '../constants';
 import type { SaveTransactionInput, TxnType } from '../types';
 
+function toFiniteNumber(value: number): number {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : 0;
+}
+
 type AddTxnModalProps = {
   account: SavingsAccount;
   onClose: () => void;
@@ -26,7 +31,10 @@ type BalancePreviewProps = {
 };
 
 function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProps) {
-  const newBalance = type === 'withdrawal' ? account.balance - parsed : account.balance + parsed;
+  const currentBalance = toFiniteNumber(account.balance);
+  const signedAmount = type === 'withdrawal' ? -Math.abs(parsed) : Math.abs(parsed);
+  const newBalance = currentBalance + signedAmount;
+
   return (
     <div
       className={`rounded-xl p-4 border ${type === 'withdrawal' ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}
@@ -38,7 +46,7 @@ function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProp
         </span>
       </div>
       <div className="flex items-center gap-2 text-xs text-slate-500">
-        <span>{fmtNative(account.balance, account.currency, true)}</span>
+        <span>{fmtNative(currentBalance, account.currency, true)}</span>
         <span>{type === 'withdrawal' ? '\u2212' : '+'}</span>
         <span className={TXN_META[type].color}>{fmtNative(parsed, account.currency, true)}</span>
         <span>=</span>
@@ -60,13 +68,14 @@ function useAddTxnForm(
   const [error, setError] = useState('');
 
   const parsed = parseFloat(amount) || 0;
+  const accountBalance = toFiniteNumber(account.balance);
 
   function handleSave(): void {
     if (!amount || isNaN(parsed) || parsed <= 0) {
       setError('Enter a valid amount');
       return;
     }
-    if (type === 'withdrawal' && parsed > account.balance) {
+    if (type === 'withdrawal' && parsed > accountBalance) {
       setError('Amount exceeds account balance');
       return;
     }
