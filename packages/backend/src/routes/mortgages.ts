@@ -64,6 +64,38 @@ async function fetchLinkedProperty(
   return { ok: true, property };
 }
 
+async function resolveLinkedProperty(
+  rawLinkedPropertyId: unknown,
+  currentPropertyId: number | null,
+  userId: number,
+  mortgageId: number,
+): Promise<
+  | { ok: true; nextId: number | null; property: LinkedProperty | null }
+  | { ok: false; error: string; status: number }
+> {
+  const nextIdResult = resolveNextPropertyId(rawLinkedPropertyId, currentPropertyId);
+  if (!nextIdResult.ok)
+    return { ok: false, error: nextIdResult.error, status: HTTP_STATUS.BAD_REQUEST };
+  const nextId = nextIdResult.id;
+  if (nextId == null) return { ok: true, nextId: null, property: null };
+  const result = await fetchLinkedProperty(userId, nextId, mortgageId);
+  if (!result.ok) return { ok: false, error: result.error, status: result.status };
+  return { ok: true, nextId, property: result.property };
+}
+
+function buildMortgageUpdates(
+  safeBody: Readonly<Record<string, unknown>>,
+  property: LinkedProperty | null,
+): Record<string, unknown> {
+  const updates: Record<string, unknown> = { ...safeBody };
+  if (property) {
+    updates.propertyAddress = property.address;
+    updates.currency = property.currency;
+    if (updates.propertyValue === undefined) updates.propertyValue = property.currentValue;
+  }
+  return updates;
+}
+
 async function syncLinkedProperty(
   userId: number,
   prevId: number | null,
@@ -167,28 +199,11 @@ app.patch('/:id', async (c) => {
     .from(properties)
     .where(and(eq(properties.userId, user.id), eq(properties.mortgageId, id)));
 
-  const nextIdResult = resolveNextPropertyId(
-    rawLinkedPropertyId,
-    currentLinkedProperty?.id ?? null,
-  );
-  if (!nextIdResult.ok) return c.json({ error: nextIdResult.error }, HTTP_STATUS.BAD_REQUEST);
-  const nextLinkedPropertyId = nextIdResult.id;
+  const currentPropertyId = currentLinkedProperty?.id ?? null;
+  const resolved = await resolveLinkedProperty(rawLinkedPropertyId, currentPropertyId, user.id, id);
+  if (!resolved.ok) return c.json({ error: resolved.error }, resolved.status);
 
-  let nextLinkedProperty: LinkedProperty | null = null;
-  if (nextLinkedPropertyId != null) {
-    const result = await fetchLinkedProperty(user.id, nextLinkedPropertyId, id);
-    if (!result.ok) return c.json({ error: result.error }, result.status);
-    nextLinkedProperty = result.property;
-  }
-
-  const updates: Record<string, unknown> = { ...safeBody };
-  if (nextLinkedProperty) {
-    updates.propertyAddress = nextLinkedProperty.address;
-    updates.currency = nextLinkedProperty.currency;
-    if (updates.propertyValue === undefined)
-      updates.propertyValue = nextLinkedProperty.currentValue;
-  }
-
+  const updates = buildMortgageUpdates(safeBody, resolved.property);
   const [data] = await db
     .update(mortgages)
     .set(updates as any)
@@ -198,8 +213,8 @@ app.patch('/:id', async (c) => {
 
   await syncLinkedProperty(
     user.id,
-    currentLinkedProperty?.id ?? null,
-    nextLinkedPropertyId,
+    currentPropertyId,
+    resolved.nextId,
     id,
     updates.outstandingBalance ?? data.outstandingBalance,
   );

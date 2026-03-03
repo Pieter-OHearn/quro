@@ -18,6 +18,35 @@ const MAX_WIDTH_MAP = {
   xl: 'max-w-xl',
 } as const;
 
+type ModalHeaderProps = {
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  scrollable?: boolean;
+};
+
+function ModalHeader({ title, subtitle, onClose, scrollable }: ModalHeaderProps) {
+  return (
+    <div
+      className={cn(
+        'bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between',
+        scrollable && 'flex-shrink-0',
+      )}
+    >
+      <div>
+        <h2 className="font-bold text-white">{title}</h2>
+        {subtitle && <p className="text-xs text-indigo-300 mt-0.5">{subtitle}</p>}
+      </div>
+      <button
+        onClick={onClose}
+        className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+      >
+        <X size={18} />
+      </button>
+    </div>
+  );
+}
+
 export function Modal({
   title,
   subtitle,
@@ -37,23 +66,7 @@ export function Modal({
           scrollable && 'flex flex-col max-h-[90vh]',
         )}
       >
-        <div
-          className={cn(
-            'bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between',
-            scrollable && 'flex-shrink-0',
-          )}
-        >
-          <div>
-            <h2 className="font-bold text-white">{title}</h2>
-            {subtitle && <p className="text-xs text-indigo-300 mt-0.5">{subtitle}</p>}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
+        <ModalHeader title={title} subtitle={subtitle} onClose={onClose} scrollable={scrollable} />
         <div className={cn('p-6 space-y-5', scrollable && 'overflow-y-auto')}>{children}</div>
         {footer && (
           <div

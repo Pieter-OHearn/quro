@@ -61,27 +61,42 @@ const normalizeGoalType = (value: GoalType | string | null | undefined): GoalTyp
   return GOAL_TYPES.includes(value as GoalType) ? (value as GoalType) : 'savings';
 };
 
-const normalizeGoal = (goal: ApiGoal): Goal => ({
-  ...goal,
+const resolveGoalYear = (goal: ApiGoal): number =>
+  toNullableInteger(goal.year) ?? inferYearFromDeadline(goal.deadline) ?? new Date().getFullYear();
+
+const resolveMonthlyTarget = (value: ApiGoal['monthlyTarget']): number | null =>
+  value == null ? null : toNumber(value);
+
+const normalizeGoalMeta = (goal: ApiGoal) => ({
   type: normalizeGoalType(goal.type),
   name: goal.name?.trim() || 'Untitled Goal',
   emoji: goal.emoji || '🎯',
-  currentAmount: toNumber(goal.currentAmount),
-  targetAmount: toNumber(goal.targetAmount),
   deadline: goal.deadline?.trim() || 'TBD',
-  year:
-    toNullableInteger(goal.year) ??
-    inferYearFromDeadline(goal.deadline) ??
-    new Date().getFullYear(),
   category: goal.category?.trim() || 'Other',
-  monthlyContribution: toNumber(goal.monthlyContribution),
-  monthlyTarget: goal.monthlyTarget == null ? null : toNumber(goal.monthlyTarget),
-  monthsCompleted: toNullableInteger(goal.monthsCompleted),
-  totalMonths: toNullableInteger(goal.totalMonths),
+});
+
+const normalizeGoalDisplay = (goal: ApiGoal) => ({
   unit: goal.unit ?? null,
   color: goal.color || '#6366f1',
   notes: goal.notes || '',
   currency: goal.currency || 'EUR',
+});
+
+const normalizeGoalNumbers = (goal: ApiGoal) => ({
+  currentAmount: toNumber(goal.currentAmount),
+  targetAmount: toNumber(goal.targetAmount),
+  year: resolveGoalYear(goal),
+  monthlyContribution: toNumber(goal.monthlyContribution),
+  monthlyTarget: resolveMonthlyTarget(goal.monthlyTarget),
+  monthsCompleted: toNullableInteger(goal.monthsCompleted),
+  totalMonths: toNullableInteger(goal.totalMonths),
+});
+
+const normalizeGoal = (goal: ApiGoal): Goal => ({
+  ...goal,
+  ...normalizeGoalMeta(goal),
+  ...normalizeGoalDisplay(goal),
+  ...normalizeGoalNumbers(goal),
 });
 
 export type CreateGoalInput = Omit<Goal, 'id'>;

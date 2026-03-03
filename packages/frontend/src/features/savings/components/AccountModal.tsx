@@ -54,6 +54,29 @@ function validateAccountForm(form: FormState): Record<string, string> {
   return errs;
 }
 
+function initialFormState(existing?: SavingsAccount): FormState {
+  if (!existing) {
+    return {
+      name: '',
+      bank: '',
+      balance: '',
+      currency: 'EUR',
+      rate: '',
+      type: 'Easy Access',
+      emoji: '\ud83c\udfe6',
+    };
+  }
+  return {
+    name: existing.name,
+    bank: existing.bank,
+    balance: existing.balance.toString(),
+    currency: existing.currency as CurrencyCode,
+    rate: existing.interestRate.toString(),
+    type: existing.accountType as 'Easy Access' | 'Term Deposit',
+    emoji: existing.emoji,
+  };
+}
+
 function InterestPreview({
   balance,
   rate,
@@ -84,7 +107,7 @@ type AccountFormBodyProps = {
   set: (field: string, value: string) => void;
 };
 
-function AccountFormBody({ form, errors, set }: AccountFormBodyProps) {
+function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
   return (
     <>
       <div className="flex gap-3">
@@ -110,6 +133,13 @@ function AccountFormBody({ form, errors, set }: AccountFormBodyProps) {
           placeholder="e.g. Rabobank"
         />
       </FormField>
+    </>
+  );
+}
+
+function AccountAmountFields({ form, errors, set }: AccountFormBodyProps) {
+  return (
+    <>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Opening Balance" required error={errors.balance}>
           <TextInput
@@ -143,21 +173,26 @@ function AccountFormBody({ form, errors, set }: AccountFormBodyProps) {
           <SelectInput value={form.type} onChange={(v) => set('type', v)} options={ACCOUNT_TYPES} />
         </FormField>
       </div>
+    </>
+  );
+}
+
+function AccountFormBody({ form, errors, set }: AccountFormBodyProps) {
+  return (
+    <>
+      <AccountBasicFields form={form} errors={errors} set={set} />
+      <AccountAmountFields form={form} errors={errors} set={set} />
       <InterestPreview balance={form.balance} rate={form.rate} currency={form.currency} />
     </>
   );
 }
 
-export function AccountModal({ existing, onClose, onSave, onDelete }: AccountModalProps) {
-  const [form, setForm] = useState<FormState>({
-    name: existing?.name ?? '',
-    bank: existing?.bank ?? '',
-    balance: existing?.balance.toString() ?? '',
-    currency: (existing?.currency ?? 'EUR') as CurrencyCode,
-    rate: existing?.interestRate.toString() ?? '',
-    type: (existing?.accountType ?? 'Easy Access') as 'Easy Access' | 'Term Deposit',
-    emoji: existing?.emoji ?? '\ud83c\udfe6',
-  });
+function useAccountModalForm(
+  existing: SavingsAccount | undefined,
+  onSave: (a: Omit<SavingsAccount, 'id'> & { id?: number }) => void,
+  onClose: () => void,
+) {
+  const [form, setForm] = useState<FormState>(initialFormState(existing));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function set(field: string, value: string): void {
@@ -189,6 +224,12 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
     });
     onClose();
   }
+
+  return { form, errors, set, handleSave };
+}
+
+export function AccountModal({ existing, onClose, onSave, onDelete }: AccountModalProps) {
+  const { form, errors, set, handleSave } = useAccountModalForm(existing, onSave, onClose);
 
   const deleteButton =
     existing && onDelete ? (

@@ -91,5 +91,5 @@ Contains TypeScript types used by both frontend and backend. Imported as `@quro/
 ## Code Conventions
 
 - **ESLint rules to be aware of:** max 50 lines per function, max complexity 10, no floating promises, `readonly` preferred for params, strict equality required. Run `bun run lint` before committing.
-- **Prettier:** single quotes, 2-space indent, trailing commas everywhere, 100-char print width, LF line endings.
+- **Prettier:** single quotes, 2-space indent, trailing commas everywhere, 100-char print width, LF line endings. Run `bun run format` before committing to auto-fix formatting, then verify with `bun run format:check` — both must pass before pushing.
 - **TypeScript:** strict mode enabled in all packages.

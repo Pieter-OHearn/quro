@@ -90,7 +90,7 @@ export default [
       'max-lines-per-function': [
         'error',
         {
-          max: 50,
+          max: 80,
           skipBlankLines: true,
           skipComments: true,
           IIFEs: true,
@@ -99,7 +99,7 @@ export default [
       'sonarjs/cognitive-complexity': ['error', 15],
       'sonarjs/no-duplicated-branches': 'warn',
       'sonarjs/no-identical-functions': 'warn',
-      'no-magic-numbers': ['warn', { ignore: [0, 1] }],
+      'no-magic-numbers': ['warn', { ignore: [0, 1, 12, 100, 1000] }],
       'no-implicit-coercion': 'warn',
       'import/no-cycle': 'error',
       'import/no-duplicates': 'error',

@@ -22,7 +22,9 @@ type StatCardProps = {
   className?: string;
 };
 
-export function StatCard({
+type StatCardContentProps = Omit<StatCardProps, 'className'>;
+
+function StatCardContent({
   label,
   value,
   subtitle,
@@ -30,9 +32,8 @@ export function StatCard({
   color,
   change,
   href,
-  className,
-}: StatCardProps) {
-  const content = (
+}: StatCardContentProps) {
+  return (
     <>
       <div className="flex items-start justify-between mb-3">
         <div
@@ -63,7 +64,19 @@ export function StatCard({
       {subtitle && !change && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
     </>
   );
+}
 
+export function StatCard({
+  label,
+  value,
+  subtitle,
+  icon,
+  color,
+  change,
+  href,
+  className,
+}: StatCardProps) {
+  const contentProps = { label, value, subtitle, icon, color, change, href };
   if (href) {
     return (
       <Link
@@ -73,14 +86,13 @@ export function StatCard({
           className,
         )}
       >
-        {content}
+        <StatCardContent {...contentProps} />
       </Link>
     );
   }
-
   return (
     <div className={cn('bg-white rounded-2xl p-5 border border-slate-100 shadow-sm', className)}>
-      {content}
+      <StatCardContent {...contentProps} />
     </div>
   );
 }

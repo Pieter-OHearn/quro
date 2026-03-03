@@ -22,28 +22,31 @@ type HoldingForm = {
   initDate: string;
 };
 
-function validateHoldingForm(
-  form: HoldingForm,
-  existing: Holding | undefined,
-): Record<string, string> {
+function validateBaseFields(form: Readonly<HoldingForm>): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.name.trim()) errs.name = 'Required';
   if (!form.ticker.trim()) errs.ticker = 'Required';
   if (!form.currentPrice || isNaN(parseFloat(form.currentPrice))) errs.currentPrice = 'Required';
+  return errs;
+}
 
+function validateInitialBuy(form: Readonly<HoldingForm>): Record<string, string> {
+  const errs: Record<string, string> = {};
+  const shares = parseFloat(form.initShares);
+  const price = parseFloat(form.initPrice);
+  if (!form.initShares || isNaN(shares) || shares <= 0) errs.initShares = 'Required';
+  if (!form.initPrice || isNaN(price) || price <= 0) errs.initPrice = 'Required';
+  return errs;
+}
+
+function validateHoldingForm(
+  form: Readonly<HoldingForm>,
+  existing: Holding | undefined,
+): Record<string, string> {
+  const errs = validateBaseFields(form);
   if (!existing) {
-    if (
-      !form.initShares ||
-      isNaN(parseFloat(form.initShares)) ||
-      parseFloat(form.initShares) <= 0
-    ) {
-      errs.initShares = 'Required';
-    }
-    if (!form.initPrice || isNaN(parseFloat(form.initPrice)) || parseFloat(form.initPrice) <= 0) {
-      errs.initPrice = 'Required';
-    }
+    Object.assign(errs, validateInitialBuy(form));
   }
-
   return errs;
 }
 
@@ -102,18 +105,123 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
   );
 }
 
-export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHoldingModalProps) {
-  const [form, setForm] = useState<HoldingForm>({
-    name: existing?.name ?? '',
-    ticker: existing?.ticker ?? '',
-    currency: (existing?.currency ?? 'EUR') as CurrencyCode,
-    sector: existing?.sector ?? 'ETF',
-    currentPrice: existing?.currentPrice.toString() ?? '',
+type HoldingBaseFieldsProps = {
+  form: HoldingForm;
+  errors: Record<string, string>;
+  onChange: (field: string, value: string) => void;
+};
+
+function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <FormField label="Security Name" required error={errors.name} className="col-span-2">
+        <TextInput
+          value={form.name}
+          onChange={(value) => onChange('name', value)}
+          error={Boolean(errors.name)}
+          placeholder="e.g. Vanguard FTSE All-World"
+        />
+      </FormField>
+      <FormField label="Ticker" required error={errors.ticker}>
+        <TextInput
+          value={form.ticker}
+          onChange={(value) => onChange('ticker', value)}
+          error={Boolean(errors.ticker)}
+          placeholder="VWCE"
+        />
+      </FormField>
+      <FormField label="Sector">
+        <TextInput
+          value={form.sector}
+          onChange={(value) => onChange('sector', value)}
+          placeholder="ETF, Tech, Finance..."
+        />
+      </FormField>
+      <FormField label="Currency">
+        <SelectInput
+          value={form.currency}
+          onChange={(value) => onChange('currency', value)}
+          options={CURRENCY_LIST}
+        />
+      </FormField>
+      <FormField label="Current Price" required error={errors.currentPrice}>
+        <TextInput
+          type="number"
+          step="0.01"
+          value={form.currentPrice}
+          onChange={(value) => onChange('currentPrice', value)}
+          error={Boolean(errors.currentPrice)}
+          placeholder="112.50"
+        />
+      </FormField>
+    </div>
+  );
+}
+
+function buildHolding(form: HoldingForm, existing: Holding | undefined): Holding {
+  return {
+    id: existing?.id ?? Date.now(),
+    name: form.name.trim(),
+    ticker: form.ticker.trim().toUpperCase(),
+    currentPrice: parseFloat(form.currentPrice),
+    currency: form.currency,
+    sector: form.sector || 'Other',
+  };
+}
+
+function buildInitialForm(existing: Holding | undefined): HoldingForm {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!existing) {
+    return {
+      name: '',
+      ticker: '',
+      currency: 'EUR' as CurrencyCode,
+      sector: 'ETF',
+      currentPrice: '',
+      initShares: '',
+      initPrice: '',
+      initDate: today,
+    };
+  }
+  return {
+    name: existing.name,
+    ticker: existing.ticker,
+    currency: existing.currency as CurrencyCode,
+    sector: existing.sector,
+    currentPrice: existing.currentPrice.toString(),
     initShares: '',
     initPrice: '',
-    initDate: new Date().toISOString().slice(0, 10),
-  });
+    initDate: today,
+  };
+}
+
+function buildDeleteButton(
+  existing: Holding | undefined,
+  onDelete: ((id: number) => void) | undefined,
+  onClose: () => void,
+): React.ReactNode {
+  if (!existing || !onDelete) return undefined;
+  return (
+    <button
+      onClick={() => {
+        onDelete(existing.id);
+        onClose();
+      }}
+      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
+      title="Delete holding"
+    >
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
+export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHoldingModalProps) {
+  const [form, setForm] = useState<HoldingForm>(() => buildInitialForm(existing));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const isNew = !existing;
+  const modalTitle = isNew ? 'Add Holding' : 'Edit Holding';
+  const modalSubtitle = isNew ? 'Add a stock, ETF or fund' : 'Update details';
+  const confirmLabel = isNew ? 'Add Holding' : 'Save Changes';
 
   function set(field: string, value: string): void {
     setForm((previous) => ({ ...previous, [field]: value }));
@@ -122,110 +230,37 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
 
   function handleSave() {
     const errs = validateHoldingForm(form, existing);
-
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
-
-    const holding: Holding = {
-      id: existing?.id ?? Date.now(),
-      name: form.name.trim(),
-      ticker: form.ticker.trim().toUpperCase(),
-      currentPrice: parseFloat(form.currentPrice),
-      currency: form.currency,
-      sector: form.sector || 'Other',
-    };
-
-    onSave(
-      holding,
-      !existing
-        ? {
-            shares: parseFloat(form.initShares),
-            price: parseFloat(form.initPrice),
-            date: form.initDate,
-          }
-        : undefined,
-    );
+    const initialBuy = isNew
+      ? {
+          shares: parseFloat(form.initShares),
+          price: parseFloat(form.initPrice),
+          date: form.initDate,
+        }
+      : undefined;
+    onSave(buildHolding(form, existing), initialBuy);
     onClose();
   }
 
-  const deleteButton =
-    existing && onDelete ? (
-      <button
-        onClick={() => {
-          onDelete(existing.id);
-          onClose();
-        }}
-        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-        title="Delete holding"
-      >
-        <Trash2 size={14} />
-      </button>
-    ) : undefined;
-
   return (
     <Modal
-      title={existing ? 'Edit Holding' : 'Add Holding'}
-      subtitle={existing ? 'Update details' : 'Add a stock, ETF or fund'}
+      title={modalTitle}
+      subtitle={modalSubtitle}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel={existing ? 'Save Changes' : 'Add Holding'}
-          danger={deleteButton}
+          confirmLabel={confirmLabel}
+          danger={buildDeleteButton(existing, onDelete, onClose)}
         />
       }
     >
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Security Name" required error={errors.name} className="col-span-2">
-          <TextInput
-            value={form.name}
-            onChange={(value) => set('name', value)}
-            error={Boolean(errors.name)}
-            placeholder="e.g. Vanguard FTSE All-World"
-          />
-        </FormField>
-
-        <FormField label="Ticker" required error={errors.ticker}>
-          <TextInput
-            value={form.ticker}
-            onChange={(value) => set('ticker', value)}
-            error={Boolean(errors.ticker)}
-            placeholder="VWCE"
-          />
-        </FormField>
-
-        <FormField label="Sector">
-          <TextInput
-            value={form.sector}
-            onChange={(value) => set('sector', value)}
-            placeholder="ETF, Tech, Finance..."
-          />
-        </FormField>
-
-        <FormField label="Currency">
-          <SelectInput
-            value={form.currency}
-            onChange={(value) => set('currency', value)}
-            options={CURRENCY_LIST}
-          />
-        </FormField>
-
-        <FormField label="Current Price" required error={errors.currentPrice}>
-          <TextInput
-            type="number"
-            step="0.01"
-            value={form.currentPrice}
-            onChange={(value) => set('currentPrice', value)}
-            error={Boolean(errors.currentPrice)}
-            placeholder="112.50"
-          />
-        </FormField>
-      </div>
-
-      {!existing && (
+      <HoldingBaseFields form={form} errors={errors} onChange={set} />
+      {isNew && (
         <InitialBuySection form={form} errors={errors} currency={form.currency} onChange={set} />
       )}
     </Modal>

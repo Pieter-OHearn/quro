@@ -47,6 +47,71 @@ function PropertyStatsPreview({
   );
 }
 
+function useUpdatePropertyForm(property: Property) {
+  const [value, setValue] = useState(property.currentValue.toString());
+  const [rent, setRent] = useState(property.monthlyRent.toString());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const numericValue = parseFloat(value) || 0;
+  const equity = numericValue - 0; // mortgage balance is passed in separately
+  const appreciation = numericValue - property.purchasePrice;
+  const appreciationPct =
+    ((numericValue || property.currentValue) / property.purchasePrice - 1) * 100;
+
+  function handleValueChange(next: string) {
+    setValue(next);
+    setErrors((previous) => ({ ...previous, value: '' }));
+  }
+
+  return {
+    value,
+    rent,
+    errors,
+    numericValue,
+    equity,
+    appreciation,
+    appreciationPct,
+    setRent,
+    setErrors,
+    handleValueChange,
+  };
+}
+
+type MortgageBalanceFieldProps = {
+  mortgageBalance: number;
+  currency: string;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+function MortgageBalanceField({ mortgageBalance, currency, fmtNative }: MortgageBalanceFieldProps) {
+  return (
+    <FormField label="Linked Mortgage Balance">
+      <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+        {mortgageBalance > 0 ? fmtNative(mortgageBalance, currency) : 'No mortgage linked yet'}
+      </div>
+      <p className="text-xs text-slate-400 mt-1">
+        Manage property-mortgage links in the Mortgage section.
+      </p>
+    </FormField>
+  );
+}
+
+function buildUpdateSaveHandler(
+  form: ReturnType<typeof useUpdatePropertyForm>,
+  property: Property,
+  onSave: (id: number, value: number, rent: number) => void,
+  onClose: () => void,
+) {
+  return () => {
+    if (!form.value || isNaN(parseFloat(form.value))) {
+      form.setErrors({ value: 'Required' });
+      return;
+    }
+    onSave(property.id, form.numericValue, parseFloat(form.rent) || 0);
+    onClose();
+  };
+}
+
 export function UpdatePropertyModal({
   property,
   mortgageBalance,
@@ -54,27 +119,9 @@ export function UpdatePropertyModal({
   onSave,
 }: UpdatePropertyModalProps) {
   const { fmtNative } = useCurrency();
-  const [value, setValue] = useState(property.currentValue.toString());
-  const [rent, setRent] = useState(property.monthlyRent.toString());
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const numericValue = parseFloat(value) || 0;
-  const equity = numericValue - mortgageBalance;
-  const appreciation = numericValue - property.purchasePrice;
-  const appreciationPct =
-    ((numericValue || property.currentValue) / property.purchasePrice - 1) * 100;
-
-  function handleSave() {
-    const errs: Record<string, string> = {};
-    if (!value || isNaN(parseFloat(value))) errs.value = 'Required';
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-
-    onSave(property.id, numericValue, parseFloat(rent) || 0);
-    onClose();
-  }
+  const form = useUpdatePropertyForm(property);
+  const equity = form.numericValue - mortgageBalance;
+  const handleSave = buildUpdateSaveHandler(form, property, onSave, onClose);
 
   return (
     <Modal
@@ -84,40 +131,29 @@ export function UpdatePropertyModal({
       maxWidth="sm"
       footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Update" />}
     >
-      <FormField label={`Current Value (${property.currency})`} required error={errors.value}>
+      <FormField label={`Current Value (${property.currency})`} required error={form.errors.value}>
         <TextInput
           type="number"
-          value={value}
-          onChange={(next) => {
-            setValue(next);
-            setErrors((previous) => ({ ...previous, value: '' }));
-          }}
-          error={Boolean(errors.value)}
+          value={form.value}
+          onChange={form.handleValueChange}
+          error={Boolean(form.errors.value)}
         />
         <p className="text-xs text-slate-400 mt-1">
           Previously {fmtNative(property.currentValue, property.currency)}
         </p>
       </FormField>
-
-      <FormField label="Linked Mortgage Balance">
-        <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
-          {mortgageBalance > 0
-            ? fmtNative(mortgageBalance, property.currency)
-            : 'No mortgage linked yet'}
-        </div>
-        <p className="text-xs text-slate-400 mt-1">
-          Manage property-mortgage links in the Mortgage section.
-        </p>
-      </FormField>
-
+      <MortgageBalanceField
+        mortgageBalance={mortgageBalance}
+        currency={property.currency}
+        fmtNative={fmtNative}
+      />
       <FormField label={`Monthly Rent (${property.currency})`}>
-        <TextInput type="number" value={rent} onChange={setRent} />
+        <TextInput type="number" value={form.rent} onChange={form.setRent} />
       </FormField>
-
       <PropertyStatsPreview
         equity={equity}
-        appreciation={appreciation}
-        appreciationPct={appreciationPct}
+        appreciation={form.appreciation}
+        appreciationPct={form.appreciationPct}
         currency={property.currency}
         fmtNative={fmtNative}
       />
