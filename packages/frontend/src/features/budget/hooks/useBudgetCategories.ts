@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { BudgetCategory } from '../types';
+import { normalizeBudgetCategory } from '../utils/normalizers';
 
 export function useBudgetCategories() {
   return useQuery({
     queryKey: ['budget', 'categories'],
     queryFn: async () => {
       const { data } = await api.get('/api/budget/categories');
-      return data.data as BudgetCategory[];
+      return (data.data as BudgetCategory[]).map(normalizeBudgetCategory);
     },
   });
 }

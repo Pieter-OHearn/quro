@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { BudgetTx } from '../types';
+import { normalizeBudgetTransaction } from '../utils/normalizers';
 
 export function useBudgetTransactions(categoryId?: number) {
   return useQuery({
@@ -8,7 +9,7 @@ export function useBudgetTransactions(categoryId?: number) {
     queryFn: async () => {
       const params = categoryId ? { categoryId } : {};
       const { data } = await api.get('/api/budget/transactions', { params });
-      return data.data as BudgetTx[];
+      return (data.data as BudgetTx[]).map(normalizeBudgetTransaction);
     },
   });
 }
