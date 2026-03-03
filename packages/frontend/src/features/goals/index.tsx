@@ -752,7 +752,11 @@ function AddGoalModal({ onClose, onSave }: AddGoalModalProps) {
           )}
         </div>
         {step === 'details' && (
-          <AddGoalModalFooter onClose={onClose} onSave={handleSave} canSave={!!form.name.trim()} />
+          <AddGoalModalFooter
+            onClose={onClose}
+            onSave={handleSave}
+            canSave={Boolean(form.name.trim())}
+          />
         )}
       </div>
     </div>

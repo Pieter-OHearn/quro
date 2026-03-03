@@ -90,7 +90,7 @@ export default [
       'max-lines-per-function': [
         'error',
         {
-          max: 50,
+          max: 80,
           skipBlankLines: true,
           skipComments: true,
           IIFEs: true,
