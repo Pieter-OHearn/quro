@@ -1,8 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, Sparkles } from 'lucide-react';
 import type { TxnTypeMeta } from '@/components/ui';
-import type { SavingsTransaction } from '@quro/shared';
-
-export type TxnType = 'deposit' | 'withdrawal' | 'interest';
+import type { TxnType } from './types';
 
 export const TXN_META: Record<
   TxnType,
@@ -67,10 +65,6 @@ export const MONTH_PREFIXES: { label: string; prefix: string }[] = [
   { label: 'Jan', prefix: '2026-01' },
   { label: 'Feb', prefix: '2026-02' },
 ];
-
-export function txnEffect(t: SavingsTransaction): number {
-  return t.type === 'withdrawal' ? -t.amount : t.amount;
-}
 
 export const FILTER_OPTIONS = [
   { key: 'all', label: 'All' },

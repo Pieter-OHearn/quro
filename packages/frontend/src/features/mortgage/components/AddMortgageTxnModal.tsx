@@ -1,42 +1,15 @@
-import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
-import { TXN_META, type MortgageTxnType } from './txnMeta';
+import { useMortgageTxnModal } from '../hooks';
+import type { MortgageTxnType } from '../types';
+import { MORTGAGE_TXN_TYPES, TXN_META } from '../utils/mortgage-meta';
 
 type AddMortgageTxnModalProps = {
   mortgage: MortgageType;
   onClose: () => void;
   onSave: (t: Omit<MortgageTransaction, 'id'>) => void;
 };
-
-const MAX_RATE_CHANGE_PERCENT = 25;
-
-function validateTxn(
-  type: MortgageTxnType,
-  parsedAmount: number,
-  parsedInterest: number,
-  parsedFixedYears: number,
-): string {
-  if (parsedAmount <= 0) return 'Enter a valid amount';
-  if (type === 'repayment' && parsedInterest > parsedAmount)
-    return 'Interest cannot exceed total repayment';
-  if (type === 'rate_change' && (parsedAmount <= 0 || parsedAmount > MAX_RATE_CHANGE_PERCENT))
-    return `Enter a valid interest rate (0-${MAX_RATE_CHANGE_PERCENT}%)`;
-  if (type === 'rate_change' && parsedFixedYears <= 0)
-    return 'Enter the number of years the rate is fixed for';
-  return '';
-}
-
-function computeFixedUntil(date: string, parsedFixedYears: number): string | null {
-  if (!date || parsedFixedYears <= 0) return null;
-  const d = new Date(date);
-  d.setFullYear(d.getFullYear() + Math.floor(parsedFixedYears));
-  if (parsedFixedYears % 1 !== 0) {
-    d.setMonth(d.getMonth() + Math.round((parsedFixedYears % 1) * 12));
-  }
-  return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-}
 
 // ─── Type Selector ────────────────────────────────────────────────────────────
 
@@ -50,7 +23,7 @@ function TxnTypeSelector({ type, onTypeChange }: TypeSelectorProps) {
     <div>
       <label className="block text-xs font-semibold text-slate-600 mb-2">Transaction Type</label>
       <div className="grid grid-cols-3 gap-2">
-        {(['repayment', 'valuation', 'rate_change'] as MortgageTxnType[]).map((t) => {
+        {MORTGAGE_TXN_TYPES.map((t) => {
           const meta = TXN_META[t];
           const Icon = meta.icon;
           const active = type === t;
@@ -245,84 +218,6 @@ function LivePreview(props: LivePreviewProps) {
       {type === 'rate_change' && <RateChangePreview {...props} />}
     </div>
   );
-}
-
-// ─── Custom Hook ─────────────────────────────────────────────────────────────
-
-function useMortgageTxnFormState() {
-  const [type, setType] = useState<MortgageTxnType>('repayment');
-  const [amount, setAmount] = useState('');
-  const [interest, setInterest] = useState('');
-  const [fixedYears, setFixedYears] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
-  return {
-    type,
-    setType,
-    amount,
-    setAmount,
-    interest,
-    setInterest,
-    fixedYears,
-    setFixedYears,
-    date,
-    setDate,
-    note,
-    setNote,
-    error,
-    setError,
-  };
-}
-
-function useMortgageTxnModal(
-  mortgage: MortgageType,
-  onSave: AddMortgageTxnModalProps['onSave'],
-  onClose: () => void,
-) {
-  const formState = useMortgageTxnFormState();
-  const { type, amount, interest, fixedYears, date, note } = formState;
-  const { setType, setError, setAmount, setInterest, setFixedYears } = formState;
-  const parsedAmount = parseFloat(amount) || 0;
-  const parsedInterest = parseFloat(interest) || 0;
-  const parsedFixedYears = parseFloat(fixedYears) || 0;
-  const derivedPrincipal = Math.max(0, parsedAmount - parsedInterest);
-  const computedFixedUntil = computeFixedUntil(date, parsedFixedYears);
-  const handleTypeChange = (t: MortgageTxnType) => {
-    setType(t);
-    setError('');
-    setAmount('');
-    setInterest('');
-    setFixedYears('');
-  };
-  const handleSave = () => {
-    const err = validateTxn(type, parsedAmount, parsedInterest, parsedFixedYears);
-    if (err) {
-      setError(err);
-      return;
-    }
-    onSave({
-      mortgageId: mortgage.id,
-      type,
-      amount: parsedAmount,
-      interest: type === 'repayment' ? parsedInterest : null,
-      principal: type === 'repayment' ? derivedPrincipal : null,
-      fixedYears: type === 'rate_change' ? parsedFixedYears : null,
-      date,
-      note,
-    });
-    onClose();
-  };
-  return {
-    ...formState,
-    parsedAmount,
-    parsedInterest,
-    parsedFixedYears,
-    derivedPrincipal,
-    computedFixedUntil,
-    handleTypeChange,
-    handleSave,
-  };
 }
 
 type TxnModalState = ReturnType<typeof useMortgageTxnModal>;
@@ -591,7 +486,7 @@ function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
 export function AddMortgageTxnModal({ mortgage, onClose, onSave }: AddMortgageTxnModalProps) {
   const { fmtBase } = useCurrency();
   const fmt = (v: number) => fmtBase(v);
-  const state = useMortgageTxnModal(mortgage, onSave, onClose);
+  const state = useMortgageTxnModal({ mortgage, onSave, onClose });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

@@ -1,6 +1,5 @@
 import { Home, Landmark, Percent } from 'lucide-react';
-
-export type MortgageTxnType = 'repayment' | 'valuation' | 'rate_change';
+import type { MortgageTxnType } from '../types';
 
 export const TXN_META: Record<
   MortgageTxnType,
@@ -34,3 +33,6 @@ export const TXN_META: Record<
     borderColor: 'border-amber-300',
   },
 };
+
+export const MORTGAGE_TXN_TYPES: MortgageTxnType[] = ['repayment', 'valuation', 'rate_change'];
+export const MORTGAGE_TXN_FILTER_OPTIONS = ['all', ...MORTGAGE_TXN_TYPES] as const;

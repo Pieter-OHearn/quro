@@ -7,21 +7,16 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-
-type PortfolioPoint = {
-  month: string;
-  brokerage: number;
-  propertyEquity: number;
-};
+import type { PortfolioHistoryPoint } from '../types';
 
 type PortfolioChartProps = {
-  data: PortfolioPoint[];
+  data: PortfolioHistoryPoint[];
   baseCurrency: string;
   fmtBase: (value: number, currency?: string, compact?: boolean) => string;
 };
 
 type PortfolioAreaChartProps = {
-  data: PortfolioPoint[];
+  data: PortfolioHistoryPoint[];
   fmtBase: (value: number, currency?: string, compact?: boolean) => string;
 };
 

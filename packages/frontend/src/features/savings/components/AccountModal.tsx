@@ -12,11 +12,12 @@ import {
   EmojiPickerField,
 } from '@/components/ui';
 import type { SavingsAccount } from '@quro/shared';
+import type { SaveAccountInput } from '../types';
 
 type AccountModalProps = {
   existing?: SavingsAccount;
   onClose: () => void;
-  onSave: (a: Omit<SavingsAccount, 'id'> & { id?: number }) => void;
+  onSave: (account: SaveAccountInput) => void;
   onDelete?: (id: number) => void;
 };
 
@@ -189,7 +190,7 @@ function AccountFormBody({ form, errors, set }: AccountFormBodyProps) {
 
 function useAccountModalForm(
   existing: SavingsAccount | undefined,
-  onSave: (a: Omit<SavingsAccount, 'id'> & { id?: number }) => void,
+  onSave: (account: SaveAccountInput) => void,
   onClose: () => void,
 ) {
   const [form, setForm] = useState<FormState>(initialFormState(existing));

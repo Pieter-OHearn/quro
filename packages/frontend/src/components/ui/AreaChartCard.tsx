@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { cn } from '@/lib/utils';
 
 type AreaChartCardProps<T extends Record<string, unknown>> = {
   title: string;
@@ -22,6 +23,7 @@ type AreaChartCardProps<T extends Record<string, unknown>> = {
   badge?: React.ReactNode;
   emptyMessage?: string;
   strokeWidth?: number;
+  className?: string;
 };
 
 type ChartContentProps<T extends Record<string, unknown>> = {
@@ -110,11 +112,12 @@ export function AreaChartCard<T extends Record<string, unknown>>({
   badge,
   emptyMessage = 'No data yet.',
   strokeWidth = 2.5,
+  className,
 }: AreaChartCardProps<T>) {
   const gradientId = useId().replace(/:/g, '');
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+    <div className={cn('bg-white rounded-2xl p-6 border border-slate-100 shadow-sm', className)}>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="font-semibold text-slate-900">{title}</h3>

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Filter, Plus, Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
-import { TXN_META, type MortgageTxnType } from './txnMeta';
+import type { MortgageTxnType } from '../types';
+import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
 
 type MortgageTxnHistoryProps = {
   mortgage: MortgageType;
@@ -100,7 +101,7 @@ function TxnFilterBar({ filter, onFilterChange }: TxnFilterBarProps) {
     <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-50">
       <Filter size={12} className="text-slate-400 mr-1" />
       <span className="text-xs text-slate-400 mr-2">Filter:</span>
-      {(['all', 'repayment', 'valuation', 'rate_change'] as const).map((f) => (
+      {MORTGAGE_TXN_FILTER_OPTIONS.map((f) => (
         <button
           key={f}
           onClick={() => onFilterChange(f)}

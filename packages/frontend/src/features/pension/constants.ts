@@ -1,21 +1,5 @@
 import { ArrowUpRight, CircleMinus, Landmark } from 'lucide-react';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export type PensionTxnType = 'contribution' | 'fee';
-
-export type DatedPensionTransaction = {
-  id: number;
-  potId: number;
-  type: 'contribution' | 'fee';
-  amount: number;
-  date: string;
-  note: string;
-  isEmployer: boolean | null;
-  timestamp: number;
-};
-
-// ─── TXN Meta ────────────────────────────────────────────────────────────────
+import type { PensionTxnType } from './types';
 
 export const PENSION_TXN_META: Record<
   PensionTxnType,
@@ -43,8 +27,6 @@ export const PENSION_TXN_META: Record<
   },
 };
 
-// ─── Pension Pot Types ───────────────────────────────────────────────────────
-
 export const PENSION_TYPES = [
   'Workplace',
   'SIPP',
@@ -63,20 +45,8 @@ export const TYPE_COLORS: Record<string, string> = {
 
 export const PALETTE = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#f97316', '#ec4899'];
 
-// ─── Projection Constants ─────────────────────────────────────────────────────
-
 /** Annual growth rate assumption for pension projections (5%) */
 export const ANNUAL_GROWTH_RATE = 0.05;
 
 /** Assumed years of drawdown in retirement (used for monthly drawdown estimate) */
 export const DRAWDOWN_YEARS = 25;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-export function toUtcTimestamp(isoDate: string): number {
-  return Date.parse(`${isoDate}T00:00:00Z`);
-}
-
-export function yearEndUtc(year: number): number {
-  return Date.UTC(year, 11, 31, 23, 59, 59, 999);
-}

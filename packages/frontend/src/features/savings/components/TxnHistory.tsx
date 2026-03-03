@@ -3,7 +3,7 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { TXN_META, FILTER_OPTIONS } from '../constants';
-import type { TxnType } from '../constants';
+import type { TxnType } from '../types';
 
 type TxnHistoryProps = {
   account: SavingsAccount;

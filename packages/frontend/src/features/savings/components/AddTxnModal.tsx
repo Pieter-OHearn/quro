@@ -8,14 +8,14 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import type { SavingsAccount } from '@quro/shared';
 import { TXN_META, TXN_TYPE_LIST } from '../constants';
-import type { TxnType } from '../constants';
+import type { SaveTransactionInput, TxnType } from '../types';
 
 type AddTxnModalProps = {
   account: SavingsAccount;
   onClose: () => void;
-  onSave: (t: Omit<SavingsTransaction, 'id'>) => void;
+  onSave: (transaction: SaveTransactionInput) => void;
 };
 
 type BalancePreviewProps = {
@@ -50,7 +50,7 @@ function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProp
 
 function useAddTxnForm(
   account: SavingsAccount,
-  onSave: (t: Omit<SavingsTransaction, 'id'>) => void,
+  onSave: (transaction: SaveTransactionInput) => void,
   onClose: () => void,
 ) {
   const [type, setType] = useState<TxnType>('deposit');

@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui/TxnHistoryPanel';
 import type { PensionPot, PensionTransaction } from '@quro/shared';
-import { PENSION_TXN_META, type PensionTxnType } from '../constants';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { PENSION_TXN_META } from '../constants';
+import type { PensionTxnType } from '../types';
+import { buildPensionTxnStats } from '../utils/pension-transaction-stats';
 
 type PensionTxnHistoryProps = {
   pot: PensionPot;
@@ -13,76 +13,44 @@ type PensionTxnHistoryProps = {
   onDelete: (id: number) => void;
 };
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const FILTER_OPTIONS = [
   { key: 'all', label: 'All' },
   { key: 'contribution', label: 'Contributions' },
   { key: 'fee', label: 'Fees' },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const buildPensionTxnStats = (
-  potTxns: PensionTransaction[],
-  currency: string,
-  fmtNative: (v: number, c: string, compact?: boolean) => string,
-) => {
-  const total = potTxns.filter((t) => t.type === 'contribution').reduce((s, t) => s + t.amount, 0);
-  const emp = potTxns
-    .filter((t) => t.type === 'contribution' && !t.isEmployer)
-    .reduce((s, t) => s + t.amount, 0);
-  const emr = potTxns
-    .filter((t) => t.type === 'contribution' && t.isEmployer)
-    .reduce((s, t) => s + t.amount, 0);
-  const fees = potTxns.filter((t) => t.type === 'fee').reduce((s, t) => s + t.amount, 0);
-  return [
-    {
-      label: 'Total Contributions',
-      value: `+${fmtNative(total, currency, true)}`,
-      color: 'text-emerald-600',
-    },
-    { label: 'Employee', value: fmtNative(emp, currency, true), color: 'text-slate-800' },
-    { label: 'Employer', value: fmtNative(emr, currency, true), color: 'text-indigo-600' },
-    {
-      label: 'Total Fees',
-      value: `\u2212${fmtNative(fees, currency, true)}`,
-      color: 'text-rose-500',
-    },
-  ];
-};
-
-// ─── Component ───────────────────────────────────────────────────────────────
-
 function PensionTxnRow({
-  t,
+  transaction,
   currency,
   fmtNative,
   onDelete,
 }: Readonly<{
-  t: PensionTransaction;
+  transaction: PensionTransaction;
   currency: string;
-  fmtNative: (v: number, c: string, b?: boolean) => string;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
   onDelete: () => void;
 }>) {
-  const m = PENSION_TXN_META[t.type];
-  const isFee = t.type === 'fee';
+  const meta = PENSION_TXN_META[transaction.type];
+  const isFee = transaction.type === 'fee';
+
   return (
     <TxnRow
-      key={t.id}
-      icon={m.icon}
-      iconColor={m.color}
-      iconBg={m.bg}
-      label={t.note || m.label}
-      date={t.date}
+      key={transaction.id}
+      icon={meta.icon}
+      iconColor={meta.color}
+      iconBg={meta.bg}
+      label={transaction.note || meta.label}
+      date={transaction.date}
       badge={
-        t.isEmployer ? { text: 'Employer', className: 'bg-indigo-100 text-indigo-600' } : undefined
+        transaction.isEmployer
+          ? { text: 'Employer', className: 'bg-indigo-100 text-indigo-600' }
+          : undefined
       }
       amount={
         <div className="text-right flex-shrink-0">
           <p className={`text-sm font-semibold ${isFee ? 'text-rose-500' : 'text-emerald-600'}`}>
             {isFee ? '\u2212' : '+'}
-            {fmtNative(t.amount, currency, true)}
+            {fmtNative(transaction.amount, currency, true)}
           </p>
         </div>
       }
@@ -99,9 +67,10 @@ export function PensionTxnHistory({
 }: PensionTxnHistoryProps): JSX.Element {
   const { fmtNative } = useCurrency();
   const [filter, setFilter] = useState<PensionTxnType | 'all'>('all');
-  const potTxns = transactions.filter((t) => t.potId === pot.id);
-  const sorted = potTxns
-    .filter((t) => filter === 'all' || t.type === filter)
+
+  const potTxns = transactions.filter((transaction) => transaction.potId === pot.id);
+  const sortedTransactions = potTxns
+    .filter((transaction) => filter === 'all' || transaction.type === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
   const stats = buildPensionTxnStats(potTxns, pot.currency, fmtNative);
 
@@ -115,15 +84,15 @@ export function PensionTxnHistory({
       onAdd={onAdd}
       accentColor="bg-amber-500 hover:bg-amber-600"
       emptyMessage="No transactions."
-      isEmpty={sorted.length === 0}
+      isEmpty={sortedTransactions.length === 0}
     >
-      {sorted.map((t) => (
+      {sortedTransactions.map((transaction) => (
         <PensionTxnRow
-          key={t.id}
-          t={t}
+          key={transaction.id}
+          transaction={transaction}
           currency={pot.currency}
           fmtNative={fmtNative}
-          onDelete={() => onDelete(t.id)}
+          onDelete={() => onDelete(transaction.id)}
         />
       ))}
     </TxnHistoryPanel>
