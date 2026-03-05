@@ -11,6 +11,7 @@ import { Pension } from '@/features/pension';
 import { Brand } from '@/features/brand';
 import { LandingPage } from '@/features/landing';
 import { useAuth } from '@/lib/AuthContext';
+import { RouteErrorScreen } from '@/router/RouteErrorScreen';
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -52,11 +53,13 @@ export const router = createBrowserRouter([
   {
     path: '/welcome',
     Component: PublicOnly,
+    ErrorBoundary: RouteErrorScreen,
     children: [{ index: true, Component: LandingPage }],
   },
   {
     path: '/',
     Component: RequireAuth,
+    ErrorBoundary: RouteErrorScreen,
     children: [
       { index: true, Component: Dashboard },
       { path: 'savings', Component: Savings },

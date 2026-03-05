@@ -90,7 +90,7 @@ export function addMonthsUtc(monthStart: number, months: number): number {
 }
 
 export function formatMonthLabel(monthStart: number): string {
-  return new Date(monthStart).toLocaleDateString('en-US', { month: 'short' });
+  return new Date(monthStart).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 }
 
 export function isInvestmentProperty(propertyType: string): boolean {

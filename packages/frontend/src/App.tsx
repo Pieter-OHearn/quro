@@ -4,15 +4,18 @@ import { router } from './routes';
 import { CurrencyProvider } from '@/lib/CurrencyContext';
 import { AuthProvider } from '@/lib/AuthContext';
 import { queryClient } from '@/lib/queryClient';
+import { AppErrorBoundary } from '@/components/errors/AppErrorBoundary';
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <CurrencyProvider>
-          <RouterProvider router={router} />
-        </CurrencyProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <CurrencyProvider>
+            <RouterProvider router={router} />
+          </CurrencyProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
 }
