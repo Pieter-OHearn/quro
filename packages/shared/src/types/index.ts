@@ -144,6 +144,16 @@ export type HoldingTransaction = {
   note: string;
 };
 
+export type HoldingPriceHistoryEntry = {
+  id: number;
+  userId: number;
+  holdingId: number;
+  eodDate: string;
+  closePrice: number;
+  priceCurrency: string;
+  syncedAt: string;
+};
+
 export type Property = {
   id: number;
   address: string;

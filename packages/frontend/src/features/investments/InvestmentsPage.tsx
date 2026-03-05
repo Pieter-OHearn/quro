@@ -21,6 +21,8 @@ import {
   useInvestmentData,
   useInvestmentPortfolioStats,
   useInvestmentPositions,
+  useInvestmentStatTrends,
+  useHoldingPriceHistory,
   useInvestmentUIState,
   usePortfolioHistory,
   useSyncHoldingPrices,
@@ -31,6 +33,7 @@ import type {
   InvestmentFormatFn,
   InvestmentNativeFormatFn,
   InvestmentPortfolioStats,
+  InvestmentStatTrends,
   InvestmentUIState,
   IsForeignFn,
   PortfolioHistoryPoint,
@@ -39,13 +42,15 @@ import type { Position } from './utils/position';
 import { buildHoldingModalsProps, buildPropertyModalsProps } from './utils/modal-props';
 
 type InvestmentPageBodyProps = {
-  holdings: Holding[];
+  activeHoldings: Holding[];
+  closedHoldings: Holding[];
   holdingTxns: HoldingTransaction[];
   properties: Property[];
   propertyTxns: PropertyTransaction[];
   mortgageById: Map<number, Mortgage>;
   positions: Record<number, Position>;
   stats: InvestmentPortfolioStats;
+  statTrends: InvestmentStatTrends;
   portfolioHistory: PortfolioHistoryPoint[];
   ui: InvestmentUIState;
   actions: InvestmentActions;
@@ -60,13 +65,15 @@ type InvestmentPageBodyProps = {
 };
 
 function InvestmentPageBody({
-  holdings,
+  activeHoldings,
+  closedHoldings,
   holdingTxns,
   properties,
   propertyTxns,
   mortgageById,
   positions,
   stats,
+  statTrends,
   portfolioHistory,
   ui,
   actions,
@@ -85,13 +92,14 @@ function InvestmentPageBody({
         holdingModals={buildHoldingModalsProps(ui, actions, positions)}
         propertyModals={buildPropertyModalsProps(ui, actions, mortgageById)}
       />
-      <InvestmentStatCards {...stats} fmtBase={fmtBase} />
+      <InvestmentStatCards {...stats} trends={statTrends} fmtBase={fmtBase} />
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <TabSwitcher tab={ui.tab} onSetTab={ui.setTab} />
         <InvestmentTabPanel
           tab={ui.tab}
-          holdings={holdings}
+          activeHoldings={activeHoldings}
+          closedHoldings={closedHoldings}
           holdingTxns={holdingTxns}
           properties={properties}
           propertyTxns={propertyTxns}
@@ -126,18 +134,44 @@ export function Investments() {
     [mortgages],
   );
   const positions = useInvestmentPositions(holdings, holdingTxns);
+  const { activeHoldings, closedHoldings } = useMemo(() => {
+    const active: Holding[] = [];
+    const closed: Holding[] = [];
+
+    for (const holding of holdings) {
+      const shares = positions[holding.id]?.shares ?? 0;
+      if (shares > 0) active.push(holding);
+      else closed.push(holding);
+    }
+
+    return { activeHoldings: active, closedHoldings: closed };
+  }, [holdings, positions]);
   const stats = useInvestmentPortfolioStats(
-    holdings,
+    activeHoldings,
     positions,
     properties,
     propertyTxns,
     mortgageById,
     convertToBase,
   );
+  const statTrends = useInvestmentStatTrends(
+    activeHoldings,
+    holdingTxns,
+    properties,
+    propertyTxns,
+    mortgageById,
+    convertToBase,
+    stats,
+    fmtBase,
+  );
   const actions = useInvestmentActions(holdings, properties, ui);
+  const { data: holdingPriceHistory = [] } = useHoldingPriceHistory(
+    holdings.map((holding) => holding.id),
+  );
   const portfolioHistory = usePortfolioHistory(
     holdings,
     holdingTxns,
+    holdingPriceHistory,
     properties,
     propertyTxns,
     mortgageById,
@@ -148,13 +182,15 @@ export function Investments() {
 
   return (
     <InvestmentPageBody
-      holdings={holdings}
+      activeHoldings={activeHoldings}
+      closedHoldings={closedHoldings}
       holdingTxns={holdingTxns}
       properties={properties}
       propertyTxns={propertyTxns}
       mortgageById={mortgageById}
       positions={positions}
       stats={stats}
+      statTrends={statTrends}
       portfolioHistory={portfolioHistory}
       ui={ui}
       actions={actions}
@@ -163,7 +199,9 @@ export function Investments() {
       fmtNative={fmtNative}
       convertToBase={convertToBase}
       isForeign={isForeign}
-      onSyncPrices={() => syncHoldingPrices.mutate()}
+      onSyncPrices={() =>
+        syncHoldingPrices.mutate({ holdingIds: activeHoldings.map((holding) => holding.id) })
+      }
       isSyncingPrices={syncHoldingPrices.isPending}
       syncSummary={syncHoldingPrices.data ?? null}
     />

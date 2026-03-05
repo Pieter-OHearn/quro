@@ -91,7 +91,8 @@ function buildIssue(holdingId: number, ticker: string, reason: string): HoldingI
 }
 
 function getUserHoldingsForSync(userId: number, holdingIds?: number[]): Promise<HoldingRow[]> {
-  const holdingIdFilter = holdingIds?.length ? holdingIds : null;
+  if (holdingIds && holdingIds.length === 0) return Promise.resolve([]);
+  const holdingIdFilter = holdingIds ?? null;
   return db
     .select()
     .from(holdings)

@@ -46,6 +46,9 @@ function PortfolioChartLegend() {
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
         Property Equity
       </div>
+      <div className="text-xs text-slate-500">
+        Estimated where historical market prices are unavailable.
+      </div>
     </div>
   );
 }
@@ -70,10 +73,22 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
             tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
           />
           <Tooltip
-            formatter={(value, name) => [
-              fmtBase(Number(value) || 0),
-              name === 'brokerage' ? 'Brokerage' : 'Property Equity',
-            ]}
+            formatter={(value, name, item) => {
+              const isEstimated =
+                name === 'brokerage' &&
+                Boolean(
+                  item &&
+                  typeof item === 'object' &&
+                  'payload' in item &&
+                  (item as { payload?: { isEstimated?: boolean } }).payload?.isEstimated,
+                );
+              return [
+                fmtBase(Number(value) || 0),
+                name === 'brokerage'
+                  ? `Brokerage${isEstimated ? ' (estimated)' : ''}`
+                  : 'Property Equity',
+              ];
+            }}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
           />
           <Area

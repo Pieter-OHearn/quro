@@ -23,6 +23,7 @@ export type PortfolioHistoryPoint = {
   month: string;
   brokerage: number;
   propertyEquity: number;
+  isEstimated: boolean;
 };
 
 export type InvestmentUIState = {
@@ -55,6 +56,19 @@ export type InvestmentPortfolioStats = {
   totalRealizedBase: number;
   totalPropertyEquityBase: number;
   totalRentalBase: number;
+};
+
+export type InvestmentStatTrend = {
+  value: string;
+  positive: boolean;
+  details: string;
+};
+
+export type InvestmentStatTrends = {
+  brokerageValue: InvestmentStatTrend;
+  unrealizedGain: InvestmentStatTrend;
+  dividendsReceived: InvestmentStatTrend;
+  propertyEquity: InvestmentStatTrend;
 };
 
 export type InvestmentActions = {

@@ -7,13 +7,14 @@ import {
 import { db } from '../db/client';
 import {
   holdings,
+  holdingPriceHistory,
   holdingTransactions,
   mortgages,
   properties,
   propertyTransactions,
   stockExchanges,
 } from '../db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { lookupTicker } from '../lib/marketstack';
@@ -35,6 +36,63 @@ function parseOptionalId(value: unknown): number | null | 'invalid' {
   const parsed = parseId(String(value));
   if (parsed === null) return 'invalid';
   return parsed;
+}
+
+function parseDateOnly(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  const parsed = new Date(`${trimmed}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, DATE_PART_LENGTH);
+}
+
+function parseHoldingIdsParam(value: string | null): number[] | null {
+  if (!value || !value.trim()) return [];
+  const rawIds = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (rawIds.length === 0) return [];
+
+  const parsedIds: number[] = [];
+  for (const rawId of rawIds) {
+    const parsed = parseId(rawId);
+    if (parsed === null) return null;
+    parsedIds.push(parsed);
+  }
+  return [...new Set(parsedIds)];
+}
+
+type HoldingPriceHistoryQuery = {
+  holdingIds: number[];
+  from: string | null;
+  to: string | null;
+};
+
+function parseHoldingPriceHistoryQuery(input: {
+  rawHoldingIds: string | null;
+  rawFrom: string | null;
+  rawTo: string | null;
+}): { value: HoldingPriceHistoryQuery } | { error: string } {
+  const holdingIds = parseHoldingIdsParam(input.rawHoldingIds);
+  if (holdingIds === null) {
+    return { error: 'Invalid holdingIds query parameter. Use comma-separated positive integers.' };
+  }
+
+  const from = parseDateOnly(input.rawFrom);
+  const to = parseDateOnly(input.rawTo);
+  if (input.rawFrom && !from) return { error: 'Invalid from date. Use YYYY-MM-DD format.' };
+  if (input.rawTo && !to) return { error: 'Invalid to date. Use YYYY-MM-DD format.' };
+  if (from && to && from > to) return { error: '`from` must be less than or equal to `to`.' };
+
+  return {
+    value: {
+      holdingIds,
+      from,
+      to,
+    },
+  };
 }
 
 function normalizeHoldingPayload(body: unknown): Record<string, unknown> {
@@ -237,6 +295,29 @@ app.delete('/holdings/:id', async (c) => {
   return c.json({ data });
 });
 
+app.get('/holding-price-history', async (c) => {
+  const user = getAuthUser(c);
+  const parsedQuery = parseHoldingPriceHistoryQuery({
+    rawHoldingIds: c.req.query('holdingIds') ?? null,
+    rawFrom: c.req.query('from') ?? null,
+    rawTo: c.req.query('to') ?? null,
+  });
+  if ('error' in parsedQuery) return c.json({ error: parsedQuery.error }, HTTP_STATUS.BAD_REQUEST);
+  const { holdingIds, from, to } = parsedQuery.value;
+
+  const conditions = [eq(holdingPriceHistory.userId, user.id)];
+  if (holdingIds.length > 0) conditions.push(inArray(holdingPriceHistory.holdingId, holdingIds));
+  if (from) conditions.push(gte(holdingPriceHistory.eodDate, from));
+  if (to) conditions.push(lte(holdingPriceHistory.eodDate, to));
+
+  const data = await db
+    .select()
+    .from(holdingPriceHistory)
+    .where(and(...conditions))
+    .orderBy(asc(holdingPriceHistory.eodDate), asc(holdingPriceHistory.holdingId));
+  return c.json({ data });
+});
+
 // ── Ticker Lookup (Marketstack) ──────────────────────────────────────────────
 
 app.get('/ticker-lookup/:symbol', async (c) => {
@@ -270,7 +351,29 @@ app.get('/ticker-lookup/:symbol', async (c) => {
 
 app.post('/holdings/sync-prices', async (c) => {
   const user = getAuthUser(c);
-  const syncOutcome = await syncHoldingPricesForUser(user.id);
+  const body = await c.req.json().catch(() => ({}));
+  const rawHoldingIds =
+    body && typeof body === 'object' && Array.isArray((body as { holdingIds?: unknown }).holdingIds)
+      ? (body as { holdingIds: unknown[] }).holdingIds
+      : null;
+
+  let holdingIds: number[] | undefined;
+  if (rawHoldingIds) {
+    const parsedIds: number[] = [];
+    for (const rawId of rawHoldingIds) {
+      const parsed = parseId(String(rawId));
+      if (parsed === null) {
+        return c.json({ error: 'Invalid holdingIds payload' }, HTTP_STATUS.BAD_REQUEST);
+      }
+      parsedIds.push(parsed);
+    }
+    holdingIds = [...new Set(parsedIds)];
+  }
+
+  const syncOutcome = await syncHoldingPricesForUser(
+    user.id,
+    holdingIds ? { holdingIds } : undefined,
+  );
   return c.json({ data: syncOutcome.summary });
 });
 

@@ -1,6 +1,7 @@
 import {
   parseTickerItemType,
   type Holding,
+  type HoldingPriceHistoryEntry,
   type HoldingTransaction,
   type Property,
   type PropertyTransaction,
@@ -58,6 +59,15 @@ export function normalizeHoldingTransaction(raw: HoldingTransaction): HoldingTra
     ...raw,
     shares: raw.shares == null ? null : toNumber(raw.shares),
     price: toNumber(raw.price),
+  };
+}
+
+export function normalizeHoldingPriceHistoryEntry(
+  raw: HoldingPriceHistoryEntry,
+): HoldingPriceHistoryEntry {
+  return {
+    ...raw,
+    closePrice: toNumber(raw.closePrice),
   };
 }
 

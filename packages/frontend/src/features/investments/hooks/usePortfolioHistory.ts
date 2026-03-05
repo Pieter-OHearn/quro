@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type {
   Holding,
+  HoldingPriceHistoryEntry,
   HoldingTransaction,
   Mortgage,
   Property,
@@ -12,6 +13,7 @@ import { computePortfolioHistory } from '../utils/portfolio';
 export function usePortfolioHistory(
   holdings: Holding[],
   holdingTxns: HoldingTransaction[],
+  holdingPriceHistory: HoldingPriceHistoryEntry[],
   properties: Property[],
   propertyTxns: PropertyTransaction[],
   mortgageById: Map<number, Mortgage>,
@@ -22,11 +24,20 @@ export function usePortfolioHistory(
       computePortfolioHistory(
         holdings,
         holdingTxns,
+        holdingPriceHistory,
         properties,
         propertyTxns,
         mortgageById,
         convertToBase,
       ),
-    [holdings, holdingTxns, properties, propertyTxns, mortgageById, convertToBase],
+    [
+      holdings,
+      holdingTxns,
+      holdingPriceHistory,
+      properties,
+      propertyTxns,
+      mortgageById,
+      convertToBase,
+    ],
   );
 }

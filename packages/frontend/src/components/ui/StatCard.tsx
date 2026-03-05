@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { ArrowUpRight, ArrowDownRight, ArrowRight } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, CircleHelp } from 'lucide-react';
 import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,7 @@ type StatCardProps = {
   subtitle?: string;
   icon: LucideIcon;
   color: keyof typeof COLOR_MAP;
-  change?: { value: string; positive: boolean };
+  change?: { value: string; positive: boolean; details?: string };
   href?: string;
   className?: string;
 };
@@ -53,12 +53,19 @@ function StatCardContent({
       {change && (
         <div
           className={cn(
-            'flex items-center gap-1 mt-1 text-xs',
+            'group/trend relative flex items-center gap-1 mt-1 text-xs',
             change.positive ? 'text-emerald-600' : 'text-rose-500',
           )}
         >
-          {change.positive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+          {change.value.includes('%') &&
+            (change.positive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />)}
           <span>{change.value}</span>
+          {change.details && <CircleHelp size={12} className="text-slate-400" />}
+          {change.details && (
+            <span className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[11px] leading-relaxed text-slate-600 opacity-0 shadow-lg transition-opacity group-hover/trend:opacity-100">
+              {change.details}
+            </span>
+          )}
         </div>
       )}
       {subtitle && !change && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}

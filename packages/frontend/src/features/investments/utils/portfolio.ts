@@ -1,5 +1,6 @@
 import type {
   Holding,
+  HoldingPriceHistoryEntry,
   HoldingTransaction,
   Mortgage,
   Property,
@@ -23,6 +24,11 @@ export const EMPTY_POSITION: Position = {
   realizedGain: 0,
   totalDividends: 0,
 };
+
+type DatedHoldingPriceHistoryEntry = HoldingPriceHistoryEntry & { timestamp: number };
+const BINARY_SEARCH_DIVISOR = 2;
+const VISIBLE_MONTH_COUNT = 12;
+const DATE_MONTH_SLICE_LENGTH = 7;
 
 function buildHoldingTxnMap(datedHoldingTxns: DatedHoldingTransaction[]) {
   const map = new Map<number, DatedHoldingTransaction[]>();
@@ -50,32 +56,133 @@ function buildPropertyTxnMap(datedPropertyTxns: DatedPropertyTransaction[]) {
   return map;
 }
 
+function buildHoldingPriceMap(datedHoldingPrices: DatedHoldingPriceHistoryEntry[]) {
+  const map = new Map<number, DatedHoldingPriceHistoryEntry[]>();
+  for (const pricePoint of datedHoldingPrices) {
+    const bucket = map.get(pricePoint.holdingId);
+    if (bucket) bucket.push(pricePoint);
+    else map.set(pricePoint.holdingId, [pricePoint]);
+  }
+  for (const prices of map.values()) {
+    prices.sort((left, right) => left.timestamp - right.timestamp);
+  }
+  return map;
+}
+
+type HoldingStateAtCutoff = {
+  shares: number;
+  avgCost: number;
+  latestTxnPrice: number | null;
+};
+
+type MutableHoldingState = {
+  shares: number;
+  totalCost: number;
+  latestTxnPrice: number | null;
+};
+
+function applyBuyHoldingTxn(state: MutableHoldingState, txnShares: number, txnPrice: number): void {
+  state.shares += txnShares;
+  state.totalCost += txnShares * txnPrice;
+  state.latestTxnPrice = txnPrice;
+}
+
+function applySellHoldingTxn(
+  state: MutableHoldingState,
+  txnShares: number,
+  txnPrice: number,
+): void {
+  const avgCostNow = state.shares > 0 ? state.totalCost / state.shares : 0;
+  const soldShares = Math.min(txnShares, state.shares);
+  state.shares -= soldShares;
+  state.totalCost = Math.max(0, state.totalCost - soldShares * avgCostNow);
+  state.latestTxnPrice = txnPrice;
+}
+
+function applyHoldingTxn(
+  state: MutableHoldingState,
+  transaction: DatedHoldingTransaction,
+  cutoff: number,
+): boolean {
+  if (transaction.timestamp > cutoff) return false;
+
+  const txnShares = Number(transaction.shares ?? 0);
+  const txnPrice = Number(transaction.price ?? 0);
+  if (transaction.type === 'buy' && txnShares > 0) {
+    applyBuyHoldingTxn(state, txnShares, txnPrice);
+    return true;
+  }
+
+  if (transaction.type === 'sell' && txnShares > 0) {
+    applySellHoldingTxn(state, txnShares, txnPrice);
+  }
+  return true;
+}
+
+function computeHoldingStateAtCutoff(
+  txns: DatedHoldingTransaction[],
+  cutoff: number,
+): HoldingStateAtCutoff {
+  const state: MutableHoldingState = {
+    shares: 0,
+    totalCost: 0,
+    latestTxnPrice: null,
+  };
+
+  for (const transaction of txns) {
+    if (!applyHoldingTxn(state, transaction, cutoff)) break;
+  }
+
+  return {
+    shares: state.shares,
+    avgCost: state.shares > 0 ? state.totalCost / state.shares : 0,
+    latestTxnPrice: state.latestTxnPrice,
+  };
+}
+
+function resolveHoldingMarketPrice(
+  pricePoints: DatedHoldingPriceHistoryEntry[],
+  cutoff: number,
+): number | null {
+  let low = 0;
+  let high = pricePoints.length - 1;
+  let candidate = -1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / BINARY_SEARCH_DIVISOR);
+    if (pricePoints[mid].timestamp <= cutoff) {
+      candidate = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  if (candidate < 0) return null;
+  const close = Number(pricePoints[candidate].closePrice);
+  return Number.isFinite(close) ? close : null;
+}
+
 function computeBrokerageForMonth(
   holdings: Holding[],
   holdingTxnMap: Map<number, DatedHoldingTransaction[]>,
+  holdingPriceMap: Map<number, DatedHoldingPriceHistoryEntry[]>,
   cutoff: number,
   convertToBase: (value: number, currency: string) => number,
 ) {
-  return holdings.reduce((sum, holding) => {
+  let isEstimated = false;
+  const brokerage = holdings.reduce((sum, holding) => {
     const txns = holdingTxnMap.get(holding.id) ?? [];
-    let shares = 0;
-    let dividends = 0;
+    const state = computeHoldingStateAtCutoff(txns, cutoff);
+    const marketPrice = resolveHoldingMarketPrice(holdingPriceMap.get(holding.id) ?? [], cutoff);
+    const resolvedPrice =
+      marketPrice ?? state.latestTxnPrice ?? (state.avgCost > 0 ? state.avgCost : 0);
+    if (marketPrice === null && state.shares > 0) isEstimated = true;
 
-    for (const transaction of txns) {
-      if (transaction.timestamp > cutoff) break;
-      const txnShares = Number(transaction.shares ?? 0);
-      if (transaction.type === 'buy' && txnShares > 0) {
-        shares += txnShares;
-      } else if (transaction.type === 'sell' && txnShares > 0) {
-        shares = Math.max(0, shares - txnShares);
-      } else if (transaction.type === 'dividend') {
-        dividends += transaction.price;
-      }
-    }
-
-    const nativeValue = Math.max(0, shares) * holding.currentPrice + dividends;
+    const nativeValue = Math.max(0, state.shares) * resolvedPrice;
     return sum + convertToBase(nativeValue, holding.currency);
   }, 0);
+  return { brokerage, isEstimated };
 }
 
 function getPropertyEquity(
@@ -124,6 +231,7 @@ function computePropertyEquityForMonth(
 export function computePortfolioHistory(
   holdings: Holding[],
   holdingTxns: HoldingTransaction[],
+  holdingPriceHistory: HoldingPriceHistoryEntry[],
   properties: Property[],
   propertyTxns: PropertyTransaction[],
   mortgageById: Map<number, Mortgage>,
@@ -135,6 +243,9 @@ export function computePortfolioHistory(
   const datedPropertyTxns: DatedPropertyTransaction[] = propertyTxns
     .map((transaction) => ({ ...transaction, timestamp: toUtcTimestamp(transaction.date) }))
     .filter((transaction) => Number.isFinite(transaction.timestamp));
+  const datedHoldingPrices: DatedHoldingPriceHistoryEntry[] = holdingPriceHistory
+    .map((pricePoint) => ({ ...pricePoint, timestamp: toUtcTimestamp(pricePoint.eodDate) }))
+    .filter((pricePoint) => Number.isFinite(pricePoint.timestamp));
 
   const allTimestamps = [
     ...datedHoldingTxns.map((transaction) => transaction.timestamp),
@@ -145,10 +256,11 @@ export function computePortfolioHistory(
 
   const currentMonthStart = monthStartUtc(Date.now());
   const earliestMonth = monthStartUtc(Math.min(...allTimestamps));
-  const oldestVisibleMonth = addMonthsUtc(currentMonthStart, -11);
+  const oldestVisibleMonth = addMonthsUtc(currentMonthStart, -(VISIBLE_MONTH_COUNT - 1));
   const firstMonth = Math.max(earliestMonth, oldestVisibleMonth);
 
   const holdingTxnMap = buildHoldingTxnMap(datedHoldingTxns);
+  const holdingPriceMap = buildHoldingPriceMap(datedHoldingPrices);
   const propertyTxnMap = buildPropertyTxnMap(datedPropertyTxns);
 
   const months: number[] = [];
@@ -158,7 +270,13 @@ export function computePortfolioHistory(
 
   return months.map((month) => {
     const cutoff = monthEndUtc(month);
-    const brokerage = computeBrokerageForMonth(holdings, holdingTxnMap, cutoff, convertToBase);
+    const brokerageResult = computeBrokerageForMonth(
+      holdings,
+      holdingTxnMap,
+      holdingPriceMap,
+      cutoff,
+      convertToBase,
+    );
     const propertyEquity = computePropertyEquityForMonth(
       properties,
       propertyTxnMap,
@@ -166,7 +284,12 @@ export function computePortfolioHistory(
       mortgageById,
       convertToBase,
     );
-    return { month: formatMonthLabel(month), brokerage, propertyEquity };
+    return {
+      month: formatMonthLabel(month),
+      brokerage: brokerageResult.brokerage,
+      propertyEquity,
+      isEstimated: brokerageResult.isEstimated,
+    };
   });
 }
 
@@ -175,7 +298,7 @@ export function computeTotalRental(
   properties: Property[],
   convertToBase: (value: number, currency: string) => number,
 ) {
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = new Date().toISOString().slice(0, DATE_MONTH_SLICE_LENGTH);
   const rentalTxns = propertyTxns.filter(
     (transaction) =>
       transaction.type === 'rent_income' && transaction.date.startsWith(currentMonth),

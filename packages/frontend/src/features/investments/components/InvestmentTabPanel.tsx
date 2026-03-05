@@ -22,7 +22,8 @@ import { PropertyTab } from './PropertyTab';
 
 type InvestmentTabPanelProps = {
   tab: Tab;
-  holdings: Holding[];
+  activeHoldings: Holding[];
+  closedHoldings: Holding[];
   holdingTxns: HoldingTransaction[];
   properties: Property[];
   propertyTxns: PropertyTransaction[];
@@ -43,7 +44,8 @@ type InvestmentTabPanelProps = {
 
 export function InvestmentTabPanel({
   tab,
-  holdings,
+  activeHoldings,
+  closedHoldings,
   holdingTxns,
   properties,
   propertyTxns,
@@ -64,7 +66,8 @@ export function InvestmentTabPanel({
   if (tab === 'brokerage') {
     return (
       <BrokerageTab
-        holdings={holdings}
+        activeHoldings={activeHoldings}
+        closedHoldings={closedHoldings}
         holdingTxns={holdingTxns}
         positions={positions}
         baseCurrency={baseCurrency}

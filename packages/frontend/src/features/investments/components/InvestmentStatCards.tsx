@@ -1,30 +1,36 @@
 import { BarChart2, Building2, DollarSign, TrendingUp } from 'lucide-react';
 import { StatCard } from '@/components/ui';
-import type { InvestmentFormatFn, InvestmentPortfolioStats } from '../types';
+import type { InvestmentFormatFn, InvestmentPortfolioStats, InvestmentStatTrends } from '../types';
 
 type InvestmentStatCardsProps = InvestmentPortfolioStats & {
   fmtBase: InvestmentFormatFn;
+  trends: InvestmentStatTrends;
+};
+
+type BrokerageStatCardsProps = Pick<
+  InvestmentPortfolioStats,
+  'totalBrokerageBase' | 'totalCostBase' | 'totalGainBase'
+> & {
+  fmtBase: InvestmentFormatFn;
+  trends: InvestmentStatTrends;
 };
 
 function BrokerageStatCards({
   totalBrokerageBase,
-  totalGainBase,
   totalCostBase,
-  gainPct,
+  totalGainBase,
   fmtBase,
-}: InvestmentStatCardsProps) {
+  trends,
+}: BrokerageStatCardsProps) {
   return (
     <>
       <StatCard
         label="Brokerage Value"
         value={fmtBase(totalBrokerageBase)}
-        subtitle={`${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}% unrealized`}
+        subtitle={`Total portfolio value in base currency`}
         icon={BarChart2}
         color="indigo"
-        change={{
-          value: `${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}%`,
-          positive: gainPct >= 0,
-        }}
+        change={trends.brokerageValue}
       />
       <StatCard
         label="Unrealized Gain"
@@ -32,10 +38,7 @@ function BrokerageStatCards({
         subtitle={`Cost basis ${fmtBase(totalCostBase)}`}
         icon={TrendingUp}
         color="emerald"
-        change={{
-          value: `${totalGainBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalGainBase), undefined, true)}`,
-          positive: totalGainBase >= 0,
-        }}
+        change={trends.unrealizedGain}
       />
     </>
   );
@@ -47,28 +50,19 @@ export function InvestmentStatCards({
   totalPropertyEquityBase,
   totalRentalBase,
   fmtBase,
+  trends,
   ...brokerage
 }: InvestmentStatCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <BrokerageStatCards
-        {...brokerage}
-        totalDividendsBase={totalDividendsBase}
-        totalRealizedBase={totalRealizedBase}
-        totalPropertyEquityBase={totalPropertyEquityBase}
-        totalRentalBase={totalRentalBase}
-        fmtBase={fmtBase}
-      />
+      <BrokerageStatCards {...brokerage} fmtBase={fmtBase} trends={trends} />
       <StatCard
         label="Dividends Received"
         value={`+${fmtBase(totalDividendsBase)}`}
         subtitle={`${totalRealizedBase >= 0 ? '+' : ''}${fmtBase(totalRealizedBase)} realized`}
         icon={DollarSign}
         color="sky"
-        change={{
-          value: `${totalRealizedBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalRealizedBase), undefined, true)}`,
-          positive: totalRealizedBase >= 0,
-        }}
+        change={trends.dividendsReceived}
       />
       <StatCard
         label="Property Equity"
@@ -76,10 +70,7 @@ export function InvestmentStatCards({
         subtitle={`${fmtBase(totalRentalBase)}/mo rental`}
         icon={Building2}
         color="amber"
-        change={{
-          value: `${fmtBase(totalRentalBase, undefined, true)}/mo`,
-          positive: totalRentalBase >= 0,
-        }}
+        change={trends.propertyEquity}
       />
     </div>
   );
