@@ -1,5 +1,6 @@
 import type {
   Holding,
+  HoldingPriceSyncResult,
   HoldingTransaction,
   Mortgage,
   Property,
@@ -35,6 +36,9 @@ type InvestmentTabPanelProps = {
   fmtNative: InvestmentNativeFormatFn;
   convertToBase: ConvertToBaseFn;
   isForeign: IsForeignFn;
+  onSyncPrices: () => void;
+  isSyncingPrices: boolean;
+  syncSummary: HoldingPriceSyncResult | null;
 };
 
 export function InvestmentTabPanel({
@@ -53,6 +57,9 @@ export function InvestmentTabPanel({
   fmtNative,
   convertToBase,
   isForeign,
+  onSyncPrices,
+  isSyncingPrices,
+  syncSummary,
 }: InvestmentTabPanelProps) {
   if (tab === 'brokerage') {
     return (
@@ -79,6 +86,9 @@ export function InvestmentTabPanel({
         onToggleExpanded={(id) => ui.setExpandedHoldingId(ui.expandedHoldingId === id ? null : id)}
         onAddTxnForHolding={ui.setAddTxnForHolding}
         onDeleteTxn={actions.handleDeleteHoldingTxn}
+        onSyncPrices={onSyncPrices}
+        isSyncingPrices={isSyncingPrices}
+        syncSummary={syncSummary}
       />
     );
   }

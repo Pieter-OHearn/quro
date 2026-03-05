@@ -1,5 +1,19 @@
-import { ArrowDownRight, ArrowUpRight, ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
-import type { Holding, HoldingTransaction } from '@quro/shared';
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Loader2,
+  Plus,
+  RefreshCcw,
+} from 'lucide-react';
+import {
+  formatItemType,
+  type Holding,
+  type HoldingPriceSyncResult,
+  type HoldingTransaction,
+} from '@quro/shared';
 import type { Position } from '../utils/position';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
@@ -23,6 +37,9 @@ type BrokerageTabProps = {
   onToggleExpanded: (id: number) => void;
   onAddTxnForHolding: (holding: Holding) => void;
   onDeleteTxn: (id: number) => void;
+  onSyncPrices: () => void;
+  isSyncingPrices: boolean;
+  syncSummary: HoldingPriceSyncResult | null;
 };
 
 type HoldingRowProps = {
@@ -73,6 +90,7 @@ type HoldingAssetCellProps = {
 };
 
 function HoldingAssetCell({ holding, foreign, txnCount }: HoldingAssetCellProps) {
+  const assetTypeLabel = formatItemType(holding.itemType) || holding.sector;
   return (
     <div className="col-span-3 flex items-center gap-3">
       <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
@@ -83,7 +101,7 @@ function HoldingAssetCell({ holding, foreign, txnCount }: HoldingAssetCellProps)
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-400">{holding.ticker}</span>
           <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded-full">
-            {holding.sector}
+            {assetTypeLabel}
           </span>
           <span
             className={`text-[10px] px-1.5 py-0.5 rounded-full ${foreign ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
@@ -357,21 +375,54 @@ type BrokerageHeaderProps = {
   holdingsCount: number;
   baseCurrency: string;
   onAddHolding: () => void;
+  onSyncPrices: () => void;
+  isSyncingPrices: boolean;
+  syncSummary: HoldingPriceSyncResult | null;
 };
 
-function BrokerageHeader({ holdingsCount, baseCurrency, onAddHolding }: BrokerageHeaderProps) {
+function BrokerageHeader({
+  holdingsCount,
+  baseCurrency,
+  onAddHolding,
+  onSyncPrices,
+  isSyncingPrices,
+  syncSummary,
+}: BrokerageHeaderProps) {
+  const syncSummaryText = syncSummary
+    ? `${syncSummary.updatedHoldings}/${syncSummary.requestedHoldings} updated · ${syncSummary.skippedHoldings} skipped`
+    : null;
+
   return (
     <>
       <div className="flex justify-between items-center px-6 pt-5 pb-3">
-        <p className="text-xs text-slate-400">
-          {holdingsCount} holdings · click row to view & record transactions
-        </p>
-        <button
-          onClick={onAddHolding}
-          className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-        >
-          <Plus size={15} /> Add Holding
-        </button>
+        <div>
+          <p className="text-xs text-slate-400">
+            {holdingsCount} holdings · click row to view & record transactions
+          </p>
+          {syncSummaryText && (
+            <p className="text-[11px] text-slate-500 mt-1">Last sync: {syncSummaryText}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onSyncPrices}
+            disabled={isSyncingPrices || holdingsCount === 0}
+            className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400 text-slate-700 px-4 py-2 rounded-xl transition-colors"
+          >
+            {isSyncingPrices ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <RefreshCcw size={15} />
+            )}
+            Sync Prices
+          </button>
+          <button
+            onClick={onAddHolding}
+            className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
+          >
+            <Plus size={15} /> Add Holding
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-12 gap-2 px-6 pb-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
         <span className="col-span-3">Asset</span>
@@ -391,13 +442,16 @@ export function BrokerageTab(props: BrokerageTabProps) {
   const { totalBrokerageBase, totalGainBase, gainPct, expandedHoldingId, fmtBase, fmtNative } =
     props;
   const { convertToBase, isForeign, onAddHolding, onEditHolding, onToggleExpanded } = props;
-  const { onAddTxnForHolding, onDeleteTxn } = props;
+  const { onAddTxnForHolding, onDeleteTxn, onSyncPrices, isSyncingPrices, syncSummary } = props;
   return (
     <div>
       <BrokerageHeader
         holdingsCount={holdings.length}
         baseCurrency={baseCurrency}
         onAddHolding={onAddHolding}
+        onSyncPrices={onSyncPrices}
+        isSyncingPrices={isSyncingPrices}
+        syncSummary={syncSummary}
       />
       <BrokerageHoldingsList
         holdings={holdings}

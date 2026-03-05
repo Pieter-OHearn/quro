@@ -5,6 +5,7 @@ import {
   savingsAccounts,
   savingsTransactions,
   holdings,
+  holdingPriceHistory,
   holdingTransactions,
   properties,
   propertyTransactions,
@@ -83,6 +84,7 @@ await db.delete(currencyRates);
 await db.delete(savingsTransactions);
 await db.delete(savingsAccounts);
 await db.delete(holdingTransactions);
+await db.delete(holdingPriceHistory);
 await db.delete(holdings);
 await db.delete(propertyTransactions);
 await db.delete(properties);

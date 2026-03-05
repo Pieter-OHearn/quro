@@ -30,6 +30,97 @@ export type SavingsTransaction = {
   note: string;
 };
 
+// ── Ticker Item Types ─────────────────────────────────────────────────────────
+
+export const TICKER_ITEM_TYPES = [
+  'equity',
+  'fund',
+  'etf',
+  'adr',
+  'trust',
+  'warrant',
+  'right',
+  'unit',
+  'preference',
+] as const;
+
+export type TickerItemType = (typeof TICKER_ITEM_TYPES)[number];
+const TICKER_ITEM_TYPE_SET = new Set<string>(TICKER_ITEM_TYPES);
+
+export const ITEM_TYPE_LABELS: Record<TickerItemType, string> = {
+  equity: 'Equity',
+  fund: 'Fund',
+  etf: 'ETF',
+  adr: 'ADR',
+  trust: 'Trust',
+  warrant: 'Warrant',
+  right: 'Right',
+  unit: 'Unit',
+  preference: 'Preference',
+};
+
+export function parseTickerItemType(raw: string | null | undefined): TickerItemType | null {
+  if (!raw) return null;
+  const normalized = raw.trim().toLowerCase();
+  return TICKER_ITEM_TYPE_SET.has(normalized) ? (normalized as TickerItemType) : null;
+}
+
+export function formatItemType(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const key = parseTickerItemType(raw);
+  return key ? ITEM_TYPE_LABELS[key] : raw.trim();
+}
+
+export type TickerLookupExchange = {
+  name: string;
+  acronym: string;
+  mic: string;
+  country: string | null;
+  countryCode: string;
+  city: string;
+  website: string;
+};
+
+export type TickerLookupResult = {
+  name: string;
+  symbol: string;
+  itemType: TickerItemType | null;
+  sector: string | null;
+  industry: string | null;
+  exchange: TickerLookupExchange | null;
+  currentPrice?: number | null;
+  currency?: string | null;
+  priceCurrency?: string | null;
+  priceUpdatedAt?: string | null;
+  eodDate?: string | null;
+};
+
+export type StockPriceResult = {
+  ticker: string;
+  price: number;
+  currency: string;
+  tradeLast: string | null;
+  eodDate?: string | null;
+  priceCurrency?: string | null;
+};
+
+export type HoldingPriceSyncIssue = {
+  holdingId: number;
+  ticker: string;
+  reason: string;
+};
+
+export type HoldingPriceSyncResult = {
+  requestedHoldings: number;
+  requestedSymbols: number;
+  updatedHoldings: number;
+  skippedHoldings: number;
+  issues: HoldingPriceSyncIssue[];
+  syncedAt: string;
+};
+
+// ── Holdings ─────────────────────────────────────────────────────────────────
+
 export type Holding = {
   id: number;
   name: string;
@@ -37,6 +128,10 @@ export type Holding = {
   currentPrice: number;
   currency: CurrencyCode;
   sector: string;
+  itemType?: TickerItemType | null;
+  exchangeMic?: string | null;
+  industry?: string | null;
+  priceUpdatedAt?: string | null;
 };
 
 export type HoldingTransaction = {

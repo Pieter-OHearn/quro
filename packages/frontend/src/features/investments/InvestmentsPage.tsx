@@ -3,6 +3,7 @@ import { LoadingSpinner } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type {
   Holding,
+  HoldingPriceSyncResult,
   HoldingTransaction,
   Mortgage,
   Property,
@@ -22,6 +23,7 @@ import {
   useInvestmentPositions,
   useInvestmentUIState,
   usePortfolioHistory,
+  useSyncHoldingPrices,
 } from './hooks';
 import type {
   ConvertToBaseFn,
@@ -52,6 +54,9 @@ type InvestmentPageBodyProps = {
   fmtNative: InvestmentNativeFormatFn;
   convertToBase: ConvertToBaseFn;
   isForeign: IsForeignFn;
+  onSyncPrices: () => void;
+  isSyncingPrices: boolean;
+  syncSummary: HoldingPriceSyncResult | null;
 };
 
 function InvestmentPageBody({
@@ -70,6 +75,9 @@ function InvestmentPageBody({
   fmtNative,
   convertToBase,
   isForeign,
+  onSyncPrices,
+  isSyncingPrices,
+  syncSummary,
 }: Readonly<InvestmentPageBodyProps>) {
   return (
     <div className="p-6 space-y-6">
@@ -97,6 +105,9 @@ function InvestmentPageBody({
           fmtNative={fmtNative}
           convertToBase={convertToBase}
           isForeign={isForeign}
+          onSyncPrices={onSyncPrices}
+          isSyncingPrices={isSyncingPrices}
+          syncSummary={syncSummary}
         />
       </div>
     </div>
@@ -107,6 +118,7 @@ export function Investments() {
   const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
   const { holdings, holdingTxns, properties, propertyTxns, mortgages, isLoading } =
     useInvestmentData();
+  const syncHoldingPrices = useSyncHoldingPrices();
   const ui = useInvestmentUIState();
 
   const mortgageById = useMemo(
@@ -151,6 +163,9 @@ export function Investments() {
       fmtNative={fmtNative}
       convertToBase={convertToBase}
       isForeign={isForeign}
+      onSyncPrices={() => syncHoldingPrices.mutate()}
+      isSyncingPrices={syncHoldingPrices.isPending}
+      syncSummary={syncHoldingPrices.data ?? null}
     />
   );
 }

@@ -9,6 +9,7 @@ import {
   boolean,
   timestamp,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
@@ -75,6 +76,19 @@ export const savingsTransactions = pgTable(
   }),
 );
 
+// ── Stock Exchanges (reference data) ─────────────────────────────────────────
+
+export const stockExchanges = pgTable('stock_exchanges', {
+  id: serial('id').primaryKey(),
+  mic: text('mic').notNull().unique(),
+  name: text('name').notNull(),
+  acronym: text('acronym'),
+  country: text('country'),
+  countryCode: text('country_code'),
+  city: text('city'),
+  website: text('website'),
+});
+
 // ── Holdings / Investments ───────────────────────────────────────────────────
 
 export const holdings = pgTable(
@@ -87,6 +101,10 @@ export const holdings = pgTable(
     currentPrice: numeric('current_price').notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     sector: text('sector').notNull(),
+    itemType: text('item_type'),
+    exchangeMic: text('exchange_mic'),
+    industry: text('industry'),
+    priceUpdatedAt: timestamp('price_updated_at'),
   },
   (table) => ({
     userIdx: index('holdings_user_id_idx').on(table.userId),
@@ -110,6 +128,34 @@ export const holdingTransactions = pgTable(
   (table) => ({
     userIdx: index('holding_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('holding_transactions_user_date_idx').on(table.userId, table.date),
+  }),
+);
+
+export const holdingPriceHistory = pgTable(
+  'holding_price_history',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    holdingId: integer('holding_id')
+      .references(() => holdings.id, { onDelete: 'cascade' })
+      .notNull(),
+    eodDate: date('eod_date', { mode: 'string' }).notNull(),
+    closePrice: numeric('close_price').notNull(),
+    priceCurrency: text('price_currency').notNull(),
+    syncedAt: timestamp('synced_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userDateIdx: index('holding_price_history_user_date_idx').on(table.userId, table.eodDate),
+    holdingDateIdx: index('holding_price_history_holding_date_idx').on(
+      table.holdingId,
+      table.eodDate,
+    ),
+    holdingDateUnique: uniqueIndex('holding_price_history_holding_date_unique').on(
+      table.holdingId,
+      table.eodDate,
+    ),
   }),
 );
 

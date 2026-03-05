@@ -30,6 +30,7 @@ type TextInputProps = {
   placeholder?: string;
   type?: string;
   step?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
   disabled?: boolean;
   className?: string;
   maxLength?: number;
@@ -42,6 +43,7 @@ export function TextInput({
   placeholder,
   type = 'text',
   step,
+  inputMode,
   disabled,
   className,
   maxLength,
@@ -50,6 +52,7 @@ export function TextInput({
     <input
       type={type}
       step={step}
+      inputMode={inputMode}
       maxLength={maxLength}
       disabled={disabled}
       className={cn(

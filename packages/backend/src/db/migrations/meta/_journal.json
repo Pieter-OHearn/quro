@@ -8,6 +8,20 @@
       "when": 1772555076715,
       "tag": "0000_magenta_korath",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772609733067,
+      "tag": "0001_silky_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772697600000,
+      "tag": "0002_fuzzy_holding_price_history",
+      "breakpoints": true
     }
   ]
 }

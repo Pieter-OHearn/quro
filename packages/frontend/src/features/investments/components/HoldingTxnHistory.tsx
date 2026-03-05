@@ -4,6 +4,7 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
 import type { TxnTypeMeta } from '@/components/ui';
 import type { Holding, HoldingTransaction } from '@quro/shared';
+import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
 
 type HoldingTxnHistoryProps = {
@@ -44,20 +45,19 @@ const TXN_META: Record<HoldingTxnType, TxnTypeMeta & { sign: string }> = {
   },
 };
 
-const FILTER_OPTIONS = [
-  { key: 'all', label: 'All' },
-  { key: 'buy', label: 'Buys' },
-  { key: 'sell', label: 'Sells' },
-  { key: 'dividend', label: 'Dividends' },
-];
-
 type HoldingTxnAmountProps = {
   transaction: HoldingTransaction;
   holding: Holding;
+  incomeLowerLabel: string;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
-function HoldingTxnAmount({ transaction, holding, fmtNative }: HoldingTxnAmountProps) {
+function HoldingTxnAmount({
+  transaction,
+  holding,
+  incomeLowerLabel,
+  fmtNative,
+}: HoldingTxnAmountProps) {
   if (transaction.type === 'buy' || transaction.type === 'sell') {
     return (
       <div className="text-right flex-shrink-0">
@@ -78,7 +78,7 @@ function HoldingTxnAmount({ transaction, holding, fmtNative }: HoldingTxnAmountP
       <p className="text-sm font-semibold text-indigo-600">
         +{fmtNative(transaction.price, holding.currency, true)}
       </p>
-      <p className="text-[10px] text-slate-400">dividend</p>
+      <p className="text-[10px] text-slate-400">{incomeLowerLabel}</p>
     </div>
   );
 }
@@ -86,6 +86,7 @@ function HoldingTxnAmount({ transaction, holding, fmtNative }: HoldingTxnAmountP
 function buildHoldingStats(
   position: Position,
   holding: Holding,
+  totalIncomeLabel: string,
   fmtNative: (value: number, currency: string, compact?: boolean) => string,
 ) {
   return [
@@ -95,7 +96,7 @@ function buildHoldingStats(
       color: 'text-slate-800',
     },
     {
-      label: 'Total Dividends',
+      label: totalIncomeLabel,
       value: `+${fmtNative(position.totalDividends, holding.currency, true)}`,
       color: 'text-indigo-600',
     },
@@ -116,21 +117,32 @@ export function HoldingTxnHistory({
 }: HoldingTxnHistoryProps) {
   const { fmtNative } = useCurrency();
   const [filter, setFilter] = useState<HoldingTxnType | 'all'>('all');
+  const incomeLabels = getIncomeTxnLabels(holding);
+  const txnMeta = {
+    ...TXN_META,
+    dividend: { ...TXN_META.dividend, label: incomeLabels.singular },
+  };
+  const filterOptions = [
+    { key: 'all', label: 'All' },
+    { key: 'buy', label: 'Buys' },
+    { key: 'sell', label: 'Sells' },
+    { key: 'dividend', label: incomeLabels.plural },
+  ];
 
   const sorted = [...transactions]
     .filter(
       (transaction) =>
         transaction.holdingId === holding.id &&
-        (transaction.type as string) in TXN_META &&
+        (transaction.type as string) in txnMeta &&
         (filter === 'all' || transaction.type === filter),
     )
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const stats = buildHoldingStats(position, holding, fmtNative);
+  const stats = buildHoldingStats(position, holding, `Total ${incomeLabels.plural}`, fmtNative);
 
   return (
     <TxnHistoryPanel
-      filterOptions={FILTER_OPTIONS}
+      filterOptions={filterOptions}
       filter={filter}
       onFilterChange={(key) => setFilter(key as HoldingTxnType | 'all')}
       stats={stats}
@@ -139,7 +151,7 @@ export function HoldingTxnHistory({
       isEmpty={sorted.length === 0}
     >
       {sorted.map((transaction) => {
-        const meta = TXN_META[transaction.type as HoldingTxnType];
+        const meta = txnMeta[transaction.type as HoldingTxnType];
         return (
           <TxnRow
             key={transaction.id}
@@ -149,7 +161,12 @@ export function HoldingTxnHistory({
             label={transaction.note || meta.label}
             date={transaction.date}
             amount={
-              <HoldingTxnAmount transaction={transaction} holding={holding} fmtNative={fmtNative} />
+              <HoldingTxnAmount
+                transaction={transaction}
+                holding={holding}
+                incomeLowerLabel={incomeLabels.lowerSingular}
+                fmtNative={fmtNative}
+              />
             }
             onDelete={() => onDelete(transaction.id)}
           />

@@ -1,9 +1,32 @@
-import type { Holding, HoldingTransaction, Property, PropertyTransaction } from '@quro/shared';
+import {
+  parseTickerItemType,
+  type Holding,
+  type HoldingTransaction,
+  type Property,
+  type PropertyTransaction,
+} from '@quro/shared';
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
-    const parsed = parseFloat(value);
+    const trimmed = value.trim();
+    if (!trimmed) return 0;
+
+    const compact = trimmed.replace(/\s+/g, '');
+    const hasComma = compact.includes(',');
+    const hasDot = compact.includes('.');
+    let normalized = compact;
+
+    if (hasComma && hasDot) {
+      normalized =
+        compact.lastIndexOf(',') > compact.lastIndexOf('.')
+          ? compact.replaceAll('.', '').replace(',', '.')
+          : compact.replaceAll(',', '');
+    } else if (hasComma) {
+      normalized = compact.replace(',', '.');
+    }
+
+    const parsed = parseFloat(normalized);
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
@@ -23,6 +46,10 @@ export function normalizeHolding(raw: Holding): Holding {
   return {
     ...raw,
     currentPrice: toNumber(raw.currentPrice),
+    itemType: parseTickerItemType(raw.itemType),
+    exchangeMic: raw.exchangeMic ?? null,
+    industry: raw.industry ?? null,
+    priceUpdatedAt: raw.priceUpdatedAt ?? null,
   };
 }
 

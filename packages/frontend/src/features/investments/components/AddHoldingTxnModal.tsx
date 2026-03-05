@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 import type { TxnTypeMeta } from '@/components/ui';
 import type { Holding, HoldingTransaction } from '@quro/shared';
+import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
 
 type AddHoldingTxnModalProps = {
@@ -150,12 +151,13 @@ type DividendPreviewProps = {
   parsedPrice: number;
   holding: Holding;
   fmtNative: FmtNative;
+  incomeLabel: string;
 };
 
-function DividendPreview({ parsedPrice, holding, fmtNative }: DividendPreviewProps) {
+function DividendPreview({ parsedPrice, holding, fmtNative, incomeLabel }: DividendPreviewProps) {
   return (
     <div className="flex justify-between text-xs">
-      <span className="text-indigo-700 font-medium">Dividend income</span>
+      <span className="text-indigo-700 font-medium">{incomeLabel} income</span>
       <span className="font-bold text-indigo-700">
         +{fmtNative(parsedPrice, holding.currency, true)}
       </span>
@@ -172,6 +174,7 @@ type TxnPreviewProps = {
   newAvgCost: number;
   realizedGain: number;
   fmtNative: FmtNative;
+  incomeLabel: string;
 };
 
 function TxnPreview({
@@ -183,6 +186,7 @@ function TxnPreview({
   newAvgCost,
   realizedGain,
   fmtNative,
+  incomeLabel,
 }: TxnPreviewProps) {
   const bgClass =
     type === 'sell'
@@ -214,7 +218,12 @@ function TxnPreview({
         />
       )}
       {type === 'dividend' && (
-        <DividendPreview parsedPrice={parsedPrice} holding={holding} fmtNative={fmtNative} />
+        <DividendPreview
+          parsedPrice={parsedPrice}
+          holding={holding}
+          fmtNative={fmtNative}
+          incomeLabel={incomeLabel}
+        />
       )}
     </div>
   );
@@ -282,6 +291,7 @@ type PriceFormFieldProps = {
   needsShares: boolean;
   error: string;
   holding: Holding;
+  incomeLabel: string;
   onChange: (value: string) => void;
 };
 
@@ -292,13 +302,14 @@ function PriceFormField({
   needsShares,
   error,
   holding,
+  incomeLabel,
   onChange,
 }: PriceFormFieldProps) {
   return (
     <FormField
       label={
         type === 'dividend'
-          ? `Total Dividend Received (${holding.currency})`
+          ? `Total ${incomeLabel} Received (${holding.currency})`
           : `Price per Share (${holding.currency})`
       }
       error={
@@ -346,6 +357,7 @@ type TxnFormBodyProps = {
   holding: Holding;
   currentPosition: Position;
   fmtNative: FmtNative;
+  incomeLabel: string;
   onTypeChange: (t: HoldingTxnType) => void;
   onSharesChange: (v: string) => void;
   onPriceChange: (v: string) => void;
@@ -359,7 +371,11 @@ function TxnFormBodyFields(props: TxnFormBodyProps) {
     <>
       <FormField label="Transaction Type">
         <TxnTypeSelector<HoldingTxnType>
-          types={TXN_TYPES.map((txnType) => TXN_META[txnType])}
+          types={TXN_TYPES.map((txnType) =>
+            txnType === 'dividend'
+              ? { ...TXN_META[txnType], label: props.incomeLabel }
+              : TXN_META[txnType],
+          )}
           value={props.type}
           onChange={props.onTypeChange}
         />
@@ -386,6 +402,7 @@ function TxnFormBodyFields(props: TxnFormBodyProps) {
         needsShares={needsShares}
         error={props.error}
         holding={props.holding}
+        incomeLabel={props.incomeLabel}
         onChange={props.onPriceChange}
       />
       <DateNoteRow
@@ -413,6 +430,7 @@ function TxnFormBody(props: TxnFormBodyProps) {
           newAvgCost={props.newAvgCost}
           realizedGain={props.realizedGain}
           fmtNative={props.fmtNative}
+          incomeLabel={props.incomeLabel}
         />
       )}
     </>
@@ -505,6 +523,7 @@ export function AddHoldingTxnModal({
   onSave,
 }: AddHoldingTxnModalProps) {
   const { fmtNative } = useCurrency();
+  const incomeLabels = getIncomeTxnLabels(holding);
   const form = useHoldingTxnForm(currentPosition);
   const handleSave = buildHoldingTxnSaveHandler(form, holding, currentPosition, onSave, onClose);
   const onSharesChange = (value: string) => {
@@ -537,6 +556,7 @@ export function AddHoldingTxnModal({
         holding={holding}
         currentPosition={currentPosition}
         fmtNative={fmtNative}
+        incomeLabel={incomeLabels.singular}
         onTypeChange={form.handleTypeChange}
         onSharesChange={onSharesChange}
         onPriceChange={onPriceChange}

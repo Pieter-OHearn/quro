@@ -31,6 +31,11 @@ export function useInvestmentActions(
   function handleSaveHolding(
     holding: Holding,
     initialBuy?: { shares: number; price: number; date: string },
+    lookupSnapshot?: {
+      priceCurrency?: string | null;
+      eodDate?: string | null;
+      priceUpdatedAt?: string | null;
+    },
   ) {
     if (holdings.find((entry) => entry.id === holding.id)) {
       updateHolding.mutate(holding);
@@ -38,20 +43,23 @@ export function useInvestmentActions(
     }
 
     const { id: _id, ...body } = holding;
-    createHolding.mutate(body, {
-      onSuccess: (created: Holding) => {
-        if (!initialBuy) return;
-        createHoldingTxn.mutate({
-          holdingId: created.id,
-          type: 'buy',
-          shares: initialBuy.shares,
-          price: initialBuy.price,
-          date: initialBuy.date,
-          note: 'Initial position',
-        });
-        ui.setExpandedHoldingId(created.id);
+    createHolding.mutate(
+      { ...body, ...lookupSnapshot },
+      {
+        onSuccess: (created: Holding) => {
+          if (!initialBuy) return;
+          createHoldingTxn.mutate({
+            holdingId: created.id,
+            type: 'buy',
+            shares: initialBuy.shares,
+            price: initialBuy.price,
+            date: initialBuy.date,
+            note: 'Initial position',
+          });
+          ui.setExpandedHoldingId(created.id);
+        },
       },
-    });
+    );
   }
 
   return {

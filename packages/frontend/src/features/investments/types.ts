@@ -1,5 +1,6 @@
 import type {
   Holding,
+  HoldingPriceSyncResult,
   HoldingTransaction,
   Mortgage,
   Property,
@@ -60,6 +61,11 @@ export type InvestmentActions = {
   handleSaveHolding: (
     holding: Holding,
     initialBuy?: { shares: number; price: number; date: string },
+    lookupSnapshot?: {
+      priceCurrency?: string | null;
+      eodDate?: string | null;
+      priceUpdatedAt?: string | null;
+    },
   ) => void;
   handleDeleteHolding: (id: number) => void;
   handleAddHoldingTxn: (transaction: Omit<HoldingTransaction, 'id'>) => void;
@@ -88,10 +94,21 @@ export type HoldingModalsProps = {
   onSaveHolding: (
     holding: Holding,
     initialBuy?: { shares: number; price: number; date: string },
+    lookupSnapshot?: {
+      priceCurrency?: string | null;
+      eodDate?: string | null;
+      priceUpdatedAt?: string | null;
+    },
   ) => void;
   onDeleteHolding: (id: number) => void;
   onCloseAddHoldingTxn: () => void;
   onSaveHoldingTxn: (transaction: Omit<HoldingTransaction, 'id'>) => void;
+};
+
+export type BrokerageSyncProps = {
+  onSyncPrices: () => void;
+  isSyncingPrices: boolean;
+  syncSummary: HoldingPriceSyncResult | null;
 };
 
 export type PropertyModalsProps = {
