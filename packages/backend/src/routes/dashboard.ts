@@ -15,13 +15,13 @@ import {
   properties,
   savingsAccounts,
   savingsTransactions,
-  netWorthSnapshots,
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 
 const app = new Hono();
 const BASE_CURRENCY = 'EUR';
 const RECENT_TRANSACTIONS_LIMIT = 20;
+const NET_WORTH_HISTORY_MONTHS = 7;
 
 const toNumber = (value: unknown): number => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -32,24 +32,28 @@ const toNumber = (value: unknown): number => {
   return 0;
 };
 
-const monthName = (date = new Date()) => date.toLocaleDateString('en-US', { month: 'long' });
+function toUtcTimestamp(value: string): number {
+  return Date.parse(`${value}T00:00:00Z`);
+}
 
-const monthOrder: Record<string, number> = {
-  january: 0,
-  february: 1,
-  march: 2,
-  april: 3,
-  may: 4,
-  june: 5,
-  july: 6,
-  august: 7,
-  september: 8,
-  october: 9,
-  november: 10,
-  december: 11,
-};
+function monthStartUtc(timestamp: number): number {
+  const date = new Date(timestamp);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+}
 
-const monthIndex = (month: string) => monthOrder[month.toLowerCase()] ?? -1;
+function monthEndUtc(monthStart: number): number {
+  const date = new Date(monthStart); // eslint-disable-next-line no-magic-numbers
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+function addMonthsUtc(monthStart: number, delta: number): number {
+  const date = new Date(monthStart);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1);
+}
+
+function formatMonthShort(monthStart: number): string {
+  return new Date(monthStart).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+}
 
 async function getRatesToBaseCurrency() {
   const rows = await db
@@ -75,7 +79,6 @@ type DerivedAllocation = {
   name: string;
   value: number;
   color: string;
-  snapshotId: number;
 };
 
 function computeSharesByHolding(
@@ -89,6 +92,188 @@ function computeSharesByHolding(
     else if (txn.type === 'sell') map.set(txn.holdingId, existing - shares);
   }
   return map;
+}
+
+type SavingsAccountRow = { id: number; balance: unknown; currency: string };
+type SavingsTransactionRow = { accountId: number; type: string; amount: unknown; date: string };
+type HoldingRow = { id: number; currentPrice: unknown; currency: string };
+type HoldingTransactionRow = { holdingId: number; type: string; shares: unknown; date: string };
+type PropertyRow = {
+  id: number;
+  purchasePrice: unknown;
+  currentValue: unknown;
+  mortgage: unknown;
+  mortgageId: number | null;
+  currency: string;
+};
+type PropertyTransactionRow = {
+  propertyId: number;
+  type: string;
+  amount: unknown;
+  interest: unknown;
+  principal: unknown;
+  date: string;
+};
+type PensionPotRow = { id: number; balance: unknown; currency: string };
+type PensionTransactionRow = { potId: number; type: string; amount: unknown; date: string };
+type MortgageRow = { id: number; outstandingBalance: unknown };
+
+type DatedSavingsTransaction = {
+  accountId: number;
+  type: 'deposit' | 'withdrawal' | 'interest';
+  amount: number;
+  timestamp: number;
+};
+
+type DatedHoldingTransaction = {
+  holdingId: number;
+  type: 'buy' | 'sell';
+  shares: number;
+  timestamp: number;
+};
+
+type DatedPropertyTransaction = {
+  propertyId: number;
+  type: 'valuation' | 'repayment';
+  amount: number;
+  interest: number | null;
+  principal: number | null;
+  timestamp: number;
+};
+
+type DatedPensionTransaction = {
+  potId: number;
+  type: 'contribution' | 'fee';
+  amount: number;
+  timestamp: number;
+};
+
+function groupByNumericId<T>(rows: readonly T[], getId: (row: T) => number): Map<number, T[]> {
+  const grouped = new Map<number, T[]>();
+  for (const row of rows) {
+    const id = getId(row);
+    const bucket = grouped.get(id);
+    if (bucket) bucket.push(row);
+    else grouped.set(id, [row]);
+  }
+  return grouped;
+}
+
+function buildDatedSavingsTransactions(
+  transactions: readonly SavingsTransactionRow[],
+): DatedSavingsTransaction[] {
+  return transactions
+    .filter(
+      (transaction) =>
+        transaction.type === 'deposit' ||
+        transaction.type === 'withdrawal' ||
+        transaction.type === 'interest',
+    )
+    .map((transaction) => ({
+      accountId: transaction.accountId,
+      type: transaction.type as DatedSavingsTransaction['type'],
+      amount: toNumber(transaction.amount),
+      timestamp: toUtcTimestamp(transaction.date),
+    }))
+    .filter((transaction) => Number.isFinite(transaction.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function buildDatedHoldingTransactions(
+  transactions: readonly HoldingTransactionRow[],
+): DatedHoldingTransaction[] {
+  return transactions
+    .filter((transaction) => transaction.type === 'buy' || transaction.type === 'sell')
+    .map((transaction) => ({
+      holdingId: transaction.holdingId,
+      type: transaction.type as DatedHoldingTransaction['type'],
+      shares: toNumber(transaction.shares),
+      timestamp: toUtcTimestamp(transaction.date),
+    }))
+    .filter((transaction) => Number.isFinite(transaction.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function buildDatedPropertyTransactions(
+  transactions: readonly PropertyTransactionRow[],
+): DatedPropertyTransaction[] {
+  return transactions
+    .filter((transaction) => transaction.type === 'valuation' || transaction.type === 'repayment')
+    .map((transaction) => ({
+      propertyId: transaction.propertyId,
+      type: transaction.type as DatedPropertyTransaction['type'],
+      amount: toNumber(transaction.amount),
+      interest: transaction.interest == null ? null : toNumber(transaction.interest),
+      principal: transaction.principal == null ? null : toNumber(transaction.principal),
+      timestamp: toUtcTimestamp(transaction.date),
+    }))
+    .filter((transaction) => Number.isFinite(transaction.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function buildDatedPensionTransactions(
+  transactions: readonly PensionTransactionRow[],
+): DatedPensionTransaction[] {
+  return transactions
+    .filter((transaction) => transaction.type === 'contribution' || transaction.type === 'fee')
+    .map((transaction) => ({
+      potId: transaction.potId,
+      type: transaction.type as DatedPensionTransaction['type'],
+      amount: toNumber(transaction.amount),
+      timestamp: toUtcTimestamp(transaction.date),
+    }))
+    .filter((transaction) => Number.isFinite(transaction.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function buildMortgageBalanceById(mortgages: readonly MortgageRow[]): Map<number, number> {
+  const balances = new Map<number, number>();
+  for (const mortgage of mortgages) {
+    balances.set(mortgage.id, toNumber(mortgage.outstandingBalance));
+  }
+  return balances;
+}
+
+function computeDerivedAllocations(
+  rates: Map<string, number>,
+  userSavings: readonly SavingsAccountRow[],
+  userHoldings: readonly HoldingRow[],
+  userHoldingTxns: readonly HoldingTransactionRow[],
+  userProperties: readonly PropertyRow[],
+  userPensions: readonly PensionPotRow[],
+  userMortgages: readonly MortgageRow[],
+): DerivedAllocation[] {
+  const savingsTotal = userSavings.reduce(
+    (sum, account) => sum + convertToBase(toNumber(account.balance), account.currency, rates),
+    0,
+  );
+
+  const sharesByHolding = computeSharesByHolding([...userHoldingTxns]);
+  const brokerageTotal = userHoldings.reduce((sum, holding) => {
+    const shares = Math.max(0, sharesByHolding.get(holding.id) ?? 0);
+    return sum + convertToBase(shares * toNumber(holding.currentPrice), holding.currency, rates);
+  }, 0);
+
+  const mortgageBalanceById = buildMortgageBalanceById(userMortgages);
+  const propertyEquityTotal = userProperties.reduce((sum, property) => {
+    const linkedBalance = property.mortgageId
+      ? mortgageBalanceById.get(property.mortgageId)
+      : undefined;
+    const equity = toNumber(property.currentValue) - (linkedBalance ?? toNumber(property.mortgage));
+    return sum + convertToBase(equity, property.currency, rates);
+  }, 0);
+
+  const pensionTotal = userPensions.reduce(
+    (sum, pot) => sum + convertToBase(toNumber(pot.balance), pot.currency, rates),
+    0,
+  );
+
+  return [
+    { id: 1, name: 'Savings', value: savingsTotal, color: '#6366f1' },
+    { id: 2, name: 'Brokerage', value: brokerageTotal, color: '#0ea5e9' },
+    { id: 3, name: 'Property Equity', value: propertyEquityTotal, color: '#10b981' },
+    { id: 4, name: 'Pension', value: pensionTotal, color: '#f59e0b' },
+  ];
 }
 
 async function buildDerivedAllocations(userId: number): Promise<DerivedAllocation[]> {
@@ -109,79 +294,336 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
     db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
     db.select().from(mortgages).where(eq(mortgages.userId, userId)),
   ]);
-
-  const savingsTotal = userSavings.reduce(
-    (sum, account) => sum + convertToBase(toNumber(account.balance), account.currency, rates),
-    0,
+  return computeDerivedAllocations(
+    rates,
+    userSavings,
+    userHoldings,
+    userHoldingTxns,
+    userProperties,
+    userPensions,
+    userMortgages,
   );
+}
 
-  const sharesByHolding = computeSharesByHolding(userHoldingTxns);
-  const brokerageTotal = userHoldings.reduce((sum, holding) => {
-    const shares = Math.max(0, sharesByHolding.get(holding.id) ?? 0);
-    return sum + convertToBase(shares * toNumber(holding.currentPrice), holding.currency, rates);
-  }, 0);
+function buildRollingMonths() {
+  const now = Date.now();
+  const currentMonth = monthStartUtc(now);
+  const firstMonth = addMonthsUtc(currentMonth, -(NET_WORTH_HISTORY_MONTHS - 1));
+  const months: Array<{
+    cutoff: number;
+    label: string;
+    year: number;
+  }> = [];
 
-  const mortgageBalanceById = new Map<number, number>();
-  for (const mortgage of userMortgages) {
-    mortgageBalanceById.set(mortgage.id, toNumber(mortgage.outstandingBalance));
+  for (let month = firstMonth; month <= currentMonth; month = addMonthsUtc(month, 1)) {
+    months.push({
+      cutoff: month === currentMonth ? now : monthEndUtc(month),
+      label: formatMonthShort(month),
+      year: new Date(month).getUTCFullYear(),
+    });
   }
 
-  const propertyEquityTotal = userProperties.reduce((sum, property) => {
-    const linkedBalance = property.mortgageId
-      ? mortgageBalanceById.get(property.mortgageId)
-      : undefined;
-    const equity = toNumber(property.currentValue) - (linkedBalance ?? toNumber(property.mortgage));
+  return months;
+}
+
+function computeSavingsAtCutoff(
+  accounts: readonly SavingsAccountRow[],
+  txnsByAccountId: ReadonlyMap<number, readonly DatedSavingsTransaction[]>,
+  cutoff: number,
+  rates: Map<string, number>,
+): number {
+  return accounts.reduce((sum, account) => {
+    let balance = toNumber(account.balance);
+    for (const transaction of txnsByAccountId.get(account.id) ?? []) {
+      if (transaction.timestamp <= cutoff) continue;
+      if (transaction.type === 'withdrawal') balance += transaction.amount;
+      else balance -= transaction.amount;
+    }
+    return sum + convertToBase(Math.max(0, balance), account.currency, rates);
+  }, 0);
+}
+
+function computePensionAtCutoff(
+  pots: readonly PensionPotRow[],
+  txnsByPotId: ReadonlyMap<number, readonly DatedPensionTransaction[]>,
+  cutoff: number,
+  rates: Map<string, number>,
+): number {
+  return pots.reduce((sum, pot) => {
+    let balance = toNumber(pot.balance);
+    for (const transaction of txnsByPotId.get(pot.id) ?? []) {
+      if (transaction.timestamp <= cutoff) continue;
+      if (transaction.type === 'fee') balance += transaction.amount;
+      else balance -= transaction.amount;
+    }
+    return sum + convertToBase(Math.max(0, balance), pot.currency, rates);
+  }, 0);
+}
+
+function computeBrokerageAtCutoff(
+  portfolioHoldings: readonly HoldingRow[],
+  txnsByHoldingId: ReadonlyMap<number, readonly DatedHoldingTransaction[]>,
+  cutoff: number,
+  rates: Map<string, number>,
+): number {
+  return portfolioHoldings.reduce((sum, holding) => {
+    let shares = 0;
+    for (const transaction of txnsByHoldingId.get(holding.id) ?? []) {
+      if (transaction.timestamp > cutoff) break;
+      if (transaction.type === 'buy') shares += transaction.shares;
+      else shares -= transaction.shares;
+    }
+    const value = Math.max(0, shares) * toNumber(holding.currentPrice);
+    return sum + convertToBase(value, holding.currency, rates);
+  }, 0);
+}
+
+function computePropertyEquityAtCutoff(
+  userProperties: readonly PropertyRow[],
+  txnsByPropertyId: ReadonlyMap<number, readonly DatedPropertyTransaction[]>,
+  mortgageBalanceById: ReadonlyMap<number, number>,
+  cutoff: number,
+  rates: Map<string, number>,
+): number {
+  function resolvePropertyValueAtCutoff(
+    property: PropertyRow,
+    transactions: readonly DatedPropertyTransaction[],
+  ): number {
+    const hasValuationTransaction = transactions.some(
+      (transaction) => transaction.type === 'valuation',
+    );
+    let propertyValue = hasValuationTransaction
+      ? toNumber(property.purchasePrice)
+      : toNumber(property.currentValue);
+
+    for (const transaction of transactions) {
+      if (transaction.timestamp > cutoff) break;
+      if (transaction.type === 'valuation') propertyValue = transaction.amount;
+    }
+    return propertyValue;
+  }
+
+  function resolveBaseMortgageBalance(property: PropertyRow): number {
+    if (property.mortgageId == null) return toNumber(property.mortgage);
+    return mortgageBalanceById.get(property.mortgageId) ?? toNumber(property.mortgage);
+  }
+
+  function resolveMortgageBalanceAtCutoff(
+    property: PropertyRow,
+    transactions: readonly DatedPropertyTransaction[],
+  ): number {
+    let mortgageBalance = resolveBaseMortgageBalance(property);
+    for (const transaction of transactions) {
+      if (transaction.timestamp <= cutoff || transaction.type !== 'repayment') continue;
+      const principal =
+        transaction.principal ?? Math.max(0, transaction.amount - (transaction.interest ?? 0));
+      mortgageBalance += principal;
+    }
+    return mortgageBalance;
+  }
+
+  return userProperties.reduce((sum, property) => {
+    const transactions = txnsByPropertyId.get(property.id) ?? [];
+    const propertyValue = resolvePropertyValueAtCutoff(property, transactions);
+    const mortgageBalance = resolveMortgageBalanceAtCutoff(property, transactions);
+    const equity = propertyValue - mortgageBalance;
     return sum + convertToBase(equity, property.currency, rates);
   }, 0);
+}
 
-  const pensionTotal = userPensions.reduce(
-    (sum, pot) => sum + convertToBase(toNumber(pot.balance), pot.currency, rates),
-    0,
+type NetWorthSourceData = {
+  rates: Map<string, number>;
+  savings: SavingsAccountRow[];
+  savingsTransactions: SavingsTransactionRow[];
+  holdings: HoldingRow[];
+  holdingTransactions: HoldingTransactionRow[];
+  properties: PropertyRow[];
+  propertyTransactions: PropertyTransactionRow[];
+  pensions: PensionPotRow[];
+  pensionTransactions: PensionTransactionRow[];
+  mortgages: MortgageRow[];
+};
+
+type NetWorthHistoryPoint = {
+  id: number;
+  month: string;
+  year: number;
+  totalValue: number;
+  currency: string;
+};
+
+async function safeLoad<T>(label: string, query: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await query;
+  } catch (error) {
+    console.warn(`[Dashboard] Failed to load ${label}`, error);
+    return fallback;
+  }
+}
+
+async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceData> {
+  const rates = await safeLoad(
+    'currency rates',
+    getRatesToBaseCurrency(),
+    new Map([[BASE_CURRENCY, 1]]),
   );
+  const [
+    savings,
+    savingsTransactionsData,
+    holdingsData,
+    holdingTransactionsData,
+    propertiesData,
+    propertyTransactionsData,
+    pensions,
+    pensionTransactionsData,
+    mortgagesData,
+  ] = await Promise.all([
+    safeLoad(
+      'savings accounts',
+      db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, userId)),
+      [],
+    ),
+    safeLoad(
+      'savings transactions',
+      db.select().from(savingsTransactions).where(eq(savingsTransactions.userId, userId)),
+      [],
+    ),
+    safeLoad('holdings', db.select().from(holdings).where(eq(holdings.userId, userId)), []),
+    safeLoad(
+      'holding transactions',
+      db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
+      [],
+    ),
+    safeLoad('properties', db.select().from(properties).where(eq(properties.userId, userId)), []),
+    safeLoad(
+      'property transactions',
+      db.select().from(propertyTransactions).where(eq(propertyTransactions.userId, userId)),
+      [],
+    ),
+    safeLoad(
+      'pension pots',
+      db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
+      [],
+    ),
+    safeLoad(
+      'pension transactions',
+      db.select().from(pensionTransactions).where(eq(pensionTransactions.userId, userId)),
+      [],
+    ),
+    safeLoad('mortgages', db.select().from(mortgages).where(eq(mortgages.userId, userId)), []),
+  ]);
+
+  return {
+    rates,
+    savings,
+    savingsTransactions: savingsTransactionsData,
+    holdings: holdingsData,
+    holdingTransactions: holdingTransactionsData,
+    properties: propertiesData,
+    propertyTransactions: propertyTransactionsData,
+    pensions,
+    pensionTransactions: pensionTransactionsData,
+    mortgages: mortgagesData,
+  };
+}
+
+function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
+  const allocations = computeDerivedAllocations(
+    sourceData.rates,
+    sourceData.savings,
+    sourceData.holdings,
+    sourceData.holdingTransactions,
+    sourceData.properties,
+    sourceData.pensions,
+    sourceData.mortgages,
+  );
+  const currentMonth = monthStartUtc(Date.now());
+  const totalValue = allocations.reduce((sum, item) => sum + item.value, 0);
 
   return [
-    { id: 1, name: 'Savings', value: savingsTotal, color: '#6366f1', snapshotId: 1 },
-    { id: 2, name: 'Brokerage', value: brokerageTotal, color: '#0ea5e9', snapshotId: 1 },
-    { id: 3, name: 'Property Equity', value: propertyEquityTotal, color: '#10b981', snapshotId: 1 },
-    { id: 4, name: 'Pension', value: pensionTotal, color: '#f59e0b', snapshotId: 1 },
+    {
+      id: 1,
+      month: formatMonthShort(currentMonth),
+      year: new Date(currentMonth).getUTCFullYear(),
+      totalValue,
+      currency: BASE_CURRENCY,
+    },
   ];
+}
+
+function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
+  const datedSavingsTransactions = buildDatedSavingsTransactions(sourceData.savingsTransactions);
+  const datedHoldingTransactions = buildDatedHoldingTransactions(sourceData.holdingTransactions);
+  const datedPropertyTransactions = buildDatedPropertyTransactions(sourceData.propertyTransactions);
+  const datedPensionTransactions = buildDatedPensionTransactions(sourceData.pensionTransactions);
+
+  const hasQualifyingTransactions =
+    datedSavingsTransactions.length > 0 ||
+    datedHoldingTransactions.length > 0 ||
+    datedPropertyTransactions.length > 0 ||
+    datedPensionTransactions.length > 0;
+  if (!hasQualifyingTransactions) return buildFallbackNetWorthHistory(sourceData);
+
+  const months = buildRollingMonths();
+  const savingsByAccount = groupByNumericId(
+    datedSavingsTransactions,
+    (transaction) => transaction.accountId,
+  );
+  const holdingsById = groupByNumericId(
+    datedHoldingTransactions,
+    (transaction) => transaction.holdingId,
+  );
+  const propertiesById = groupByNumericId(
+    datedPropertyTransactions,
+    (transaction) => transaction.propertyId,
+  );
+  const pensionsByPotId = groupByNumericId(
+    datedPensionTransactions,
+    (transaction) => transaction.potId,
+  );
+  const mortgageBalanceById = buildMortgageBalanceById(sourceData.mortgages);
+
+  return months.map((month, index) => {
+    const savings = computeSavingsAtCutoff(
+      sourceData.savings,
+      savingsByAccount,
+      month.cutoff,
+      sourceData.rates,
+    );
+    const brokerage = computeBrokerageAtCutoff(
+      sourceData.holdings,
+      holdingsById,
+      month.cutoff,
+      sourceData.rates,
+    );
+    const propertyEquity = computePropertyEquityAtCutoff(
+      sourceData.properties,
+      propertiesById,
+      mortgageBalanceById,
+      month.cutoff,
+      sourceData.rates,
+    );
+    const pension = computePensionAtCutoff(
+      sourceData.pensions,
+      pensionsByPotId,
+      month.cutoff,
+      sourceData.rates,
+    );
+
+    return {
+      id: index + 1,
+      month: month.label,
+      year: month.year,
+      totalValue: savings + brokerage + propertyEquity + pension,
+      currency: BASE_CURRENCY,
+    };
+  });
 }
 
 app.get('/net-worth', async (c) => {
   const user = getAuthUser(c);
-  const [snapshots, allocations] = await Promise.all([
-    db.select().from(netWorthSnapshots).where(eq(netWorthSnapshots.userId, user.id)),
-    buildDerivedAllocations(user.id),
-  ]);
-
-  const sortedSnapshots = [...snapshots].sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year;
-    return monthIndex(a.month) - monthIndex(b.month);
-  });
-
-  if (sortedSnapshots.length > 0) {
-    return c.json({
-      data: sortedSnapshots.map((snapshot) => ({
-        ...snapshot,
-        totalValue: toNumber(snapshot.totalValue),
-      })),
-    });
-  }
-
-  const total = allocations.reduce((sum, item) => sum + item.value, 0);
-  const now = new Date();
-
-  return c.json({
-    data: [
-      {
-        id: 1,
-        month: monthName(now),
-        year: now.getFullYear(),
-        totalValue: total,
-        currency: BASE_CURRENCY,
-      },
-    ],
-  });
+  const sourceData = await loadNetWorthSourceData(user.id);
+  return c.json({ data: buildNetWorthHistory(sourceData) });
 });
 
 app.get('/allocations', async (c) => {

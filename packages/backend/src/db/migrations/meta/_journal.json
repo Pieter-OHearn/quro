@@ -22,6 +22,13 @@
       "when": 1772697600000,
       "tag": "0002_fuzzy_holding_price_history",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772729872137,
+      "tag": "0003_remove_net_worth_snapshot_tables",
+      "breakpoints": true
     }
   ]
 }

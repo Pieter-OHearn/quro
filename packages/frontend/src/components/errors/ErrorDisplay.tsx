@@ -134,7 +134,7 @@ function ErrorFooter() {
     <footer className="flex-shrink-0 border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
       <div className="flex items-center gap-2.5">
         <QuroLogo className="h-5 w-auto opacity-40" />
-        <span className="text-xs text-slate-400">Pieter O&apos;Hearn · Personal Finance</span>
+        <span className="text-xs text-slate-400">Quro · Personal Finance</span>
       </div>
       <p className="text-xs text-slate-400">Apologies for the inconvenience</p>
     </footer>

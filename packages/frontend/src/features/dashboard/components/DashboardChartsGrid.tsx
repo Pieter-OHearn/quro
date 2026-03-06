@@ -23,7 +23,7 @@ export function DashboardChartsGrid({
         <AreaChartCard
           className="h-full"
           title="Net Worth Growth"
-          subtitle={`Last ${chartData.length} months in ${baseCurrency}`}
+          subtitle={`Last 7 months in ${baseCurrency}`}
           data={chartData}
           dataKey="value"
           xKey="month"

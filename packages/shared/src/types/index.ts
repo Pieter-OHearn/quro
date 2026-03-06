@@ -307,7 +307,6 @@ export type AssetAllocation = {
   name: string;
   value: number;
   color: string;
-  snapshotId: number;
 };
 
 export type CurrencyRate = {

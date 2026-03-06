@@ -64,4 +64,4 @@ export type DashboardTxnStats = {
   totalExpenses: number;
 };
 
-export type NetWorthMetricData = { month: string; value: number };
+export type NetWorthMetricData = { month: string; year: number; value: number };

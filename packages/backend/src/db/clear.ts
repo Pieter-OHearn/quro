@@ -15,15 +15,11 @@ import {
   goals,
   budgetCategories,
   budgetTransactions,
-  netWorthSnapshots,
-  assetAllocations,
   currencyRates,
   dashboardTransactions,
 } from './schema';
 
 console.log('Clearing all data...');
-await db.delete(assetAllocations);
-await db.delete(netWorthSnapshots);
 await db.delete(budgetTransactions);
 await db.delete(budgetCategories);
 await db.delete(dashboardTransactions);

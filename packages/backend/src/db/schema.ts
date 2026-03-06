@@ -385,40 +385,6 @@ export const budgetTransactions = pgTable(
   }),
 );
 
-// ── Net Worth ────────────────────────────────────────────────────────────────
-
-export const netWorthSnapshots = pgTable(
-  'net_worth_snapshots',
-  {
-    id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
-    month: text('month').notNull(),
-    year: integer('year').notNull(),
-    totalValue: numeric('total_value').notNull(),
-    currency: currencyCodeEnum('currency').default('EUR').notNull(),
-  },
-  (table) => ({
-    userIdx: index('net_worth_snapshots_user_id_idx').on(table.userId),
-  }),
-);
-
-export const assetAllocations = pgTable(
-  'asset_allocations',
-  {
-    id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
-    name: text('name').notNull(),
-    value: numeric('value').notNull(),
-    color: text('color'),
-    snapshotId: integer('snapshot_id')
-      .references(() => netWorthSnapshots.id)
-      .notNull(),
-  },
-  (table) => ({
-    userIdx: index('asset_allocations_user_id_idx').on(table.userId),
-  }),
-);
-
 // ── Currency ─────────────────────────────────────────────────────────────────
 
 export const currencyRates = pgTable('currency_rates', {

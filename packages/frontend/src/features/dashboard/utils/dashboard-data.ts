@@ -114,7 +114,10 @@ const computeSalary = (
 export const computeNWMetrics = (chartData: readonly NetWorthMetricData[], totalAlloc: number) => {
   const currentNW = chartData.length > 0 ? chartData[chartData.length - 1].value : totalAlloc;
   const prevNW = chartData.length > 1 ? chartData[chartData.length - 2].value : currentNW;
-  const firstNW = chartData.length > 0 ? chartData[0].value : currentNW;
+  const currentYear = new Date().getFullYear();
+  const firstCurrentYearPoint = chartData.find((point) => point.year === currentYear);
+  const firstNW =
+    firstCurrentYearPoint?.value ?? (chartData.length > 0 ? chartData[0].value : currentNW);
   return {
     netWorth: currentNW,
     monthChange: currentNW - prevNW,

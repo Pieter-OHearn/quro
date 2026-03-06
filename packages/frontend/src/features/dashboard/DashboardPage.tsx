@@ -44,6 +44,7 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
   const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
   const chartData = netWorthData.map((snapshot) => ({
     month: snapshot.month,
+    year: snapshot.year,
     value: snapshot.totalValue,
   }));
   const allocationData = allocations.map((allocation) => ({

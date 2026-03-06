@@ -17,8 +17,6 @@ import {
   goals,
   budgetCategories,
   budgetTransactions,
-  netWorthSnapshots,
-  assetAllocations,
   currencyRates,
   dashboardTransactions,
 } from './schema';
@@ -75,8 +73,6 @@ if (seedUser.created)
 // ── Clear all tables (child tables first) ────────────────────────────────────
 
 console.log('Clearing existing data...');
-await db.delete(assetAllocations);
-await db.delete(netWorthSnapshots);
 await db.delete(budgetTransactions);
 await db.delete(budgetCategories);
 await db.delete(dashboardTransactions);
@@ -1219,36 +1215,6 @@ await db.insert(budgetTransactions).values(
       date: '2026-02-17',
       merchant: "Sainsbury's",
     },
-  ]),
-);
-
-// ── Net Worth Snapshots ──────────────────────────────────────────────────────
-
-console.log('Seeding net worth snapshots...');
-const insertedSnapshots = await db
-  .insert(netWorthSnapshots)
-  .values(
-    withUser([
-      { month: 'August', year: 2025, totalValue: '380000', currency: 'EUR' },
-      { month: 'September', year: 2025, totalValue: '396000', currency: 'EUR' },
-      { month: 'October', year: 2025, totalValue: '410000', currency: 'EUR' },
-      { month: 'November', year: 2025, totalValue: '418500', currency: 'EUR' },
-      { month: 'December', year: 2025, totalValue: '428000', currency: 'EUR' },
-      { month: 'January', year: 2026, totalValue: '436000', currency: 'EUR' },
-      { month: 'February', year: 2026, totalValue: '445000', currency: 'EUR' },
-    ]),
-  )
-  .returning();
-
-// Asset allocations for the latest snapshot (February 2026)
-const latestSnapshotId = insertedSnapshots[insertedSnapshots.length - 1].id;
-
-await db.insert(assetAllocations).values(
-  withUser([
-    { name: 'Savings', value: '51300', color: '#6366f1', snapshotId: latestSnapshotId },
-    { name: 'Brokerage', value: '52700', color: '#0ea5e9', snapshotId: latestSnapshotId },
-    { name: 'Property Equity', value: '249200', color: '#10b981', snapshotId: latestSnapshotId },
-    { name: 'Pension', value: '91700', color: '#f59e0b', snapshotId: latestSnapshotId },
   ]),
 );
 
