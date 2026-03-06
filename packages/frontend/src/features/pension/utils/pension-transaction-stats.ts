@@ -18,6 +18,9 @@ export function buildPensionTxnStats(
   const fees = potTxns
     .filter((txn) => txn.type === 'fee')
     .reduce((sum, txn) => sum + txn.amount, 0);
+  const taxes = potTxns
+    .filter((txn) => txn.type === 'tax')
+    .reduce((sum, txn) => sum + txn.amount, 0);
 
   return [
     {
@@ -38,6 +41,11 @@ export function buildPensionTxnStats(
     {
       label: 'Total Fees',
       value: `\u2212${fmtNative(fees, currency, true)}`,
+      color: 'text-rose-500',
+    },
+    {
+      label: 'Total Taxes',
+      value: `\u2212${fmtNative(taxes, currency, true)}`,
       color: 'text-rose-500',
     },
   ];

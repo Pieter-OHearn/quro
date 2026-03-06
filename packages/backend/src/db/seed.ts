@@ -586,7 +586,7 @@ const insertedPensions = await db
       {
         name: 'ABP Werknemerspensioen',
         provider: 'ABP',
-        type: 'Workplace',
+        type: 'Workplace Pension',
         balance: '47030',
         currency: 'EUR',
         employeeMonthly: '325',
@@ -598,7 +598,7 @@ const insertedPensions = await db
       {
         name: 'Australian Superannuation',
         provider: 'Australian Super',
-        type: 'Superannuation',
+        type: 'Workplace Pension',
         balance: '71050',
         currency: 'AUD',
         employeeMonthly: '500',
@@ -610,7 +610,7 @@ const insertedPensions = await db
       {
         name: 'Self-Invested Pension',
         provider: 'DeGiro',
-        type: 'SIPP',
+        type: 'Personal Pension',
         balance: '17430',
         currency: 'EUR',
         employeeMonthly: '200',
@@ -638,7 +638,7 @@ const penTxRows: Array<{
   isEmployer: boolean | null;
 }> = [];
 
-// ABP: 6 months employee + employer + 1 fee
+// ABP: 6 months employee + employer + 1 fee + 1 tax
 for (const m of propTxMonths) {
   penTxRows.push({
     potId: penIds[0],
@@ -663,6 +663,14 @@ penTxRows.push({
   amount: '45',
   date: '2025-12-31',
   note: 'Annual management fee',
+  isEmployer: null,
+});
+penTxRows.push({
+  potId: penIds[0],
+  type: 'tax',
+  amount: '150',
+  date: '2025-12-31',
+  note: 'Contributions Tax',
   isEmployer: null,
 });
 

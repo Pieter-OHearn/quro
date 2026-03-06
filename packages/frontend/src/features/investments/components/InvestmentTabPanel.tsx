@@ -42,14 +42,10 @@ type InvestmentTabPanelProps = {
   syncSummary: HoldingPriceSyncResult | null;
 };
 
-export function InvestmentTabPanel({
-  tab,
+function renderBrokerageTab({
   activeHoldings,
   closedHoldings,
   holdingTxns,
-  properties,
-  propertyTxns,
-  mortgageById,
   positions,
   stats,
   ui,
@@ -63,38 +59,70 @@ export function InvestmentTabPanel({
   isSyncingPrices,
   syncSummary,
 }: InvestmentTabPanelProps) {
-  if (tab === 'brokerage') {
-    return (
-      <BrokerageTab
-        activeHoldings={activeHoldings}
-        closedHoldings={closedHoldings}
-        holdingTxns={holdingTxns}
-        positions={positions}
-        baseCurrency={baseCurrency}
-        totalDividendsBase={stats.totalDividendsBase}
-        totalRealizedBase={stats.totalRealizedBase}
-        totalBrokerageBase={stats.totalBrokerageBase}
-        totalGainBase={stats.totalGainBase}
-        gainPct={stats.gainPct}
-        expandedHoldingId={ui.expandedHoldingId}
-        fmtBase={fmtBase}
-        fmtNative={fmtNative}
-        convertToBase={convertToBase}
-        isForeign={isForeign}
-        onAddHolding={() => {
-          ui.setEditingHolding(null);
-          ui.setShowAddHolding(true);
-        }}
-        onEditHolding={ui.setEditingHolding}
-        onToggleExpanded={(id) => ui.setExpandedHoldingId(ui.expandedHoldingId === id ? null : id)}
-        onAddTxnForHolding={ui.setAddTxnForHolding}
-        onDeleteTxn={actions.handleDeleteHoldingTxn}
-        onSyncPrices={onSyncPrices}
-        isSyncingPrices={isSyncingPrices}
-        syncSummary={syncSummary}
-      />
-    );
-  }
+  const handleAddHolding = () => {
+    ui.setEditingHolding(null);
+    ui.setShowAddHolding(true);
+  };
+  const toggleHoldingExpanded = (id: number) =>
+    ui.setExpandedHoldingId(ui.expandedHoldingId === id ? null : id);
+  const handleAddTxnForHolding = (holding: Holding) => {
+    ui.setEditingHoldingTxn(null);
+    ui.setAddTxnForHolding(holding);
+  };
+  const handleEditHoldingTxn = (transaction: HoldingTransaction) => {
+    ui.setAddTxnForHolding(null);
+    ui.setEditingHoldingTxn(transaction);
+  };
+
+  return (
+    <BrokerageTab
+      activeHoldings={activeHoldings}
+      closedHoldings={closedHoldings}
+      holdingTxns={holdingTxns}
+      positions={positions}
+      baseCurrency={baseCurrency}
+      totalDividendsBase={stats.totalDividendsBase}
+      totalRealizedBase={stats.totalRealizedBase}
+      totalBrokerageBase={stats.totalBrokerageBase}
+      totalGainBase={stats.totalGainBase}
+      gainPct={stats.gainPct}
+      expandedHoldingId={ui.expandedHoldingId}
+      fmtBase={fmtBase}
+      fmtNative={fmtNative}
+      convertToBase={convertToBase}
+      isForeign={isForeign}
+      onAddHolding={handleAddHolding}
+      onEditHolding={ui.setEditingHolding}
+      onToggleExpanded={toggleHoldingExpanded}
+      onAddTxnForHolding={handleAddTxnForHolding}
+      onEditTxn={handleEditHoldingTxn}
+      onDeleteTxn={actions.handleDeleteHoldingTxn}
+      onSyncPrices={onSyncPrices}
+      isSyncingPrices={isSyncingPrices}
+      syncSummary={syncSummary}
+    />
+  );
+}
+
+function renderPropertyTab({
+  properties,
+  propertyTxns,
+  mortgageById,
+  ui,
+  actions,
+  fmtNative,
+}: InvestmentTabPanelProps) {
+  const handleAddProperty = () => ui.setShowAddProperty(true);
+  const togglePropertyExpanded = (id: number) =>
+    ui.setExpandedPropertyId(ui.expandedPropertyId === id ? null : id);
+  const handleAddTxnForProperty = (property: Property) => {
+    ui.setEditingPropertyTxn(null);
+    ui.setAddTxnForProperty(property);
+  };
+  const handleEditPropertyTxn = (transaction: PropertyTransaction) => {
+    ui.setAddTxnForProperty(null);
+    ui.setEditingPropertyTxn(transaction);
+  };
 
   return (
     <PropertyTab
@@ -103,11 +131,20 @@ export function InvestmentTabPanel({
       mortgageById={mortgageById}
       expandedPropertyId={ui.expandedPropertyId}
       fmtNative={fmtNative}
-      onAddProperty={() => ui.setShowAddProperty(true)}
+      onAddProperty={handleAddProperty}
       onUpdateProperty={ui.setUpdatingProperty}
-      onToggleExpanded={(id) => ui.setExpandedPropertyId(ui.expandedPropertyId === id ? null : id)}
-      onAddTxnForProperty={ui.setAddTxnForProperty}
+      onToggleExpanded={togglePropertyExpanded}
+      onAddTxnForProperty={handleAddTxnForProperty}
+      onEditTxn={handleEditPropertyTxn}
       onDeleteTxn={actions.handleDeletePropertyTxn}
     />
   );
+}
+
+export function InvestmentTabPanel(props: InvestmentTabPanelProps) {
+  if (props.tab === 'brokerage') {
+    return renderBrokerageTab(props);
+  }
+
+  return renderPropertyTab(props);
 }

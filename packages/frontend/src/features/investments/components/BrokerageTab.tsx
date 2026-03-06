@@ -39,6 +39,7 @@ type BrokerageTabProps = {
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForHolding: (holding: Holding) => void;
+  onEditTxn: (transaction: HoldingTransaction) => void;
   onDeleteTxn: (id: number) => void;
   onSyncPrices: () => void;
   isSyncingPrices: boolean;
@@ -57,6 +58,7 @@ type HoldingRowProps = {
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForHolding: (holding: Holding) => void;
+  onEditTxn: (transaction: HoldingTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -234,6 +236,7 @@ type HoldingHistoryProps = {
   holdingTxns: HoldingTransaction[];
   position: Position;
   onAddTxnForHolding: (holding: Holding) => void;
+  onEditTxn: (transaction: HoldingTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -242,6 +245,7 @@ function HoldingHistory({
   holdingTxns,
   position,
   onAddTxnForHolding,
+  onEditTxn,
   onDeleteTxn,
 }: HoldingHistoryProps) {
   return (
@@ -250,6 +254,7 @@ function HoldingHistory({
       position={position}
       transactions={holdingTxns}
       onAdd={() => onAddTxnForHolding(holding)}
+      onEdit={onEditTxn}
       onDelete={onDeleteTxn}
     />
   );
@@ -302,6 +307,7 @@ function HoldingRow(props: HoldingRowProps) {
           holdingTxns={holdingTxns}
           position={position}
           onAddTxnForHolding={props.onAddTxnForHolding}
+          onEditTxn={props.onEditTxn}
           onDeleteTxn={props.onDeleteTxn}
         />
       )}
@@ -363,6 +369,7 @@ type BrokerageHoldingsListProps = {
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForHolding: (holding: Holding) => void;
+  onEditTxn: (transaction: HoldingTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -378,6 +385,7 @@ function BrokerageHoldingsList({
   onEditHolding,
   onToggleExpanded,
   onAddTxnForHolding,
+  onEditTxn,
   onDeleteTxn,
 }: BrokerageHoldingsListProps) {
   return (
@@ -396,6 +404,7 @@ function BrokerageHoldingsList({
           onEditHolding={onEditHolding}
           onToggleExpanded={onToggleExpanded}
           onAddTxnForHolding={onAddTxnForHolding}
+          onEditTxn={onEditTxn}
           onDeleteTxn={onDeleteTxn}
         />
       ))}
@@ -441,6 +450,7 @@ type ClosedHoldingRowProps = {
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForHolding: (holding: Holding) => void;
+  onEditTxn: (transaction: HoldingTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -598,6 +608,7 @@ function ClosedHoldingRow({
   onEditHolding,
   onToggleExpanded,
   onAddTxnForHolding,
+  onEditTxn,
   onDeleteTxn,
 }: ClosedHoldingRowProps) {
   const isForeignHolding = isForeign(holding.currency);
@@ -661,6 +672,7 @@ function ClosedHoldingRow({
           holdingTxns={holdingTxns}
           position={position}
           onAddTxnForHolding={onAddTxnForHolding}
+          onEditTxn={onEditTxn}
           onDeleteTxn={onDeleteTxn}
         />
       )}
@@ -680,6 +692,7 @@ type ClosedHoldingsSectionProps = {
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForHolding: (holding: Holding) => void;
+  onEditTxn: (transaction: HoldingTransaction) => void;
   onDeleteTxn: (id: number) => void;
   showClosed: boolean;
   onToggleClosed: () => void;
@@ -774,6 +787,7 @@ function ClosedHoldingsTable({
   onEditHolding,
   onToggleExpanded,
   onAddTxnForHolding,
+  onEditTxn,
   onDeleteTxn,
 }: {
   closedHoldings: Holding[];
@@ -787,6 +801,7 @@ function ClosedHoldingsTable({
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForHolding: (holding: Holding) => void;
+  onEditTxn: (transaction: HoldingTransaction) => void;
   onDeleteTxn: (id: number) => void;
 }) {
   return (
@@ -814,6 +829,7 @@ function ClosedHoldingsTable({
             onEditHolding={onEditHolding}
             onToggleExpanded={onToggleExpanded}
             onAddTxnForHolding={onAddTxnForHolding}
+            onEditTxn={onEditTxn}
             onDeleteTxn={onDeleteTxn}
           />
         ))}
@@ -852,6 +868,7 @@ function ClosedHoldingsSection({
   onEditHolding,
   onToggleExpanded,
   onAddTxnForHolding,
+  onEditTxn,
   onDeleteTxn,
   showClosed,
   onToggleClosed,
@@ -886,6 +903,7 @@ function ClosedHoldingsSection({
             onEditHolding={onEditHolding}
             onToggleExpanded={onToggleExpanded}
             onAddTxnForHolding={onAddTxnForHolding}
+            onEditTxn={onEditTxn}
             onDeleteTxn={onDeleteTxn}
           />
           <ClosedHoldingsFooter closedCount={closedHoldings.length} summary={summary} />
@@ -986,7 +1004,8 @@ export function BrokerageTab(props: BrokerageTabProps) {
   const { totalBrokerageBase, totalGainBase, gainPct, expandedHoldingId, fmtBase, fmtNative } =
     props;
   const { convertToBase, isForeign, onAddHolding, onEditHolding, onToggleExpanded } = props;
-  const { onAddTxnForHolding, onDeleteTxn, onSyncPrices, isSyncingPrices, syncSummary } = props;
+  const { onAddTxnForHolding, onEditTxn, onDeleteTxn, onSyncPrices, isSyncingPrices, syncSummary } =
+    props;
   const [showClosed, setShowClosed] = useState(true);
   return (
     <div>
@@ -1011,6 +1030,7 @@ export function BrokerageTab(props: BrokerageTabProps) {
         onEditHolding={onEditHolding}
         onToggleExpanded={onToggleExpanded}
         onAddTxnForHolding={onAddTxnForHolding}
+        onEditTxn={onEditTxn}
         onDeleteTxn={onDeleteTxn}
       />
       {activeHoldings.length > 0 && (
@@ -1035,6 +1055,7 @@ export function BrokerageTab(props: BrokerageTabProps) {
         onEditHolding={onEditHolding}
         onToggleExpanded={onToggleExpanded}
         onAddTxnForHolding={onAddTxnForHolding}
+        onEditTxn={onEditTxn}
         onDeleteTxn={onDeleteTxn}
         showClosed={showClosed}
         onToggleClosed={() => setShowClosed((open) => !open)}

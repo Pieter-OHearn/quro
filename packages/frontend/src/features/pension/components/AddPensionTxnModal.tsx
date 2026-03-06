@@ -5,12 +5,13 @@ import { DateNoteRow } from '@/components/ui/DateNoteRow';
 import type { PensionPot, PensionTransaction } from '@quro/shared';
 import { PENSION_TXN_META } from '../constants';
 import { useAddPensionTxnForm } from '../hooks';
-import type { PensionTxnType } from '../types';
+import type { PensionTxnType, SavePensionTransactionInput } from '../types';
 
 type AddPensionTxnModalProps = {
   pot: PensionPot;
+  existing?: PensionTransaction;
   onClose: () => void;
-  onSave: (txn: Omit<PensionTransaction, 'id'>) => void;
+  onSave: (txn: SavePensionTransactionInput) => void;
 };
 
 const TXN_TYPE_OPTIONS = Object.entries(PENSION_TXN_META).map(([key, meta]) => ({
@@ -25,16 +26,16 @@ function EmployerToggle({
   return (
     <div className="flex items-center gap-3">
       <button
-        onClick={() => setIsEmployer(false)}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
-      >
-        Employee
-      </button>
-      <button
         onClick={() => setIsEmployer(true)}
         className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${isEmployer ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
       >
         Employer
+      </button>
+      <button
+        onClick={() => setIsEmployer(false)}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+      >
+        Employee
       </button>
     </div>
   );
@@ -47,7 +48,9 @@ type PensionTxnFormBodyProps = {
 
 function PensionTxnFormBody({ form, pot }: Readonly<PensionTxnFormBodyProps>) {
   const amountLabel =
-    form.type === 'contribution' ? `Amount (${pot.currency})` : `Fee Amount (${pot.currency})`;
+    form.type === 'contribution'
+      ? `Amount (${pot.currency})`
+      : `${PENSION_TXN_META[form.type].label} Amount (${pot.currency})`;
 
   return (
     <>
@@ -56,7 +59,7 @@ function PensionTxnFormBody({ form, pot }: Readonly<PensionTxnFormBodyProps>) {
           types={TXN_TYPE_OPTIONS}
           value={form.type}
           onChange={form.handleTypeChange}
-          columns={2}
+          columns={3}
         />
       </FormField>
       {form.type === 'contribution' && (
@@ -108,13 +111,15 @@ function PreviewBanner({
   currency,
   fmtNative,
 }: Readonly<PreviewBannerProps>): JSX.Element {
-  const isFee = type === 'fee';
-  const colorClass = isFee ? 'text-rose-600' : 'text-emerald-700';
-  const bgClass = isFee ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100';
+  const isDeduction = type !== 'contribution';
+  const colorClass = isDeduction ? 'text-rose-600' : 'text-emerald-700';
+  const bgClass = isDeduction ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100';
 
   let label: string;
-  if (isFee) {
+  if (type === 'fee') {
     label = 'Fee deducted';
+  } else if (type === 'tax') {
+    label = 'Contributions tax deducted';
   } else if (isEmployer) {
     label = 'Employer contribution';
   } else {
@@ -126,7 +131,7 @@ function PreviewBanner({
       <div className="flex justify-between text-xs">
         <span className={`font-medium ${colorClass}`}>{label}</span>
         <span className={`font-bold ${colorClass}`}>
-          {isFee ? '\u2212' : '+'}
+          {isDeduction ? '\u2212' : '+'}
           {fmtNative(amount, currency, true)}
         </span>
       </div>
@@ -134,15 +139,27 @@ function PreviewBanner({
   );
 }
 
-export function AddPensionTxnModal({ pot, onClose, onSave }: AddPensionTxnModalProps): JSX.Element {
-  const form = useAddPensionTxnForm(pot, onSave, onClose);
+export function AddPensionTxnModal({
+  pot,
+  existing,
+  onClose,
+  onSave,
+}: AddPensionTxnModalProps): JSX.Element {
+  const form = useAddPensionTxnForm(pot, existing, onSave, onClose);
+  const isEditing = Boolean(existing);
 
   return (
     <Modal
-      title="Record Transaction"
+      title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
       subtitle={`${pot.emoji} ${pot.name}`}
       onClose={onClose}
-      footer={<ModalFooter onCancel={onClose} onConfirm={form.handleSave} confirmLabel="Record" />}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={form.handleSave}
+          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+        />
+      }
     >
       <PensionTxnFormBody form={form} pot={pot} />
     </Modal>

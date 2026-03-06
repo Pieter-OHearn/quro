@@ -11,13 +11,15 @@ import {
 } from '@/components/ui';
 import type { TxnTypeMeta } from '@/components/ui';
 import type { Property, PropertyTransaction } from '@quro/shared';
+import type { SavePropertyTxnInput } from '../types';
 import { isInvestmentProperty, type PropertyTxnType } from '../utils/position';
 
 type AddPropertyTxnModalProps = {
   property: Property;
   mortgageBalance: number;
+  existing?: PropertyTransaction;
   onClose: () => void;
-  onSave: (t: Omit<PropertyTransaction, 'id'>) => void;
+  onSave: (t: SavePropertyTxnInput) => void;
 };
 
 const PROPERTY_TXN_META: Record<PropertyTxnType, TxnTypeMeta> = {
@@ -386,17 +388,32 @@ function RepaymentField({
   );
 }
 
-function usePropertyTxnForm(property: Property) {
-  const supportsCashflowTxns = isInvestmentProperty(property.propertyType);
-  const transactionTypes = supportsCashflowTxns
+function getSupportedPropertyTxnTypes(property: Property): PropertyTxnType[] {
+  return isInvestmentProperty(property.propertyType)
     ? (['repayment', 'valuation', 'rent_income', 'expense'] as PropertyTxnType[])
     : (['repayment', 'valuation'] as PropertyTxnType[]);
+}
 
-  const [type, setType] = useState<PropertyTxnType>(transactionTypes[0] ?? 'repayment');
-  const [amount, setAmount] = useState('');
-  const [interest, setInterest] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [note, setNote] = useState('');
+function resolveInitialPropertyTxnType(
+  transactionTypes: PropertyTxnType[],
+  existing: PropertyTransaction | undefined,
+): PropertyTxnType {
+  const fallbackType = transactionTypes[0] ?? 'repayment';
+  const initialType = existing?.type ?? fallbackType;
+  return transactionTypes.includes(initialType) ? initialType : fallbackType;
+}
+
+function usePropertyTxnForm(property: Property, existing: PropertyTransaction | undefined) {
+  const transactionTypes = getSupportedPropertyTxnTypes(property);
+  const [type, setType] = useState<PropertyTxnType>(
+    resolveInitialPropertyTxnType(transactionTypes, existing),
+  );
+  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
+  const [interest, setInterest] = useState(
+    existing?.interest != null ? String(existing.interest) : '',
+  );
+  const [date, setDate] = useState(existing?.date ?? new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState(existing?.note ?? '');
   const [error, setError] = useState('');
 
   const parsedAmount = parseFloat(amount) || 0;
@@ -529,11 +546,18 @@ function PropertyTxnFormBody({
 export function AddPropertyTxnModal({
   property,
   mortgageBalance,
+  existing,
   onClose,
   onSave,
 }: AddPropertyTxnModalProps) {
   const { fmtNative } = useCurrency();
-  const form = usePropertyTxnForm(property);
+  const form = usePropertyTxnForm(property, existing);
+  const existingPrincipal =
+    existing?.type === 'repayment'
+      ? (existing.principal ?? Math.max(0, existing.amount - (existing.interest ?? 0)))
+      : 0;
+  const effectiveMortgageBalance = mortgageBalance + existingPrincipal;
+  const isEditing = Boolean(existing);
 
   function handleSave() {
     if (form.parsedAmount <= 0) {
@@ -542,7 +566,7 @@ export function AddPropertyTxnModal({
     }
     const repaymentError = validateRepayment(
       form.type,
-      mortgageBalance,
+      effectiveMortgageBalance,
       form.parsedInterest,
       form.parsedAmount,
     );
@@ -550,7 +574,7 @@ export function AddPropertyTxnModal({
       form.setError(repaymentError);
       return;
     }
-    onSave({
+    const payload = {
       propertyId: property.id,
       type: form.type,
       amount: form.parsedAmount,
@@ -558,21 +582,28 @@ export function AddPropertyTxnModal({
       principal: form.type === 'repayment' ? form.derivedPrincipal : null,
       date: form.date,
       note: form.note,
-    });
+    };
+    onSave(existing ? { id: existing.id, ...payload } : payload);
     onClose();
   }
 
   return (
     <Modal
-      title="Record Transaction"
+      title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
       subtitle={`${property.emoji} ${property.address}`}
       onClose={onClose}
-      footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Record" />}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={handleSave}
+          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+        />
+      }
     >
       <PropertyTxnFormBody
         form={form}
         property={property}
-        mortgageBalance={mortgageBalance}
+        mortgageBalance={effectiveMortgageBalance}
         fmtNative={fmtNative}
       />
     </Modal>

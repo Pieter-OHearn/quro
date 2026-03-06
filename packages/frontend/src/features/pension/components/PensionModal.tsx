@@ -173,7 +173,7 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
     return {
       name: '',
       provider: '',
-      type: 'Workplace',
+      type: 'Workplace Pension',
       balance: '',
       currency: 'EUR' as CurrencyCode,
       employeeMonthly: '',

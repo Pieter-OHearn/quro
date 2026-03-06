@@ -26,8 +26,8 @@ export function usePensionComputations(
   yearsToRetirement: number | null,
 ): PensionComputations {
   const { totalInBase, totalMonthlyContribInBase } = useMemo(
-    () => computePensionTotals(pensions, convertToBase),
-    [pensions, convertToBase],
+    () => computePensionTotals(pensions, pensionTxns, convertToBase),
+    [pensions, pensionTxns, convertToBase],
   );
 
   const projected = useMemo(

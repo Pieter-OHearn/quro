@@ -10,6 +10,7 @@ import { usePensionComputations } from './usePensionComputations';
 import { usePensionPots } from './usePensionPots';
 import { usePensionTransactions } from './usePensionTransactions';
 import { useUpdatePensionPot } from './useUpdatePensionPot';
+import { useUpdatePensionTransaction } from './useUpdatePensionTransaction';
 
 export function usePensionPageState(): PensionPageState {
   const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
@@ -20,12 +21,14 @@ export function usePensionPageState(): PensionPageState {
   const updatePot = useUpdatePensionPot();
   const deletePot = useDeletePensionPot();
   const createTxn = useCreatePensionTransaction();
+  const updateTxn = useUpdatePensionTransaction();
   const deleteTxn = useDeletePensionTransaction();
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<PensionPot | undefined>(undefined);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [addTxnForPot, setAddTxnForPot] = useState<PensionPot | null>(null);
+  const [editingTxn, setEditingTxn] = useState<PensionTransaction | null>(null);
   const [retirementYearsInput, setRetirementYearsInput] = useState('');
 
   const parsedRetirementYears = Number.parseInt(retirementYearsInput, 10);
@@ -50,7 +53,12 @@ export function usePensionPageState(): PensionPageState {
     createPot.mutate(pot);
   };
 
-  const handleAddPensionTxn = (txn: Omit<PensionTransaction, 'id'>): void => {
+  const handleAddPensionTxn = (txn: Omit<PensionTransaction, 'id'> & { id?: number }): void => {
+    if (txn.id) {
+      const { id, ...payload } = txn;
+      updateTxn.mutate({ id, ...payload });
+      return;
+    }
     createTxn.mutate(txn);
   };
 
@@ -75,6 +83,8 @@ export function usePensionPageState(): PensionPageState {
     setExpanded,
     addTxnForPot,
     setAddTxnForPot,
+    editingTxn,
+    setEditingTxn,
     retirementYearsInput,
     setRetirementYearsInput,
     ...computations,

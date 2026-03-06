@@ -76,7 +76,7 @@ export const LANDING_FEATURES: readonly LandingFeature[] = [
   {
     icon: ShieldCheck,
     label: 'Pension',
-    desc: 'Manage multiple pension pots across countries — ABP, Australian Super, SIPP.',
+    desc: 'Manage multiple pension pots across countries — ABP, Australian Super, personal pension.',
     color: 'bg-amber-50 text-amber-600',
     border: 'hover:border-amber-200',
   },

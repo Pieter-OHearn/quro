@@ -46,6 +46,7 @@ export function Pension(): JSX.Element {
         setEditing={state.setEditing}
         setShowModal={state.setShowModal}
         setAddTxnForPot={state.setAddTxnForPot}
+        setEditingTxn={state.setEditingTxn}
         deletePot={state.deletePot}
         handleDeletePensionTxn={state.handleDeletePensionTxn}
         fmtBase={state.fmtBase}

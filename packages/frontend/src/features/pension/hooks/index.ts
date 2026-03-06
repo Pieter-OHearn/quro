@@ -8,3 +8,4 @@ export { usePensionPageState } from './usePensionPageState';
 export { usePensionPots } from './usePensionPots';
 export { usePensionTransactions } from './usePensionTransactions';
 export { useUpdatePensionPot } from './useUpdatePensionPot';
+export { useUpdatePensionTransaction } from './useUpdatePensionTransaction';

@@ -234,7 +234,7 @@ export const pensionTransactions = pgTable(
     potId: integer('pot_id')
       .references(() => pensionPots.id)
       .notNull(),
-    type: text('type').notNull(), // contribution | fee
+    type: text('type').notNull(), // contribution | fee | tax
     amount: numeric('amount').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),

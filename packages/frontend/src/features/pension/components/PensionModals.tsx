@@ -12,11 +12,17 @@ export function PensionModals({ state }: Readonly<PensionModalsProps>) {
     setShowModal,
     editing,
     setEditing,
+    pensions,
     addTxnForPot,
     setAddTxnForPot,
+    editingTxn,
+    setEditingTxn,
     handleSave,
     handleAddPensionTxn,
   } = state;
+  const modalPot =
+    addTxnForPot ??
+    (editingTxn ? (pensions.find((pot) => pot.id === editingTxn.potId) ?? null) : null);
 
   return (
     <>
@@ -30,10 +36,14 @@ export function PensionModals({ state }: Readonly<PensionModalsProps>) {
           onSave={handleSave}
         />
       )}
-      {addTxnForPot && (
+      {modalPot && (
         <AddPensionTxnModal
-          pot={addTxnForPot}
-          onClose={() => setAddTxnForPot(null)}
+          pot={modalPot}
+          existing={editingTxn ?? undefined}
+          onClose={() => {
+            setAddTxnForPot(null);
+            setEditingTxn(null);
+          }}
           onSave={handleAddPensionTxn}
         />
       )}

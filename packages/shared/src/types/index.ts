@@ -182,7 +182,7 @@ export type PensionPot = {
   id: number;
   name: string;
   provider: string;
-  type: 'Workplace' | 'SIPP' | 'Superannuation' | 'Final Salary' | 'Other';
+  type: 'Workplace Pension' | 'Personal Pension' | 'State Pension' | 'Other';
   balance: number;
   currency: CurrencyCode;
   employeeMonthly: number;
@@ -195,7 +195,7 @@ export type PensionPot = {
 export type PensionTransaction = {
   id: number;
   potId: number;
-  type: 'contribution' | 'fee';
+  type: 'contribution' | 'fee' | 'tax';
   amount: number;
   date: string;
   note: string;

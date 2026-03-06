@@ -5,6 +5,7 @@ import { useDeleteSavingsTransaction } from './useDeleteSavingsTransaction';
 import { useSavingsAccounts } from './useSavingsAccounts';
 import { useSavingsTransactions } from './useSavingsTransactions';
 import { useUpdateSavingsAccount } from './useUpdateSavingsAccount';
+import { useUpdateSavingsTransaction } from './useUpdateSavingsTransaction';
 
 export function useSavingsData() {
   const { data: accounts = [], isLoading: loadingAccounts } = useSavingsAccounts();
@@ -13,6 +14,7 @@ export function useSavingsData() {
   const updateAccount = useUpdateSavingsAccount();
   const deleteAccount = useDeleteSavingsAccount();
   const createTxn = useCreateSavingsTransaction();
+  const updateTxn = useUpdateSavingsTransaction();
   const deleteTxn = useDeleteSavingsTransaction();
 
   return {
@@ -24,6 +26,7 @@ export function useSavingsData() {
     updateAccount,
     deleteAccount,
     createTxn,
+    updateTxn,
     deleteTxn,
   };
 }

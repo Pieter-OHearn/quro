@@ -143,7 +143,7 @@ type DatedPropertyTransaction = {
 
 type DatedPensionTransaction = {
   potId: number;
-  type: 'contribution' | 'fee';
+  type: 'contribution' | 'fee' | 'tax';
   amount: number;
   timestamp: number;
 };
@@ -215,7 +215,12 @@ function buildDatedPensionTransactions(
   transactions: readonly PensionTransactionRow[],
 ): DatedPensionTransaction[] {
   return transactions
-    .filter((transaction) => transaction.type === 'contribution' || transaction.type === 'fee')
+    .filter(
+      (transaction) =>
+        transaction.type === 'contribution' ||
+        transaction.type === 'fee' ||
+        transaction.type === 'tax',
+    )
     .map((transaction) => ({
       potId: transaction.potId,
       type: transaction.type as DatedPensionTransaction['type'],
@@ -353,7 +358,7 @@ function computePensionAtCutoff(
     let balance = toNumber(pot.balance);
     for (const transaction of txnsByPotId.get(pot.id) ?? []) {
       if (transaction.timestamp <= cutoff) continue;
-      if (transaction.type === 'fee') balance += transaction.amount;
+      if (transaction.type === 'fee' || transaction.type === 'tax') balance += transaction.amount;
       else balance -= transaction.amount;
     }
     return sum + convertToBase(Math.max(0, balance), pot.currency, rates);
@@ -714,8 +719,14 @@ function buildActivityList(p: any[], b: any[], s: any[], h: any[], m: any[], pe:
         category: 'Mortgage',
       })),
     ...pe.map((row) => ({
-      name: row.note || 'Pension contribution',
-      type: row.type === 'fee' ? ('expense' as const) : ('transfer' as const),
+      name:
+        row.note ||
+        (row.type === 'contribution'
+          ? 'Pension contribution'
+          : row.type === 'tax'
+            ? 'Contributions tax'
+            : 'Pension fee'),
+      type: row.type === 'contribution' ? ('transfer' as const) : ('expense' as const),
       amount: -Math.abs(toNumber(row.amount)),
       date: row.date,
       category: 'Pension',

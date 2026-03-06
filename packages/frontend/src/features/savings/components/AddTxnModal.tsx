@@ -8,7 +8,7 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import type { SavingsAccount } from '@quro/shared';
+import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { TXN_META, TXN_TYPE_LIST } from '../constants';
 import type { SaveTransactionInput, TxnType } from '../types';
 
@@ -19,21 +19,32 @@ function toFiniteNumber(value: number): number {
 
 type AddTxnModalProps = {
   account: SavingsAccount;
+  existing?: SavingsTransaction;
   onClose: () => void;
   onSave: (transaction: SaveTransactionInput) => void;
 };
 
+function signedAmount(type: TxnType, amount: number): number {
+  const absoluteAmount = Math.abs(amount);
+  return type === 'withdrawal' ? -absoluteAmount : absoluteAmount;
+}
+
 type BalancePreviewProps = {
   type: TxnType;
   parsed: number;
-  account: SavingsAccount;
+  currency: string;
+  balanceBeforeTxn: number;
   fmtNative: (v: number, c: string, d?: boolean) => string;
 };
 
-function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProps) {
-  const currentBalance = toFiniteNumber(account.balance);
-  const signedAmount = type === 'withdrawal' ? -Math.abs(parsed) : Math.abs(parsed);
-  const newBalance = currentBalance + signedAmount;
+function BalancePreview({
+  type,
+  parsed,
+  currency,
+  balanceBeforeTxn,
+  fmtNative,
+}: BalancePreviewProps) {
+  const newBalance = balanceBeforeTxn + signedAmount(type, parsed);
 
   return (
     <div
@@ -42,15 +53,15 @@ function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProp
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-slate-600">Balance after transaction</span>
         <span className={`font-bold ${newBalance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-          {fmtNative(newBalance, account.currency, true)}
+          {fmtNative(newBalance, currency, true)}
         </span>
       </div>
       <div className="flex items-center gap-2 text-xs text-slate-500">
-        <span>{fmtNative(currentBalance, account.currency, true)}</span>
+        <span>{fmtNative(balanceBeforeTxn, currency, true)}</span>
         <span>{type === 'withdrawal' ? '\u2212' : '+'}</span>
-        <span className={TXN_META[type].color}>{fmtNative(parsed, account.currency, true)}</span>
+        <span className={TXN_META[type].color}>{fmtNative(parsed, currency, true)}</span>
         <span>=</span>
-        <span className="font-semibold">{fmtNative(newBalance, account.currency, true)}</span>
+        <span className="font-semibold">{fmtNative(newBalance, currency, true)}</span>
       </div>
     </div>
   );
@@ -58,28 +69,34 @@ function BalancePreview({ type, parsed, account, fmtNative }: BalancePreviewProp
 
 function useAddTxnForm(
   account: SavingsAccount,
+  existing: SavingsTransaction | undefined,
   onSave: (transaction: SaveTransactionInput) => void,
   onClose: () => void,
 ) {
-  const [type, setType] = useState<TxnType>('deposit');
-  const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [note, setNote] = useState('');
+  const [type, setType] = useState<TxnType>(existing?.type ?? 'deposit');
+  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
+  const [date, setDate] = useState(existing?.date ?? new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState(existing?.note ?? '');
   const [error, setError] = useState('');
 
   const parsed = parseFloat(amount) || 0;
   const accountBalance = toFiniteNumber(account.balance);
+  const existingSignedAmount = existing
+    ? signedAmount(existing.type, toFiniteNumber(existing.amount))
+    : 0;
+  const balanceBeforeTxn = accountBalance - existingSignedAmount;
 
   function handleSave(): void {
     if (!amount || isNaN(parsed) || parsed <= 0) {
       setError('Enter a valid amount');
       return;
     }
-    if (type === 'withdrawal' && parsed > accountBalance) {
+    if (type === 'withdrawal' && parsed > balanceBeforeTxn) {
       setError('Amount exceeds account balance');
       return;
     }
-    onSave({ accountId: account.id, type, amount: parsed, date, note });
+    const payload = { accountId: account.id, type, amount: parsed, date, note };
+    onSave(existing ? { id: existing.id, ...payload } : payload);
     onClose();
   }
 
@@ -95,23 +112,25 @@ function useAddTxnForm(
     error,
     setError,
     parsed,
+    balanceBeforeTxn,
     handleSave,
   };
 }
 
-export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
+export function AddTxnModal({ account, existing, onClose, onSave }: AddTxnModalProps) {
   const { fmtNative } = useCurrency();
-  const form = useAddTxnForm(account, onSave, onClose);
+  const form = useAddTxnForm(account, existing, onSave, onClose);
+  const isEditing = Boolean(existing);
   return (
     <Modal
-      title="Add Transaction"
+      title={isEditing ? 'Edit Transaction' : 'Add Transaction'}
       subtitle={`${account.emoji} ${account.name}`}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={form.handleSave}
-          confirmLabel="Record Transaction"
+          confirmLabel={isEditing ? 'Save Changes' : 'Record Transaction'}
         />
       }
     >
@@ -147,7 +166,8 @@ export function AddTxnModal({ account, onClose, onSave }: AddTxnModalProps) {
         <BalancePreview
           type={form.type}
           parsed={form.parsed}
-          account={account}
+          currency={account.currency}
+          balanceBeforeTxn={form.balanceBeforeTxn}
           fmtNative={fmtNative}
         />
       )}

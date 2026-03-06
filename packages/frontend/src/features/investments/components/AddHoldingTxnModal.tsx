@@ -12,14 +12,24 @@ import {
 } from '@/components/ui';
 import type { TxnTypeMeta } from '@/components/ui';
 import type { Holding, HoldingTransaction } from '@quro/shared';
+import type { SaveHoldingTxnInput } from '../types';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
 
 type AddHoldingTxnModalProps = {
   holding: Holding;
   currentPosition: Position;
+  existing?: HoldingTransaction;
   onClose: () => void;
-  onSave: (t: Omit<HoldingTransaction, 'id'>) => void;
+  onSave: (t: SaveHoldingTxnInput) => void;
+};
+
+type InitialHoldingTxnFormValues = {
+  type: HoldingTxnType;
+  shares: string;
+  price: string;
+  date: string;
+  note: string;
 };
 
 const TXN_META: Record<HoldingTxnType, TxnTypeMeta> = {
@@ -437,27 +447,66 @@ function TxnFormBody(props: TxnFormBodyProps) {
   );
 }
 
-function useHoldingTxnForm(currentPosition: Position) {
-  const [type, setType] = useState<HoldingTxnType>('buy');
-  const [shares, setShares] = useState('');
-  const [price, setPrice] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [note, setNote] = useState('');
+function computeNextAverageCost(
+  type: HoldingTxnType,
+  parsedShares: number,
+  parsedPrice: number,
+  currentPosition: Position,
+): number {
+  if (type !== 'buy' || parsedShares <= 0 || parsedPrice <= 0) return currentPosition.avgCost;
+  const newTotal = currentPosition.shares * currentPosition.avgCost + parsedShares * parsedPrice;
+  return newTotal / (currentPosition.shares + parsedShares);
+}
+
+function computeRealizedGainEstimate(
+  type: HoldingTxnType,
+  parsedShares: number,
+  parsedPrice: number,
+  currentPosition: Position,
+): number {
+  if (type !== 'sell' || parsedShares <= 0 || parsedPrice <= 0) return 0;
+  return (parsedPrice - currentPosition.avgCost) * parsedShares;
+}
+
+function buildInitialHoldingTxnValues(
+  existing: HoldingTransaction | undefined,
+): InitialHoldingTxnFormValues {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    type: existing?.type ?? 'buy',
+    shares: existing?.shares != null ? String(existing.shares) : '',
+    price: existing != null ? String(existing.price) : '',
+    date: existing?.date ?? today,
+    note: existing?.note ?? '',
+  };
+}
+
+function parseFormNumber(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function useHoldingTxnForm(currentPosition: Position, existing: HoldingTransaction | undefined) {
+  const initialValues = buildInitialHoldingTxnValues(existing);
+  const [type, setType] = useState<HoldingTxnType>(initialValues.type);
+  const [shares, setShares] = useState(initialValues.shares);
+  const [price, setPrice] = useState(initialValues.price);
+  const [date, setDate] = useState(initialValues.date);
+  const [note, setNote] = useState(initialValues.note);
   const [error, setError] = useState('');
 
-  const parsedShares = parseFloat(shares) || 0;
-  const parsedPrice = parseFloat(price) || 0;
+  const parsedShares = parseFormNumber(shares);
+  const parsedPrice = parseFormNumber(price);
 
-  const newAvgCost = useMemo(() => {
-    if (type !== 'buy' || parsedShares <= 0 || parsedPrice <= 0) return currentPosition.avgCost;
-    const newTotal = currentPosition.shares * currentPosition.avgCost + parsedShares * parsedPrice;
-    return newTotal / (currentPosition.shares + parsedShares);
-  }, [type, parsedShares, parsedPrice, currentPosition]);
+  const newAvgCost = useMemo(
+    () => computeNextAverageCost(type, parsedShares, parsedPrice, currentPosition),
+    [type, parsedShares, parsedPrice, currentPosition],
+  );
 
-  const realizedGain = useMemo(() => {
-    if (type !== 'sell' || parsedShares <= 0 || parsedPrice <= 0) return 0;
-    return (parsedPrice - currentPosition.avgCost) * parsedShares;
-  }, [type, parsedShares, parsedPrice, currentPosition]);
+  const realizedGain = useMemo(
+    () => computeRealizedGainEstimate(type, parsedShares, parsedPrice, currentPosition),
+    [type, parsedShares, parsedPrice, currentPosition],
+  );
 
   function handleTypeChange(t: HoldingTxnType) {
     setType(t);
@@ -490,6 +539,7 @@ function buildHoldingTxnSaveHandler(
   form: ReturnType<typeof useHoldingTxnForm>,
   holding: Holding,
   currentPosition: Position,
+  existing: HoldingTransaction | undefined,
   onSave: AddHoldingTxnModalProps['onSave'],
   onClose: () => void,
 ) {
@@ -504,14 +554,15 @@ function buildHoldingTxnSaveHandler(
       form.setError(validationError);
       return;
     }
-    onSave({
+    const payload = {
       holdingId: holding.id,
       type: form.type,
       shares: form.type === 'buy' || form.type === 'sell' ? form.parsedShares : null,
       price: form.parsedPrice,
       date: form.date,
       note: form.note,
-    });
+    };
+    onSave(existing ? { id: existing.id, ...payload } : payload);
     onClose();
   };
 }
@@ -519,13 +570,22 @@ function buildHoldingTxnSaveHandler(
 export function AddHoldingTxnModal({
   holding,
   currentPosition,
+  existing,
   onClose,
   onSave,
 }: AddHoldingTxnModalProps) {
   const { fmtNative } = useCurrency();
   const incomeLabels = getIncomeTxnLabels(holding);
-  const form = useHoldingTxnForm(currentPosition);
-  const handleSave = buildHoldingTxnSaveHandler(form, holding, currentPosition, onSave, onClose);
+  const form = useHoldingTxnForm(currentPosition, existing);
+  const handleSave = buildHoldingTxnSaveHandler(
+    form,
+    holding,
+    currentPosition,
+    existing,
+    onSave,
+    onClose,
+  );
+  const isEditing = Boolean(existing);
   const onSharesChange = (value: string) => {
     form.setShares(value);
     form.setError('');
@@ -537,10 +597,16 @@ export function AddHoldingTxnModal({
 
   return (
     <Modal
-      title="Record Transaction"
+      title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
       subtitle={`${holding.ticker} · ${holding.name}`}
       onClose={onClose}
-      footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Record" />}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={handleSave}
+          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+        />
+      }
     >
       <TxnFormBody
         type={form.type}

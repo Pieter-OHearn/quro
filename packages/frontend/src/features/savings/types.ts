@@ -21,4 +21,4 @@ export type SavingsContributionDatum = {
 export type TxnType = 'deposit' | 'withdrawal' | 'interest';
 
 export type SaveAccountInput = Omit<SavingsAccount, 'id'> & { id?: number };
-export type SaveTransactionInput = Omit<SavingsTransaction, 'id'>;
+export type SaveTransactionInput = Omit<SavingsTransaction, 'id'> & { id?: number };

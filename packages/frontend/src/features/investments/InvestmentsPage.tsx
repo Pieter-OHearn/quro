@@ -89,8 +89,14 @@ function InvestmentPageBody({
   return (
     <div className="p-6 space-y-6">
       <InvestmentModals
-        holdingModals={buildHoldingModalsProps(ui, actions, positions)}
-        propertyModals={buildPropertyModalsProps(ui, actions, mortgageById)}
+        holdingModals={buildHoldingModalsProps(
+          ui,
+          actions,
+          [...activeHoldings, ...closedHoldings],
+          holdingTxns,
+          positions,
+        )}
+        propertyModals={buildPropertyModalsProps(ui, actions, properties, mortgageById)}
       />
       <InvestmentStatCards {...stats} trends={statTrends} fmtBase={fmtBase} />
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />

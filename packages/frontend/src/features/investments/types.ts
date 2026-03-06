@@ -26,24 +26,31 @@ export type PortfolioHistoryPoint = {
   isEstimated: boolean;
 };
 
+export type SaveHoldingTxnInput = Omit<HoldingTransaction, 'id'> & { id?: number };
+export type SavePropertyTxnInput = Omit<PropertyTransaction, 'id'> & { id?: number };
+
 export type InvestmentUIState = {
   tab: Tab;
   editingHolding: Holding | null;
   showAddHolding: boolean;
   addTxnForHolding: Holding | null;
+  editingHoldingTxn: HoldingTransaction | null;
   expandedHoldingId: number | null;
   updatingProperty: Property | null;
   showAddProperty: boolean;
   addTxnForProperty: Property | null;
+  editingPropertyTxn: PropertyTransaction | null;
   expandedPropertyId: number | null;
   setTab: (tab: Tab) => void;
   setEditingHolding: (holding: Holding | null) => void;
   setShowAddHolding: (show: boolean) => void;
   setAddTxnForHolding: (holding: Holding | null) => void;
+  setEditingHoldingTxn: (transaction: HoldingTransaction | null) => void;
   setExpandedHoldingId: (id: number | null) => void;
   setUpdatingProperty: (property: Property | null) => void;
   setShowAddProperty: (show: boolean) => void;
   setAddTxnForProperty: (property: Property | null) => void;
+  setEditingPropertyTxn: (transaction: PropertyTransaction | null) => void;
   setExpandedPropertyId: (id: number | null) => void;
 };
 
@@ -82,11 +89,11 @@ export type InvestmentActions = {
     },
   ) => void;
   handleDeleteHolding: (id: number) => void;
-  handleAddHoldingTxn: (transaction: Omit<HoldingTransaction, 'id'>) => void;
+  handleAddHoldingTxn: (transaction: SaveHoldingTxnInput) => void;
   handleDeleteHoldingTxn: (id: number) => void;
   handleUpdateProperty: (id: number, value: number, rent: number) => void;
   handleSaveProperty: (property: Omit<Property, 'id'>) => void;
-  handleAddPropertyTxn: (transaction: Omit<PropertyTransaction, 'id'>) => void;
+  handleAddPropertyTxn: (transaction: SavePropertyTxnInput) => void;
   handleDeletePropertyTxn: (id: number) => void;
 };
 
@@ -103,6 +110,9 @@ export type HoldingModalsProps = {
   showAddHolding: boolean;
   editingHolding: Holding | null;
   addTxnForHolding: Holding | null;
+  editingHoldingTxn: HoldingTransaction | null;
+  holdings: Holding[];
+  holdingTxns: HoldingTransaction[];
   positions: Record<number, Position>;
   onCloseEditHolding: () => void;
   onSaveHolding: (
@@ -116,7 +126,7 @@ export type HoldingModalsProps = {
   ) => void;
   onDeleteHolding: (id: number) => void;
   onCloseAddHoldingTxn: () => void;
-  onSaveHoldingTxn: (transaction: Omit<HoldingTransaction, 'id'>) => void;
+  onSaveHoldingTxn: (transaction: SaveHoldingTxnInput) => void;
 };
 
 export type BrokerageSyncProps = {
@@ -129,11 +139,13 @@ export type PropertyModalsProps = {
   updatingProperty: Property | null;
   showAddProperty: boolean;
   addTxnForProperty: Property | null;
+  editingPropertyTxn: PropertyTransaction | null;
+  properties: Property[];
   mortgageById: Map<number, Mortgage>;
   onCloseUpdateProperty: () => void;
   onSaveUpdateProperty: (id: number, value: number, rent: number) => void;
   onCloseAddProperty: () => void;
   onSaveAddProperty: (property: Omit<Property, 'id'>) => void;
   onCloseAddPropertyTxn: () => void;
-  onSavePropertyTxn: (transaction: Omit<PropertyTransaction, 'id'>) => void;
+  onSavePropertyTxn: (transaction: SavePropertyTxnInput) => void;
 };

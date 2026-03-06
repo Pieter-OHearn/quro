@@ -15,6 +15,7 @@ type PropertyTabProps = {
   onUpdateProperty: (property: Property) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForProperty: (property: Property) => void;
+  onEditTxn: (transaction: PropertyTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -273,6 +274,7 @@ type PropertyCardProps = {
   onUpdateProperty: (property: Property) => void;
   onToggleExpanded: (id: number) => void;
   onAddTxnForProperty: (property: Property) => void;
+  onEditTxn: (transaction: PropertyTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -337,7 +339,7 @@ function PropertyCardHeader({
 
 function PropertyCard(props: PropertyCardProps) {
   const { property, propertyTxns, mortgageById, isExpanded, fmtNative } = props;
-  const { onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onDeleteTxn } = props;
+  const { onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onEditTxn, onDeleteTxn } = props;
   const linkedMortgage =
     property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
   const stats = computePropertyCardStats(property, propertyTxns, mortgageById);
@@ -380,6 +382,7 @@ function PropertyCard(props: PropertyCardProps) {
           property={property}
           transactions={propertyTxns.filter((t) => t.propertyId === property.id)}
           onAdd={() => onAddTxnForProperty(property)}
+          onEdit={onEditTxn}
           onDelete={onDeleteTxn}
         />
       )}
@@ -400,6 +403,7 @@ function PropertyCardsList({
   onUpdateProperty,
   onToggleExpanded,
   onAddTxnForProperty,
+  onEditTxn,
   onDeleteTxn,
 }: PropertyCardsListProps) {
   return (
@@ -415,6 +419,7 @@ function PropertyCardsList({
           onUpdateProperty={onUpdateProperty}
           onToggleExpanded={onToggleExpanded}
           onAddTxnForProperty={onAddTxnForProperty}
+          onEditTxn={onEditTxn}
           onDeleteTxn={onDeleteTxn}
         />
       ))}
@@ -432,6 +437,7 @@ export function PropertyTab({
   onUpdateProperty,
   onToggleExpanded,
   onAddTxnForProperty,
+  onEditTxn,
   onDeleteTxn,
 }: PropertyTabProps) {
   return (
@@ -465,6 +471,7 @@ export function PropertyTab({
           onUpdateProperty={onUpdateProperty}
           onToggleExpanded={onToggleExpanded}
           onAddTxnForProperty={onAddTxnForProperty}
+          onEditTxn={onEditTxn}
           onDeleteTxn={onDeleteTxn}
         />
       )}

@@ -4,18 +4,45 @@ import { AddPropertyTxnModal } from './AddPropertyTxnModal';
 import { EditHoldingModal } from './EditHoldingModal';
 import { UpdatePropertyModal } from './UpdatePropertyModal';
 import type { HoldingModalsProps, PropertyModalsProps } from '../types';
+import { computePosition, getPropertyMortgageBalance } from '../utils/position';
 import { EMPTY_POSITION } from '../utils/portfolio';
-import { getPropertyMortgageBalance } from '../utils/position';
 
 type InvestmentModalsProps = {
   holdingModals: HoldingModalsProps;
   propertyModals: PropertyModalsProps;
 };
 
+function resolveHoldingTxnModalState(
+  addTxnForHolding: HoldingModalsProps['addTxnForHolding'],
+  editingHoldingTxn: HoldingModalsProps['editingHoldingTxn'],
+  holdings: HoldingModalsProps['holdings'],
+  holdingTxns: HoldingModalsProps['holdingTxns'],
+  positions: HoldingModalsProps['positions'],
+) {
+  const editingTransactionHolding =
+    editingHoldingTxn != null
+      ? (holdings.find((holding) => holding.id === editingHoldingTxn.holdingId) ?? null)
+      : null;
+  const modalHolding = addTxnForHolding ?? editingTransactionHolding;
+  if (!modalHolding) return { modalHolding: null, effectivePosition: EMPTY_POSITION };
+
+  const effectivePosition = editingHoldingTxn
+    ? computePosition(
+        modalHolding.id,
+        holdingTxns.filter((txn) => txn.id !== editingHoldingTxn.id),
+      )
+    : (positions[modalHolding.id] ?? EMPTY_POSITION);
+
+  return { modalHolding, effectivePosition };
+}
+
 function HoldingModals({
   showAddHolding,
   editingHolding,
   addTxnForHolding,
+  editingHoldingTxn,
+  holdings,
+  holdingTxns,
   positions,
   onCloseEditHolding,
   onSaveHolding,
@@ -23,6 +50,14 @@ function HoldingModals({
   onCloseAddHoldingTxn,
   onSaveHoldingTxn,
 }: HoldingModalsProps) {
+  const { modalHolding, effectivePosition } = resolveHoldingTxnModalState(
+    addTxnForHolding,
+    editingHoldingTxn,
+    holdings,
+    holdingTxns,
+    positions,
+  );
+
   return (
     <>
       {(showAddHolding || editingHolding) && (
@@ -33,10 +68,11 @@ function HoldingModals({
           onDelete={onDeleteHolding}
         />
       )}
-      {addTxnForHolding && (
+      {modalHolding && (
         <AddHoldingTxnModal
-          holding={addTxnForHolding}
-          currentPosition={positions[addTxnForHolding.id] ?? EMPTY_POSITION}
+          holding={modalHolding}
+          existing={editingHoldingTxn ?? undefined}
+          currentPosition={effectivePosition}
           onClose={onCloseAddHoldingTxn}
           onSave={onSaveHoldingTxn}
         />
@@ -49,6 +85,8 @@ function PropertyModals({
   updatingProperty,
   showAddProperty,
   addTxnForProperty,
+  editingPropertyTxn,
+  properties,
   mortgageById,
   onCloseUpdateProperty,
   onSaveUpdateProperty,
@@ -57,6 +95,12 @@ function PropertyModals({
   onCloseAddPropertyTxn,
   onSavePropertyTxn,
 }: PropertyModalsProps) {
+  const editingTransactionProperty =
+    editingPropertyTxn != null
+      ? (properties.find((property) => property.id === editingPropertyTxn.propertyId) ?? null)
+      : null;
+  const modalProperty = addTxnForProperty ?? editingTransactionProperty;
+
   return (
     <>
       {updatingProperty && (
@@ -70,10 +114,11 @@ function PropertyModals({
       {showAddProperty && (
         <AddPropertyModal onClose={onCloseAddProperty} onSave={onSaveAddProperty} />
       )}
-      {addTxnForProperty && (
+      {modalProperty && (
         <AddPropertyTxnModal
-          property={addTxnForProperty}
-          mortgageBalance={getPropertyMortgageBalance(addTxnForProperty, mortgageById)}
+          property={modalProperty}
+          existing={editingPropertyTxn ?? undefined}
+          mortgageBalance={getPropertyMortgageBalance(modalProperty, mortgageById)}
           onClose={onCloseAddPropertyTxn}
           onSave={onSavePropertyTxn}
         />

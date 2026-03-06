@@ -22,4 +22,6 @@ export { useRefreshHoldingPrice } from './useRefreshHoldingPrice';
 export { useSyncHoldingPrices } from './useSyncHoldingPrices';
 export { useTickerLookup } from './useTickerLookup';
 export { useUpdateHolding } from './useUpdateHolding';
+export { useUpdateHoldingTransaction } from './useUpdateHoldingTransaction';
 export { useUpdateProperty } from './useUpdateProperty';
+export { useUpdatePropertyTransaction } from './useUpdatePropertyTransaction';

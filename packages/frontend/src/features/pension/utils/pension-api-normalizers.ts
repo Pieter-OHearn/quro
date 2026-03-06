@@ -21,9 +21,30 @@ const toPositiveInt = (value: IntegerLike): number => {
   return 0;
 };
 
+const PENSION_TYPE_ALIASES: Record<string, PensionPot['type']> = {
+  'workplace pension': 'Workplace Pension',
+  workplace: 'Workplace Pension',
+  superannuation: 'Workplace Pension',
+  'employer pensioenfonds': 'Workplace Pension',
+  'personal pension': 'Personal Pension',
+  sipp: 'Personal Pension',
+  'self-managed super fund': 'Personal Pension',
+  'lijfrente / private pension': 'Personal Pension',
+  'state pension': 'State Pension',
+  'government age pension': 'State Pension',
+  aow: 'State Pension',
+  other: 'Other',
+};
+
+function normalizePensionPotType(rawType: unknown): PensionPot['type'] {
+  if (typeof rawType !== 'string') return 'Other';
+  return PENSION_TYPE_ALIASES[rawType.trim().toLowerCase()] ?? 'Other';
+}
+
 export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
   ...pot,
   id: toPositiveInt((pot as { id?: IntegerLike }).id),
+  type: normalizePensionPotType(pot.type),
   balance: toNumber(pot.balance),
   employeeMonthly: toNumber(pot.employeeMonthly),
   employerMonthly: toNumber(pot.employerMonthly),

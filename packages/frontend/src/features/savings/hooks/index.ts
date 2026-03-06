@@ -9,3 +9,4 @@ export { useSavingsData } from './useSavingsData';
 export { useSavingsMetrics } from './useSavingsMetrics';
 export { useSavingsTransactions } from './useSavingsTransactions';
 export { useUpdateSavingsAccount } from './useUpdateSavingsAccount';
+export { useUpdateSavingsTransaction } from './useUpdateSavingsTransaction';

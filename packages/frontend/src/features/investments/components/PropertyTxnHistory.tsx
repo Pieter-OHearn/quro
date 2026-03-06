@@ -10,6 +10,7 @@ type PropertyTxnHistoryProps = {
   property: Property;
   transactions: PropertyTransaction[];
   onAdd: () => void;
+  onEdit: (transaction: PropertyTransaction) => void;
   onDelete: (id: number) => void;
 };
 
@@ -190,10 +191,17 @@ type PropertyTxnRowProps = {
   transaction: PropertyTransaction;
   property: Property;
   fmtNative: (v: number, c: string) => string;
+  onEdit: (transaction: PropertyTransaction) => void;
   onDelete: (id: number) => void;
 };
 
-function PropertyTxnRow({ transaction, property, fmtNative, onDelete }: PropertyTxnRowProps) {
+function PropertyTxnRow({
+  transaction,
+  property,
+  fmtNative,
+  onEdit,
+  onDelete,
+}: PropertyTxnRowProps) {
   const meta = PROPERTY_TXN_META[transaction.type];
   return (
     <TxnRow
@@ -210,13 +218,14 @@ function PropertyTxnRow({ transaction, property, fmtNative, onDelete }: Property
           fmtNative={fmtNative}
         />
       }
+      onEdit={() => onEdit(transaction)}
       onDelete={() => onDelete(transaction.id)}
     />
   );
 }
 
 export function PropertyTxnHistory(props: PropertyTxnHistoryProps) {
-  const { property, transactions, onAdd, onDelete } = props;
+  const { property, transactions, onAdd, onEdit, onDelete } = props;
   const { fmtNative } = useCurrency();
   const supportsCashflowTxns = isInvestmentProperty(property.propertyType);
   const filterOptions = getPropertyFilterOptions(supportsCashflowTxns);
@@ -247,6 +256,7 @@ export function PropertyTxnHistory(props: PropertyTxnHistoryProps) {
           transaction={t}
           property={property}
           fmtNative={fmtNative}
+          onEdit={onEdit}
           onDelete={onDelete}
         />
       ))}

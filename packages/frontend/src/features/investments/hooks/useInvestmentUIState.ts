@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Holding, Property } from '@quro/shared';
+import type { Holding, HoldingTransaction, Property, PropertyTransaction } from '@quro/shared';
 import type { InvestmentUIState, Tab } from '../types';
 
 export function useInvestmentUIState(): InvestmentUIState {
@@ -7,10 +7,12 @@ export function useInvestmentUIState(): InvestmentUIState {
   const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
   const [showAddHolding, setShowAddHolding] = useState(false);
   const [addTxnForHolding, setAddTxnForHolding] = useState<Holding | null>(null);
+  const [editingHoldingTxn, setEditingHoldingTxn] = useState<HoldingTransaction | null>(null);
   const [expandedHoldingId, setExpandedHoldingId] = useState<number | null>(null);
   const [updatingProperty, setUpdatingProperty] = useState<Property | null>(null);
   const [showAddProperty, setShowAddProperty] = useState(false);
   const [addTxnForProperty, setAddTxnForProperty] = useState<Property | null>(null);
+  const [editingPropertyTxn, setEditingPropertyTxn] = useState<PropertyTransaction | null>(null);
   const [expandedPropertyId, setExpandedPropertyId] = useState<number | null>(null);
 
   return {
@@ -18,19 +20,23 @@ export function useInvestmentUIState(): InvestmentUIState {
     editingHolding,
     showAddHolding,
     addTxnForHolding,
+    editingHoldingTxn,
     expandedHoldingId,
     updatingProperty,
     showAddProperty,
     addTxnForProperty,
+    editingPropertyTxn,
     expandedPropertyId,
     setTab,
     setEditingHolding,
     setShowAddHolding,
     setAddTxnForHolding,
+    setEditingHoldingTxn,
     setExpandedHoldingId,
     setUpdatingProperty,
     setShowAddProperty,
     setAddTxnForProperty,
+    setEditingPropertyTxn,
     setExpandedPropertyId,
   };
 }

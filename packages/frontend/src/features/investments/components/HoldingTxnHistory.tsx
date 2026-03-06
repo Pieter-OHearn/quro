@@ -12,6 +12,7 @@ type HoldingTxnHistoryProps = {
   position: Position;
   transactions: HoldingTransaction[];
   onAdd: () => void;
+  onEdit: (transaction: HoldingTransaction) => void;
   onDelete: (id: number) => void;
 };
 
@@ -113,6 +114,7 @@ export function HoldingTxnHistory({
   position,
   transactions,
   onAdd,
+  onEdit,
   onDelete,
 }: HoldingTxnHistoryProps) {
   const { fmtNative } = useCurrency();
@@ -168,6 +170,7 @@ export function HoldingTxnHistory({
                 fmtNative={fmtNative}
               />
             }
+            onEdit={() => onEdit(transaction)}
             onDelete={() => onDelete(transaction.id)}
           />
         );

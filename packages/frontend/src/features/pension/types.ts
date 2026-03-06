@@ -1,6 +1,6 @@
 import type { PensionPot, PensionTransaction } from '@quro/shared';
 
-export type PensionTxnType = 'contribution' | 'fee';
+export type PensionTxnType = 'contribution' | 'fee' | 'tax';
 
 export type PensionGrowthPoint = {
   year: string;
@@ -33,6 +33,8 @@ export type DeletePotMutation = {
   mutate: (id: number) => void;
 };
 
+export type SavePensionTransactionInput = Omit<PensionTransaction, 'id'> & { id?: number };
+
 export type PensionPageState = {
   fmtBase: PensionFormatBaseFn;
   fmtNative: PensionFormatNativeFn;
@@ -50,6 +52,8 @@ export type PensionPageState = {
   setExpanded: (value: number | null) => void;
   addTxnForPot: PensionPot | null;
   setAddTxnForPot: (value: PensionPot | null) => void;
+  editingTxn: PensionTransaction | null;
+  setEditingTxn: (value: PensionTransaction | null) => void;
   totalInBase: number;
   totalMonthlyContribInBase: number;
   projected: number | null;
@@ -60,7 +64,7 @@ export type PensionPageState = {
   pensionGrowthData: PensionGrowthPoint[];
   pensionGrowthPct: number | null;
   handleSave: (pot: PensionPot | Omit<PensionPot, 'id'>) => void;
-  handleAddPensionTxn: (txn: Omit<PensionTransaction, 'id'>) => void;
+  handleAddPensionTxn: (txn: SavePensionTransactionInput) => void;
   handleDeletePensionTxn: (id: number) => void;
   deletePot: DeletePotMutation;
 };

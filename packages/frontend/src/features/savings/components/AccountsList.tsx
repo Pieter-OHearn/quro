@@ -20,6 +20,7 @@ type AccountRowProps = {
   onToggleExpand: () => void;
   onEdit: () => void;
   onAddTxn: () => void;
+  onEditTxn: (transaction: SavingsTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -51,6 +52,7 @@ type AccountsListProps = {
   onEdit: (account: SavingsAccount) => void;
   onAddAccount: () => void;
   onAddTxn: (account: SavingsAccount) => void;
+  onEditTxn: (transaction: SavingsTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
@@ -182,6 +184,7 @@ function AccountRow({
   onToggleExpand,
   onEdit,
   onAddTxn,
+  onEditTxn,
   onDeleteTxn,
 }: Readonly<AccountRowProps>) {
   const balanceInBase = convertToBase(acc.balance, acc.currency);
@@ -210,6 +213,7 @@ function AccountRow({
           account={acc}
           transactions={transactions}
           onAdd={onAddTxn}
+          onEdit={onEditTxn}
           onDelete={onDeleteTxn}
         />
       )}
@@ -277,6 +281,7 @@ export function AccountsList({
   onEdit,
   onAddAccount,
   onAddTxn,
+  onEditTxn,
   onDeleteTxn,
 }: Readonly<AccountsListProps>) {
   return (
@@ -302,6 +307,7 @@ export function AccountsList({
             onToggleExpand={() => onToggleExpand(account.id)}
             onEdit={() => onEdit(account)}
             onAddTxn={() => onAddTxn(account)}
+            onEditTxn={onEditTxn}
             onDeleteTxn={onDeleteTxn}
           />
         ))}

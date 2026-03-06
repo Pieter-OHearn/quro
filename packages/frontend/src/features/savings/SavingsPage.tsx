@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { LoadingSpinner } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
-import type { SavingsAccount } from '@quro/shared';
+import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { AccountsList, SavingsCharts, SavingsModals, SavingsStats } from './components';
 import {
   useContribChartData,
@@ -22,9 +22,11 @@ type SavingsPageBodyProps = {
   setEditing: (account: SavingsAccount | undefined) => void;
   setShowAccountModal: (value: boolean) => void;
   setAddTxnFor: (account: SavingsAccount | null) => void;
+  setEditingTxn: (transaction: SavingsTransaction | null) => void;
   showAccountModal: boolean;
   editing: SavingsAccount | undefined;
   addTxnFor: SavingsAccount | null;
+  editingTxn: SavingsTransaction | null;
   onSaveAccount: (account: SaveAccountInput) => void;
   onDeleteAccount: (id: number) => void;
   onSaveTxn: (transaction: SaveTransactionInput) => void;
@@ -38,82 +40,81 @@ type SavingsPageBodyProps = {
   baseCurrency: string;
 };
 
-function SavingsPageBody({
-  accounts,
-  transactions,
-  totalInBase,
-  totalInterest,
-  avgRate,
-  expandedId,
-  setExpandedId,
-  setEditing,
-  setShowAccountModal,
-  setAddTxnFor,
-  showAccountModal,
-  editing,
-  addTxnFor,
-  onSaveAccount,
-  onDeleteAccount,
-  onSaveTxn,
-  onDeleteTxn,
-  contribChartData,
-  growthChartData,
-  fmtBase,
-  fmtNative,
-  convertToBase,
-  isForeign,
-  baseCurrency,
-}: Readonly<SavingsPageBodyProps>) {
+function SavingsPageBodyContent(props: Readonly<SavingsPageBodyProps>) {
+  const handleCloseAccountModal = () => {
+    props.setShowAccountModal(false);
+    props.setEditing(undefined);
+  };
+  const handleCloseTxnModal = () => {
+    props.setAddTxnFor(null);
+    props.setEditingTxn(null);
+  };
+  const handleToggleExpand = (id: number) =>
+    props.setExpandedId(props.expandedId === id ? null : id);
+  const handleAddAccount = () => {
+    props.setEditing(undefined);
+    props.setShowAccountModal(true);
+  };
+  const handleAddTxn = (account: SavingsAccount) => {
+    props.setEditingTxn(null);
+    props.setAddTxnFor(account);
+  };
+  const handleEditTxn = (transaction: SavingsTransaction) => {
+    props.setAddTxnFor(null);
+    props.setEditingTxn(transaction);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <SavingsModals
-        showAccountModal={showAccountModal}
-        editing={editing}
-        addTxnFor={addTxnFor}
-        onCloseAccountModal={() => {
-          setShowAccountModal(false);
-          setEditing(undefined);
-        }}
-        onSaveAccount={onSaveAccount}
-        onDeleteAccount={onDeleteAccount}
-        onCloseTxnModal={() => setAddTxnFor(null)}
-        onSaveTxn={onSaveTxn}
+        accounts={props.accounts}
+        showAccountModal={props.showAccountModal}
+        editing={props.editing}
+        addTxnFor={props.addTxnFor}
+        editingTxn={props.editingTxn}
+        onCloseAccountModal={handleCloseAccountModal}
+        onSaveAccount={props.onSaveAccount}
+        onDeleteAccount={props.onDeleteAccount}
+        onCloseTxnModal={handleCloseTxnModal}
+        onSaveTxn={props.onSaveTxn}
       />
       <SavingsStats
-        totalInBase={totalInBase}
-        totalInterest={totalInterest}
-        avgRate={avgRate}
-        accounts={accounts}
-        transactions={transactions}
-        fmtBase={fmtBase}
+        totalInBase={props.totalInBase}
+        totalInterest={props.totalInterest}
+        avgRate={props.avgRate}
+        accounts={props.accounts}
+        transactions={props.transactions}
+        fmtBase={props.fmtBase}
       />
       <SavingsCharts
-        growthChartData={growthChartData}
-        contribChartData={contribChartData}
-        baseCurrency={baseCurrency}
-        fmtBase={fmtBase}
+        growthChartData={props.growthChartData}
+        contribChartData={props.contribChartData}
+        baseCurrency={props.baseCurrency}
+        fmtBase={props.fmtBase}
       />
       <AccountsList
-        accounts={accounts}
-        transactions={transactions}
-        totalInBase={totalInBase}
-        totalInterest={totalInterest}
-        expandedId={expandedId}
-        convertToBase={convertToBase}
-        isForeign={isForeign}
-        fmtBase={fmtBase}
-        fmtNative={fmtNative}
-        onToggleExpand={(id) => setExpandedId(expandedId === id ? null : id)}
-        onEdit={(account) => setEditing(account)}
-        onAddAccount={() => {
-          setEditing(undefined);
-          setShowAccountModal(true);
-        }}
-        onAddTxn={(account) => setAddTxnFor(account)}
-        onDeleteTxn={onDeleteTxn}
+        accounts={props.accounts}
+        transactions={props.transactions}
+        totalInBase={props.totalInBase}
+        totalInterest={props.totalInterest}
+        expandedId={props.expandedId}
+        convertToBase={props.convertToBase}
+        isForeign={props.isForeign}
+        fmtBase={props.fmtBase}
+        fmtNative={props.fmtNative}
+        onToggleExpand={handleToggleExpand}
+        onEdit={props.setEditing}
+        onAddAccount={handleAddAccount}
+        onAddTxn={handleAddTxn}
+        onEditTxn={handleEditTxn}
+        onDeleteTxn={props.onDeleteTxn}
       />
     </div>
   );
+}
+
+function SavingsPageBody(props: Readonly<SavingsPageBodyProps>) {
+  return <SavingsPageBodyContent {...props} />;
 }
 
 export function Savings() {
@@ -127,6 +128,7 @@ export function Savings() {
     updateAccount,
     deleteAccount,
     createTxn,
+    updateTxn,
     deleteTxn,
   } = useSavingsData();
 
@@ -134,6 +136,7 @@ export function Savings() {
   const [editing, setEditing] = useState<SavingsAccount | undefined>(undefined);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [addTxnFor, setAddTxnFor] = useState<SavingsAccount | null>(null);
+  const [editingTxn, setEditingTxn] = useState<SavingsTransaction | null>(null);
 
   const onSaveAccount = (account: SaveAccountInput): void => {
     if (account.id) {
@@ -169,8 +172,17 @@ export function Savings() {
       addTxnFor={addTxnFor}
       onSaveAccount={onSaveAccount}
       onDeleteAccount={(id) => deleteAccount.mutate(id)}
-      onSaveTxn={(transaction) => createTxn.mutate(transaction)}
+      onSaveTxn={(transaction) => {
+        if (transaction.id) {
+          const { id, ...payload } = transaction;
+          updateTxn.mutate({ id, ...payload });
+          return;
+        }
+        createTxn.mutate(transaction);
+      }}
       onDeleteTxn={(id) => deleteTxn.mutate(id)}
+      setEditingTxn={setEditingTxn}
+      editingTxn={editingTxn}
       contribChartData={contribChartData}
       growthChartData={growthChartData}
       fmtBase={fmtBase}

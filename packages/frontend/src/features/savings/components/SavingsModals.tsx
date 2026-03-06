@@ -1,12 +1,14 @@
-import type { SavingsAccount } from '@quro/shared';
+import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { AccountModal } from './AccountModal';
 import { AddTxnModal } from './AddTxnModal';
 import type { SaveAccountInput, SaveTransactionInput } from '../types';
 
 type SavingsModalsProps = {
+  accounts: SavingsAccount[];
   showAccountModal: boolean;
   editing: SavingsAccount | undefined;
   addTxnFor: SavingsAccount | null;
+  editingTxn: SavingsTransaction | null;
   onCloseAccountModal: () => void;
   onSaveAccount: (account: SaveAccountInput) => void;
   onDeleteAccount: (id: number) => void;
@@ -15,15 +17,21 @@ type SavingsModalsProps = {
 };
 
 export function SavingsModals({
+  accounts,
   showAccountModal,
   editing,
   addTxnFor,
+  editingTxn,
   onCloseAccountModal,
   onSaveAccount,
   onDeleteAccount,
   onCloseTxnModal,
   onSaveTxn,
 }: Readonly<SavingsModalsProps>) {
+  const transactionAccount =
+    addTxnFor ??
+    (editingTxn ? (accounts.find((account) => account.id === editingTxn.accountId) ?? null) : null);
+
   return (
     <>
       {(showAccountModal || editing) && (
@@ -34,8 +42,13 @@ export function SavingsModals({
           onDelete={onDeleteAccount}
         />
       )}
-      {addTxnFor && (
-        <AddTxnModal account={addTxnFor} onClose={onCloseTxnModal} onSave={onSaveTxn} />
+      {transactionAccount && (
+        <AddTxnModal
+          account={transactionAccount}
+          existing={editingTxn ?? undefined}
+          onClose={onCloseTxnModal}
+          onSave={onSaveTxn}
+        />
       )}
     </>
   );

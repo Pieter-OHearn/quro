@@ -26,14 +26,39 @@ export function yearEndUtc(year: number): number {
   );
 }
 
+function signedPensionTxnAmount(txn: Pick<PensionTransaction, 'type' | 'amount'>): number {
+  return txn.type === 'contribution' ? txn.amount : -txn.amount;
+}
+
+function buildNetByPotId(pensionTxns: PensionTransaction[]): Map<number, number> {
+  const netByPotId = new Map<number, number>();
+  for (const txn of pensionTxns) {
+    netByPotId.set(txn.potId, (netByPotId.get(txn.potId) ?? 0) + signedPensionTxnAmount(txn));
+  }
+  return netByPotId;
+}
+
+export function computeCurrentPensionBalance(
+  pot: PensionPot,
+  pensionTxns: PensionTransaction[],
+): number {
+  const net = pensionTxns.reduce((sum, txn) => {
+    if (txn.potId !== pot.id) return sum;
+    return sum + signedPensionTxnAmount(txn);
+  }, 0);
+  return Math.max(0, pot.balance + net);
+}
+
 export function computePensionTotals(
   pensions: PensionPot[],
+  pensionTxns: PensionTransaction[],
   convertToBase: ConvertToBaseFn,
 ): { totalInBase: number; totalMonthlyContribInBase: number } {
-  const totalInBase = pensions.reduce(
-    (sum, pot) => sum + convertToBase(pot.balance, pot.currency),
-    0,
-  );
+  const netByPotId = buildNetByPotId(pensionTxns);
+  const totalInBase = pensions.reduce((sum, pot) => {
+    const currentBalance = Math.max(0, pot.balance + (netByPotId.get(pot.id) ?? 0));
+    return sum + convertToBase(currentBalance, pot.currency);
+  }, 0);
   const totalMonthlyContribInBase = pensions.reduce(
     (sum, pot) => sum + convertToBase(pot.employeeMonthly + pot.employerMonthly, pot.currency),
     0,
@@ -75,6 +100,7 @@ export function computePensionGrowthData(
     .filter((txn) => Number.isFinite(txn.timestamp));
 
   if (datedTxns.length === 0) return [];
+  const netByPotId = buildNetByPotId(pensionTxns);
 
   const currentYear = new Date().getUTCFullYear();
   const earliestYear = new Date(
@@ -89,11 +115,12 @@ export function computePensionGrowthData(
     const cutoff = year === currentYear ? Date.now() : yearEndUtc(year);
 
     const total = pensions.reduce((sum, pot) => {
+      const currentBalance = Math.max(0, pot.balance + (netByPotId.get(pot.id) ?? 0));
       const netAfterCutoff = datedTxns
         .filter((txn) => txn.potId === pot.id && txn.timestamp > cutoff)
-        .reduce((acc, txn) => acc + (txn.type === 'contribution' ? txn.amount : -txn.amount), 0);
+        .reduce((acc, txn) => acc + signedPensionTxnAmount(txn), 0);
 
-      return sum + convertToBase(Math.max(0, pot.balance - netAfterCutoff), pot.currency);
+      return sum + convertToBase(Math.max(0, currentBalance - netAfterCutoff), pot.currency);
     }, 0);
 
     return { year: String(year), value: total };

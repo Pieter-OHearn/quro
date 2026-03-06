@@ -8,6 +8,7 @@ import type {
   PensionFormatBaseFn,
   PensionFormatNativeFn,
 } from '../types';
+import { computeCurrentPensionBalance } from '../utils/pension-calculations';
 import { PensionTxnHistory } from './PensionTxnHistory';
 
 type PensionPotsListProps = {
@@ -18,6 +19,7 @@ type PensionPotsListProps = {
   setEditing: (value: PensionPot | undefined) => void;
   setShowModal: (value: boolean) => void;
   setAddTxnForPot: (value: PensionPot | null) => void;
+  setEditingTxn: (value: PensionTransaction | null) => void;
   deletePot: DeletePotMutation;
   handleDeletePensionTxn: (id: number) => void;
   fmtBase: PensionFormatBaseFn;
@@ -40,12 +42,14 @@ type PensionPotCardProps = {
   onToggle: (id: number | null) => void;
   onDelete: (id: number) => void;
   onAddTxn: (pot: PensionPot) => void;
+  onEditTxn: (transaction: PensionTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
 type PensionPotExpandedProps = {
   pot: PensionPot;
   pensionTxns: PensionTransaction[];
+  currentBalance: number;
   foreign: boolean;
   balanceInBase: number;
   baseCurrency: string;
@@ -53,11 +57,13 @@ type PensionPotExpandedProps = {
   fmtNative: PensionFormatNativeFn;
   onDelete: (id: number) => void;
   onAddTxn: (pot: PensionPot) => void;
+  onEditTxn: (transaction: PensionTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
 
 type PensionPotDetailsProps = {
   pot: PensionPot;
+  currentBalance: number;
   foreign: boolean;
   balanceInBase: number;
   baseCurrency: string;
@@ -68,6 +74,7 @@ type PensionPotDetailsProps = {
 
 function PensionPotDetails({
   pot,
+  currentBalance,
   foreign,
   balanceInBase,
   baseCurrency,
@@ -76,12 +83,12 @@ function PensionPotDetails({
   onDelete,
 }: Readonly<PensionPotDetailsProps>) {
   const detailStats = [
-    { label: 'Balance (Native)', value: fmtNative(pot.balance, pot.currency) },
+    { label: 'Balance (Native)', value: fmtNative(currentBalance, pot.currency) },
     { label: `Balance (${baseCurrency})`, value: fmtBase(balanceInBase) },
     { label: 'Your Contribution', value: `${fmtNative(pot.employeeMonthly, pot.currency)}/mo` },
     {
-      label: 'Employer Match',
-      value: pot.employerMonthly > 0 ? `${fmtNative(pot.employerMonthly, pot.currency)}/mo` : 'N/A',
+      label: 'Employer Contributions',
+      value: `${fmtNative(pot.employerMonthly, pot.currency)}/mo`,
     },
   ];
 
@@ -125,6 +132,7 @@ function PensionPotDetails({
 function PensionPotExpanded({
   pot,
   pensionTxns,
+  currentBalance,
   foreign,
   balanceInBase,
   baseCurrency,
@@ -132,12 +140,14 @@ function PensionPotExpanded({
   fmtNative,
   onDelete,
   onAddTxn,
+  onEditTxn,
   onDeleteTxn,
 }: Readonly<PensionPotExpandedProps>) {
   return (
     <div>
       <PensionPotDetails
         pot={pot}
+        currentBalance={currentBalance}
         foreign={foreign}
         balanceInBase={balanceInBase}
         baseCurrency={baseCurrency}
@@ -149,6 +159,7 @@ function PensionPotExpanded({
         pot={pot}
         transactions={pensionTxns}
         onAdd={() => onAddTxn(pot)}
+        onEdit={onEditTxn}
         onDelete={onDeleteTxn}
       />
     </div>
@@ -191,6 +202,7 @@ function PensionPotCardLeft({
 
 type PensionPotCardRightProps = {
   pot: PensionPot;
+  currentBalance: number;
   totalMonthly: number;
   balanceInBase: number;
   foreign: boolean;
@@ -203,6 +215,7 @@ type PensionPotCardRightProps = {
 
 function PensionPotCardRight({
   pot,
+  currentBalance,
   totalMonthly,
   balanceInBase,
   foreign,
@@ -215,7 +228,7 @@ function PensionPotCardRight({
   return (
     <>
       <div className="text-right flex-shrink-0 mr-3">
-        <p className="font-bold text-slate-900">{fmtNative(pot.balance, pot.currency)}</p>
+        <p className="font-bold text-slate-900">{fmtNative(currentBalance, pot.currency)}</p>
         {foreign && (
           <p className="text-xs text-amber-600 font-medium">&asymp; {fmtBase(balanceInBase)}</p>
         )}
@@ -254,12 +267,15 @@ function PensionPotCard({
   onToggle,
   onDelete,
   onAddTxn,
+  onEditTxn,
   onDeleteTxn,
 }: Readonly<PensionPotCardProps>) {
+  const potTxns = pensionTxns.filter((txn) => txn.potId === pot.id);
+  const currentBalance = computeCurrentPensionBalance(pot, potTxns);
   const totalMonthly = pot.employeeMonthly + pot.employerMonthly;
-  const balanceInBase = convertToBase(pot.balance, pot.currency);
+  const balanceInBase = convertToBase(currentBalance, pot.currency);
   const foreign = isForeign(pot.currency);
-  const txnCount = pensionTxns.filter((txn) => txn.potId === pot.id).length;
+  const txnCount = potTxns.length;
 
   return (
     <div className="overflow-hidden">
@@ -272,6 +288,7 @@ function PensionPotCard({
         />
         <PensionPotCardRight
           pot={pot}
+          currentBalance={currentBalance}
           totalMonthly={totalMonthly}
           balanceInBase={balanceInBase}
           foreign={foreign}
@@ -286,6 +303,7 @@ function PensionPotCard({
         <PensionPotExpanded
           pot={pot}
           pensionTxns={pensionTxns}
+          currentBalance={currentBalance}
           foreign={foreign}
           balanceInBase={balanceInBase}
           baseCurrency={baseCurrency}
@@ -293,6 +311,7 @@ function PensionPotCard({
           fmtNative={fmtNative}
           onDelete={onDelete}
           onAddTxn={onAddTxn}
+          onEditTxn={onEditTxn}
           onDeleteTxn={onDeleteTxn}
         />
       )}
@@ -307,6 +326,7 @@ function PensionPotsListItems({
   setExpanded,
   setEditing,
   setAddTxnForPot,
+  setEditingTxn,
   deletePot,
   handleDeletePensionTxn,
   fmtBase,
@@ -336,7 +356,14 @@ function PensionPotsListItems({
           onEdit={(item) => setEditing(item)}
           onToggle={setExpanded}
           onDelete={(id) => deletePot.mutate(id)}
-          onAddTxn={setAddTxnForPot}
+          onAddTxn={(pot) => {
+            setEditingTxn(null);
+            setAddTxnForPot(pot);
+          }}
+          onEditTxn={(transaction) => {
+            setAddTxnForPot(null);
+            setEditingTxn(transaction);
+          }}
           onDeleteTxn={handleDeletePensionTxn}
         />
       ))}
