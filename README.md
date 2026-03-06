@@ -51,11 +51,11 @@ At a glance, Quro helps you:
 ```text
 .
 ├── packages/
-│   ├── frontend/   # React/Vite app
-│   ├── backend/    # Hono API + Drizzle/Postgres
+│   ├── frontend/   # React/Vite app (+ .env/.env.example)
+│   ├── backend/    # Hono API + Drizzle/Postgres (+ .env/.env.example)
 │   └── shared/     # Shared types/utilities
 ├── docker-compose.yml
-└── .env.example
+└── README.md
 ```
 
 ## Prerequisites
@@ -71,16 +71,19 @@ At a glance, Quro helps you:
 bun install
 ```
 
-2. Create your local env file:
+2. Create your local env files:
 
 ```bash
-cp .env.example .env
+cp packages/backend/.env.example packages/backend/.env
+cp packages/frontend/.env.example packages/frontend/.env
 ```
 
-3. Start PostgreSQL:
+Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
+
+3. Start PostgreSQL + MinIO:
 
 ```bash
-docker compose up -d db
+docker compose --env-file packages/backend/.env up -d db minio minio-init
 ```
 
 4. Run database migrations:
@@ -151,7 +154,7 @@ bun run format
 ### Run full stack with Docker Compose
 
 ```bash
-docker compose up --build
+docker compose --env-file packages/backend/.env up --build
 ```
 
 Services:
@@ -159,17 +162,19 @@ Services:
 - Frontend (nginx): `http://localhost`
 - Backend API: `http://localhost:3000`
 - Postgres: `localhost:5432`
+- MinIO API: `http://localhost:9000`
+- MinIO Console: `http://localhost:9001`
 
 Stop services:
 
 ```bash
-docker compose down
+docker compose --env-file packages/backend/.env down
 ```
 
 Remove containers + volume (clears DB data):
 
 ```bash
-docker compose down -v
+docker compose --env-file packages/backend/.env down -v
 ```
 
 ### Build images directly

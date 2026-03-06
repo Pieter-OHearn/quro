@@ -205,6 +205,16 @@ export type PensionTransaction = {
   isEmployer: boolean | null;
 };
 
+export type PensionStatementDocument = {
+  id: number;
+  transactionId: number;
+  potId: number;
+  fileName: string;
+  mimeType: 'application/pdf';
+  sizeBytes: number;
+  uploadedAt: string;
+};
+
 export type Mortgage = {
   id: number;
   linkedPropertyId?: number | null;

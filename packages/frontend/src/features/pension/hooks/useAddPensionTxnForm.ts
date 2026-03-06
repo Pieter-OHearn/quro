@@ -7,7 +7,6 @@ import type {
   SavePensionTransactionInput,
 } from '../types';
 
-type AddPensionTxnSaveFn = (txn: SavePensionTransactionInput) => void;
 const ISO_DATE_SLICE_END = 10;
 
 type InitialPensionTxnValues = {
@@ -113,61 +112,23 @@ function buildInitialPensionTxnValues(
   };
 }
 
-function createPensionTxnSaveHandler(params: {
+function validatePensionTxnInput(params: {
   parsedAmount: number;
   parsedTaxAmount: number;
-  setError: (value: string) => void;
-  potId: number;
   type: PensionTxnType;
-  annualStatementDirection: AnnualStatementDirection;
-  date: string;
-  note: string;
-  isEmployer: boolean;
-  existing: PensionTransaction | undefined;
-  onSave: AddPensionTxnSaveFn;
-  onClose: () => void;
-}) {
-  return (): void => {
-    if (params.parsedAmount <= 0) {
-      params.setError('Enter a valid amount');
-      return;
-    }
+}): string {
+  if (params.parsedAmount <= 0) return 'Enter a valid amount';
 
-    if (params.type === 'contribution') {
-      if (params.parsedTaxAmount < 0) {
-        params.setError('Tax amount cannot be negative');
-        return;
-      }
-      if (params.parsedTaxAmount > params.parsedAmount) {
-        params.setError('Tax amount cannot exceed contribution amount');
-        return;
-      }
-    }
+  if (params.type !== 'contribution') return '';
+  if (params.parsedTaxAmount < 0) return 'Tax amount cannot be negative';
+  if (params.parsedTaxAmount > params.parsedAmount) {
+    return 'Tax amount cannot exceed contribution amount';
+  }
 
-    const payload = buildPensionTxnPayload({
-      potId: params.potId,
-      type: params.type,
-      amount: params.parsedAmount,
-      taxAmount: params.type === 'contribution' ? params.parsedTaxAmount : 0,
-      annualStatementDirection: params.annualStatementDirection,
-      date: params.date,
-      note: params.note,
-      isEmployer: params.isEmployer,
-    });
-
-    if (params.existing) params.onSave({ id: params.existing.id, ...payload });
-    else params.onSave(payload);
-
-    params.onClose();
-  };
+  return '';
 }
 
-export function useAddPensionTxnForm(
-  pot: PensionPot,
-  existing: PensionTransaction | undefined,
-  onSave: AddPensionTxnSaveFn,
-  onClose: () => void,
-) {
+export function useAddPensionTxnForm(pot: PensionPot, existing: PensionTransaction | undefined) {
   const { fmtNative } = useCurrency();
   const initialValues = buildInitialPensionTxnValues(existing);
   const [type, setType] = useState<PensionTxnType>(initialValues.type);
@@ -192,20 +153,31 @@ export function useAddPensionTxnForm(
     setIsEmployer(true);
   };
 
-  const handleSave = createPensionTxnSaveHandler({
-    parsedAmount,
-    parsedTaxAmount,
-    setError,
-    potId: pot.id,
-    type,
-    annualStatementDirection,
-    date,
-    note,
-    isEmployer,
-    existing,
-    onSave,
-    onClose,
-  });
+  const handleSave = (): SavePensionTransactionInput | null => {
+    const validationError = validatePensionTxnInput({
+      parsedAmount,
+      parsedTaxAmount,
+      type,
+    });
+    if (validationError) {
+      setError(validationError);
+      return null;
+    }
+
+    const payload = buildPensionTxnPayload({
+      potId: pot.id,
+      type,
+      amount: parsedAmount,
+      taxAmount: type === 'contribution' ? parsedTaxAmount : 0,
+      annualStatementDirection,
+      date,
+      note,
+      isEmployer,
+    });
+
+    if (existing) return { id: existing.id, ...payload };
+    return payload;
+  };
 
   return {
     type,

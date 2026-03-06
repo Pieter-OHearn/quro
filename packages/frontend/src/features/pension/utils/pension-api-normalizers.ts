@@ -1,5 +1,11 @@
-import type { PensionPot, PensionTransaction } from '@quro/shared';
-import type { ApiPensionPot, ApiPensionTransaction, IntegerLike, NumericLike } from '../types';
+import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@quro/shared';
+import type {
+  ApiPensionPot,
+  ApiPensionStatementDocument,
+  ApiPensionTransaction,
+  IntegerLike,
+  NumericLike,
+} from '../types';
 
 const toNumber = (value: NumericLike): number => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -83,4 +89,18 @@ export const normalizePensionTransaction = (txn: ApiPensionTransaction): Pension
   amount: toNumber(txn.amount),
   taxAmount: toNumber(txn.taxAmount),
   note: typeof txn.note === 'string' ? txn.note : '',
+});
+
+export const normalizePensionStatementDocument = (
+  document: ApiPensionStatementDocument,
+): PensionStatementDocument => ({
+  ...document,
+  id: toPositiveInt((document as { id?: IntegerLike }).id),
+  transactionId: toPositiveInt((document as { transactionId?: IntegerLike }).transactionId),
+  potId: toPositiveInt((document as { potId?: IntegerLike }).potId),
+  sizeBytes: toNumber(document.sizeBytes),
+  mimeType: 'application/pdf',
+  fileName: typeof document.fileName === 'string' ? document.fileName : 'statement.pdf',
+  uploadedAt:
+    typeof document.uploadedAt === 'string' ? document.uploadedAt : new Date().toISOString(),
 });

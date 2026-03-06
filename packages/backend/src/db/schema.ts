@@ -250,6 +250,37 @@ export const pensionTransactions = pgTable(
   }),
 );
 
+export const pensionStatementDocuments = pgTable(
+  'pension_statement_documents',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    potId: integer('pot_id')
+      .references(() => pensionPots.id, { onDelete: 'cascade' })
+      .notNull(),
+    transactionId: integer('transaction_id')
+      .references(() => pensionTransactions.id, { onDelete: 'cascade' })
+      .notNull(),
+    storageKey: text('storage_key').notNull(),
+    fileName: text('file_name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index('pension_statement_documents_user_id_idx').on(table.userId),
+    potIdx: index('pension_statement_documents_pot_id_idx').on(table.potId),
+    transactionUnique: uniqueIndex('pension_statement_documents_transaction_id_uidx').on(
+      table.transactionId,
+    ),
+    storageKeyUnique: uniqueIndex('pension_statement_documents_storage_key_uidx').on(
+      table.storageKey,
+    ),
+  }),
+);
+
 // ── Mortgages ────────────────────────────────────────────────────────────────
 
 export const mortgages = pgTable(

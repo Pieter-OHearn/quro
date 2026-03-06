@@ -1,4 +1,4 @@
-import type { PensionPot, PensionTransaction } from '@quro/shared';
+import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@quro/shared';
 
 export type PensionTxnType = 'contribution' | 'fee' | 'annual_statement';
 export type AnnualStatementDirection = 'gain' | 'loss';
@@ -35,11 +35,16 @@ export type ApiPensionTransaction = Omit<PensionTransaction, 'amount' | 'taxAmou
   taxAmount: NumericLike;
 };
 
+export type ApiPensionStatementDocument = Omit<PensionStatementDocument, 'sizeBytes'> & {
+  sizeBytes: NumericLike;
+};
+
 export type DeletePotMutation = {
   mutate: (id: number) => void;
 };
 
 export type SavePensionTransactionInput = Omit<PensionTransaction, 'id'> & { id?: number };
+export type SavePensionTransactionResult = PensionTransaction;
 
 export type PensionPageState = {
   fmtBase: PensionFormatBaseFn;
@@ -49,6 +54,7 @@ export type PensionPageState = {
   baseCurrency: string;
   pensions: PensionPot[];
   pensionTxns: PensionTransaction[];
+  documentsByTransactionId: Map<number, PensionStatementDocument>;
   isLoading: boolean;
   showModal: boolean;
   setShowModal: (value: boolean) => void;
@@ -70,7 +76,7 @@ export type PensionPageState = {
   pensionGrowthData: PensionGrowthPoint[];
   pensionGrowthPct: number | null;
   handleSave: (pot: PensionPot | Omit<PensionPot, 'id'>) => void;
-  handleAddPensionTxn: (txn: SavePensionTransactionInput) => void;
+  handleAddPensionTxn: (txn: SavePensionTransactionInput) => Promise<SavePensionTransactionResult>;
   handleDeletePensionTxn: (id: number) => void;
   deletePot: DeletePotMutation;
 };

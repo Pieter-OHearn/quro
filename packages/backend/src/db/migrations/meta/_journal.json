@@ -36,6 +36,13 @@
       "when": 1772798400000,
       "tag": "0004_pension_redesign",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772884800000,
+      "tag": "0005_pension_statement_documents",
+      "breakpoints": true
     }
   ]
 }

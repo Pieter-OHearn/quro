@@ -1,6 +1,28 @@
 import type { PensionTransaction } from '@quro/shared';
 import type { PensionFormatNativeFn } from '../types';
 
+function resolveInvestmentResultLabel(amount: number): string {
+  if (amount > 0) return 'Investment Gain';
+  if (amount < 0) return 'Investment Loss';
+  return 'Investment Gain/Loss';
+}
+
+function formatSignedAmount(
+  amount: number,
+  currency: string,
+  fmtNative: PensionFormatNativeFn,
+): string {
+  if (amount > 0) return `+${fmtNative(amount, currency, true)}`;
+  if (amount < 0) return `\u2212${fmtNative(Math.abs(amount), currency, true)}`;
+  return fmtNative(0, currency, true);
+}
+
+function resolveInvestmentResultColor(amount: number): string {
+  if (amount > 0) return 'text-amber-700';
+  if (amount < 0) return 'text-rose-500';
+  return 'text-slate-800';
+}
+
 export function buildPensionTxnStats(
   potTxns: PensionTransaction[],
   currency: string,
@@ -44,12 +66,9 @@ export function buildPensionTxnStats(
       color: 'text-rose-500',
     },
     {
-      label: 'Annual Statements',
-      value:
-        annualStatements >= 0
-          ? `+${fmtNative(annualStatements, currency, true)}`
-          : `\u2212${fmtNative(Math.abs(annualStatements), currency, true)}`,
-      color: annualStatements >= 0 ? 'text-amber-700' : 'text-rose-500',
+      label: resolveInvestmentResultLabel(annualStatements),
+      value: formatSignedAmount(annualStatements, currency, fmtNative),
+      color: resolveInvestmentResultColor(annualStatements),
     },
   ];
 }

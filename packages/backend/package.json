@@ -12,9 +12,10 @@
     "db:clear": "bun run src/db/clear.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1003.0",
     "@quro/shared": "workspace:*",
-    "hono": "^4.7.0",
     "drizzle-orm": "^0.45.1",
+    "hono": "^4.7.0",
     "postgres": "^3.4.0"
   },
   "devDependencies": {

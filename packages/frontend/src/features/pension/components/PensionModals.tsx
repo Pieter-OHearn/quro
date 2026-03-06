@@ -17,6 +17,7 @@ export function PensionModals({ state }: Readonly<PensionModalsProps>) {
     setAddTxnForPot,
     editingTxn,
     setEditingTxn,
+    documentsByTransactionId,
     handleSave,
     handleAddPensionTxn,
   } = state;
@@ -40,6 +41,9 @@ export function PensionModals({ state }: Readonly<PensionModalsProps>) {
         <AddPensionTxnModal
           pot={modalPot}
           existing={editingTxn ?? undefined}
+          existingDocument={
+            editingTxn ? (documentsByTransactionId.get(editingTxn.id) ?? null) : null
+          }
           onClose={() => {
             setAddTxnForPot(null);
             setEditingTxn(null);
