@@ -1165,7 +1165,7 @@ app.post('/:id/commit', async (c) => {
   if (rowValidationError) return c.json({ error: rowValidationError }, HTTP_STATUS.BAD_REQUEST);
 
   const now = new Date();
-  let committedTransactionIds: number[] = [];
+  let committedTransactionIds: number[];
 
   try {
     committedTransactionIds = await commitRowsToLedger({
