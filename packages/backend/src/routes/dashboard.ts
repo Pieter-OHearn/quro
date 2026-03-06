@@ -115,7 +115,13 @@ type PropertyTransactionRow = {
   date: string;
 };
 type PensionPotRow = { id: number; balance: unknown; currency: string };
-type PensionTransactionRow = { potId: number; type: string; amount: unknown; date: string };
+type PensionTransactionRow = {
+  potId: number;
+  type: string;
+  amount: unknown;
+  taxAmount: unknown;
+  date: string;
+};
 type MortgageRow = { id: number; outstandingBalance: unknown };
 
 type DatedSavingsTransaction = {
@@ -143,10 +149,22 @@ type DatedPropertyTransaction = {
 
 type DatedPensionTransaction = {
   potId: number;
-  type: 'contribution' | 'fee' | 'tax';
+  type: 'contribution' | 'fee' | 'annual_statement' | 'tax';
   amount: number;
+  taxAmount: number;
   timestamp: number;
 };
+
+function computePensionTxnDelta(transaction: {
+  type: string;
+  amount: number;
+  taxAmount: number;
+}): number {
+  if (transaction.type === 'contribution') return transaction.amount - transaction.taxAmount;
+  if (transaction.type === 'fee' || transaction.type === 'tax') return -transaction.amount;
+  if (transaction.type === 'annual_statement') return transaction.amount;
+  return 0;
+}
 
 function groupByNumericId<T>(rows: readonly T[], getId: (row: T) => number): Map<number, T[]> {
   const grouped = new Map<number, T[]>();
@@ -219,12 +237,14 @@ function buildDatedPensionTransactions(
       (transaction) =>
         transaction.type === 'contribution' ||
         transaction.type === 'fee' ||
+        transaction.type === 'annual_statement' ||
         transaction.type === 'tax',
     )
     .map((transaction) => ({
       potId: transaction.potId,
       type: transaction.type as DatedPensionTransaction['type'],
       amount: toNumber(transaction.amount),
+      taxAmount: toNumber(transaction.taxAmount),
       timestamp: toUtcTimestamp(transaction.date),
     }))
     .filter((transaction) => Number.isFinite(transaction.timestamp))
@@ -358,8 +378,7 @@ function computePensionAtCutoff(
     let balance = toNumber(pot.balance);
     for (const transaction of txnsByPotId.get(pot.id) ?? []) {
       if (transaction.timestamp <= cutoff) continue;
-      if (transaction.type === 'fee' || transaction.type === 'tax') balance += transaction.amount;
-      else balance -= transaction.amount;
+      balance -= computePensionTxnDelta(transaction);
     }
     return sum + convertToBase(Math.max(0, balance), pot.currency, rates);
   }, 0);
@@ -718,19 +737,41 @@ function buildActivityList(p: any[], b: any[], s: any[], h: any[], m: any[], pe:
         date: row.date,
         category: 'Mortgage',
       })),
-    ...pe.map((row) => ({
-      name:
-        row.note ||
-        (row.type === 'contribution'
-          ? 'Pension contribution'
-          : row.type === 'tax'
-            ? 'Contributions tax'
-            : 'Pension fee'),
-      type: row.type === 'contribution' ? ('transfer' as const) : ('expense' as const),
-      amount: -Math.abs(toNumber(row.amount)),
-      date: row.date,
-      category: 'Pension',
-    })),
+    ...pe.map((row) => {
+      const amount = toNumber(row.amount);
+      const taxAmount = toNumber(row.taxAmount);
+      if (row.type === 'contribution') {
+        const netAmount = amount - taxAmount;
+        return {
+          name: row.note || 'Pension contribution',
+          type: 'transfer' as const,
+          amount: -Math.abs(netAmount),
+          date: row.date,
+          category: 'Pension',
+        };
+      }
+
+      if (row.type === 'annual_statement') {
+        const isGain = amount >= 0;
+        return {
+          name:
+            row.note ||
+            (isGain ? 'Pension annual statement gain' : 'Pension annual statement loss'),
+          type: isGain ? ('income' as const) : ('expense' as const),
+          amount: isGain ? Math.abs(amount) : -Math.abs(amount),
+          date: row.date,
+          category: 'Pension',
+        };
+      }
+
+      return {
+        name: row.note || 'Pension fee',
+        type: 'expense' as const,
+        amount: -Math.abs(amount),
+        date: row.date,
+        category: 'Pension',
+      };
+    }),
     ...pr.filter((row) => row.type === 'rent_income' || row.type === 'expense').map(mapPropertyTxn),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))

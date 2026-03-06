@@ -19,7 +19,7 @@ const FILTER_OPTIONS = [
   { key: 'all', label: 'All' },
   { key: 'contribution', label: 'Contributions' },
   { key: 'fee', label: 'Fees' },
-  { key: 'tax', label: 'Tax' },
+  { key: 'annual_statement', label: 'Annual Statements' },
 ];
 const PAGE_SIZE = 6;
 
@@ -110,7 +110,14 @@ function PensionTxnRow({
   onDelete: () => void;
 }>) {
   const meta = PENSION_TXN_META[transaction.type];
-  const isDeduction = transaction.type !== 'contribution';
+  const signedAmount =
+    transaction.type === 'contribution'
+      ? transaction.amount - transaction.taxAmount
+      : transaction.type === 'fee'
+        ? -transaction.amount
+        : transaction.amount;
+  const isDeduction = signedAmount < 0;
+  const displayAmount = Math.abs(signedAmount);
 
   return (
     <TxnRow
@@ -121,7 +128,7 @@ function PensionTxnRow({
       label={transaction.note || meta.label}
       date={transaction.date}
       badge={
-        transaction.isEmployer
+        transaction.type === 'contribution' && transaction.isEmployer
           ? { text: 'Employer', className: 'bg-indigo-100 text-indigo-600' }
           : undefined
       }
@@ -131,7 +138,7 @@ function PensionTxnRow({
             className={`text-sm font-semibold ${isDeduction ? 'text-rose-500' : 'text-emerald-600'}`}
           >
             {isDeduction ? '\u2212' : '+'}
-            {fmtNative(transaction.amount, currency, true)}
+            {fmtNative(displayAmount, currency, true)}
           </p>
         </div>
       }

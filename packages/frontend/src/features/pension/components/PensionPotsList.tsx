@@ -82,6 +82,7 @@ function PensionPotDetails({
   fmtNative,
   onDelete,
 }: Readonly<PensionPotDetailsProps>) {
+  const metadataEntries = Object.entries(pot.metadata ?? {});
   const detailStats = [
     { label: 'Balance (Native)', value: fmtNative(currentBalance, pot.currency) },
     { label: `Balance (${baseCurrency})`, value: fmtBase(balanceInBase) },
@@ -90,11 +91,15 @@ function PensionPotDetails({
       label: 'Employer Contributions',
       value: `${fmtNative(pot.employerMonthly, pot.currency)}/mo`,
     },
+    {
+      label: 'Strategy',
+      value: pot.investmentStrategy ?? '\u2014',
+    },
   ];
 
   return (
     <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/30">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
         {detailStats.map(({ label, value }) => (
           <div key={label} className="bg-white rounded-xl p-3 border border-slate-100">
             <p className="text-xs text-slate-400 mb-1">{label}</p>
@@ -116,6 +121,21 @@ function PensionPotDetails({
           <Info size={12} className="text-slate-400 mt-0.5 flex-shrink-0" />
           {pot.notes}
         </p>
+      )}
+      {metadataEntries.length > 0 && (
+        <div className="mt-3 text-xs text-slate-500">
+          <p className="font-semibold text-slate-600 mb-1">Metadata</p>
+          <div className="flex flex-wrap gap-1.5">
+            {metadataEntries.map(([key, value]) => (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1"
+              >
+                <strong className="text-slate-700">{key}:</strong> {value || '\u2014'}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
       <div className="flex gap-2 mt-3">
         <button

@@ -41,6 +41,26 @@ function normalizePensionPotType(rawType: unknown): PensionPot['type'] {
   return PENSION_TYPE_ALIASES[rawType.trim().toLowerCase()] ?? 'Other';
 }
 
+function normalizePensionMetadata(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  return Object.entries(value).reduce<Record<string, string>>((acc, [rawKey, rawValue]) => {
+    const key = rawKey.trim();
+    if (!key) return acc;
+    if (rawValue == null) return acc;
+
+    if (
+      typeof rawValue === 'string' ||
+      typeof rawValue === 'number' ||
+      typeof rawValue === 'boolean'
+    ) {
+      acc[key] = String(rawValue);
+    }
+
+    return acc;
+  }, {});
+}
+
 export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
   ...pot,
   id: toPositiveInt((pot as { id?: IntegerLike }).id),
@@ -48,6 +68,12 @@ export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
   balance: toNumber(pot.balance),
   employeeMonthly: toNumber(pot.employeeMonthly),
   employerMonthly: toNumber(pot.employerMonthly),
+  investmentStrategy:
+    typeof pot.investmentStrategy === 'string' && pot.investmentStrategy.trim()
+      ? pot.investmentStrategy.trim()
+      : null,
+  metadata: normalizePensionMetadata(pot.metadata),
+  notes: typeof pot.notes === 'string' ? pot.notes : '',
 });
 
 export const normalizePensionTransaction = (txn: ApiPensionTransaction): PensionTransaction => ({
@@ -55,4 +81,6 @@ export const normalizePensionTransaction = (txn: ApiPensionTransaction): Pension
   id: toPositiveInt((txn as { id?: IntegerLike }).id),
   potId: toPositiveInt((txn as { potId?: IntegerLike }).potId),
   amount: toNumber(txn.amount),
+  taxAmount: toNumber(txn.taxAmount),
+  note: typeof txn.note === 'string' ? txn.note : '',
 });

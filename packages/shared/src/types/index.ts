@@ -187,6 +187,8 @@ export type PensionPot = {
   currency: CurrencyCode;
   employeeMonthly: number;
   employerMonthly: number;
+  investmentStrategy: string | null;
+  metadata: Record<string, string>;
   color: string;
   emoji: string;
   notes: string;
@@ -195,8 +197,9 @@ export type PensionPot = {
 export type PensionTransaction = {
   id: number;
   potId: number;
-  type: 'contribution' | 'fee' | 'tax';
+  type: 'contribution' | 'fee' | 'annual_statement';
   amount: number;
+  taxAmount: number;
   date: string;
   note: string;
   isEmployer: boolean | null;

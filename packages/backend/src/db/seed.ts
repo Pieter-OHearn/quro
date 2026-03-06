@@ -587,10 +587,15 @@ const insertedPensions = await db
         name: 'ABP Werknemerspensioen',
         provider: 'ABP',
         type: 'Workplace Pension',
-        balance: '47030',
+        balance: '50035',
         currency: 'EUR',
         employeeMonthly: '325',
         employerMonthly: '195',
+        investmentStrategy: 'High growth',
+        metadata: {
+          riskProfile: 'High',
+          allocation: 'Global equity tilt',
+        },
         color: '#6366f1',
         emoji: '\u{1F1F3}\u{1F1F1}',
         notes: null,
@@ -599,10 +604,15 @@ const insertedPensions = await db
         name: 'Australian Superannuation',
         provider: 'Australian Super',
         type: 'Workplace Pension',
-        balance: '71050',
+        balance: '78460',
         currency: 'AUD',
         employeeMonthly: '500',
         employerMonthly: '725',
+        investmentStrategy: 'Balanced growth',
+        metadata: {
+          riskProfile: 'Medium',
+          regionFocus: 'Australia & Global',
+        },
         color: '#f59e0b',
         emoji: '\u{1F1E6}\u{1F1FA}',
         notes: null,
@@ -611,10 +621,15 @@ const insertedPensions = await db
         name: 'Self-Invested Pension',
         provider: 'DeGiro',
         type: 'Personal Pension',
-        balance: '17430',
+        balance: '18555',
         currency: 'EUR',
         employeeMonthly: '200',
         employerMonthly: '0',
+        investmentStrategy: 'High growth',
+        metadata: {
+          riskProfile: 'High',
+          style: 'ETF core with satellites',
+        },
         color: '#0ea5e9',
         emoji: '\u{1F4CA}',
         notes: null,
@@ -633,17 +648,19 @@ const penTxRows: Array<{
   potId: number;
   type: string;
   amount: string;
+  taxAmount: string;
   date: string;
   note: string | null;
   isEmployer: boolean | null;
 }> = [];
 
-// ABP: 6 months employee + employer + 1 fee + 1 tax
+// ABP: 6 months employee + employer + 1 fee + 1 annual statement loss
 for (const m of propTxMonths) {
   penTxRows.push({
     potId: penIds[0],
     type: 'contribution',
     amount: '325',
+    taxAmount: '25',
     date: `${m}-25`,
     note: 'Employee contribution',
     isEmployer: false,
@@ -652,6 +669,7 @@ for (const m of propTxMonths) {
     potId: penIds[0],
     type: 'contribution',
     amount: '195',
+    taxAmount: '0',
     date: `${m}-25`,
     note: 'Employer contribution',
     isEmployer: true,
@@ -661,25 +679,28 @@ penTxRows.push({
   potId: penIds[0],
   type: 'fee',
   amount: '45',
+  taxAmount: '0',
   date: '2025-12-31',
   note: 'Annual management fee',
   isEmployer: null,
 });
 penTxRows.push({
   potId: penIds[0],
-  type: 'tax',
-  amount: '150',
+  type: 'annual_statement',
+  amount: '-140',
+  taxAmount: '0',
   date: '2025-12-31',
-  note: 'Contributions Tax',
+  note: 'Annual statement adjustment (loss)',
   isEmployer: null,
 });
 
-// AustralianSuper: 6 months employee + employer + 1 fee
+// AustralianSuper: 6 months employee + employer + 1 fee + 1 annual statement gain
 for (const m of propTxMonths) {
   penTxRows.push({
     potId: penIds[1],
     type: 'contribution',
     amount: '500',
+    taxAmount: '40',
     date: `${m}-25`,
     note: 'Employee contribution',
     isEmployer: false,
@@ -688,6 +709,7 @@ for (const m of propTxMonths) {
     potId: penIds[1],
     type: 'contribution',
     amount: '725',
+    taxAmount: '0',
     date: `${m}-25`,
     note: 'Employer contribution',
     isEmployer: true,
@@ -697,17 +719,28 @@ penTxRows.push({
   potId: penIds[1],
   type: 'fee',
   amount: '120',
+  taxAmount: '0',
   date: '2025-12-31',
   note: 'Annual management fee',
   isEmployer: null,
 });
+penTxRows.push({
+  potId: penIds[1],
+  type: 'annual_statement',
+  amount: '420',
+  taxAmount: '0',
+  date: '2025-12-31',
+  note: 'Annual statement investment gain',
+  isEmployer: null,
+});
 
-// DeGiro: 6 months employee + 1 fee
+// DeGiro: 6 months employee + 1 fee + 1 annual statement loss
 for (const m of propTxMonths) {
   penTxRows.push({
     potId: penIds[2],
     type: 'contribution',
     amount: '200',
+    taxAmount: '0',
     date: `${m}-25`,
     note: 'Employee contribution',
     isEmployer: false,
@@ -717,8 +750,18 @@ penTxRows.push({
   potId: penIds[2],
   type: 'fee',
   amount: '15',
+  taxAmount: '0',
   date: '2025-12-31',
   note: 'Annual management fee',
+  isEmployer: null,
+});
+penTxRows.push({
+  potId: penIds[2],
+  type: 'annual_statement',
+  amount: '-60',
+  taxAmount: '0',
+  date: '2025-12-31',
+  note: 'Annual statement adjustment (loss)',
   isEmployer: null,
 });
 

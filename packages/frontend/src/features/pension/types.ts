@@ -1,6 +1,7 @@
 import type { PensionPot, PensionTransaction } from '@quro/shared';
 
-export type PensionTxnType = 'contribution' | 'fee' | 'tax';
+export type PensionTxnType = 'contribution' | 'fee' | 'annual_statement';
+export type AnnualStatementDirection = 'gain' | 'loss';
 
 export type PensionGrowthPoint = {
   year: string;
@@ -19,14 +20,19 @@ export type IsForeignFn = (currency: string) => boolean;
 export type NumericLike = number | string | null | undefined;
 export type IntegerLike = number | string | null | undefined;
 
-export type ApiPensionPot = Omit<PensionPot, 'balance' | 'employeeMonthly' | 'employerMonthly'> & {
+export type ApiPensionPot = Omit<
+  PensionPot,
+  'balance' | 'employeeMonthly' | 'employerMonthly' | 'metadata'
+> & {
   balance: NumericLike;
   employeeMonthly: NumericLike;
   employerMonthly: NumericLike;
+  metadata?: unknown;
 };
 
-export type ApiPensionTransaction = Omit<PensionTransaction, 'amount'> & {
+export type ApiPensionTransaction = Omit<PensionTransaction, 'amount' | 'taxAmount'> & {
   amount: NumericLike;
+  taxAmount: NumericLike;
 };
 
 export type DeletePotMutation = {

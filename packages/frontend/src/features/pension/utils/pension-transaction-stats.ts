@@ -8,18 +8,18 @@ export function buildPensionTxnStats(
 ) {
   const total = potTxns
     .filter((txn) => txn.type === 'contribution')
-    .reduce((sum, txn) => sum + txn.amount, 0);
+    .reduce((sum, txn) => sum + (txn.amount - txn.taxAmount), 0);
   const employeeContributions = potTxns
     .filter((txn) => txn.type === 'contribution' && !txn.isEmployer)
-    .reduce((sum, txn) => sum + txn.amount, 0);
+    .reduce((sum, txn) => sum + (txn.amount - txn.taxAmount), 0);
   const employerContributions = potTxns
     .filter((txn) => txn.type === 'contribution' && txn.isEmployer)
-    .reduce((sum, txn) => sum + txn.amount, 0);
+    .reduce((sum, txn) => sum + (txn.amount - txn.taxAmount), 0);
   const fees = potTxns
     .filter((txn) => txn.type === 'fee')
     .reduce((sum, txn) => sum + txn.amount, 0);
-  const taxes = potTxns
-    .filter((txn) => txn.type === 'tax')
+  const annualStatements = potTxns
+    .filter((txn) => txn.type === 'annual_statement')
     .reduce((sum, txn) => sum + txn.amount, 0);
 
   return [
@@ -44,9 +44,12 @@ export function buildPensionTxnStats(
       color: 'text-rose-500',
     },
     {
-      label: 'Total Taxes',
-      value: `\u2212${fmtNative(taxes, currency, true)}`,
-      color: 'text-rose-500',
+      label: 'Annual Statements',
+      value:
+        annualStatements >= 0
+          ? `+${fmtNative(annualStatements, currency, true)}`
+          : `\u2212${fmtNative(Math.abs(annualStatements), currency, true)}`,
+      color: annualStatements >= 0 ? 'text-amber-700' : 'text-rose-500',
     },
   ];
 }

@@ -7,15 +7,16 @@ import { EmojiPickerField } from '@/components/ui/EmojiPickerField';
 import type { PensionPot } from '@quro/shared';
 import { PENSION_TYPES, PALETTE } from '../constants';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type PensionModalProps = {
   existing?: PensionPot;
   onClose: () => void;
   onSave: (p: PensionPot | Omit<PensionPot, 'id'>) => void;
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+type MetadataEntry = {
+  key: string;
+  value: string;
+};
 
 type PensionFormState = {
   name: string;
@@ -25,6 +26,7 @@ type PensionFormState = {
   currency: CurrencyCode;
   employeeMonthly: string;
   employerMonthly: string;
+  investmentStrategy: string;
   notes: string;
   emoji: string;
 };
@@ -33,12 +35,26 @@ const validatePensionForm = (form: PensionFormState): Record<string, string> => 
   const errs: Record<string, string> = {};
   if (!form.name.trim()) errs.name = 'Required';
   if (!form.provider.trim()) errs.provider = 'Required';
-  if (!form.balance || isNaN(parseFloat(form.balance))) errs.balance = 'Enter a valid amount';
+  if (!form.balance || Number.isNaN(parseFloat(form.balance)))
+    errs.balance = 'Enter a valid amount';
   if (!isSingleEmoji(form.emoji.trim())) errs.emoji = 'Pick an emoji';
   return errs;
 };
 
-const buildPotData = (form: PensionFormState, existing: PensionPot | undefined) => ({
+function buildMetadataRecord(entries: MetadataEntry[]): Record<string, string> {
+  return entries.reduce<Record<string, string>>((acc, entry) => {
+    const key = entry.key.trim();
+    if (!key) return acc;
+    acc[key] = entry.value.trim();
+    return acc;
+  }, {});
+}
+
+const buildPotData = (
+  form: PensionFormState,
+  metadataEntries: MetadataEntry[],
+  existing: PensionPot | undefined,
+) => ({
   name: form.name.trim(),
   provider: form.provider.trim(),
   type: form.type as PensionPot['type'],
@@ -46,17 +62,17 @@ const buildPotData = (form: PensionFormState, existing: PensionPot | undefined) 
   currency: form.currency,
   employeeMonthly: parseFloat(form.employeeMonthly) || 0,
   employerMonthly: parseFloat(form.employerMonthly) || 0,
+  investmentStrategy: form.investmentStrategy.trim() || null,
+  metadata: buildMetadataRecord(metadataEntries),
   color: existing?.color ?? PALETTE[Math.floor(Math.random() * PALETTE.length)],
   emoji: form.emoji.trim(),
   notes: form.notes,
 });
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
 type PensionFormFields = {
   form: PensionFormState;
   errors: Record<string, string>;
-  set: (field: string, value: string) => void;
+  set: (field: keyof PensionFormState, value: string) => void;
 };
 
 function PensionEmojiNameRow({ form, errors, set }: Readonly<PensionFormFields>) {
@@ -106,7 +122,7 @@ function PensionProviderTypeRow({ form, errors, set }: Readonly<PensionFormField
 function PensionBalanceCurrencyRow({ form, errors, set }: Readonly<PensionFormFields>) {
   return (
     <div className="grid grid-cols-2 gap-4">
-      <FormField label="Opening Balance" required error={errors.balance}>
+      <FormField label="Current Balance" required error={errors.balance}>
         <TextInput
           type="number"
           value={form.balance}
@@ -149,6 +165,64 @@ function PensionContributionsRow({ form, set }: Readonly<Omit<PensionFormFields,
   );
 }
 
+function PensionStrategyField({
+  value,
+  onChange,
+}: Readonly<{ value: string; onChange: (value: string) => void }>) {
+  return (
+    <FormField label="Investment Strategy" hint="optional">
+      <TextInput value={value} onChange={onChange} placeholder="e.g. High growth" />
+    </FormField>
+  );
+}
+
+function PensionMetadataEditor({
+  entries,
+  onChangeEntry,
+  onAddEntry,
+  onRemoveEntry,
+}: Readonly<{
+  entries: MetadataEntry[];
+  onChangeEntry: (index: number, field: keyof MetadataEntry, value: string) => void;
+  onAddEntry: () => void;
+  onRemoveEntry: (index: number) => void;
+}>) {
+  return (
+    <FormField label="Additional Metadata" hint="optional key/value pairs">
+      <div className="space-y-2">
+        {entries.map((entry, index) => (
+          <div key={`metadata-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+            <TextInput
+              value={entry.key}
+              onChange={(value) => onChangeEntry(index, 'key', value)}
+              placeholder="Key"
+            />
+            <TextInput
+              value={entry.value}
+              onChange={(value) => onChangeEntry(index, 'value', value)}
+              placeholder="Value"
+            />
+            <button
+              type="button"
+              onClick={() => onRemoveEntry(index)}
+              className="rounded-lg border border-slate-200 px-2 text-xs text-slate-500 hover:bg-slate-100 transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={onAddEntry}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+        >
+          Add metadata row
+        </button>
+      </div>
+    </FormField>
+  );
+}
+
 function PensionNotesField({
   value,
   onChange,
@@ -166,7 +240,14 @@ function PensionNotesField({
   );
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function buildInitialMetadataEntries(existing: PensionPot | undefined): MetadataEntry[] {
+  const entries = Object.entries(existing?.metadata ?? {}).map(([key, value]) => ({
+    key,
+    value,
+  }));
+
+  return entries.length > 0 ? entries : [{ key: '', value: '' }];
+}
 
 function buildInitialPensionState(existing: PensionPot | undefined): PensionFormState {
   if (!existing) {
@@ -178,6 +259,7 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
       currency: 'EUR' as CurrencyCode,
       employeeMonthly: '',
       employerMonthly: '',
+      investmentStrategy: '',
       notes: '',
       emoji: '\uD83C\uDFE6',
     };
@@ -190,6 +272,7 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
     currency: existing.currency as CurrencyCode,
     employeeMonthly: existing.employeeMonthly.toString(),
     employerMonthly: existing.employerMonthly.toString(),
+    investmentStrategy: existing.investmentStrategy ?? '',
     notes: existing.notes,
     emoji: existing.emoji,
   };
@@ -197,10 +280,13 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
 
 export function PensionModal({ existing, onClose, onSave }: PensionModalProps): JSX.Element {
   const [form, setForm] = useState<PensionFormState>(() => buildInitialPensionState(existing));
+  const [metadataEntries, setMetadataEntries] = useState<MetadataEntry[]>(() =>
+    buildInitialMetadataEntries(existing),
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const isEdit = Boolean(existing);
 
-  const set = (field: string, value: string): void => {
+  const set = (field: keyof PensionFormState, value: string): void => {
     setForm((f) => ({ ...f, [field]: value }));
     if (errors[field])
       setErrors((e) => {
@@ -210,13 +296,37 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps): 
       });
   };
 
+  const handleMetadataEntryChange = (
+    index: number,
+    field: keyof MetadataEntry,
+    value: string,
+  ): void => {
+    setMetadataEntries((entries) =>
+      entries.map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, [field]: value } : entry,
+      ),
+    );
+  };
+
+  const handleAddMetadataEntry = (): void => {
+    setMetadataEntries((entries) => [...entries, { key: '', value: '' }]);
+  };
+
+  const handleRemoveMetadataEntry = (index: number): void => {
+    setMetadataEntries((entries) => {
+      const next = entries.filter((_, entryIndex) => entryIndex !== index);
+      return next.length > 0 ? next : [{ key: '', value: '' }];
+    });
+  };
+
   const handleSave = (): void => {
     const errs = validatePensionForm(form);
     if (Object.keys(errs).length) {
       setErrors(errs);
       return;
     }
-    const potData = buildPotData(form, existing);
+
+    const potData = buildPotData(form, metadataEntries, existing);
     onSave(existing ? { id: existing.id, ...potData } : potData);
     onClose();
   };
@@ -239,6 +349,16 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps): 
       <PensionProviderTypeRow form={form} errors={errors} set={set} />
       <PensionBalanceCurrencyRow form={form} errors={errors} set={set} />
       <PensionContributionsRow form={form} set={set} />
+      <PensionStrategyField
+        value={form.investmentStrategy}
+        onChange={(value) => set('investmentStrategy', value)}
+      />
+      <PensionMetadataEditor
+        entries={metadataEntries}
+        onChangeEntry={handleMetadataEntryChange}
+        onAddEntry={handleAddMetadataEntry}
+        onRemoveEntry={handleRemoveMetadataEntry}
+      />
       <PensionNotesField value={form.notes} onChange={(v) => set('notes', v)} />
     </Modal>
   );

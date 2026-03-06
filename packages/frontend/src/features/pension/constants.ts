@@ -25,12 +25,12 @@ export const PENSION_TXN_META: Record<
     bg: 'bg-rose-50',
     borderColor: 'border-rose-300',
   },
-  tax: {
-    label: 'Tax',
-    icon: CircleMinus,
-    color: 'text-rose-500',
-    bg: 'bg-rose-50',
-    borderColor: 'border-rose-300',
+  annual_statement: {
+    label: 'Annual Statement',
+    icon: Landmark,
+    color: 'text-amber-700',
+    bg: 'bg-amber-50',
+    borderColor: 'border-amber-300',
   },
 };
 

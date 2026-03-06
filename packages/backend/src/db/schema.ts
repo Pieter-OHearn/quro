@@ -7,6 +7,7 @@ import {
   numeric,
   integer,
   boolean,
+  jsonb,
   timestamp,
   index,
   uniqueIndex,
@@ -217,6 +218,8 @@ export const pensionPots = pgTable(
     currency: currencyCodeEnum('currency').notNull(),
     employeeMonthly: numeric('employee_monthly').notNull(),
     employerMonthly: numeric('employer_monthly').notNull(),
+    investmentStrategy: text('investment_strategy'),
+    metadata: jsonb('metadata').$type<Record<string, string>>().notNull().default({}),
     color: text('color'),
     emoji: text('emoji'),
     notes: text('notes'),
@@ -234,8 +237,9 @@ export const pensionTransactions = pgTable(
     potId: integer('pot_id')
       .references(() => pensionPots.id)
       .notNull(),
-    type: text('type').notNull(), // contribution | fee | tax
+    type: text('type').notNull(), // contribution | fee | annual_statement
     amount: numeric('amount').notNull(),
+    taxAmount: numeric('tax_amount').notNull().default('0'),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     isEmployer: boolean('is_employer'),

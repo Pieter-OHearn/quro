@@ -5,7 +5,11 @@ import { DateNoteRow } from '@/components/ui/DateNoteRow';
 import type { PensionPot, PensionTransaction } from '@quro/shared';
 import { PENSION_TXN_META } from '../constants';
 import { useAddPensionTxnForm } from '../hooks';
-import type { PensionTxnType, SavePensionTransactionInput } from '../types';
+import type {
+  AnnualStatementDirection,
+  PensionTxnType,
+  SavePensionTransactionInput,
+} from '../types';
 
 type AddPensionTxnModalProps = {
   pot: PensionPot;
@@ -26,16 +30,59 @@ function EmployerToggle({
   return (
     <div className="flex items-center gap-3">
       <button
+        type="button"
         onClick={() => setIsEmployer(true)}
         className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${isEmployer ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
       >
         Employer
       </button>
       <button
+        type="button"
         onClick={() => setIsEmployer(false)}
         className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
       >
         Employee
+      </button>
+    </div>
+  );
+}
+
+function AnnualStatementDirectionToggle({
+  direction,
+  onChange,
+}: Readonly<{
+  direction: AnnualStatementDirection;
+  onChange: (value: AnnualStatementDirection) => void;
+}>) {
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => onChange('gain')}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'gain' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+      >
+        Gain
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('loss')}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'loss' ? 'bg-rose-50 border-rose-300 text-rose-600' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+      >
+        Loss
+      </button>
+    </div>
+  );
+}
+
+function PdfUploadStub() {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+      <button
+        type="button"
+        disabled
+        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-400 cursor-not-allowed"
+      >
+        Attach PDF (Coming soon)
       </button>
     </div>
   );
@@ -49,8 +96,10 @@ type PensionTxnFormBodyProps = {
 function PensionTxnFormBody({ form, pot }: Readonly<PensionTxnFormBodyProps>) {
   const amountLabel =
     form.type === 'contribution'
-      ? `Amount (${pot.currency})`
-      : `${PENSION_TXN_META[form.type].label} Amount (${pot.currency})`;
+      ? `Contribution Amount (${pot.currency})`
+      : form.type === 'fee'
+        ? `Fee Amount (${pot.currency})`
+        : `Statement Amount (${pot.currency})`;
 
   return (
     <>
@@ -65,6 +114,14 @@ function PensionTxnFormBody({ form, pot }: Readonly<PensionTxnFormBodyProps>) {
       {form.type === 'contribution' && (
         <EmployerToggle isEmployer={form.isEmployer} setIsEmployer={form.setIsEmployer} />
       )}
+      {form.type === 'annual_statement' && (
+        <FormField label="Statement Result">
+          <AnnualStatementDirectionToggle
+            direction={form.annualStatementDirection}
+            onChange={form.setAnnualStatementDirection}
+          />
+        </FormField>
+      )}
       <FormField label={amountLabel} error={form.error}>
         <CurrencyInput
           currency={pot.currency}
@@ -76,6 +133,18 @@ function PensionTxnFormBody({ form, pot }: Readonly<PensionTxnFormBodyProps>) {
           error={Boolean(form.error)}
         />
       </FormField>
+      {form.type === 'contribution' && (
+        <FormField label={`Tax Amount (${pot.currency})`}>
+          <CurrencyInput
+            currency={pot.currency}
+            value={form.taxAmount}
+            onChange={(value) => {
+              form.setTaxAmount(value);
+              form.setError('');
+            }}
+          />
+        </FormField>
+      )}
       <DateNoteRow
         date={form.date}
         note={form.note}
@@ -83,11 +152,14 @@ function PensionTxnFormBody({ form, pot }: Readonly<PensionTxnFormBodyProps>) {
         onNoteChange={form.setNote}
         notePlaceholder="e.g. Monthly SG..."
       />
+      {form.type === 'annual_statement' && <PdfUploadStub />}
       {form.parsedAmount > 0 && (
         <PreviewBanner
           type={form.type}
           isEmployer={form.isEmployer}
           amount={form.parsedAmount}
+          taxAmount={form.parsedTaxAmount}
+          annualStatementDirection={form.annualStatementDirection}
           currency={pot.currency}
           fmtNative={form.fmtNative}
         />
@@ -100,31 +172,61 @@ type PreviewBannerProps = {
   type: PensionTxnType;
   isEmployer: boolean;
   amount: number;
+  taxAmount: number;
+  annualStatementDirection: AnnualStatementDirection;
   currency: string;
   fmtNative: (amount: number, currency: string, compact?: boolean) => string;
 };
+
+function resolvePreviewSignedAmount(params: {
+  type: PensionTxnType;
+  amount: number;
+  taxAmount: number;
+  annualStatementDirection: AnnualStatementDirection;
+}): number {
+  if (params.type === 'contribution') return params.amount - params.taxAmount;
+  if (params.type === 'fee') return -params.amount;
+  return params.annualStatementDirection === 'gain' ? params.amount : -params.amount;
+}
+
+function resolvePreviewLabel(params: {
+  type: PensionTxnType;
+  isEmployer: boolean;
+  annualStatementDirection: AnnualStatementDirection;
+}): string {
+  if (params.type === 'fee') return 'Fee deducted';
+  if (params.type === 'annual_statement') {
+    return params.annualStatementDirection === 'gain'
+      ? 'Annual statement gain'
+      : 'Annual statement loss';
+  }
+  return params.isEmployer ? 'Employer contribution' : 'Employee contribution';
+}
+
+function resolvePreviewTone(isDeduction: boolean): { colorClass: string; bgClass: string } {
+  return isDeduction
+    ? { colorClass: 'text-rose-600', bgClass: 'bg-rose-50 border-rose-100' }
+    : { colorClass: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-100' };
+}
 
 function PreviewBanner({
   type,
   isEmployer,
   amount,
+  taxAmount,
+  annualStatementDirection,
   currency,
   fmtNative,
 }: Readonly<PreviewBannerProps>): JSX.Element {
-  const isDeduction = type !== 'contribution';
-  const colorClass = isDeduction ? 'text-rose-600' : 'text-emerald-700';
-  const bgClass = isDeduction ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100';
-
-  let label: string;
-  if (type === 'fee') {
-    label = 'Fee deducted';
-  } else if (type === 'tax') {
-    label = 'Contributions tax deducted';
-  } else if (isEmployer) {
-    label = 'Employer contribution';
-  } else {
-    label = 'Employee contribution';
-  }
+  const signedAmount = resolvePreviewSignedAmount({
+    type,
+    amount,
+    taxAmount,
+    annualStatementDirection,
+  });
+  const isDeduction = signedAmount < 0;
+  const { colorClass, bgClass } = resolvePreviewTone(isDeduction);
+  const label = resolvePreviewLabel({ type, isEmployer, annualStatementDirection });
 
   return (
     <div className={`rounded-xl p-4 border ${bgClass}`}>
@@ -132,9 +234,14 @@ function PreviewBanner({
         <span className={`font-medium ${colorClass}`}>{label}</span>
         <span className={`font-bold ${colorClass}`}>
           {isDeduction ? '\u2212' : '+'}
-          {fmtNative(amount, currency, true)}
+          {fmtNative(Math.abs(signedAmount), currency, true)}
         </span>
       </div>
+      {type === 'contribution' && taxAmount > 0 && (
+        <p className="mt-2 text-[11px] text-slate-500">
+          Gross {fmtNative(amount, currency, true)} · Tax {fmtNative(taxAmount, currency, true)}
+        </p>
+      )}
     </div>
   );
 }
