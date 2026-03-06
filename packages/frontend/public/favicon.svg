@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Quro">
+  <defs>
+    <linearGradient id="quro-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0d1627" />
+      <stop offset="1" stop-color="#1b2550" />
+    </linearGradient>
+    <linearGradient id="quro-tail" x1="49.32" y1="42" x2="57" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#818cf8" />
+      <stop offset="1" stop-color="#c084fc" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#quro-bg)" />
+  <circle cx="32" cy="32" r="20" fill="none" stroke="#ffffff" stroke-width="4.8" stroke-opacity="0.06" />
+  <path
+    d="M 37.18 51.32 A 20 20 0 1 1 49.32 42"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-opacity="0.92"
+  />
+  <path
+    d="M 49.32 42 Q 54.32 33.34 57 24"
+    fill="none"
+    stroke="url(#quro-tail)"
+    stroke-width="5"
+    stroke-linecap="round"
+  />
+  <circle cx="32" cy="32" r="2.8" fill="#ffffff" fill-opacity="0.72" />
+</svg>
