@@ -50,6 +50,13 @@
       "when": 1772899200000,
       "tag": "0006_pension_statement_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773000000000,
+      "tag": "0007_worker_heartbeats",
+      "breakpoints": true
     }
   ]
 }

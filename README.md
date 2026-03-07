@@ -129,6 +129,7 @@ uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 808
 
 Pension statement extraction now uses `vllm` only.
 If your MacBook is too weak for this workload, point `VLLM_BASE_URL` at a reachable GPU host before starting the worker and parser.
+If you skip the worker or parser locally, the app will keep pension PDF import disabled and show `AI off`.
 
 Recommended parser settings:
 
@@ -194,7 +195,8 @@ bun run format
 ### Run core stack with Docker Compose
 
 This mode runs the app shell in Docker: frontend, backend, database, and MinIO.
-Pension statement import is not available in this mode.
+Pension statement import is auto-disabled in this mode because the AI worker stack is not running.
+The pension UI shows an `AI off` badge until the pension-import profile is started.
 
 ```bash
 docker compose --env-file packages/backend/.env up --build

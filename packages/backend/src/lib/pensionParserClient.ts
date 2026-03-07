@@ -1,4 +1,5 @@
 const DEFAULT_PARSER_TIMEOUT_MS = 300_000;
+const DEFAULT_PARSER_HEALTH_TIMEOUT_MS = 4_000;
 
 export type PensionParserEvidence = {
   page: number | null;
@@ -38,6 +39,11 @@ function getParserBaseUrl(): string {
   const value = process.env.PENSION_PARSER_URL?.trim();
   return value || 'http://pension-parser:8080';
 }
+
+export type ParserHealthCheckResult = {
+  healthy: boolean;
+  errorMessage: string | null;
+};
 
 function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -134,6 +140,42 @@ export async function parsePensionStatement(
       modelName: typeof payload.modelName === 'string' ? payload.modelName : null,
       modelVersion: typeof payload.modelVersion === 'string' ? payload.modelVersion : null,
       rows: normalizeRows(payload.rows),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function checkPensionParserHealth(): Promise<ParserHealthCheckResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_PARSER_HEALTH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${getParserBaseUrl()}/health`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return {
+        healthy: false,
+        errorMessage: `Parser health check failed with status ${response.status}`,
+      };
+    }
+
+    const payload = (await response.json().catch(() => null)) as { status?: unknown } | null;
+    if (payload?.status !== 'ok') {
+      return {
+        healthy: false,
+        errorMessage: 'Parser health check returned an unexpected response',
+      };
+    }
+
+    return { healthy: true, errorMessage: null };
+  } catch (error) {
+    return {
+      healthy: false,
+      errorMessage: error instanceof Error ? error.message : 'Parser health check failed',
     };
   } finally {
     clearTimeout(timer);

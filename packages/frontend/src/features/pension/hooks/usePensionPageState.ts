@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@quro/shared';
+import { DEFAULT_APP_CAPABILITIES, useAppCapabilities } from '@/lib/useAppCapabilities';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { PensionPageState } from '../types';
 import { useCreatePensionPot } from './useCreatePensionPot';
@@ -58,6 +59,7 @@ export function usePensionPageState(): PensionPageState {
   const { data: pensionTxns = [], isLoading: loadingTransactions } = usePensionTransactions();
   const { data: pensionDocuments = [], isLoading: loadingDocuments } =
     usePensionStatementDocuments();
+  const capabilitiesQuery = useAppCapabilities();
   const ui = usePensionUiState();
   const createPot = useCreatePensionPot();
   const updatePot = useUpdatePensionPot();
@@ -108,6 +110,9 @@ export function usePensionPageState(): PensionPageState {
     pensions,
     pensionTxns,
     documentsByTransactionId,
+    pensionImportCapability:
+      capabilitiesQuery.data?.pensionStatementImport ??
+      DEFAULT_APP_CAPABILITIES.pensionStatementImport,
     isLoading: loadingPots || loadingTransactions || loadingDocuments,
     ...ui,
     ...computations,

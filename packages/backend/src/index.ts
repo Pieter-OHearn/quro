@@ -13,6 +13,7 @@ import goals from './routes/goals';
 import budget from './routes/budget';
 import dashboard from './routes/dashboard';
 import currency from './routes/currency';
+import capabilities from './routes/capabilities';
 
 const app = new Hono();
 
@@ -33,6 +34,8 @@ app.use('/api/goals/*', requireAuth);
 app.use('/api/budget/*', requireAuth);
 app.use('/api/dashboard/*', requireAuth);
 app.use('/api/currency/*', requireAuth);
+app.use('/api/capabilities', requireAuth);
+app.use('/api/capabilities/*', requireAuth);
 
 app.route('/api/savings', savings);
 app.route('/api/investments', investments);
@@ -44,6 +47,7 @@ app.route('/api/goals', goals);
 app.route('/api/budget', budget);
 app.route('/api/dashboard', dashboard);
 app.route('/api/currency', currency);
+app.route('/api/capabilities', capabilities);
 
 export default {
   port: parseInt(process.env.PORT || '3000'),

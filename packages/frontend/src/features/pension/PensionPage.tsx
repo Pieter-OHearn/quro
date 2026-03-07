@@ -69,12 +69,11 @@ function resolveDeepLink(routeState: unknown, pensions: PensionPot[]): DeepLinkR
   return { type: 'open', importId: parsed.importId, pot };
 }
 
-export function Pension(): JSX.Element {
-  const state = usePensionPageState();
+function useImportDeepLink(state: ReturnType<typeof usePensionPageState>): void {
   const location = useLocation();
   const navigate = useNavigate();
-  const { pensions, openImportModal } = state;
   const consumedDeepLinkRef = useRef<string | null>(null);
+  const { pensions, openImportModal } = state;
 
   useEffect(() => {
     if (state.isLoading) return;
@@ -96,6 +95,11 @@ export function Pension(): JSX.Element {
     clearImportState(location.pathname, location.state, navigate);
     openImportModal(resolution.pot, resolution.importId);
   }, [location.pathname, location.state, navigate, openImportModal, pensions, state.isLoading]);
+}
+
+export function Pension(): JSX.Element {
+  const state = usePensionPageState();
+  useImportDeepLink(state);
 
   if (state.isLoading) return <LoadingSpinner />;
 
@@ -140,6 +144,7 @@ export function Pension(): JSX.Element {
         convertToBase={state.convertToBase}
         isForeign={state.isForeign}
         baseCurrency={state.baseCurrency}
+        pensionImportCapability={state.pensionImportCapability}
       />
       <PensionRetirementProjection
         totalInBase={state.totalInBase}

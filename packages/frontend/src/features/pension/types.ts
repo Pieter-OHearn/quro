@@ -1,4 +1,5 @@
 import type {
+  AppCapabilityStatus,
   PensionImportCollisionWarning,
   PensionImportConfidenceLabel,
   PensionPot,
@@ -111,6 +112,7 @@ export type PensionPageState = {
   pensions: PensionPot[];
   pensionTxns: PensionTransaction[];
   documentsByTransactionId: Map<number, PensionStatementDocument>;
+  pensionImportCapability: AppCapabilityStatus;
   isLoading: boolean;
   showModal: boolean;
   setShowModal: (value: boolean) => void;

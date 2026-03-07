@@ -11,6 +11,7 @@ import {
   pensionTransactions,
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { getPensionStatementImportCapability } from '../lib/capabilities';
 import {
   parsePensionStatement,
   type PensionParserResult,
@@ -920,6 +921,14 @@ app.get('/', async (c) => {
 
 app.post('/', async (c) => {
   const user = getAuthUser(c);
+  const capability = await getPensionStatementImportCapability();
+  if (!capability.enabled) {
+    return c.json(
+      { error: capability.message, reason: capability.reason },
+      HTTP_STATUS.SERVICE_UNAVAILABLE,
+    );
+  }
+
   const formData = await c.req.formData();
   const potId = parseId(String(formData.get('potId') ?? ''));
   if (potId === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);

@@ -52,6 +52,19 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// ── Worker Heartbeats ───────────────────────────────────────────────────────
+
+export const workerHeartbeats = pgTable('worker_heartbeats', {
+  workerName: text('worker_name').primaryKey(),
+  status: text('status').notNull(),
+  lastHeartbeatAt: timestamp('last_heartbeat_at').notNull(),
+  parserHealthy: boolean('parser_healthy').notNull().default(false),
+  parserCheckedAt: timestamp('parser_checked_at'),
+  parserError: text('parser_error'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ── Savings ──────────────────────────────────────────────────────────────────
 
 export const savingsAccounts = pgTable(

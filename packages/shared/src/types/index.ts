@@ -231,6 +231,20 @@ export type PensionImportCollisionWarning = {
   reason: string;
 };
 
+export type AppCapabilityReason = 'worker_unavailable' | 'worker_stale' | 'parser_unhealthy';
+
+export type AppCapabilityStatus = {
+  enabled: boolean;
+  reason: AppCapabilityReason | null;
+  message: string;
+  checkedAt: string;
+};
+
+export type AppCapabilities = {
+  ai: AppCapabilityStatus;
+  pensionStatementImport: AppCapabilityStatus;
+};
+
 export type PensionStatementImport = {
   id: number;
   potId: number;
