@@ -1,4 +1,13 @@
-import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@quro/shared';
+import type {
+  PensionImportCollisionWarning,
+  PensionImportConfidenceLabel,
+  PensionPot,
+  PensionStatementDocument,
+  PensionStatementImport,
+  PensionStatementImportSummary,
+  PensionStatementImportRow,
+  PensionTransaction,
+} from '@quro/shared';
 
 export type PensionTxnType = 'contribution' | 'fee' | 'annual_statement';
 export type AnnualStatementDirection = 'gain' | 'loss';
@@ -39,6 +48,42 @@ export type ApiPensionStatementDocument = Omit<PensionStatementDocument, 'sizeBy
   sizeBytes: NumericLike;
 };
 
+export type ApiPensionStatementImport = Omit<
+  PensionStatementImport,
+  'sizeBytes' | 'totalRows' | 'deletedRows' | 'activeRows'
+> & {
+  sizeBytes: NumericLike;
+  totalRows?: NumericLike;
+  deletedRows?: NumericLike;
+  activeRows?: NumericLike;
+};
+
+export type ApiPensionStatementImportSummary = Omit<
+  PensionStatementImportSummary,
+  'totalRows' | 'deletedRows' | 'activeRows'
+> & {
+  totalRows?: NumericLike;
+  deletedRows?: NumericLike;
+  activeRows?: NumericLike;
+};
+
+export type ApiPensionStatementImportRow = Omit<
+  PensionStatementImportRow,
+  'amount' | 'taxAmount' | 'confidence' | 'collisionWarning'
+> & {
+  amount: NumericLike;
+  taxAmount: NumericLike;
+  confidence: NumericLike;
+  collisionWarning?: PensionImportCollisionWarning | null;
+  confidenceLabel: PensionImportConfidenceLabel;
+  type: PensionTransaction['type'];
+  evidence: Array<{ page: number | null; snippet: string }>;
+};
+
+export type UpdatePensionImportRowPayload = Partial<
+  Pick<PensionStatementImportRow, 'type' | 'amount' | 'taxAmount' | 'date' | 'note' | 'isEmployer'>
+>;
+
 export type DeletePotMutation = {
   mutate: (id: number) => void;
 };
@@ -64,6 +109,12 @@ export type PensionPageState = {
   setExpanded: (value: number | null) => void;
   addTxnForPot: PensionPot | null;
   setAddTxnForPot: (value: PensionPot | null) => void;
+  importModal: {
+    pot: PensionPot;
+    importId: number | null;
+  } | null;
+  openImportModal: (pot: PensionPot, importId?: number | null) => void;
+  closeImportModal: () => void;
   editingTxn: PensionTransaction | null;
   setEditingTxn: (value: PensionTransaction | null) => void;
   totalInBase: number;

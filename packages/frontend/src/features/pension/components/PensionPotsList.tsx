@@ -19,6 +19,7 @@ type PensionPotsListProps = {
   setEditing: (value: PensionPot | undefined) => void;
   setShowModal: (value: boolean) => void;
   setAddTxnForPot: (value: PensionPot | null) => void;
+  openImportModal: (pot: PensionPot, importId?: number | null) => void;
   setEditingTxn: (value: PensionTransaction | null) => void;
   deletePot: DeletePotMutation;
   handleDeletePensionTxn: (id: number) => void;
@@ -42,6 +43,7 @@ type PensionPotCardProps = {
   onToggle: (id: number | null) => void;
   onDelete: (id: number) => void;
   onAddTxn: (pot: PensionPot) => void;
+  onImportStatement: (pot: PensionPot) => void;
   onEditTxn: (transaction: PensionTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
@@ -57,6 +59,7 @@ type PensionPotExpandedProps = {
   fmtNative: PensionFormatNativeFn;
   onDelete: (id: number) => void;
   onAddTxn: (pot: PensionPot) => void;
+  onImportStatement: (pot: PensionPot) => void;
   onEditTxn: (transaction: PensionTransaction) => void;
   onDeleteTxn: (id: number) => void;
 };
@@ -160,6 +163,7 @@ function PensionPotExpanded({
   fmtNative,
   onDelete,
   onAddTxn,
+  onImportStatement,
   onEditTxn,
   onDeleteTxn,
 }: Readonly<PensionPotExpandedProps>) {
@@ -182,6 +186,15 @@ function PensionPotExpanded({
         onEdit={onEditTxn}
         onDelete={onDeleteTxn}
       />
+      <div className="px-6 pb-5 -mt-2">
+        <button
+          type="button"
+          onClick={() => onImportStatement(pot)}
+          className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+        >
+          Import Annual Statement PDF
+        </button>
+      </div>
     </div>
   );
 }
@@ -287,6 +300,7 @@ function PensionPotCard({
   onToggle,
   onDelete,
   onAddTxn,
+  onImportStatement,
   onEditTxn,
   onDeleteTxn,
 }: Readonly<PensionPotCardProps>) {
@@ -331,6 +345,7 @@ function PensionPotCard({
           fmtNative={fmtNative}
           onDelete={onDelete}
           onAddTxn={onAddTxn}
+          onImportStatement={onImportStatement}
           onEditTxn={onEditTxn}
           onDeleteTxn={onDeleteTxn}
         />
@@ -346,6 +361,7 @@ function PensionPotsListItems({
   setExpanded,
   setEditing,
   setAddTxnForPot,
+  openImportModal,
   setEditingTxn,
   deletePot,
   handleDeletePensionTxn,
@@ -379,6 +395,9 @@ function PensionPotsListItems({
           onAddTxn={(pot) => {
             setEditingTxn(null);
             setAddTxnForPot(pot);
+          }}
+          onImportStatement={(pot) => {
+            openImportModal(pot);
           }}
           onEditTxn={(transaction) => {
             setAddTxnForPot(null);

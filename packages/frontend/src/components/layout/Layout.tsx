@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router';
 import {
   LayoutDashboard,
   PiggyBank,
@@ -19,11 +19,14 @@ import {
   ShieldCheck,
   ChevronDown,
   Check,
+  Loader2,
 } from 'lucide-react';
 import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { useAuth } from '@/lib/AuthContext';
 import { QuroLogo } from '@/components/ui/QuroLogo';
+import { usePensionStatementImports } from '@/features/pension/hooks';
+import type { PensionStatementImportSummary } from '@quro/shared';
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -225,12 +228,206 @@ function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen, pathname 
 
 // ─── App Header ───────────────────────────────────────────────────────────────
 
+const IMPORT_STATUS_META: Record<
+  PensionStatementImportSummary['status'],
+  { label: string; badgeClass: string; actionLabel: string }
+> = {
+  queued: {
+    label: 'Queued',
+    badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200',
+    actionLabel: 'View status',
+  },
+  processing: {
+    label: 'Processing',
+    badgeClass: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+    actionLabel: 'View status',
+  },
+  ready_for_review: {
+    label: 'Review Ready',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    actionLabel: 'Review now',
+  },
+  failed: {
+    label: 'Failed',
+    badgeClass: 'bg-rose-50 text-rose-700 border border-rose-200',
+    actionLabel: 'View error',
+  },
+  committed: {
+    label: 'Committed',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    actionLabel: 'Open',
+  },
+  expired: {
+    label: 'Expired',
+    badgeClass: 'bg-slate-100 text-slate-500 border border-slate-200',
+    actionLabel: 'Open',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    badgeClass: 'bg-slate-100 text-slate-500 border border-slate-200',
+    actionLabel: 'Open',
+  },
+};
+
+function formatImportUpdatedAt(isoDate: string): string {
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.valueOf())) return '';
+  return parsed.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 type AppHeaderProps = {
   mobileOpen: boolean;
   setMobileOpen: (v: boolean) => void;
   currentPageLabel: string;
   today: string;
 };
+
+const EMPTY_IMPORT_NOTIFICATIONS: PensionStatementImportSummary[] = [];
+
+type ImportNotificationRowProps = {
+  item: PensionStatementImportSummary;
+  onOpenImport: (item: PensionStatementImportSummary) => void;
+};
+
+function ImportNotificationRow({ item, onOpenImport }: Readonly<ImportNotificationRowProps>) {
+  const meta = IMPORT_STATUS_META[item.status];
+  return (
+    <div className="px-4 py-3 border-b border-slate-100 last:border-b-0">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold text-slate-700 truncate">
+          {item.potEmoji} {item.potName}
+        </p>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${meta.badgeClass}`}>
+          {meta.label}
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-500 truncate mt-0.5">{item.fileName}</p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="text-[10px] text-slate-400 truncate">
+          {item.potProvider} · Updated {formatImportUpdatedAt(item.updatedAt)}
+        </p>
+        <button
+          type="button"
+          onClick={() => onOpenImport(item)}
+          className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
+        >
+          {meta.actionLabel}
+        </button>
+      </div>
+      {item.status === 'failed' && item.errorMessage && (
+        <p className="text-[10px] text-rose-600 mt-1 truncate">{item.errorMessage}</p>
+      )}
+    </div>
+  );
+}
+
+type ImportNotificationsPanelProps = {
+  isOpen: boolean;
+  isLoading: boolean;
+  isFetching: boolean;
+  readyCount: number;
+  notifications: PensionStatementImportSummary[];
+  onOpenImport: (item: PensionStatementImportSummary) => void;
+};
+
+function ImportNotificationsPanel({
+  isOpen,
+  isLoading,
+  isFetching,
+  readyCount,
+  notifications,
+  onOpenImport,
+}: Readonly<ImportNotificationsPanelProps>) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="absolute right-0 mt-2 w-[360px] max-w-[90vw] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Import Notifications</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {readyCount > 0
+              ? `${readyCount} ready for review`
+              : 'Track queued and processing pension statement imports'}
+          </p>
+        </div>
+        {isFetching && <Loader2 size={14} className="animate-spin text-slate-400 flex-shrink-0" />}
+      </div>
+
+      <div className="max-h-[360px] overflow-y-auto">
+        {isLoading && (
+          <p className="px-4 py-5 text-xs text-slate-500 text-center">Loading notifications...</p>
+        )}
+        {!isLoading && notifications.length === 0 && (
+          <p className="px-4 py-6 text-xs text-slate-500 text-center">
+            No active pension import notifications.
+          </p>
+        )}
+        {notifications.map((item) => (
+          <ImportNotificationRow key={item.id} item={item} onOpenImport={onOpenImport} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ImportNotificationsBell() {
+  const navigate = useNavigate();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const importsQuery = usePensionStatementImports();
+  const importNotifications = importsQuery.data ?? EMPTY_IMPORT_NOTIFICATIONS;
+  const hasNotifications = importNotifications.length > 0;
+  const readyCount = importNotifications.filter(
+    (item) => item.status === 'ready_for_review',
+  ).length;
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const handleClickOutside = (event: MouseEvent): void => {
+      if (notificationsRef.current?.contains(event.target as Node)) return;
+      setNotificationsOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notificationsOpen]);
+
+  const handleOpenImport = (item: PensionStatementImportSummary): void => {
+    setNotificationsOpen(false);
+    void navigate(`/pension?importId=${item.id}&potId=${item.potId}`);
+  };
+
+  return (
+    <div className="relative" ref={notificationsRef}>
+      <button
+        type="button"
+        onClick={() => setNotificationsOpen((open) => !open)}
+        className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+        title="Import notifications"
+      >
+        <Bell size={18} />
+        {hasNotifications && (
+          <span className="absolute top-1.5 right-1.5 min-w-[6px] h-[6px] rounded-full bg-rose-500" />
+        )}
+      </button>
+      <ImportNotificationsPanel
+        isOpen={notificationsOpen}
+        isLoading={importsQuery.isLoading}
+        isFetching={importsQuery.isFetching}
+        readyCount={readyCount}
+        notifications={importNotifications}
+        onOpenImport={handleOpenImport}
+      />
+    </div>
+  );
+}
 
 function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHeaderProps) {
   const { user } = useAuth();
@@ -250,10 +447,7 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
       </div>
       <div className="flex items-center gap-3">
         <CurrencySelector />
-        <button className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-          <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
-        </button>
+        <ImportNotificationsBell />
         <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
             <User size={14} className="text-white" />

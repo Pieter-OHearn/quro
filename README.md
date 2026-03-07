@@ -61,9 +61,10 @@ At a glance, Quro helps you:
 ## Prerequisites
 
 - Bun 1.x
-- Docker (for PostgreSQL and full-stack container runs)
+- Python 3.11+
+- Docker (for infrastructure and full-stack container runs)
 
-## Local development
+## Local development (Bun + Python parser)
 
 1. Install dependencies:
 
@@ -79,11 +80,12 @@ cp packages/frontend/.env.example packages/frontend/.env
 ```
 
 Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
+It also includes parser worker settings for AI-based pension statement import drafts.
 
-3. Start PostgreSQL + MinIO:
+3. Start required infra with Docker (DB, object storage, and local LLM):
 
 ```bash
-docker compose --env-file packages/backend/.env up -d db minio minio-init
+docker compose --env-file packages/backend/.env up -d db minio minio-init ollama ollama-init
 ```
 
 4. Run database migrations:
@@ -104,10 +106,50 @@ bun run db:seed
 bun run dev
 ```
 
-7. Open the app:
+7. Start the pension import worker in a second terminal:
+
+```bash
+set -a
+source packages/backend/.env
+set +a
+bun run --filter '@quro/backend' worker:pension-imports
+```
+
+8. Start the Python pension parser service in a third terminal:
+
+```bash
+set -a
+source packages/backend/.env
+set +a
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r services/pension-parser/requirements.txt
+uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
+```
+
+This dev mode uses `PARSER_LLM_BACKEND=ollama` by default (Mac-friendly).
+
+Recommended local parser tuning for Mac:
+
+```bash
+PENSION_PARSER_TIMEOUT_MS=300000
+PARSER_ALLOW_REGEX_FALLBACK=true
+PARSER_REGEX_ONLY=false
+OLLAMA_TIMEOUT_SECONDS=300
+OLLAMA_NUM_CTX=8192
+OLLAMA_MAX_TEXT_CHARS=12000
+```
+
+If Ollama is too slow on your Mac for extraction, temporarily set `PARSER_REGEX_ONLY=true` for local flow validation.
+
+For OCR fallback locally, install system packages used by the parser (`poppler` + `tesseract`, including Dutch language data).
+
+9. Open the app:
 
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:3000/api/health`
+- Parser health: `http://localhost:8080/health`
+- Ollama API: `http://localhost:11434`
 
 ### Useful dev commands
 
@@ -151,11 +193,15 @@ bun run format
 
 ## Docker usage
 
-### Run full stack with Docker Compose
+### Run full stack with Docker Compose (regular usage)
+
+This mode runs everything in Docker: frontend, backend, database, MinIO, parser, worker, and local LLM.
 
 ```bash
 docker compose --env-file packages/backend/.env up --build
 ```
+
+By default this uses Ollama (`PARSER_LLM_BACKEND=ollama`).
 
 Services:
 
@@ -164,6 +210,27 @@ Services:
 - Postgres: `localhost:5432`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
+- Ollama API: `http://localhost:11434`
+- Pension parser API: `http://localhost:8080`
+- Pension import worker: `pension-import-worker` (background service, no public port)
+
+### GPU profile (for your RTX PC later)
+
+To run parser extraction against vLLM instead of Ollama:
+
+1. In `packages/backend/.env`, set:
+
+```bash
+PARSER_LLM_BACKEND=vllm
+```
+
+2. Start compose with the GPU profile:
+
+```bash
+docker compose --profile gpu --env-file packages/backend/.env up --build
+```
+
+This starts `vllm` on `http://localhost:8000` in addition to the default stack.
 
 Stop services:
 
@@ -184,7 +251,7 @@ docker build -t quro-backend -f packages/backend/Dockerfile .
 docker build -t quro-frontend -f packages/frontend/Dockerfile .
 ```
 
-For normal development and full local runs, `docker compose` is the recommended path.
+Use local development mode for faster UI/API iteration, and Docker full stack mode for regular end-to-end usage.
 
 ## How to fork this repo
 

@@ -13,25 +13,59 @@ import { usePensionTransactions } from './usePensionTransactions';
 import { useUpdatePensionPot } from './useUpdatePensionPot';
 import { useUpdatePensionTransaction } from './useUpdatePensionTransaction';
 
+function usePensionUiState() {
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<PensionPot | undefined>(undefined);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [addTxnForPot, setAddTxnForPot] = useState<PensionPot | null>(null);
+  const [importModal, setImportModal] = useState<{
+    pot: PensionPot;
+    importId: number | null;
+  } | null>(null);
+  const [editingTxn, setEditingTxn] = useState<PensionTransaction | null>(null);
+  const [retirementYearsInput, setRetirementYearsInput] = useState('');
+
+  const openImportModal = (pot: PensionPot, importId: number | null = null): void => {
+    setImportModal({ pot, importId });
+  };
+
+  const closeImportModal = (): void => {
+    setImportModal(null);
+  };
+
+  return {
+    showModal,
+    setShowModal,
+    editing,
+    setEditing,
+    expanded,
+    setExpanded,
+    addTxnForPot,
+    setAddTxnForPot,
+    importModal,
+    openImportModal,
+    closeImportModal,
+    editingTxn,
+    setEditingTxn,
+    retirementYearsInput,
+    setRetirementYearsInput,
+  };
+}
+
 export function usePensionPageState(): PensionPageState {
   const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
   const { data: pensions = [], isLoading: loadingPots } = usePensionPots();
   const { data: pensionTxns = [], isLoading: loadingTransactions } = usePensionTransactions();
   const { data: pensionDocuments = [], isLoading: loadingDocuments } =
     usePensionStatementDocuments();
+  const ui = usePensionUiState();
   const createPot = useCreatePensionPot();
   const updatePot = useUpdatePensionPot();
   const deletePot = useDeletePensionPot();
   const createTxn = useCreatePensionTransaction();
   const updateTxn = useUpdatePensionTransaction();
   const deleteTxn = useDeletePensionTransaction();
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<PensionPot | undefined>(undefined);
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [addTxnForPot, setAddTxnForPot] = useState<PensionPot | null>(null);
-  const [editingTxn, setEditingTxn] = useState<PensionTransaction | null>(null);
-  const [retirementYearsInput, setRetirementYearsInput] = useState('');
-  const parsedRetirementYears = Number.parseInt(retirementYearsInput, 10);
+  const parsedRetirementYears = Number.parseInt(ui.retirementYearsInput, 10);
   const yearsToRetirement =
     Number.isFinite(parsedRetirementYears) && parsedRetirementYears > 0
       ? parsedRetirementYears
@@ -64,6 +98,7 @@ export function usePensionPageState(): PensionPageState {
     map.set(document.transactionId, document);
     return map;
   }, new Map<number, PensionStatementDocument>());
+
   return {
     fmtBase,
     fmtNative,
@@ -74,18 +109,7 @@ export function usePensionPageState(): PensionPageState {
     pensionTxns,
     documentsByTransactionId,
     isLoading: loadingPots || loadingTransactions || loadingDocuments,
-    showModal,
-    setShowModal,
-    editing,
-    setEditing,
-    expanded,
-    setExpanded,
-    addTxnForPot,
-    setAddTxnForPot,
-    editingTxn,
-    setEditingTxn,
-    retirementYearsInput,
-    setRetirementYearsInput,
+    ...ui,
     ...computations,
     handleSave,
     handleAddPensionTxn,

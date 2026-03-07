@@ -6,6 +6,7 @@ import auth from './routes/auth';
 import savings from './routes/savings';
 import investments from './routes/investments';
 import pensions from './routes/pensions';
+import pensionImports from './routes/pension-imports';
 import mortgages from './routes/mortgages';
 import salary from './routes/salary';
 import goals from './routes/goals';
@@ -35,6 +36,7 @@ app.use('/api/currency/*', requireAuth);
 
 app.route('/api/savings', savings);
 app.route('/api/investments', investments);
+app.route('/api/pensions/imports', pensionImports);
 app.route('/api/pensions', pensions);
 app.route('/api/mortgages', mortgages);
 app.route('/api/salary', salary);

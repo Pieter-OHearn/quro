@@ -215,6 +215,85 @@ export type PensionStatementDocument = {
   uploadedAt: string;
 };
 
+export type PensionImportStatus =
+  | 'queued'
+  | 'processing'
+  | 'ready_for_review'
+  | 'failed'
+  | 'committed'
+  | 'expired'
+  | 'cancelled';
+
+export type PensionImportConfidenceLabel = 'high' | 'medium' | 'low';
+
+export type PensionImportCollisionWarning = {
+  existingTransactionId: number;
+  reason: string;
+};
+
+export type PensionStatementImport = {
+  id: number;
+  potId: number;
+  status: PensionImportStatus;
+  fileName: string;
+  mimeType: 'application/pdf';
+  sizeBytes: number;
+  fileHashSha256: string;
+  statementPeriodStart: string | null;
+  statementPeriodEnd: string | null;
+  languageHints: string[];
+  modelName: string | null;
+  modelVersion: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  committedAt: string | null;
+  totalRows?: number;
+  deletedRows?: number;
+  activeRows?: number;
+};
+
+export type PensionStatementImportSummary = Pick<
+  PensionStatementImport,
+  | 'id'
+  | 'potId'
+  | 'status'
+  | 'fileName'
+  | 'errorMessage'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'totalRows'
+  | 'deletedRows'
+  | 'activeRows'
+> & {
+  potName: string;
+  potProvider: string;
+  potEmoji: string;
+};
+
+export type PensionStatementImportRow = {
+  id: number;
+  importId: number;
+  rowOrder: number;
+  type: PensionTransaction['type'];
+  amount: number;
+  taxAmount: number;
+  date: string;
+  note: string;
+  isEmployer: boolean | null;
+  confidence: number;
+  confidenceLabel: PensionImportConfidenceLabel;
+  evidence: Array<{ page: number | null; snippet: string }>;
+  isDerived: boolean;
+  isDeleted: boolean;
+  collisionWarning: PensionImportCollisionWarning | null;
+  committedTransactionId: number | null;
+  editedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Mortgage = {
   id: number;
   linkedPropertyId?: number | null;

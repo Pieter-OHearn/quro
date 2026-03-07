@@ -43,6 +43,13 @@
       "when": 1772884800000,
       "tag": "0005_pension_statement_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772899200000,
+      "tag": "0006_pension_statement_imports",
+      "breakpoints": true
     }
   ]
 }

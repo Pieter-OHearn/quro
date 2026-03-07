@@ -53,7 +53,7 @@ function useUpdatePropertyForm(property: Property) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const numericValue = parseFloat(value) || 0;
-  const equity = numericValue - 0; // mortgage balance is passed in separately
+  const equity = numericValue; // mortgage balance is passed in separately
   const appreciation = numericValue - property.purchasePrice;
   const appreciationPct =
     ((numericValue || property.currentValue) / property.purchasePrice - 1) * 100;
