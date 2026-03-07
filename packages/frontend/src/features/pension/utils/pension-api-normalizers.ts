@@ -1,4 +1,5 @@
 import type {
+  PensionStatementImportFeedItem,
   PensionStatementImport,
   PensionStatementImportSummary,
   PensionStatementImportRow,
@@ -7,6 +8,7 @@ import type {
   PensionTransaction,
 } from '@quro/shared';
 import type {
+  ApiPensionStatementImportFeedItem,
   ApiPensionStatementImport,
   ApiPensionStatementImportSummary,
   ApiPensionStatementImportRow,
@@ -250,6 +252,23 @@ export const normalizePensionStatementImportSummary = (
   potProvider: toStringOr(value.potProvider, DEFAULT_POT_PROVIDER),
   potEmoji: toNonEmptyStringOr(value.potEmoji, DEFAULT_POT_EMOJI),
 });
+
+export const normalizePensionStatementImportFeedItem = (
+  value: ApiPensionStatementImportFeedItem,
+): PensionStatementImportFeedItem => {
+  const pot = value.pot;
+  const emoji = typeof pot?.emoji === 'string' && pot.emoji.trim().length > 0 ? pot.emoji : null;
+
+  return {
+    import: normalizePensionStatementImport(value.import),
+    pot: {
+      id: toPositiveInt(pot?.id),
+      name: toStringOr(pot?.name, DEFAULT_POT_NAME),
+      provider: toStringOr(pot?.provider, DEFAULT_POT_PROVIDER),
+      emoji,
+    },
+  };
+};
 
 export const normalizePensionStatementImportRow = (
   value: ApiPensionStatementImportRow,

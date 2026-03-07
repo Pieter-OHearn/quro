@@ -1235,10 +1235,18 @@ function ReviewStep({
 type FailedStepProps = {
   importErrorMessage: string | null;
   errorMessage: string;
+  isCancelling: boolean;
+  onCancelJob: () => Promise<boolean>;
   onClose: () => void;
 };
 
-function FailedStep({ importErrorMessage, errorMessage, onClose }: Readonly<FailedStepProps>) {
+function FailedStep({
+  importErrorMessage,
+  errorMessage,
+  isCancelling,
+  onCancelJob,
+  onClose,
+}: Readonly<FailedStepProps>) {
   return (
     <>
       <div className="p-6 space-y-4">
@@ -1255,9 +1263,23 @@ function FailedStep({ importErrorMessage, errorMessage, onClose }: Readonly<Fail
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-white transition-colors font-medium"
+          className="rounded-xl border border-slate-200 text-slate-600 px-5 py-2.5 text-sm hover:bg-white transition-colors font-medium"
         >
           Close
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            void (async () => {
+              const cancelled = await onCancelJob();
+              if (cancelled) onClose();
+            })();
+          }}
+          disabled={isCancelling}
+          className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-70 disabled:cursor-not-allowed text-white py-2.5 text-sm transition-colors font-medium flex items-center justify-center gap-2"
+        >
+          {isCancelling ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+          Clear failed job
         </button>
       </div>
     </>
@@ -1374,6 +1396,8 @@ function ModalStepContent({
       <FailedStep
         importErrorMessage={controller.importQuery.data?.errorMessage ?? null}
         errorMessage={controller.errorMessage}
+        isCancelling={controller.isCancelling}
+        onCancelJob={controller.handleCancelJob}
         onClose={onClose}
       />
     );

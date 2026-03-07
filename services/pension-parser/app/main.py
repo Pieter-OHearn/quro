@@ -22,9 +22,6 @@ ALLOWED_TYPES = {"contribution", "fee", "annual_statement"}
 ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MIN_TEXT_LENGTH = 400
 MAX_TEXT_CHARS = 80_000
-OLLAMA_MAX_TEXT_CHARS_DEFAULT = 12_000
-OLLAMA_NUM_CTX_DEFAULT = 8_192
-OLLAMA_TIMEOUT_SECONDS_DEFAULT = 300.0
 VLLM_TIMEOUT_SECONDS_DEFAULT = 180.0
 REGEX_FALLBACK_DATE_PATTERNS = ("%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d")
 
@@ -108,17 +105,6 @@ def _parse_language_hints(raw: str | None) -> list[str]:
     except Exception:
         pass
     return ["en", "nl"]
-
-
-def _read_positive_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name, "").strip()
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return value if value > 0 else default
 
 
 def _read_positive_float_env(name: str, default: float) -> float:
@@ -448,26 +434,6 @@ def _build_messages(prompt: str) -> list[dict[str, str]]:
     ]
 
 
-def _shrink_text_for_ollama(text: str) -> str:
-    max_chars = _read_positive_int_env("OLLAMA_MAX_TEXT_CHARS", OLLAMA_MAX_TEXT_CHARS_DEFAULT)
-    if len(text) <= max_chars:
-        return text
-
-    head_chars = int(max_chars * 0.7)
-    tail_chars = max_chars - head_chars
-    trimmed = (
-        text[:head_chars]
-        + "\n\n[... statement text truncated for local model context limits ...]\n\n"
-        + text[-tail_chars:]
-    )
-    logger.info(
-        "Truncated statement text for Ollama: original=%s, truncated=%s",
-        len(text),
-        len(trimmed),
-    )
-    return trimmed
-
-
 async def _call_vllm(text: str, provider: str, currency: str, languages: list[str]) -> dict[str, Any]:
     base_url = os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
     model = os.getenv("VLLM_MODEL", "Qwen/Qwen2.5-14B-Instruct-AWQ")
@@ -501,53 +467,16 @@ async def _call_vllm(text: str, provider: str, currency: str, languages: list[st
         ) from exc
 
 
-async def _call_ollama(text: str, provider: str, currency: str, languages: list[str]) -> dict[str, Any]:
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
-    model = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
-    prompt = _build_extraction_prompt(_shrink_text_for_ollama(text), provider, currency, languages)
-    timeout_seconds = _read_positive_float_env(
-        "OLLAMA_TIMEOUT_SECONDS",
-        OLLAMA_TIMEOUT_SECONDS_DEFAULT,
-    )
-    num_ctx = _read_positive_int_env("OLLAMA_NUM_CTX", OLLAMA_NUM_CTX_DEFAULT)
-
-    try:
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            response = await client.post(
-                f"{base_url}/api/chat",
-                json={
-                    "model": model,
-                    "messages": _build_messages(prompt),
-                    "stream": False,
-                    "options": {
-                        "temperature": 0,
-                        "num_ctx": num_ctx,
-                    },
-                },
-            )
-            if response.status_code >= 400:
-                raise RuntimeError(
-                    f"Ollama returned HTTP {response.status_code}: {response.text[:500]}"
-                )
-            payload = response.json()
-            content = payload.get("message", {}).get("content", "{}")
-            return _extract_json_from_text(str(content))
-    except Exception as exc:
-        raise RuntimeError(
-            f"Ollama request failed (base_url={base_url}, model={model}): {exc!r}"
-        ) from exc
-
-
-async def _call_llm(text: str, provider: str, currency: str, languages: list[str]) -> tuple[dict[str, Any], str, str]:
-    backend = os.getenv("PARSER_LLM_BACKEND", "ollama").strip().lower()
-    logger.info("Using parser LLM backend=%s, text_chars=%s", backend, len(text))
-    if backend == "vllm":
-        payload = await _call_vllm(text=text, provider=provider, currency=currency, languages=languages)
-        return payload, os.getenv("VLLM_MODEL", "Qwen/Qwen2.5-14B-Instruct-AWQ"), "vllm"
-    if backend == "ollama":
-        payload = await _call_ollama(text=text, provider=provider, currency=currency, languages=languages)
-        return payload, os.getenv("OLLAMA_MODEL", "qwen2.5:7b"), "ollama"
-    raise ValueError(f"Unsupported PARSER_LLM_BACKEND value: {backend}")
+async def _call_llm(
+    text: str,
+    provider: str,
+    currency: str,
+    languages: list[str],
+) -> tuple[dict[str, Any], str, str]:
+    model = os.getenv("VLLM_MODEL", "Qwen/Qwen2.5-14B-Instruct-AWQ")
+    logger.info("Using parser LLM backend=vllm, text_chars=%s", len(text))
+    payload = await _call_vllm(text=text, provider=provider, currency=currency, languages=languages)
+    return payload, model, "vllm"
 
 
 @app.get("/health")

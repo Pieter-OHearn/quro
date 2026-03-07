@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import type { PensionImportStatus, PensionStatementImportSummary } from '@quro/shared';
 import { api } from '@/lib/api';
-import type { ApiPensionStatementImportSummary } from '../types';
-import { normalizePensionStatementImportSummary } from '../utils/pension-api-normalizers';
+import type { ApiPensionStatementImportFeedItem } from '../types';
+import { normalizePensionStatementImportFeedItem } from '../utils/pension-api-normalizers';
 
 const DEFAULT_IMPORT_STATUSES: PensionImportStatus[] = [
   'queued',
@@ -30,9 +30,23 @@ export function usePensionStatementImports(options: UsePensionStatementImportsOp
         },
       });
 
-      return (data.data as ApiPensionStatementImportSummary[]).map(
-        normalizePensionStatementImportSummary,
-      );
+      return (data.data as ApiPensionStatementImportFeedItem[])
+        .map(normalizePensionStatementImportFeedItem)
+        .map(({ import: importItem, pot }) => ({
+          id: importItem.id,
+          potId: importItem.potId,
+          status: importItem.status,
+          fileName: importItem.fileName,
+          errorMessage: importItem.errorMessage,
+          createdAt: importItem.createdAt,
+          updatedAt: importItem.updatedAt,
+          totalRows: importItem.totalRows ?? 0,
+          deletedRows: importItem.deletedRows ?? 0,
+          activeRows: importItem.activeRows ?? 0,
+          potName: pot.name,
+          potProvider: pot.provider,
+          potEmoji: pot.emoji ?? '🏦',
+        }));
     },
     refetchInterval: (query) => {
       const imports = query.state.data ?? [];

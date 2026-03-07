@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { PensionPageState } from '../types';
@@ -25,13 +25,13 @@ function usePensionUiState() {
   const [editingTxn, setEditingTxn] = useState<PensionTransaction | null>(null);
   const [retirementYearsInput, setRetirementYearsInput] = useState('');
 
-  const openImportModal = (pot: PensionPot, importId: number | null = null): void => {
+  const openImportModal = useCallback((pot: PensionPot, importId: number | null = null): void => {
     setImportModal({ pot, importId });
-  };
+  }, []);
 
-  const closeImportModal = (): void => {
+  const closeImportModal = useCallback((): void => {
     setImportModal(null);
-  };
+  }, []);
 
   return {
     showModal,

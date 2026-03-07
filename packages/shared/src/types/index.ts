@@ -272,6 +272,16 @@ export type PensionStatementImportSummary = Pick<
   potEmoji: string;
 };
 
+export type PensionStatementImportFeedItem = {
+  import: PensionStatementImport;
+  pot: {
+    id: number;
+    name: string;
+    provider: string;
+    emoji: string | null;
+  };
+};
+
 export type PensionStatementImportRow = {
   id: number;
   importId: number;

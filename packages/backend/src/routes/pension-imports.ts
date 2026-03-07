@@ -35,8 +35,8 @@ const LIST_IMPORT_DEFAULT_STATUSES = [
 ] as const;
 const DEFAULT_LANGUAGE_HINTS = ['en', 'nl'];
 const IMPORT_TTL_DAYS_DEFAULT = 7;
-const IMPORT_LIST_DEFAULT_LIMIT = 20;
-const IMPORT_LIST_MAX_LIMIT = 50;
+const IMPORT_LIST_DEFAULT_LIMIT = 30;
+const IMPORT_LIST_MAX_LIMIT = 100;
 
 type PensionTransactionType = (typeof TRANSACTION_TYPES)[number];
 
@@ -97,23 +97,29 @@ const IMPORT_STATUS_SET = new Set<ImportStatus>(IMPORT_STATUSES);
 type ImportRecord = typeof pensionStatementImports.$inferSelect;
 type ImportRowRecord = typeof pensionStatementImportRows.$inferSelect;
 type PensionTransactionRecord = typeof pensionTransactions.$inferSelect;
-type ImportSummaryRow = {
+type ImportFeedRow = {
   id: number;
+  userId: number;
   potId: number;
   status: ImportStatus;
+  storageKey: string;
   fileName: string;
+  mimeType: string;
+  sizeBytes: unknown;
+  fileHashSha256: string;
+  statementPeriodStart: string | null;
+  statementPeriodEnd: string | null;
+  languageHints: unknown;
+  modelName: string | null;
+  modelVersion: string | null;
   errorMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
+  expiresAt: Date;
+  committedAt: Date | null;
   potName: string;
   potProvider: string;
-  potEmoji: string;
-};
-type ImportRowStats = {
-  importId: number;
-  totalRows: number;
-  deletedRows: number;
-  activeRows: number;
+  potEmoji: string | null;
 };
 
 function parseId(value: string): number | null {
@@ -493,20 +499,32 @@ async function hasDuplicateImport(params: {
   return Boolean(existing);
 }
 
-function listImportSummaries(params: {
+function listImportFeedItems(params: {
   userId: number;
   statuses: ImportStatus[];
   limit: number;
-}): Promise<ImportSummaryRow[]> {
+}): Promise<ImportFeedRow[]> {
   return db
     .select({
       id: pensionStatementImports.id,
+      userId: pensionStatementImports.userId,
       potId: pensionStatementImports.potId,
       status: pensionStatementImports.status,
+      storageKey: pensionStatementImports.storageKey,
       fileName: pensionStatementImports.fileName,
+      mimeType: pensionStatementImports.mimeType,
+      sizeBytes: pensionStatementImports.sizeBytes,
+      fileHashSha256: pensionStatementImports.fileHashSha256,
+      statementPeriodStart: pensionStatementImports.statementPeriodStart,
+      statementPeriodEnd: pensionStatementImports.statementPeriodEnd,
+      languageHints: pensionStatementImports.languageHints,
+      modelName: pensionStatementImports.modelName,
+      modelVersion: pensionStatementImports.modelVersion,
       errorMessage: pensionStatementImports.errorMessage,
       createdAt: pensionStatementImports.createdAt,
       updatedAt: pensionStatementImports.updatedAt,
+      expiresAt: pensionStatementImports.expiresAt,
+      committedAt: pensionStatementImports.committedAt,
       potName: pensionPots.name,
       potProvider: pensionPots.provider,
       potEmoji: pensionPots.emoji,
@@ -526,53 +544,18 @@ function listImportSummaries(params: {
       ),
     )
     .orderBy(desc(pensionStatementImports.updatedAt), desc(pensionStatementImports.id))
-    .limit(params.limit) as Promise<ImportSummaryRow[]>;
+    .limit(params.limit) as Promise<ImportFeedRow[]>;
 }
 
-async function loadImportRowStats(importIds: number[]): Promise<ImportRowStats[]> {
-  if (importIds.length === 0) return [];
-
-  const rows = await db
-    .select({
-      importId: pensionStatementImportRows.importId,
-      totalRows: sql<number>`COUNT(*)`,
-      deletedRows: sql<number>`COUNT(*) FILTER (WHERE ${pensionStatementImportRows.isDeleted})`,
-      activeRows: sql<number>`COUNT(*) FILTER (WHERE NOT ${pensionStatementImportRows.isDeleted})`,
-    })
-    .from(pensionStatementImportRows)
-    .where(inArray(pensionStatementImportRows.importId, importIds))
-    .groupBy(pensionStatementImportRows.importId);
-
-  return rows.map((row) => ({
-    importId: row.importId,
-    totalRows: Number(row.totalRows ?? 0),
-    deletedRows: Number(row.deletedRows ?? 0),
-    activeRows: Number(row.activeRows ?? 0),
-  }));
-}
-
-function mapRowStatsByImportId(stats: ImportRowStats[]): Map<number, ImportRowStats> {
-  return new Map(stats.map((row) => [row.importId, row]));
-}
-
-function toImportSummaryPayload(
-  importRow: ImportSummaryRow,
-  stats: ImportRowStats | undefined,
-): Record<string, unknown> {
+function toImportFeedPayload(importRow: ImportFeedRow): Record<string, unknown> {
   return {
-    id: importRow.id,
-    potId: importRow.potId,
-    status: importRow.status,
-    fileName: importRow.fileName,
-    errorMessage: importRow.errorMessage,
-    createdAt: importRow.createdAt.toISOString(),
-    updatedAt: importRow.updatedAt.toISOString(),
-    totalRows: stats?.totalRows ?? 0,
-    deletedRows: stats?.deletedRows ?? 0,
-    activeRows: stats?.activeRows ?? 0,
-    potName: importRow.potName,
-    potProvider: importRow.potProvider,
-    potEmoji: importRow.potEmoji,
+    import: normalizeImportResponse(importRow),
+    pot: {
+      id: importRow.potId,
+      name: importRow.potName,
+      provider: importRow.potProvider,
+      emoji: importRow.potEmoji,
+    },
   };
 }
 
@@ -924,19 +907,14 @@ app.get('/', async (c) => {
   if (!parsedStatuses.ok) {
     return c.json({ error: parsedStatuses.error }, HTTP_STATUS.BAD_REQUEST);
   }
-  const imports = await listImportSummaries({
+  const imports = await listImportFeedItems({
     userId: user.id,
     statuses: parsedStatuses.data,
     limit: parseImportListLimit(c.req.query('limit')),
   });
 
-  if (imports.length === 0) return c.json({ data: [] });
-
-  const rowStats = await loadImportRowStats(imports.map((item) => item.id));
-  const statsByImportId = mapRowStatsByImportId(rowStats);
-
   return c.json({
-    data: imports.map((item) => toImportSummaryPayload(item, statsByImportId.get(item.id))),
+    data: imports.map(toImportFeedPayload),
   });
 });
 

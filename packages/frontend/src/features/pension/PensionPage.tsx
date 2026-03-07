@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import type { PensionPot } from '@quro/shared';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
@@ -17,52 +17,85 @@ type DeepLinkResolution =
   | { type: 'clear' }
   | { type: 'open'; importId: number; pot: PensionPot };
 
-function clearImportParams(
-  searchParams: URLSearchParams,
-  setSearchParams: ReturnType<typeof useSearchParams>[1],
-): void {
-  const next = new URLSearchParams(searchParams);
-  next.delete('importId');
-  next.delete('potId');
-  setSearchParams(next, { replace: true });
+type ParsedDeepLinkIds =
+  | { type: 'none' }
+  | { type: 'clear' }
+  | { type: 'open'; importId: number; potId: number };
+
+function parsePositiveInt(value: unknown): number | null {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
-function resolveDeepLink(
-  searchParams: URLSearchParams,
-  pensions: PensionPot[],
-): DeepLinkResolution {
-  const importIdRaw = searchParams.get('importId');
-  const potIdRaw = searchParams.get('potId');
-  if (!importIdRaw && !potIdRaw) return { type: 'none' };
-
-  const importId = Number.parseInt(importIdRaw ?? '', 10);
-  const potId = Number.parseInt(potIdRaw ?? '', 10);
-  if (!Number.isInteger(importId) || importId <= 0 || !Number.isInteger(potId) || potId <= 0) {
-    return { type: 'clear' };
+function parseDeepLinkIds(routeState: unknown): ParsedDeepLinkIds {
+  if (!routeState || typeof routeState !== 'object') return { type: 'none' };
+  const state = routeState as { openImportId?: unknown; openImportPotId?: unknown };
+  if (state.openImportId === undefined && state.openImportPotId === undefined) {
+    return { type: 'none' };
   }
 
-  const pot = pensions.find((candidate) => candidate.id === potId);
+  const importId = parsePositiveInt(state.openImportId);
+  const potId = parsePositiveInt(state.openImportPotId);
+  if (importId === null || potId === null) return { type: 'clear' };
+  return { type: 'open', importId, potId };
+}
+
+function clearImportState(
+  pathname: string,
+  routeState: unknown,
+  navigate: ReturnType<typeof useNavigate>,
+): void {
+  if (!routeState || typeof routeState !== 'object') {
+    void navigate(pathname, { replace: true, state: null });
+    return;
+  }
+
+  const nextState = { ...(routeState as Record<string, unknown>) };
+  delete nextState.openImportId;
+  delete nextState.openImportPotId;
+  void navigate(pathname, {
+    replace: true,
+    state: Object.keys(nextState).length > 0 ? nextState : null,
+  });
+}
+
+function resolveDeepLink(routeState: unknown, pensions: PensionPot[]): DeepLinkResolution {
+  const parsed = parseDeepLinkIds(routeState);
+  if (parsed.type !== 'open') return parsed;
+
+  const pot = pensions.find((candidate) => candidate.id === parsed.potId);
   if (!pot) return { type: 'clear' };
-  return { type: 'open', importId, pot };
+  return { type: 'open', importId: parsed.importId, pot };
 }
 
 export function Pension(): JSX.Element {
   const state = usePensionPageState();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { pensions, openImportModal } = state;
+  const consumedDeepLinkRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (state.isLoading) return;
-    const resolution = resolveDeepLink(searchParams, pensions);
-    if (resolution.type === 'none') return;
+    const resolution = resolveDeepLink(location.state, pensions);
+    if (resolution.type === 'none') {
+      consumedDeepLinkRef.current = null;
+      return;
+    }
     if (resolution.type === 'clear') {
-      clearImportParams(searchParams, setSearchParams);
+      consumedDeepLinkRef.current = null;
+      clearImportState(location.pathname, location.state, navigate);
       return;
     }
 
+    const deepLinkKey = `${resolution.importId}:${resolution.pot.id}`;
+    if (consumedDeepLinkRef.current === deepLinkKey) return;
+    consumedDeepLinkRef.current = deepLinkKey;
+
+    clearImportState(location.pathname, location.state, navigate);
     openImportModal(resolution.pot, resolution.importId);
-    clearImportParams(searchParams, setSearchParams);
-  }, [openImportModal, pensions, searchParams, setSearchParams, state.isLoading]);
+  }, [location.pathname, location.state, navigate, openImportModal, pensions, state.isLoading]);
 
   if (state.isLoading) return <LoadingSpinner />;
 

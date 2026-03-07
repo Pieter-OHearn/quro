@@ -3,6 +3,7 @@ import type {
   PensionImportConfidenceLabel,
   PensionPot,
   PensionStatementDocument,
+  PensionStatementImportFeedItem,
   PensionStatementImport,
   PensionStatementImportSummary,
   PensionStatementImportRow,
@@ -56,6 +57,16 @@ export type ApiPensionStatementImport = Omit<
   totalRows?: NumericLike;
   deletedRows?: NumericLike;
   activeRows?: NumericLike;
+};
+
+export type ApiPensionStatementImportFeedItem = Omit<PensionStatementImportFeedItem, 'import'> & {
+  import: ApiPensionStatementImport;
+  pot: {
+    id: IntegerLike;
+    name: string;
+    provider: string;
+    emoji: string | null;
+  };
 };
 
 export type ApiPensionStatementImportSummary = Omit<

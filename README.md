@@ -80,12 +80,12 @@ cp packages/frontend/.env.example packages/frontend/.env
 ```
 
 Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
-It also includes parser worker settings for AI-based pension statement import drafts.
+It also includes the parser worker settings for AI-based pension statement import drafts.
 
-3. Start required infra with Docker (DB, object storage, and local LLM):
+3. Start required infra with Docker (DB and object storage):
 
 ```bash
-docker compose --env-file packages/backend/.env up -d db minio minio-init ollama ollama-init
+docker compose --env-file packages/backend/.env up -d db minio minio-init
 ```
 
 4. Run database migrations:
@@ -127,20 +127,19 @@ pip install -r services/pension-parser/requirements.txt
 uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
 ```
 
-This dev mode uses `PARSER_LLM_BACKEND=ollama` by default (Mac-friendly).
+Pension statement extraction now uses `vllm` only.
+If your MacBook is too weak for this workload, point `VLLM_BASE_URL` at a reachable GPU host before starting the worker and parser.
 
-Recommended local parser tuning for Mac:
+Recommended parser settings:
 
 ```bash
 PENSION_PARSER_TIMEOUT_MS=300000
 PARSER_ALLOW_REGEX_FALLBACK=true
 PARSER_REGEX_ONLY=false
-OLLAMA_TIMEOUT_SECONDS=300
-OLLAMA_NUM_CTX=8192
-OLLAMA_MAX_TEXT_CHARS=12000
+VLLM_TIMEOUT_SECONDS=180
 ```
 
-If Ollama is too slow on your Mac for extraction, temporarily set `PARSER_REGEX_ONLY=true` for local flow validation.
+If `vllm` is temporarily unavailable, set `PARSER_REGEX_ONLY=true` for local flow validation.
 
 For OCR fallback locally, install system packages used by the parser (`poppler` + `tesseract`, including Dutch language data).
 
@@ -149,7 +148,6 @@ For OCR fallback locally, install system packages used by the parser (`poppler` 
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:3000/api/health`
 - Parser health: `http://localhost:8080/health`
-- Ollama API: `http://localhost:11434`
 
 ### Useful dev commands
 
@@ -193,15 +191,14 @@ bun run format
 
 ## Docker usage
 
-### Run full stack with Docker Compose (regular usage)
+### Run core stack with Docker Compose
 
-This mode runs everything in Docker: frontend, backend, database, MinIO, parser, worker, and local LLM.
+This mode runs the app shell in Docker: frontend, backend, database, and MinIO.
+Pension statement import is not available in this mode.
 
 ```bash
 docker compose --env-file packages/backend/.env up --build
 ```
-
-By default this uses Ollama (`PARSER_LLM_BACKEND=ollama`).
 
 Services:
 
@@ -210,27 +207,25 @@ Services:
 - Postgres: `localhost:5432`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
-- Ollama API: `http://localhost:11434`
+
+### Pension import stack (vLLM only)
+
+This profile adds the pension import worker, parser, and `vllm` to the Docker stack.
+Run it on a GPU-capable host.
+
+Start compose with the `pension-import` profile:
+
+```bash
+docker compose --profile pension-import --env-file packages/backend/.env up --build
+```
+
+Additional services:
+
+- vLLM API: `http://localhost:8000`
 - Pension parser API: `http://localhost:8080`
 - Pension import worker: `pension-import-worker` (background service, no public port)
 
-### GPU profile (for your RTX PC later)
-
-To run parser extraction against vLLM instead of Ollama:
-
-1. In `packages/backend/.env`, set:
-
-```bash
-PARSER_LLM_BACKEND=vllm
-```
-
-2. Start compose with the GPU profile:
-
-```bash
-docker compose --profile gpu --env-file packages/backend/.env up --build
-```
-
-This starts `vllm` on `http://localhost:8000` in addition to the default stack.
+The compose file uses container-internal service URLs automatically for MinIO, the parser, and `vllm`, so the host-facing values in `packages/backend/.env` can stay pointed at `127.0.0.1` for local non-Docker development.
 
 Stop services:
 

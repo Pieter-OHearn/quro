@@ -11,6 +11,10 @@ export { useDeletePensionTransaction } from './useDeletePensionTransaction';
 export { usePensionComputations } from './usePensionComputations';
 export { usePensionPageState } from './usePensionPageState';
 export { usePensionImportModalController } from './usePensionImportModalController';
+export {
+  usePensionImportNotifications,
+  PENSION_IMPORT_NOTIFICATIONS_QUERY_KEY,
+} from './usePensionImportNotifications';
 export { usePensionPots } from './usePensionPots';
 export { usePensionStatementImport } from './usePensionStatementImport';
 export { usePensionStatementImports } from './usePensionStatementImports';

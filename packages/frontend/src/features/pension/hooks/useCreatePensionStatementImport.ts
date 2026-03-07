@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { invalidatePensionQueries } from '../utils/pension-query-invalidation';
 import { normalizePensionStatementImport } from '../utils/pension-api-normalizers';
 import type { ApiPensionStatementImport } from '../types';
+import { PENSION_IMPORT_NOTIFICATIONS_QUERY_KEY } from './usePensionImportNotifications';
 
 type CreatePensionStatementImportInput = {
   potId: number;
@@ -25,6 +26,7 @@ export function useCreatePensionStatementImport() {
     },
     onSuccess: (createdImport) => {
       void queryClient.invalidateQueries({ queryKey: ['pensions', 'imports', createdImport.id] });
+      void queryClient.invalidateQueries({ queryKey: PENSION_IMPORT_NOTIFICATIONS_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ['pensions', 'imports', 'list'] });
       invalidatePensionQueries(queryClient);
     },
