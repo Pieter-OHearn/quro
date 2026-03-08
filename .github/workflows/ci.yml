@@ -109,13 +109,7 @@ jobs:
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
       - name: Bun audit
-        run: |
-          output=$(bun audit 2>&1 || true)
-          echo "$output"
-          if echo "$output" | grep -qE "^\s+(critical|high):"; then
-            echo "::error::High or critical severity vulnerabilities found"
-            exit 1
-          fi
+        run: bun audit
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
