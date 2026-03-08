@@ -17,6 +17,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
+  "overrides": {
+    "esbuild": ">=0.25.0"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.48.0",
