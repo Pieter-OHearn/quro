@@ -61,9 +61,10 @@ At a glance, Quro helps you:
 ## Prerequisites
 
 - Bun 1.x
-- Docker (for PostgreSQL and full-stack container runs)
+- Python 3.11+
+- Docker (for infrastructure and full-stack container runs)
 
-## Local development
+## Local development (Bun + Python parser)
 
 1. Install dependencies:
 
@@ -79,8 +80,9 @@ cp packages/frontend/.env.example packages/frontend/.env
 ```
 
 Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
+It also includes the parser worker settings for AI-based pension statement import drafts.
 
-3. Start PostgreSQL + MinIO:
+3. Start required infra with Docker (DB and object storage):
 
 ```bash
 docker compose --env-file packages/backend/.env up -d db minio minio-init
@@ -104,10 +106,49 @@ bun run db:seed
 bun run dev
 ```
 
-7. Open the app:
+7. Start the pension import worker in a second terminal:
+
+```bash
+set -a
+source packages/backend/.env
+set +a
+bun run --filter '@quro/backend' worker:pension-imports
+```
+
+8. Start the Python pension parser service in a third terminal:
+
+```bash
+set -a
+source packages/backend/.env
+set +a
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r services/pension-parser/requirements.txt
+uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
+```
+
+Pension statement extraction now uses `vllm` only.
+If your MacBook is too weak for this workload, point `VLLM_BASE_URL` at a reachable GPU host before starting the worker and parser.
+If you skip the worker or parser locally, the app will keep pension PDF import disabled and show `AI off`.
+
+Recommended parser settings:
+
+```bash
+PENSION_PARSER_TIMEOUT_MS=300000
+PARSER_ALLOW_REGEX_FALLBACK=true
+PARSER_REGEX_ONLY=false
+VLLM_TIMEOUT_SECONDS=180
+```
+
+If `vllm` is temporarily unavailable, set `PARSER_REGEX_ONLY=true` for local flow validation.
+
+For OCR fallback locally, install system packages used by the parser (`poppler` + `tesseract`, including Dutch language data).
+
+9. Open the app:
 
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:3000/api/health`
+- Parser health: `http://localhost:8080/health`
 
 ### Useful dev commands
 
@@ -151,7 +192,11 @@ bun run format
 
 ## Docker usage
 
-### Run full stack with Docker Compose
+### Run core stack with Docker Compose
+
+This mode runs the app shell in Docker: frontend, backend, database, and MinIO.
+Pension statement import is auto-disabled in this mode because the AI worker stack is not running.
+The pension UI shows an `AI off` badge until the pension-import profile is started.
 
 ```bash
 docker compose --env-file packages/backend/.env up --build
@@ -164,6 +209,25 @@ Services:
 - Postgres: `localhost:5432`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
+
+### Pension import stack (vLLM only)
+
+This profile adds the pension import worker, parser, and `vllm` to the Docker stack.
+Run it on a GPU-capable host.
+
+Start compose with the `pension-import` profile:
+
+```bash
+docker compose --profile pension-import --env-file packages/backend/.env up --build
+```
+
+Additional services:
+
+- vLLM API: `http://localhost:8000`
+- Pension parser API: `http://localhost:8080`
+- Pension import worker: `pension-import-worker` (background service, no public port)
+
+The compose file uses container-internal service URLs automatically for MinIO, the parser, and `vllm`, so the host-facing values in `packages/backend/.env` can stay pointed at `127.0.0.1` for local non-Docker development.
 
 Stop services:
 
@@ -184,7 +248,7 @@ docker build -t quro-backend -f packages/backend/Dockerfile .
 docker build -t quro-frontend -f packages/frontend/Dockerfile .
 ```
 
-For normal development and full local runs, `docker compose` is the recommended path.
+Use local development mode for faster UI/API iteration, and Docker full stack mode for regular end-to-end usage.
 
 ## How to fork this repo
 

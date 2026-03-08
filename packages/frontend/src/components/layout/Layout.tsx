@@ -8,7 +8,6 @@ import {
   Briefcase,
   Target,
   Wallet,
-  Bell,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -24,6 +23,7 @@ import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContex
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { useAuth } from '@/lib/AuthContext';
 import { QuroLogo } from '@/components/ui/QuroLogo';
+import { NotificationBell } from '@/components/notifications';
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -250,10 +250,7 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
       </div>
       <div className="flex items-center gap-3">
         <CurrencySelector />
-        <button className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-          <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
-        </button>
+        <NotificationBell />
         <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
             <User size={14} className="text-white" />

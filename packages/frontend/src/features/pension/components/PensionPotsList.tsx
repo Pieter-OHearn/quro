@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronUp, Edit3, Info, Plus, Trash2 } from 'lucide-react';
-import type { PensionPot, PensionTransaction } from '@quro/shared';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp, Edit3, Info, Lock, Plus, Trash2 } from 'lucide-react';
+import type { AppCapabilityStatus, PensionPot, PensionTransaction } from '@quro/shared';
 import { TYPE_COLORS } from '../constants';
 import type {
   ConvertToBaseFn,
@@ -19,6 +20,7 @@ type PensionPotsListProps = {
   setEditing: (value: PensionPot | undefined) => void;
   setShowModal: (value: boolean) => void;
   setAddTxnForPot: (value: PensionPot | null) => void;
+  openImportModal: (pot: PensionPot, importId?: number | null) => void;
   setEditingTxn: (value: PensionTransaction | null) => void;
   deletePot: DeletePotMutation;
   handleDeletePensionTxn: (id: number) => void;
@@ -27,6 +29,7 @@ type PensionPotsListProps = {
   convertToBase: ConvertToBaseFn;
   isForeign: IsForeignFn;
   baseCurrency: string;
+  pensionImportCapability: AppCapabilityStatus;
 };
 
 type PensionPotCardProps = {
@@ -42,8 +45,10 @@ type PensionPotCardProps = {
   onToggle: (id: number | null) => void;
   onDelete: (id: number) => void;
   onAddTxn: (pot: PensionPot) => void;
+  onImportStatement: (pot: PensionPot) => void;
   onEditTxn: (transaction: PensionTransaction) => void;
   onDeleteTxn: (id: number) => void;
+  pensionImportCapability: AppCapabilityStatus;
 };
 
 type PensionPotExpandedProps = {
@@ -57,8 +62,10 @@ type PensionPotExpandedProps = {
   fmtNative: PensionFormatNativeFn;
   onDelete: (id: number) => void;
   onAddTxn: (pot: PensionPot) => void;
+  onImportStatement: (pot: PensionPot) => void;
   onEditTxn: (transaction: PensionTransaction) => void;
   onDeleteTxn: (id: number) => void;
+  pensionImportCapability: AppCapabilityStatus;
 };
 
 type PensionPotDetailsProps = {
@@ -160,8 +167,10 @@ function PensionPotExpanded({
   fmtNative,
   onDelete,
   onAddTxn,
+  onImportStatement,
   onEditTxn,
   onDeleteTxn,
+  pensionImportCapability,
 }: Readonly<PensionPotExpandedProps>) {
   return (
     <div>
@@ -182,7 +191,79 @@ function PensionPotExpanded({
         onEdit={onEditTxn}
         onDelete={onDeleteTxn}
       />
+      <div className="px-6 pb-5 -mt-2">
+        <PensionImportButton
+          pot={pot}
+          capability={pensionImportCapability}
+          onImportStatement={onImportStatement}
+        />
+      </div>
     </div>
+  );
+}
+
+type PensionImportButtonProps = {
+  pot: PensionPot;
+  capability: AppCapabilityStatus;
+  onImportStatement: (pot: PensionPot) => void;
+};
+
+function DisabledPensionImportButton({
+  capability,
+}: Readonly<Pick<PensionImportButtonProps, 'capability'>>) {
+  const [showHint, setShowHint] = useState(false);
+
+  return (
+    <div className="relative inline-flex max-w-full">
+      {showHint && (
+        <div
+          role="tooltip"
+          className="absolute bottom-full left-1/2 z-20 mb-3 w-[320px] max-w-[calc(100vw-4rem)] -translate-x-1/2 rounded-[26px] bg-[#0a1430] px-5 py-4 text-sm font-medium text-white shadow-[0_18px_40px_rgba(10,20,48,0.28)]"
+        >
+          {capability.message}
+          <span className="absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-[#0a1430]" />
+        </div>
+      )}
+      <button
+        type="button"
+        aria-disabled="true"
+        onClick={(event) => {
+          event.preventDefault();
+          setShowHint((current) => !current);
+        }}
+        onMouseEnter={() => setShowHint(true)}
+        onMouseLeave={() => setShowHint(false)}
+        onFocus={() => setShowHint(true)}
+        onBlur={() => setShowHint(false)}
+        className="inline-flex max-w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-400 shadow-sm shadow-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300/70"
+      >
+        <Lock size={14} className="flex-shrink-0 text-slate-300" />
+        <span className="truncate">Import Annual Statement PDF</span>
+        <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500">
+          AI off
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function PensionImportButton({
+  pot,
+  capability,
+  onImportStatement,
+}: Readonly<PensionImportButtonProps>) {
+  if (!capability.enabled) {
+    return <DisabledPensionImportButton capability={capability} />;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onImportStatement(pot)}
+      className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+    >
+      Import Annual Statement PDF
+    </button>
   );
 }
 
@@ -287,8 +368,10 @@ function PensionPotCard({
   onToggle,
   onDelete,
   onAddTxn,
+  onImportStatement,
   onEditTxn,
   onDeleteTxn,
+  pensionImportCapability,
 }: Readonly<PensionPotCardProps>) {
   const potTxns = pensionTxns.filter((txn) => txn.potId === pot.id);
   const currentBalance = computeCurrentPensionBalance(pot, potTxns);
@@ -331,8 +414,10 @@ function PensionPotCard({
           fmtNative={fmtNative}
           onDelete={onDelete}
           onAddTxn={onAddTxn}
+          onImportStatement={onImportStatement}
           onEditTxn={onEditTxn}
           onDeleteTxn={onDeleteTxn}
+          pensionImportCapability={pensionImportCapability}
         />
       )}
     </div>
@@ -346,6 +431,7 @@ function PensionPotsListItems({
   setExpanded,
   setEditing,
   setAddTxnForPot,
+  openImportModal,
   setEditingTxn,
   deletePot,
   handleDeletePensionTxn,
@@ -354,6 +440,7 @@ function PensionPotsListItems({
   convertToBase,
   isForeign,
   baseCurrency,
+  pensionImportCapability,
 }: Readonly<PensionPotsListProps>) {
   return (
     <div className="divide-y divide-slate-50">
@@ -380,11 +467,15 @@ function PensionPotsListItems({
             setEditingTxn(null);
             setAddTxnForPot(pot);
           }}
+          onImportStatement={(pot) => {
+            openImportModal(pot);
+          }}
           onEditTxn={(transaction) => {
             setAddTxnForPot(null);
             setEditingTxn(transaction);
           }}
           onDeleteTxn={handleDeletePensionTxn}
+          pensionImportCapability={pensionImportCapability}
         />
       ))}
     </div>

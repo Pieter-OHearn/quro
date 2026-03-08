@@ -15,6 +15,21 @@ import {
 
 const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
 export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
+export const pensionImportStatusEnum = pgEnum('pension_import_status', [
+  'queued',
+  'processing',
+  'ready_for_review',
+  'failed',
+  'committed',
+  'expired',
+  'cancelled',
+]);
+
+export const pensionImportConfidenceLabelEnum = pgEnum('pension_import_confidence_label', [
+  'high',
+  'medium',
+  'low',
+]);
 
 // ── Users ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +50,19 @@ export const sessions = pgTable('sessions', {
     .notNull(),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ── Worker Heartbeats ───────────────────────────────────────────────────────
+
+export const workerHeartbeats = pgTable('worker_heartbeats', {
+  workerName: text('worker_name').primaryKey(),
+  status: text('status').notNull(),
+  lastHeartbeatAt: timestamp('last_heartbeat_at').notNull(),
+  parserHealthy: boolean('parser_healthy').notNull().default(false),
+  parserCheckedAt: timestamp('parser_checked_at'),
+  parserError: text('parser_error'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 // ── Savings ──────────────────────────────────────────────────────────────────
@@ -277,6 +305,95 @@ export const pensionStatementDocuments = pgTable(
     ),
     storageKeyUnique: uniqueIndex('pension_statement_documents_storage_key_uidx').on(
       table.storageKey,
+    ),
+  }),
+);
+
+export const pensionStatementImports = pgTable(
+  'pension_statement_imports',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    potId: integer('pot_id')
+      .references(() => pensionPots.id, { onDelete: 'cascade' })
+      .notNull(),
+    status: pensionImportStatusEnum('status').notNull().default('queued'),
+    storageKey: text('storage_key').notNull(),
+    fileName: text('file_name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    fileHashSha256: text('file_hash_sha256').notNull(),
+    statementPeriodStart: date('statement_period_start', { mode: 'string' }),
+    statementPeriodEnd: date('statement_period_end', { mode: 'string' }),
+    languageHints: jsonb('language_hints').$type<string[]>().notNull().default([]),
+    modelName: text('model_name'),
+    modelVersion: text('model_version'),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    committedAt: timestamp('committed_at'),
+  },
+  (table) => ({
+    userStatusIdx: index('pension_statement_imports_user_status_idx').on(
+      table.userId,
+      table.status,
+      table.createdAt,
+    ),
+    potIdx: index('pension_statement_imports_pot_id_idx').on(table.potId),
+    hashIdx: index('pension_statement_imports_hash_idx').on(table.fileHashSha256),
+  }),
+);
+
+export const pensionStatementImportRows = pgTable(
+  'pension_statement_import_rows',
+  {
+    id: serial('id').primaryKey(),
+    importId: integer('import_id')
+      .references(() => pensionStatementImports.id, { onDelete: 'cascade' })
+      .notNull(),
+    rowOrder: integer('row_order').notNull(),
+    type: text('type').notNull(),
+    amount: numeric('amount').notNull(),
+    taxAmount: numeric('tax_amount').notNull().default('0'),
+    date: date('date', { mode: 'string' }).notNull(),
+    note: text('note').notNull().default(''),
+    isEmployer: boolean('is_employer'),
+    confidence: numeric('confidence').notNull().default('0'),
+    confidenceLabel: pensionImportConfidenceLabelEnum('confidence_label').notNull().default('low'),
+    evidence: jsonb('evidence')
+      .$type<Array<{ page: number | null; snippet: string }>>()
+      .notNull()
+      .default([]),
+    isDerived: boolean('is_derived').notNull().default(false),
+    isDeleted: boolean('is_deleted').notNull().default(false),
+    collisionWarning: jsonb('collision_warning').$type<{
+      existingTransactionId: number;
+      reason: string;
+    } | null>(),
+    committedTransactionId: integer('committed_transaction_id').references(
+      () => pensionTransactions.id,
+      {
+        onDelete: 'set null',
+      },
+    ),
+    editedAt: timestamp('edited_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    importOrderIdx: index('pension_statement_import_rows_import_order_idx').on(
+      table.importId,
+      table.rowOrder,
+    ),
+    importDeletedIdx: index('pension_statement_import_rows_import_deleted_idx').on(
+      table.importId,
+      table.isDeleted,
+    ),
+    committedTxnIdx: index('pension_statement_import_rows_committed_txn_idx').on(
+      table.committedTransactionId,
     ),
   }),
 );

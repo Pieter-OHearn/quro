@@ -1,4 +1,5 @@
 export { AddPensionTxnModal } from './AddPensionTxnModal';
+export { ImportPensionStatementModal } from './ImportPensionStatementModal';
 export { PensionGrowthChart } from './PensionGrowthChart';
 export { PensionHeroBanner } from './PensionHeroBanner';
 export { PensionModal } from './PensionModal';

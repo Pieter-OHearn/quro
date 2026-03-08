@@ -8,6 +8,8 @@ coverage/
 .cache/
 .turbo/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Logs
 *.log

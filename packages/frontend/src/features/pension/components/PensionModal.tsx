@@ -14,9 +14,12 @@ type PensionModalProps = {
 };
 
 type MetadataEntry = {
+  id: string;
   key: string;
   value: string;
 };
+
+type MetadataEditableField = 'key' | 'value';
 
 type PensionFormState = {
   name: string;
@@ -48,6 +51,14 @@ function buildMetadataRecord(entries: MetadataEntry[]): Record<string, string> {
     acc[key] = entry.value.trim();
     return acc;
   }, {});
+}
+
+function createMetadataEntry(key = '', value = ''): MetadataEntry {
+  return {
+    id: crypto.randomUUID(),
+    key,
+    value,
+  };
 }
 
 const buildPotData = (
@@ -183,7 +194,7 @@ function PensionMetadataEditor({
   onRemoveEntry,
 }: Readonly<{
   entries: MetadataEntry[];
-  onChangeEntry: (index: number, field: keyof MetadataEntry, value: string) => void;
+  onChangeEntry: (index: number, field: MetadataEditableField, value: string) => void;
   onAddEntry: () => void;
   onRemoveEntry: (index: number) => void;
 }>) {
@@ -191,7 +202,7 @@ function PensionMetadataEditor({
     <FormField label="Additional Metadata" hint="optional key/value pairs">
       <div className="space-y-2">
         {entries.map((entry, index) => (
-          <div key={`metadata-${index}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <div key={entry.id} className="grid grid-cols-[1fr_1fr_auto] gap-2">
             <TextInput
               value={entry.key}
               onChange={(value) => onChangeEntry(index, 'key', value)}
@@ -241,12 +252,11 @@ function PensionNotesField({
 }
 
 function buildInitialMetadataEntries(existing: PensionPot | undefined): MetadataEntry[] {
-  const entries = Object.entries(existing?.metadata ?? {}).map(([key, value]) => ({
-    key,
-    value,
-  }));
+  const entries = Object.entries(existing?.metadata ?? {}).map(([key, value]) =>
+    createMetadataEntry(key, value),
+  );
 
-  return entries.length > 0 ? entries : [{ key: '', value: '' }];
+  return entries.length > 0 ? entries : [createMetadataEntry()];
 }
 
 function buildInitialPensionState(existing: PensionPot | undefined): PensionFormState {
@@ -298,7 +308,7 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps): 
 
   const handleMetadataEntryChange = (
     index: number,
-    field: keyof MetadataEntry,
+    field: MetadataEditableField,
     value: string,
   ): void => {
     setMetadataEntries((entries) =>
@@ -309,13 +319,13 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps): 
   };
 
   const handleAddMetadataEntry = (): void => {
-    setMetadataEntries((entries) => [...entries, { key: '', value: '' }]);
+    setMetadataEntries((entries) => [...entries, createMetadataEntry()]);
   };
 
   const handleRemoveMetadataEntry = (index: number): void => {
     setMetadataEntries((entries) => {
       const next = entries.filter((_, entryIndex) => entryIndex !== index);
-      return next.length > 0 ? next : [{ key: '', value: '' }];
+      return next.length > 0 ? next : [createMetadataEntry()];
     });
   };
 

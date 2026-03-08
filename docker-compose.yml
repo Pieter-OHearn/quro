@@ -61,12 +61,13 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-quro}:${POSTGRES_PASSWORD:-quro}@db:5432/${POSTGRES_DB:-quro}
       PORT: '3000'
       CORS_ORIGIN: 'http://localhost:5173'
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-qurominio}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-qurominio123}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
     ports:
       - '3000:3000'
     depends_on:
@@ -76,6 +77,80 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+
+  pension-import-worker:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    command: ['bun', 'run', 'src/workers/pensionImportWorker.ts']
+    profiles: ['pension-import']
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-quro}:${POSTGRES_PASSWORD:-quro}@db:5432/${POSTGRES_DB:-quro}
+      S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-eu-west-1}
+      S3_BUCKET: ${S3_BUCKET:-quro-documents}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-qurominio}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-qurominio123}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
+      IMPORT_DRAFT_TTL_DAYS: ${IMPORT_DRAFT_TTL_DAYS:-7}
+      IMPORT_WORKER_POLL_INTERVAL_MS: ${IMPORT_WORKER_POLL_INTERVAL_MS:-3000}
+      PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-120000}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      pension-parser:
+        condition: service_started
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    restart: unless-stopped
+    profiles: ['pension-import']
+    command:
+      - --model
+      - ${VLLM_MODEL:-Qwen/Qwen2.5-14B-Instruct-AWQ}
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8000'
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION:-0.92}
+      - --max-model-len
+      - ${VLLM_MAX_MODEL_LEN:-8192}
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    ports:
+      - '8000:8000'
+    volumes:
+      - vllm-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  pension-parser:
+    build:
+      context: .
+      dockerfile: services/pension-parser/Dockerfile
+    profiles: ['pension-import']
+    restart: unless-stopped
+    environment:
+      PARSER_ALLOW_REGEX_FALLBACK: ${PARSER_ALLOW_REGEX_FALLBACK:-true}
+      PARSER_REGEX_ONLY: ${PARSER_REGEX_ONLY:-false}
+      VLLM_BASE_URL: ${VLLM_INTERNAL_BASE_URL:-http://vllm:8000}
+      VLLM_MODEL: ${VLLM_MODEL:-Qwen/Qwen2.5-14B-Instruct-AWQ}
+      VLLM_TIMEOUT_SECONDS: ${VLLM_TIMEOUT_SECONDS:-180}
+    depends_on:
+      vllm:
+        condition: service_started
 
   frontend:
     build:
@@ -90,3 +165,4 @@ services:
 volumes:
   pgdata:
   minio-data:
+  vllm-cache:
