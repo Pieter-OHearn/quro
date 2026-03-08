@@ -4,9 +4,9 @@ import json
 import logging
 import os
 import re
-from io import BytesIO
 from dataclasses import dataclass
 from datetime import date, datetime
+from io import BytesIO
 from typing import Any
 
 import httpx
@@ -213,7 +213,9 @@ def _build_regex_fallback_payload(
                     "taxAmount": 0.0,
                     "date": row_date,
                     "note": line,
-                    "isEmployer": "employer" in normalized if ("employer" in normalized or "employee" in normalized) else None,
+                    "isEmployer": "employer" in normalized
+                    if ("employer" in normalized or "employee" in normalized)
+                    else None,
                     "confidence": 0.7,
                     "confidenceLabel": "medium",
                     "evidence": [{"page": None, "snippet": line[:180]}],
@@ -342,7 +344,9 @@ def _normalize_rows(payload: dict[str, Any], text_excerpt: str) -> list[ParsedRo
                 tax_amount=tax_amount,
                 row_date=str(row_date),
                 note=_safe_note(item.get("note")),
-                is_employer=item.get("isEmployer") if isinstance(item.get("isEmployer"), bool) else None,
+                is_employer=item.get("isEmployer")
+                if isinstance(item.get("isEmployer"), bool)
+                else None,
                 confidence=confidence,
                 confidence_label=_confidence_label(confidence, item.get("confidenceLabel")),
                 evidence=evidence,
@@ -362,9 +366,7 @@ def _derive_annual_statement_row(payload: dict[str, Any], rows: list[ParsedRow])
     if opening == 0 and closing == 0:
         return rows
 
-    contributions = sum(
-        row.amount for row in rows if row.type == "contribution"
-    )
+    contributions = sum(row.amount for row in rows if row.type == "contribution")
     fees = sum(row.amount for row in rows if row.type == "fee")
     annual_value = closing - opening - contributions + fees
     if abs(annual_value) < 1e-9:
@@ -434,7 +436,9 @@ def _build_messages(prompt: str) -> list[dict[str, str]]:
     ]
 
 
-async def _call_vllm(text: str, provider: str, currency: str, languages: list[str]) -> dict[str, Any]:
+async def _call_vllm(
+    text: str, provider: str, currency: str, languages: list[str]
+) -> dict[str, Any]:
     base_url = os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
     model = os.getenv("VLLM_MODEL", "Qwen/Qwen2.5-14B-Instruct-AWQ")
     prompt = _build_extraction_prompt(text, provider, currency, languages)
@@ -455,11 +459,7 @@ async def _call_vllm(text: str, provider: str, currency: str, languages: list[st
                     f"vLLM returned HTTP {response.status_code}: {response.text[:500]}"
                 )
             payload = response.json()
-            content = (
-                payload.get("choices", [{}])[0]
-                .get("message", {})
-                .get("content", "{}")
-            )
+            content = payload.get("choices", [{}])[0].get("message", {}).get("content", "{}")
             return _extract_json_from_text(str(content))
     except Exception as exc:
         raise RuntimeError(
