@@ -1,6 +1,7 @@
 export { Modal, ModalFooter } from './Modal';
 export { StatCard } from './StatCard';
 export { FormField, TextInput, CurrencyInput, SelectInput } from './FormField';
+export { PdfAttachmentField } from './PdfAttachmentField';
 export { TxnTypeSelector } from './TxnTypeSelector';
 export type { TxnTypeMeta } from './TxnTypeSelector';
 export { TxnHistoryPanel, TxnRow } from './TxnHistoryPanel';

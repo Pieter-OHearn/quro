@@ -1,20 +1,17 @@
 import { useState } from 'react';
 import type { CurrencyCode, Payslip } from '@quro/shared';
-import type { PayslipFieldErrorMap, PayslipFormState } from '../types';
+import type { PayslipFieldErrorMap, PayslipFormState, SavePayslipInput } from '../types';
 import {
   computePayslipDraftAmounts,
+  createPayslipFormFromExisting,
   createEmptyPayslipForm,
   validatePayslipForm,
 } from '../utils/payslip-form';
 
-type UseAddPayslipFormArgs = {
-  onSave: (payslip: Omit<Payslip, 'id'>) => void;
-  onClose: () => void;
-  baseCurrency: CurrencyCode;
-};
-
-export function useAddPayslipForm({ onSave, onClose, baseCurrency }: UseAddPayslipFormArgs) {
-  const [form, setForm] = useState<PayslipFormState>(() => createEmptyPayslipForm(baseCurrency));
+export function useAddPayslipForm(baseCurrency: CurrencyCode, existing?: Payslip) {
+  const [form, setForm] = useState<PayslipFormState>(() =>
+    existing ? createPayslipFormFromExisting(existing) : createEmptyPayslipForm(baseCurrency),
+  );
   const [errors, setErrors] = useState<PayslipFieldErrorMap>({});
   const { gross, tax, pension, bonus, net } = computePayslipDraftAmounts(form);
 
@@ -29,14 +26,14 @@ export function useAddPayslipForm({ onSave, onClose, baseCurrency }: UseAddPaysl
     }
   };
 
-  const handleSave = () => {
+  const buildPayload = (): SavePayslipInput | null => {
     const nextErrors = validatePayslipForm(form, gross, tax, pension);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
-      return;
+      return null;
     }
 
-    onSave({
+    return {
       month: form.month.trim(),
       date: form.date.trim(),
       gross,
@@ -45,9 +42,8 @@ export function useAddPayslipForm({ onSave, onClose, baseCurrency }: UseAddPaysl
       net,
       bonus: bonus > 0 ? bonus : null,
       currency: form.currency,
-    });
-    onClose();
+    };
   };
 
-  return { form, errors, set, gross, tax, pension, bonus, net, handleSave };
+  return { form, errors, set, gross, tax, pension, bonus, net, buildPayload };
 }

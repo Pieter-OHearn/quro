@@ -1,4 +1,7 @@
 import type { Payslip } from '@quro/shared';
+import { PdfAttachmentField } from '@/components/ui';
+import { buildApiDownloadUrl, usePdfAttachmentState } from '@/lib/pdfDocuments';
+import { useDeletePayslipDocument, useUploadPayslipDocument } from '../hooks';
 import type { FmtFn } from '../types';
 import { buildBreakdownItems, getPayslipBreakdownTotal } from '../utils/salary-data';
 
@@ -7,6 +10,43 @@ type PayBreakdownPanelProps = {
   fmtBase: FmtFn;
 };
 
+function PayslipDocumentSection({ payslip }: Readonly<{ payslip: Payslip }>) {
+  const uploadDocument = useUploadPayslipDocument();
+  const deleteDocument = useDeletePayslipDocument();
+  const documentState = usePdfAttachmentState({
+    initialDocument: payslip.document,
+    uploadFile: (payslipId, file) => uploadDocument.mutateAsync({ payslipId, file }),
+    deleteFile: (payslipId) => deleteDocument.mutateAsync(payslipId),
+    isUploading: uploadDocument.isPending,
+    isDeleting: deleteDocument.isPending,
+    uploadErrorMessage: 'Failed to upload payslip PDF',
+    deleteErrorMessage: 'Failed to remove payslip PDF',
+  });
+
+  return (
+    <PdfAttachmentField
+      label="Payslip PDF"
+      document={documentState.document}
+      selectedFile={documentState.selectedFile}
+      fileError={documentState.fileError}
+      busy={documentState.busy}
+      downloadUrl={buildApiDownloadUrl(`/api/salary/payslips/${payslip.id}/document/download`)}
+      selectedFileHint={
+        documentState.document
+          ? 'This PDF will replace the current one when uploaded.'
+          : 'Upload a PDF to keep the original payslip with this entry.'
+      }
+      selectedActionLabel="Upload PDF"
+      onFileSelect={documentState.handleFileSelect}
+      onClearFile={documentState.clearSelectedFile}
+      onRemoveDocument={() => documentState.handleRemoveDocument(payslip.id)}
+      onSelectedAction={() => {
+        void documentState.uploadSelectedFile(payslip.id).catch(() => {});
+      }}
+    />
+  );
+}
+
 function PayBreakdownDetail({
   selected,
   fmtBase,
@@ -14,21 +54,23 @@ function PayBreakdownDetail({
   const totalPay = getPayslipBreakdownTotal(selected);
   const percentageOfTotal = (value: number): number =>
     totalPay > 0 ? (value / totalPay) * 100 : 0;
+  const taxValue = Math.abs(selected.tax);
+  const pensionValue = Math.abs(selected.pension);
 
   return (
     <>
       <div className="flex h-7 rounded-xl overflow-hidden mb-5 gap-px">
         <div
           className="bg-emerald-500 h-full"
-          style={{ width: `${percentageOfTotal(selected.net)}%` }}
+          style={{ width: `${percentageOfTotal(Math.abs(selected.net))}%` }}
         />
         <div
-          className="bg-rose-400 h-full"
-          style={{ width: `${percentageOfTotal(selected.tax)}%` }}
+          className={`${selected.tax < 0 ? 'bg-emerald-300' : 'bg-rose-400'} h-full`}
+          style={{ width: `${percentageOfTotal(taxValue)}%` }}
         />
         <div
-          className="bg-indigo-400 h-full"
-          style={{ width: `${percentageOfTotal(selected.pension)}%` }}
+          className={`${selected.pension < 0 ? 'bg-emerald-300' : 'bg-indigo-400'} h-full`}
+          style={{ width: `${percentageOfTotal(pensionValue)}%` }}
         />
       </div>
       <div className="space-y-2.5">
@@ -50,6 +92,7 @@ function PayBreakdownDetail({
           </div>
         ))}
       </div>
+      <PayslipDocumentSection key={selected.id} payslip={selected} />
     </>
   );
 }

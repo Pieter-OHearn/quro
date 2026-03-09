@@ -20,7 +20,6 @@ import { getAuthUser } from '../lib/authUser';
 
 const app = new Hono();
 const BASE_CURRENCY = 'EUR';
-const RECENT_TRANSACTIONS_LIMIT = 20;
 const NET_WORTH_HISTORY_MONTHS = 7;
 
 const toNumber = (value: unknown): number => {
@@ -775,7 +774,6 @@ function buildActivityList(p: any[], b: any[], s: any[], h: any[], m: any[], pe:
     ...pr.filter((row) => row.type === 'rent_income' || row.type === 'expense').map(mapPropertyTxn),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, RECENT_TRANSACTIONS_LIMIT)
     .map((row, index) => ({ id: index + 1, ...row }));
 }
 

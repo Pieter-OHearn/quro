@@ -10,6 +10,7 @@ import type {
   PensionStatementImportRow,
   PensionTransaction,
 } from '@quro/shared';
+import type { ApiPdfDocument } from '@/lib/pdfDocuments';
 
 export type PensionTxnType = 'contribution' | 'fee' | 'annual_statement';
 export type AnnualStatementDirection = 'gain' | 'loss';
@@ -46,9 +47,8 @@ export type ApiPensionTransaction = Omit<PensionTransaction, 'amount' | 'taxAmou
   taxAmount: NumericLike;
 };
 
-export type ApiPensionStatementDocument = Omit<PensionStatementDocument, 'sizeBytes'> & {
-  sizeBytes: NumericLike;
-};
+export type ApiPensionStatementDocument = Omit<PensionStatementDocument, 'sizeBytes' | 'mimeType'> &
+  ApiPdfDocument;
 
 export type ApiPensionStatementImport = Omit<
   PensionStatementImport,

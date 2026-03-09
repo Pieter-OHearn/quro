@@ -4,12 +4,17 @@ import type { ApiPayslip, SavePayslipInput } from '../types';
 import { normalizePayslip } from '../utils/normalizers';
 import { salaryQueryKeys } from './queryKeys';
 
-export function useCreatePayslip() {
+type UpdatePayslipInput = {
+  id: number;
+  payslip: SavePayslipInput;
+};
+
+export function useUpdatePayslip() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payslip: SavePayslipInput) => {
-      const { data } = await api.post('/api/salary/payslips', payslip);
+    mutationFn: async ({ id, payslip }: UpdatePayslipInput) => {
+      const { data } = await api.patch(`/api/salary/payslips/${id}`, payslip);
       return normalizePayslip(data.data as ApiPayslip);
     },
     onSuccess: () => {

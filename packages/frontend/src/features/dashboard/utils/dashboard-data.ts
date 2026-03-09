@@ -157,23 +157,23 @@ export const buildMonthlySummaryItems = (
 ];
 
 export function computeDashboardTxnStats(
-  recentTransactions: readonly DashboardTransaction[],
+  transactions: readonly DashboardTransaction[],
 ): DashboardTxnStats {
   const { currentKey, prevKey } = getMonthKeys(new Date());
-  const monthTxns = recentTransactions.filter((tx) => tx.date.startsWith(currentKey));
+  const monthTxns = transactions.filter((tx) => tx.date.startsWith(currentKey));
   const monthlyCategoryChange = (category: string) =>
     monthTxns
       .filter((tx) => tx.category === category)
       .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
   const { monthlySalaryValue, monthlySalaryChange } = computeSalary(
-    recentTransactions,
+    transactions,
     currentKey,
     prevKey,
   );
-  const totalIncome = recentTransactions
+  const totalIncome = monthTxns
     .filter((tx) => tx.type === 'income')
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);
-  const totalExpenses = recentTransactions
+  const totalExpenses = monthTxns
     .filter((tx) => tx.type === 'expense')
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);
   return {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Payslip } from '@quro/shared';
 import { Loader2 } from 'lucide-react';
+import type { Payslip } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   AddPayslipModal,
@@ -10,24 +10,33 @@ import {
   SalaryHistoryChart,
   SalaryStatsCards,
 } from './components';
-import { useCreatePayslip, useDeletePayslip, usePayslips, useSalaryHistory } from './hooks';
+import {
+  useCreatePayslip,
+  useDeletePayslip,
+  usePayslips,
+  useSalaryHistory,
+  useUpdatePayslip,
+} from './hooks';
 import {
   buildSalaryStatCards,
   computeSalaryMetrics,
   computeSalaryYears,
   parsePayslipYear,
 } from './utils/salary-data';
+import type { SavePayslipInput } from './types';
 
 function useSalaryData() {
   const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
   const { data: salaryHistory = [], isLoading: loadingHistory } = useSalaryHistory();
   const createPayslip = useCreatePayslip();
+  const updatePayslip = useUpdatePayslip();
   const deletePayslip = useDeletePayslip();
 
   return {
     payslips,
     salaryHistory,
     createPayslip,
+    updatePayslip,
     deletePayslip,
     isLoading: loadingPayslips || loadingHistory,
   };
@@ -38,9 +47,11 @@ function useSalaryPageState() {
   const currentYear = new Date().getFullYear();
   const [activeYear, setActiveYear] = useState(currentYear);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingPayslip, setEditingPayslip] = useState<Payslip | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const { payslips, salaryHistory, createPayslip, deletePayslip, isLoading } = useSalaryData();
+  const { payslips, salaryHistory, createPayslip, updatePayslip, deletePayslip, isLoading } =
+    useSalaryData();
 
   const years = useMemo(() => computeSalaryYears(payslips, currentYear), [payslips, currentYear]);
 
@@ -82,10 +93,13 @@ function useSalaryPageState() {
     fmtBase,
     baseCurrency,
     createPayslip,
+    updatePayslip,
     deletePayslip,
     isLoading,
     showAdd,
     setShowAdd,
+    editingPayslip,
+    setEditingPayslip,
     selected,
     setSelectedId,
     years,
@@ -102,12 +116,24 @@ function useSalaryPageState() {
 export function Salary() {
   const state = useSalaryPageState();
 
-  const handleAdd = (payslip: Omit<Payslip, 'id'>) => {
-    state.createPayslip.mutate(payslip);
-  };
+  const handleSave = (payslip: SavePayslipInput) =>
+    state.editingPayslip
+      ? state.updatePayslip.mutateAsync({ id: state.editingPayslip.id, payslip })
+      : state.createPayslip.mutateAsync(payslip);
 
   const handleDelete = (id: number) => {
     state.deletePayslip.mutate(id);
+    if (state.selected?.id === id) {
+      state.setSelectedId(null);
+    }
+    if (state.editingPayslip?.id === id) {
+      state.setEditingPayslip(null);
+    }
+  };
+
+  const closeModal = () => {
+    state.setShowAdd(false);
+    state.setEditingPayslip(null);
   };
 
   if (state.isLoading) {
@@ -120,10 +146,12 @@ export function Salary() {
 
   return (
     <div className="p-6 space-y-6">
-      {state.showAdd && (
+      {(state.showAdd || state.editingPayslip) && (
         <AddPayslipModal
-          onClose={() => state.setShowAdd(false)}
-          onSave={handleAdd}
+          existing={state.editingPayslip ?? undefined}
+          onClose={closeModal}
+          onSave={handleSave}
+          onDelete={handleDelete}
           baseCurrency={state.baseCurrency}
         />
       )}
@@ -160,8 +188,14 @@ export function Salary() {
         selected={state.selected}
         fmtBase={state.fmtBase}
         onSelect={state.setSelectedId}
-        onAdd={() => state.setShowAdd(true)}
-        onDelete={handleDelete}
+        onAdd={() => {
+          state.setEditingPayslip(null);
+          state.setShowAdd(true);
+        }}
+        onEdit={(payslip) => {
+          state.setShowAdd(false);
+          state.setEditingPayslip(payslip);
+        }}
       />
 
       <PensionTrackerLink />

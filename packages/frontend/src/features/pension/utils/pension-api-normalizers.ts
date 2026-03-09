@@ -1,3 +1,4 @@
+import { normalizePdfDocument } from '@/lib/pdfDocuments';
 import type {
   PensionStatementImportFeedItem,
   PensionStatementImport,
@@ -198,16 +199,20 @@ export const normalizePensionTransaction = (txn: ApiPensionTransaction): Pension
 
 export const normalizePensionStatementDocument = (
   document: ApiPensionStatementDocument,
-): PensionStatementDocument => ({
-  ...document,
-  id: toPositiveInt((document as { id?: IntegerLike }).id),
-  transactionId: toPositiveInt((document as { transactionId?: IntegerLike }).transactionId),
-  potId: toPositiveInt((document as { potId?: IntegerLike }).potId),
-  sizeBytes: toNumber(document.sizeBytes),
-  mimeType: 'application/pdf',
-  fileName: toStringOr(document.fileName, DEFAULT_STATEMENT_FILE_NAME),
-  uploadedAt: toIsoStringOrNow(document.uploadedAt),
-});
+): PensionStatementDocument => {
+  const normalizedDocument = normalizePdfDocument(document);
+
+  return {
+    ...document,
+    id: toPositiveInt((document as { id?: IntegerLike }).id),
+    transactionId: toPositiveInt((document as { transactionId?: IntegerLike }).transactionId),
+    potId: toPositiveInt((document as { potId?: IntegerLike }).potId),
+    sizeBytes: normalizedDocument?.sizeBytes ?? 0,
+    mimeType: 'application/pdf',
+    fileName: normalizedDocument?.fileName ?? DEFAULT_STATEMENT_FILE_NAME,
+    uploadedAt: normalizedDocument?.uploadedAt ?? toIsoStringOrNow(document.uploadedAt),
+  };
+};
 
 export const normalizePensionStatementImport = (
   value: ApiPensionStatementImport,

@@ -205,15 +205,20 @@ export type PensionTransaction = {
   isEmployer: boolean | null;
 };
 
-export type PensionStatementDocument = {
-  id: number;
-  transactionId: number;
-  potId: number;
+export type PdfDocument = {
   fileName: string;
   mimeType: 'application/pdf';
   sizeBytes: number;
   uploadedAt: string;
 };
+
+export type PensionStatementDocument = PdfDocument & {
+  id: number;
+  transactionId: number;
+  potId: number;
+};
+
+export type PayslipDocument = PdfDocument;
 
 export type PensionImportStatus =
   | 'queued'
@@ -359,6 +364,7 @@ export type Payslip = {
   net: number;
   bonus: number | null;
   currency: CurrencyCode;
+  document: PayslipDocument | null;
 };
 
 export type SalaryHistory = {

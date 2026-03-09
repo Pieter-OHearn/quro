@@ -1,11 +1,10 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { and, asc, desc, eq, inArray, lte, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { HTTP_STATUS } from '../constants/http';
 import {
   pensionPots,
-  pensionStatementDocuments,
   pensionStatementImportRows,
   pensionStatementImports,
   pensionTransactions,
@@ -17,14 +16,18 @@ import {
   type PensionParserResult,
   type PensionParserRow,
 } from '../lib/pensionParserClient';
+import {
+  asFile,
+  normalizePdfFileName,
+  PDF_EXTENSION,
+  PDF_MIME_TYPE,
+  validateUploadedPdf,
+} from '../lib/pdfDocuments';
 import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
 
 const app = new Hono();
 
 const MAX_INT32 = 2_147_483_647;
-const PDF_MIME_TYPE = 'application/pdf';
-const PDF_EXTENSION = '.pdf';
-const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TRANSACTION_TYPES = ['contribution', 'fee', 'annual_statement'] as const;
 const ACTIVE_IMPORT_STATUSES = ['queued', 'processing', 'ready_for_review', 'committed'] as const;
@@ -137,33 +140,6 @@ function toFiniteNumber(value: unknown): number | null {
 function toNumber(value: unknown): number {
   const parsed = toFiniteNumber(value);
   return parsed ?? 0;
-}
-
-function normalizeFileName(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return `annual-statement${PDF_EXTENSION}`;
-  return trimmed.replaceAll(/[^\w.-]+/g, '_');
-}
-
-function hasPdfExtension(fileName: string): boolean {
-  return fileName.trim().toLowerCase().endsWith(PDF_EXTENSION);
-}
-
-function isAllowedPdfMimeType(mimeType: string): boolean {
-  return mimeType === PDF_MIME_TYPE || mimeType === '';
-}
-
-function isValidUploadedPdf(file: File): { valid: true } | { valid: false; error: string } {
-  if (file.size <= 0) return { valid: false, error: 'Uploaded file is empty' };
-  if (file.size > MAX_PDF_SIZE_BYTES) return { valid: false, error: 'PDF exceeds 20MB limit' };
-  if (!hasPdfExtension(file.name)) return { valid: false, error: 'Only PDF files are allowed' };
-  if (!isAllowedPdfMimeType(file.type))
-    return { valid: false, error: 'Only PDF files are allowed' };
-  return { valid: true };
-}
-
-function asFile(value: unknown): File | null {
-  return value instanceof File ? value : null;
 }
 
 function parsePensionTransactionType(value: unknown): PensionTransactionType | null {
@@ -290,7 +266,7 @@ function buildImportStorageKey(params: { userId: number; potId: number }): strin
     'pensions',
     String(params.potId),
     'imports',
-    `${crypto.randomUUID()}${PDF_EXTENSION}`,
+    `${randomUUID()}${PDF_EXTENSION}`,
   ].join('/');
 }
 
@@ -668,6 +644,14 @@ async function commitRowsToLedger(params: {
           date: validated.data.date,
           note: validated.data.note,
           isEmployer: validated.data.isEmployer,
+          ...(validated.data.type === 'annual_statement'
+            ? {
+                documentStorageKey: params.importRecord.storageKey,
+                documentFileName: params.importRecord.fileName,
+                documentSizeBytes: params.importRecord.sizeBytes,
+                documentUploadedAt: params.now,
+              }
+            : {}),
         })
         .returning();
 
@@ -695,16 +679,6 @@ async function commitRowsToLedger(params: {
     if (annualStatementTransactionId === null) {
       throw new Error('Missing annual statement transaction');
     }
-
-    await tx.insert(pensionStatementDocuments).values({
-      userId: params.userId,
-      potId: params.importRecord.potId,
-      transactionId: annualStatementTransactionId,
-      storageKey: params.importRecord.storageKey,
-      fileName: params.importRecord.fileName,
-      mimeType: PDF_MIME_TYPE,
-      sizeBytes: params.importRecord.sizeBytes,
-    });
 
     await tx
       .update(pensionStatementImports)
@@ -936,7 +910,7 @@ app.post('/', async (c) => {
   const file = asFile(formData.get('file'));
   if (!file) return c.json({ error: 'A PDF file is required' }, HTTP_STATUS.BAD_REQUEST);
 
-  const validation = isValidUploadedPdf(file);
+  const validation = validateUploadedPdf(file);
   if (!validation.valid) return c.json({ error: validation.error }, HTTP_STATUS.BAD_REQUEST);
   if (!(await assertOwnedPot(user.id, potId)))
     return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
@@ -952,7 +926,7 @@ app.post('/', async (c) => {
   }
 
   const storageKey = buildImportStorageKey({ userId: user.id, potId });
-  const safeFileName = normalizeFileName(file.name);
+  const safeFileName = normalizePdfFileName(file.name, 'annual-statement');
   const now = new Date();
   const expiresAt = getImportExpiryDate(now);
 

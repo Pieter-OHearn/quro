@@ -34,14 +34,17 @@ const computeAnnualGross = (payslips: ReadonlyArray<{ gross: number; date: strin
 function useDashboardData(fmtBase: DashboardFormatFn) {
   const { data: netWorthData = [], isLoading: loadingNW } = useNetWorthSnapshots();
   const { data: allocations = [], isLoading: loadingAlloc } = useAssetAllocations();
-  const { data: recentTransactions = [], isLoading: loadingTxns } = useDashboardTransactions();
+  const { data: transactions = [], isLoading: loadingTxns } = useDashboardTransactions();
   const { data: goals = [], isLoading: loadingGoals } = useGoals();
   const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
 
   const isLoading = loadingNW || loadingAlloc || loadingTxns || loadingGoals || loadingPayslips;
-  const currentYear = new Date().getFullYear();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const annualGross = computeAnnualGross(payslips);
   const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
+  const currentMonthTransactions = transactions.filter((tx) => tx.date.startsWith(currentMonthKey));
   const chartData = netWorthData.map((snapshot) => ({
     month: snapshot.month,
     year: snapshot.year,
@@ -65,7 +68,7 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
     monthlySalaryChange,
     totalIncome,
     totalExpenses,
-  } = computeDashboardTxnStats(recentTransactions);
+  } = computeDashboardTxnStats(transactions);
 
   return {
     isLoading,
@@ -73,7 +76,7 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
     allocationData,
     totalAlloc,
     goals,
-    recentTransactions,
+    recentTransactions: transactions,
     monthlySalaryValue,
     monthlyCategoryChange,
     monthlySalaryChange,
@@ -84,7 +87,7 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
     annualGross,
     currentYear,
     displayedGoals: yearGoals.slice(0, DASHBOARD_GOAL_LIMIT),
-    displayedRecentTransactions: [...recentTransactions]
+    displayedRecentTransactions: [...currentMonthTransactions]
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, DASHBOARD_TXN_LIMIT),
     monthlySummaryItems: buildMonthlySummaryItems(totalIncome, totalExpenses, fmtBase),

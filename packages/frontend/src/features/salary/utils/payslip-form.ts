@@ -1,8 +1,7 @@
-import { isCurrencyCode, type CurrencyCode } from '@quro/shared';
+import { isCurrencyCode, type CurrencyCode, type Payslip } from '@quro/shared';
 import type { PayslipFieldErrorMap, PayslipFormState } from '../types';
 
-const isInvalidAmount = (raw: string, parsed: number, allowZero: boolean) =>
-  !raw || Number.isNaN(parsed) || (allowZero ? parsed < 0 : parsed <= 0);
+const isInvalidRequiredNumber = (raw: string, parsed: number) => !raw || Number.isNaN(parsed);
 
 export const createEmptyPayslipForm = (currency: CurrencyCode): PayslipFormState => ({
   month: '',
@@ -12,6 +11,16 @@ export const createEmptyPayslipForm = (currency: CurrencyCode): PayslipFormState
   pension: '',
   bonus: '',
   currency,
+});
+
+export const createPayslipFormFromExisting = (payslip: Payslip): PayslipFormState => ({
+  month: payslip.month,
+  date: payslip.date,
+  gross: payslip.gross.toString(),
+  tax: payslip.tax.toString(),
+  pension: payslip.pension.toString(),
+  bonus: payslip.bonus?.toString() ?? '',
+  currency: payslip.currency,
 });
 
 export const computePayslipDraftAmounts = (form: PayslipFormState) => {
@@ -34,9 +43,11 @@ export function validatePayslipForm(
 
   if (!form.month.trim()) errors.month = 'Required';
   if (!form.date.trim()) errors.date = 'Required';
-  if (isInvalidAmount(form.gross, gross, false)) errors.gross = 'Enter a valid amount';
-  if (isInvalidAmount(form.tax, tax, true)) errors.tax = 'Enter a valid amount';
-  if (isInvalidAmount(form.pension, pension, true)) errors.pension = 'Enter a valid amount';
+  if (isInvalidRequiredNumber(form.gross, gross) || gross <= 0) {
+    errors.gross = 'Enter a valid amount';
+  }
+  if (isInvalidRequiredNumber(form.tax, tax)) errors.tax = 'Enter a valid amount';
+  if (isInvalidRequiredNumber(form.pension, pension)) errors.pension = 'Enter a valid amount';
   if (!isCurrencyCode(form.currency)) errors.currency = 'Select a currency';
 
   return errors;

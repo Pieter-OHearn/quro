@@ -1,10 +1,20 @@
-import { useEffect, useState } from 'react';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
-import { FormField, CurrencyInput } from '@/components/ui/FormField';
-import { TxnTypeSelector } from '@/components/ui/TxnTypeSelector';
-import { DateNoteRow } from '@/components/ui/DateNoteRow';
-import { api } from '@/lib/api';
+import { useEffect, useEffectEvent, useState } from 'react';
+import {
+  CurrencyInput,
+  FormField,
+  Modal,
+  ModalFooter,
+  PdfAttachmentField,
+  TxnTypeSelector,
+  DateNoteRow,
+} from '@/components/ui';
 import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@quro/shared';
+import {
+  PdfAttachmentUploadError,
+  buildApiDownloadUrl,
+  resolveApiErrorMessage,
+  usePdfAttachmentState,
+} from '@/lib/pdfDocuments';
 import { PENSION_TXN_META } from '../constants';
 import {
   useAddPensionTxnForm,
@@ -17,10 +27,6 @@ import type {
   SavePensionTransactionInput,
   SavePensionTransactionResult,
 } from '../types';
-
-const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
-const KILOBYTE = 1024;
-const MEGABYTE = 1024 * 1024;
 
 const TXN_TYPE_OPTIONS = Object.entries(PENSION_TXN_META).map(([key, meta]) => ({
   key,
@@ -35,87 +41,21 @@ type AddPensionTxnModalProps = {
   onSave: (txn: SavePensionTransactionInput) => Promise<SavePensionTransactionResult>;
 };
 
+function resolveErrorMessage(error: unknown): string {
+  return resolveApiErrorMessage(error, 'Failed to save transaction');
+}
+
 type StatementDocumentState = {
-  statementDocument: PensionStatementDocument | null;
+  document: PensionStatementDocument | null;
   selectedFile: File | null;
   fileError: string;
   busy: boolean;
+  setFileError: (value: string) => void;
   handleFileSelect: (file: File | null) => void;
   clearSelectedFile: () => void;
-  handleRemoveDocument: () => Promise<void>;
-  uploadSelectedFile: (transactionId: number) => Promise<void>;
+  handleRemoveDocument: (ownerId: number) => Promise<void>;
+  uploadSelectedFile: (ownerId: number) => Promise<void>;
 };
-
-function formatFileSize(bytes: number): string {
-  if (bytes < KILOBYTE) return `${bytes} B`;
-  if (bytes < MEGABYTE) return `${(bytes / KILOBYTE).toFixed(1)} KB`;
-  return `${(bytes / MEGABYTE).toFixed(1)} MB`;
-}
-
-function validatePdfFile(file: File): string {
-  const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
-  const allowedMimeType = file.type === 'application/pdf' || file.type === '';
-
-  if (!hasPdfExtension || !allowedMimeType) return 'Only PDF files are allowed';
-  if (file.size > MAX_PDF_SIZE_BYTES) return 'PDF exceeds 20MB limit';
-  return '';
-}
-
-function buildDocumentDownloadUrl(transactionId: number): string {
-  return `${api.defaults.baseURL}/api/pensions/transactions/${transactionId}/document/download`;
-}
-
-function readApiError(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null;
-  const responseError = (error as { response?: { data?: { error?: unknown } } }).response?.data
-    ?.error;
-  return typeof responseError === 'string' ? responseError : null;
-}
-
-function resolveErrorMessage(error: unknown): string {
-  const apiError = readApiError(error);
-  if (apiError) return apiError;
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Failed to save transaction';
-}
-
-class StatementDocumentUploadError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'StatementDocumentUploadError';
-  }
-}
-
-function createStatementFileSelectHandler(params: {
-  statementDocument: PensionStatementDocument | null;
-  selectedFile: File | null;
-  setSelectedFile: (file: File | null) => void;
-  setFileError: (message: string) => void;
-}): (file: File | null) => void {
-  return (file: File | null): void => {
-    if (!file) {
-      params.setSelectedFile(null);
-      return;
-    }
-    if (params.statementDocument) {
-      params.setSelectedFile(null);
-      params.setFileError('Remove the existing PDF before selecting a new file');
-      return;
-    }
-    if (params.selectedFile) {
-      params.setFileError('Clear the selected PDF before choosing another file');
-      return;
-    }
-    const validationError = validatePdfFile(file);
-    if (validationError) {
-      params.setSelectedFile(null);
-      params.setFileError(validationError);
-      return;
-    }
-    params.setFileError('');
-    params.setSelectedFile(file);
-  };
-}
 
 function EmployerToggle({
   isEmployer,
@@ -168,90 +108,6 @@ function AnnualStatementDirectionToggle({
   );
 }
 
-function PdfAttachmentField({
-  document,
-  selectedFile,
-  fileError,
-  busy,
-  onFileSelect,
-  onClearFile,
-  onRemoveDocument,
-}: Readonly<{
-  document: PensionStatementDocument | null;
-  selectedFile: File | null;
-  fileError: string;
-  busy: boolean;
-  onFileSelect: (file: File | null) => void;
-  onClearFile: () => void;
-  onRemoveDocument: () => Promise<void>;
-}>) {
-  const downloadUrl = document ? buildDocumentDownloadUrl(document.transactionId) : null;
-  const attachmentActionClass =
-    'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60';
-
-  return (
-    <FormField label="Annual Statement PDF" error={fileError}>
-      <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-        {!document && !selectedFile && (
-          <input
-            type="file"
-            accept="application/pdf,.pdf"
-            onChange={(event) => onFileSelect(event.target.files?.[0] ?? null)}
-            disabled={busy}
-            className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-indigo-700 hover:file:bg-indigo-200"
-          />
-        )}
-
-        {selectedFile && (
-          <div className="rounded-lg border border-indigo-100 bg-white px-2.5 py-2 text-xs text-slate-600">
-            <p className="font-medium text-slate-700">Selected: {selectedFile.name}</p>
-            <p>{formatFileSize(selectedFile.size)}</p>
-            <button
-              type="button"
-              onClick={onClearFile}
-              className="mt-1 text-indigo-600 hover:text-indigo-700"
-              disabled={busy}
-            >
-              Clear selection
-            </button>
-          </div>
-        )}
-
-        {document && !selectedFile && (
-          <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600">
-            <p className="font-medium text-slate-700">Attached: {document.fileName}</p>
-            <p>{formatFileSize(document.sizeBytes)}</p>
-            <div className="mt-1 flex items-center gap-2">
-              {downloadUrl && (
-                <a
-                  href={downloadUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`${attachmentActionClass} text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700`}
-                >
-                  View PDF
-                </a>
-              )}
-              <button
-                type="button"
-                onClick={() => void onRemoveDocument()}
-                className={`${attachmentActionClass} text-rose-600 hover:bg-rose-50 hover:text-rose-700`}
-                disabled={busy}
-              >
-                Remove PDF
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!document && !selectedFile && (
-          <p className="text-[11px] text-slate-500">Attach one PDF up to 20MB.</p>
-        )}
-      </div>
-    </FormField>
-  );
-}
-
 function ContributionFields({
   currency,
   taxAmount,
@@ -280,7 +136,7 @@ function ContributionFields({
 function AnnualStatementFields({
   direction,
   setDirection,
-  statementDocument,
+  document,
   selectedFile,
   fileError,
   busy,
@@ -290,7 +146,7 @@ function AnnualStatementFields({
 }: Readonly<{
   direction: AnnualStatementDirection;
   setDirection: (value: AnnualStatementDirection) => void;
-  statementDocument: PensionStatementDocument | null;
+  document: PensionStatementDocument | null;
   selectedFile: File | null;
   fileError: string;
   busy: boolean;
@@ -304,10 +160,18 @@ function AnnualStatementFields({
         <AnnualStatementDirectionToggle direction={direction} onChange={setDirection} />
       </FormField>
       <PdfAttachmentField
-        document={statementDocument}
+        label="Annual Statement PDF"
+        document={document}
         selectedFile={selectedFile}
         fileError={fileError}
         busy={busy}
+        downloadUrl={
+          document
+            ? buildApiDownloadUrl(
+                `/api/pensions/transactions/${document.transactionId}/document/download`,
+              )
+            : null
+        }
         onFileSelect={onFileSelect}
         onClearFile={onClearFile}
         onRemoveDocument={onRemoveDocument}
@@ -376,13 +240,17 @@ function PensionTxnFormBody({
         <AnnualStatementFields
           direction={form.annualStatementDirection}
           setDirection={form.setAnnualStatementDirection}
-          statementDocument={documentState.statementDocument}
+          document={documentState.document}
           selectedFile={documentState.selectedFile}
           fileError={documentState.fileError}
           busy={busy}
           onFileSelect={documentState.handleFileSelect}
           onClearFile={documentState.clearSelectedFile}
-          onRemoveDocument={documentState.handleRemoveDocument}
+          onRemoveDocument={() =>
+            documentState.document
+              ? documentState.handleRemoveDocument(documentState.document.transactionId)
+              : Promise.resolve()
+          }
         />
       )}
       <FormField label={amountLabel} error={form.error}>
@@ -502,66 +370,27 @@ function useStatementDocumentState(
 ): StatementDocumentState {
   const uploadDocument = useUploadPensionStatementDocument();
   const deleteDocument = useDeletePensionStatementDocument();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileError, setFileError] = useState('');
-  const [statementDocument, setStatementDocument] = useState<PensionStatementDocument | null>(
+  const documentState = usePdfAttachmentState({
     initialDocument,
-  );
-  const busy = uploadDocument.isPending || deleteDocument.isPending;
-  useEffect(() => setStatementDocument(initialDocument), [initialDocument]);
+    uploadFile: (transactionId, file) => uploadDocument.mutateAsync({ transactionId, file }),
+    deleteFile: (transactionId) => deleteDocument.mutateAsync(transactionId),
+    isUploading: uploadDocument.isPending,
+    isDeleting: deleteDocument.isPending,
+    uploadErrorMessage: 'Failed to upload annual statement PDF',
+    deleteErrorMessage: 'Failed to remove annual statement PDF',
+  });
+
+  const clearSelectedFile = useEffectEvent(() => {
+    documentState.clearSelectedFile();
+  });
+
   useEffect(() => {
     if (transactionType !== 'annual_statement') {
-      setSelectedFile(null);
-      setFileError('');
+      clearSelectedFile();
     }
   }, [transactionType]);
-  const handleFileSelect = createStatementFileSelectHandler({
-    statementDocument,
-    selectedFile,
-    setSelectedFile,
-    setFileError,
-  });
-  const handleRemoveDocument = async (): Promise<void> => {
-    if (!statementDocument) return;
-    try {
-      await deleteDocument.mutateAsync(statementDocument.transactionId);
-      setStatementDocument(null);
-      setFileError('');
-    } catch (error) {
-      setFileError(resolveErrorMessage(error));
-    }
-  };
-  const uploadSelectedFile = async (transactionId: number): Promise<void> => {
-    if (!selectedFile) return;
-    const validationError = validatePdfFile(selectedFile);
-    if (validationError) {
-      setFileError(validationError);
-      throw new StatementDocumentUploadError(validationError);
-    }
-    try {
-      const uploaded = await uploadDocument.mutateAsync({ transactionId, file: selectedFile });
-      setStatementDocument(uploaded);
-      setSelectedFile(null);
-      setFileError('');
-    } catch (error) {
-      const message = resolveErrorMessage(error);
-      setFileError(message);
-      throw new StatementDocumentUploadError(message);
-    }
-  };
-  return {
-    statementDocument,
-    selectedFile,
-    fileError,
-    busy,
-    handleFileSelect,
-    clearSelectedFile: () => {
-      setSelectedFile(null);
-      setFileError('');
-    },
-    handleRemoveDocument,
-    uploadSelectedFile,
-  };
+
+  return documentState;
 }
 
 export function AddPensionTxnModal({
@@ -594,7 +423,7 @@ export function AddPensionTxnModal({
       }
       onClose();
     } catch (error) {
-      if (error instanceof StatementDocumentUploadError) return;
+      if (error instanceof PdfAttachmentUploadError) return;
       form.setError(resolveErrorMessage(error));
     } finally {
       setIsSaving(false);

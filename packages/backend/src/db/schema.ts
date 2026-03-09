@@ -10,8 +10,10 @@ import {
   jsonb,
   timestamp,
   index,
+  check,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
 export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
@@ -30,6 +32,28 @@ export const pensionImportConfidenceLabelEnum = pgEnum('pension_import_confidenc
   'medium',
   'low',
 ]);
+
+const inlinePdfDocumentColumns = () => ({
+  documentStorageKey: text('document_storage_key'),
+  documentFileName: text('document_file_name'),
+  documentSizeBytes: integer('document_size_bytes'),
+  documentUploadedAt: timestamp('document_uploaded_at'),
+});
+
+const inlinePdfDocumentStateCheck = (
+  constraintName: string,
+  table: ReturnType<typeof inlinePdfDocumentColumns>,
+) =>
+  check(
+    constraintName,
+    sql`((${table.documentStorageKey} is null and ${table.documentFileName} is null and ${table.documentSizeBytes} is null and ${table.documentUploadedAt} is null) or (${table.documentStorageKey} is not null and ${table.documentFileName} is not null and ${table.documentSizeBytes} is not null and ${table.documentUploadedAt} is not null))`,
+  );
+
+const inlinePdfDocumentSizeCheck = (
+  constraintName: string,
+  table: ReturnType<typeof inlinePdfDocumentColumns>,
+) =>
+  check(constraintName, sql`${table.documentSizeBytes} is null or ${table.documentSizeBytes} > 0`);
 
 // ── Users ───────────────────────────────────────────────────────────────────
 
@@ -271,40 +295,18 @@ export const pensionTransactions = pgTable(
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     isEmployer: boolean('is_employer'),
+    ...inlinePdfDocumentColumns(),
   },
   (table) => ({
     userIdx: index('pension_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('pension_transactions_user_date_idx').on(table.userId, table.date),
-  }),
-);
-
-export const pensionStatementDocuments = pgTable(
-  'pension_statement_documents',
-  {
-    id: serial('id').primaryKey(),
-    userId: integer('user_id')
-      .references(() => users.id, { onDelete: 'cascade' })
-      .notNull(),
-    potId: integer('pot_id')
-      .references(() => pensionPots.id, { onDelete: 'cascade' })
-      .notNull(),
-    transactionId: integer('transaction_id')
-      .references(() => pensionTransactions.id, { onDelete: 'cascade' })
-      .notNull(),
-    storageKey: text('storage_key').notNull(),
-    fileName: text('file_name').notNull(),
-    mimeType: text('mime_type').notNull(),
-    sizeBytes: integer('size_bytes').notNull(),
-    uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
-  },
-  (table) => ({
-    userIdx: index('pension_statement_documents_user_id_idx').on(table.userId),
-    potIdx: index('pension_statement_documents_pot_id_idx').on(table.potId),
-    transactionUnique: uniqueIndex('pension_statement_documents_transaction_id_uidx').on(
-      table.transactionId,
+    documentStateChk: inlinePdfDocumentStateCheck(
+      'pension_transactions_document_fields_chk',
+      table,
     ),
-    storageKeyUnique: uniqueIndex('pension_statement_documents_storage_key_uidx').on(
-      table.storageKey,
+    documentSizeChk: inlinePdfDocumentSizeCheck(
+      'pension_transactions_document_size_bytes_chk',
+      table,
     ),
   }),
 );
@@ -462,10 +464,13 @@ export const payslips = pgTable(
     net: numeric('net').notNull(),
     bonus: numeric('bonus'),
     currency: currencyCodeEnum('currency').default('EUR').notNull(),
+    ...inlinePdfDocumentColumns(),
   },
   (table) => ({
     userIdx: index('payslips_user_id_idx').on(table.userId),
     userDateIdx: index('payslips_user_date_idx').on(table.userId, table.date),
+    documentStateChk: inlinePdfDocumentStateCheck('payslips_document_fields_chk', table),
+    documentSizeChk: inlinePdfDocumentSizeCheck('payslips_document_size_bytes_chk', table),
   }),
 );
 

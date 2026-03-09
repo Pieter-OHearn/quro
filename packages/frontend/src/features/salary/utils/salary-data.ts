@@ -13,7 +13,11 @@ export type SalaryBreakdownItem = {
   pct?: number;
 };
 
-export const getPayslipBreakdownTotal = (payslip: Pick<Payslip, 'gross' | 'bonus'>): number =>
+export const getPayslipBreakdownTotal = (
+  payslip: Pick<Payslip, 'net' | 'tax' | 'pension'>,
+): number => Math.abs(payslip.net) + Math.abs(payslip.tax) + Math.abs(payslip.pension);
+
+const getPayslipAnnualGross = (payslip: Pick<Payslip, 'gross' | 'bonus'>): number =>
   payslip.gross + (payslip.bonus ?? 0);
 
 const percentageOfTotal = (value: number, total: number): number =>
@@ -21,6 +25,8 @@ const percentageOfTotal = (value: number, total: number): number =>
 
 export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => {
   const totalPay = getPayslipBreakdownTotal(payslip);
+  const hasTaxCorrection = payslip.tax < 0;
+  const hasPensionCorrection = payslip.pension < 0;
 
   return [
     {
@@ -44,21 +50,21 @@ export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => 
       val: payslip.net,
       color: 'bg-emerald-500',
       tc: 'text-emerald-700',
-      pct: percentageOfTotal(payslip.net, totalPay),
+      pct: percentageOfTotal(Math.abs(payslip.net), totalPay),
     },
     {
-      label: 'Income Tax',
+      label: hasTaxCorrection ? 'Tax Correction' : 'Income Tax',
       val: -payslip.tax,
-      color: 'bg-rose-400',
-      tc: 'text-rose-600',
-      pct: percentageOfTotal(payslip.tax, totalPay),
+      color: hasTaxCorrection ? 'bg-emerald-300' : 'bg-rose-400',
+      tc: hasTaxCorrection ? 'text-emerald-700' : 'text-rose-600',
+      pct: percentageOfTotal(Math.abs(payslip.tax), totalPay),
     },
     {
-      label: 'Pension',
+      label: hasPensionCorrection ? 'Pension Correction' : 'Pension',
       val: -payslip.pension,
-      color: 'bg-indigo-400',
-      tc: 'text-indigo-600',
-      pct: percentageOfTotal(payslip.pension, totalPay),
+      color: hasPensionCorrection ? 'bg-emerald-300' : 'bg-indigo-400',
+      tc: hasPensionCorrection ? 'text-emerald-700' : 'text-indigo-600',
+      pct: percentageOfTotal(Math.abs(payslip.pension), totalPay),
     },
   ];
 };
@@ -125,7 +131,7 @@ export function computeSalaryMetrics(
   currentYear: number,
 ) {
   const annualGross = annualPayslips.reduce(
-    (sum, payslip) => sum + convertToBase(payslip.gross, payslip.currency),
+    (sum, payslip) => sum + convertToBase(getPayslipAnnualGross(payslip), payslip.currency),
     0,
   );
   const annualNet = annualPayslips.reduce(
@@ -153,7 +159,10 @@ export function computeSalaryMetrics(
           allPayslips.reduce((grossByYear, payslip) => {
             const year = parsePayslipYear(payslip, currentYear);
             const annualTotal = grossByYear.get(year) ?? 0;
-            grossByYear.set(year, annualTotal + convertToBase(payslip.gross, payslip.currency));
+            grossByYear.set(
+              year,
+              annualTotal + convertToBase(getPayslipAnnualGross(payslip), payslip.currency),
+            );
             return grossByYear;
           }, new Map<number, number>()),
         )

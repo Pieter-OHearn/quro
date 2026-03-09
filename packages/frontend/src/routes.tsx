@@ -57,6 +57,11 @@ export const router = createBrowserRouter([
     children: [{ index: true, Component: LandingPage }],
   },
   {
+    path: '/brand',
+    Component: Brand,
+    ErrorBoundary: RouteErrorScreen,
+  },
+  {
     path: '/',
     Component: RequireAuth,
     ErrorBoundary: RouteErrorScreen,
@@ -69,7 +74,6 @@ export const router = createBrowserRouter([
       { path: 'pension', Component: Pension },
       { path: 'goals', Component: Goals },
       { path: 'budget', Component: Budget },
-      { path: 'brand', Component: Brand },
     ],
   },
 ]);

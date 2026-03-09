@@ -75,6 +75,7 @@ type CurrencyInputProps = {
   error?: boolean;
   placeholder?: string;
   step?: string;
+  disabled?: boolean;
 };
 
 export function CurrencyInput({
@@ -84,6 +85,7 @@ export function CurrencyInput({
   error,
   placeholder = '0.00',
   step = '0.01',
+  disabled,
 }: CurrencyInputProps) {
   return (
     <div className="relative">
@@ -93,9 +95,11 @@ export function CurrencyInput({
       <input
         type="number"
         step={step}
+        disabled={disabled}
         className={cn(
           'w-full rounded-xl border pl-12 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300',
           error ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50',
+          disabled && 'opacity-50',
         )}
         placeholder={placeholder}
         value={value}
@@ -110,15 +114,18 @@ type SelectInputProps = {
   onChange: (value: string) => void;
   options: { value: string; label: string }[] | string[];
   className?: string;
+  disabled?: boolean;
 };
 
-export function SelectInput({ value, onChange, options, className }: SelectInputProps) {
+export function SelectInput({ value, onChange, options, className, disabled }: SelectInputProps) {
   return (
     <select
       className={cn(
         'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300',
+        disabled && 'opacity-50',
         className,
       )}
+      disabled={disabled}
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >

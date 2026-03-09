@@ -57,6 +57,13 @@
       "when": 1773000000000,
       "tag": "0007_worker_heartbeats",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773090000000,
+      "tag": "0008_inline_pdf_documents",
+      "breakpoints": true
     }
   ]
 }
