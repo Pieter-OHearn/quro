@@ -9,8 +9,7 @@ import { usePensionStatementImportRows } from './usePensionStatementImportRows';
 import { useRestorePensionStatementImportRow } from './useRestorePensionStatementImportRow';
 import { useUpdatePensionStatementImportRow } from './useUpdatePensionStatementImportRow';
 import type { UpdatePensionImportRowPayload } from '../types';
-
-const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
+import { validatePdfFile } from '../../../lib/pdfDocuments';
 
 type RowDraft = {
   type: PensionStatementImportRow['type'];
@@ -100,16 +99,6 @@ function toDraft(row: PensionStatementImportRow): RowDraft {
     note: row.note,
     isEmployer: row.isEmployer,
   };
-}
-
-function validateUploadFile(file: File | null): string {
-  if (!file) return 'A PDF file is required';
-  const mimeAllowed = file.type === 'application/pdf' || file.type === '';
-  if (!file.name.toLowerCase().endsWith('.pdf') || !mimeAllowed)
-    return 'Only PDF files are allowed';
-  if (file.size <= 0) return 'Uploaded file is empty';
-  if (file.size > MAX_PDF_SIZE_BYTES) return 'PDF exceeds 20MB limit';
-  return '';
 }
 
 function buildRowPayload(draft: RowDraft): UpdatePensionImportRowPayload {
@@ -331,14 +320,18 @@ function useImportActions({
   };
 
   const handleUpload = async (): Promise<void> => {
-    const validationError = validateUploadFile(selectedFile);
+    if (!selectedFile) {
+      setErrorMessage('A PDF file is required');
+      return;
+    }
+    const validationError = validatePdfFile(selectedFile);
     if (validationError) {
       setErrorMessage(validationError);
       return;
     }
 
     try {
-      const created = await createImport.mutateAsync({ potId, file: selectedFile! });
+      const created = await createImport.mutateAsync({ potId, file: selectedFile });
       setImportId(created.id);
       setErrorMessage('');
       setConfirmMode('none');

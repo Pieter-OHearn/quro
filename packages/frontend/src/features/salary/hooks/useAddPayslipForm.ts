@@ -27,7 +27,7 @@ export function useAddPayslipForm(baseCurrency: CurrencyCode, existing?: Payslip
   };
 
   const buildPayload = (): SavePayslipInput | null => {
-    const nextErrors = validatePayslipForm(form, gross, tax, pension);
+    const nextErrors = validatePayslipForm(form);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return null;

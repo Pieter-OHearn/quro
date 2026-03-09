@@ -5,6 +5,13 @@ export const PDF_MIME_TYPE = 'application/pdf' as const;
 export const PDF_EXTENSION = '.pdf';
 export const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
 
+export const CLEAR_INLINE_PDF_DOCUMENT = {
+  documentStorageKey: null,
+  documentFileName: null,
+  documentSizeBytes: null,
+  documentUploadedAt: null,
+};
+
 export type InlinePdfDocumentFields = {
   documentStorageKey: string | null;
   documentFileName: string | null;

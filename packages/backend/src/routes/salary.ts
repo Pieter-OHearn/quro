@@ -7,6 +7,7 @@ import { getAuthUser } from '../lib/authUser';
 import {
   asFile,
   buildPdfStorageKey,
+  CLEAR_INLINE_PDF_DOCUMENT,
   deleteStoredPdfSafely,
   formatInlinePdfDocument,
   isS3NotFoundError,
@@ -453,12 +454,7 @@ app.delete('/payslips/:id/document', async (c) => {
 
   await db
     .update(payslips)
-    .set({
-      documentStorageKey: null,
-      documentFileName: null,
-      documentSizeBytes: null,
-      documentUploadedAt: null,
-    })
+    .set(CLEAR_INLINE_PDF_DOCUMENT)
     .where(and(eq(payslips.id, payslipId), eq(payslips.userId, user.id)));
 
   await deleteStoredPdfSafely(deletedDocument.storageKey, 'payslip PDF');

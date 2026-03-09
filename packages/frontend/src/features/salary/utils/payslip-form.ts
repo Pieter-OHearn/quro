@@ -33,12 +33,8 @@ export const computePayslipDraftAmounts = (form: PayslipFormState) => {
   return { gross, tax, pension, bonus, net };
 };
 
-export function validatePayslipForm(
-  form: PayslipFormState,
-  gross: number,
-  tax: number,
-  pension: number,
-): PayslipFieldErrorMap {
+export function validatePayslipForm(form: PayslipFormState): PayslipFieldErrorMap {
+  const { gross, tax, pension } = computePayslipDraftAmounts(form);
   const errors: PayslipFieldErrorMap = {};
 
   if (!form.month.trim()) errors.month = 'Required';

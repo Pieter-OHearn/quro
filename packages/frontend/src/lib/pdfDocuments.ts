@@ -44,6 +44,7 @@ export function validatePdfFile(file: File): string {
   const allowedMimeType = file.type === 'application/pdf' || file.type === '';
 
   if (!hasPdfExtension || !allowedMimeType) return 'Only PDF files are allowed';
+  if (file.size <= 0) return 'Uploaded file is empty';
   if (file.size > MAX_PDF_SIZE_BYTES) return 'PDF exceeds 20MB limit';
   return '';
 }
