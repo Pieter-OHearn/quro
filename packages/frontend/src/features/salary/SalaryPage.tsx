@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Payslip } from '@quro/shared';
-import { LoadingState } from '@/components/ui';
+import { LoadingState, SegmentedControl } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   AddPayslipModal,
@@ -153,18 +153,21 @@ export function Salary() {
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
-        {state.years.map((year) => (
-          <button
-            key={year}
-            onClick={() => state.setActiveYear(year)}
-            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${year === state.activeYear ? 'bg-[#0a0f1e] text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          >
-            {year}
-            {year === state.currentYear && (
-              <span className="ml-1.5 text-[10px] opacity-70">current</span>
-            )}
-          </button>
-        ))}
+        <SegmentedControl
+          options={state.years.map((year) => ({
+            value: year,
+            label: year,
+            badge:
+              year === state.currentYear ? (
+                <span className="text-[10px] opacity-70">current</span>
+              ) : undefined,
+          }))}
+          value={state.activeYear}
+          onChange={state.setActiveYear}
+          variant="pill"
+          tone="dark"
+          buttonClassName="px-5 font-semibold"
+        />
       </div>
 
       <SalaryStatsCards cards={state.statCards} />

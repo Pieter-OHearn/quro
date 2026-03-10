@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 import type { Goal } from '@quro/shared';
+import { SegmentedControl } from '@/components/ui';
 import type { FilterKey } from '../types';
 import { FILTERS, GOAL_TYPE_META } from '../utils/goals-constants';
 import { normalizeGoalType, parseGoalYear } from '../utils/goal-utils';
@@ -53,15 +54,13 @@ export function GoalsFilterBar({
 }: Readonly<GoalsFilterBarProps>) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl p-1 flex-wrap">
-        {FILTERS.map(({ key, label, Icon }) => (
-          <button
-            key={key}
-            onClick={() => onFilterChange(key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${activeFilter === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
-          >
-            <Icon size={13} /> {label}
-            {key !== 'all' && (
+      <SegmentedControl
+        options={FILTERS.map(({ key, label, Icon }) => ({
+          value: key,
+          label,
+          icon: <Icon size={13} />,
+          badge:
+            key !== 'all' ? (
               <FilterCountBadge
                 filterKey={key}
                 activeFilter={activeFilter}
@@ -69,12 +68,15 @@ export function GoalsFilterBar({
                 activeYear={activeYear}
                 currentYear={currentYear}
               />
-            )}
-          </button>
-        ))}
-      </div>
+            ) : undefined,
+        }))}
+        value={activeFilter}
+        onChange={onFilterChange}
+        variant="contained"
+      />
       <div className="flex-1" />
       <button
+        type="button"
         onClick={onAdd}
         className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl transition-colors"
       >

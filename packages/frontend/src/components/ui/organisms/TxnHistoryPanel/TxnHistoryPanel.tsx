@@ -2,6 +2,7 @@ import { Edit3, Filter, Plus, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import { Badge, Button, IconButton } from '../../atoms';
+import { SegmentedControl } from '../../molecules';
 
 export type FilterOption = {
   key: string;
@@ -13,6 +14,16 @@ export type TxnHistoryStat = {
   value: string;
   color?: string;
 };
+
+const GRID_COLUMN_CLASSES = {
+  '1': 'grid-cols-1',
+  '2': 'grid-cols-2',
+  '3': 'grid-cols-3',
+  '4': 'grid-cols-4',
+  '5': 'grid-cols-5',
+} as const;
+
+const DEFAULT_GRID_COLUMN_CLASS = 'grid-cols-6';
 
 export type TxnHistoryPanelProps = {
   filterOptions: FilterOption[];
@@ -37,17 +48,8 @@ type StatsGridProps = {
 function StatsGrid({ stats, statsColumns }: StatsGridProps) {
   const columns = statsColumns ?? stats.length;
   const columnsClass =
-    columns === 1
-      ? 'grid-cols-1'
-      : columns === 2
-        ? 'grid-cols-2'
-        : columns === 3
-          ? 'grid-cols-3'
-          : columns === 4
-            ? 'grid-cols-4'
-            : columns === 5
-              ? 'grid-cols-5'
-              : 'grid-cols-6';
+    GRID_COLUMN_CLASSES[String(columns) as keyof typeof GRID_COLUMN_CLASSES] ??
+    DEFAULT_GRID_COLUMN_CLASS;
 
   return (
     <div className={cn('grid gap-3 mb-4', columnsClass)}>
@@ -83,20 +85,15 @@ function FilterBar({
       <div className="flex items-center gap-1">
         <Filter size={12} className="text-slate-400" />
         <span className="text-xs text-slate-400 mr-1">Filter:</span>
-        {filterOptions.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => onFilterChange(f.key)}
-            className={cn(
-              'text-xs px-2.5 py-1 rounded-lg transition-colors',
-              filter === f.key
-                ? 'bg-indigo-100 text-indigo-700 font-medium'
-                : 'text-slate-500 hover:bg-slate-100',
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
+        <SegmentedControl
+          options={filterOptions.map((option) => ({
+            value: option.key,
+            label: option.label,
+          }))}
+          value={filter}
+          onChange={onFilterChange}
+          variant="soft"
+        />
       </div>
       <Button
         onClick={onAdd}

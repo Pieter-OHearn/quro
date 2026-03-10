@@ -3,6 +3,8 @@ export * from './EmojiPickerField';
 export * from './EmptyState';
 export * from './FormField';
 export * from './LoadingState';
+export * from './Pagination';
 export * from './PanelHeader';
 export * from './PdfAttachmentField';
+export * from './SegmentedControl';
 export * from './TxnTypeSelector';

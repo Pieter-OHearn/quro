@@ -446,6 +446,11 @@ Implementation Notes:
   - Investments and mortgage tabs are implemented with the same base control, even if styling variants differ.
 - Estimated complexity: Medium
 
+Implementation Notes:
+
+- Added shared `SegmentedControl` and `Pagination` molecules under `packages/frontend/src/components/ui`, with segmented variants covering the current year-switcher, filter-chip, and underline-tab patterns without introducing a separate wrapper component.
+- Migrated goals and salary year selectors, goals and transaction-history filters, mortgage and investments tabs, and the savings/pension transaction pagination footers onto those shared primitives while preserving the existing dark, indigo, and amber visual accents.
+
 ### Ticket 9. Promote transaction history into shared
 
 - Description: Move `TxnHistoryPanel` and its row primitives into the frontend design-system layer and migrate mortgage history onto it.
@@ -520,7 +525,7 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 5. Introduce shared card and panel header primitives
 - [x] Ticket 6. Normalize KPI summary cards
 - [x] Ticket 7. Unify loading and empty states
-- [ ] Ticket 8. Extract segmented controls and pagination
+- [x] Ticket 8. Extract segmented controls and pagination
 - [ ] Ticket 9. Promote transaction history into shared
 - [ ] Ticket 10. Introduce shared table and chart shells
 - [ ] Ticket 11. Add lightweight shared UI verification
