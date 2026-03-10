@@ -38,16 +38,44 @@ const navItems = [
 
 // ─── Currency Selector ────────────────────────────────────────────────────────
 
-type CurrencyDropdownProps = { baseCurrency: CurrencyCode; onSelect: (code: CurrencyCode) => void };
+type CurrencyDropdownProps = {
+  baseCurrency: CurrencyCode;
+  onSelect: (code: CurrencyCode) => void;
+};
 
-function CurrencyDropdown({ baseCurrency, onSelect }: CurrencyDropdownProps) {
+function formatRatesUpdatedAt(updatedAt: string | null): string {
+  if (!updatedAt) return 'Server-backed FX rates';
+
+  const parsed = new Date(updatedAt);
+  if (Number.isNaN(parsed.getTime())) return 'Server-backed FX rates';
+
+  return `Rates updated ${parsed.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
+}
+
+type CurrencyDropdownWithRatesProps = CurrencyDropdownProps & {
+  ratesUpdatedAt: string | null;
+};
+
+function CurrencyDropdown({
+  baseCurrency,
+  onSelect,
+  ratesUpdatedAt,
+}: CurrencyDropdownWithRatesProps) {
   return (
     <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
       <div className="px-3 py-2.5 border-b border-slate-100">
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
           Base Currency
         </p>
-        <p className="text-xs text-slate-500 mt-0.5">All totals convert to this</p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          All totals convert using server-backed FX rates
+        </p>
       </div>
       <div className="py-1.5 max-h-72 overflow-y-auto">
         {CURRENCY_CODES.map((code: CurrencyCode) => {
@@ -69,12 +97,15 @@ function CurrencyDropdown({ baseCurrency, onSelect }: CurrencyDropdownProps) {
           );
         })}
       </div>
+      <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400">
+        {formatRatesUpdatedAt(ratesUpdatedAt)}
+      </div>
     </div>
   );
 }
 
 function CurrencySelector() {
-  const { baseCurrency, setBaseCurrency } = useCurrency();
+  const { baseCurrency, setBaseCurrency, ratesUpdatedAt } = useCurrency();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const meta = CURRENCY_META[baseCurrency];
@@ -103,6 +134,7 @@ function CurrencySelector() {
       {open && (
         <CurrencyDropdown
           baseCurrency={baseCurrency}
+          ratesUpdatedAt={ratesUpdatedAt}
           onSelect={(code) => {
             setBaseCurrency(code);
             setOpen(false);

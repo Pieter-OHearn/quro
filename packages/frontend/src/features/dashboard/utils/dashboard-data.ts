@@ -119,14 +119,21 @@ const toMonthStartUtc = (monthKey: string) => new Date(`${monthKey}-01T00:00:00Z
 const getPayslipMonthlyAmount = (payslip: Pick<Payslip, 'net' | 'bonus'>) =>
   payslip.net + (payslip.bonus ?? 0);
 
-const computeSalaryMetrics = (payslips: readonly Payslip[]) => {
+const computeSalaryMetrics = (
+  payslips: readonly Payslip[],
+  convertToBase: (amount: number, currency: string) => number,
+) => {
   if (payslips.length === 0) {
     return { monthlySalaryValue: 0, salaryTrendChange: 0 };
   }
 
   const monthlyTotals = payslips.reduce((totals, payslip) => {
     const monthKey = payslip.date.slice(0, 7);
-    totals.set(monthKey, (totals.get(monthKey) ?? 0) + getPayslipMonthlyAmount(payslip));
+    totals.set(
+      monthKey,
+      (totals.get(monthKey) ?? 0) +
+        convertToBase(getPayslipMonthlyAmount(payslip), payslip.currency),
+    );
     return totals;
   }, new Map<string, number>());
 
@@ -205,6 +212,7 @@ export const buildMonthlySummaryItems = (
 export function computeDashboardTxnStats(
   transactions: readonly DashboardTransaction[],
   payslips: readonly Payslip[],
+  convertToBase: (amount: number, currency: string) => number,
 ): DashboardTxnStats {
   const currentKey = getMonthKey(new Date());
   const monthTxns = transactions.filter((tx) => tx.date.startsWith(currentKey));
@@ -212,7 +220,7 @@ export function computeDashboardTxnStats(
     monthTxns
       .filter((tx) => tx.category === category)
       .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
-  const { monthlySalaryValue, salaryTrendChange } = computeSalaryMetrics(payslips);
+  const { monthlySalaryValue, salaryTrendChange } = computeSalaryMetrics(payslips, convertToBase);
   const totalIncome = monthTxns
     .filter((tx) => tx.type === 'income')
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);

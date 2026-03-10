@@ -1,13 +1,23 @@
 import { Hono } from 'hono';
 import { db } from '../db/client';
 import { currencyRates } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { HTTP_STATUS } from '../constants/http';
 
 const app = new Hono();
 
 app.get('/rates', async (c) => {
-  const data = await db.select().from(currencyRates);
+  const data = await db
+    .select({
+      id: currencyRates.id,
+      fromCurrency: currencyRates.fromCurrency,
+      toCurrency: currencyRates.toCurrency,
+      rate: currencyRates.rate,
+      updatedAt: currencyRates.updatedAt,
+    })
+    .from(currencyRates)
+    .orderBy(asc(currencyRates.fromCurrency), asc(currencyRates.toCurrency));
+
   return c.json({ data });
 });
 

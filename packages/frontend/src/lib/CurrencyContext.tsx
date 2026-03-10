@@ -1,80 +1,167 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { CURRENCY_CODES, CURRENCY_META, type CurrencyCode } from '@quro/shared';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { CURRENCY_CODES, CURRENCY_META, isCurrencyCode, type CurrencyCode } from '@quro/shared';
+import { Button, LoadingSpinner } from '@/components/ui';
+import { useAuth } from './AuthContext';
+import { convertCurrencyAmount } from './currencyRates';
+import { getCurrencyRatesErrorDetail, useCurrencyRates } from './useCurrencyRates';
 
 export { CURRENCY_CODES, CURRENCY_META };
 export type { CurrencyCode };
 
-/**
- * Rates expressed as: 1 unit of this currency = X EUR
- * To convert amount from currency A to base currency B:
- *   amountInEUR = amount * RATES_TO_EUR[A]
- *   amountInBase = amountInEUR / RATES_TO_EUR[B]
- * Approximate rates as of early 2026.
- */
-export const RATES_TO_EUR: Record<CurrencyCode, number> = {
-  EUR: 1.0,
-  GBP: 1.18,
-  USD: 0.922,
-  AUD: 0.6,
-  NZD: 0.551,
-  CAD: 0.66,
-  CHF: 1.046,
-  SGD: 0.68,
-};
-
-// ─── Context ──────────────────────────────────────────────────────────────────
+export type CurrencyRatesStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 type CurrencyContextType = {
   baseCurrency: CurrencyCode;
   setBaseCurrency: (c: CurrencyCode) => void;
-  /** Convert an amount from any currency into the base currency */
   convertToBase: (amount: number, fromCurrency: string) => number;
-  /** Format an amount (already in `fromCurrency`) displayed in the base currency */
   fmtBase: (amount: number, fromCurrency?: string, decimals?: boolean) => string;
-  /** Format an amount in its own native currency */
   fmtNative: (amount: number, currency: string, decimals?: boolean) => string;
-  /** True when fromCurrency ≠ baseCurrency */
   isForeign: (currency: string) => boolean;
+  ratesStatus: CurrencyRatesStatus;
+  ratesUpdatedAt: string | null;
 };
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
-const CURRENCY_SET = new Set<CurrencyCode>(CURRENCY_CODES);
+
+type CurrencyRatesQueryState = Pick<
+  ReturnType<typeof useCurrencyRates>,
+  'data' | 'error' | 'isError' | 'isPending' | 'refetch'
+>;
 
 function normalizeCurrency(currency: string): CurrencyCode {
-  if (CURRENCY_SET.has(currency as CurrencyCode)) return currency as CurrencyCode;
+  if (isCurrencyCode(currency)) return currency;
   return 'EUR';
 }
 
+function formatCurrency(amount: number, currency: string, decimals = false): string {
+  if (!Number.isFinite(amount)) return 'Unavailable';
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: normalizeCurrency(currency),
+    minimumFractionDigits: decimals ? 2 : 0,
+    maximumFractionDigits: decimals ? 2 : 0,
+  }).format(amount);
+}
+
+type CurrencyRatesFallbackProps = {
+  detail: string | null;
+  onRetry: () => void;
+};
+
+function CurrencyRatesFallback({ detail, onRetry }: Readonly<CurrencyRatesFallbackProps>) {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-xl rounded-3xl border border-amber-200 bg-white p-8 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-600">
+          Currency Rates Unavailable
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold text-slate-900">
+          Converted balances are paused
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Quro could not load the server-backed FX rates required to render converted totals safely.
+          Native balances remain stored, but cross-currency views stay blocked until the rate source
+          is available again.
+        </p>
+        {detail ? (
+          <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
+            {detail}
+          </p>
+        ) : null}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button onClick={onRetry}>Retry rate fetch</Button>
+          <Button variant="secondary" onClick={() => window.location.reload()}>
+            Reload app
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getCurrencyRatesStatus(
+  hasUser: boolean,
+  ratesQuery: CurrencyRatesQueryState,
+): CurrencyRatesStatus {
+  if (!hasUser) return 'idle';
+  if (ratesQuery.isPending) return 'loading';
+  if (ratesQuery.isError) return 'error';
+  return 'ready';
+}
+
+function renderCurrencyRatesGate(
+  hasUser: boolean,
+  authLoading: boolean,
+  ratesQuery: CurrencyRatesQueryState,
+): ReactNode | null {
+  if (hasUser && !authLoading && ratesQuery.isPending) {
+    return <LoadingSpinner className="min-h-screen" label="Loading server-backed currency rates" />;
+  }
+
+  if (hasUser && ratesQuery.isError) {
+    return (
+      <CurrencyRatesFallback
+        detail={getCurrencyRatesErrorDetail(ratesQuery.error)}
+        onRetry={() => {
+          void ratesQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  return null;
+}
+
 export function CurrencyProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
+  const ratesQuery = useCurrencyRates();
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>('EUR');
+  const hasUser = Boolean(user);
+  const ratesStatus = getCurrencyRatesStatus(hasUser, ratesQuery);
+  const gate = renderCurrencyRatesGate(hasUser, authLoading, ratesQuery);
+
+  if (gate) return gate;
 
   const convertToBase = (amount: number, fromCurrency: string): number => {
     const safeCurrency = normalizeCurrency(fromCurrency);
-    const amountInEUR = amount * RATES_TO_EUR[safeCurrency];
-    return amountInEUR / RATES_TO_EUR[baseCurrency];
-  };
+    const table = ratesQuery.data;
 
-  const fmtCurrency = (amount: number, currency: string, decimals = false): string =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: normalizeCurrency(currency),
-      minimumFractionDigits: decimals ? 2 : 0,
-      maximumFractionDigits: decimals ? 2 : 0,
-    }).format(amount);
+    if (!table) {
+      if (!hasUser || safeCurrency === baseCurrency) return amount;
+      throw new Error('Currency rates are not ready');
+    }
+
+    const converted = convertCurrencyAmount(amount, safeCurrency, baseCurrency, table);
+    if (converted === null) {
+      throw new Error(`Missing server-backed FX rate for ${safeCurrency} -> ${baseCurrency}`);
+    }
+
+    return converted;
+  };
 
   const fmtBase = (amount: number, fromCurrency?: string, decimals = false): string => {
     const converted = fromCurrency ? convertToBase(amount, fromCurrency) : amount;
-    return fmtCurrency(converted, baseCurrency, decimals);
+    return formatCurrency(converted, baseCurrency, decimals);
   };
 
   const fmtNative = (amount: number, currency: string, decimals = false): string =>
-    fmtCurrency(amount, currency, decimals);
+    formatCurrency(amount, currency, decimals);
 
   const isForeign = (currency: string) => normalizeCurrency(currency) !== baseCurrency;
 
   return (
     <CurrencyContext.Provider
-      value={{ baseCurrency, setBaseCurrency, convertToBase, fmtBase, fmtNative, isForeign }}
+      value={{
+        baseCurrency,
+        setBaseCurrency,
+        convertToBase,
+        fmtBase,
+        fmtNative,
+        isForeign,
+        ratesStatus,
+        ratesUpdatedAt: ratesQuery.data?.latestUpdatedAt ?? null,
+      }}
     >
       {children}
     </CurrencyContext.Provider>

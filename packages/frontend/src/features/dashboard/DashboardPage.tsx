@@ -24,14 +24,22 @@ import { useAssetAllocations, useDashboardTransactions, useNetWorthSnapshots } f
 
 const DASHBOARD_GOAL_LIMIT = 4;
 const DASHBOARD_TXN_LIMIT = 6;
+const DASHBOARD_SOURCE_CURRENCY = 'EUR';
 
-const computeAnnualGross = (payslips: ReadonlyArray<{ gross: number; date: string }>): number => {
+const computeAnnualGross = (
+  payslips: ReadonlyArray<{ gross: number; date: string; currency: string }>,
+  convertToBase: (amount: number, currency: string) => number,
+): number => {
   if (payslips.length === 0) return 0;
   const latest = [...payslips].sort((a, b) => b.date.localeCompare(a.date))[0];
-  return (latest?.gross ?? 0) * 12;
+  if (!latest) return 0;
+  return convertToBase(latest.gross * 12, latest.currency);
 };
 
-function useDashboardData(fmtBase: DashboardFormatFn) {
+function useDashboardData(
+  fmtBase: DashboardFormatFn,
+  convertToBase: (amount: number, currency: string) => number,
+) {
   const { data: netWorthData = [], isLoading: loadingNW } = useNetWorthSnapshots();
   const { data: allocations = [], isLoading: loadingAlloc } = useAssetAllocations();
   const { data: transactions = [], isLoading: loadingTxns } = useDashboardTransactions();
@@ -42,17 +50,23 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  const annualGross = computeAnnualGross(payslips);
+  const annualGross = computeAnnualGross(payslips, convertToBase);
   const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
-  const currentMonthTransactions = transactions.filter((tx) => tx.date.startsWith(currentMonthKey));
+  const convertedTransactions = transactions.map((transaction) => ({
+    ...transaction,
+    amount: convertToBase(transaction.amount, DASHBOARD_SOURCE_CURRENCY),
+  }));
+  const currentMonthTransactions = convertedTransactions.filter((tx) =>
+    tx.date.startsWith(currentMonthKey),
+  );
   const chartData = netWorthData.map((snapshot) => ({
     month: snapshot.month,
     year: snapshot.year,
-    value: snapshot.totalValue,
+    value: convertToBase(snapshot.totalValue, snapshot.currency),
   }));
   const allocationData = allocations.map((allocation) => ({
     name: allocation.name,
-    value: allocation.value,
+    value: convertToBase(allocation.value, DASHBOARD_SOURCE_CURRENCY),
     color: allocation.color,
   }));
   const totalAlloc = allocationData.reduce((sum, item) => sum + item.value, 0);
@@ -68,7 +82,7 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
     salaryTrendChange,
     totalIncome,
     totalExpenses,
-  } = computeDashboardTxnStats(transactions, payslips);
+  } = computeDashboardTxnStats(convertedTransactions, payslips, convertToBase);
 
   return {
     isLoading,
@@ -76,7 +90,7 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
     allocationData,
     totalAlloc,
     goals,
-    recentTransactions: transactions,
+    recentTransactions: convertedTransactions,
     monthlySalaryValue,
     monthlyCategoryChange,
     salaryTrendChange,
@@ -194,9 +208,9 @@ function DashboardPageBody({
 }
 
 export function Dashboard() {
-  const { fmtBase, baseCurrency } = useCurrency();
+  const { fmtBase, baseCurrency, convertToBase } = useCurrency();
   const { user } = useAuth();
-  const data = useDashboardData(fmtBase);
+  const data = useDashboardData(fmtBase, convertToBase);
 
   if (data.isLoading) return <LoadingSpinner />;
 
