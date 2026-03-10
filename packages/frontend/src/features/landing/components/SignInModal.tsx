@@ -1,8 +1,7 @@
 import { ArrowRight } from 'lucide-react';
-import { FormField, PasswordInput, TextInput } from '@/components/ui';
+import { FormField, Modal, ModalHeader, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
 import { useSignInState } from '../hooks';
 import type { SignInState } from '../types';
-import { ModalHeader } from './ModalHeader';
 import { SubmitButton } from './SubmitButton';
 
 type SignInModalProps = {
@@ -92,16 +91,33 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
   const state = useSignInState();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+    <Modal
+      title="Welcome back"
+      subtitle="Sign in to your Quro account"
+      onClose={onClose}
+      maxWidth="md"
+      backdropClassName="bg-black/60 backdrop-blur-sm"
+      contentClassName="rounded-3xl"
+      bodyClassName="p-0 space-y-0"
+      header={
         <ModalHeader
           onClose={onClose}
           title="Welcome back"
           subtitle="Sign in to your Quro account"
+          align="center"
+          visual={
+            <div className="flex justify-center mb-4">
+              <QuroLogo size={52} showBg={false} />
+            </div>
+          }
+          className="bg-gradient-to-br from-[#0a0f1e] to-[#1a2550] px-8 pt-8 pb-10"
+          titleClassName="text-2xl font-black tracking-tight"
+          subtitleClassName="text-sm mt-1"
+          closeIconSize={16}
         />
-        <SignInForm state={state} onSwitchToSignUp={onSwitchToSignUp} />
-      </div>
-    </div>
+      }
+    >
+      <SignInForm state={state} onSwitchToSignUp={onSwitchToSignUp} />
+    </Modal>
   );
 }

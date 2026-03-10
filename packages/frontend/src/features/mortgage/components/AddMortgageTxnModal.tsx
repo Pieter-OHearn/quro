@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Modal, ModalFooter, ModalHeader } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import { useMortgageTxnModal } from '../hooks';
@@ -489,39 +489,24 @@ export function AddMortgageTxnModal({ mortgage, onClose, onSave }: AddMortgageTx
   const state = useMortgageTxnModal({ mortgage, onSave, onClose });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-white">Record Transaction</h2>
-            <p className="text-xs text-indigo-300 mt-0.5 truncate max-w-[240px]">
-              🏠 {mortgage.propertyAddress}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <TxnModalFormBody state={state} mortgage={mortgage} fmt={fmt} />
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-slate-100 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={state.handleSave}
-            className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 text-sm transition-colors font-medium"
-          >
-            Record
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      title="Record Transaction"
+      subtitle={`🏠 ${mortgage.propertyAddress}`}
+      onClose={onClose}
+      maxWidth="md"
+      bodyClassName="p-0 space-y-0"
+      header={
+        <ModalHeader
+          onClose={onClose}
+          title="Record Transaction"
+          subtitle={`🏠 ${mortgage.propertyAddress}`}
+          contentClassName="min-w-0"
+          subtitleClassName="truncate max-w-[240px]"
+        />
+      }
+      footer={<ModalFooter onCancel={onClose} onConfirm={state.handleSave} confirmLabel="Record" />}
+    >
+      <TxnModalFormBody state={state} mortgage={mortgage} fmt={fmt} />
+    </Modal>
   );
 }

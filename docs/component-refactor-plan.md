@@ -390,6 +390,11 @@ Implementation Notes:
   - Existing close-on-overlay-click behavior is preserved.
 - Estimated complexity: Large
 
+Implementation Notes:
+
+- Extended the shared `Modal` with customizable header, body, panel, and backdrop variants, and exported a reusable `ModalHeader` alongside the existing `ModalFooter`.
+- Migrated goals, landing auth, and mortgage dialog shells to the shared modal foundation, preserving overlay-click close behavior while removing their duplicated overlay container markup.
+
 ### Ticket 5. Introduce shared card and panel header primitives
 
 - Description: Create shared card surface and header components for lists, charts, and data panels.
@@ -496,7 +501,7 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 1. Scaffold frontend design-system structure
 - [x] Ticket 2. Extract shared action primitives
 - [x] Ticket 3. Build the shared field system
-- [ ] Ticket 4. Consolidate dialog shells
+- [x] Ticket 4. Consolidate dialog shells
 - [ ] Ticket 5. Introduce shared card and panel header primitives
 - [ ] Ticket 6. Normalize KPI summary cards
 - [ ] Ticket 7. Unify loading and empty states

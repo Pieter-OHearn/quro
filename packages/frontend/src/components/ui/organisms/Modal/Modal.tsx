@@ -2,14 +2,33 @@ import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../../atoms';
 
+export type ModalHeaderProps = {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  onClose: () => void;
+  scrollable?: boolean;
+  align?: 'start' | 'center';
+  visual?: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
+  titleClassName?: string;
+  subtitleClassName?: string;
+  closeButtonClassName?: string;
+  closeIconSize?: number;
+};
+
 export type ModalProps = {
-  title: string;
-  subtitle?: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
   onClose: () => void;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
   children: React.ReactNode;
   footer?: React.ReactNode;
   scrollable?: boolean;
+  header?: React.ReactNode;
+  backdropClassName?: string;
+  contentClassName?: string;
+  bodyClassName?: string;
 };
 
 const MAX_WIDTH_MAP = {
@@ -19,31 +38,74 @@ const MAX_WIDTH_MAP = {
   xl: 'max-w-xl',
 } as const;
 
-type ModalHeaderProps = {
-  title: string;
-  subtitle?: string;
-  onClose: () => void;
-  scrollable?: boolean;
-};
+const DEFAULT_CLOSE_ICON_SIZE = 18;
 
-function ModalHeader({ title, subtitle, onClose, scrollable }: ModalHeaderProps) {
+export function ModalHeader({
+  title,
+  subtitle,
+  onClose,
+  scrollable,
+  align = 'start',
+  visual,
+  className,
+  contentClassName,
+  titleClassName,
+  subtitleClassName,
+  closeButtonClassName,
+  closeIconSize = DEFAULT_CLOSE_ICON_SIZE,
+}: ModalHeaderProps) {
+  const isCentered = align === 'center';
+
   return (
     <div
       className={cn(
         'bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between',
         scrollable && 'flex-shrink-0',
+        isCentered && 'relative block text-center',
+        className,
       )}
     >
-      <div>
-        <h2 className="font-bold text-white">{title}</h2>
-        {subtitle && <p className="text-xs text-indigo-300 mt-0.5">{subtitle}</p>}
-      </div>
-      <button
-        onClick={onClose}
-        className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-      >
-        <X size={18} />
-      </button>
+      {isCentered ? (
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className={cn(
+              'absolute top-4 right-4 p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors',
+              closeButtonClassName,
+            )}
+          >
+            <X size={closeIconSize} />
+          </button>
+          <div className={cn('min-w-0 flex flex-col items-center', contentClassName)}>
+            {visual}
+            <h2 className={cn('font-bold text-white', titleClassName)}>{title}</h2>
+            {subtitle && (
+              <p className={cn('text-xs text-indigo-300 mt-0.5', subtitleClassName)}>{subtitle}</p>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className={cn('min-w-0 pr-4', contentClassName)}>
+            {visual}
+            <h2 className={cn('font-bold text-white', titleClassName)}>{title}</h2>
+            {subtitle && (
+              <p className={cn('text-xs text-indigo-300 mt-0.5', subtitleClassName)}>{subtitle}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className={cn(
+              'p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors',
+              closeButtonClassName,
+            )}
+          >
+            <X size={closeIconSize} />
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -56,19 +118,36 @@ export function Modal({
   children,
   footer,
   scrollable,
+  header,
+  backdropClassName,
+  contentClassName,
+  bodyClassName,
 }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className={cn('absolute inset-0 bg-black/40 backdrop-blur-sm', backdropClassName)}
+        onClick={onClose}
+      />
       <div
         className={cn(
           'relative bg-white rounded-2xl shadow-2xl w-full overflow-hidden',
           MAX_WIDTH_MAP[maxWidth],
           scrollable && 'flex flex-col max-h-[90vh]',
+          contentClassName,
         )}
       >
-        <ModalHeader title={title} subtitle={subtitle} onClose={onClose} scrollable={scrollable} />
-        <div className={cn('p-6 space-y-5', scrollable && 'overflow-y-auto')}>{children}</div>
+        {header ?? (
+          <ModalHeader
+            title={title}
+            subtitle={subtitle}
+            onClose={onClose}
+            scrollable={scrollable}
+          />
+        )}
+        <div className={cn('p-6 space-y-5', scrollable && 'overflow-y-auto', bodyClassName)}>
+          {children}
+        </div>
         {footer && (
           <div
             className={cn(

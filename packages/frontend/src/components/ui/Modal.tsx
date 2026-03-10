@@ -1,2 +1,2 @@
-export { Modal, ModalFooter } from './organisms/Modal';
-export type { ModalFooterProps, ModalProps } from './organisms/Modal';
+export { Modal, ModalFooter, ModalHeader } from './organisms/Modal';
+export type { ModalFooterProps, ModalHeaderProps, ModalProps } from './organisms/Modal';

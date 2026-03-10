@@ -1,8 +1,7 @@
 import { Sparkles } from 'lucide-react';
-import { FormField, PasswordInput, TextInput } from '@/components/ui';
+import { FormField, Modal, ModalHeader, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
 import { useSignUpState } from '../hooks';
 import type { SignUpState } from '../types';
-import { ModalHeader } from './ModalHeader';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { SubmitButton } from './SubmitButton';
 
@@ -77,7 +76,7 @@ function SignUpForm({ state, onSwitchToSignIn }: Readonly<SignUpFormProps>) {
       onSubmit={(event) => {
         void handleSubmit(event);
       }}
-      className="px-8 py-7 space-y-4 overflow-y-auto text-slate-900"
+      className="px-8 py-7 space-y-4 text-slate-900"
     >
       <SignUpFormFields state={state} />
       <SubmitButton
@@ -108,16 +107,35 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
   const state = useSignUpState();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden max-h-[95vh] flex flex-col">
+    <Modal
+      title="Create your account"
+      subtitle="Start tracking your finances for free"
+      onClose={onClose}
+      maxWidth="md"
+      scrollable
+      backdropClassName="bg-black/60 backdrop-blur-sm"
+      contentClassName="rounded-3xl max-h-[95vh]"
+      bodyClassName="p-0 space-y-0"
+      header={
         <ModalHeader
           onClose={onClose}
           title="Create your account"
           subtitle="Start tracking your finances for free"
+          align="center"
+          scrollable
+          visual={
+            <div className="flex justify-center mb-4">
+              <QuroLogo size={52} showBg={false} />
+            </div>
+          }
+          className="bg-gradient-to-br from-[#0a0f1e] to-[#1a2550] px-8 pt-8 pb-10"
+          titleClassName="text-2xl font-black tracking-tight"
+          subtitleClassName="text-sm mt-1"
+          closeIconSize={16}
         />
-        <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
-      </div>
-    </div>
+      }
+    >
+      <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
+    </Modal>
   );
 }

@@ -1,5 +1,5 @@
-import { Link2, X } from 'lucide-react';
-import { FormField, SelectInput, Textarea, TextInput } from '@/components/ui';
+import { Link2 } from 'lucide-react';
+import { FormField, Modal, ModalFooter, SelectInput, Textarea, TextInput } from '@/components/ui';
 import type { GoalType } from '@quro/shared';
 import { useAddGoalModal } from '../hooks';
 import { COLORS, GOAL_TYPE_META } from '../utils/goals-constants';
@@ -305,90 +305,49 @@ function GoalDetailsStep({
   );
 }
 
-function AddGoalModalFooter({
-  onClose,
-  onSave,
-  canSave,
-}: Readonly<{ onClose: () => void; onSave: () => void; canSave: boolean }>) {
-  return (
-    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 flex-shrink-0">
-      <button
-        onClick={onClose}
-        className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-slate-100 transition-colors"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={onSave}
-        disabled={!canSave}
-        className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white py-2.5 text-sm font-medium transition-colors"
-      >
-        Save Goal
-      </button>
-    </div>
-  );
-}
-
-function AddGoalModalHeader({
-  step,
-  type,
-  onClose,
-}: Readonly<{ step: 'type' | 'details'; type: GoalType; onClose: () => void }>) {
-  return (
-    <div className="bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between flex-shrink-0">
-      <div>
-        <h2 className="font-bold text-white">Add Goal</h2>
-        <p className="text-xs text-indigo-300 mt-0.5">
-          {step === 'type'
-            ? 'Choose a goal type to get started'
-            : `${GOAL_TYPE_META[type].label} - fill in the details`}
-        </p>
-      </div>
-      <button
-        onClick={onClose}
-        className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-      >
-        <X size={18} />
-      </button>
-    </div>
-  );
-}
-
 export function AddGoalModal({ onClose, onSave }: Readonly<AddGoalModalProps>) {
   const { baseCurrency, step, type, form, setField, handleSave, setType, setStep } =
     useAddGoalModal(onSave, onClose);
+  const subtitle =
+    step === 'type'
+      ? 'Choose a goal type to get started'
+      : `${GOAL_TYPE_META[type].label} - fill in the details`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-        <AddGoalModalHeader step={step} type={type} onClose={onClose} />
-        <div className="overflow-y-auto flex-1">
-          {step === 'type' ? (
-            <GoalTypeStep
-              onSelect={(selectedType) => {
-                setType(selectedType);
-                setStep('details');
-              }}
-            />
-          ) : (
-            <GoalDetailsStep
-              type={type}
-              form={form}
-              setField={setField}
-              baseCurrency={baseCurrency}
-              onBack={() => setStep('type')}
-            />
-          )}
-        </div>
-        {step === 'details' && (
-          <AddGoalModalFooter
-            onClose={onClose}
-            onSave={handleSave}
-            canSave={Boolean(form.name.trim())}
+    <Modal
+      title="Add Goal"
+      subtitle={subtitle}
+      onClose={onClose}
+      maxWidth="lg"
+      scrollable
+      bodyClassName="p-0 space-y-0"
+      footer={
+        step === 'details' ? (
+          <ModalFooter
+            onCancel={onClose}
+            onConfirm={handleSave}
+            confirmLabel="Save Goal"
+            disabled={!form.name.trim()}
           />
-        )}
-      </div>
-    </div>
+        ) : undefined
+      }
+    >
+      {step === 'type' ? (
+        <GoalTypeStep
+          onSelect={(selectedType) => {
+            setType(selectedType);
+            setStep('details');
+          }}
+        />
+      ) : (
+        <GoalDetailsStep
+          type={type}
+          form={form}
+          setField={setField}
+          baseCurrency={baseCurrency}
+          onBack={() => setStep('type')}
+        />
+      )}
+    </Modal>
   );
 }

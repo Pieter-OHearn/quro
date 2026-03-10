@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Modal, ModalFooter } from '@/components/ui';
 import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import type { Mortgage as MortgageType, Property } from '@quro/shared';
 import { useAddMortgageForm } from '../hooks';
@@ -350,59 +350,6 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
   );
 }
 
-type MortgageModalHeaderProps = { existing: MortgageType | undefined; onClose: () => void };
-function MortgageModalHeader({ existing, onClose }: MortgageModalHeaderProps) {
-  return (
-    <div className="bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between flex-shrink-0">
-      <div>
-        <h2 className="font-bold text-white">{existing ? 'Edit Mortgage' : 'Add Mortgage'}</h2>
-        <p className="text-xs text-indigo-300 mt-0.5">
-          {existing ? 'Update mortgage details' : 'Set up a new property mortgage'}
-        </p>
-      </div>
-      <button
-        onClick={onClose}
-        className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-      >
-        <X size={18} />
-      </button>
-    </div>
-  );
-}
-
-type MortgageModalFooterProps = {
-  saving: boolean;
-  existing: MortgageType | undefined;
-  disableSave: boolean;
-  onSave: () => void;
-  onClose: () => void;
-};
-function MortgageModalFooter({
-  saving,
-  existing,
-  disableSave,
-  onSave,
-  onClose,
-}: MortgageModalFooterProps) {
-  return (
-    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 flex-shrink-0">
-      <button
-        onClick={onClose}
-        className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-slate-100 transition-colors"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={onSave}
-        disabled={disableSave}
-        className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-2.5 text-sm font-medium transition-colors"
-      >
-        {saving ? 'Saving...' : existing ? 'Save Changes' : 'Add Mortgage'}
-      </button>
-    </div>
-  );
-}
-
 type MortgageFormBodyProps = {
   form: MortgageFormState;
   errors: Record<string, string>;
@@ -464,30 +411,37 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
       ? ((n(form.outstandingBalance) / n(form.propertyValue)) * 100).toFixed(1)
       : null;
   const disableSave = saving || (!existing && availableProperties.length === 0);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
-        <MortgageModalHeader existing={existing} onClose={onClose} />
-        <MortgageFormBody
-          form={form}
-          errors={errors}
-          setField={setField}
-          availableProperties={availableProperties}
-          selectedProperty={selectedProperty}
-          existing={existing}
-          ltvPreview={ltvPreview}
-        />
-        <MortgageModalFooter
-          saving={saving}
-          existing={existing}
-          disableSave={disableSave}
-          onSave={() => {
+    <Modal
+      title={existing ? 'Edit Mortgage' : 'Add Mortgage'}
+      subtitle={existing ? 'Update mortgage details' : 'Set up a new property mortgage'}
+      onClose={onClose}
+      maxWidth="xl"
+      scrollable
+      backdropClassName="bg-black/50 backdrop-blur-sm"
+      bodyClassName="p-0 space-y-0"
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => {
             void handleSave();
           }}
-          onClose={onClose}
+          confirmLabel={existing ? 'Save Changes' : 'Add Mortgage'}
+          disabled={disableSave}
+          loading={saving}
         />
-      </div>
-    </div>
+      }
+    >
+      <MortgageFormBody
+        form={form}
+        errors={errors}
+        setField={setField}
+        availableProperties={availableProperties}
+        selectedProperty={selectedProperty}
+        existing={existing}
+        ltvPreview={ltvPreview}
+      />
+    </Modal>
   );
 }
