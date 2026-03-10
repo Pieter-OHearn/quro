@@ -1,6 +1,6 @@
 import { Home } from 'lucide-react';
 import type { Mortgage as MortgageType } from '@quro/shared';
-import { EmptyState, LoadingSpinner } from '@/components/ui';
+import { EmptyState, LoadingState } from '@/components/ui';
 import {
   AddMortgageModal,
   MortgageCharts,
@@ -130,7 +130,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
 export function Mortgage() {
   const state = useMortgagePageState();
 
-  if (state.isLoading) return <LoadingSpinner className="min-h-[256px]" />;
+  if (state.isLoading) return <LoadingState compact />;
   if (!state.mortgage) return <MortgageEmptyState state={state} />;
 
   return <MortgageContent state={state} mortgage={state.mortgage} />;

@@ -1,5 +1,5 @@
-import { LoadingSpinner } from '@/components/ui';
+import { LoadingState } from '@/components/ui';
 
 export function BudgetLoadingState() {
-  return <LoadingSpinner />;
+  return <LoadingState />;
 }

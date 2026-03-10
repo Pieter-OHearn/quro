@@ -432,6 +432,11 @@ Implementation Notes:
   - Notification, goals, mortgage, and property states use the shared family or thin wrappers around it.
 - Estimated complexity: Small
 
+Implementation Notes:
+
+- Added a shared `LoadingState` entry in `packages/frontend/src/components/ui` as a thin alias over the existing loading shell so feature pages and wrappers can converge on one API without breaking existing `LoadingSpinner` imports.
+- Expanded the shared `EmptyState` with compact, tone, and CTA configuration, then migrated goals and notifications to thin wrappers around that shared component while keeping mortgage/property on the same shared family.
+
 ### Ticket 8. Extract segmented controls and pagination
 
 - Description: Create shared filter/tab/year-switcher/pagination molecules.
@@ -514,7 +519,7 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 4. Consolidate dialog shells
 - [x] Ticket 5. Introduce shared card and panel header primitives
 - [x] Ticket 6. Normalize KPI summary cards
-- [ ] Ticket 7. Unify loading and empty states
+- [x] Ticket 7. Unify loading and empty states
 - [ ] Ticket 8. Extract segmented controls and pagination
 - [ ] Ticket 9. Promote transaction history into shared
 - [ ] Ticket 10. Introduce shared table and chart shells
