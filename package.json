@@ -9,6 +9,7 @@
     "dev:frontend": "bun run --filter '@quro/frontend' dev",
     "dev:backend": "bun run --filter '@quro/backend' dev",
     "build": "bun run --filter '@quro/frontend' build && bun run --filter '@quro/backend' build",
+    "test:ui": "bun run --filter '@quro/frontend' test:ui",
     "db:migrate": "bun run --filter '@quro/backend' db:migrate",
     "db:seed": "bun run --filter '@quro/backend' db:seed",
     "db:clear": "bun run --filter '@quro/backend' db:clear",

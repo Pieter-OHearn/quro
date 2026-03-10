@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:ui": "bun test src/components/ui/shared-ui.smoke.test.tsx"
   },
   "dependencies": {
     "@quro/shared": "workspace:*",

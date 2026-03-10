@@ -488,6 +488,20 @@ Implementation Notes:
   - New shared components are not merged without some reusable verification path.
 - Estimated complexity: Medium
 
+Implementation Notes:
+
+- Added a Bun-based shared UI smoke suite at `packages/frontend/src/components/ui/shared-ui.smoke.test.tsx`, using `react-dom/server` render assertions to cover the current lightweight shared atoms and molecules without introducing a heavier browser-test stack.
+- Added `docs/shared-ui-verification.md` as the reusable manual verification checklist and documented `EmojiPickerField` plus `PdfAttachmentField` as manual-only until richer DOM and file-input coverage exists.
+
+### Ticket 12. Add shared page templates
+
+- Description: Introduce lightweight `PageStack` and `ContentSection` templates once the lower shared primitives are stable.
+- Acceptance criteria:
+  - `packages/frontend/src/components/ui/templates` exports shared page-spacing and section-framing primitives.
+  - At least two main app pages use the shared templates for spacing and section composition.
+  - Route logic, app-shell behavior, and feature hooks remain outside the template layer.
+- Estimated complexity: Medium
+
 ## Recommended implementation order
 
 If the refactor must be sequenced aggressively, the highest-value order is:
@@ -538,4 +552,5 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 8. Extract segmented controls and pagination
 - [x] Ticket 9. Promote transaction history into shared
 - [x] Ticket 10. Introduce shared table and chart shells
-- [ ] Ticket 11. Add lightweight shared UI verification
+- [x] Ticket 11. Add lightweight shared UI verification
+- [ ] Ticket 12. Add shared page templates

@@ -172,11 +172,14 @@ If you run `bun run db:seed`, a demo user is created:
 
 ## Testing and quality checks
 
-There is currently no automated unit/integration test script wired in `package.json`.
+There is still no broad unit/integration suite wired across the repo, but shared UI refactor work now has a lightweight smoke suite.
 
 Use the current quality checks:
 
 ```bash
+# Shared UI smoke coverage
+bun run test:ui
+
 # Lint
 bun run lint
 
@@ -189,6 +192,8 @@ bun run format:check
 # Prettier write
 bun run format
 ```
+
+For the route-based manual checklist used by UI refactor PRs, see `docs/shared-ui-verification.md`.
 
 ## Docker usage
 
