@@ -1,9 +1,8 @@
 import { Sparkles } from 'lucide-react';
+import { FormField, PasswordInput, TextInput } from '@/components/ui';
 import { useSignUpState } from '../hooks';
 import type { SignUpState } from '../types';
-import { FormField } from './FormField';
 import { ModalHeader } from './ModalHeader';
-import { PasswordInput } from './PasswordInput';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { SubmitButton } from './SubmitButton';
 
@@ -23,22 +22,24 @@ function SignUpFormFields({ state }: Readonly<{ state: SignUpState }>) {
   return (
     <>
       <FormField label="Full name" error={errors.name}>
-        <input
+        <TextInput
           type="text"
           autoFocus
           placeholder="e.g. John Smith"
-          className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.name ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+          className="px-4 py-3 transition-all"
+          error={Boolean(errors.name)}
           value={form.name}
-          onChange={(event) => setField('name', event.target.value)}
+          onChange={(value) => setField('name', value)}
         />
       </FormField>
       <FormField label="Email address" error={errors.email}>
-        <input
+        <TextInput
           type="email"
           placeholder="you@example.com"
-          className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.email ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+          className="px-4 py-3 transition-all"
+          error={Boolean(errors.email)}
           value={form.email}
-          onChange={(event) => setField('email', event.target.value)}
+          onChange={(value) => setField('email', value)}
         />
       </FormField>
       <FormField label="Password" error={errors.password}>
@@ -47,8 +48,9 @@ function SignUpFormFields({ state }: Readonly<{ state: SignUpState }>) {
           placeholder="Min. 8 characters"
           show={showPw}
           onToggle={toggleShowPw}
+          className="px-4 py-3 transition-all"
           onChange={(value) => setField('password', value)}
-          error={errors.password}
+          error={Boolean(errors.password)}
         />
         <PasswordStrengthMeter password={form.password} />
       </FormField>
@@ -58,8 +60,9 @@ function SignUpFormFields({ state }: Readonly<{ state: SignUpState }>) {
           placeholder="Re-enter password"
           show={showConfirm}
           onToggle={toggleShowConfirm}
+          className="px-4 py-3 transition-all"
           onChange={(value) => setField('confirm', value)}
-          error={errors.confirm}
+          error={Boolean(errors.confirm)}
         />
       </FormField>
     </>

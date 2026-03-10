@@ -1,7 +1,2 @@
-export { FormField, TextInput, CurrencyInput, SelectInput } from './FormField';
-export type {
-  CurrencyInputProps,
-  FormFieldProps,
-  SelectInputProps,
-  TextInputProps,
-} from './FormField';
+export { FormField } from './FormField';
+export type { FormFieldProps } from './FormField';

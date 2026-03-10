@@ -376,6 +376,11 @@ Implementation Notes:
   - No new feature-local input chrome is introduced.
 - Estimated complexity: Large
 
+Implementation Notes:
+
+- Extracted shared `TextInput`, `SelectInput`, `CurrencyInput`, `DateInput`, `PasswordInput`, and `Textarea` atoms under `packages/frontend/src/components/ui/atoms` while keeping `packages/frontend/src/components/ui/FormField.tsx` as the migration-safe export shim.
+- Migrated landing sign-in/sign-up forms to the shared field atoms and switched `AddGoalModal` to the shared `FormField`, `TextInput`, `SelectInput`, and `Textarea` primitives so one app modal now uses the same field system.
+
 ### Ticket 4. Consolidate dialog shells
 
 - Description: Replace custom overlay shells with a shared dialog foundation.
@@ -490,7 +495,7 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 
 - [x] Ticket 1. Scaffold frontend design-system structure
 - [x] Ticket 2. Extract shared action primitives
-- [ ] Ticket 3. Build the shared field system
+- [x] Ticket 3. Build the shared field system
 - [ ] Ticket 4. Consolidate dialog shells
 - [ ] Ticket 5. Introduce shared card and panel header primitives
 - [ ] Ticket 6. Normalize KPI summary cards

@@ -1,9 +1,8 @@
 import { ArrowRight } from 'lucide-react';
+import { FormField, PasswordInput, TextInput } from '@/components/ui';
 import { useSignInState } from '../hooks';
 import type { SignInState } from '../types';
-import { FormField } from './FormField';
 import { ModalHeader } from './ModalHeader';
-import { PasswordInput } from './PasswordInput';
 import { SubmitButton } from './SubmitButton';
 
 type SignInModalProps = {
@@ -23,14 +22,15 @@ function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
   return (
     <>
       <FormField label="Email address" error={errors.email}>
-        <input
+        <TextInput
           type="email"
           autoFocus
           placeholder="you@example.com"
-          className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${errors.email ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+          className="px-4 py-3 transition-all"
+          error={Boolean(errors.email)}
           value={email}
-          onChange={(event) => {
-            setEmail(event.target.value);
+          onChange={(value) => {
+            setEmail(value);
             clearError('email');
           }}
         />
@@ -41,11 +41,12 @@ function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
           placeholder="••••••••"
           show={showPw}
           onToggle={toggleShowPw}
+          className="px-4 py-3 transition-all"
           onChange={(value) => {
             setPassword(value);
             clearError('password');
           }}
-          error={errors.password}
+          error={Boolean(errors.password)}
         />
       </FormField>
     </>

@@ -1,4 +1,5 @@
 import { Link2, X } from 'lucide-react';
+import { FormField, SelectInput, Textarea, TextInput } from '@/components/ui';
 import type { GoalType } from '@quro/shared';
 import { useAddGoalModal } from '../hooks';
 import { COLORS, GOAL_TYPE_META } from '../utils/goals-constants';
@@ -40,9 +41,6 @@ function GoalTypeStep({ onSelect }: Readonly<{ onSelect: (type: GoalType) => voi
   );
 }
 
-const inputCls =
-  'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300';
-
 function AmountFieldsSavingsPortfolio({
   type,
   form,
@@ -54,41 +52,31 @@ function AmountFieldsSavingsPortfolio({
 }>) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Current Amount</label>
-        <input
+      <FormField label="Current Amount">
+        <TextInput
           type="number"
-          className={inputCls}
           placeholder="0"
           value={form.current}
-          onChange={(event) => setField('current', event.target.value)}
+          onChange={(value) => setField('current', value)}
         />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Target Amount <span className="text-rose-500">*</span>
-        </label>
-        <input
+      </FormField>
+      <FormField label="Target Amount" required>
+        <TextInput
           type="number"
-          className={inputCls}
           placeholder="15000"
           value={form.target}
-          onChange={(event) => setField('target', event.target.value)}
+          onChange={(value) => setField('target', value)}
         />
-      </div>
+      </FormField>
       {type === 'savings' && (
-        <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Monthly Contribution
-          </label>
-          <input
+        <FormField label="Monthly Contribution" className="col-span-2">
+          <TextInput
             type="number"
-            className={inputCls}
             placeholder="500"
             value={form.monthlyContrib}
-            onChange={(event) => setField('monthlyContrib', event.target.value)}
+            onChange={(value) => setField('monthlyContrib', value)}
           />
-        </div>
+        </FormField>
       )}
     </div>
   );
@@ -99,21 +87,17 @@ function AmountFieldsSalary({
   setField,
 }: Readonly<{ form: GoalFormState; setField: SetField }>) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        Target Annual Gross <span className="text-rose-500">*</span>
-      </label>
-      <input
+    <FormField label="Target Annual Gross" required>
+      <TextInput
         type="number"
-        className={inputCls}
         placeholder="90000"
         value={form.target}
-        onChange={(event) => setField('target', event.target.value)}
+        onChange={(value) => setField('target', value)}
       />
       <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
         <Link2 size={10} /> Current salary auto-linked from your Salary page
       </p>
-    </div>
+    </FormField>
   );
 }
 
@@ -128,30 +112,22 @@ function AmountFieldsInvestHabit({
 }>) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Monthly Target ({baseCurrency}) <span className="text-rose-500">*</span>
-        </label>
-        <input
+      <FormField label={`Monthly Target (${baseCurrency})`} required>
+        <TextInput
           type="number"
-          className={inputCls}
           placeholder="500"
           value={form.monthlyTarget}
-          onChange={(event) => setField('monthlyTarget', event.target.value)}
+          onChange={(value) => setField('monthlyTarget', value)}
         />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Months in Period
-        </label>
-        <input
+      </FormField>
+      <FormField label="Months in Period">
+        <TextInput
           type="number"
-          className={inputCls}
           placeholder="12"
           value={form.totalMonths}
-          onChange={(event) => setField('totalMonths', event.target.value)}
+          onChange={(value) => setField('totalMonths', value)}
         />
-      </div>
+      </FormField>
     </div>
   );
 }
@@ -162,41 +138,29 @@ function AmountFieldsAnnual({
 }: Readonly<{ form: GoalFormState; setField: SetField }>) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Current Progress
-        </label>
-        <input
+      <FormField label="Current Progress">
+        <TextInput
           type="number"
-          className={inputCls}
           placeholder="0"
           value={form.current}
-          onChange={(event) => setField('current', event.target.value)}
+          onChange={(value) => setField('current', value)}
         />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Target <span className="text-rose-500">*</span>
-        </label>
-        <input
+      </FormField>
+      <FormField label="Target" required>
+        <TextInput
           type="number"
-          className={inputCls}
           placeholder="4"
           value={form.target}
-          onChange={(event) => setField('target', event.target.value)}
+          onChange={(value) => setField('target', value)}
         />
-      </div>
-      <div className="col-span-2">
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Unit label <span className="text-slate-400 font-normal">optional</span>
-        </label>
-        <input
-          className={inputCls}
+      </FormField>
+      <FormField label="Unit label" hint="optional" className="col-span-2">
+        <TextInput
           placeholder="e.g. books, %, EUR/mo"
           value={form.unit}
-          onChange={(event) => setField('unit', event.target.value)}
+          onChange={(value) => setField('unit', value)}
         />
-      </div>
+      </FormField>
     </div>
   );
 }
@@ -229,26 +193,21 @@ function GoalDetailsNameRow({
 }: Readonly<{ form: GoalFormState; setField: SetField }>) {
   return (
     <div className="flex gap-3">
-      <div className="flex-shrink-0">
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Icon</label>
-        <input
-          className="w-14 h-[42px] rounded-xl border border-slate-200 bg-slate-50 text-xl text-center focus:outline-none focus:ring-2 focus:ring-indigo-300"
+      <FormField label="Icon" className="w-14 flex-shrink-0">
+        <TextInput
+          className="h-[42px] px-0 text-center text-xl"
           value={form.emoji}
-          onChange={(event) => setField('emoji', event.target.value)}
+          onChange={(value) => setField('emoji', value)}
           maxLength={2}
         />
-      </div>
-      <div className="flex-1">
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Goal Name <span className="text-rose-500">*</span>
-        </label>
-        <input
-          className={inputCls}
+      </FormField>
+      <FormField label="Goal Name" required className="flex-1">
+        <TextInput
           placeholder="e.g. Hit 100k salary"
           value={form.name}
-          onChange={(event) => setField('name', event.target.value)}
+          onChange={(value) => setField('name', value)}
         />
-      </div>
+      </FormField>
     </div>
   );
 }
@@ -259,27 +218,20 @@ function GoalDetailsDateRow({
 }: Readonly<{ form: GoalFormState; setField: SetField }>) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Deadline</label>
-        <input
-          className={inputCls}
+      <FormField label="Deadline">
+        <TextInput
           placeholder="Dec 2026"
           value={form.deadline}
-          onChange={(event) => setField('deadline', event.target.value)}
+          onChange={(value) => setField('deadline', value)}
         />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Year</label>
-        <select
-          className={inputCls}
+      </FormField>
+      <FormField label="Year">
+        <SelectInput
           value={form.year}
-          onChange={(event) => setField('year', event.target.value)}
-        >
-          {['2025', '2026', '2027', '2028', '2029', '2030'].map((year) => (
-            <option key={year}>{year}</option>
-          ))}
-        </select>
-      </div>
+          options={['2025', '2026', '2027', '2028', '2029', '2030']}
+          onChange={(value) => setField('year', value)}
+        />
+      </FormField>
     </div>
   );
 }
@@ -341,18 +293,14 @@ function GoalDetailsStep({
       />
       <GoalDetailsDateRow form={form} setField={setField} />
       <GoalColorPicker selected={form.color} onSelect={(color) => setField('color', color)} />
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Notes <span className="text-slate-400 font-normal">optional</span>
-        </label>
-        <textarea
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+      <FormField label="Notes" hint="optional">
+        <Textarea
           rows={2}
           placeholder="Any extra context..."
           value={form.notes}
-          onChange={(event) => setField('notes', event.target.value)}
+          onChange={(value) => setField('notes', value)}
         />
-      </div>
+      </FormField>
     </div>
   );
 }
