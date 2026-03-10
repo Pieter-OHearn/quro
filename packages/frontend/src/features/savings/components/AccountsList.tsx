@@ -1,5 +1,6 @@
 import { Calendar, ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import { Badge, Button, IconButton } from '@/components/ui';
 import { TxnHistory } from './TxnHistory';
 import type {
   ConvertToBaseFn,
@@ -71,14 +72,12 @@ function AccountRowMeta({
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-0.5 flex-wrap">
         <p className="text-sm font-semibold text-slate-800">{acc.name}</p>
-        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+        <Badge tone="neutral" size="sm">
           {acc.accountType}
-        </span>
-        <span
-          className={`text-[10px] px-2 py-0.5 rounded-full ${foreign ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
-        >
+        </Badge>
+        <Badge tone={foreign ? 'warningSoft' : 'muted'} size="sm">
           {acc.currency}
-        </span>
+        </Badge>
       </div>
       <p className="text-xs text-slate-400">
         {acc.bank} · {accTxns.length} transactions
@@ -153,20 +152,20 @@ function AccountRowHeader({
         fmtNative={fmtNative}
       />
       <div className="flex items-center gap-1 flex-shrink-0">
-        <button
+        <IconButton
           onClick={onEdit}
-          className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          icon={Edit3}
+          label="Edit account"
           title="Edit account"
-        >
-          <Edit3 size={14} />
-        </button>
-        <button
+          variant="subtle"
+        />
+        <IconButton
           onClick={onToggleExpand}
-          className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+          icon={isExpanded ? ChevronUp : ChevronDown}
+          label={isExpanded ? 'Hide transactions' : 'Show transactions'}
           title={isExpanded ? 'Hide transactions' : 'Show transactions'}
-        >
-          {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-        </button>
+          variant="subtle"
+        />
       </div>
     </div>
   );
@@ -236,12 +235,9 @@ function AccountsListHeader({
           {accounts.length} accounts · click a row to view & record transactions
         </p>
       </div>
-      <button
-        onClick={onAddAccount}
-        className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-      >
-        <Plus size={15} /> Add Account
-      </button>
+      <Button onClick={onAddAccount} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
+        Add Account
+      </Button>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { Plus } from 'lucide-react';
+import { Button } from '../../atoms';
 
 export type EmptyStateProps = {
   icon: LucideIcon;
@@ -17,12 +18,15 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
       <h3 className="font-semibold text-slate-800 mb-1">{title}</h3>
       <p className="text-sm text-slate-400 mb-6 max-w-xs">{description}</p>
       {action && (
-        <button
+        <Button
           onClick={action.onClick}
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
+          variant="primary"
+          size="lg"
+          leadingIcon={<Plus size={15} />}
+          className="px-5 transition-all"
         >
-          <Plus size={15} /> {action.label}
-        </button>
+          {action.label}
+        </Button>
       )}
     </div>
   );

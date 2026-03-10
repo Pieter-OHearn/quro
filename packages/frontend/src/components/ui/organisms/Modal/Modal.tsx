@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '../../atoms';
 
 export type ModalProps = {
   title: string;
@@ -105,19 +106,20 @@ export function ModalFooter({
   return (
     <>
       {danger}
-      <button
-        onClick={onCancel}
-        className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-slate-100 transition-colors"
-      >
+      <Button onClick={onCancel} variant="secondary" size="lg" className="flex-1">
         {cancelLabel}
-      </button>
-      <button
+      </Button>
+      <Button
         onClick={onConfirm}
         disabled={disabled}
-        className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-2.5 text-sm transition-colors font-medium"
+        variant="primary"
+        size="lg"
+        loading={loading}
+        loadingLabel="Saving..."
+        className="flex-1"
       >
-        {loading ? 'Saving...' : confirmLabel}
-      </button>
+        {confirmLabel}
+      </Button>
     </>
   );
 }

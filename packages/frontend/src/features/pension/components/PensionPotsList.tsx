@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Edit3, Info, Lock, Plus, Trash2 } from 'lucide-react';
 import type { AppCapabilityStatus, PensionPot, PensionTransaction } from '@quro/shared';
+import { Badge, IconButton } from '@/components/ui';
 import { TYPE_COLORS } from '../constants';
 import type {
   ConvertToBaseFn,
@@ -286,12 +287,12 @@ function PensionPotCardLeft({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
           <p className="font-semibold text-slate-800 text-sm">{pot.name}</p>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full ${TYPE_COLORS[pot.type]}`}>
+          <Badge size="sm" className={TYPE_COLORS[pot.type]}>
             {pot.type}
-          </span>
-          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+          </Badge>
+          <Badge tone="muted" size="sm">
             {pot.currency}
-          </span>
+          </Badge>
         </div>
         <p className="text-xs text-slate-400">
           {pot.provider} · {fmtNative(totalMonthly, pot.currency)}/mo · {txnCount} transactions
@@ -336,20 +337,20 @@ function PensionPotCardRight({
         <p className="text-xs text-emerald-600">+{fmtNative(totalMonthly * 12, pot.currency)}/yr</p>
       </div>
       <div className="flex items-center gap-0.5 flex-shrink-0">
-        <button
+        <IconButton
           onClick={() => onEdit(pot)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          icon={Edit3}
+          label="Edit pot"
           title="Edit pot"
-        >
-          <Edit3 size={13} />
-        </button>
-        <button
+          variant="subtle"
+        />
+        <IconButton
           onClick={() => onToggle(isOpen ? null : pot.id)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+          icon={isOpen ? ChevronUp : ChevronDown}
+          label={isOpen ? 'Collapse' : 'View transactions'}
           title={isOpen ? 'Collapse' : 'View transactions'}
-        >
-          {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
+          variant="subtle"
+        />
       </div>
     </>
   );

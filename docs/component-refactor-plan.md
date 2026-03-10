@@ -362,6 +362,11 @@ Implementation Notes:
   - Row action icons use a shared primitive.
 - Estimated complexity: Medium
 
+Implementation Notes:
+
+- Added shared `Button`, `IconButton`, `Spinner`, and `Badge` atoms under `packages/frontend/src/components/ui/atoms` and exported them through the existing `ui` barrel.
+- Migrated the shared modal footer, landing submit button, shared transaction row actions, and the first set of exact duplicate add/action/badge usages in salary, savings, pension, and mortgage list components without changing feature workflows.
+
 ### Ticket 3. Build the shared field system
 
 - Description: Consolidate labeled fields and common input variants into shared atoms and molecules.
@@ -484,7 +489,7 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 ## Progress Tracker
 
 - [x] Ticket 1. Scaffold frontend design-system structure
-- [ ] Ticket 2. Extract shared action primitives
+- [x] Ticket 2. Extract shared action primitives
 - [ ] Ticket 3. Build the shared field system
 - [ ] Ticket 4. Consolidate dialog shells
 - [ ] Ticket 5. Introduce shared card and panel header primitives

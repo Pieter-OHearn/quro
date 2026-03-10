@@ -1,6 +1,7 @@
 import { Edit3, Filter, Plus, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
+import { Badge, Button, IconButton } from '../../atoms';
 
 export type FilterOption = {
   key: string;
@@ -97,15 +98,15 @@ function FilterBar({
           </button>
         ))}
       </div>
-      <button
+      <Button
         onClick={onAdd}
-        className={cn(
-          'flex items-center gap-1.5 text-xs text-white px-3 py-1.5 rounded-lg transition-colors',
-          accentColor,
-        )}
+        variant="primary"
+        size="sm"
+        leadingIcon={<Plus size={12} />}
+        className={accentColor}
       >
-        <Plus size={12} /> {addLabel}
-      </button>
+        {addLabel}
+      </Button>
     </div>
   );
 }
@@ -186,11 +187,9 @@ export function TxnRow({
         <div className="flex items-center gap-1.5">
           <p className="text-xs font-medium text-slate-700">{label}</p>
           {badge && (
-            <span
-              className={cn('text-[9px] px-1.5 py-0.5 rounded-full font-medium', badge.className)}
-            >
+            <Badge size="xs" className={badge.className}>
               {badge.text}
-            </span>
+            </Badge>
           )}
         </div>
         <p className="text-[10px] text-slate-400">{formatDate(date)}</p>
@@ -198,21 +197,23 @@ export function TxnRow({
       {amount}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
         {onEdit && (
-          <button
+          <IconButton
             onClick={onEdit}
+            icon={Edit3}
+            label="Edit transaction"
             title="Edit transaction"
-            className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors"
-          >
-            <Edit3 size={11} />
-          </button>
+            size="sm"
+            variant="ghost"
+          />
         )}
-        <button
+        <IconButton
           onClick={onDelete}
+          icon={Trash2}
+          label="Delete transaction"
           title="Delete transaction"
-          className="p-1 rounded hover:bg-rose-50 text-slate-200 hover:text-rose-400 transition-colors"
-        >
-          <Trash2 size={11} />
-        </button>
+          size="sm"
+          variant="danger"
+        />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { CURRENCY_META, type Payslip } from '@quro/shared';
+import { Badge, Button, IconButton } from '@/components/ui';
 import { buildApiDownloadUrl } from '@/lib/pdfDocuments';
 import { formatDate } from '@/lib/utils';
 import { Download, Edit3, Plus } from 'lucide-react';
@@ -29,38 +30,37 @@ function PayslipRowActions({
   return (
     <div className="flex items-center justify-end gap-1">
       {payslip.document ? (
-        <a
+        <IconButton
           href={downloadUrl}
           target="_blank"
           rel="noreferrer"
           onClick={(event) => event.stopPropagation()}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors"
+          icon={Download}
+          label="Download payslip"
           title="Download payslip"
-        >
-          <Download size={14} />
-        </a>
+          variant="ghost"
+        />
       ) : (
-        <button
-          type="button"
+        <IconButton
           disabled
           onClick={(event) => event.stopPropagation()}
-          className="p-1.5 rounded-lg text-slate-200 cursor-not-allowed"
+          icon={Download}
+          label="No payslip PDF"
           title="No payslip PDF"
-        >
-          <Download size={14} />
-        </button>
+          className="text-slate-200"
+        />
       )}
-      <button
+      <IconButton
         type="button"
         onClick={(event) => {
           event.stopPropagation();
           onEdit(payslip);
         }}
-        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors"
+        icon={Edit3}
+        label="Edit payslip"
         title="Edit payslip"
-      >
-        <Edit3 size={14} />
-      </button>
+        variant="ghost"
+      />
     </div>
   );
 }
@@ -91,14 +91,14 @@ function PayslipTableRow({
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-slate-800">{payslip.month}</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+          <Badge tone="info" size="sm">
             <span aria-hidden>{currencyMeta.flag}</span>
             <span>{payslip.currency}</span>
-          </span>
+          </Badge>
           {payslip.bonus && (
-            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+            <Badge tone="warning" size="xs">
               +Bonus
-            </span>
+            </Badge>
           )}
         </div>
         <p className="text-xs text-slate-400">{formatDate(payslip.date)}</p>
@@ -131,12 +131,9 @@ function PayslipTableHeader({ count, onAdd }: Readonly<{ count: number; onAdd: (
           {count} payslips · click a row to view breakdown
         </p>
       </div>
-      <button
-        onClick={onAdd}
-        className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-      >
-        <Plus size={15} /> Add Payslip
-      </button>
+      <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
+        Add Payslip
+      </Button>
     </div>
   );
 }

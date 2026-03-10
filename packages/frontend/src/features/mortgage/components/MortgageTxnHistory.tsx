@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Filter, Plus, Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { Button, IconButton } from '@/components/ui';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import type { MortgageTxnType } from '../types';
 import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
@@ -54,12 +55,15 @@ function MortgageTxnRow({ t, fmt, fmtDate, onDelete }: MortgageTxnRowProps) {
           </p>
         </div>
       )}
-      <button
+      <IconButton
         onClick={() => onDelete(t.id)}
-        className="p-1.5 rounded hover:bg-rose-50 text-slate-200 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-      >
-        <Trash2 size={12} />
-      </button>
+        icon={Trash2}
+        label="Delete transaction"
+        title="Delete transaction"
+        size="sm"
+        variant="danger"
+        className="opacity-0 group-hover:opacity-100"
+      />
     </div>
   );
 }
@@ -137,12 +141,9 @@ export function MortgageTxnHistory({
             {transactions.length} transactions recorded
           </p>
         </div>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-        >
-          <Plus size={14} /> Record Transaction
-        </button>
+        <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={14} />}>
+          Record Transaction
+        </Button>
       </div>
       <MortgageSummaryStats transactions={transactions} fmt={fmt} />
       <TxnFilterBar filter={filter} onFilterChange={setFilter} />

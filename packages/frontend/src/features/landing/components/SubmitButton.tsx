@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Button } from '@/components/ui';
 
 type SubmitButtonProps = {
   loading: boolean;
@@ -8,19 +9,16 @@ type SubmitButtonProps = {
 
 export function SubmitButton({ loading, loadingText, idleContent }: Readonly<SubmitButtonProps>) {
   return (
-    <button
+    <Button
       type="submit"
-      disabled={loading}
-      className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2 mt-2"
+      variant="primary"
+      size="xl"
+      fullWidth
+      loading={loading}
+      loadingLabel={loadingText}
+      className="mt-2 font-semibold transition-all"
     >
-      {loading ? (
-        <>
-          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          {loadingText}
-        </>
-      ) : (
-        idleContent
-      )}
-    </button>
+      {idleContent}
+    </Button>
   );
 }
