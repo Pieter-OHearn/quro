@@ -8,6 +8,7 @@ import { getS3ObjectBytes } from '../lib/s3';
 import {
   asFile,
   buildPdfStorageKey,
+  CLEAR_INLINE_PDF_DOCUMENT,
   deleteStoredPdfSafely,
   isS3NotFoundError,
   PDF_MIME_TYPE,
@@ -309,18 +310,6 @@ async function applyPensionPotBalanceDelta(
     .where(and(eq(pensionPots.id, potId), eq(pensionPots.userId, userId)));
 }
 
-async function findOwnedTransactionRow(
-  tx: DbTransaction,
-  userId: number,
-  transactionId: number,
-): Promise<typeof pensionTransactions.$inferSelect | null> {
-  const [transaction] = await tx
-    .select()
-    .from(pensionTransactions)
-    .where(and(eq(pensionTransactions.id, transactionId), eq(pensionTransactions.userId, userId)));
-  return transaction ?? null;
-}
-
 type UploadStatementDocumentResult =
   | { ok: true; document: PensionStatementDocumentRecord }
   | { ok: false; error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
@@ -385,9 +374,16 @@ async function uploadStatementDocumentForTransaction(params: {
   transactionId: number;
   file: File;
 }): Promise<UploadStatementDocumentResult> {
-  const transaction = await db.transaction((tx) =>
-    findOwnedTransactionRow(tx, params.userId, params.transactionId),
-  );
+  const [transactionRow] = await db
+    .select()
+    .from(pensionTransactions)
+    .where(
+      and(
+        eq(pensionTransactions.id, params.transactionId),
+        eq(pensionTransactions.userId, params.userId),
+      ),
+    );
+  const transaction = transactionRow ?? null;
 
   if (!transaction)
     return { ok: false, error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
@@ -496,28 +492,15 @@ async function handleStatementDocumentAfterTransactionUpdate(params: {
   transactionId: number;
   previousType: string;
   nextType: string;
+  existingRow: typeof pensionTransactions.$inferSelect;
 }): Promise<string | null> {
   if (params.previousType === 'annual_statement' && params.nextType !== 'annual_statement') {
-    const [transaction] = await params.tx
-      .select()
-      .from(pensionTransactions)
-      .where(
-        and(
-          eq(pensionTransactions.id, params.transactionId),
-          eq(pensionTransactions.userId, params.userId),
-        ),
-      );
-    const document = transaction ? readInlinePdfDocument(transaction) : null;
+    const document = readInlinePdfDocument(params.existingRow);
     if (!document) return null;
 
     await params.tx
       .update(pensionTransactions)
-      .set({
-        documentStorageKey: null,
-        documentFileName: null,
-        documentSizeBytes: null,
-        documentUploadedAt: null,
-      })
+      .set(CLEAR_INLINE_PDF_DOCUMENT)
       .where(
         and(
           eq(pensionTransactions.id, params.transactionId),
@@ -613,6 +596,7 @@ async function updatePensionTransaction(params: {
       transactionId: params.transactionId,
       previousType: normalizedExisting.type,
       nextType: nextPayload.type,
+      existingRow: existing,
     });
 
     return { data };
@@ -908,12 +892,7 @@ app.delete('/transactions/:id/document', async (c) => {
 
   await db
     .update(pensionTransactions)
-    .set({
-      documentStorageKey: null,
-      documentFileName: null,
-      documentSizeBytes: null,
-      documentUploadedAt: null,
-    })
+    .set(CLEAR_INLINE_PDF_DOCUMENT)
     .where(and(eq(pensionTransactions.userId, user.id), eq(pensionTransactions.id, transactionId)));
 
   await deleteStoredPdfSafely(existingDocument.storageKey, 'pension statement PDF');
