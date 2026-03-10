@@ -1,4 +1,5 @@
 import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
+import type { Payslip } from '@quro/shared';
 import type {
   DashboardCard,
   DashboardFormatFn,
@@ -9,6 +10,8 @@ import type {
   MonthlySummaryItem,
   NetWorthMetricData,
 } from '../types';
+
+const ROLLING_SALARY_WINDOW_MONTHS = 12;
 
 export const getGreeting = (hour: number): string => {
   if (hour < 12) return 'Good morning';
@@ -54,13 +57,16 @@ export const deriveGoalDisplay = (g: GoalSummaryItem, monthlySalaryValue: number
 export const buildDashboardCards = (
   allocationByName: Record<string, number>,
   monthlySalaryValue: number,
-  monthlySalaryChange: number,
+  salaryTrendChange: number,
   monthlyCategoryChange: (category: string) => number,
 ): DashboardCard[] => [
   {
     label: 'Total Savings',
     value: allocationByName.Savings ?? 0,
-    monthlyChange: monthlyCategoryChange('Savings'),
+    change: {
+      amount: monthlyCategoryChange('Savings'),
+      label: 'this month',
+    },
     icon: PiggyBank,
     path: '/savings',
     color: 'indigo',
@@ -68,7 +74,10 @@ export const buildDashboardCards = (
   {
     label: 'Investments',
     value: allocationByName.Brokerage ?? 0,
-    monthlyChange: monthlyCategoryChange('Investment'),
+    change: {
+      amount: monthlyCategoryChange('Investment'),
+      label: 'this month',
+    },
     icon: TrendingUp,
     path: '/investments',
     color: 'sky',
@@ -76,7 +85,10 @@ export const buildDashboardCards = (
   {
     label: 'Pension',
     value: allocationByName.Pension ?? 0,
-    monthlyChange: monthlyCategoryChange('Pension'),
+    change: {
+      amount: monthlyCategoryChange('Pension'),
+      label: 'this month',
+    },
     icon: ShieldCheck,
     path: '/pension',
     color: 'amber',
@@ -84,31 +96,65 @@ export const buildDashboardCards = (
   {
     label: 'Monthly Salary',
     value: monthlySalaryValue,
-    monthlyChange: monthlySalaryChange,
+    change: {
+      amount: salaryTrendChange,
+      label: 'over 12 months',
+    },
     icon: Briefcase,
     path: '/salary',
     color: 'emerald',
   },
 ];
 
-const getMonthKeys = (d: Date) => {
-  const fmt = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-  return { currentKey: fmt(d), prevKey: fmt(new Date(d.getFullYear(), d.getMonth() - 1, 1)) };
-};
+const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-const computeSalary = (
-  txns: readonly DashboardTransaction[],
-  monthKey: string,
-  prevKey: string,
-) => {
-  const monthlySalary = txns.filter((t) => t.category === 'Salary' && t.date.startsWith(monthKey));
-  const thisMonth = monthlySalary.reduce((s, t) => s + Math.abs(t.amount), 0);
-  const lastMonth = txns
-    .filter((t) => t.category === 'Salary' && t.date.startsWith(prevKey))
-    .reduce((s, t) => s + Math.abs(t.amount), 0);
-  const latest = txns.find((t) => t.category === 'Salary');
-  const value = thisMonth > 0 ? thisMonth : latest ? Math.abs(latest.amount) : 0;
-  return { monthlySalaryValue: value, monthlySalaryChange: lastMonth > 0 ? value - lastMonth : 0 };
+const formatMonthKey = (date: Date) =>
+  `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+const addUtcMonths = (date: Date, delta: number) =>
+  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1));
+
+const toMonthStartUtc = (monthKey: string) => new Date(`${monthKey}-01T00:00:00Z`);
+
+const getPayslipMonthlyAmount = (payslip: Pick<Payslip, 'net' | 'bonus'>) =>
+  payslip.net + (payslip.bonus ?? 0);
+
+const computeSalaryMetrics = (payslips: readonly Payslip[]) => {
+  if (payslips.length === 0) {
+    return { monthlySalaryValue: 0, salaryTrendChange: 0 };
+  }
+
+  const monthlyTotals = payslips.reduce((totals, payslip) => {
+    const monthKey = payslip.date.slice(0, 7);
+    totals.set(monthKey, (totals.get(monthKey) ?? 0) + getPayslipMonthlyAmount(payslip));
+    return totals;
+  }, new Map<string, number>());
+
+  const sortedMonthKeys = [...monthlyTotals.keys()].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  const latestMonthKey = sortedMonthKeys[sortedMonthKeys.length - 1];
+  const latestMonthStart = toMonthStartUtc(latestMonthKey);
+  const preferredBaselineKey = formatMonthKey(
+    addUtcMonths(latestMonthStart, -ROLLING_SALARY_WINDOW_MONTHS),
+  );
+  const fallbackBaselineLimit = formatMonthKey(
+    addUtcMonths(latestMonthStart, -(ROLLING_SALARY_WINDOW_MONTHS - 1)),
+  );
+  const fallbackBaselineKey =
+    sortedMonthKeys.find(
+      (monthKey) => monthKey >= fallbackBaselineLimit && monthKey < latestMonthKey,
+    ) ?? null;
+  const baselineMonthKey = monthlyTotals.has(preferredBaselineKey)
+    ? preferredBaselineKey
+    : fallbackBaselineKey;
+  const monthlySalaryValue = monthlyTotals.get(latestMonthKey) ?? 0;
+  const baselineValue = baselineMonthKey == null ? 0 : (monthlyTotals.get(baselineMonthKey) ?? 0);
+
+  return {
+    monthlySalaryValue,
+    salaryTrendChange: baselineValue > 0 ? monthlySalaryValue - baselineValue : 0,
+  };
 };
 
 export const computeNWMetrics = (chartData: readonly NetWorthMetricData[], totalAlloc: number) => {
@@ -158,18 +204,15 @@ export const buildMonthlySummaryItems = (
 
 export function computeDashboardTxnStats(
   transactions: readonly DashboardTransaction[],
+  payslips: readonly Payslip[],
 ): DashboardTxnStats {
-  const { currentKey, prevKey } = getMonthKeys(new Date());
+  const currentKey = getMonthKey(new Date());
   const monthTxns = transactions.filter((tx) => tx.date.startsWith(currentKey));
   const monthlyCategoryChange = (category: string) =>
     monthTxns
       .filter((tx) => tx.category === category)
       .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
-  const { monthlySalaryValue, monthlySalaryChange } = computeSalary(
-    transactions,
-    currentKey,
-    prevKey,
-  );
+  const { monthlySalaryValue, salaryTrendChange } = computeSalaryMetrics(payslips);
   const totalIncome = monthTxns
     .filter((tx) => tx.type === 'income')
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);
@@ -179,7 +222,7 @@ export function computeDashboardTxnStats(
   return {
     monthlyCategoryChange,
     monthlySalaryValue,
-    monthlySalaryChange,
+    salaryTrendChange,
     totalIncome,
     totalExpenses,
   };

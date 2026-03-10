@@ -65,10 +65,10 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
   const {
     monthlyCategoryChange,
     monthlySalaryValue,
-    monthlySalaryChange,
+    salaryTrendChange,
     totalIncome,
     totalExpenses,
-  } = computeDashboardTxnStats(transactions);
+  } = computeDashboardTxnStats(transactions, payslips);
 
   return {
     isLoading,
@@ -79,7 +79,7 @@ function useDashboardData(fmtBase: DashboardFormatFn) {
     recentTransactions: transactions,
     monthlySalaryValue,
     monthlyCategoryChange,
-    monthlySalaryChange,
+    salaryTrendChange,
     allocationByName,
     netWorth,
     monthChange,
@@ -146,7 +146,7 @@ function DashboardPageBody({
     totalAlloc,
     monthlySalaryValue,
     monthlyCategoryChange,
-    monthlySalaryChange,
+    salaryTrendChange,
     allocationByName,
     netWorth,
     monthChange,
@@ -157,7 +157,7 @@ function DashboardPageBody({
   const dashboardCards = buildDashboardCards(
     allocationByName,
     monthlySalaryValue,
-    monthlySalaryChange,
+    salaryTrendChange,
     monthlyCategoryChange,
   );
 

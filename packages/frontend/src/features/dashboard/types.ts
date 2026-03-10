@@ -50,7 +50,10 @@ export type GoalSummaryItem = {
 export type DashboardCard = {
   label: string;
   value: number;
-  monthlyChange: number;
+  change: {
+    amount: number;
+    label: string;
+  };
   icon: LucideIcon;
   path: string;
   color: 'indigo' | 'sky' | 'amber' | 'emerald';
@@ -59,7 +62,7 @@ export type DashboardCard = {
 export type DashboardTxnStats = {
   monthlyCategoryChange: (category: string) => number;
   monthlySalaryValue: number;
-  monthlySalaryChange: number;
+  salaryTrendChange: number;
   totalIncome: number;
   totalExpenses: number;
 };

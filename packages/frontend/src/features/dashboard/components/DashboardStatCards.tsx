@@ -12,6 +12,7 @@ export function DashboardStatCards({
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
+        const changeAmount = card.change.amount;
         return (
           <StatCard
             key={card.label}
@@ -21,8 +22,12 @@ export function DashboardStatCards({
             color={card.color}
             href={card.path}
             change={{
-              value: `${card.monthlyChange >= 0 ? '+' : '-'}${fmtBase(Math.abs(card.monthlyChange), undefined, true)} this month`,
-              positive: card.monthlyChange >= 0,
+              value: `${changeAmount >= 0 ? '+' : '-'}${fmtBase(
+                Math.abs(changeAmount),
+                undefined,
+                true,
+              )} ${card.change.label}`,
+              positive: changeAmount >= 0,
             }}
           />
         );
