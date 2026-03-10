@@ -404,6 +404,11 @@ Implementation Notes:
   - Existing card content layouts remain visually unchanged.
 - Estimated complexity: Medium
 
+Implementation Notes:
+
+- Added a shared `Card` atom and `PanelHeader` molecule under `packages/frontend/src/components/ui` so the repeated white surface shell and title/subtitle/action header layout are defined once in the frontend design-system layer.
+- Migrated shared `AreaChartCard` plus the salary payslip table, savings accounts list, and mortgage transaction history panels to the new primitives without changing their internal row, table, or filter layouts.
+
 ### Ticket 6. Normalize KPI summary cards
 
 - Description: Standardize summary card grids around shared `StatCard` and `StatsGrid`.
@@ -502,7 +507,7 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 2. Extract shared action primitives
 - [x] Ticket 3. Build the shared field system
 - [x] Ticket 4. Consolidate dialog shells
-- [ ] Ticket 5. Introduce shared card and panel header primitives
+- [x] Ticket 5. Introduce shared card and panel header primitives
 - [ ] Ticket 6. Normalize KPI summary cards
 - [ ] Ticket 7. Unify loading and empty states
 - [ ] Ticket 8. Extract segmented controls and pagination

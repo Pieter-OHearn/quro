@@ -1,5 +1,5 @@
 import { CURRENCY_META, type Payslip } from '@quro/shared';
-import { Badge, Button, IconButton } from '@/components/ui';
+import { Badge, Button, Card, IconButton, PanelHeader } from '@/components/ui';
 import { buildApiDownloadUrl } from '@/lib/pdfDocuments';
 import { formatDate } from '@/lib/utils';
 import { Download, Edit3, Plus } from 'lucide-react';
@@ -124,17 +124,15 @@ function PayslipTableRow({
 
 function PayslipTableHeader({ count, onAdd }: Readonly<{ count: number; onAdd: () => void }>) {
   return (
-    <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-      <div>
-        <h3 className="font-semibold text-slate-900">Payslip History</h3>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {count} payslips · click a row to view breakdown
-        </p>
-      </div>
-      <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
-        Add Payslip
-      </Button>
-    </div>
+    <PanelHeader
+      title="Payslip History"
+      subtitle={`${count} payslips · click a row to view breakdown`}
+      action={
+        <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
+          Add Payslip
+        </Button>
+      }
+    />
   );
 }
 
@@ -147,7 +145,7 @@ export function PayslipHistoryTable({
   onEdit,
 }: Readonly<PayslipTableProps>) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <Card padding="none" className="overflow-hidden">
       <PayslipTableHeader count={payslips.length} onAdd={onAdd} />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[860px] table-fixed text-sm">
@@ -196,6 +194,6 @@ export function PayslipHistoryTable({
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }

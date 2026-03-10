@@ -1,6 +1,6 @@
 import { Calendar, ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
-import { Badge, Button, IconButton } from '@/components/ui';
+import { Badge, Button, Card, IconButton, PanelHeader } from '@/components/ui';
 import { TxnHistory } from './TxnHistory';
 import type {
   ConvertToBaseFn,
@@ -228,17 +228,15 @@ function AccountsListHeader({
   onAddAccount: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-      <div>
-        <h3 className="font-semibold text-slate-900">Savings Accounts</h3>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {accounts.length} accounts · click a row to view & record transactions
-        </p>
-      </div>
-      <Button onClick={onAddAccount} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
-        Add Account
-      </Button>
-    </div>
+    <PanelHeader
+      title="Savings Accounts"
+      subtitle={`${accounts.length} accounts · click a row to view & record transactions`}
+      action={
+        <Button onClick={onAddAccount} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
+          Add Account
+        </Button>
+      }
+    />
   );
 }
 
@@ -281,7 +279,7 @@ export function AccountsList({
   onDeleteTxn,
 }: Readonly<AccountsListProps>) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <Card padding="none" className="overflow-hidden">
       <AccountsListHeader accounts={accounts} onAddAccount={onAddAccount} />
       {accounts.length === 0 && (
         <p className="text-center py-10 text-slate-400 text-sm">
@@ -309,6 +307,6 @@ export function AccountsList({
         ))}
       </div>
       {accounts.length > 0 && <AnnualProjection totalInterest={totalInterest} fmtBase={fmtBase} />}
-    </div>
+    </Card>
   );
 }

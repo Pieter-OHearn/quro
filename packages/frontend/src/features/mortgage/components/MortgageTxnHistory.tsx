@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Filter, Plus, Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { Button, IconButton } from '@/components/ui';
+import { Button, Card, IconButton, PanelHeader } from '@/components/ui';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import type { MortgageTxnType } from '../types';
 import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
@@ -133,18 +133,16 @@ export function MortgageTxnHistory({
   const fmtDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
-        <div>
-          <h3 className="font-semibold text-slate-900">Transaction History</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {transactions.length} transactions recorded
-          </p>
-        </div>
-        <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={14} />}>
-          Record Transaction
-        </Button>
-      </div>
+    <Card padding="none" className="overflow-hidden">
+      <PanelHeader
+        title="Transaction History"
+        subtitle={`${transactions.length} transactions recorded`}
+        action={
+          <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={14} />}>
+            Record Transaction
+          </Button>
+        }
+      />
       <MortgageSummaryStats transactions={transactions} fmt={fmt} />
       <TxnFilterBar filter={filter} onFilterChange={setFilter} />
       <div className="divide-y divide-slate-50">
@@ -160,6 +158,6 @@ export function MortgageTxnHistory({
           <MortgageTxnRow key={t.id} t={t} fmt={fmt} fmtDate={fmtDate} onDelete={onDelete} />
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
