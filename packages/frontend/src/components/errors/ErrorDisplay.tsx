@@ -1,5 +1,5 @@
 import { AlertTriangle, ChevronDown, ChevronUp, Home, RefreshCw, TrendingDown } from 'lucide-react';
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 
 export type ErrorDisplayProps = {
   title?: string;

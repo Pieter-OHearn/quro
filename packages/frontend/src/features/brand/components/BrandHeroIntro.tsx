@@ -1,4 +1,4 @@
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 
 type BrandHeroIntroProps = {
   readonly heroTags: readonly string[];

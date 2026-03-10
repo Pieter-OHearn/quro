@@ -1,5 +1,5 @@
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 
 type CtaSectionProps = {
   onSignUp: () => void;

@@ -1,5 +1,5 @@
 import { Check, ChevronRight } from 'lucide-react';
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 import { PREVIEW_BARS, PREVIEW_STATS } from '../utils/landing-data';
 
 function AppPreviewChart() {

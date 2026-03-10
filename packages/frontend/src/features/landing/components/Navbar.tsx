@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 import { LANDING_NAV_LINKS } from '../utils/landing-data';
 
 type NavbarProps = {

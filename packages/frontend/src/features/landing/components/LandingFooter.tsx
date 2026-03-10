@@ -1,4 +1,4 @@
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 
 export function LandingFooter() {
   return (

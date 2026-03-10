@@ -1,4 +1,4 @@
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 import { SectionHeader } from './SectionHeader';
 
 export function ClearspaceSection() {

@@ -161,6 +161,17 @@ export default [
       },
     },
     rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/components/ui/*'],
+              message: "Use '@/components/ui' instead of subpath UI imports.",
+            },
+          ],
+        },
+      ],
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'react/no-array-index-key': 'warn',

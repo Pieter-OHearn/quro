@@ -1,4 +1,4 @@
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 import type { BrandLogoSize } from '../types';
 import { SectionHeader } from './SectionHeader';
 

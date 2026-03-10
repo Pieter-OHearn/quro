@@ -22,7 +22,7 @@ import {
 import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { useAuth } from '@/lib/AuthContext';
-import { QuroLogo } from '@/components/ui/QuroLogo';
+import { QuroLogo } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
 
 const navItems = [

@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
-import { FormField, TextInput, SelectInput } from '@/components/ui/FormField';
-import { EmojiPickerField } from '@/components/ui/EmojiPickerField';
+import {
+  EmojiPickerField,
+  FormField,
+  Modal,
+  ModalFooter,
+  SelectInput,
+  TextInput,
+} from '@/components/ui';
 import type { PensionPot } from '@quro/shared';
 import { PENSION_TYPES, PALETTE } from '../constants';
 
