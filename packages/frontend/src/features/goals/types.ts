@@ -1,5 +1,6 @@
 import type { ElementType } from 'react';
 import type { Goal, GoalType } from '@quro/shared';
+import type { LucideIcon } from 'lucide-react';
 
 export type GoalStatus = 'complete' | 'on_track' | 'at_risk' | 'pending';
 export type FilterKey = 'all' | 'savings' | 'career' | 'investing' | 'annual';
@@ -73,7 +74,7 @@ export type GoalStatCard = {
   label: string;
   value: string;
   sub: string;
-  icon: ElementType;
+  icon: LucideIcon;
   color: GoalStatCardColor;
 };
 

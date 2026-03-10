@@ -1,5 +1,5 @@
 import { Calendar, Home, Percent, TrendingDown } from 'lucide-react';
-import { StatCard } from '@/components/ui';
+import { StatCard, StatsGrid } from '@/components/ui';
 import type { Mortgage as MortgageType } from '@quro/shared';
 import type { MortgageFormatFn } from '../types';
 
@@ -23,7 +23,7 @@ export function MortgageStatCards({
   paidPct,
 }: Readonly<MortgageStatCardsProps>) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <StatsGrid>
       <StatCard
         label="Property Value"
         value={fmt(mortgage.propertyValue)}
@@ -52,6 +52,6 @@ export function MortgageStatCards({
         icon={Calendar}
         color="amber"
       />
-    </div>
+    </StatsGrid>
   );
 }

@@ -1,4 +1,4 @@
-import { StatCard } from '@/components/ui';
+import { StatCard, StatsGrid } from '@/components/ui';
 import type { DashboardCard, DashboardFormatFn } from '../types';
 
 export function DashboardStatCards({
@@ -9,7 +9,7 @@ export function DashboardStatCards({
   fmtBase: DashboardFormatFn;
 }>) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <StatsGrid>
       {cards.map((card) => {
         const Icon = card.icon;
         const changeAmount = card.change.amount;
@@ -32,6 +32,6 @@ export function DashboardStatCards({
           />
         );
       })}
-    </div>
+    </StatsGrid>
   );
 }

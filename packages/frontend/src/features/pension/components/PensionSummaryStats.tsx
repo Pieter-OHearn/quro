@@ -1,5 +1,5 @@
 import { Calendar, Clock, ShieldCheck, TrendingUp } from 'lucide-react';
-import { StatCard } from '@/components/ui/StatCard';
+import { StatCard, StatsGrid } from '@/components/ui';
 import type { PensionFormatBaseFn } from '../types';
 
 type PensionSummaryStatsProps = {
@@ -18,7 +18,7 @@ export function PensionSummaryStats({
   fmtBase,
 }: Readonly<PensionSummaryStatsProps>) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <StatsGrid>
       <StatCard
         label="Total Pension Value"
         value={fmtBase(totalInBase)}
@@ -47,6 +47,6 @@ export function PensionSummaryStats({
         icon={Clock}
         color="sky"
       />
-    </div>
+    </StatsGrid>
   );
 }

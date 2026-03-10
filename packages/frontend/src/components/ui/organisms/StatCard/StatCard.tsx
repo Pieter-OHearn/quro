@@ -20,6 +20,7 @@ export type StatCardProps = {
   change?: { value: string; positive: boolean; details?: string };
   href?: string;
   className?: string;
+  valueClassName?: string;
 };
 
 type StatCardContentProps = Omit<StatCardProps, 'className'>;
@@ -32,6 +33,7 @@ function StatCardContent({
   color,
   change,
   href,
+  valueClassName,
 }: StatCardContentProps) {
   return (
     <>
@@ -49,7 +51,7 @@ function StatCardContent({
         )}
       </div>
       <p className="text-xs text-slate-500 mb-1">{label}</p>
-      <p className="font-bold text-slate-900">{value}</p>
+      <p className={cn('font-bold text-slate-900', valueClassName)}>{value}</p>
       {change && (
         <div
           className={cn(
@@ -82,8 +84,9 @@ export function StatCard({
   change,
   href,
   className,
+  valueClassName,
 }: StatCardProps) {
-  const contentProps = { label, value, subtitle, icon, color, change, href };
+  const contentProps = { label, value, subtitle, icon, color, change, href, valueClassName };
   if (href) {
     return (
       <Link

@@ -1,5 +1,5 @@
 import { BarChart2, Building2, DollarSign, TrendingUp } from 'lucide-react';
-import { StatCard } from '@/components/ui';
+import { StatCard, StatsGrid } from '@/components/ui';
 import type { InvestmentFormatFn, InvestmentPortfolioStats, InvestmentStatTrends } from '../types';
 
 type InvestmentStatCardsProps = InvestmentPortfolioStats & {
@@ -54,7 +54,7 @@ export function InvestmentStatCards({
   ...brokerage
 }: InvestmentStatCardsProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <StatsGrid>
       <BrokerageStatCards {...brokerage} fmtBase={fmtBase} trends={trends} />
       <StatCard
         label="Dividends Received"
@@ -72,6 +72,6 @@ export function InvestmentStatCards({
         color="amber"
         change={trends.propertyEquity}
       />
-    </div>
+    </StatsGrid>
   );
 }

@@ -418,6 +418,11 @@ Implementation Notes:
   - KPI grid spacing stays consistent across screens.
 - Estimated complexity: Medium
 
+Implementation Notes:
+
+- Added a shared `StatsGrid` organism under `packages/frontend/src/components/ui` and wired the existing KPI sections onto it so the 2-up mobile and 4-up desktop spacing now comes from one frontend design-system primitive.
+- Migrated salary, goals, and budget KPI cards onto the shared `StatCard`, extending `StatCard` with an optional `valueClassName` so budget-specific positive and warning emphasis stays intact without reintroducing bespoke card markup.
+
 ### Ticket 7. Unify loading and empty states
 
 - Description: Replace duplicate loader and empty-state components with shared versions.
@@ -508,7 +513,7 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 3. Build the shared field system
 - [x] Ticket 4. Consolidate dialog shells
 - [x] Ticket 5. Introduce shared card and panel header primitives
-- [ ] Ticket 6. Normalize KPI summary cards
+- [x] Ticket 6. Normalize KPI summary cards
 - [ ] Ticket 7. Unify loading and empty states
 - [ ] Ticket 8. Extract segmented controls and pagination
 - [ ] Ticket 9. Promote transaction history into shared
