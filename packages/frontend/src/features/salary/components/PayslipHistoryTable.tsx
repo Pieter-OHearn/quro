@@ -1,5 +1,5 @@
 import { CURRENCY_META, type Payslip } from '@quro/shared';
-import { Badge, Button, Card, IconButton, PanelHeader } from '@/components/ui';
+import { Badge, Button, DataTable, IconButton, RowActions } from '@/components/ui';
 import { buildApiDownloadUrl } from '@/lib/pdfDocuments';
 import { formatDate } from '@/lib/utils';
 import { Download, Edit3, Plus } from 'lucide-react';
@@ -28,7 +28,7 @@ function PayslipRowActions({
   const downloadUrl = buildApiDownloadUrl(`/api/salary/payslips/${payslip.id}/document/download`);
 
   return (
-    <div className="flex items-center justify-end gap-1">
+    <RowActions>
       {payslip.document ? (
         <IconButton
           href={downloadUrl}
@@ -61,7 +61,7 @@ function PayslipRowActions({
         title="Edit payslip"
         variant="ghost"
       />
-    </div>
+    </RowActions>
   );
 }
 
@@ -122,20 +122,6 @@ function PayslipTableRow({
   );
 }
 
-function PayslipTableHeader({ count, onAdd }: Readonly<{ count: number; onAdd: () => void }>) {
-  return (
-    <PanelHeader
-      title="Payslip History"
-      subtitle={`${count} payslips · click a row to view breakdown`}
-      action={
-        <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
-          Add Payslip
-        </Button>
-      }
-    />
-  );
-}
-
 export function PayslipHistoryTable({
   payslips,
   selected,
@@ -145,55 +131,51 @@ export function PayslipHistoryTable({
   onEdit,
 }: Readonly<PayslipTableProps>) {
   return (
-    <Card padding="none" className="overflow-hidden">
-      <PayslipTableHeader count={payslips.length} onAdd={onAdd} />
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] table-fixed text-sm">
-          <colgroup>
-            <col className="w-[28%]" />
-            <col className="w-[15%]" />
-            <col className="w-[15%]" />
-            <col className="w-[15%]" />
-            <col className="w-[15%]" />
-            <col className="w-24" />
-          </colgroup>
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/60">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap">
-                Month
-              </th>
-              {['Gross', 'Tax', 'Pension', 'Net Pay'].map((header) => (
-                <th
-                  key={header}
-                  className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap"
-                >
-                  {header}
-                </th>
-              ))}
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {payslips.map((payslip) => (
-              <PayslipTableRow
-                key={payslip.id}
-                payslip={payslip}
-                isSelected={selected?.id === payslip.id}
-                fmtBase={fmtBase}
-                onSelect={onSelect}
-                onEdit={onEdit}
-              />
-            ))}
-            {payslips.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-12 text-center text-slate-400 text-sm">
-                  No payslips yet. Click <strong>Add Payslip</strong> to get started.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+    <DataTable
+      title="Payslip History"
+      subtitle={`${payslips.length} payslips · click a row to view breakdown`}
+      action={
+        <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
+          Add Payslip
+        </Button>
+      }
+      columns={[
+        { key: 'month', header: 'Month' },
+        { key: 'gross', header: 'Gross', align: 'right' },
+        { key: 'tax', header: 'Tax', align: 'right' },
+        { key: 'pension', header: 'Pension', align: 'right' },
+        { key: 'net', header: 'Net Pay', align: 'right' },
+        { key: 'actions', header: '' },
+      ]}
+      colGroup={
+        <colgroup>
+          <col className="w-[28%]" />
+          <col className="w-[15%]" />
+          <col className="w-[15%]" />
+          <col className="w-[15%]" />
+          <col className="w-[15%]" />
+          <col className="w-24" />
+        </colgroup>
+      }
+      isEmpty={payslips.length === 0}
+      emptyState={
+        <>
+          No payslips yet. Click <strong>Add Payslip</strong> to get started.
+        </>
+      }
+      minWidth={860}
+      tableLayout="fixed"
+    >
+      {payslips.map((payslip) => (
+        <PayslipTableRow
+          key={payslip.id}
+          payslip={payslip}
+          isSelected={selected?.id === payslip.id}
+          fmtBase={fmtBase}
+          onSelect={onSelect}
+          onEdit={onEdit}
+        />
+      ))}
+    </DataTable>
   );
 }

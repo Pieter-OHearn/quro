@@ -1,3 +1,4 @@
+import { ChartCard } from '@/components/ui';
 import { ArrowUpRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { FmtFn, SalaryChartEntry } from '../types';
@@ -16,10 +17,23 @@ export function SalaryHistoryChart({
   baseCurrency,
 }: Readonly<SalaryHistoryChartProps>) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <h3 className="font-semibold text-slate-900 mb-1">Salary Growth History</h3>
-      <p className="text-xs text-slate-400 mb-5">Annual gross in {baseCurrency}</p>
-      {data.length > 0 ? (
+    <ChartCard
+      title="Salary Growth History"
+      subtitle={`Annual gross in ${baseCurrency}`}
+      hasData={data.length > 0}
+      emptyMessage="No salary history yet."
+      footer={
+        growthPct > 0 ? (
+          <div className="mt-3 flex items-center gap-2 bg-emerald-50 rounded-xl p-3">
+            <ArrowUpRight size={16} className="text-emerald-600" />
+            <p className="text-xs text-emerald-700">
+              Salary has grown by <strong>+{growthPct.toFixed(0)}%</strong> since {data[0].year}
+            </p>
+          </div>
+        ) : undefined
+      }
+    >
+      {data.length > 0 && (
         <>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={data} barSize={32}>
@@ -47,18 +61,8 @@ export function SalaryHistoryChart({
               <Bar dataKey="gross" fill="#6366f1" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-          {growthPct > 0 && (
-            <div className="mt-3 flex items-center gap-2 bg-emerald-50 rounded-xl p-3">
-              <ArrowUpRight size={16} className="text-emerald-600" />
-              <p className="text-xs text-emerald-700">
-                Salary has grown by <strong>+{growthPct.toFixed(0)}%</strong> since {data[0].year}
-              </p>
-            </div>
-          )}
         </>
-      ) : (
-        <p className="text-sm text-slate-400 py-12 text-center">No salary history yet.</p>
       )}
-    </div>
+    </ChartCard>
   );
 }

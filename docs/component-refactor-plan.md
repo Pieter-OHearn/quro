@@ -474,6 +474,11 @@ Implementation Notes:
   - Empty-state and header patterns are no longer duplicated across chart cards.
 - Estimated complexity: Large
 
+Implementation Notes:
+
+- Added shared `DataTable` and `ChartCard` organisms plus a small `RowActions` molecule under `packages/frontend/src/components/ui`, keeping the new abstractions focused on shell-level structure instead of feature-specific table rows or chart series logic.
+- Migrated `PayslipHistoryTable` to the shared table shell and moved `AreaChartCard`, `SalaryHistoryChart`, `PensionGrowthChart`, and `PortfolioChart` onto the shared chart container so card headers, empty states, and action-cell layout now come from one frontend UI layer.
+
 ### Ticket 11. Add lightweight shared UI verification
 
 - Description: Add minimal render-level or smoke-test coverage for shared components as they are introduced.
@@ -532,5 +537,5 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 7. Unify loading and empty states
 - [x] Ticket 8. Extract segmented controls and pagination
 - [x] Ticket 9. Promote transaction history into shared
-- [ ] Ticket 10. Introduce shared table and chart shells
+- [x] Ticket 10. Introduce shared table and chart shells
 - [ ] Ticket 11. Add lightweight shared UI verification

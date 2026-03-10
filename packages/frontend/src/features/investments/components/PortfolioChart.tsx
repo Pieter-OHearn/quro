@@ -1,3 +1,4 @@
+import { ChartCard } from '@/components/ui';
 import {
   AreaChart,
   Area,
@@ -118,20 +119,13 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
 
 export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartProps) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <div className="mb-5">
-        <h3 className="font-semibold text-slate-900">Portfolio Performance</h3>
-        <p className="text-xs text-slate-400 mt-0.5">
-          Brokerage + Property equity in {baseCurrency}
-        </p>
-      </div>
-      {data.length > 0 ? (
-        <PortfolioAreaChart data={data} fmtBase={fmtBase} />
-      ) : (
-        <div className="flex items-center justify-center py-10 text-sm text-slate-400">
-          Add transactions to generate portfolio history.
-        </div>
-      )}
-    </div>
+    <ChartCard
+      title="Portfolio Performance"
+      subtitle={`Brokerage + Property equity in ${baseCurrency}`}
+      hasData={data.length > 0}
+      emptyMessage="Add transactions to generate portfolio history."
+    >
+      {data.length > 0 && <PortfolioAreaChart data={data} fmtBase={fmtBase} />}
+    </ChartCard>
   );
 }

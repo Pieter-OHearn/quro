@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import type { ButtonProps } from '../../atoms';
 import { Badge, Button, Card, IconButton } from '../../atoms';
-import { PanelHeader, SegmentedControl } from '../../molecules';
+import { PanelHeader, RowActions, SegmentedControl } from '../../molecules';
 
 export type FilterOption = {
   key: string;
@@ -373,9 +373,9 @@ export function TxnRow({
         <p className={cn('text-[10px] text-slate-400', dateClassName)}>{formatDate(date)}</p>
       </div>
       {amount}
-      <div
+      <RowActions
         className={cn(
-          'flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0',
+          'opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0',
           actionsClassName,
         )}
       >
@@ -397,7 +397,7 @@ export function TxnRow({
           size="sm"
           variant="danger"
         />
-      </div>
+      </RowActions>
     </div>
   );
 }

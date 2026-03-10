@@ -1,3 +1,4 @@
+import { ChartCard } from '@/components/ui';
 import {
   Area,
   AreaChart,
@@ -67,30 +68,25 @@ export function PensionGrowthChart({
   baseCurrency,
 }: Readonly<PensionGrowthChartProps>) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h3 className="font-semibold text-slate-900">Total Pension Growth</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Combined value across all pots ({baseCurrency})
-          </p>
-        </div>
-        {pensionGrowthPct !== null && (
+    <ChartCard
+      title="Total Pension Growth"
+      subtitle={`Combined value across all pots (${baseCurrency})`}
+      badge={
+        pensionGrowthPct !== null && pensionGrowthData.length > 0 ? (
           <span
             className={`text-sm px-4 py-2 rounded-full font-semibold ${pensionGrowthPct >= 0 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-600'}`}
           >
             {pensionGrowthPct >= 0 ? '+' : ''}
-            {pensionGrowthPct.toFixed(0)}% since {pensionGrowthData[0]?.year}
+            {pensionGrowthPct.toFixed(0)}% since {pensionGrowthData[0].year}
           </span>
-        )}
-      </div>
-      {pensionGrowthData.length > 0 ? (
+        ) : undefined
+      }
+      hasData={pensionGrowthData.length > 0}
+      emptyMessage="Add pension transactions to generate growth history."
+    >
+      {pensionGrowthData.length > 0 && (
         <PensionGrowthAreaChart data={pensionGrowthData} fmtBase={fmtBase} />
-      ) : (
-        <div className="flex items-center justify-center py-12 text-slate-400 text-sm">
-          Add pension transactions to generate growth history.
-        </div>
       )}
-    </div>
+    </ChartCard>
   );
 }

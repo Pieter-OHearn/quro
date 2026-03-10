@@ -9,8 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { cn } from '@/lib/utils';
-import { Card } from '../../atoms';
-import { PanelHeader } from '../../molecules';
+import { ChartCard } from '../ChartCard';
 
 export type AreaChartCardProps<T extends Record<string, unknown>> = {
   title: string;
@@ -119,17 +118,16 @@ export function AreaChartCard<T extends Record<string, unknown>>({
   const gradientId = useId().replace(/:/g, '');
 
   return (
-    <Card className={cn(className)}>
-      <PanelHeader
-        title={title}
-        subtitle={subtitle}
-        action={badge}
-        spacing="none"
-        divider={false}
-        className="mb-6"
-      />
-
-      {data.length > 0 ? (
+    <ChartCard
+      title={title}
+      subtitle={subtitle}
+      badge={badge}
+      hasData={data.length > 0}
+      emptyMessage={emptyMessage}
+      className={cn(className)}
+      headerClassName="mb-6"
+    >
+      {data.length > 0 && (
         <ChartContent
           data={data}
           dataKey={dataKey}
@@ -142,9 +140,7 @@ export function AreaChartCard<T extends Record<string, unknown>>({
           gradientId={gradientId}
           title={title}
         />
-      ) : (
-        <p className="text-sm text-slate-400 py-12 text-center">{emptyMessage}</p>
       )}
-    </Card>
+    </ChartCard>
   );
 }

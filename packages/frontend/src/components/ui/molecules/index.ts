@@ -7,4 +7,5 @@ export * from './Pagination';
 export * from './PanelHeader';
 export * from './PdfAttachmentField';
 export * from './SegmentedControl';
+export * from './RowActions';
 export * from './TxnTypeSelector';
