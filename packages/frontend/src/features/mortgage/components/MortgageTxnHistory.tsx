@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Filter, Plus, Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { Button, Card, IconButton, PanelHeader } from '@/components/ui';
+import { TxnHistoryPanel, TxnRow } from '@/components/ui';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import type { MortgageTxnType } from '../types';
 import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
@@ -16,55 +15,58 @@ type MortgageTxnHistoryProps = {
 type MortgageTxnRowProps = {
   t: MortgageTransaction;
   fmt: (n: number) => string;
-  fmtDate: (iso: string) => string;
   onDelete: (id: number) => void;
 };
-function MortgageTxnRow({ t, fmt, fmtDate, onDelete }: MortgageTxnRowProps) {
-  const m = TXN_META[t.type];
-  const Icon = m.icon;
+function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
+  if (t.type === 'repayment') {
+    return (
+      <div className="text-right flex-shrink-0">
+        <p className="text-sm font-semibold text-slate-700">-{fmt(t.amount)}</p>
+        <p className="text-[10px] text-slate-400">
+          <span className="text-rose-400">{fmt(t.interest ?? 0)} int</span>
+          {' · '}
+          <span className="text-indigo-500">{fmt(t.principal ?? 0)} prin</span>
+        </p>
+      </div>
+    );
+  }
+
+  if (t.type === 'valuation') {
+    return (
+      <div className="text-right flex-shrink-0">
+        <p className="text-sm font-semibold text-emerald-600">{fmt(t.amount)}</p>
+        <p className="text-[10px] text-slate-400">new value</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-3 px-5 py-3 group hover:bg-slate-50/60 transition-colors">
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${m.bg}`}>
-        <Icon size={14} className={m.color} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-700">{t.note || m.label}</p>
-        <p className="text-xs text-slate-400">{fmtDate(t.date)}</p>
-      </div>
-      {t.type === 'repayment' && (
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold text-slate-700">−{fmt(t.amount)}</p>
-          <p className="text-[10px] text-slate-400">
-            <span className="text-rose-400">{fmt(t.interest ?? 0)} int</span>
-            {' · '}
-            <span className="text-indigo-500">{fmt(t.principal ?? 0)} prin</span>
-          </p>
-        </div>
-      )}
-      {t.type === 'valuation' && (
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold text-emerald-600">{fmt(t.amount)}</p>
-          <p className="text-[10px] text-slate-400">new value</p>
-        </div>
-      )}
-      {t.type === 'rate_change' && (
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-semibold text-amber-600">{t.amount}%</p>
-          <p className="text-[10px] text-slate-400">
-            {t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate'}
-          </p>
-        </div>
-      )}
-      <IconButton
-        onClick={() => onDelete(t.id)}
-        icon={Trash2}
-        label="Delete transaction"
-        title="Delete transaction"
-        size="sm"
-        variant="danger"
-        className="opacity-0 group-hover:opacity-100"
-      />
+    <div className="text-right flex-shrink-0">
+      <p className="text-sm font-semibold text-amber-600">{t.amount}%</p>
+      <p className="text-[10px] text-slate-400">
+        {t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate'}
+      </p>
     </div>
+  );
+}
+
+function MortgageTxnRow({ t, fmt, onDelete }: MortgageTxnRowProps) {
+  const m = TXN_META[t.type];
+  return (
+    <TxnRow
+      icon={m.icon}
+      iconColor={m.color}
+      iconBg={m.bg}
+      iconContainerClassName="w-9 h-9 rounded-xl"
+      iconSize={14}
+      label={t.note || m.label}
+      labelClassName="text-sm font-medium text-slate-700"
+      date={t.date}
+      dateClassName="text-xs text-slate-400"
+      amount={<MortgageTxnAmount t={t} fmt={fmt} />}
+      onDelete={() => onDelete(t.id)}
+      className="rounded-none border-0 bg-transparent px-5 py-3 hover:bg-slate-50/60"
+    />
   );
 }
 
@@ -72,50 +74,18 @@ type MortgageSummaryStatsProps = {
   transactions: MortgageTransaction[];
   fmt: (n: number) => string;
 };
-function MortgageSummaryStats({ transactions, fmt }: MortgageSummaryStatsProps) {
+function buildMortgageTxnStats({ transactions, fmt }: MortgageSummaryStatsProps) {
   const repayments = transactions.filter((t) => t.type === 'repayment');
   const totalRepaid = repayments.reduce((s, t) => s + t.amount, 0);
   const totalPrincipal = repayments.reduce((s, t) => s + (t.principal ?? 0), 0);
   const totalInterest = repayments.reduce((s, t) => s + (t.interest ?? 0), 0);
   const rateChanges = transactions.filter((t) => t.type === 'rate_change').length;
-  return (
-    <div className="grid grid-cols-4 gap-3 p-5 border-b border-slate-50">
-      {[
-        { label: 'Total Repaid', value: fmt(totalRepaid), color: 'text-slate-800' },
-        { label: 'Principal Paid', value: fmt(totalPrincipal), color: 'text-indigo-600' },
-        { label: 'Interest Paid', value: fmt(totalInterest), color: 'text-rose-500' },
-        { label: 'Rate Changes', value: String(rateChanges), color: 'text-amber-600' },
-      ].map(({ label, value, color }) => (
-        <div key={label} className="bg-slate-50 rounded-xl px-3 py-2.5">
-          <p className="text-[10px] text-slate-400 mb-0.5">{label}</p>
-          <p className={`text-sm font-semibold ${color}`}>{value}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-type TxnFilterBarProps = {
-  filter: MortgageTxnType | 'all';
-  onFilterChange: (f: MortgageTxnType | 'all') => void;
-};
-
-function TxnFilterBar({ filter, onFilterChange }: TxnFilterBarProps) {
-  return (
-    <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-50">
-      <Filter size={12} className="text-slate-400 mr-1" />
-      <span className="text-xs text-slate-400 mr-2">Filter:</span>
-      {MORTGAGE_TXN_FILTER_OPTIONS.map((f) => (
-        <button
-          key={f}
-          onClick={() => onFilterChange(f)}
-          className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${filter === f ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-100'}`}
-        >
-          {f === 'all' ? 'All' : TXN_META[f].label + 's'}
-        </button>
-      ))}
-    </div>
-  );
+  return [
+    { label: 'Total Repaid', value: fmt(totalRepaid), color: 'text-slate-800' },
+    { label: 'Principal Paid', value: fmt(totalPrincipal), color: 'text-indigo-600' },
+    { label: 'Interest Paid', value: fmt(totalInterest), color: 'text-rose-500' },
+    { label: 'Rate Changes', value: String(rateChanges), color: 'text-amber-600' },
+  ];
 }
 
 export function MortgageTxnHistory({
@@ -130,34 +100,28 @@ export function MortgageTxnHistory({
   const sorted = [...transactions]
     .filter((t) => filter === 'all' || t.type === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
-  const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
   return (
-    <Card padding="none" className="overflow-hidden">
-      <PanelHeader
-        title="Transaction History"
-        subtitle={`${transactions.length} transactions recorded`}
-        action={
-          <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={14} />}>
-            Record Transaction
-          </Button>
-        }
-      />
-      <MortgageSummaryStats transactions={transactions} fmt={fmt} />
-      <TxnFilterBar filter={filter} onFilterChange={setFilter} />
-      <div className="divide-y divide-slate-50">
-        {sorted.length === 0 && (
-          <p className="text-center py-10 text-slate-400 text-sm">
-            No transactions.{' '}
-            <button onClick={onAdd} className="text-indigo-500 hover:underline">
-              Add one
-            </button>
-          </p>
-        )}
-        {sorted.map((t) => (
-          <MortgageTxnRow key={t.id} t={t} fmt={fmt} fmtDate={fmtDate} onDelete={onDelete} />
-        ))}
-      </div>
-    </Card>
+    <TxnHistoryPanel
+      title="Transaction History"
+      subtitle={`${transactions.length} transactions recorded`}
+      variant="card"
+      addButtonPlacement="header"
+      filterOptions={MORTGAGE_TXN_FILTER_OPTIONS.map((option) => ({
+        key: option,
+        label: option === 'all' ? 'All' : `${TXN_META[option].label}s`,
+      }))}
+      filter={filter}
+      onFilterChange={(key) => setFilter(key as MortgageTxnType | 'all')}
+      stats={buildMortgageTxnStats({ transactions, fmt })}
+      statsColumns={4}
+      onAdd={onAdd}
+      addLabel="Record Transaction"
+      isEmpty={sorted.length === 0}
+    >
+      {sorted.map((t) => (
+        <MortgageTxnRow key={t.id} t={t} fmt={fmt} onDelete={onDelete} />
+      ))}
+    </TxnHistoryPanel>
   );
 }

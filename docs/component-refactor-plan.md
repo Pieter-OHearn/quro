@@ -460,6 +460,11 @@ Implementation Notes:
   - Feature-specific amount cells remain injectable via props or children.
 - Estimated complexity: Large
 
+Implementation Notes:
+
+- Extended the shared `TxnHistoryPanel` to support both embedded and standalone card layouts, including header-level add actions for the mortgage screen while keeping the existing embedded savings, pension, holding, and property histories unchanged.
+- Expanded `TxnRow` with small styling hooks so mortgage history could reuse the shared row primitive without losing its larger icon, typography, or custom amount cell layout.
+
 ### Ticket 10. Introduce shared table and chart shells
 
 - Description: Create shared `DataTable` and `ChartCard` shells for richer list and chart screens.
@@ -526,6 +531,6 @@ This should be treated as an extraction and consolidation effort, not a rewrite.
 - [x] Ticket 6. Normalize KPI summary cards
 - [x] Ticket 7. Unify loading and empty states
 - [x] Ticket 8. Extract segmented controls and pagination
-- [ ] Ticket 9. Promote transaction history into shared
+- [x] Ticket 9. Promote transaction history into shared
 - [ ] Ticket 10. Introduce shared table and chart shells
 - [ ] Ticket 11. Add lightweight shared UI verification
