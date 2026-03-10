@@ -1,4 +1,4 @@
-import { LoadingSpinner } from '@/components/ui';
+import { ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
 import { useGoals } from '@/features/goals/hooks';
 import { parseGoalYear } from '@/features/goals/utils/goal-utils';
 import { usePayslips } from '@/features/salary/hooks';
@@ -162,26 +162,34 @@ function DashboardPageBody({
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <WelcomeBanner
-        greeting={getGreeting(hour)}
-        greetingName={userName}
-        netWorth={netWorth}
-        monthChange={monthChange}
-        baseCurrency={baseCurrency}
-        fmtBase={fmtBase}
-      />
-      <DashboardStatCards cards={dashboardCards} fmtBase={fmtBase} />
-      <DashboardChartsGrid
-        chartData={chartData}
-        allocationData={allocationData}
-        totalAlloc={totalAlloc}
-        baseCurrency={baseCurrency}
-        ytdPct={ytdPct}
-        fmtBase={fmtBase}
-      />
-      <DashboardBottomCards data={data} />
-    </div>
+    <PageStack>
+      <ContentSection>
+        <WelcomeBanner
+          greeting={getGreeting(hour)}
+          greetingName={userName}
+          netWorth={netWorth}
+          monthChange={monthChange}
+          baseCurrency={baseCurrency}
+          fmtBase={fmtBase}
+        />
+      </ContentSection>
+      <ContentSection>
+        <DashboardStatCards cards={dashboardCards} fmtBase={fmtBase} />
+      </ContentSection>
+      <ContentSection>
+        <DashboardChartsGrid
+          chartData={chartData}
+          allocationData={allocationData}
+          totalAlloc={totalAlloc}
+          baseCurrency={baseCurrency}
+          ytdPct={ytdPct}
+          fmtBase={fmtBase}
+        />
+      </ContentSection>
+      <ContentSection spacing="lg">
+        <DashboardBottomCards data={data} />
+      </ContentSection>
+    </PageStack>
   );
 }
 

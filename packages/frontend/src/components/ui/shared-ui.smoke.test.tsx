@@ -24,6 +24,7 @@ import { PanelHeader } from './molecules/PanelHeader';
 import { RowActions } from './molecules/RowActions';
 import { SegmentedControl } from './molecules/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
+import { ContentSection, PageStack } from './templates';
 
 type SmokeCase = {
   name: string;
@@ -246,6 +247,25 @@ const smokeCases: readonly SmokeCase[] = [
       />
     ),
     includes: ['Deposit', 'Transfer'],
+  },
+  {
+    name: 'PageStack renders shared page spacing classes',
+    element: (
+      <PageStack data-smoke="page-stack">
+        <div>Overview</div>
+        <div>Details</div>
+      </PageStack>
+    ),
+    includes: ['data-smoke="page-stack"', 'p-6 space-y-6', 'Overview', 'Details'],
+  },
+  {
+    name: 'ContentSection renders section spacing classes',
+    element: (
+      <ContentSection data-smoke="content-section" spacing="lg">
+        <div>Performance</div>
+      </ContentSection>
+    ),
+    includes: ['data-smoke="content-section"', 'space-y-6', 'Performance'],
   },
 ];
 
