@@ -1,9 +1,14 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { CURRENCY_CODES, CURRENCY_META, isCurrencyCode, type CurrencyCode } from '@quro/shared';
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from './AuthContext';
+import { api } from './api';
 import { convertCurrencyAmount } from './currencyRates';
-import { getCurrencyRatesErrorDetail, useCurrencyRates } from './useCurrencyRates';
+import {
+  getCurrencyRatesErrorDetail,
+  isCurrencyRatesUnavailableError,
+  useCurrencyRates,
+} from './useCurrencyRates';
 
 export { CURRENCY_CODES, CURRENCY_META };
 export type { CurrencyCode };
@@ -23,10 +28,16 @@ type CurrencyContextType = {
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
 
+export type CurrencyRatesFailureMode = 'fx-unavailable' | 'app-error';
+
 type CurrencyRatesQueryState = Pick<
   ReturnType<typeof useCurrencyRates>,
   'data' | 'error' | 'isError' | 'isPending' | 'refetch'
 >;
+
+export function getCurrencyRatesFailureMode(error: unknown): CurrencyRatesFailureMode {
+  return isCurrencyRatesUnavailableError(error) ? 'fx-unavailable' : 'app-error';
+}
 
 function normalizeCurrency(currency: string): CurrencyCode {
   if (isCurrencyCode(currency)) return currency;
@@ -100,26 +111,59 @@ function renderCurrencyRatesGate(
   }
 
   if (hasUser && ratesQuery.isError) {
-    return (
-      <CurrencyRatesFallback
-        detail={getCurrencyRatesErrorDetail(ratesQuery.error)}
-        onRetry={() => {
-          void ratesQuery.refetch();
-        }}
-      />
-    );
+    if (getCurrencyRatesFailureMode(ratesQuery.error) === 'fx-unavailable') {
+      return (
+        <CurrencyRatesFallback
+          detail={getCurrencyRatesErrorDetail(ratesQuery.error)}
+          onRetry={() => {
+            void ratesQuery.refetch();
+          }}
+        />
+      );
+    }
+
+    throw ratesQuery.error instanceof Error
+      ? ratesQuery.error
+      : new Error('Failed to load server-backed currency rates');
   }
 
   return null;
 }
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, replaceUser } = useAuth();
   const ratesQuery = useCurrencyRates();
-  const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>('EUR');
+  const [baseCurrency, setBaseCurrencyState] = useState<CurrencyCode>(
+    normalizeCurrency(user?.baseCurrency ?? 'EUR'),
+  );
   const hasUser = Boolean(user);
   const ratesStatus = getCurrencyRatesStatus(hasUser, ratesQuery);
   const gate = renderCurrencyRatesGate(hasUser, authLoading, ratesQuery);
+
+  useEffect(() => {
+    setBaseCurrencyState(normalizeCurrency(user?.baseCurrency ?? 'EUR'));
+  }, [user?.baseCurrency]);
+
+  const setBaseCurrency = useCallback(
+    (nextCurrency: CurrencyCode) => {
+      if (nextCurrency === baseCurrency) return;
+
+      const previousCurrency = baseCurrency;
+      setBaseCurrencyState(nextCurrency);
+
+      if (!user) return;
+
+      void api
+        .put('/api/settings/preferences', { baseCurrency: nextCurrency })
+        .then((response) => {
+          replaceUser(response.data.data);
+        })
+        .catch(() => {
+          setBaseCurrencyState(previousCurrency);
+        });
+    },
+    [baseCurrency, replaceUser, user],
+  );
 
   if (gate) return gate;
 

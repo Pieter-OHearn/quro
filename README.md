@@ -81,6 +81,9 @@ cp packages/frontend/.env.example packages/frontend/.env
 
 Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
 It also includes the parser worker settings for AI-based pension statement import drafts.
+`CORS_ORIGIN` in `packages/backend/.env` defaults to `http://localhost,http://localhost:5173` so the same backend env works for the Docker shell and split frontend/backend local development.
+Leave `VITE_API_URL` unset for same-origin `/api` deployments such as Docker, preview, and production.
+For local split frontend/backend development with Vite on `http://localhost:5173`, set `VITE_API_URL=http://localhost:3000` in `packages/frontend/.env`.
 
 3. Start required infra with Docker (DB and object storage):
 
@@ -123,7 +126,7 @@ source packages/backend/.env
 set +a
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r services/pension-parser/requirements.txt
+pip install -r services/pension-parser/requirements.txt ruff pip-audit
 uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
 ```
 
@@ -170,6 +173,8 @@ If you run `bun run db:seed`, a demo user is created:
 - Email: `demo@quro.local`
 - Password: `password123`
 
+`bun run db:seed` resets and reseeds the demo user's data only. It should not delete data for other users.
+
 ## Testing and quality checks
 
 There is still no broad unit/integration suite wired across the repo, but shared UI refactor work now has a lightweight smoke suite.
@@ -177,21 +182,32 @@ There is still no broad unit/integration suite wired across the repo, but shared
 Use the current quality checks:
 
 ```bash
+# Full local CI gate
+bun run ci:check
+
 # Shared UI smoke coverage
 bun run test:ui
 
 # Lint
-bun run lint
+bun run check:lint
 
 # Auto-fix lint issues
 bun run lint:fix
 
 # Prettier check
-bun run format:check
+bun run check:format
 
 # Prettier write
 bun run format
+
+# Install the checked-in Git hooks
+bun run hooks:install
 ```
+
+`bun run ci:check` mirrors the checks in `.github/workflows/ci.yml`, including the Python worker and security audits.
+The checked-in pre-commit hook runs the same command once you install it with `bun run hooks:install`.
+It automatically picks up `ruff` and `pip-audit` from `.venv/bin` when present.
+If those Python tools are missing, pre-commit skips the Python-only checks only when the staged changes do not touch `services/pension-parser/`; direct `bun run ci:check` still requires the full toolchain.
 
 For the route-based manual checklist used by UI refactor PRs, see `docs/shared-ui-verification.md`.
 
@@ -202,6 +218,9 @@ For the route-based manual checklist used by UI refactor PRs, see `docs/shared-u
 This mode runs the app shell in Docker: frontend, backend, database, and MinIO.
 Pension statement import is auto-disabled in this mode because the AI worker stack is not running.
 The pension UI shows an `AI off` badge until the pension-import profile is started.
+The frontend defaults to same-origin `/api` requests here, so nginx handles auth and document download proxying without extra frontend client configuration.
+Because the browser stays on `http://localhost`, CORS is not part of the normal Docker request path.
+`CORS_ORIGIN` only matters if you access `http://localhost:3000` directly from another browser origin such as local Vite on `http://localhost:5173`.
 
 ```bash
 docker compose --env-file packages/backend/.env up --build
@@ -214,6 +233,12 @@ Services:
 - Postgres: `localhost:5432`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
+
+Smoke check after the stack is up:
+
+1. Open `http://localhost` and sign up or sign in.
+2. Refresh a protected page such as the dashboard to confirm the session cookie survives through nginx.
+3. Upload a payslip PDF or open an existing statement PDF, then download it from the salary or pension UI to confirm proxied document responses work through `http://localhost/api/...`.
 
 ### Pension import stack (vLLM only)
 

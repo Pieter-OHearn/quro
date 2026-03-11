@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router';
 import {
   LayoutDashboard,
   PiggyBank,
   TrendingUp,
   Home,
+  Banknote,
   Briefcase,
   Target,
   Wallet,
@@ -22,6 +23,7 @@ import {
 import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { useAuth } from '@/lib/AuthContext';
+import { getUserDisplayName } from '@/lib/user';
 import { QuroLogo } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
 
@@ -31,6 +33,7 @@ const navItems = [
   { label: 'Investments', path: '/investments', icon: TrendingUp },
   { label: 'Pension', path: '/pension', icon: ShieldCheck },
   { label: 'Mortgage', path: '/mortgage', icon: Home },
+  { label: 'Debts', path: '/debts', icon: Banknote },
   { label: 'Salary', path: '/salary', icon: Briefcase },
   { label: 'Goals', path: '/goals', icon: Target },
   { label: 'Budget', path: '/budget', icon: Wallet },
@@ -73,9 +76,7 @@ function CurrencyDropdown({
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
           Base Currency
         </p>
-        <p className="text-xs text-slate-500 mt-0.5">
-          All totals convert using server-backed FX rates
-        </p>
+        <p className="text-xs text-slate-500 mt-0.5">All totals convert to this currency</p>
       </div>
       <div className="py-1.5 max-h-72 overflow-y-auto">
         {CURRENCY_CODES.map((code: CurrencyCode) => {
@@ -182,18 +183,30 @@ function SidebarNav({ collapsed, pathname, onNavigate }: NavItemsProps) {
   );
 }
 
-type SidebarBottomProps = { collapsed: boolean };
+type SidebarBottomProps = {
+  collapsed: boolean;
+  pathname: string;
+  onNavigate: () => void;
+};
 
-function SidebarBottom({ collapsed }: SidebarBottomProps) {
+function SidebarBottom({ collapsed, pathname, onNavigate }: SidebarBottomProps) {
   const { signOut } = useAuth();
+  const settingsActive = pathname.startsWith('/settings');
+
   return (
     <div className="border-t border-white/10 px-2 py-3 space-y-1">
-      <button
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-white/5 hover:text-white transition-all ${collapsed ? 'justify-center' : ''}`}
+      <NavLink
+        to="/settings"
+        onClick={onNavigate}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+          settingsActive
+            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+            : 'text-slate-400 hover:bg-white/5 hover:text-white'
+        } ${collapsed ? 'justify-center' : ''}`}
       >
         <Settings size={18} />
         {!collapsed && <span className="text-sm font-medium">Settings</span>}
-      </button>
+      </NavLink>
       <button
         onClick={() => {
           void signOut();
@@ -240,7 +253,11 @@ function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen, pathname 
         pathname={pathname}
         onNavigate={() => setMobileOpen(false)}
       />
-      <SidebarBottom collapsed={collapsed} />
+      <SidebarBottom
+        collapsed={collapsed}
+        pathname={pathname}
+        onNavigate={() => setMobileOpen(false)}
+      />
       <button
         onClick={() => setCollapsed(!collapsed)}
         className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-indigo-600 rounded-full items-center justify-center shadow-md hover:bg-indigo-500 transition-colors"
@@ -265,7 +282,10 @@ type AppHeaderProps = {
 };
 
 function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHeaderProps) {
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const userDisplayName = getUserDisplayName(user);
+
   return (
     <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
       <div className="flex items-center gap-3">
@@ -283,15 +303,26 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
       <div className="flex items-center gap-3">
         <CurrencySelector />
         <NotificationBell />
-        <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            void navigate('/settings?tab=profile');
+          }}
+          className="group flex items-center gap-2 rounded-xl border-l border-slate-200 pl-3 text-left transition-colors hover:bg-slate-50"
+          aria-label="Open profile settings"
+        >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
             <User size={14} className="text-white" />
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-slate-800">{user?.name ?? 'User'}</p>
-            <p className="text-[10px] text-slate-400">{user?.email}</p>
+            <p className="text-xs font-semibold text-slate-800 transition-colors group-hover:text-indigo-600">
+              {userDisplayName}
+            </p>
+            <p className="text-[10px] text-slate-400 transition-colors group-hover:text-slate-500">
+              {user?.email}
+            </p>
           </div>
-        </div>
+        </button>
       </div>
     </header>
   );
@@ -313,6 +344,9 @@ export function Layout() {
   const currentPage = navItems.find((item) =>
     item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path),
   );
+  const currentPageLabel = location.pathname.startsWith('/settings')
+    ? 'Settings'
+    : (currentPage?.label ?? 'Dashboard');
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -333,7 +367,7 @@ export function Layout() {
         <AppHeader
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
-          currentPageLabel={currentPage?.label ?? 'Dashboard'}
+          currentPageLabel={currentPageLabel}
           today={today}
         />
         <main className="flex-1 overflow-y-auto">

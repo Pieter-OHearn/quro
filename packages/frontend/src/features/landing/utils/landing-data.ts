@@ -1,5 +1,6 @@
 import {
   BarChart2,
+  Banknote,
   Briefcase,
   Check,
   Globe,
@@ -69,9 +70,16 @@ export const LANDING_FEATURES: readonly LandingFeature[] = [
   {
     icon: Home,
     label: 'Mortgage',
-    desc: 'Log repayments, valuations, and rate changes with a live amortisation view.',
+    desc: 'Track mortgage balances, repayments, property-linked leverage, and rate changes.',
     color: 'bg-sky-50 text-sky-600',
     border: 'hover:border-sky-200',
+  },
+  {
+    icon: Banknote,
+    label: 'Debts',
+    desc: 'Track student loans, credit cards, personal loans, car finance, overdrafts, and more.',
+    color: 'bg-rose-50 text-rose-600',
+    border: 'hover:border-rose-200',
   },
   {
     icon: ShieldCheck,
@@ -125,7 +133,7 @@ export const HOW_IT_WORKS_STEPS: readonly LandingHowItWorksStep[] = [
   {
     step: '02',
     title: 'Add your assets',
-    desc: 'Enter your savings, investments, mortgage, salary and pension details.',
+    desc: 'Enter your savings, investments, mortgage, debts, salary and pension details.',
     icon: BarChart2,
     color: 'text-violet-600 bg-violet-50',
   },

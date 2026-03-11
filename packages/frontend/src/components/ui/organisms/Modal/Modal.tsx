@@ -26,6 +26,7 @@ export type ModalProps = {
   footer?: React.ReactNode;
   scrollable?: boolean;
   header?: React.ReactNode;
+  headerProps?: Omit<ModalHeaderProps, 'title' | 'subtitle' | 'onClose' | 'scrollable'>;
   backdropClassName?: string;
   contentClassName?: string;
   bodyClassName?: string;
@@ -119,6 +120,7 @@ export function Modal({
   footer,
   scrollable,
   header,
+  headerProps,
   backdropClassName,
   contentClassName,
   bodyClassName,
@@ -143,6 +145,7 @@ export function Modal({
             subtitle={subtitle}
             onClose={onClose}
             scrollable={scrollable}
+            {...headerProps}
           />
         )}
         <div className={cn('p-6 space-y-5', scrollable && 'overflow-y-auto', bodyClassName)}>

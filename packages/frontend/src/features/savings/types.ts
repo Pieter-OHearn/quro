@@ -1,6 +1,6 @@
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 
-export type SavingsFormatFn = (value: number, unit?: unknown, compact?: boolean) => string;
+export type SavingsFormatFn = (value: number, unit?: string, compact?: boolean) => string;
 export type SavingsNativeFormatFn = (value: number, currency: string, compact?: boolean) => string;
 
 export type ConvertToBaseFn = (value: number, currency: string) => number;

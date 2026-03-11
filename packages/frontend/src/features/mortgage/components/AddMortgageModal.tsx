@@ -353,7 +353,7 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
 type MortgageFormBodyProps = {
   form: MortgageFormState;
   errors: Record<string, string>;
-  setField: (f: string, v: string) => void;
+  setField: SetFieldFn;
   availableProperties: Property[];
   selectedProperty: Property | undefined;
   existing: MortgageType | undefined;

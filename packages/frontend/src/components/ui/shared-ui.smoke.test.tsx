@@ -24,6 +24,7 @@ import { PanelHeader } from './molecules/PanelHeader';
 import { RowActions } from './molecules/RowActions';
 import { SegmentedControl } from './molecules/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
+import { Modal } from './organisms/Modal';
 import { ContentSection, PageStack } from './templates';
 
 type SmokeCase = {
@@ -247,6 +248,34 @@ const smokeCases: readonly SmokeCase[] = [
       />
     ),
     includes: ['Deposit', 'Transfer'],
+  },
+  {
+    name: 'Modal renders shared headerProps shell',
+    element: (
+      <Modal
+        title="Welcome back"
+        subtitle="Sign in to continue"
+        onClose={noop}
+        scrollable
+        headerProps={{
+          align: 'center',
+          visual: <div data-smoke="modal-visual">Logo</div>,
+          titleClassName: 'tracking-tight',
+          closeButtonClassName: 'rounded-full',
+        }}
+        footer={<Button>Submit</Button>}
+      >
+        <div>Modal body</div>
+      </Modal>
+    ),
+    includes: [
+      'Welcome back',
+      'Sign in to continue',
+      'data-smoke="modal-visual"',
+      'Modal body',
+      'Submit',
+      'max-w-md',
+    ],
   },
   {
     name: 'PageStack renders shared page spacing classes',

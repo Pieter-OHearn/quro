@@ -4,9 +4,33 @@ export type CurrencyCode = (typeof CURRENCY_CODES)[number];
 
 export type User = {
   id: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  location: string;
+  age: number;
+  retirementAge: number;
+  baseCurrency: CurrencyCode;
+  passwordUpdatedAt: string | null;
   createdAt: string;
+};
+
+export type UpdateUserProfileInput = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  location: string;
+  age: number;
+  retirementAge: number;
+};
+
+export type UpdateUserPreferencesInput = {
+  baseCurrency: CurrencyCode;
+};
+
+export type UpdateUserPasswordInput = {
+  currentPassword: string;
+  nextPassword: string;
 };
 
 export type SavingsAccount = {
@@ -354,6 +378,44 @@ export type MortgageTransaction = {
   fixedYears: number | null;
 };
 
+export const DEBT_TYPES = [
+  'car_loan',
+  'student_loan',
+  'personal_loan',
+  'credit_card',
+  'overdraft',
+  'other',
+] as const;
+
+export type DebtType = (typeof DEBT_TYPES)[number];
+
+export type Debt = {
+  id: number;
+  name: string;
+  type: DebtType;
+  lender: string;
+  originalAmount: number;
+  remainingBalance: number;
+  currency: CurrencyCode;
+  interestRate: number;
+  monthlyPayment: number;
+  startDate: string;
+  endDate: string | null;
+  color: string;
+  emoji: string;
+  notes: string | null;
+};
+
+export type DebtPayment = {
+  id: number;
+  debtId: number;
+  date: string;
+  amount: number;
+  principal: number;
+  interest: number;
+  note: string;
+};
+
 export type Payslip = {
   id: number;
   month: string;
@@ -429,6 +491,13 @@ export type AssetAllocation = {
   name: string;
   value: number;
   color: string;
+  currency: CurrencyCode;
+};
+
+export type DashboardAllocationsSummary = {
+  allocations: AssetAllocation[];
+  liabilitiesTotal: number;
+  debtCount: number;
 };
 
 export type CurrencyRate = {
@@ -445,6 +514,7 @@ export type DashboardTransaction = {
   amount: number;
   date: string;
   category: string;
+  currency: CurrencyCode;
 };
 
 export type CurrencyMeta = {

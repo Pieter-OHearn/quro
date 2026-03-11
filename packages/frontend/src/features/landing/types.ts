@@ -11,8 +11,11 @@ export type SignInFormValues = {
 };
 
 export type SignUpFormValues = {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  currentAge: string;
+  retirementAge: string;
   password: string;
   confirm: string;
 };

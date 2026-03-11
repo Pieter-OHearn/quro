@@ -7,6 +7,7 @@ type MortgageTabSelectorProps = {
   activeMortgage: MortgageType;
   onSelect: (id: number | null) => void;
   onAddClick: () => void;
+  addLabel?: string;
 };
 
 export function MortgageTabSelector({
@@ -14,6 +15,7 @@ export function MortgageTabSelector({
   activeMortgage,
   onSelect,
   onAddClick,
+  addLabel = 'Add Mortgage',
 }: Readonly<MortgageTabSelectorProps>) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -35,7 +37,7 @@ export function MortgageTabSelector({
         onClick={onAddClick}
         className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 text-sm font-medium transition-all"
       >
-        <Plus size={14} /> Add Mortgage
+        <Plus size={14} /> {addLabel}
       </button>
     </div>
   );

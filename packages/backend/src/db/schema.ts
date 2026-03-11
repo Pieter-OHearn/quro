@@ -12,6 +12,7 @@ import {
   index,
   check,
   uniqueIndex,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -42,7 +43,12 @@ const inlinePdfDocumentColumns = () => ({
 
 const inlinePdfDocumentStateCheck = (
   constraintName: string,
-  table: ReturnType<typeof inlinePdfDocumentColumns>,
+  table: {
+    documentStorageKey: AnyPgColumn;
+    documentFileName: AnyPgColumn;
+    documentSizeBytes: AnyPgColumn;
+    documentUploadedAt: AnyPgColumn;
+  },
 ) =>
   check(
     constraintName,
@@ -51,19 +57,44 @@ const inlinePdfDocumentStateCheck = (
 
 const inlinePdfDocumentSizeCheck = (
   constraintName: string,
-  table: ReturnType<typeof inlinePdfDocumentColumns>,
+  table: {
+    documentStorageKey: AnyPgColumn;
+    documentFileName: AnyPgColumn;
+    documentSizeBytes: AnyPgColumn;
+    documentUploadedAt: AnyPgColumn;
+  },
 ) =>
   check(constraintName, sql`${table.documentSizeBytes} is null or ${table.documentSizeBytes} > 0`);
 
 // ── Users ───────────────────────────────────────────────────────────────────
 
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+    firstName: text('first_name').notNull(),
+    lastName: text('last_name').notNull(),
+    email: text('email').notNull().unique(),
+    location: text('location').notNull().default(''),
+    age: integer('age').notNull().default(35),
+    retirementAge: integer('retirement_age').notNull().default(67),
+    baseCurrency: currencyCodeEnum('base_currency').notNull().default('EUR'),
+    passwordHash: text('password_hash').notNull(),
+    passwordUpdatedAt: timestamp('password_updated_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    ageRangeCheck: check('users_age_range_check', sql`${table.age} between 16 and 100`),
+    retirementAgeRangeCheck: check(
+      'users_retirement_age_range_check',
+      sql`${table.retirementAge} between 17 and 80`,
+    ),
+    retirementAfterAgeCheck: check(
+      'users_retirement_after_age_check',
+      sql`${table.retirementAge} > ${table.age}`,
+    ),
+  }),
+);
 
 // ── Sessions ────────────────────────────────────────────────────────────────
 
@@ -446,6 +477,57 @@ export const mortgageTransactions = pgTable(
   (table) => ({
     userIdx: index('mortgage_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('mortgage_transactions_user_date_idx').on(table.userId, table.date),
+  }),
+);
+
+// ── Debts ────────────────────────────────────────────────────────────────────
+
+export const debts = pgTable(
+  'debts',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    lender: text('lender').notNull(),
+    originalAmount: numeric('original_amount').notNull(),
+    remainingBalance: numeric('remaining_balance').notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
+    interestRate: numeric('interest_rate').notNull(),
+    monthlyPayment: numeric('monthly_payment').notNull(),
+    startDate: date('start_date', { mode: 'string' }).notNull(),
+    endDate: date('end_date', { mode: 'string' }),
+    color: text('color').notNull(),
+    emoji: text('emoji').notNull(),
+    notes: text('notes'),
+  },
+  (table) => ({
+    userIdx: index('debts_user_id_idx').on(table.userId),
+  }),
+);
+
+export const debtPayments = pgTable(
+  'debt_payments',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    debtId: integer('debt_id')
+      .references(() => debts.id, { onDelete: 'cascade' })
+      .notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
+    amount: numeric('amount').notNull(),
+    principal: numeric('principal').notNull(),
+    interest: numeric('interest').notNull(),
+    note: text('note'),
+  },
+  (table) => ({
+    userIdx: index('debt_payments_user_id_idx').on(table.userId),
+    userDateIdx: index('debt_payments_user_date_idx').on(table.userId, table.date),
+    debtIdx: index('debt_payments_debt_id_idx').on(table.debtId),
   }),
 );
 

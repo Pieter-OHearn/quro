@@ -1,6 +1,12 @@
 import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
-import type { Payslip } from '@quro/shared';
 import type {
+  DashboardAllocationsSummary as DashboardAllocationSummaryPayload,
+  DashboardTransaction as DashboardTransactionPayload,
+  NetWorthSnapshot,
+  Payslip,
+} from '@quro/shared';
+import type {
+  AllocationSummary,
   DashboardCard,
   DashboardFormatFn,
   DashboardTransaction,
@@ -106,6 +112,53 @@ export const buildDashboardCards = (
   },
 ];
 
+export function normalizeNetWorthSnapshots(
+  snapshots: readonly NetWorthSnapshot[],
+  convertToBase: (amount: number, currency: string) => number,
+): NetWorthMetricData[] {
+  return snapshots.map((snapshot) => ({
+    month: snapshot.month,
+    year: snapshot.year,
+    value: convertToBase(snapshot.totalValue, snapshot.currency),
+  }));
+}
+
+export function normalizeAssetAllocations(
+  summary: DashboardAllocationSummaryPayload,
+  convertToBase: (amount: number, currency: string) => number,
+): AllocationSummary {
+  const summaryCurrency = summary.allocations[0]?.currency ?? 'EUR';
+  const allocationData = summary.allocations.map((allocation) => ({
+    name: allocation.name,
+    value: convertToBase(allocation.value, allocation.currency),
+    color: allocation.color,
+  }));
+  const totalAssets = allocationData.reduce((sum, item) => sum + item.value, 0);
+  const liabilitiesTotal = convertToBase(summary.liabilitiesTotal, summaryCurrency);
+
+  return {
+    allocationData,
+    totalAssets,
+    liabilitiesTotal,
+    debtCount: summary.debtCount,
+    netWorth: totalAssets - liabilitiesTotal,
+  };
+}
+
+export function normalizeDashboardTransactions(
+  transactions: readonly DashboardTransactionPayload[],
+  convertToBase: (amount: number, currency: string) => number,
+): DashboardTransaction[] {
+  return transactions.map((transaction) => ({
+    id: transaction.id,
+    name: transaction.name,
+    category: transaction.category,
+    date: transaction.date,
+    type: transaction.type,
+    amount: convertToBase(transaction.amount, transaction.currency),
+  }));
+}
+
 const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
 const formatMonthKey = (date: Date) =>
@@ -164,8 +217,11 @@ const computeSalaryMetrics = (
   };
 };
 
-export const computeNWMetrics = (chartData: readonly NetWorthMetricData[], totalAlloc: number) => {
-  const currentNW = chartData.length > 0 ? chartData[chartData.length - 1].value : totalAlloc;
+export const computeNWMetrics = (
+  chartData: readonly NetWorthMetricData[],
+  fallbackNetWorth: number,
+) => {
+  const currentNW = chartData.length > 0 ? chartData[chartData.length - 1].value : fallbackNetWorth;
   const prevNW = chartData.length > 1 ? chartData[chartData.length - 2].value : currentNW;
   const currentYear = new Date().getFullYear();
   const firstCurrentYearPoint = chartData.find((point) => point.year === currentYear);

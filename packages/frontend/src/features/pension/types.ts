@@ -135,8 +135,6 @@ export type PensionPageState = {
   projected: number | null;
   monthlyDrawdown: number | null;
   yearsToRetirement: number | null;
-  retirementYearsInput: string;
-  setRetirementYearsInput: (value: string) => void;
   pensionGrowthData: PensionGrowthPoint[];
   pensionGrowthPct: number | null;
   handleSave: (pot: PensionPot | Omit<PensionPot, 'id'>) => void;

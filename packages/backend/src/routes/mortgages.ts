@@ -71,7 +71,7 @@ async function resolveLinkedProperty(
   mortgageId: number,
 ): Promise<
   | { ok: true; nextId: number | null; property: LinkedProperty | null }
-  | { ok: false; error: string; status: number }
+  | { ok: false; error: string; status: 400 | 404 | 409 }
 > {
   const nextIdResult = resolveNextPropertyId(rawLinkedPropertyId, currentPropertyId);
   if (!nextIdResult.ok)
@@ -122,6 +122,33 @@ async function syncLinkedProperty(
 app.get('/', async (c) => {
   const user = getAuthUser(c);
   const data = await db.select().from(mortgages).where(eq(mortgages.userId, user.id));
+  return c.json({ data });
+});
+
+// ── Mortgage Transactions ────────────────────────────────────────────────────
+
+app.get('/transactions', async (c) => {
+  const user = getAuthUser(c);
+  const mortgageId = c.req.query('mortgageId');
+  if (mortgageId) {
+    const parsedMortgageId = parseId(mortgageId);
+    if (parsedMortgageId === null)
+      return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
+    const data = await db
+      .select()
+      .from(mortgageTransactions)
+      .where(
+        and(
+          eq(mortgageTransactions.mortgageId, parsedMortgageId),
+          eq(mortgageTransactions.userId, user.id),
+        ),
+      );
+    return c.json({ data });
+  }
+  const data = await db
+    .select()
+    .from(mortgageTransactions)
+    .where(eq(mortgageTransactions.userId, user.id));
   return c.json({ data });
 });
 
@@ -236,33 +263,6 @@ app.delete('/:id', async (c) => {
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
-});
-
-// ── Mortgage Transactions ────────────────────────────────────────────────────
-
-app.get('/transactions', async (c) => {
-  const user = getAuthUser(c);
-  const mortgageId = c.req.query('mortgageId');
-  if (mortgageId) {
-    const parsedMortgageId = parseId(mortgageId);
-    if (parsedMortgageId === null)
-      return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
-    const data = await db
-      .select()
-      .from(mortgageTransactions)
-      .where(
-        and(
-          eq(mortgageTransactions.mortgageId, parsedMortgageId),
-          eq(mortgageTransactions.userId, user.id),
-        ),
-      );
-    return c.json({ data });
-  }
-  const data = await db
-    .select()
-    .from(mortgageTransactions)
-    .where(eq(mortgageTransactions.userId, user.id));
   return c.json({ data });
 });
 

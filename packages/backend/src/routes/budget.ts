@@ -117,12 +117,34 @@ app.patch('/transactions/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   const body = await c.req.json();
   const { userId: _ignoredUserId, ...safeBody } = body ?? {};
+
+  const [existing] = await db
+    .select()
+    .from(budgetTransactions)
+    .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)));
+  if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
+  const nextCategoryId = Number(safeBody.categoryId ?? existing.categoryId);
+  if (!Number.isInteger(nextCategoryId) || nextCategoryId <= 0) {
+    return c.json({ error: 'Invalid category id' }, HTTP_STATUS.BAD_REQUEST);
+  }
+
+  if (nextCategoryId !== existing.categoryId) {
+    const [category] = await db
+      .select({ id: budgetCategories.id })
+      .from(budgetCategories)
+      .where(and(eq(budgetCategories.id, nextCategoryId), eq(budgetCategories.userId, user.id)));
+    if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
+  }
+
+  const updateValues =
+    'categoryId' in safeBody ? { ...safeBody, categoryId: nextCategoryId } : safeBody;
+
   const [data] = await db
     .update(budgetTransactions)
-    .set(safeBody)
+    .set(updateValues)
     .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
     .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 

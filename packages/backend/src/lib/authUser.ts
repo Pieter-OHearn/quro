@@ -2,7 +2,6 @@ import type { Context } from 'hono';
 
 export type AuthUser = {
   id: number;
-  name: string;
   email: string;
 };
 

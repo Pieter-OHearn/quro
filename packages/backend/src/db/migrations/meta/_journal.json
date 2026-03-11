@@ -64,6 +64,27 @@
       "when": 1773090000000,
       "tag": "0008_inline_pdf_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773180000000,
+      "tag": "0009_standalone_debts_domain",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773273600000,
+      "tag": "0010_user_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773360000000,
+      "tag": "0011_remove_user_name",
+      "breakpoints": true
     }
   ]
 }

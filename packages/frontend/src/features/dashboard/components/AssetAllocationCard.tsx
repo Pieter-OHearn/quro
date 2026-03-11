@@ -1,4 +1,5 @@
 import { Cell, Pie, PieChart } from 'recharts';
+import { Link } from 'react-router';
 import type { AllocationItem, DashboardFormatFn } from '../types';
 
 export function AllocationPieChart({ data }: Readonly<{ data: readonly AllocationItem[] }>) {
@@ -55,26 +56,53 @@ function AllocationLegend({
 export function AssetAllocationCard({
   allocationData,
   totalAlloc,
+  liabilitiesTotal,
   baseCurrency,
   fmtBase,
 }: Readonly<{
   allocationData: readonly AllocationItem[];
   totalAlloc: number;
+  liabilitiesTotal: number;
   baseCurrency: string;
   fmtBase: DashboardFormatFn;
 }>) {
+  const netWorth = totalAlloc - liabilitiesTotal;
+  const hasAssets = allocationData.length > 0;
+
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm h-full">
       <h3 className="font-semibold text-slate-900 mb-1">Asset Allocation</h3>
       <p className="text-xs text-slate-400 mb-4">All values in {baseCurrency}</p>
-      {allocationData.length > 0 ? (
+      {hasAssets ? (
         <>
           <AllocationPieChart data={allocationData} />
           <AllocationLegend data={allocationData} totalAlloc={totalAlloc} fmtBase={fmtBase} />
         </>
       ) : (
-        <p className="text-sm text-slate-400 py-12 text-center">No allocation data yet.</p>
+        <p className="py-12 text-center text-sm text-slate-400">No asset allocation data yet.</p>
       )}
+      {hasAssets || liabilitiesTotal > 0 ? (
+        <div className="mt-4 space-y-2">
+          <div className="border-t border-slate-100" />
+          {liabilitiesTotal > 0 ? (
+            <Link to="/debts" className="group flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-rose-400" />
+                <span className="text-xs text-rose-500 transition-colors group-hover:text-rose-700">
+                  Liabilities
+                </span>
+              </div>
+              <span className="text-xs font-semibold text-rose-500">
+                -{fmtBase(liabilitiesTotal)}
+              </span>
+            </Link>
+          ) : null}
+          <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+            <span className="text-xs font-semibold text-slate-700">Net Worth</span>
+            <span className="text-xs font-bold text-slate-900">{fmtBase(netWorth)}</span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

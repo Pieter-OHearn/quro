@@ -23,7 +23,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    this.setState({ componentStack: info.componentStack });
+    this.setState({ componentStack: info.componentStack ?? null });
     console.error('Unhandled app render error', error, info);
   }
 

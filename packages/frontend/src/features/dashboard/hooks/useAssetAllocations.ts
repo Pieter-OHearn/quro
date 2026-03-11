@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { AssetAllocation } from '@quro/shared';
+import type { DashboardAllocationsSummary } from '@quro/shared';
 import { api } from '@/lib/api';
 
 export function useAssetAllocations() {
@@ -7,7 +7,7 @@ export function useAssetAllocations() {
     queryKey: ['dashboard', 'allocations'],
     queryFn: async () => {
       const { data } = await api.get('/api/dashboard/allocations');
-      return data.data as AssetAllocation[];
+      return data.data as DashboardAllocationsSummary;
     },
   });
 }

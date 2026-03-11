@@ -2,8 +2,10 @@ import { ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
 import { useGoals } from '@/features/goals/hooks';
 import { parseGoalYear } from '@/features/goals/utils/goal-utils';
 import { usePayslips } from '@/features/salary/hooks';
+import type { DashboardAllocationsSummary } from '@quro/shared';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { getUserDisplayName } from '@/lib/user';
 import {
   DashboardChartsGrid,
   DashboardStatCards,
@@ -18,13 +20,20 @@ import {
   computeDashboardTxnStats,
   computeNWMetrics,
   getGreeting,
+  normalizeAssetAllocations,
+  normalizeDashboardTransactions,
+  normalizeNetWorthSnapshots,
 } from './utils/dashboard-data';
 import type { DashboardFormatFn } from './types';
 import { useAssetAllocations, useDashboardTransactions, useNetWorthSnapshots } from './hooks';
 
 const DASHBOARD_GOAL_LIMIT = 4;
 const DASHBOARD_TXN_LIMIT = 6;
-const DASHBOARD_SOURCE_CURRENCY = 'EUR';
+const EMPTY_ALLOCATIONS_SUMMARY: DashboardAllocationsSummary = {
+  allocations: [],
+  liabilitiesTotal: 0,
+  debtCount: 0,
+};
 
 const computeAnnualGross = (
   payslips: ReadonlyArray<{ gross: number; date: string; currency: string }>,
@@ -41,7 +50,8 @@ function useDashboardData(
   convertToBase: (amount: number, currency: string) => number,
 ) {
   const { data: netWorthData = [], isLoading: loadingNW } = useNetWorthSnapshots();
-  const { data: allocations = [], isLoading: loadingAlloc } = useAssetAllocations();
+  const { data: allocations = EMPTY_ALLOCATIONS_SUMMARY, isLoading: loadingAlloc } =
+    useAssetAllocations();
   const { data: transactions = [], isLoading: loadingTxns } = useDashboardTransactions();
   const { data: goals = [], isLoading: loadingGoals } = useGoals();
   const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
@@ -52,30 +62,21 @@ function useDashboardData(
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const annualGross = computeAnnualGross(payslips, convertToBase);
   const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
-  const convertedTransactions = transactions.map((transaction) => ({
-    ...transaction,
-    amount: convertToBase(transaction.amount, DASHBOARD_SOURCE_CURRENCY),
-  }));
+  const convertedTransactions = normalizeDashboardTransactions(transactions, convertToBase);
   const currentMonthTransactions = convertedTransactions.filter((tx) =>
     tx.date.startsWith(currentMonthKey),
   );
-  const chartData = netWorthData.map((snapshot) => ({
-    month: snapshot.month,
-    year: snapshot.year,
-    value: convertToBase(snapshot.totalValue, snapshot.currency),
-  }));
-  const allocationData = allocations.map((allocation) => ({
-    name: allocation.name,
-    value: convertToBase(allocation.value, DASHBOARD_SOURCE_CURRENCY),
-    color: allocation.color,
-  }));
-  const totalAlloc = allocationData.reduce((sum, item) => sum + item.value, 0);
-  const allocationByName = allocationData.reduce<Record<string, number>>((acc, item) => {
-    acc[item.name] = item.value;
-    return acc;
-  }, {});
+  const chartData = normalizeNetWorthSnapshots(netWorthData, convertToBase);
+  const allocationSummary = normalizeAssetAllocations(allocations, convertToBase);
+  const allocationByName = allocationSummary.allocationData.reduce<Record<string, number>>(
+    (acc, item) => {
+      acc[item.name] = item.value;
+      return acc;
+    },
+    {},
+  );
 
-  const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, totalAlloc);
+  const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, allocationSummary.netWorth);
   const {
     monthlyCategoryChange,
     monthlySalaryValue,
@@ -87,8 +88,10 @@ function useDashboardData(
   return {
     isLoading,
     chartData,
-    allocationData,
-    totalAlloc,
+    allocationData: allocationSummary.allocationData,
+    totalAssets: allocationSummary.totalAssets,
+    liabilitiesTotal: allocationSummary.liabilitiesTotal,
+    debtCount: allocationSummary.debtCount,
     goals,
     recentTransactions: convertedTransactions,
     monthlySalaryValue,
@@ -157,7 +160,9 @@ function DashboardPageBody({
   const {
     chartData,
     allocationData,
-    totalAlloc,
+    totalAssets,
+    liabilitiesTotal,
+    debtCount,
     monthlySalaryValue,
     monthlyCategoryChange,
     salaryTrendChange,
@@ -183,18 +188,26 @@ function DashboardPageBody({
           greetingName={userName}
           netWorth={netWorth}
           monthChange={monthChange}
+          totalAssets={totalAssets}
+          liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
           fmtBase={fmtBase}
         />
       </ContentSection>
       <ContentSection>
-        <DashboardStatCards cards={dashboardCards} fmtBase={fmtBase} />
+        <DashboardStatCards
+          cards={dashboardCards}
+          liabilitiesValue={liabilitiesTotal}
+          debtCount={debtCount}
+          fmtBase={fmtBase}
+        />
       </ContentSection>
       <ContentSection>
         <DashboardChartsGrid
           chartData={chartData}
           allocationData={allocationData}
-          totalAlloc={totalAlloc}
+          totalAlloc={totalAssets}
+          liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
           ytdPct={ytdPct}
           fmtBase={fmtBase}
@@ -217,7 +230,7 @@ export function Dashboard() {
   return (
     <DashboardPageBody
       data={data}
-      userName={user?.name ?? 'there'}
+      userName={getUserDisplayName(user, 'there')}
       baseCurrency={baseCurrency}
       fmtBase={fmtBase}
     />

@@ -4,12 +4,14 @@ import { Dashboard } from '@/features/dashboard';
 import { Savings } from '@/features/savings';
 import { Investments } from '@/features/investments';
 import { Mortgage } from '@/features/mortgage';
+import { Debts } from '@/features/debts';
 import { Salary } from '@/features/salary';
 import { Goals } from '@/features/goals';
 import { Budget } from '@/features/budget';
 import { Pension } from '@/features/pension';
 import { Brand } from '@/features/brand';
 import { LandingPage } from '@/features/landing';
+import { Settings } from '@/features/settings';
 import { useAuth } from '@/lib/AuthContext';
 import { RouteErrorScreen } from '@/router/RouteErrorScreen';
 
@@ -70,10 +72,12 @@ export const router = createBrowserRouter([
       { path: 'savings', Component: Savings },
       { path: 'investments', Component: Investments },
       { path: 'mortgage', Component: Mortgage },
+      { path: 'debts', Component: Debts },
       { path: 'salary', Component: Salary },
       { path: 'pension', Component: Pension },
       { path: 'goals', Component: Goals },
       { path: 'budget', Component: Budget },
+      { path: 'settings', Component: Settings },
     ],
   },
 ]);

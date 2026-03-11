@@ -80,7 +80,7 @@ export function PensionTxnHistory({
   onAdd,
   onEdit,
   onDelete,
-}: PensionTxnHistoryProps): JSX.Element {
+}: PensionTxnHistoryProps) {
   const { fmtNative } = useCurrency();
   const [filter, setFilter] = useState<PensionTxnType | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);

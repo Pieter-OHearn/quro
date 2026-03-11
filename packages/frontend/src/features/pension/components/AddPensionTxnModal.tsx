@@ -335,7 +335,7 @@ function PreviewBanner({
   annualStatementDirection: AnnualStatementDirection;
   currency: string;
   fmtNative: (amount: number, currency: string, compact?: boolean) => string;
-}>): JSX.Element {
+}>) {
   const signedAmount = resolvePreviewSignedAmount({
     type,
     amount,
@@ -399,7 +399,7 @@ export function AddPensionTxnModal({
   existingDocument,
   onClose,
   onSave,
-}: AddPensionTxnModalProps): JSX.Element {
+}: AddPensionTxnModalProps) {
   const form = useAddPensionTxnForm(pot, existing);
   const documentState = useStatementDocumentState(existingDocument, form.type);
   const [isSaving, setIsSaving] = useState(false);

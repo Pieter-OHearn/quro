@@ -77,7 +77,7 @@ export function BudgetSummaryCards({
   fmt,
 }: Readonly<BudgetSummaryCardsProps>) {
   return (
-    <StatsGrid>
+    <StatsGrid className={'lg:grid-cols-4 xl:grid-cols-4'}>
       <TotalBudgetCard totalBudgeted={totalBudgeted} fmt={fmt} />
       <TotalSpentCard totalBudgeted={totalBudgeted} totalSpent={totalSpent} fmt={fmt} />
       <RemainingCard remaining={remaining} fmt={fmt} />

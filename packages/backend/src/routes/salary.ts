@@ -428,9 +428,12 @@ app.get('/payslips/:id/document/download', async (c) => {
     const bytes = await getS3ObjectBytes({ key: document.storageKey });
     if (!bytes) return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
 
-    c.header('Content-Type', PDF_MIME_TYPE);
-    c.header('Content-Disposition', `inline; filename="${document.fileName}"`);
-    return c.body(bytes);
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        'Content-Type': PDF_MIME_TYPE,
+        'Content-Disposition': `inline; filename="${document.fileName}"`,
+      },
+    });
   } catch (error) {
     if (isS3NotFoundError(error)) {
       return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
