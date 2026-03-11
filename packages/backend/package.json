@@ -9,8 +9,7 @@
     "build": "bun build src/index.ts --outdir dist --target bun",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
-    "db:seed": "bun run src/db/seed.ts",
-    "db:clear": "bun run src/db/clear.ts"
+    "db:seed": "bun run src/db/seed.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1003.0",

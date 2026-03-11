@@ -2,6 +2,7 @@ import { ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
 import { useGoals } from '@/features/goals/hooks';
 import { parseGoalYear } from '@/features/goals/utils/goal-utils';
 import { usePayslips } from '@/features/salary/hooks';
+import type { DashboardAllocationsSummary } from '@quro/shared';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
@@ -27,6 +28,11 @@ import { useAssetAllocations, useDashboardTransactions, useNetWorthSnapshots } f
 
 const DASHBOARD_GOAL_LIMIT = 4;
 const DASHBOARD_TXN_LIMIT = 6;
+const EMPTY_ALLOCATIONS_SUMMARY: DashboardAllocationsSummary = {
+  allocations: [],
+  liabilitiesTotal: 0,
+  debtCount: 0,
+};
 
 const computeAnnualGross = (
   payslips: ReadonlyArray<{ gross: number; date: string; currency: string }>,
@@ -43,7 +49,8 @@ function useDashboardData(
   convertToBase: (amount: number, currency: string) => number,
 ) {
   const { data: netWorthData = [], isLoading: loadingNW } = useNetWorthSnapshots();
-  const { data: allocations = [], isLoading: loadingAlloc } = useAssetAllocations();
+  const { data: allocations = EMPTY_ALLOCATIONS_SUMMARY, isLoading: loadingAlloc } =
+    useAssetAllocations();
   const { data: transactions = [], isLoading: loadingTxns } = useDashboardTransactions();
   const { data: goals = [], isLoading: loadingGoals } = useGoals();
   const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
@@ -59,14 +66,16 @@ function useDashboardData(
     tx.date.startsWith(currentMonthKey),
   );
   const chartData = normalizeNetWorthSnapshots(netWorthData, convertToBase);
-  const allocationData = normalizeAssetAllocations(allocations, convertToBase);
-  const totalAlloc = allocationData.reduce((sum, item) => sum + item.value, 0);
-  const allocationByName = allocationData.reduce<Record<string, number>>((acc, item) => {
-    acc[item.name] = item.value;
-    return acc;
-  }, {});
+  const allocationSummary = normalizeAssetAllocations(allocations, convertToBase);
+  const allocationByName = allocationSummary.allocationData.reduce<Record<string, number>>(
+    (acc, item) => {
+      acc[item.name] = item.value;
+      return acc;
+    },
+    {},
+  );
 
-  const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, totalAlloc);
+  const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, allocationSummary.netWorth);
   const {
     monthlyCategoryChange,
     monthlySalaryValue,
@@ -78,8 +87,10 @@ function useDashboardData(
   return {
     isLoading,
     chartData,
-    allocationData,
-    totalAlloc,
+    allocationData: allocationSummary.allocationData,
+    totalAssets: allocationSummary.totalAssets,
+    liabilitiesTotal: allocationSummary.liabilitiesTotal,
+    debtCount: allocationSummary.debtCount,
     goals,
     recentTransactions: convertedTransactions,
     monthlySalaryValue,
@@ -148,7 +159,9 @@ function DashboardPageBody({
   const {
     chartData,
     allocationData,
-    totalAlloc,
+    totalAssets,
+    liabilitiesTotal,
+    debtCount,
     monthlySalaryValue,
     monthlyCategoryChange,
     salaryTrendChange,
@@ -174,18 +187,26 @@ function DashboardPageBody({
           greetingName={userName}
           netWorth={netWorth}
           monthChange={monthChange}
+          totalAssets={totalAssets}
+          liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
           fmtBase={fmtBase}
         />
       </ContentSection>
       <ContentSection>
-        <DashboardStatCards cards={dashboardCards} fmtBase={fmtBase} />
+        <DashboardStatCards
+          cards={dashboardCards}
+          liabilitiesValue={liabilitiesTotal}
+          debtCount={debtCount}
+          fmtBase={fmtBase}
+        />
       </ContentSection>
       <ContentSection>
         <DashboardChartsGrid
           chartData={chartData}
           allocationData={allocationData}
-          totalAlloc={totalAlloc}
+          totalAlloc={totalAssets}
+          liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
           ytdPct={ytdPct}
           fmtBase={fmtBase}

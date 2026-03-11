@@ -18,6 +18,14 @@ export type AllocationItem = {
   color: string;
 };
 
+export type AllocationSummary = {
+  allocationData: AllocationItem[];
+  totalAssets: number;
+  liabilitiesTotal: number;
+  debtCount: number;
+  netWorth: number;
+};
+
 export type GoalDisplay = {
   name: string;
   current: number;

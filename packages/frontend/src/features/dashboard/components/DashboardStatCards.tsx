@@ -1,11 +1,16 @@
+import { Banknote } from 'lucide-react';
 import { StatCard, StatsGrid } from '@/components/ui';
 import type { DashboardCard, DashboardFormatFn } from '../types';
 
 export function DashboardStatCards({
   cards,
+  liabilitiesValue,
+  debtCount,
   fmtBase,
 }: Readonly<{
   cards: readonly DashboardCard[];
+  liabilitiesValue: number;
+  debtCount: number;
   fmtBase: DashboardFormatFn;
 }>) {
   return (
@@ -32,6 +37,14 @@ export function DashboardStatCards({
           />
         );
       })}
+      <StatCard
+        label="Total Liabilities"
+        value={fmtBase(liabilitiesValue)}
+        subtitle={`${debtCount} active debt${debtCount === 1 ? '' : 's'}`}
+        icon={Banknote}
+        color="rose"
+        href="/debts"
+      />
     </StatsGrid>
   );
 }

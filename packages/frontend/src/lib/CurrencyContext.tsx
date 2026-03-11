@@ -3,7 +3,11 @@ import { CURRENCY_CODES, CURRENCY_META, isCurrencyCode, type CurrencyCode } from
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from './AuthContext';
 import { convertCurrencyAmount } from './currencyRates';
-import { getCurrencyRatesErrorDetail, useCurrencyRates } from './useCurrencyRates';
+import {
+  getCurrencyRatesErrorDetail,
+  isCurrencyRatesUnavailableError,
+  useCurrencyRates,
+} from './useCurrencyRates';
 
 export { CURRENCY_CODES, CURRENCY_META };
 export type { CurrencyCode };
@@ -23,10 +27,16 @@ type CurrencyContextType = {
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
 
+export type CurrencyRatesFailureMode = 'fx-unavailable' | 'app-error';
+
 type CurrencyRatesQueryState = Pick<
   ReturnType<typeof useCurrencyRates>,
   'data' | 'error' | 'isError' | 'isPending' | 'refetch'
 >;
+
+export function getCurrencyRatesFailureMode(error: unknown): CurrencyRatesFailureMode {
+  return isCurrencyRatesUnavailableError(error) ? 'fx-unavailable' : 'app-error';
+}
 
 function normalizeCurrency(currency: string): CurrencyCode {
   if (isCurrencyCode(currency)) return currency;
@@ -100,14 +110,20 @@ function renderCurrencyRatesGate(
   }
 
   if (hasUser && ratesQuery.isError) {
-    return (
-      <CurrencyRatesFallback
-        detail={getCurrencyRatesErrorDetail(ratesQuery.error)}
-        onRetry={() => {
-          void ratesQuery.refetch();
-        }}
-      />
-    );
+    if (getCurrencyRatesFailureMode(ratesQuery.error) === 'fx-unavailable') {
+      return (
+        <CurrencyRatesFallback
+          detail={getCurrencyRatesErrorDetail(ratesQuery.error)}
+          onRetry={() => {
+            void ratesQuery.refetch();
+          }}
+        />
+      );
+    }
+
+    throw ratesQuery.error instanceof Error
+      ? ratesQuery.error
+      : new Error('Failed to load server-backed currency rates');
   }
 
   return null;

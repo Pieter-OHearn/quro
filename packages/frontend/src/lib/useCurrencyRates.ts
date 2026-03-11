@@ -16,6 +16,12 @@ export class CurrencyRatesUnavailableError extends Error {
   }
 }
 
+export function isCurrencyRatesUnavailableError(
+  error: unknown,
+): error is CurrencyRatesUnavailableError {
+  return error instanceof CurrencyRatesUnavailableError;
+}
+
 export function getCurrencyRatesErrorDetail(error: unknown): string | null {
   if (error instanceof Error && error.message.trim()) return error.message;
   return null;

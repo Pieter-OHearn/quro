@@ -354,6 +354,44 @@ export type MortgageTransaction = {
   fixedYears: number | null;
 };
 
+export const DEBT_TYPES = [
+  'car_loan',
+  'student_loan',
+  'personal_loan',
+  'credit_card',
+  'overdraft',
+  'other',
+] as const;
+
+export type DebtType = (typeof DEBT_TYPES)[number];
+
+export type Debt = {
+  id: number;
+  name: string;
+  type: DebtType;
+  lender: string;
+  originalAmount: number;
+  remainingBalance: number;
+  currency: CurrencyCode;
+  interestRate: number;
+  monthlyPayment: number;
+  startDate: string;
+  endDate: string | null;
+  color: string;
+  emoji: string;
+  notes: string | null;
+};
+
+export type DebtPayment = {
+  id: number;
+  debtId: number;
+  date: string;
+  amount: number;
+  principal: number;
+  interest: number;
+  note: string;
+};
+
 export type Payslip = {
   id: number;
   month: string;
@@ -430,6 +468,12 @@ export type AssetAllocation = {
   value: number;
   color: string;
   currency: CurrencyCode;
+};
+
+export type DashboardAllocationsSummary = {
+  allocations: AssetAllocation[];
+  liabilitiesTotal: number;
+  debtCount: number;
 };
 
 export type CurrencyRate = {

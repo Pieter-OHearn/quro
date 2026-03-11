@@ -4,6 +4,7 @@ import { Dashboard } from '@/features/dashboard';
 import { Savings } from '@/features/savings';
 import { Investments } from '@/features/investments';
 import { Mortgage } from '@/features/mortgage';
+import { Debts } from '@/features/debts';
 import { Salary } from '@/features/salary';
 import { Goals } from '@/features/goals';
 import { Budget } from '@/features/budget';
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
       { path: 'savings', Component: Savings },
       { path: 'investments', Component: Investments },
       { path: 'mortgage', Component: Mortgage },
+      { path: 'debts', Component: Debts },
       { path: 'salary', Component: Salary },
       { path: 'pension', Component: Pension },
       { path: 'goals', Component: Goals },

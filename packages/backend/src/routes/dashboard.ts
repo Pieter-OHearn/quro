@@ -4,6 +4,8 @@ import { db } from '../db/client';
 import {
   budgetTransactions,
   currencyRates,
+  debtPayments,
+  debts,
   holdingTransactions,
   holdings,
   mortgageTransactions,
@@ -81,6 +83,12 @@ type DerivedAllocation = {
   currency: string;
 };
 
+export type DerivedAllocationSummary = {
+  allocations: DerivedAllocation[];
+  liabilitiesTotal: number;
+  debtCount: number;
+};
+
 function computeSharesByHolding(
   txns: Array<{ holdingId: number; shares: unknown; type: string }>,
 ): Map<number, number> {
@@ -123,6 +131,15 @@ type PensionTransactionRow = {
   date: string;
 };
 type MortgageRow = { id: number; outstandingBalance: unknown };
+type DebtRow = { id: number; remainingBalance: unknown; currency: string };
+type DebtPaymentRow = {
+  debtId: number;
+  amount: unknown;
+  principal: unknown;
+  interest: unknown;
+  date: string;
+  note?: string | null;
+};
 
 type CurrencyRow = { id: number; currency: string };
 
@@ -154,6 +171,14 @@ type DatedPensionTransaction = {
   type: 'contribution' | 'fee' | 'annual_statement' | 'tax';
   amount: number;
   taxAmount: number;
+  timestamp: number;
+};
+
+type DatedDebtPayment = {
+  debtId: number;
+  amount: number;
+  principal: number;
+  interest: number;
   timestamp: number;
 };
 
@@ -277,7 +302,46 @@ function buildMortgageBalanceById(mortgages: readonly MortgageRow[]): Map<number
   return balances;
 }
 
-function computeDerivedAllocations(
+function buildDatedDebtPayments(payments: readonly DebtPaymentRow[]): DatedDebtPayment[] {
+  return payments
+    .map((payment) => ({
+      debtId: payment.debtId,
+      amount: toNumber(payment.amount),
+      principal: toNumber(payment.principal),
+      interest: toNumber(payment.interest),
+      timestamp: toUtcTimestamp(payment.date),
+    }))
+    .filter((payment) => Number.isFinite(payment.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function computeDebtLiabilitiesTotal(
+  userDebts: readonly DebtRow[],
+  rates: Map<string, number>,
+): number {
+  return userDebts.reduce(
+    (sum, debt) => sum + convertToBase(toNumber(debt.remainingBalance), debt.currency, rates),
+    0,
+  );
+}
+
+function computeDebtLiabilitiesAtCutoff(
+  debts: readonly DebtRow[],
+  paymentsByDebtId: ReadonlyMap<number, readonly DatedDebtPayment[]>,
+  cutoff: number,
+  rates: Map<string, number>,
+): number {
+  return debts.reduce((sum, debt) => {
+    let balance = toNumber(debt.remainingBalance);
+    for (const payment of paymentsByDebtId.get(debt.id) ?? []) {
+      if (payment.timestamp <= cutoff) continue;
+      balance += payment.principal;
+    }
+    return sum + convertToBase(Math.max(0, balance), debt.currency, rates);
+  }, 0);
+}
+
+export function computeDerivedAllocations(
   rates: Map<string, number>,
   userSavings: readonly SavingsAccountRow[],
   userHoldings: readonly HoldingRow[],
@@ -285,7 +349,8 @@ function computeDerivedAllocations(
   userProperties: readonly PropertyRow[],
   userPensions: readonly PensionPotRow[],
   userMortgages: readonly MortgageRow[],
-): DerivedAllocation[] {
+  userDebts: readonly DebtRow[],
+): DerivedAllocationSummary {
   const savingsTotal = userSavings.reduce(
     (sum, account) => sum + convertToBase(toNumber(account.balance), account.currency, rates),
     0,
@@ -311,27 +376,31 @@ function computeDerivedAllocations(
     0,
   );
 
-  return [
-    { id: 1, name: 'Savings', value: savingsTotal, color: '#6366f1', currency: BASE_CURRENCY },
-    {
-      id: 2,
-      name: 'Brokerage',
-      value: brokerageTotal,
-      color: '#0ea5e9',
-      currency: BASE_CURRENCY,
-    },
-    {
-      id: 3,
-      name: 'Property Equity',
-      value: propertyEquityTotal,
-      color: '#10b981',
-      currency: BASE_CURRENCY,
-    },
-    { id: 4, name: 'Pension', value: pensionTotal, color: '#f59e0b', currency: BASE_CURRENCY },
-  ];
+  return {
+    allocations: [
+      { id: 1, name: 'Savings', value: savingsTotal, color: '#6366f1', currency: BASE_CURRENCY },
+      {
+        id: 2,
+        name: 'Brokerage',
+        value: brokerageTotal,
+        color: '#0ea5e9',
+        currency: BASE_CURRENCY,
+      },
+      {
+        id: 3,
+        name: 'Property Equity',
+        value: propertyEquityTotal,
+        color: '#10b981',
+        currency: BASE_CURRENCY,
+      },
+      { id: 4, name: 'Pension', value: pensionTotal, color: '#f59e0b', currency: BASE_CURRENCY },
+    ],
+    liabilitiesTotal: computeDebtLiabilitiesTotal(userDebts, rates),
+    debtCount: userDebts.length,
+  };
 }
 
-async function buildDerivedAllocations(userId: number): Promise<DerivedAllocation[]> {
+async function buildDerivedAllocations(userId: number): Promise<DerivedAllocationSummary> {
   const [
     rates,
     userSavings,
@@ -340,6 +409,7 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
     userProperties,
     userPensions,
     userMortgages,
+    userDebts,
   ] = await Promise.all([
     getRatesToBaseCurrency(),
     db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, userId)),
@@ -348,6 +418,7 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
     db.select().from(properties).where(eq(properties.userId, userId)),
     db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
     db.select().from(mortgages).where(eq(mortgages.userId, userId)),
+    db.select().from(debts).where(eq(debts.userId, userId)),
   ]);
   return computeDerivedAllocations(
     rates,
@@ -357,6 +428,7 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
     userProperties,
     userPensions,
     userMortgages,
+    userDebts,
   );
 }
 
@@ -496,6 +568,8 @@ type NetWorthSourceData = {
   pensions: PensionPotRow[];
   pensionTransactions: PensionTransactionRow[];
   mortgages: MortgageRow[];
+  debts: DebtRow[];
+  debtPayments: DebtPaymentRow[];
 };
 
 type NetWorthHistoryPoint = {
@@ -531,6 +605,8 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
     pensions,
     pensionTransactionsData,
     mortgagesData,
+    debtsData,
+    debtPaymentsData,
   ] = await Promise.all([
     safeLoad(
       'savings accounts',
@@ -565,6 +641,12 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
       [],
     ),
     safeLoad('mortgages', db.select().from(mortgages).where(eq(mortgages.userId, userId)), []),
+    safeLoad('debts', db.select().from(debts).where(eq(debts.userId, userId)), []),
+    safeLoad(
+      'debt payments',
+      db.select().from(debtPayments).where(eq(debtPayments.userId, userId)),
+      [],
+    ),
   ]);
 
   return {
@@ -578,11 +660,13 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
     pensions,
     pensionTransactions: pensionTransactionsData,
     mortgages: mortgagesData,
+    debts: debtsData,
+    debtPayments: debtPaymentsData,
   };
 }
 
 function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
-  const allocations = computeDerivedAllocations(
+  const allocationSummary = computeDerivedAllocations(
     sourceData.rates,
     sourceData.savings,
     sourceData.holdings,
@@ -590,9 +674,12 @@ function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthH
     sourceData.properties,
     sourceData.pensions,
     sourceData.mortgages,
+    sourceData.debts,
   );
   const currentMonth = monthStartUtc(Date.now());
-  const totalValue = allocations.reduce((sum, item) => sum + item.value, 0);
+  const totalValue =
+    allocationSummary.allocations.reduce((sum, item) => sum + item.value, 0) -
+    allocationSummary.liabilitiesTotal;
 
   return [
     {
@@ -605,17 +692,19 @@ function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthH
   ];
 }
 
-function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
+export function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
   const datedSavingsTransactions = buildDatedSavingsTransactions(sourceData.savingsTransactions);
   const datedHoldingTransactions = buildDatedHoldingTransactions(sourceData.holdingTransactions);
   const datedPropertyTransactions = buildDatedPropertyTransactions(sourceData.propertyTransactions);
   const datedPensionTransactions = buildDatedPensionTransactions(sourceData.pensionTransactions);
+  const datedDebtPayments = buildDatedDebtPayments(sourceData.debtPayments);
 
   const hasQualifyingTransactions =
     datedSavingsTransactions.length > 0 ||
     datedHoldingTransactions.length > 0 ||
     datedPropertyTransactions.length > 0 ||
-    datedPensionTransactions.length > 0;
+    datedPensionTransactions.length > 0 ||
+    datedDebtPayments.length > 0;
   if (!hasQualifyingTransactions) return buildFallbackNetWorthHistory(sourceData);
 
   const months = buildRollingMonths();
@@ -634,6 +723,10 @@ function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPo
   const pensionsByPotId = groupByNumericId(
     datedPensionTransactions,
     (transaction) => transaction.potId,
+  );
+  const debtPaymentsByDebtId = groupByNumericId(
+    datedDebtPayments,
+    (transaction) => transaction.debtId,
   );
   const mortgageBalanceById = buildMortgageBalanceById(sourceData.mortgages);
 
@@ -663,12 +756,18 @@ function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPo
       month.cutoff,
       sourceData.rates,
     );
+    const liabilities = computeDebtLiabilitiesAtCutoff(
+      sourceData.debts,
+      debtPaymentsByDebtId,
+      month.cutoff,
+      sourceData.rates,
+    );
 
     return {
       id: index + 1,
       month: month.label,
       year: month.year,
-      totalValue: savings + brokerage + propertyEquity + pension,
+      totalValue: savings + brokerage + propertyEquity + pension - liabilities,
       currency: BASE_CURRENCY,
     };
   });
@@ -718,6 +817,15 @@ type MortgageActivityRow = ActivityRow & { mortgageId: number };
 type PensionActivityRow = ActivityRow & { potId: number; taxAmount: unknown };
 
 type PropertyActivityRow = ActivityRow & { propertyId: number };
+
+type DebtActivityRow = {
+  debtId: number;
+  date: string;
+  amount: unknown;
+  principal: unknown;
+  interest: unknown;
+  note?: string | null;
+};
 
 function mapSavingsTxn(row: SavingsActivityRow, currencyByAccountId: ReadonlyMap<number, string>) {
   const currency = resolveCurrency(currencyByAccountId, row.accountId);
@@ -818,6 +926,17 @@ function mapMortgageTxn(
   };
 }
 
+function mapDebtPayment(row: DebtActivityRow, debtCurrencyById: ReadonlyMap<number, string>) {
+  return {
+    name: row.note || 'Debt payment',
+    type: 'expense' as const,
+    amount: -Math.abs(toNumber(row.amount)),
+    date: row.date,
+    category: 'Debt',
+    currency: resolveCurrency(debtCurrencyById, row.debtId),
+  };
+}
+
 function mapPensionTxn(
   row: PensionActivityRow,
   pensionCurrencyByPotId: ReadonlyMap<number, string>,
@@ -861,17 +980,19 @@ function mapPensionTxn(
   };
 }
 
-function buildActivityList(
+export function buildActivityList(
   payslipRows: readonly PayslipActivityRow[],
   budgetRows: readonly BudgetActivityRow[],
   savingsRows: readonly SavingsActivityRow[],
   holdingRows: readonly HoldingActivityRow[],
   mortgageRows: readonly MortgageActivityRow[],
+  debtRows: readonly DebtActivityRow[],
   pensionRows: readonly PensionActivityRow[],
   propertyRows: readonly PropertyActivityRow[],
   savingsCurrencyByAccountId: ReadonlyMap<number, string>,
   holdingCurrencyById: ReadonlyMap<number, string>,
   mortgageCurrencyById: ReadonlyMap<number, string>,
+  debtCurrencyById: ReadonlyMap<number, string>,
   pensionCurrencyByPotId: ReadonlyMap<number, string>,
   propertyCurrencyById: ReadonlyMap<number, string>,
 ) {
@@ -883,6 +1004,7 @@ function buildActivityList(
     ...mortgageRows
       .filter((row) => row.type === 'repayment')
       .map((row) => mapMortgageTxn(row, mortgageCurrencyById)),
+    ...debtRows.map((row) => mapDebtPayment(row, debtCurrencyById)),
     ...pensionRows.map((row) => mapPensionTxn(row, pensionCurrencyByPotId)),
     ...propertyRows
       .filter((row) => row.type === 'rent_income' || row.type === 'expense')
@@ -894,7 +1016,7 @@ function buildActivityList(
 
 app.get('/transactions', async (c) => {
   const user = getAuthUser(c);
-  const [p, b, s, sa, h, ho, m, mo, pe, po, pr, ps] = await Promise.all([
+  const [p, b, s, sa, h, ho, m, mo, d, doRows, pe, po, pr, ps] = await Promise.all([
     db.select().from(payslips).where(eq(payslips.userId, user.id)),
     db.select().from(budgetTransactions).where(eq(budgetTransactions.userId, user.id)),
     db.select().from(savingsTransactions).where(eq(savingsTransactions.userId, user.id)),
@@ -912,6 +1034,11 @@ app.get('/transactions', async (c) => {
       .select({ id: mortgages.id, currency: mortgages.currency })
       .from(mortgages)
       .where(eq(mortgages.userId, user.id)),
+    db.select().from(debtPayments).where(eq(debtPayments.userId, user.id)),
+    db
+      .select({ id: debts.id, currency: debts.currency })
+      .from(debts)
+      .where(eq(debts.userId, user.id)),
     db.select().from(pensionTransactions).where(eq(pensionTransactions.userId, user.id)),
     db
       .select({ id: pensionPots.id, currency: pensionPots.currency })
@@ -930,11 +1057,13 @@ app.get('/transactions', async (c) => {
       s,
       h,
       m,
+      d,
       pe,
       pr,
       buildCurrencyById(sa),
       buildCurrencyById(ho),
       buildCurrencyById(mo),
+      buildCurrencyById(doRows),
       buildCurrencyById(po),
       buildCurrencyById(ps),
     ),

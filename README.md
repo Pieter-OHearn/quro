@@ -173,6 +173,8 @@ If you run `bun run db:seed`, a demo user is created:
 - Email: `demo@quro.local`
 - Password: `password123`
 
+`bun run db:seed` resets and reseeds the demo user's data only. It should not delete data for other users.
+
 ## Testing and quality checks
 
 There is still no broad unit/integration suite wired across the repo, but shared UI refactor work now has a lightweight smoke suite.

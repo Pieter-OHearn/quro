@@ -449,6 +449,57 @@ export const mortgageTransactions = pgTable(
   }),
 );
 
+// ── Debts ────────────────────────────────────────────────────────────────────
+
+export const debts = pgTable(
+  'debts',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    lender: text('lender').notNull(),
+    originalAmount: numeric('original_amount').notNull(),
+    remainingBalance: numeric('remaining_balance').notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
+    interestRate: numeric('interest_rate').notNull(),
+    monthlyPayment: numeric('monthly_payment').notNull(),
+    startDate: date('start_date', { mode: 'string' }).notNull(),
+    endDate: date('end_date', { mode: 'string' }),
+    color: text('color').notNull(),
+    emoji: text('emoji').notNull(),
+    notes: text('notes'),
+  },
+  (table) => ({
+    userIdx: index('debts_user_id_idx').on(table.userId),
+  }),
+);
+
+export const debtPayments = pgTable(
+  'debt_payments',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    debtId: integer('debt_id')
+      .references(() => debts.id, { onDelete: 'cascade' })
+      .notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
+    amount: numeric('amount').notNull(),
+    principal: numeric('principal').notNull(),
+    interest: numeric('interest').notNull(),
+    note: text('note'),
+  },
+  (table) => ({
+    userIdx: index('debt_payments_user_id_idx').on(table.userId),
+    userDateIdx: index('debt_payments_user_date_idx').on(table.userId, table.date),
+    debtIdx: index('debt_payments_debt_id_idx').on(table.debtId),
+  }),
+);
+
 // ── Salary ───────────────────────────────────────────────────────────────────
 
 export const payslips = pgTable(

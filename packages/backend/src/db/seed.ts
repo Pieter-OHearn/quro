@@ -13,6 +13,8 @@ import {
   pensionTransactions,
   mortgages,
   mortgageTransactions,
+  debtPayments,
+  debts,
   payslips,
   goals,
   budgetCategories,
@@ -72,25 +74,27 @@ if (seedUser.created)
 
 // ── Clear all tables (child tables first) ────────────────────────────────────
 
-console.log('Clearing existing data...');
-await db.delete(budgetTransactions);
-await db.delete(budgetCategories);
-await db.delete(dashboardTransactions);
+console.log(`Clearing existing demo data for user ${seedUser.email}...`);
+await db.delete(budgetTransactions).where(eq(budgetTransactions.userId, seedUserId));
+await db.delete(budgetCategories).where(eq(budgetCategories.userId, seedUserId));
+await db.delete(dashboardTransactions).where(eq(dashboardTransactions.userId, seedUserId));
 await db.delete(currencyRates);
-await db.delete(savingsTransactions);
-await db.delete(savingsAccounts);
-await db.delete(holdingTransactions);
-await db.delete(holdingPriceHistory);
-await db.delete(holdings);
-await db.delete(propertyTransactions);
-await db.delete(properties);
-await db.delete(pensionTransactions);
-await db.delete(pensionPots);
-await db.delete(mortgageTransactions);
-await db.delete(mortgages);
-await db.delete(payslips);
-await db.delete(goals);
-console.log('All tables cleared.');
+await db.delete(savingsTransactions).where(eq(savingsTransactions.userId, seedUserId));
+await db.delete(savingsAccounts).where(eq(savingsAccounts.userId, seedUserId));
+await db.delete(holdingTransactions).where(eq(holdingTransactions.userId, seedUserId));
+await db.delete(holdingPriceHistory).where(eq(holdingPriceHistory.userId, seedUserId));
+await db.delete(holdings).where(eq(holdings.userId, seedUserId));
+await db.delete(propertyTransactions).where(eq(propertyTransactions.userId, seedUserId));
+await db.delete(properties).where(eq(properties.userId, seedUserId));
+await db.delete(pensionTransactions).where(eq(pensionTransactions.userId, seedUserId));
+await db.delete(pensionPots).where(eq(pensionPots.userId, seedUserId));
+await db.delete(mortgageTransactions).where(eq(mortgageTransactions.userId, seedUserId));
+await db.delete(mortgages).where(eq(mortgages.userId, seedUserId));
+await db.delete(debtPayments).where(eq(debtPayments.userId, seedUserId));
+await db.delete(debts).where(eq(debts.userId, seedUserId));
+await db.delete(payslips).where(eq(payslips.userId, seedUserId));
+await db.delete(goals).where(eq(goals.userId, seedUserId));
+console.log('Demo user tables cleared.');
 
 // ── Savings Accounts ─────────────────────────────────────────────────────────
 
@@ -849,6 +853,190 @@ mortTxRows.push({
 });
 
 await db.insert(mortgageTransactions).values(withUser(mortTxRows));
+
+// ── Debts ────────────────────────────────────────────────────────────────────
+
+console.log('Seeding debts...');
+const insertedDebts = await db
+  .insert(debts)
+  .values(
+    withUser([
+      {
+        name: 'Volkswagen Golf Loan',
+        type: 'car_loan',
+        lender: 'Volkskrediet Bank',
+        originalAmount: '22000',
+        remainingBalance: '14800',
+        currency: 'EUR',
+        interestRate: '4.90',
+        monthlyPayment: '420',
+        startDate: '2023-03-01',
+        endDate: '2027-03-01',
+        color: '#6366f1',
+        emoji: '🚗',
+        notes: '5-year term. Early repayment allowed with no penalty.',
+      },
+      {
+        name: 'DUO Student Loan',
+        type: 'student_loan',
+        lender: 'DUO (Dienst Uitvoering Onderwijs)',
+        originalAmount: '28000',
+        remainingBalance: '21400',
+        currency: 'EUR',
+        interestRate: '0.46',
+        monthlyPayment: '180',
+        startDate: '2020-09-01',
+        endDate: '2030-09-01',
+        color: '#0ea5e9',
+        emoji: '🎓',
+        notes: 'Income-linked repayment. NL government scheme.',
+      },
+      {
+        name: 'ING Credit Card Balance',
+        type: 'credit_card',
+        lender: 'ING Bank',
+        originalAmount: '3000',
+        remainingBalance: '1240',
+        currency: 'EUR',
+        interestRate: '16.90',
+        monthlyPayment: '150',
+        startDate: '2025-08-01',
+        endDate: null,
+        color: '#ef4444',
+        emoji: '💳',
+        notes: 'High priority. Clear before adding extra brokerage contributions.',
+      },
+    ]),
+  )
+  .returning();
+
+const debtIdByName = new Map(insertedDebts.map((entry) => [entry.name, entry.id]));
+
+console.log('Seeding debt payments...');
+await db.insert(debtPayments).values(
+  withUser([
+    {
+      debtId: debtIdByName.get('Volkswagen Golf Loan') ?? 0,
+      date: '2025-09-05',
+      amount: '420',
+      principal: '360',
+      interest: '60',
+      note: 'Monthly instalment',
+    },
+    {
+      debtId: debtIdByName.get('Volkswagen Golf Loan') ?? 0,
+      date: '2025-10-05',
+      amount: '420',
+      principal: '362',
+      interest: '58',
+      note: 'Monthly instalment',
+    },
+    {
+      debtId: debtIdByName.get('Volkswagen Golf Loan') ?? 0,
+      date: '2025-11-05',
+      amount: '420',
+      principal: '364',
+      interest: '56',
+      note: 'Monthly instalment',
+    },
+    {
+      debtId: debtIdByName.get('Volkswagen Golf Loan') ?? 0,
+      date: '2025-12-05',
+      amount: '420',
+      principal: '366',
+      interest: '54',
+      note: 'Monthly instalment',
+    },
+    {
+      debtId: debtIdByName.get('Volkswagen Golf Loan') ?? 0,
+      date: '2026-01-05',
+      amount: '420',
+      principal: '368',
+      interest: '52',
+      note: 'Monthly instalment',
+    },
+    {
+      debtId: debtIdByName.get('Volkswagen Golf Loan') ?? 0,
+      date: '2026-02-05',
+      amount: '420',
+      principal: '370',
+      interest: '50',
+      note: 'Monthly instalment',
+    },
+    {
+      debtId: debtIdByName.get('DUO Student Loan') ?? 0,
+      date: '2025-09-01',
+      amount: '180',
+      principal: '172',
+      interest: '8',
+      note: 'Monthly repayment',
+    },
+    {
+      debtId: debtIdByName.get('DUO Student Loan') ?? 0,
+      date: '2025-10-01',
+      amount: '180',
+      principal: '172',
+      interest: '8',
+      note: 'Monthly repayment',
+    },
+    {
+      debtId: debtIdByName.get('DUO Student Loan') ?? 0,
+      date: '2025-11-01',
+      amount: '180',
+      principal: '172',
+      interest: '8',
+      note: 'Monthly repayment',
+    },
+    {
+      debtId: debtIdByName.get('DUO Student Loan') ?? 0,
+      date: '2025-12-01',
+      amount: '180',
+      principal: '172',
+      interest: '8',
+      note: 'Monthly repayment',
+    },
+    {
+      debtId: debtIdByName.get('DUO Student Loan') ?? 0,
+      date: '2026-01-01',
+      amount: '180',
+      principal: '172',
+      interest: '8',
+      note: 'Monthly repayment',
+    },
+    {
+      debtId: debtIdByName.get('DUO Student Loan') ?? 0,
+      date: '2026-02-01',
+      amount: '180',
+      principal: '172',
+      interest: '8',
+      note: 'Monthly repayment',
+    },
+    {
+      debtId: debtIdByName.get('ING Credit Card Balance') ?? 0,
+      date: '2025-12-28',
+      amount: '150',
+      principal: '133',
+      interest: '17',
+      note: 'Minimum payment',
+    },
+    {
+      debtId: debtIdByName.get('ING Credit Card Balance') ?? 0,
+      date: '2026-01-28',
+      amount: '150',
+      principal: '133',
+      interest: '17',
+      note: 'Minimum payment',
+    },
+    {
+      debtId: debtIdByName.get('ING Credit Card Balance') ?? 0,
+      date: '2026-02-28',
+      amount: '150',
+      principal: '133',
+      interest: '17',
+      note: 'Minimum payment',
+    },
+  ]),
+);
 
 // ── Payslips ─────────────────────────────────────────────────────────────────
 

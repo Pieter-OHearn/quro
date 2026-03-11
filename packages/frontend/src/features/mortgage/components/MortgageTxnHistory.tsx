@@ -7,6 +7,7 @@ import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
 
 type MortgageTxnHistoryProps = {
   mortgage: MortgageType;
+  currency?: string;
   transactions: MortgageTransaction[];
   onAdd: () => void;
   onDelete: (id: number) => void;
@@ -90,12 +91,13 @@ function buildMortgageTxnStats({ transactions, fmt }: MortgageSummaryStatsProps)
 
 export function MortgageTxnHistory({
   mortgage: _mortgage,
+  currency,
   transactions,
   onAdd,
   onDelete,
 }: MortgageTxnHistoryProps) {
   const { fmtBase } = useCurrency();
-  const fmt = (n: number) => fmtBase(n);
+  const fmt = (n: number) => fmtBase(n, currency);
   const [filter, setFilter] = useState<MortgageTxnType | 'all'>('all');
   const sorted = [...transactions]
     .filter((t) => filter === 'all' || t.type === filter)

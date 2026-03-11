@@ -2,8 +2,8 @@
 
 import { expect, test } from 'bun:test';
 import type {
-  AssetAllocation,
   CurrencyCode,
+  DashboardAllocationsSummary,
   DashboardTransaction as DashboardTransactionPayload,
   NetWorthSnapshot,
   Payslip,
@@ -68,9 +68,11 @@ test('normalizes dashboard payload rows using each row currency metadata', () =>
   const snapshots: NetWorthSnapshot[] = [
     { id: 1, month: 'Mar', year: 2026, totalValue: 1000, currency: 'EUR' },
   ];
-  const allocations: AssetAllocation[] = [
-    { id: 1, name: 'Savings', value: 1000, color: '#6366f1', currency: 'EUR' },
-  ];
+  const allocations: DashboardAllocationsSummary = {
+    allocations: [{ id: 1, name: 'Savings', value: 1000, color: '#6366f1', currency: 'EUR' }],
+    liabilitiesTotal: 250,
+    debtCount: 2,
+  };
   const transactions: DashboardTransactionPayload[] = [
     {
       id: 1,
@@ -93,11 +95,14 @@ test('normalizes dashboard payload rows using each row currency metadata', () =>
   ];
 
   const chartData = normalizeNetWorthSnapshots(snapshots, convertToGbp);
-  const allocationData = normalizeAssetAllocations(allocations, convertToGbp);
+  const allocationSummary = normalizeAssetAllocations(allocations, convertToGbp);
   const activityData = normalizeDashboardTransactions(transactions, convertToGbp);
 
   expect(chartData[0]?.value).toBeCloseTo(1000 / 1.18, 10);
-  expect(allocationData[0]?.value).toBeCloseTo(1000 / 1.18, 10);
+  expect(allocationSummary.allocationData[0]?.value).toBeCloseTo(1000 / 1.18, 10);
+  expect(allocationSummary.liabilitiesTotal).toBeCloseTo(250 / 1.18, 10);
+  expect(allocationSummary.debtCount).toBe(2);
+  expect(allocationSummary.netWorth).toBeCloseTo((1000 - 250) / 1.18, 10);
   expect(activityData[0]?.amount).toBe(100);
   expect(activityData[1]?.amount).toBeCloseTo((200 * 0.922) / 1.18, 10);
 });

@@ -64,6 +64,13 @@
       "when": 1773090000000,
       "tag": "0008_inline_pdf_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773180000000,
+      "tag": "0009_standalone_debts_domain",
+      "breakpoints": true
     }
   ]
 }
