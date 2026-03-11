@@ -293,7 +293,7 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
   };
 }
 
-export function PensionModal({ existing, onClose, onSave }: PensionModalProps): JSX.Element {
+export function PensionModal({ existing, onClose, onSave }: PensionModalProps) {
   const [form, setForm] = useState<PensionFormState>(() => buildInitialPensionState(existing));
   const [metadataEntries, setMetadataEntries] = useState<MetadataEntry[]>(() =>
     buildInitialMetadataEntries(existing),

@@ -271,15 +271,17 @@ export async function syncHoldingPricesForUser(
       quoteCheck.ticker,
       quoteCheck.quote,
     );
-    if ('issue' in updateResult) {
+    if ('issue' in updateResult && updateResult.issue !== undefined) {
       issues.push(updateResult.issue);
       continue;
     }
 
-    if (updateResult.issue) {
+    if ('issue' in updateResult && updateResult.issue !== undefined) {
       issues.push(updateResult.issue);
     }
-    updates.push(updateResult.updated);
+    if ('updated' in updateResult) {
+      updates.push(updateResult.updated);
+    }
   }
 
   return {

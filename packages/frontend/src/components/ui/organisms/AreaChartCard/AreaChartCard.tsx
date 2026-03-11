@@ -14,7 +14,7 @@ import { ChartCard } from '../ChartCard';
 export type AreaChartCardProps<T extends Record<string, unknown>> = {
   title: string;
   subtitle: string;
-  data: T[];
+  data: readonly T[];
   dataKey: keyof T & string;
   xKey: keyof T & string;
   color: string;
@@ -28,7 +28,7 @@ export type AreaChartCardProps<T extends Record<string, unknown>> = {
 };
 
 type ChartContentProps<T extends Record<string, unknown>> = {
-  data: T[];
+  data: readonly T[];
   dataKey: keyof T & string;
   xKey: keyof T & string;
   color: string;
@@ -67,7 +67,7 @@ function ChartContent<T extends Record<string, unknown>>({
     formatYAxis ? formatYAxis(Number(value)) : `${(Number(value) / 1000).toFixed(0)}k`;
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={data}>
+      <AreaChart data={[...data]}>
         <ChartGradient id={gradientId} color={color} />
         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
         <XAxis
@@ -83,7 +83,7 @@ function ChartContent<T extends Record<string, unknown>>({
           tickFormatter={yTickFormatter}
         />
         <Tooltip
-          formatter={(value: number) => [formatValue(Number(value) || 0), title]}
+          formatter={(value) => [formatValue(Number(value) || 0), title]}
           contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
         />
         <Area

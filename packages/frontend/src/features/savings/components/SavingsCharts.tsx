@@ -48,7 +48,7 @@ function GrowthChart({ growthChartData, baseCurrency, fmtBase }: Readonly<Growth
             tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
           />
           <Tooltip
-            formatter={(value: number) => [fmtBase(value), 'Total Savings']}
+            formatter={(value) => [fmtBase(Number(value) || 0), 'Total Savings']}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
           />
           <Area
@@ -89,9 +89,9 @@ function ContribChart({ contribChartData, baseCurrency, fmtBase }: Readonly<Cont
             tickFormatter={(value) => `${(value / 1000).toFixed(1)}k`}
           />
           <Tooltip
-            formatter={(value: number, name: string) => [
-              fmtBase(value),
-              name === 'contribution' ? 'Net Contributions' : 'Interest',
+            formatter={(value, name) => [
+              fmtBase(Number(value) || 0),
+              String(name) === 'contribution' ? 'Net Contributions' : 'Interest',
             ]}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
           />

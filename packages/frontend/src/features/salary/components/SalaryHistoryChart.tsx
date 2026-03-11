@@ -50,7 +50,7 @@ export function SalaryHistoryChart({
               tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
             />
             <Tooltip
-              formatter={(value: number) => [fmtBase(value), 'Annual Gross']}
+              formatter={(value) => [fmtBase(Number(value) || 0), 'Annual Gross']}
               contentStyle={{
                 borderRadius: '12px',
                 border: '1px solid #e2e8f0',

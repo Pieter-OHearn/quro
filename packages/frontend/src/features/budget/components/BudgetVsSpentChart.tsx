@@ -38,9 +38,9 @@ export function BudgetVsSpentChart({ categories, fmt }: Readonly<BudgetVsSpentCh
               tickFormatter={(value) => fmt(value)}
             />
             <Tooltip
-              formatter={(value: number, name: string) => [
-                fmt(value),
-                name === 'budgeted' ? 'Budgeted' : 'Spent',
+              formatter={(value, name) => [
+                fmt(Number(value) || 0),
+                String(name) === 'budgeted' ? 'Budgeted' : 'Spent',
               ]}
               contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
             />

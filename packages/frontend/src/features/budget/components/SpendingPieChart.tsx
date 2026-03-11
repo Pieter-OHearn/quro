@@ -29,7 +29,7 @@ export function SpendingPieChart({ pieData, fmtDec }: Readonly<SpendingPieChartP
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => fmtDec(value)}
+                formatter={(value) => fmtDec(Number(value) || 0)}
                 contentStyle={{ borderRadius: '12px', fontSize: '12px' }}
               />
             </PieChart>

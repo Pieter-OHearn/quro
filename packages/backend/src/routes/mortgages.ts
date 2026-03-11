@@ -71,7 +71,7 @@ async function resolveLinkedProperty(
   mortgageId: number,
 ): Promise<
   | { ok: true; nextId: number | null; property: LinkedProperty | null }
-  | { ok: false; error: string; status: number }
+  | { ok: false; error: string; status: 400 | 404 | 409 }
 > {
   const nextIdResult = resolveNextPropertyId(rawLinkedPropertyId, currentPropertyId);
   if (!nextIdResult.ok)

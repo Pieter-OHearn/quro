@@ -98,7 +98,7 @@ function useImportDeepLink(state: ReturnType<typeof usePensionPageState>): void 
   }, [location.pathname, location.state, navigate, openImportModal, pensions, state.isLoading]);
 }
 
-export function Pension(): JSX.Element {
+export function Pension() {
   const state = usePensionPageState();
   const { user } = useAuth();
   useImportDeepLink(state);

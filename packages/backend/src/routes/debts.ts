@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { DEBT_TYPES, isCurrencyCode, type DebtType } from '@quro/shared';
+import { DEBT_TYPES, isCurrencyCode, type CurrencyCode, type DebtType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
@@ -20,7 +20,7 @@ type DebtPayload = {
   lender: string;
   originalAmount: number;
   remainingBalance: number;
-  currency: string;
+  currency: CurrencyCode;
   interestRate: number;
   monthlyPayment: number;
   startDate: string;
@@ -42,6 +42,58 @@ type DebtPaymentPayload = {
 type RouteMutationResult =
   | { data: unknown }
   | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
+
+function toDebtInsertPayload(payload: DebtPayload, userId: number): typeof debts.$inferInsert {
+  return {
+    userId,
+    name: payload.name,
+    type: payload.type,
+    lender: payload.lender,
+    originalAmount: payload.originalAmount.toString(),
+    remainingBalance: payload.remainingBalance.toString(),
+    currency: payload.currency,
+    interestRate: payload.interestRate.toString(),
+    monthlyPayment: payload.monthlyPayment.toString(),
+    startDate: payload.startDate,
+    endDate: payload.endDate,
+    color: payload.color,
+    emoji: payload.emoji,
+    notes: payload.notes,
+  };
+}
+
+function toDebtUpdatePayload(payload: DebtPayload): Partial<typeof debts.$inferInsert> {
+  return {
+    name: payload.name,
+    type: payload.type,
+    lender: payload.lender,
+    originalAmount: payload.originalAmount.toString(),
+    remainingBalance: payload.remainingBalance.toString(),
+    currency: payload.currency,
+    interestRate: payload.interestRate.toString(),
+    monthlyPayment: payload.monthlyPayment.toString(),
+    startDate: payload.startDate,
+    endDate: payload.endDate,
+    color: payload.color,
+    emoji: payload.emoji,
+    notes: payload.notes,
+  };
+}
+
+function toDebtPaymentInsertPayload(
+  payload: DebtPaymentPayload,
+  userId: number,
+): typeof debtPayments.$inferInsert {
+  return {
+    userId,
+    debtId: payload.debtId,
+    date: payload.date,
+    amount: payload.amount.toString(),
+    interest: payload.interest.toString(),
+    principal: payload.principal.toString(),
+    note: payload.note,
+  };
+}
 
 function parseId(value: string): number | null {
   const parsed = Number.parseInt(value, 10);
@@ -278,7 +330,7 @@ async function createDebt(params: {
 
   const [data] = await db
     .insert(debts)
-    .values({ ...parsed.data, userId: params.userId })
+    .values(toDebtInsertPayload(parsed.data, params.userId))
     .returning();
 
   return { data };
@@ -297,7 +349,7 @@ async function updateDebt(params: {
 
   const [data] = await db
     .update(debts)
-    .set(parsed.data)
+    .set(toDebtUpdatePayload(parsed.data))
     .where(and(eq(debts.id, params.debtId), eq(debts.userId, params.userId)))
     .returning();
 
@@ -305,14 +357,14 @@ async function updateDebt(params: {
   return { data };
 }
 
-function createDebtPayment(params: {
+async function createDebtPayment(params: {
   userId: number;
   raw: Record<string, unknown>;
 }): Promise<RouteMutationResult> {
   const parsed = parseDebtPaymentPayload(params.raw);
   if (!parsed.ok) return { error: parsed.error, status: HTTP_STATUS.BAD_REQUEST };
 
-  return db.transaction(async (tx) => {
+  return await db.transaction(async (tx) => {
     const debt = await getDebtById(tx, params.userId, parsed.data.debtId);
     if (!debt) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
@@ -330,13 +382,16 @@ function createDebtPayment(params: {
 
     const [data] = await tx
       .insert(debtPayments)
-      .values({ ...parsed.data, userId: params.userId })
+      .values(toDebtPaymentInsertPayload(parsed.data, params.userId))
       .returning();
 
     await tx
       .update(debts)
       .set({
-        remainingBalance: applyDebtPrincipalPayment(currentRemainingBalance, parsed.data.principal),
+        remainingBalance: applyDebtPrincipalPayment(
+          currentRemainingBalance,
+          parsed.data.principal,
+        ).toString(),
       })
       .where(and(eq(debts.id, debt.id), eq(debts.userId, params.userId)));
 
@@ -364,7 +419,7 @@ function deleteDebtPayment(params: {
         remainingBalance: restoreDebtPrincipalPayment(
           parseDebtBalance(debt.remainingBalance),
           parseDebtBalance(existing.principal),
-        ),
+        ).toString(),
       })
       .where(and(eq(debts.id, debt.id), eq(debts.userId, params.userId)));
 

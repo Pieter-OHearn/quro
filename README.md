@@ -126,7 +126,7 @@ source packages/backend/.env
 set +a
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r services/pension-parser/requirements.txt
+pip install -r services/pension-parser/requirements.txt ruff pip-audit
 uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
 ```
 
@@ -182,21 +182,32 @@ There is still no broad unit/integration suite wired across the repo, but shared
 Use the current quality checks:
 
 ```bash
+# Full local CI gate
+bun run ci:check
+
 # Shared UI smoke coverage
 bun run test:ui
 
 # Lint
-bun run lint
+bun run check:lint
 
 # Auto-fix lint issues
 bun run lint:fix
 
 # Prettier check
-bun run format:check
+bun run check:format
 
 # Prettier write
 bun run format
+
+# Install the checked-in Git hooks
+bun run hooks:install
 ```
+
+`bun run ci:check` mirrors the checks in `.github/workflows/ci.yml`, including the Python worker and security audits.
+The checked-in pre-commit hook runs the same command once you install it with `bun run hooks:install`.
+It automatically picks up `ruff` and `pip-audit` from `.venv/bin` when present.
+If those Python tools are missing, pre-commit skips the Python-only checks only when the staged changes do not touch `services/pension-parser/`; direct `bun run ci:check` still requires the full toolchain.
 
 For the route-based manual checklist used by UI refactor PRs, see `docs/shared-ui-verification.md`.
 

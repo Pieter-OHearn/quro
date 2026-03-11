@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "test": "bun test",
     "test:ui": "bun test src/components/ui/shared-ui.smoke.test.tsx"
   },

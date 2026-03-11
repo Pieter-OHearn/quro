@@ -13,18 +13,18 @@ import { useUpdateHoldingTransaction } from './useUpdateHoldingTransaction';
 import { useUpdateProperty } from './useUpdateProperty';
 import { useUpdatePropertyTransaction } from './useUpdatePropertyTransaction';
 
-function mutateTransaction<T extends { id?: number }>(
-  transaction: T,
-  update: (transaction: T & { id: number }) => void,
-  create: (transaction: Omit<T, 'id'>) => void,
+function mutateTransaction<TCreate extends object, TUpdate extends TCreate & { id: number }>(
+  transaction: TCreate & { id?: number },
+  update: (transaction: TUpdate) => void,
+  create: (transaction: TCreate) => void,
 ): void {
-  if (transaction.id) {
-    const { id, ...payload } = transaction;
-    update({ id, ...payload } as T & { id: number });
+  const { id, ...payload } = transaction;
+  if (typeof id === 'number') {
+    update({ id, ...payload } as TUpdate);
     return;
   }
 
-  create(transaction);
+  create(payload as TCreate);
 }
 
 export function useInvestmentActions(

@@ -616,7 +616,7 @@ const insertedPensions = await db
         metadata: {
           riskProfile: 'High',
           allocation: 'Global equity tilt',
-        },
+        } as Record<string, string>,
         color: '#6366f1',
         emoji: '\u{1F1F3}\u{1F1F1}',
         notes: null,
@@ -633,7 +633,7 @@ const insertedPensions = await db
         metadata: {
           riskProfile: 'Medium',
           regionFocus: 'Australia & Global',
-        },
+        } as Record<string, string>,
         color: '#f59e0b',
         emoji: '\u{1F1E6}\u{1F1FA}',
         notes: null,
@@ -650,7 +650,7 @@ const insertedPensions = await db
         metadata: {
           riskProfile: 'High',
           style: 'ETF core with satellites',
-        },
+        } as Record<string, string>,
         color: '#0ea5e9',
         emoji: '\u{1F4CA}',
         notes: null,

@@ -45,7 +45,7 @@ function MortgageBalanceChart({ amortization, fmt }: Readonly<MortgageBalanceCha
             tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
           />
           <Tooltip
-            formatter={(v: number) => [fmt(v), 'Balance']}
+            formatter={(value) => [fmt(Number(value) || 0), 'Balance']}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
           />
           <Area
@@ -110,9 +110,9 @@ function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymen
                   border: '1px solid #e2e8f0',
                   fontSize: '12px',
                 }}
-                formatter={(v: number, name) => [
-                  fmt(v),
-                  name === 'principal' ? 'Principal' : 'Interest',
+                formatter={(value, name) => [
+                  fmt(Number(value) || 0),
+                  String(name) === 'principal' ? 'Principal' : 'Interest',
                 ]}
               />
               <Bar

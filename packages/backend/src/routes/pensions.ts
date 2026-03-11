@@ -75,6 +75,36 @@ type RouteMutationResult =
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+function toPensionTransactionInsertPayload(
+  payload: NormalizedPensionTransactionPayload,
+  userId: number,
+): typeof pensionTransactions.$inferInsert {
+  return {
+    userId,
+    potId: payload.potId,
+    type: payload.type,
+    amount: payload.amount.toString(),
+    taxAmount: payload.taxAmount.toString(),
+    date: payload.date,
+    note: payload.note,
+    isEmployer: payload.isEmployer,
+  };
+}
+
+function toPensionTransactionUpdatePayload(
+  payload: NormalizedPensionTransactionPayload,
+): Partial<typeof pensionTransactions.$inferInsert> {
+  return {
+    potId: payload.potId,
+    type: payload.type,
+    amount: payload.amount.toString(),
+    taxAmount: payload.taxAmount.toString(),
+    date: payload.date,
+    note: payload.note,
+    isEmployer: payload.isEmployer,
+  };
+}
+
 function toFiniteNumber(value: unknown): number | null {
   const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
   return Number.isFinite(parsed) ? parsed : null;
@@ -525,7 +555,7 @@ function createPensionTransaction(params: {
 
     const [data] = await tx
       .insert(pensionTransactions)
-      .values({ ...params.payload, userId: params.userId })
+      .values(toPensionTransactionInsertPayload(params.payload, params.userId))
       .returning();
 
     await applyPensionPotBalanceDelta(
@@ -572,7 +602,7 @@ async function updatePensionTransaction(params: {
 
     const [data] = await tx
       .update(pensionTransactions)
-      .set(nextPayload)
+      .set(toPensionTransactionUpdatePayload(nextPayload))
       .where(
         and(
           eq(pensionTransactions.id, params.transactionId),
@@ -866,9 +896,12 @@ app.get('/transactions/:id/document/download', async (c) => {
     const bytes = await getS3ObjectBytes({ key: document.storageKey });
     if (!bytes) return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
 
-    c.header('Content-Type', PDF_MIME_TYPE);
-    c.header('Content-Disposition', `inline; filename="${document.fileName}"`);
-    return c.body(bytes);
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        'Content-Type': PDF_MIME_TYPE,
+        'Content-Disposition': `inline; filename="${document.fileName}"`,
+      },
+    });
   } catch (error) {
     if (isS3NotFoundError(error)) {
       return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);

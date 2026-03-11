@@ -12,6 +12,7 @@ import {
   index,
   check,
   uniqueIndex,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -42,7 +43,12 @@ const inlinePdfDocumentColumns = () => ({
 
 const inlinePdfDocumentStateCheck = (
   constraintName: string,
-  table: ReturnType<typeof inlinePdfDocumentColumns>,
+  table: {
+    documentStorageKey: AnyPgColumn;
+    documentFileName: AnyPgColumn;
+    documentSizeBytes: AnyPgColumn;
+    documentUploadedAt: AnyPgColumn;
+  },
 ) =>
   check(
     constraintName,
@@ -51,7 +57,12 @@ const inlinePdfDocumentStateCheck = (
 
 const inlinePdfDocumentSizeCheck = (
   constraintName: string,
-  table: ReturnType<typeof inlinePdfDocumentColumns>,
+  table: {
+    documentStorageKey: AnyPgColumn;
+    documentFileName: AnyPgColumn;
+    documentSizeBytes: AnyPgColumn;
+    documentUploadedAt: AnyPgColumn;
+  },
 ) =>
   check(constraintName, sql`${table.documentSizeBytes} is null or ${table.documentSizeBytes} > 0`);
 
