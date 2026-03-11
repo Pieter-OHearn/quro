@@ -81,6 +81,7 @@ cp packages/frontend/.env.example packages/frontend/.env
 
 Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
 It also includes the parser worker settings for AI-based pension statement import drafts.
+`CORS_ORIGIN` in `packages/backend/.env` defaults to `http://localhost,http://localhost:5173` so the same backend env works for the Docker shell and split frontend/backend local development.
 Leave `VITE_API_URL` unset for same-origin `/api` deployments such as Docker, preview, and production.
 For local split frontend/backend development with Vite on `http://localhost:5173`, set `VITE_API_URL=http://localhost:3000` in `packages/frontend/.env`.
 
@@ -205,6 +206,8 @@ This mode runs the app shell in Docker: frontend, backend, database, and MinIO.
 Pension statement import is auto-disabled in this mode because the AI worker stack is not running.
 The pension UI shows an `AI off` badge until the pension-import profile is started.
 The frontend defaults to same-origin `/api` requests here, so nginx handles auth and document download proxying without extra frontend client configuration.
+Because the browser stays on `http://localhost`, CORS is not part of the normal Docker request path.
+`CORS_ORIGIN` only matters if you access `http://localhost:3000` directly from another browser origin such as local Vite on `http://localhost:5173`.
 
 ```bash
 docker compose --env-file packages/backend/.env up --build
@@ -217,6 +220,12 @@ Services:
 - Postgres: `localhost:5432`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
+
+Smoke check after the stack is up:
+
+1. Open `http://localhost` and sign up or sign in.
+2. Refresh a protected page such as the dashboard to confirm the session cookie survives through nginx.
+3. Upload a payslip PDF or open an existing statement PDF, then download it from the salary or pension UI to confirm proxied document responses work through `http://localhost/api/...`.
 
 ### Pension import stack (vLLM only)
 

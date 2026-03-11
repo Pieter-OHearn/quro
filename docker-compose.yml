@@ -60,7 +60,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-quro}:${POSTGRES_PASSWORD:-quro}@db:5432/${POSTGRES_DB:-quro}
       PORT: '3000'
-      CORS_ORIGIN: 'http://localhost:5173'
+      CORS_ORIGIN: '${CORS_ORIGIN:-http://localhost,http://localhost:5173}'
       S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}
