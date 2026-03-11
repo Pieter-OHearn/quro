@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { HTTP_STATUS } from '../constants/http';
 import {
   DEFAULT_BASE_CURRENCY,
+  DEFAULT_USER_NUMBER_FORMAT,
   DEFAULT_RETIREMENT_AGE,
   DEFAULT_USER_AGE,
   publicUserColumns,
@@ -162,6 +163,7 @@ app.post('/signup', async (c) => {
       age: data.age,
       retirementAge: data.retirementAge,
       baseCurrency: DEFAULT_BASE_CURRENCY,
+      numberFormat: DEFAULT_USER_NUMBER_FORMAT,
       passwordHash,
     })
     .returning(publicUserColumns);

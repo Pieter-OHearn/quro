@@ -1,5 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { CURRENCY_CODES, CURRENCY_META, isCurrencyCode, type CurrencyCode } from '@quro/shared';
+import {
+  CURRENCY_CODES,
+  CURRENCY_META,
+  DEFAULT_NUMBER_FORMAT,
+  formatCurrency as formatCurrencyValue,
+  isCurrencyCode,
+  isNumberFormatPreference,
+  type CurrencyCode,
+  type NumberFormatPreference,
+} from '@quro/shared';
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from './AuthContext';
 import { api } from './api';
@@ -17,6 +26,7 @@ export type CurrencyRatesStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 type CurrencyContextType = {
   baseCurrency: CurrencyCode;
+  numberFormat: NumberFormatPreference;
   setBaseCurrency: (c: CurrencyCode) => void;
   convertToBase: (amount: number, fromCurrency: string) => number;
   fmtBase: (amount: number, fromCurrency?: string, decimals?: boolean) => string;
@@ -44,15 +54,18 @@ function normalizeCurrency(currency: string): CurrencyCode {
   return 'EUR';
 }
 
-function formatCurrency(amount: number, currency: string, decimals = true): string {
-  if (!Number.isFinite(amount)) return 'Unavailable';
+function normalizeNumberFormat(numberFormat: unknown): NumberFormatPreference {
+  return isNumberFormatPreference(numberFormat) ? numberFormat : DEFAULT_NUMBER_FORMAT;
+}
 
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: normalizeCurrency(currency),
-    minimumFractionDigits: decimals ? 2 : 0,
-    maximumFractionDigits: decimals ? 2 : 0,
-  }).format(amount);
+function formatCurrency(
+  amount: number,
+  currency: string,
+  decimals = true,
+  numberFormat: NumberFormatPreference,
+): string {
+  if (!Number.isFinite(amount)) return 'Unavailable';
+  return formatCurrencyValue(amount, normalizeCurrency(currency), decimals, numberFormat);
 }
 
 type CurrencyRatesFallbackProps = {
@@ -136,6 +149,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [baseCurrency, setBaseCurrencyState] = useState<CurrencyCode>(
     normalizeCurrency(user?.baseCurrency ?? 'EUR'),
   );
+  const numberFormat = normalizeNumberFormat(user?.numberFormat);
   const hasUser = Boolean(user);
   const ratesStatus = getCurrencyRatesStatus(hasUser, ratesQuery);
   const gate = renderCurrencyRatesGate(hasUser, authLoading, ratesQuery);
@@ -186,11 +200,11 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   const fmtBase = (amount: number, fromCurrency?: string, decimals = true): string => {
     const converted = fromCurrency ? convertToBase(amount, fromCurrency) : amount;
-    return formatCurrency(converted, baseCurrency, decimals);
+    return formatCurrency(converted, baseCurrency, decimals, numberFormat);
   };
 
   const fmtNative = (amount: number, currency: string, decimals = true): string =>
-    formatCurrency(amount, currency, decimals);
+    formatCurrency(amount, currency, decimals, numberFormat);
 
   const isForeign = (currency: string) => normalizeCurrency(currency) !== baseCurrency;
 
@@ -198,6 +212,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     <CurrencyContext.Provider
       value={{
         baseCurrency,
+        numberFormat,
         setBaseCurrency,
         convertToBase,
         fmtBase,

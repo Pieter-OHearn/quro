@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router';
-import type { Goal, GoalType } from '@quro/shared';
+import { formatNumber, type Goal, type GoalType } from '@quro/shared';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { GOAL_TYPE_META } from '@/features/goals/utils/goals-constants';
 import { getGoalPct, normalizeGoalType } from '@/features/goals/utils/goal-utils';
 import type { CompactFormatFn } from '../types';
@@ -22,9 +23,6 @@ const TYPE_BADGE_CLASS: Record<GoalType, string> = {
   net_worth: 'bg-pink-50 text-pink-700',
   annual: 'bg-teal-50 text-teal-700',
 };
-
-const formatPlainNumber = (value: number): string =>
-  new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
 
 const getAnnualBarColor = (goal: Goal, type: GoalType, clampedPct: number): string => {
   const color = goal.color || '#6366f1';
@@ -49,11 +47,14 @@ const buildInvestHabitValueParts = (goal: Goal): { primary: string; secondary: s
   secondary: ' months',
 });
 
-const buildAnnualValueParts = (goal: Goal): { primary: string; secondary: string } => {
+const buildAnnualValueParts = (
+  goal: Goal,
+  numberFormat: ReturnType<typeof useCurrency>['numberFormat'],
+): { primary: string; secondary: string } => {
   const unit = goal.unit ? ` ${goal.unit}` : '';
   return {
-    primary: formatPlainNumber(goal.currentAmount || 0),
-    secondary: ` / ${formatPlainNumber(goal.targetAmount || 0)}${unit}`,
+    primary: formatNumber(goal.currentAmount || 0, numberFormat, { maximumFractionDigits: 0 }),
+    secondary: ` / ${formatNumber(goal.targetAmount || 0, numberFormat, { maximumFractionDigits: 0 })}${unit}`,
   };
 };
 
@@ -70,6 +71,7 @@ const buildValueParts = (
   type: GoalType,
   annualGross: number,
   fmtBase: CompactFormatFn,
+  numberFormat: ReturnType<typeof useCurrency>['numberFormat'],
 ): { primary: string; secondary?: string } => {
   switch (type) {
     case 'salary':
@@ -77,7 +79,7 @@ const buildValueParts = (
     case 'invest_habit':
       return buildInvestHabitValueParts(goal);
     case 'annual':
-      return buildAnnualValueParts(goal);
+      return buildAnnualValueParts(goal, numberFormat);
     default:
       return buildAmountValueParts(goal, fmtBase);
   }
@@ -148,11 +150,12 @@ function GoalProgressItem({
   annualGross: number;
   fmtBase: CompactFormatFn;
 }>) {
+  const { numberFormat } = useCurrency();
   const type = normalizeGoalType(goal);
   const pct = getGoalPct(goal, annualGross);
   const clampedPct = Math.max(0, Math.min(pct, 100));
   const barColor = getAnnualBarColor(goal, type, clampedPct);
-  const valueParts = buildValueParts(goal, type, annualGross, fmtBase);
+  const valueParts = buildValueParts(goal, type, annualGross, fmtBase, numberFormat);
   const subtext = buildGoalSubtext(goal, type, clampedPct, annualGross, fmtBase);
 
   return (

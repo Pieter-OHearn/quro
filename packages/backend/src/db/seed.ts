@@ -23,7 +23,12 @@ import {
   dashboardTransactions,
 } from './schema';
 import { eq } from 'drizzle-orm';
-import { DEFAULT_BASE_CURRENCY, DEFAULT_RETIREMENT_AGE, DEFAULT_USER_AGE } from '../lib/users';
+import {
+  DEFAULT_BASE_CURRENCY,
+  DEFAULT_RETIREMENT_AGE,
+  DEFAULT_USER_NUMBER_FORMAT,
+  DEFAULT_USER_AGE,
+} from '../lib/users';
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
@@ -55,6 +60,7 @@ async function ensureDemoUser(): Promise<SeedUser> {
         age: DEFAULT_USER_AGE,
         retirementAge: DEFAULT_RETIREMENT_AGE,
         baseCurrency: DEFAULT_BASE_CURRENCY,
+        numberFormat: DEFAULT_USER_NUMBER_FORMAT,
       })
       .where(eq(users.id, existing.id));
     return { ...existing, created: false };
@@ -74,6 +80,7 @@ async function ensureDemoUser(): Promise<SeedUser> {
       age: DEFAULT_USER_AGE,
       retirementAge: DEFAULT_RETIREMENT_AGE,
       baseCurrency: DEFAULT_BASE_CURRENCY,
+      numberFormat: DEFAULT_USER_NUMBER_FORMAT,
       passwordHash,
     })
     .returning({ id: users.id, email: users.email });

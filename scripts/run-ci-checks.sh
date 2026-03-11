@@ -30,6 +30,75 @@ run_check() {
   "$@"
 }
 
+postgres_is_ready() {
+  bun -e "import net from 'node:net';
+const socket = net.createConnection({ host: process.env.QRO_DB_HOST, port: Number(process.env.QRO_DB_PORT) });
+const finish = (code) => {
+  socket.destroy();
+  process.exit(code);
+};
+socket.setTimeout(1000);
+socket.on('connect', () => finish(0));
+socket.on('timeout', () => finish(1));
+socket.on('error', () => finish(1));" >/dev/null 2>&1
+}
+
+wait_for_postgres() {
+  attempts=0
+  max_attempts=30
+
+  while [ "$attempts" -lt "$max_attempts" ]; do
+    if postgres_is_ready; then
+      return 0
+    fi
+
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+
+  return 1
+}
+
+STARTED_DOCKER_DB=0
+
+cleanup_started_postgres() {
+  if [ "$STARTED_DOCKER_DB" -eq 1 ]; then
+    docker compose stop db >/dev/null 2>&1 || true
+  fi
+}
+
+ensure_postgres() {
+  if postgres_is_ready; then
+    return 0
+  fi
+
+  if [ -n "${DATABASE_URL:-}" ] && [ "$DATABASE_HOST" != "127.0.0.1" ] && [ "$DATABASE_HOST" != "localhost" ]; then
+    echo "Postgres is not reachable at $DATABASE_HOST:$DATABASE_PORT from DATABASE_URL." >&2
+    echo "Ensure the CI database service is running and reachable, then rerun ci:check." >&2
+    exit 1
+  fi
+
+  if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+    echo "Postgres is not reachable at $DATABASE_HOST:$DATABASE_PORT and docker compose is unavailable." >&2
+    echo "Start Postgres manually or install Docker Desktop, then rerun ci:check." >&2
+    exit 1
+  fi
+
+  echo "Postgres is not reachable at $DATABASE_HOST:$DATABASE_PORT. Starting docker compose service 'db'..." >&2
+  docker compose up -d db
+  STARTED_DOCKER_DB=1
+
+  if ! wait_for_postgres; then
+    echo "Postgres did not become ready after starting docker compose service 'db'." >&2
+    exit 1
+  fi
+}
+
+prepare_test_database() {
+  ensure_postgres
+  run_check "Database migrate" bun run db:migrate
+}
+
 has_staged_parser_changes() {
   git diff --cached --name-only --diff-filter=ACMR -- services/pension-parser | grep -q .
 }
@@ -49,9 +118,24 @@ skip_python_check() {
 
 require_command bun
 
+DATABASE_TARGET=$(
+  bun -e "const connectionString = process.env.DATABASE_URL || 'postgres://quro:quro@127.0.0.1:5432/quro';
+const url = new URL(connectionString);
+const host = url.hostname || '127.0.0.1';
+const port = url.port || '5432';
+process.stdout.write(\`\${host}|\${port}\`);"
+)
+DATABASE_HOST=${DATABASE_TARGET%|*}
+DATABASE_PORT=${DATABASE_TARGET#*|}
+export QRO_DB_HOST="$DATABASE_HOST"
+export QRO_DB_PORT="$DATABASE_PORT"
+
+trap cleanup_started_postgres EXIT INT TERM
+
 run_check "Format" bun run check:format
 run_check "Lint" bun run check:lint
 run_check "Typecheck" bun run check:typecheck
+prepare_test_database
 run_check "Tests" bun run check:test
 run_check "Build" bun run check:build
 

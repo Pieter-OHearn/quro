@@ -2,6 +2,18 @@ export const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 
 
 export type CurrencyCode = (typeof CURRENCY_CODES)[number];
 
+export const NUMBER_FORMATS = ['en-US', 'de-DE'] as const;
+
+export type NumberFormatPreference = (typeof NUMBER_FORMATS)[number];
+
+export const DEFAULT_NUMBER_FORMAT: NumberFormatPreference = 'en-US';
+
+const NUMBER_FORMAT_SET = new Set<string>(NUMBER_FORMATS);
+
+export function isNumberFormatPreference(value: unknown): value is NumberFormatPreference {
+  return typeof value === 'string' && NUMBER_FORMAT_SET.has(value);
+}
+
 export type User = {
   id: number;
   firstName: string;
@@ -11,6 +23,7 @@ export type User = {
   age: number;
   retirementAge: number;
   baseCurrency: CurrencyCode;
+  numberFormat: NumberFormatPreference;
   passwordUpdatedAt: string | null;
   createdAt: string;
 };
@@ -25,7 +38,8 @@ export type UpdateUserProfileInput = {
 };
 
 export type UpdateUserPreferencesInput = {
-  baseCurrency: CurrencyCode;
+  baseCurrency?: CurrencyCode;
+  numberFormat?: NumberFormatPreference;
 };
 
 export type UpdateUserPasswordInput = {

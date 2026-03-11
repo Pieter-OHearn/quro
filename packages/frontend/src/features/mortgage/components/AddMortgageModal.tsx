@@ -1,6 +1,6 @@
 import { Modal, ModalFooter } from '@/components/ui';
-import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
-import type { Mortgage as MortgageType, Property } from '@quro/shared';
+import { CURRENCY_CODES, useCurrency, type CurrencyCode } from '@/lib/CurrencyContext';
+import { formatNumber, type Mortgage as MortgageType, type Property } from '@quro/shared';
 import { useAddMortgageForm } from '../hooks';
 import type { MortgageFormPayload, MortgageFormState } from '../types';
 
@@ -333,6 +333,7 @@ function getLtvColor(ltv: number) {
 type LtvPreviewProps = { ltvPreview: string; form: FormState };
 
 function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
+  const { numberFormat } = useCurrency();
   const ltvVal = parseFloat(ltvPreview);
   const { border, text } = getLtvColor(ltvVal);
   return (
@@ -340,8 +341,16 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
       <div>
         <p className="text-xs font-semibold text-slate-700">Loan-to-Value Preview</p>
         <p className="text-xs text-slate-500 mt-0.5">
-          {form.currency} {n(form.outstandingBalance).toLocaleString()} on {form.currency}{' '}
-          {n(form.propertyValue).toLocaleString()}
+          {form.currency}{' '}
+          {formatNumber(n(form.outstandingBalance), numberFormat, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}{' '}
+          on {form.currency}{' '}
+          {formatNumber(n(form.propertyValue), numberFormat, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </p>
       </div>
       <div className="text-right">

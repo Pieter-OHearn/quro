@@ -4,11 +4,13 @@ import type { ComponentProps, ElementType } from 'react';
 import { useSearchParams } from 'react-router';
 import type {
   CurrencyCode,
+  NumberFormatPreference,
   UpdateUserPasswordInput,
   UpdateUserPreferencesInput,
   UpdateUserProfileInput,
   User,
 } from '@quro/shared';
+import { formatNumber, NUMBER_FORMATS } from '@quro/shared';
 import {
   AlertTriangle,
   Calendar,
@@ -688,16 +690,25 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
 
 function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionProps>) {
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(user.baseCurrency);
+  const [selectedNumberFormat, setSelectedNumberFormat] = useState<NumberFormatPreference>(
+    user.numberFormat,
+  );
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const { saved, showSaved } = useSavedState();
+  const hasChanges =
+    selectedCurrency !== user.baseCurrency || selectedNumberFormat !== user.numberFormat;
 
   useEffect(() => {
     setSelectedCurrency(user.baseCurrency);
-  }, [user.baseCurrency]);
+    setSelectedNumberFormat(user.numberFormat);
+  }, [user.baseCurrency, user.numberFormat]);
 
   const handleSave = async () => {
-    const payload: UpdateUserPreferencesInput = { baseCurrency: selectedCurrency };
+    const payload: UpdateUserPreferencesInput = {
+      baseCurrency: selectedCurrency,
+      numberFormat: selectedNumberFormat,
+    };
 
     setIsSaving(true);
     setFormError('');
@@ -757,6 +768,51 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
       </div>
 
       <div className="mb-8 border-t border-slate-100 pt-6">
+        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          <SlidersHorizontal size={14} className="text-indigo-500" />
+          Number Format
+        </p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {NUMBER_FORMATS.map((numberFormat) => {
+            const isSelected = numberFormat === selectedNumberFormat;
+            const sample = formatNumber(1000, numberFormat, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+
+            return (
+              <button
+                key={numberFormat}
+                type="button"
+                onClick={() => setSelectedNumberFormat(numberFormat)}
+                className={cn(
+                  'rounded-2xl border px-4 py-4 text-left transition-all',
+                  isSelected
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50',
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {numberFormat === 'en-US' ? '1,000.00 style' : '1.000,00 style'}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Example: <span className="font-semibold text-slate-600">{sample}</span>
+                    </p>
+                  </div>
+                  {isSelected ? <Check size={16} className="ml-auto text-indigo-600" /> : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          Controls decimal and thousands separators anywhere Quro formats amounts.
+        </p>
+      </div>
+
+      <div className="mb-8 border-t border-slate-100 pt-6">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
           Coming Soon
         </p>
@@ -788,7 +844,7 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
         <SaveActionButton
           saved={saved}
           loading={isSaving}
-          disabled={selectedCurrency === user.baseCurrency}
+          disabled={!hasChanges}
           onClick={() => {
             void handleSave();
           }}

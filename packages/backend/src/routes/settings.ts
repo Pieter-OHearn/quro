@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import {
+  isNumberFormatPreference,
   isCurrencyCode,
   type UpdateUserPasswordInput,
   type UpdateUserPreferencesInput,
@@ -72,16 +73,32 @@ function parsePreferencesPayload(payload: unknown): ParseResult<UpdateUserPrefer
     return { ok: false, error: 'Invalid preferences payload' };
   }
 
-  const rawBaseCurrency = (payload as Partial<Record<'baseCurrency', unknown>>).baseCurrency;
-  if (!isCurrencyCode(rawBaseCurrency)) {
-    return { ok: false, error: 'Choose a valid base currency' };
+  const raw = payload as Partial<Record<keyof UpdateUserPreferencesInput, unknown>>;
+  const nextPreferences: UpdateUserPreferencesInput = {};
+
+  if (raw.baseCurrency !== undefined) {
+    if (!isCurrencyCode(raw.baseCurrency)) {
+      return { ok: false, error: 'Choose a valid base currency' };
+    }
+
+    nextPreferences.baseCurrency = raw.baseCurrency;
+  }
+
+  if (raw.numberFormat !== undefined) {
+    if (!isNumberFormatPreference(raw.numberFormat)) {
+      return { ok: false, error: 'Choose a valid number format' };
+    }
+
+    nextPreferences.numberFormat = raw.numberFormat;
+  }
+
+  if (!nextPreferences.baseCurrency && !nextPreferences.numberFormat) {
+    return { ok: false, error: 'Choose at least one preference to update' };
   }
 
   return {
     ok: true,
-    data: {
-      baseCurrency: rawBaseCurrency,
-    },
+    data: nextPreferences,
   };
 }
 
@@ -170,9 +187,13 @@ app.put('/preferences', async (c) => {
     return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
   }
 
+  const updatePayload: Partial<typeof users.$inferInsert> = {};
+  if (parsed.data.baseCurrency) updatePayload.baseCurrency = parsed.data.baseCurrency;
+  if (parsed.data.numberFormat) updatePayload.numberFormat = parsed.data.numberFormat;
+
   const [data] = await db
     .update(users)
-    .set({ baseCurrency: parsed.data.baseCurrency })
+    .set(updatePayload)
     .where(eq(users.id, authUser.id))
     .returning(publicUserColumns);
 

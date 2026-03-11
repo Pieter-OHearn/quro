@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   CURRENCY_CODES,
   CURRENCY_META,
+  formatCurrency as formatCurrencyValue,
   type CurrencyCode,
   type Payslip,
   type PayslipDocument,
@@ -22,6 +23,7 @@ import {
   resolveApiErrorMessage,
   usePdfAttachmentState,
 } from '@/lib/pdfDocuments';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddPayslipForm, useDeletePayslipDocument, useUploadPayslipDocument } from '../hooks';
 import type { PayslipFieldErrorMap, PayslipFormState, SavePayslipInput } from '../types';
 
@@ -78,16 +80,8 @@ type PayslipModalBodyProps = {
   documentState: PayslipDocumentState;
 };
 
-function formatCurrency(amount: number, currency: CurrencyCode) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps>) {
+  const { numberFormat } = useCurrency();
   const previewTotal = Math.abs(net) + Math.abs(tax) + Math.abs(pension);
 
   return (
@@ -100,7 +94,7 @@ function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps
           <p className="text-sm font-semibold text-slate-700">Calculated Take-Home</p>
         </div>
         <p className={`font-bold ${net >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-          {net >= 0 ? formatCurrency(net, payCurrency) : 'Check values'}
+          {net >= 0 ? formatCurrencyValue(net, payCurrency, true, numberFormat) : 'Check values'}
         </p>
       </div>
       {previewTotal > 0 && (

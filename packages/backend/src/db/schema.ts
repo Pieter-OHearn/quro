@@ -79,6 +79,7 @@ export const users = pgTable(
     age: integer('age').notNull().default(35),
     retirementAge: integer('retirement_age').notNull().default(67),
     baseCurrency: currencyCodeEnum('base_currency').notNull().default('EUR'),
+    numberFormat: text('number_format').notNull().default('en-US'),
     passwordHash: text('password_hash').notNull(),
     passwordUpdatedAt: timestamp('password_updated_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -92,6 +93,10 @@ export const users = pgTable(
     retirementAfterAgeCheck: check(
       'users_retirement_after_age_check',
       sql`${table.retirementAge} > ${table.age}`,
+    ),
+    numberFormatCheck: check(
+      'users_number_format_check',
+      sql`${table.numberFormat} in ('en-US', 'de-DE')`,
     ),
   }),
 );
