@@ -15,6 +15,7 @@ import budget from './routes/budget';
 import dashboard from './routes/dashboard';
 import currency from './routes/currency';
 import capabilities from './routes/capabilities';
+import settings from './routes/settings';
 
 const app = new Hono();
 
@@ -38,6 +39,8 @@ app.use('/api/dashboard/*', requireAuth);
 app.use('/api/currency/*', requireAuth);
 app.use('/api/capabilities', requireAuth);
 app.use('/api/capabilities/*', requireAuth);
+app.use('/api/settings', requireAuth);
+app.use('/api/settings/*', requireAuth);
 
 app.route('/api/savings', savings);
 app.route('/api/investments', investments);
@@ -51,6 +54,7 @@ app.route('/api/budget', budget);
 app.route('/api/dashboard', dashboard);
 app.route('/api/currency', currency);
 app.route('/api/capabilities', capabilities);
+app.route('/api/settings', settings);
 
 export default {
   port: parseInt(process.env.PORT || '3000'),

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@quro/shared';
 import { DEFAULT_APP_CAPABILITIES, useAppCapabilities } from '@/lib/useAppCapabilities';
+import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { PensionPageState } from '../types';
 import { useCreatePensionPot } from './useCreatePensionPot';
@@ -24,7 +25,6 @@ function usePensionUiState() {
     importId: number | null;
   } | null>(null);
   const [editingTxn, setEditingTxn] = useState<PensionTransaction | null>(null);
-  const [retirementYearsInput, setRetirementYearsInput] = useState('');
 
   const openImportModal = useCallback((pot: PensionPot, importId: number | null = null): void => {
     setImportModal({ pot, importId });
@@ -48,13 +48,12 @@ function usePensionUiState() {
     closeImportModal,
     editingTxn,
     setEditingTxn,
-    retirementYearsInput,
-    setRetirementYearsInput,
   };
 }
 
 export function usePensionPageState(): PensionPageState {
   const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
+  const { user } = useAuth();
   const { data: pensions = [], isLoading: loadingPots } = usePensionPots();
   const { data: pensionTxns = [], isLoading: loadingTransactions } = usePensionTransactions();
   const { data: pensionDocuments = [], isLoading: loadingDocuments } =
@@ -67,11 +66,8 @@ export function usePensionPageState(): PensionPageState {
   const createTxn = useCreatePensionTransaction();
   const updateTxn = useUpdatePensionTransaction();
   const deleteTxn = useDeletePensionTransaction();
-  const parsedRetirementYears = Number.parseInt(ui.retirementYearsInput, 10);
   const yearsToRetirement =
-    Number.isFinite(parsedRetirementYears) && parsedRetirementYears > 0
-      ? parsedRetirementYears
-      : null;
+    user && user.retirementAge > user.age ? user.retirementAge - user.age : null;
   const computations = usePensionComputations(
     pensions,
     pensionTxns,

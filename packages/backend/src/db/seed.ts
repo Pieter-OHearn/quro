@@ -23,6 +23,7 @@ import {
   dashboardTransactions,
 } from './schema';
 import { eq } from 'drizzle-orm';
+import { DEFAULT_BASE_CURRENCY, DEFAULT_RETIREMENT_AGE, DEFAULT_USER_AGE } from '../lib/users';
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
@@ -32,21 +33,32 @@ function pad(n: number) {
 
 type SeedUser = {
   id: number;
-  name: string;
   email: string;
   created: boolean;
 };
 
 const DEMO_USER_EMAIL = 'demo@quro.local';
-const DEMO_USER_NAME = 'Demo User';
 const DEMO_USER_PASSWORD = 'password123';
 
 async function ensureDemoUser(): Promise<SeedUser> {
   const [existing] = await db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({ id: users.id, email: users.email })
     .from(users)
     .where(eq(users.email, DEMO_USER_EMAIL));
-  if (existing) return { ...existing, created: false };
+  if (existing) {
+    await db
+      .update(users)
+      .set({
+        firstName: 'Demo',
+        lastName: 'User',
+        location: 'Amsterdam, Netherlands',
+        age: DEFAULT_USER_AGE,
+        retirementAge: DEFAULT_RETIREMENT_AGE,
+        baseCurrency: DEFAULT_BASE_CURRENCY,
+      })
+      .where(eq(users.id, existing.id));
+    return { ...existing, created: false };
+  }
 
   const passwordHash = await Bun.password.hash(DEMO_USER_PASSWORD, {
     algorithm: 'bcrypt',
@@ -55,11 +67,16 @@ async function ensureDemoUser(): Promise<SeedUser> {
   const [created] = await db
     .insert(users)
     .values({
-      name: DEMO_USER_NAME,
+      firstName: 'Demo',
+      lastName: 'User',
       email: DEMO_USER_EMAIL,
+      location: 'Amsterdam, Netherlands',
+      age: DEFAULT_USER_AGE,
+      retirementAge: DEFAULT_RETIREMENT_AGE,
+      baseCurrency: DEFAULT_BASE_CURRENCY,
       passwordHash,
     })
-    .returning({ id: users.id, name: users.name, email: users.email });
+    .returning({ id: users.id, email: users.email });
   return { ...created, created: true };
 }
 

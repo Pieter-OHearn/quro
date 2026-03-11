@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import { FormField, Modal, ModalHeader, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
+import { FormField, Modal, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
 import { useSignInState } from '../hooks';
 import type { SignInState } from '../types';
 import { SubmitButton } from './SubmitButton';
@@ -24,8 +24,8 @@ function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
         <TextInput
           type="email"
           autoFocus
+          autoComplete="email"
           placeholder="you@example.com"
-          className="px-4 py-3 transition-all"
           error={Boolean(errors.email)}
           value={email}
           onChange={(value) => {
@@ -38,9 +38,9 @@ function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
         <PasswordInput
           value={password}
           placeholder="••••••••"
+          autoComplete="current-password"
           show={showPw}
           onToggle={toggleShowPw}
-          className="px-4 py-3 transition-all"
           onChange={(value) => {
             setPassword(value);
             clearError('password');
@@ -60,7 +60,7 @@ function SignInForm({ state, onSwitchToSignUp }: Readonly<SignInFormProps>) {
       onSubmit={(event) => {
         void handleSubmit(event);
       }}
-      className="px-8 py-7 space-y-4 text-slate-900"
+      className="space-y-4 px-8 py-7 text-slate-900"
     >
       <SignInFormFields state={state} />
       <SubmitButton
@@ -73,12 +73,12 @@ function SignInForm({ state, onSwitchToSignUp }: Readonly<SignInFormProps>) {
           </>
         }
       />
-      <p className="text-center text-sm text-slate-500 pt-1">
+      <p className="pt-1 text-center text-sm text-slate-500">
         Don't have an account?{' '}
         <button
           type="button"
           onClick={onSwitchToSignUp}
-          className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
+          className="font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
         >
           Sign up free
         </button>
@@ -96,26 +96,19 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
       subtitle="Sign in to your Quro account"
       onClose={onClose}
       maxWidth="md"
-      backdropClassName="bg-black/60 backdrop-blur-sm"
-      contentClassName="rounded-3xl"
-      bodyClassName="p-0 space-y-0"
-      header={
-        <ModalHeader
-          onClose={onClose}
-          title="Welcome back"
-          subtitle="Sign in to your Quro account"
-          align="center"
-          visual={
-            <div className="flex justify-center mb-4">
-              <QuroLogo size={52} showBg={false} />
-            </div>
-          }
-          className="bg-gradient-to-br from-[#0a0f1e] to-[#1a2550] px-8 pt-8 pb-10"
-          titleClassName="text-2xl font-black tracking-tight"
-          subtitleClassName="text-sm mt-1"
-          closeIconSize={16}
-        />
-      }
+      bodyClassName="space-y-0 p-0"
+      headerProps={{
+        align: 'center',
+        visual: (
+          <div className="mb-4 flex justify-center">
+            <QuroLogo size={52} showBg={false} />
+          </div>
+        ),
+        className: 'bg-gradient-to-br from-[#0a0f1e] to-[#1a2550] px-8 pb-10 pt-8',
+        titleClassName: 'text-2xl font-black tracking-tight',
+        subtitleClassName: 'mt-1 text-sm',
+        closeIconSize: 16,
+      }}
     >
       <SignInForm state={state} onSwitchToSignUp={onSwitchToSignUp} />
     </Modal>

@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { CURRENCY_CODES, CURRENCY_META, isCurrencyCode, type CurrencyCode } from '@quro/shared';
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from './AuthContext';
+import { api } from './api';
 import { convertCurrencyAmount } from './currencyRates';
 import {
   getCurrencyRatesErrorDetail,
@@ -130,12 +131,39 @@ function renderCurrencyRatesGate(
 }
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, replaceUser } = useAuth();
   const ratesQuery = useCurrencyRates();
-  const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>('EUR');
+  const [baseCurrency, setBaseCurrencyState] = useState<CurrencyCode>(
+    normalizeCurrency(user?.baseCurrency ?? 'EUR'),
+  );
   const hasUser = Boolean(user);
   const ratesStatus = getCurrencyRatesStatus(hasUser, ratesQuery);
   const gate = renderCurrencyRatesGate(hasUser, authLoading, ratesQuery);
+
+  useEffect(() => {
+    setBaseCurrencyState(normalizeCurrency(user?.baseCurrency ?? 'EUR'));
+  }, [user?.baseCurrency]);
+
+  const setBaseCurrency = useCallback(
+    (nextCurrency: CurrencyCode) => {
+      if (nextCurrency === baseCurrency) return;
+
+      const previousCurrency = baseCurrency;
+      setBaseCurrencyState(nextCurrency);
+
+      if (!user) return;
+
+      void api
+        .put('/api/settings/preferences', { baseCurrency: nextCurrency })
+        .then((response) => {
+          replaceUser(response.data.data);
+        })
+        .catch(() => {
+          setBaseCurrencyState(previousCurrency);
+        });
+    },
+    [baseCurrency, replaceUser, user],
+  );
 
   if (gate) return gate;
 

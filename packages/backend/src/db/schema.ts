@@ -57,13 +57,33 @@ const inlinePdfDocumentSizeCheck = (
 
 // ── Users ───────────────────────────────────────────────────────────────────
 
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+    firstName: text('first_name').notNull(),
+    lastName: text('last_name').notNull(),
+    email: text('email').notNull().unique(),
+    location: text('location').notNull().default(''),
+    age: integer('age').notNull().default(35),
+    retirementAge: integer('retirement_age').notNull().default(67),
+    baseCurrency: currencyCodeEnum('base_currency').notNull().default('EUR'),
+    passwordHash: text('password_hash').notNull(),
+    passwordUpdatedAt: timestamp('password_updated_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    ageRangeCheck: check('users_age_range_check', sql`${table.age} between 16 and 100`),
+    retirementAgeRangeCheck: check(
+      'users_retirement_age_range_check',
+      sql`${table.retirementAge} between 17 and 80`,
+    ),
+    retirementAfterAgeCheck: check(
+      'users_retirement_after_age_check',
+      sql`${table.retirementAge} > ${table.age}`,
+    ),
+  }),
+);
 
 // ── Sessions ────────────────────────────────────────────────────────────────
 

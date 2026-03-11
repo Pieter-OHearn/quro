@@ -5,6 +5,7 @@ import { usePayslips } from '@/features/salary/hooks';
 import type { DashboardAllocationsSummary } from '@quro/shared';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { getUserDisplayName } from '@/lib/user';
 import {
   DashboardChartsGrid,
   DashboardStatCards,
@@ -229,7 +230,7 @@ export function Dashboard() {
   return (
     <DashboardPageBody
       data={data}
-      userName={user?.name ?? 'there'}
+      userName={getUserDisplayName(user, 'there')}
       baseCurrency={baseCurrency}
       fmtBase={fmtBase}
     />

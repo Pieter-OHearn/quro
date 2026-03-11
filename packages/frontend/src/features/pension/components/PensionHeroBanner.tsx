@@ -49,7 +49,9 @@ export function PensionHeroBanner({
             </p>
             <p className="text-2xl font-bold">{projected == null ? '—' : fmtBase(projected)}</p>
             <p className="text-slate-400 text-xs mt-0.5">
-              {projected == null ? 'Set retirement horizon below' : 'Projected from current data'}
+              {projected == null
+                ? 'Needs profile retirement settings'
+                : 'Projected from current data'}
             </p>
           </div>
         </div>

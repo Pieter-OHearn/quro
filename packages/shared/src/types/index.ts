@@ -4,9 +4,33 @@ export type CurrencyCode = (typeof CURRENCY_CODES)[number];
 
 export type User = {
   id: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
+  location: string;
+  age: number;
+  retirementAge: number;
+  baseCurrency: CurrencyCode;
+  passwordUpdatedAt: string | null;
   createdAt: string;
+};
+
+export type UpdateUserProfileInput = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  location: string;
+  age: number;
+  retirementAge: number;
+};
+
+export type UpdateUserPreferencesInput = {
+  baseCurrency: CurrencyCode;
+};
+
+export type UpdateUserPasswordInput = {
+  currentPassword: string;
+  nextPassword: string;
 };
 
 export type SavingsAccount = {

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type { PensionPot } from '@quro/shared';
 import { LoadingSpinner } from '@/components/ui';
+import { useAuth } from '@/lib/AuthContext';
 import {
   PensionGrowthChart,
   PensionHeroBanner,
@@ -99,6 +100,7 @@ function useImportDeepLink(state: ReturnType<typeof usePensionPageState>): void 
 
 export function Pension(): JSX.Element {
   const state = usePensionPageState();
+  const { user } = useAuth();
   useImportDeepLink(state);
 
   if (state.isLoading) return <LoadingSpinner />;
@@ -151,8 +153,8 @@ export function Pension(): JSX.Element {
         projected={state.projected}
         monthlyDrawdown={state.monthlyDrawdown}
         yearsToRetirement={state.yearsToRetirement}
-        retirementYearsInput={state.retirementYearsInput}
-        onRetirementYearsChange={state.setRetirementYearsInput}
+        currentAge={user?.age ?? null}
+        targetRetirementAge={user?.retirementAge ?? null}
         fmtBase={state.fmtBase}
         baseCurrency={state.baseCurrency}
       />

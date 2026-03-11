@@ -6,8 +6,11 @@ import { getAuthErrorMessage } from '../utils/auth-error';
 import { validateSignUp } from '../utils/validation';
 
 const initialForm: SignUpFormValues = {
-  name: '',
+  firstName: '',
+  lastName: '',
   email: '',
+  currentAge: '',
+  retirementAge: '',
   password: '',
   confirm: '',
 };
@@ -23,7 +26,12 @@ export function useSignUpState(): SignUpState {
 
   const setField = (field: keyof SignUpFormValues, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: '' }));
+    setErrors((current) => ({
+      ...current,
+      [field]: '',
+      ...(field === 'password' ? { confirm: '' } : {}),
+      ...(field === 'currentAge' ? { retirementAge: '' } : {}),
+    }));
   };
 
   const handleSubmit: SignUpState['handleSubmit'] = async (event) => {
@@ -38,7 +46,14 @@ export function useSignUpState(): SignUpState {
     setLoading(true);
 
     try {
-      await signUp(form.name, form.email, form.password);
+      await signUp({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email,
+        password: form.password,
+        age: Number(form.currentAge),
+        retirementAge: Number(form.retirementAge),
+      });
       void navigate('/');
     } catch (error: unknown) {
       setErrors({ email: getAuthErrorMessage(error, 'Sign up failed') });

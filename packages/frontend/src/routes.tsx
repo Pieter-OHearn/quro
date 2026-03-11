@@ -11,6 +11,7 @@ import { Budget } from '@/features/budget';
 import { Pension } from '@/features/pension';
 import { Brand } from '@/features/brand';
 import { LandingPage } from '@/features/landing';
+import { Settings } from '@/features/settings';
 import { useAuth } from '@/lib/AuthContext';
 import { RouteErrorScreen } from '@/router/RouteErrorScreen';
 
@@ -76,6 +77,7 @@ export const router = createBrowserRouter([
       { path: 'pension', Component: Pension },
       { path: 'goals', Component: Goals },
       { path: 'budget', Component: Budget },
+      { path: 'settings', Component: Settings },
     ],
   },
 ]);
