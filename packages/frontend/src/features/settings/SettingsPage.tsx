@@ -1,6 +1,7 @@
 /* eslint-disable complexity, max-lines-per-function */
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ElementType } from 'react';
+import { useSearchParams } from 'react-router';
 import type {
   CurrencyCode,
   UpdateUserPasswordInput,
@@ -104,6 +105,12 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string; icon: ElementType; subti
 ];
 
 const DEFAULT_ERROR_MESSAGE = 'Failed to save your changes';
+const DEFAULT_TAB: TabKey = 'profile';
+
+function resolveActiveTab(value: string | null): TabKey {
+  const candidate = TABS.find((tab) => tab.key === value);
+  return candidate?.key ?? DEFAULT_TAB;
+}
 
 function toProfileFormState(user: User): ProfileFormState {
   return {
@@ -793,7 +800,12 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
 
 export function Settings() {
   const { user, replaceUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabKey>('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = resolveActiveTab(searchParams.get('tab'));
+
+  const setActiveTab = (nextTab: TabKey): void => {
+    setSearchParams({ tab: nextTab });
+  };
 
   if (!user) return null;
 

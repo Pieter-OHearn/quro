@@ -17,7 +17,7 @@ import currency from './routes/currency';
 import capabilities from './routes/capabilities';
 import settings from './routes/settings';
 
-const app = new Hono();
+export const app = new Hono();
 
 app.use('*', corsMiddleware);
 app.onError(errorHandler);

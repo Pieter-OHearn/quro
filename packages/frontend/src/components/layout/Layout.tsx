@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router';
 import {
   LayoutDashboard,
   PiggyBank,
@@ -282,6 +282,7 @@ type AppHeaderProps = {
 };
 
 function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHeaderProps) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const userDisplayName = getUserDisplayName(user);
 
@@ -302,15 +303,26 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
       <div className="flex items-center gap-3">
         <CurrencySelector />
         <NotificationBell />
-        <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            void navigate('/settings?tab=profile');
+          }}
+          className="group flex items-center gap-2 rounded-xl border-l border-slate-200 pl-3 text-left transition-colors hover:bg-slate-50"
+          aria-label="Open profile settings"
+        >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
             <User size={14} className="text-white" />
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-slate-800">{userDisplayName}</p>
-            <p className="text-[10px] text-slate-400">{user?.email}</p>
+            <p className="text-xs font-semibold text-slate-800 transition-colors group-hover:text-indigo-600">
+              {userDisplayName}
+            </p>
+            <p className="text-[10px] text-slate-400 transition-colors group-hover:text-slate-500">
+              {user?.email}
+            </p>
           </div>
-        </div>
+        </button>
       </div>
     </header>
   );
