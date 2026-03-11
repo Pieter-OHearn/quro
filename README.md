@@ -177,13 +177,16 @@ If you run `bun run db:seed`, a demo user is created:
 
 ## Testing and quality checks
 
-There is still no broad unit/integration suite wired across the repo, but shared UI refactor work now has a lightweight smoke suite.
+The repo now has Bun-based unit/integration coverage plus a small Playwright browser smoke suite for the MVP flow.
 
 Use the current quality checks:
 
 ```bash
 # Full local CI gate
 bun run ci:check
+
+# Browser smoke suite for the MVP happy path
+bun run test:smoke
 
 # Shared UI smoke coverage
 bun run test:ui
@@ -208,6 +211,9 @@ bun run hooks:install
 The checked-in pre-commit hook runs the same command once you install it with `bun run hooks:install`.
 It automatically picks up `ruff` and `pip-audit` from `.venv/bin` when present.
 If those Python tools are missing, pre-commit skips the Python-only checks only when the staged changes do not touch `services/pension-parser/`; direct `bun run ci:check` still requires the full toolchain.
+`bun run test:smoke` runs migrations, reseeds the demo user, starts the backend and frontend automatically, signs in through the browser, creates one savings account, one budget category, and one payslip, then verifies the dashboard updates.
+It requires PostgreSQL to be reachable at `127.0.0.1:5432`; on local machines it uses installed Chrome by default, and CI installs Playwright Chromium explicitly.
+If you need to use bundled Chromium locally instead of system Chrome, run `npx playwright install chromium` once and then use `QRO_SMOKE_USE_SYSTEM_CHROME=0 bun run test:smoke`.
 
 For the route-based manual checklist used by UI refactor PRs, see `docs/shared-ui-verification.md`.
 

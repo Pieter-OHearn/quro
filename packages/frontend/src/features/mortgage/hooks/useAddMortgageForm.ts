@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
+import { formatFixedInputValue } from '@/lib/utils';
 import type { Mortgage as MortgageType, Property } from '@quro/shared';
 import type { MortgageFormPayload, MortgageFormState } from '../types';
 
@@ -84,7 +85,7 @@ function applyLinkedProperty(
   if (property) {
     next.propertyAddress = property.address;
     next.currency = property.currency;
-    next.propertyValue = property.currentValue.toString();
+    next.propertyValue = formatFixedInputValue(property.currentValue);
   }
   return next;
 }
@@ -120,11 +121,11 @@ function buildInitialMortgageState(
     propertyAddress: existing.propertyAddress,
     lender: existing.lender,
     currency: existing.currency as CurrencyCode,
-    originalAmount: String(existing.originalAmount ?? ''),
-    outstandingBalance: String(existing.outstandingBalance ?? ''),
-    propertyValue: String(existing.propertyValue ?? ''),
-    monthlyPayment: String(existing.monthlyPayment ?? ''),
-    interestRate: String(existing.interestRate ?? ''),
+    originalAmount: formatFixedInputValue(existing.originalAmount),
+    outstandingBalance: formatFixedInputValue(existing.outstandingBalance),
+    propertyValue: formatFixedInputValue(existing.propertyValue),
+    monthlyPayment: formatFixedInputValue(existing.monthlyPayment),
+    interestRate: formatFixedInputValue(existing.interestRate),
     rateType: existing.rateType,
     fixedUntil: existing.fixedUntil,
     termYears: String(existing.termYears ?? ''),

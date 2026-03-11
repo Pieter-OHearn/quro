@@ -138,6 +138,8 @@ export function Modal({
           scrollable && 'flex flex-col max-h-[90vh]',
           contentClassName,
         )}
+        role="dialog"
+        aria-modal="true"
       >
         {header ?? (
           <ModalHeader

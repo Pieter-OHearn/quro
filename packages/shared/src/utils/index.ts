@@ -1,4 +1,4 @@
-export function formatCurrency(amount: number, currency: string, decimals = false): string {
+export function formatCurrency(amount: number, currency: string, decimals = true): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,

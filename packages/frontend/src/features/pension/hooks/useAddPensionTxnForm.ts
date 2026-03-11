@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { PensionPot, PensionTransaction } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { formatFixedInputValue } from '@/lib/utils';
 import type {
   AnnualStatementDirection,
   PensionTxnType,
@@ -30,12 +31,12 @@ function resolveInitialTransactionType(existing: PensionTransaction | undefined)
 
 function resolveInitialTransactionAmount(existing: PensionTransaction | undefined): string {
   if (!existing) return '';
-  if (existing.type !== 'annual_statement') return String(existing.amount);
-  return String(Math.abs(existing.amount));
+  if (existing.type !== 'annual_statement') return formatFixedInputValue(existing.amount);
+  return formatFixedInputValue(Math.abs(existing.amount));
 }
 
 function resolveInitialTaxAmount(existing: PensionTransaction | undefined): string {
-  return existing?.type === 'contribution' ? String(existing.taxAmount) : '';
+  return existing?.type === 'contribution' ? formatFixedInputValue(existing.taxAmount) : '';
 }
 
 function resolveInitialStatementDirection(

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { formatFixedInputValue } from '@/lib/utils';
 import {
   Modal,
   ModalFooter,
@@ -74,7 +75,7 @@ function useAddTxnForm(
   onClose: () => void,
 ) {
   const [type, setType] = useState<TxnType>(existing?.type ?? 'deposit');
-  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
+  const [amount, setAmount] = useState(existing ? formatFixedInputValue(existing.amount) : '');
   const [date, setDate] = useState(existing?.date ?? new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState(existing?.note ?? '');
   const [error, setError] = useState('');

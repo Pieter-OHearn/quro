@@ -153,6 +153,7 @@ function PayslipPeriodField({ form, errors, set, disabled }: Readonly<PayslipFor
   return (
     <FormField label="Pay Period" required error={errors.month}>
       <TextInput
+        data-testid="salary-payslip-month-input"
         value={form.month}
         onChange={(value) => set('month', value)}
         placeholder="e.g. Mar 2026"
@@ -167,6 +168,7 @@ function PayslipDateField({ form, errors, set, disabled }: Readonly<PayslipFormP
   return (
     <FormField label="Pay Date" required error={errors.date}>
       <TextInput
+        data-testid="salary-payslip-date-input"
         type="date"
         value={form.date}
         onChange={(value) => set('date', value)}
@@ -181,6 +183,7 @@ function PayslipGrossField({ form, errors, set, disabled }: Readonly<PayslipForm
   return (
     <FormField label={`Gross Pay (${form.currency})`} required error={errors.gross}>
       <CurrencyInput
+        data-testid="salary-payslip-gross-input"
         currency={form.currency}
         value={form.gross}
         onChange={(value) => set('gross', value)}
@@ -195,6 +198,7 @@ function PayslipBonusField({ form, set, disabled }: Readonly<PayslipFormPartProp
   return (
     <FormField label={`Bonus (${form.currency})`} hint="optional">
       <CurrencyInput
+        data-testid="salary-payslip-bonus-input"
         currency={form.currency}
         value={form.bonus}
         onChange={(value) => set('bonus', value)}
@@ -214,6 +218,7 @@ function PayslipDeductionsRow({ form, errors, set, disabled }: Readonly<PayslipF
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField label={`Income Tax (${form.currency})`} required error={errors.tax}>
           <CurrencyInput
+            data-testid="salary-payslip-tax-input"
             currency={form.currency}
             value={form.tax}
             onChange={(value) => set('tax', value)}
@@ -223,6 +228,7 @@ function PayslipDeductionsRow({ form, errors, set, disabled }: Readonly<PayslipF
         </FormField>
         <FormField label={`Pension (${form.currency})`} required error={errors.pension}>
           <CurrencyInput
+            data-testid="salary-payslip-pension-input"
             currency={form.currency}
             value={form.pension}
             onChange={(value) => set('pension', value)}

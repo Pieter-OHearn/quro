@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
+import { formatFixedInputValue } from '@/lib/utils';
 import {
   EmojiPickerField,
   FormField,
@@ -141,10 +142,12 @@ function PensionBalanceCurrencyRow({ form, errors, set }: Readonly<PensionFormFi
       <FormField label="Current Balance" required error={errors.balance}>
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           value={form.balance}
           onChange={(v) => set('balance', v)}
           error={Boolean(errors.balance)}
-          placeholder="48200"
+          placeholder="48200.00"
         />
       </FormField>
       <FormField label="Currency">
@@ -164,17 +167,21 @@ function PensionContributionsRow({ form, set }: Readonly<Omit<PensionFormFields,
       <FormField label="Your Contribution /mo">
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           value={form.employeeMonthly}
           onChange={(v) => set('employeeMonthly', v)}
-          placeholder="325"
+          placeholder="325.00"
         />
       </FormField>
       <FormField label="Employer Match /mo">
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           value={form.employerMonthly}
           onChange={(v) => set('employerMonthly', v)}
-          placeholder="195"
+          placeholder="195.00"
         />
       </FormField>
     </div>
@@ -283,10 +290,10 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
     name: existing.name,
     provider: existing.provider,
     type: existing.type,
-    balance: existing.balance.toString(),
+    balance: formatFixedInputValue(existing.balance),
     currency: existing.currency as CurrencyCode,
-    employeeMonthly: existing.employeeMonthly.toString(),
-    employerMonthly: existing.employerMonthly.toString(),
+    employeeMonthly: formatFixedInputValue(existing.employeeMonthly),
+    employerMonthly: formatFixedInputValue(existing.employerMonthly),
     investmentStrategy: existing.investmentStrategy ?? '',
     notes: existing.notes,
     emoji: existing.emoji,

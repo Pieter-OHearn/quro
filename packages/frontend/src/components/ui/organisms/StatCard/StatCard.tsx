@@ -20,6 +20,7 @@ export type StatCardProps = {
   change?: { value: string; positive: boolean; details?: string };
   href?: string;
   className?: string;
+  testId?: string;
   valueClassName?: string;
 };
 
@@ -84,6 +85,7 @@ export function StatCard({
   change,
   href,
   className,
+  testId,
   valueClassName,
 }: StatCardProps) {
   const contentProps = { label, value, subtitle, icon, color, change, href, valueClassName };
@@ -91,6 +93,7 @@ export function StatCard({
     return (
       <Link
         to={href}
+        data-testid={testId}
         className={cn(
           'bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow group',
           className,
@@ -101,7 +104,10 @@ export function StatCard({
     );
   }
   return (
-    <div className={cn('bg-white rounded-2xl p-5 border border-slate-100 shadow-sm', className)}>
+    <div
+      data-testid={testId}
+      className={cn('bg-white rounded-2xl p-5 border border-slate-100 shadow-sm', className)}
+    >
       <StatCardContent {...contentProps} />
     </div>
   );

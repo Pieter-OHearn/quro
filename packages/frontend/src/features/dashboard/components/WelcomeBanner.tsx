@@ -17,7 +17,9 @@ function NetWorthBadge({
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-4 text-center flex-shrink-0 min-w-[220px]">
       <p className="text-indigo-300 text-xs uppercase tracking-widest mb-1">Net Worth</p>
-      <p className="text-3xl font-bold">{fmtBase(netWorth)}</p>
+      <p className="text-3xl font-bold" data-testid="dashboard-net-worth-value">
+        {fmtBase(netWorth)}
+      </p>
       {monthChange !== 0 && (
         <div className="flex items-center justify-center gap-1 mt-1">
           {monthChange >= 0 ? (

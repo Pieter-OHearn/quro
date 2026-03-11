@@ -110,7 +110,7 @@ const smokeCases: readonly SmokeCase[] = [
   {
     name: 'CurrencyInput renders currency prefix and numeric input',
     element: <CurrencyInput currency="EUR" value="1250.50" onChange={noop} />,
-    includes: ['>EUR</span>', 'type="number"', 'value="1250.50"'],
+    includes: ['>EUR</span>', 'type="number"', 'step="0.01"', 'value="1250.50"'],
   },
   {
     name: 'DateInput renders date field markup',

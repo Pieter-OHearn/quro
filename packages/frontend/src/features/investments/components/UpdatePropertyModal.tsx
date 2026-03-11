@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { Modal, ModalFooter, FormField, TextInput } from '@/components/ui';
+import { formatFixedInputValue } from '@/lib/utils';
 import type { Property } from '@quro/shared';
 
 type UpdatePropertyModalProps = {
@@ -48,8 +49,8 @@ function PropertyStatsPreview({
 }
 
 function useUpdatePropertyForm(property: Property) {
-  const [value, setValue] = useState(property.currentValue.toString());
-  const [rent, setRent] = useState(property.monthlyRent.toString());
+  const [value, setValue] = useState(formatFixedInputValue(property.currentValue));
+  const [rent, setRent] = useState(formatFixedInputValue(property.monthlyRent));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const numericValue = parseFloat(value) || 0;
@@ -134,6 +135,8 @@ export function UpdatePropertyModal({
       <FormField label={`Current Value (${property.currency})`} required error={form.errors.value}>
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           value={form.value}
           onChange={form.handleValueChange}
           error={Boolean(form.errors.value)}
@@ -148,7 +151,13 @@ export function UpdatePropertyModal({
         fmtNative={fmtNative}
       />
       <FormField label={`Monthly Rent (${property.currency})`}>
-        <TextInput type="number" value={form.rent} onChange={form.setRent} />
+        <TextInput
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          value={form.rent}
+          onChange={form.setRent}
+        />
       </FormField>
       <PropertyStatsPreview
         equity={equity}

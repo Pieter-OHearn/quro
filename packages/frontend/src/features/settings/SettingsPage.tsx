@@ -381,7 +381,7 @@ function ProfileSection({ user, replaceUser, initials }: Readonly<ProfileSection
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
         <FormField label="First name" required error={errors.firstName}>
           <TextInput
-            placeholder="Pieter"
+            placeholder="John"
             value={form.firstName}
             error={Boolean(errors.firstName)}
             onChange={(value) => {
@@ -392,7 +392,7 @@ function ProfileSection({ user, replaceUser, initials }: Readonly<ProfileSection
         </FormField>
         <FormField label="Last name" required error={errors.lastName}>
           <TextInput
-            placeholder="O'Hearn"
+            placeholder="Doe"
             value={form.lastName}
             error={Boolean(errors.lastName)}
             onChange={(value) => {

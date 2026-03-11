@@ -26,6 +26,7 @@ export function DashboardStatCards({
             icon={Icon}
             color={card.color}
             href={card.path}
+            testId={card.label === 'Monthly Salary' ? 'dashboard-monthly-salary-card' : undefined}
             change={{
               value: `${changeAmount >= 0 ? '+' : '-'}${fmtBase(
                 Math.abs(changeAmount),

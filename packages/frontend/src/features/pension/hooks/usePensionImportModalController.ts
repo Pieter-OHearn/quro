@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PensionImportStatus, PensionStatementImportRow } from '@quro/shared';
+import { formatFixedInputValue } from '@/lib/utils';
 import { useCancelPensionStatementImport } from './useCancelPensionStatementImport';
 import { useCommitPensionStatementImport } from './useCommitPensionStatementImport';
 import { useCreatePensionStatementImport } from './useCreatePensionStatementImport';
@@ -93,8 +94,8 @@ function parseNumber(value: string): number {
 function toDraft(row: PensionStatementImportRow): RowDraft {
   return {
     type: row.type,
-    amount: String(row.amount),
-    taxAmount: String(row.taxAmount),
+    amount: formatFixedInputValue(row.amount),
+    taxAmount: formatFixedInputValue(row.taxAmount),
     date: row.date,
     note: row.note,
     isEmployer: row.isEmployer,

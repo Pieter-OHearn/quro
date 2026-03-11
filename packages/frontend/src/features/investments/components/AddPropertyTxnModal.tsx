@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CircleMinus, DollarSign, Home, Landmark } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { formatFixedInputValue } from '@/lib/utils';
 import {
   Modal,
   ModalFooter,
@@ -408,9 +409,9 @@ function usePropertyTxnForm(property: Property, existing: PropertyTransaction | 
   const [type, setType] = useState<PropertyTxnType>(
     resolveInitialPropertyTxnType(transactionTypes, existing),
   );
-  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
+  const [amount, setAmount] = useState(existing ? formatFixedInputValue(existing.amount) : '');
   const [interest, setInterest] = useState(
-    existing?.interest != null ? String(existing.interest) : '',
+    existing?.interest != null ? formatFixedInputValue(existing.interest) : '',
   );
   const [date, setDate] = useState(existing?.date ?? new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState(existing?.note ?? '');

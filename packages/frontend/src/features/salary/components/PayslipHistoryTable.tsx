@@ -135,7 +135,13 @@ export function PayslipHistoryTable({
       title="Payslip History"
       subtitle={`${payslips.length} payslips · click a row to view breakdown`}
       action={
-        <Button onClick={onAdd} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
+        <Button
+          onClick={onAdd}
+          variant="primary"
+          size="md"
+          leadingIcon={<Plus size={15} />}
+          data-testid="salary-add-payslip-button"
+        >
           Add Payslip
         </Button>
       }

@@ -55,6 +55,8 @@ function AmountFieldsSavingsPortfolio({
       <FormField label="Current Amount">
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           placeholder="0"
           value={form.current}
           onChange={(value) => setField('current', value)}
@@ -63,6 +65,8 @@ function AmountFieldsSavingsPortfolio({
       <FormField label="Target Amount" required>
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           placeholder="15000"
           value={form.target}
           onChange={(value) => setField('target', value)}
@@ -72,6 +76,8 @@ function AmountFieldsSavingsPortfolio({
         <FormField label="Monthly Contribution" className="col-span-2">
           <TextInput
             type="number"
+            inputMode="decimal"
+            step="0.01"
             placeholder="500"
             value={form.monthlyContrib}
             onChange={(value) => setField('monthlyContrib', value)}
@@ -90,6 +96,8 @@ function AmountFieldsSalary({
     <FormField label="Target Annual Gross" required>
       <TextInput
         type="number"
+        inputMode="decimal"
+        step="0.01"
         placeholder="90000"
         value={form.target}
         onChange={(value) => setField('target', value)}
@@ -115,6 +123,8 @@ function AmountFieldsInvestHabit({
       <FormField label={`Monthly Target (${baseCurrency})`} required>
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           placeholder="500"
           value={form.monthlyTarget}
           onChange={(value) => setField('monthlyTarget', value)}

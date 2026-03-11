@@ -232,7 +232,13 @@ function AccountsListHeader({
       title="Savings Accounts"
       subtitle={`${accounts.length} accounts · click a row to view & record transactions`}
       action={
-        <Button onClick={onAddAccount} variant="primary" size="md" leadingIcon={<Plus size={15} />}>
+        <Button
+          onClick={onAddAccount}
+          variant="primary"
+          size="md"
+          leadingIcon={<Plus size={15} />}
+          data-testid="savings-add-account-button"
+        >
           Add Account
         </Button>
       }

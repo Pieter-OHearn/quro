@@ -116,6 +116,7 @@ export default [
           allowDefaultProject: [
             'packages/backend/drizzle.config.ts',
             'packages/frontend/vite.config.ts',
+            'packages/shared/test/*.ts',
           ],
         },
         tsconfigRootDir: __dirname,

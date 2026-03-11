@@ -118,28 +118,34 @@ function PropertyValueFields({ form, errors, onSet }: PropertyFormFieldsProps) {
         <FormField label="Purchase Price" required error={errors.purchasePrice}>
           <TextInput
             type="number"
+            inputMode="decimal"
+            step="0.01"
             value={form.purchasePrice}
             onChange={(value) => onSet('purchasePrice', value)}
             error={Boolean(errors.purchasePrice)}
-            placeholder="0"
+            placeholder="0.00"
           />
         </FormField>
         <FormField label="Current Value" required error={errors.currentValue}>
           <TextInput
             type="number"
+            inputMode="decimal"
+            step="0.01"
             value={form.currentValue}
             onChange={(value) => onSet('currentValue', value)}
             error={Boolean(errors.currentValue)}
-            placeholder="0"
+            placeholder="0.00"
           />
         </FormField>
       </div>
       <FormField label="Monthly Rent">
         <TextInput
           type="number"
+          inputMode="decimal"
+          step="0.01"
           value={form.monthlyRent}
           onChange={(value) => onSet('monthlyRent', value)}
-          placeholder="0"
+          placeholder="0.00"
         />
       </FormField>
     </>

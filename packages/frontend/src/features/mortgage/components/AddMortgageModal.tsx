@@ -168,6 +168,8 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
               </span>
               <input
                 type="number"
+                inputMode="decimal"
+                step="0.01"
                 className={`w-full rounded-xl border pl-12 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors[field] ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
                 placeholder={placeholder}
                 value={form[field as keyof MortgageFormState]}

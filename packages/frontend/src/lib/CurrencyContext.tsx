@@ -44,7 +44,7 @@ function normalizeCurrency(currency: string): CurrencyCode {
   return 'EUR';
 }
 
-function formatCurrency(amount: number, currency: string, decimals = false): string {
+function formatCurrency(amount: number, currency: string, decimals = true): string {
   if (!Number.isFinite(amount)) return 'Unavailable';
 
   return new Intl.NumberFormat('en-US', {
@@ -184,12 +184,12 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return converted;
   };
 
-  const fmtBase = (amount: number, fromCurrency?: string, decimals = false): string => {
+  const fmtBase = (amount: number, fromCurrency?: string, decimals = true): string => {
     const converted = fromCurrency ? convertToBase(amount, fromCurrency) : amount;
     return formatCurrency(converted, baseCurrency, decimals);
   };
 
-  const fmtNative = (amount: number, currency: string, decimals = false): string =>
+  const fmtNative = (amount: number, currency: string, decimals = true): string =>
     formatCurrency(amount, currency, decimals);
 
   const isForeign = (currency: string) => normalizeCurrency(currency) !== baseCurrency;

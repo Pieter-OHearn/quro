@@ -30,19 +30,24 @@ function AddCategoryForm({
   return (
     <div className="mb-5 p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex gap-3">
       <input
+        data-testid="budget-category-name-input"
         className="flex-1 rounded-xl border border-indigo-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
         placeholder="Category name"
         value={newCat.name}
         onChange={(event) => onChange({ ...newCat, name: event.target.value })}
       />
       <input
+        data-testid="budget-category-budget-input"
         className="w-36 rounded-xl border border-indigo-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
         placeholder={`Budget (${baseCurrency})`}
+        inputMode="decimal"
         type="number"
+        step="0.01"
         value={newCat.budgeted}
         onChange={(event) => onChange({ ...newCat, budgeted: event.target.value })}
       />
       <button
+        data-testid="budget-category-submit-button"
         onClick={onAdd}
         className="rounded-xl bg-indigo-600 text-white text-sm px-4 py-2 hover:bg-indigo-700 transition-colors"
       >
@@ -112,6 +117,7 @@ function CategorySectionHeader({
         )}
       </div>
       <button
+        data-testid="budget-add-category-button"
         onClick={onToggleAdd}
         className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
       >

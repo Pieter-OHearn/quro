@@ -3,6 +3,7 @@ import { Trash2, Check } from 'lucide-react';
 import { CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
+import { formatFixedInputValue } from '@/lib/utils';
 import {
   Modal,
   ModalFooter,
@@ -70,9 +71,9 @@ function initialFormState(existing?: SavingsAccount): FormState {
   return {
     name: existing.name,
     bank: existing.bank,
-    balance: existing.balance.toString(),
+    balance: formatFixedInputValue(existing.balance),
     currency: existing.currency as CurrencyCode,
-    rate: existing.interestRate.toString(),
+    rate: formatFixedInputValue(existing.interestRate),
     type: existing.accountType as 'Easy Access' | 'Term Deposit',
     emoji: existing.emoji,
   };
@@ -119,6 +120,7 @@ function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
         />
         <FormField label="Account Name" required error={errors.name} className="flex-1">
           <TextInput
+            data-testid="savings-account-name-input"
             value={form.name}
             onChange={(v) => set('name', v)}
             error={Boolean(errors.name)}
@@ -128,6 +130,7 @@ function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
       </div>
       <FormField label="Bank / Provider" required error={errors.bank}>
         <TextInput
+          data-testid="savings-account-bank-input"
           value={form.bank}
           onChange={(v) => set('bank', v)}
           error={Boolean(errors.bank)}
@@ -149,11 +152,14 @@ function AccountAmountFields({
       <div className="grid grid-cols-2 gap-4">
         <FormField label={balanceLabel} required error={errors.balance}>
           <TextInput
+            data-testid="savings-account-balance-input"
             type="number"
+            inputMode="decimal"
+            step="0.01"
             value={form.balance}
             onChange={(v) => set('balance', v)}
             error={Boolean(errors.balance)}
-            placeholder="18500"
+            placeholder="18500.00"
           />
         </FormField>
         <FormField label="Currency">
@@ -167,6 +173,7 @@ function AccountAmountFields({
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Interest Rate (% APY)" required error={errors.rate}>
           <TextInput
+            data-testid="savings-account-rate-input"
             type="number"
             step="0.01"
             value={form.rate}

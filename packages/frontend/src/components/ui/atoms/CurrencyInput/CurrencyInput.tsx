@@ -18,6 +18,7 @@ export function CurrencyInput({
   containerClassName,
   currency,
   error = false,
+  inputMode = 'decimal',
   onChange,
   placeholder = '0.00',
   step = '0.01',
@@ -32,6 +33,7 @@ export function CurrencyInput({
       <TextInput
         {...props}
         type="number"
+        inputMode={inputMode}
         step={step}
         value={value}
         error={error}

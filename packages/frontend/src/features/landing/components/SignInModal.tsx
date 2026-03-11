@@ -22,6 +22,7 @@ function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
     <>
       <FormField label="Email address" error={errors.email}>
         <TextInput
+          data-testid="signin-email-input"
           type="email"
           autoFocus
           autoComplete="email"
@@ -36,6 +37,7 @@ function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
       </FormField>
       <FormField label="Password" error={errors.password}>
         <PasswordInput
+          data-testid="signin-password-input"
           value={password}
           placeholder="••••••••"
           autoComplete="current-password"

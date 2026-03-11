@@ -1,4 +1,5 @@
 import { isCurrencyCode, type CurrencyCode, type Payslip } from '@quro/shared';
+import { formatFixedInputValue } from '@/lib/utils';
 import type { PayslipFieldErrorMap, PayslipFormState } from '../types';
 
 const isInvalidRequiredNumber = (raw: string, parsed: number) => !raw || Number.isNaN(parsed);
@@ -16,10 +17,10 @@ export const createEmptyPayslipForm = (currency: CurrencyCode): PayslipFormState
 export const createPayslipFormFromExisting = (payslip: Payslip): PayslipFormState => ({
   month: payslip.month,
   date: payslip.date,
-  gross: payslip.gross.toString(),
-  tax: payslip.tax.toString(),
-  pension: payslip.pension.toString(),
-  bonus: payslip.bonus?.toString() ?? '',
+  gross: formatFixedInputValue(payslip.gross),
+  tax: formatFixedInputValue(payslip.tax),
+  pension: formatFixedInputValue(payslip.pension),
+  bonus: payslip.bonus != null ? formatFixedInputValue(payslip.bonus) : '',
   currency: payslip.currency,
 });
 
