@@ -2,7 +2,7 @@ fastapi==0.135.1
 starlette==0.52.1
 uvicorn[standard]==0.37.0
 python-multipart==0.0.22
-pypdf==6.7.5
+pypdf==6.8.0
 httpx==0.28.1
 pdf2image==1.17.0
 pytesseract==0.3.13
