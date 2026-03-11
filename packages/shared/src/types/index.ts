@@ -429,6 +429,7 @@ export type AssetAllocation = {
   name: string;
   value: number;
   color: string;
+  currency: CurrencyCode;
 };
 
 export type CurrencyRate = {
@@ -445,6 +446,7 @@ export type DashboardTransaction = {
   amount: number;
   date: string;
   category: string;
+  currency: CurrencyCode;
 };
 
 export type CurrencyMeta = {

@@ -73,9 +73,7 @@ function CurrencyDropdown({
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
           Base Currency
         </p>
-        <p className="text-xs text-slate-500 mt-0.5">
-          All totals convert using server-backed FX rates
-        </p>
+        <p className="text-xs text-slate-500 mt-0.5">All totals convert to this currency</p>
       </div>
       <div className="py-1.5 max-h-72 overflow-y-auto">
         {CURRENCY_CODES.map((code: CurrencyCode) => {

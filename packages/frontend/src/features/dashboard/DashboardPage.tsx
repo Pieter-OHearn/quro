@@ -18,13 +18,15 @@ import {
   computeDashboardTxnStats,
   computeNWMetrics,
   getGreeting,
+  normalizeAssetAllocations,
+  normalizeDashboardTransactions,
+  normalizeNetWorthSnapshots,
 } from './utils/dashboard-data';
 import type { DashboardFormatFn } from './types';
 import { useAssetAllocations, useDashboardTransactions, useNetWorthSnapshots } from './hooks';
 
 const DASHBOARD_GOAL_LIMIT = 4;
 const DASHBOARD_TXN_LIMIT = 6;
-const DASHBOARD_SOURCE_CURRENCY = 'EUR';
 
 const computeAnnualGross = (
   payslips: ReadonlyArray<{ gross: number; date: string; currency: string }>,
@@ -52,23 +54,12 @@ function useDashboardData(
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const annualGross = computeAnnualGross(payslips, convertToBase);
   const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
-  const convertedTransactions = transactions.map((transaction) => ({
-    ...transaction,
-    amount: convertToBase(transaction.amount, DASHBOARD_SOURCE_CURRENCY),
-  }));
+  const convertedTransactions = normalizeDashboardTransactions(transactions, convertToBase);
   const currentMonthTransactions = convertedTransactions.filter((tx) =>
     tx.date.startsWith(currentMonthKey),
   );
-  const chartData = netWorthData.map((snapshot) => ({
-    month: snapshot.month,
-    year: snapshot.year,
-    value: convertToBase(snapshot.totalValue, snapshot.currency),
-  }));
-  const allocationData = allocations.map((allocation) => ({
-    name: allocation.name,
-    value: convertToBase(allocation.value, DASHBOARD_SOURCE_CURRENCY),
-    color: allocation.color,
-  }));
+  const chartData = normalizeNetWorthSnapshots(netWorthData, convertToBase);
+  const allocationData = normalizeAssetAllocations(allocations, convertToBase);
   const totalAlloc = allocationData.reduce((sum, item) => sum + item.value, 0);
   const allocationByName = allocationData.reduce<Record<string, number>>((acc, item) => {
     acc[item.name] = item.value;

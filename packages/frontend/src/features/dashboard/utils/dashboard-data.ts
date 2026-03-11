@@ -1,6 +1,12 @@
 import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
-import type { Payslip } from '@quro/shared';
 import type {
+  AssetAllocation as DashboardAllocationPayload,
+  DashboardTransaction as DashboardTransactionPayload,
+  NetWorthSnapshot,
+  Payslip,
+} from '@quro/shared';
+import type {
+  AllocationItem,
   DashboardCard,
   DashboardFormatFn,
   DashboardTransaction,
@@ -105,6 +111,42 @@ export const buildDashboardCards = (
     color: 'emerald',
   },
 ];
+
+export function normalizeNetWorthSnapshots(
+  snapshots: readonly NetWorthSnapshot[],
+  convertToBase: (amount: number, currency: string) => number,
+): NetWorthMetricData[] {
+  return snapshots.map((snapshot) => ({
+    month: snapshot.month,
+    year: snapshot.year,
+    value: convertToBase(snapshot.totalValue, snapshot.currency),
+  }));
+}
+
+export function normalizeAssetAllocations(
+  allocations: readonly DashboardAllocationPayload[],
+  convertToBase: (amount: number, currency: string) => number,
+): AllocationItem[] {
+  return allocations.map((allocation) => ({
+    name: allocation.name,
+    value: convertToBase(allocation.value, allocation.currency),
+    color: allocation.color,
+  }));
+}
+
+export function normalizeDashboardTransactions(
+  transactions: readonly DashboardTransactionPayload[],
+  convertToBase: (amount: number, currency: string) => number,
+): DashboardTransaction[] {
+  return transactions.map((transaction) => ({
+    id: transaction.id,
+    name: transaction.name,
+    category: transaction.category,
+    date: transaction.date,
+    type: transaction.type,
+    amount: convertToBase(transaction.amount, transaction.currency),
+  }));
+}
 
 const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
