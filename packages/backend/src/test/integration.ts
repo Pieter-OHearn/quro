@@ -5,6 +5,16 @@ import {
   budgetCategories,
   budgetTransactions,
   goals,
+  holdingPriceHistory,
+  holdingTransactions,
+  holdings,
+  mortgageTransactions,
+  mortgages,
+  payslips,
+  pensionPots,
+  pensionTransactions,
+  properties,
+  propertyTransactions,
   savingsAccounts,
   savingsTransactions,
   sessions,
@@ -13,6 +23,7 @@ import {
 
 type RequestOptions = {
   method?: string;
+  body?: BodyInit;
   json?: unknown;
   headers?: HeadersInit;
   cookie?: string | null;
@@ -51,6 +62,8 @@ function createRequestFunction() {
     if (options.json !== undefined) {
       headers.set('Content-Type', 'application/json');
       body = JSON.stringify(options.json);
+    } else if (options.body !== undefined) {
+      body = options.body;
     }
 
     return app.request(path, {
@@ -121,6 +134,16 @@ async function cleanupTestUsers(emailPattern: string) {
 
   await db.delete(savingsTransactions).where(inArray(savingsTransactions.userId, userIds));
   await db.delete(savingsAccounts).where(inArray(savingsAccounts.userId, userIds));
+  await db.delete(holdingPriceHistory).where(inArray(holdingPriceHistory.userId, userIds));
+  await db.delete(holdingTransactions).where(inArray(holdingTransactions.userId, userIds));
+  await db.delete(propertyTransactions).where(inArray(propertyTransactions.userId, userIds));
+  await db.delete(mortgageTransactions).where(inArray(mortgageTransactions.userId, userIds));
+  await db.delete(pensionTransactions).where(inArray(pensionTransactions.userId, userIds));
+  await db.delete(payslips).where(inArray(payslips.userId, userIds));
+  await db.delete(mortgages).where(inArray(mortgages.userId, userIds));
+  await db.delete(properties).where(inArray(properties.userId, userIds));
+  await db.delete(holdings).where(inArray(holdings.userId, userIds));
+  await db.delete(pensionPots).where(inArray(pensionPots.userId, userIds));
   await db.delete(budgetTransactions).where(inArray(budgetTransactions.userId, userIds));
   await db.delete(budgetCategories).where(inArray(budgetCategories.userId, userIds));
   await db.delete(goals).where(inArray(goals.userId, userIds));

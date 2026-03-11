@@ -98,7 +98,7 @@ jobs:
       - name: Install ruff
         run: pip install ruff
       - name: Check formatting
-        run: bun run check:python:format
+        run: ruff format --check services/pension-parser/
 
   python-lint:
     name: Python Lint
@@ -111,7 +111,7 @@ jobs:
       - name: Install ruff
         run: pip install ruff
       - name: Run linter
-        run: bun run check:python:lint
+        run: ruff check services/pension-parser/
 
   build-worker:
     name: Build Worker (pension-parser)
@@ -125,7 +125,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r services/pension-parser/requirements.txt
       - name: Compile check
-        run: bun run check:python:build
+        run: python -m compileall services/pension-parser/app/
 
   # ── Security ─────────────────────────────────────────────────────────────
 
@@ -145,4 +145,4 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Python security audit
-        run: bun run check:security:python
+        run: pip-audit -r services/pension-parser/requirements.txt

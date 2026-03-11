@@ -125,6 +125,33 @@ app.get('/', async (c) => {
   return c.json({ data });
 });
 
+// ── Mortgage Transactions ────────────────────────────────────────────────────
+
+app.get('/transactions', async (c) => {
+  const user = getAuthUser(c);
+  const mortgageId = c.req.query('mortgageId');
+  if (mortgageId) {
+    const parsedMortgageId = parseId(mortgageId);
+    if (parsedMortgageId === null)
+      return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
+    const data = await db
+      .select()
+      .from(mortgageTransactions)
+      .where(
+        and(
+          eq(mortgageTransactions.mortgageId, parsedMortgageId),
+          eq(mortgageTransactions.userId, user.id),
+        ),
+      );
+    return c.json({ data });
+  }
+  const data = await db
+    .select()
+    .from(mortgageTransactions)
+    .where(eq(mortgageTransactions.userId, user.id));
+  return c.json({ data });
+});
+
 app.get('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
@@ -236,33 +263,6 @@ app.delete('/:id', async (c) => {
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
-});
-
-// ── Mortgage Transactions ────────────────────────────────────────────────────
-
-app.get('/transactions', async (c) => {
-  const user = getAuthUser(c);
-  const mortgageId = c.req.query('mortgageId');
-  if (mortgageId) {
-    const parsedMortgageId = parseId(mortgageId);
-    if (parsedMortgageId === null)
-      return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
-    const data = await db
-      .select()
-      .from(mortgageTransactions)
-      .where(
-        and(
-          eq(mortgageTransactions.mortgageId, parsedMortgageId),
-          eq(mortgageTransactions.userId, user.id),
-        ),
-      );
-    return c.json({ data });
-  }
-  const data = await db
-    .select()
-    .from(mortgageTransactions)
-    .where(eq(mortgageTransactions.userId, user.id));
   return c.json({ data });
 });
 
