@@ -81,6 +81,8 @@ cp packages/frontend/.env.example packages/frontend/.env
 
 Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
 It also includes the parser worker settings for AI-based pension statement import drafts.
+Leave `VITE_API_URL` unset for same-origin `/api` deployments such as Docker, preview, and production.
+For local split frontend/backend development with Vite on `http://localhost:5173`, set `VITE_API_URL=http://localhost:3000` in `packages/frontend/.env`.
 
 3. Start required infra with Docker (DB and object storage):
 
@@ -202,6 +204,7 @@ For the route-based manual checklist used by UI refactor PRs, see `docs/shared-u
 This mode runs the app shell in Docker: frontend, backend, database, and MinIO.
 Pension statement import is auto-disabled in this mode because the AI worker stack is not running.
 The pension UI shows an `AI off` badge until the pension-import profile is started.
+The frontend defaults to same-origin `/api` requests here, so nginx handles auth and document download proxying without extra frontend client configuration.
 
 ```bash
 docker compose --env-file packages/backend/.env up --build

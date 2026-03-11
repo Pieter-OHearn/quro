@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PdfDocument } from '@quro/shared';
-import { api } from './api';
+import { buildApiUrl } from './api';
 
 const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
 const KILOBYTE = 1024;
@@ -50,7 +50,7 @@ export function validatePdfFile(file: File): string {
 }
 
 export function buildApiDownloadUrl(path: string): string {
-  return `${api.defaults.baseURL}${path}`;
+  return buildApiUrl(path);
 }
 
 export function readApiErrorMessage(error: unknown): string | null {
