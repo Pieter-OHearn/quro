@@ -446,6 +446,115 @@ describe('savings integration', () => {
       error: 'Invalid account id',
     });
   });
+
+  test('rejects invalid savings payloads', async () => {
+    const owner = await integration.signUp('savings-validation');
+
+    const invalidAccountResponse = await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: '   ',
+        bank: 'Monzo',
+        balance: 100,
+        currency: 'EUR',
+        interestRate: 1.5,
+        accountType: 'Easy Access',
+        color: '#2563eb',
+        emoji: 'S',
+      },
+    });
+    expect(invalidAccountResponse.status).toBe(400);
+    expect(await invalidAccountResponse.json()).toEqual({
+      error: 'Account name is required',
+    });
+
+    const createAccountResponse = await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Buffer',
+        bank: 'Starling',
+        balance: 900,
+        currency: 'EUR',
+        interestRate: 1.1,
+        accountType: 'Easy Access',
+        color: '#14b8a6',
+        emoji: 'B',
+      },
+    });
+    const account = (await createAccountResponse.json()) as {
+      data: {
+        id: number;
+      };
+    };
+
+    const invalidCurrencyResponse = await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Foreign',
+        bank: 'Wise',
+        balance: 400,
+        currency: 'SEK',
+        interestRate: 0.9,
+        accountType: 'Easy Access',
+        color: '#6366f1',
+        emoji: 'F',
+      },
+    });
+    expect(invalidCurrencyResponse.status).toBe(400);
+    expect(await invalidCurrencyResponse.json()).toEqual({
+      error: 'Invalid currency',
+    });
+
+    const invalidTransactionTypeResponse = await integration.request('/api/savings/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        accountId: account.data.id,
+        type: 'transfer',
+        amount: 50,
+        date: '2026-03-11',
+        note: 'Bad type',
+      },
+    });
+    expect(invalidTransactionTypeResponse.status).toBe(400);
+    expect(await invalidTransactionTypeResponse.json()).toEqual({
+      error: 'Invalid transaction type',
+    });
+
+    const invalidTransactionDateResponse = await integration.request('/api/savings/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        accountId: account.data.id,
+        type: 'deposit',
+        amount: 50,
+        date: '2026-02-30',
+        note: 'Bad date',
+      },
+    });
+    expect(invalidTransactionDateResponse.status).toBe(400);
+    expect(await invalidTransactionDateResponse.json()).toEqual({
+      error: 'Transaction date must be a valid ISO date',
+    });
+
+    const unknownFieldPatchResponse = await integration.request(
+      `/api/savings/accounts/${account.data.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          nickname: 'Rainy Day',
+        },
+      },
+    );
+    expect(unknownFieldPatchResponse.status).toBe(400);
+    expect(await unknownFieldPatchResponse.json()).toEqual({
+      error: 'Unknown field: nickname',
+    });
+  });
 });
 
 describe('budget integration', () => {
@@ -769,6 +878,96 @@ describe('budget integration', () => {
     };
     expect(ownerTransactionLookup.data.categoryId).toBe(ownerCategory.data.id);
   });
+
+  test('rejects invalid budget payloads', async () => {
+    const owner = await integration.signUp('budget-validation');
+
+    const invalidCategoryResponse = await integration.request('/api/budget/categories', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Groceries',
+        emoji: 'G',
+        budgeted: 'oops',
+        spent: 0,
+        color: '#f59e0b',
+        month: 'Mar',
+        year: 2026,
+      },
+    });
+    expect(invalidCategoryResponse.status).toBe(400);
+    expect(await invalidCategoryResponse.json()).toEqual({
+      error: 'Budgeted amount must be zero or greater',
+    });
+
+    const createCategoryResponse = await integration.request('/api/budget/categories', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Household',
+        emoji: 'H',
+        budgeted: 320,
+        spent: 10,
+        color: '#0ea5e9',
+        month: 'Mar',
+        year: 2026,
+      },
+    });
+    const category = (await createCategoryResponse.json()) as {
+      data: {
+        id: number;
+      };
+    };
+
+    const invalidMonthResponse = await integration.request('/api/budget/categories', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Travel',
+        emoji: 'T',
+        budgeted: 200,
+        spent: 0,
+        color: '#8b5cf6',
+        month: 'March',
+        year: 2026,
+      },
+    });
+    expect(invalidMonthResponse.status).toBe(400);
+    expect(await invalidMonthResponse.json()).toEqual({
+      error: 'Invalid month',
+    });
+
+    const invalidTransactionDateResponse = await integration.request('/api/budget/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        categoryId: category.data.id,
+        description: 'Market run',
+        amount: 24,
+        date: '2026-13-01',
+        merchant: 'Weekend Market',
+      },
+    });
+    expect(invalidTransactionDateResponse.status).toBe(400);
+    expect(await invalidTransactionDateResponse.json()).toEqual({
+      error: 'Transaction date must be a valid ISO date',
+    });
+
+    const unknownFieldPatchResponse = await integration.request(
+      `/api/budget/categories/${category.data.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          cap: 500,
+        },
+      },
+    );
+    expect(unknownFieldPatchResponse.status).toBe(400);
+    expect(await unknownFieldPatchResponse.json()).toEqual({
+      error: 'Unknown field: cap',
+    });
+  });
 });
 
 describe('goals integration', () => {
@@ -920,6 +1119,112 @@ describe('goals integration', () => {
     expect(crossUserDeleteResponse.status).toBe(404);
     expect(await crossUserDeleteResponse.json()).toEqual({
       error: 'Goal not found',
+    });
+  });
+
+  test('rejects invalid goal payloads', async () => {
+    const owner = await integration.signUp('goals-validation');
+
+    const invalidTypeResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'side_quest',
+        name: 'Emergency Fund',
+        currentAmount: 500,
+        targetAmount: 5000,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Savings',
+        monthlyContribution: 200,
+        currency: 'EUR',
+      },
+    });
+    expect(invalidTypeResponse.status).toBe(400);
+    expect(await invalidTypeResponse.json()).toEqual({
+      error: 'Invalid goal type',
+    });
+
+    const missingNameResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'savings',
+        name: '   ',
+        currentAmount: 500,
+        targetAmount: 5000,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Savings',
+        monthlyContribution: 200,
+        currency: 'EUR',
+      },
+    });
+    expect(missingNameResponse.status).toBe(400);
+    expect(await missingNameResponse.json()).toEqual({
+      error: 'Goal name is required',
+    });
+
+    const invalidInvestHabitResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'invest_habit',
+        name: 'Monthly ETF Habit',
+        currentAmount: 0,
+        targetAmount: 0,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Investing',
+        monthlyContribution: 0,
+        monthlyTarget: 0,
+        totalMonths: 12,
+        currency: 'EUR',
+      },
+    });
+    expect(invalidInvestHabitResponse.status).toBe(400);
+    expect(await invalidInvestHabitResponse.json()).toEqual({
+      error: 'Monthly target must be greater than zero',
+    });
+
+    const createGoalResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'annual',
+        name: 'Books',
+        emoji: 'B',
+        currentAmount: 2,
+        targetAmount: 12,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Learning',
+        monthlyContribution: 0,
+        monthlyTarget: null,
+        monthsCompleted: 2,
+        totalMonths: 12,
+        unit: 'books',
+        color: '#16a34a',
+        notes: '',
+        currency: 'EUR',
+      },
+    });
+    const goal = (await createGoalResponse.json()) as {
+      data: {
+        id: number;
+      };
+    };
+
+    const unknownFieldPatchResponse = await integration.request(`/api/goals/${goal.data.id}`, {
+      method: 'PATCH',
+      cookie: owner.cookie,
+      json: {
+        progress: 90,
+      },
+    });
+    expect(unknownFieldPatchResponse.status).toBe(400);
+    expect(await unknownFieldPatchResponse.json()).toEqual({
+      error: 'Unknown field: progress',
     });
   });
 });
