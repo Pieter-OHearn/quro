@@ -17,6 +17,9 @@ require_command() {
     if [ "$1" = "ruff" ] || [ "$1" = "pip-audit" ]; then
       echo "Install Python tooling into .venv or your PATH, for example:" >&2
       echo "  python3 -m venv .venv && . .venv/bin/activate && pip install -r services/pension-parser/requirements.txt ruff pip-audit" >&2
+    elif [ "$1" = "gitleaks" ]; then
+      echo "Install gitleaks and retry, for example:" >&2
+      echo "  brew install gitleaks" >&2
     fi
     exit 1
   fi
@@ -131,6 +134,11 @@ export QRO_DB_HOST="$DATABASE_HOST"
 export QRO_DB_PORT="$DATABASE_PORT"
 
 trap cleanup_started_postgres EXIT INT TERM
+
+if [ "${QRO_PRECOMMIT:-0}" = "1" ]; then
+  require_command gitleaks
+  run_check "Secret scan" gitleaks git --pre-commit --redact --staged --verbose
+fi
 
 run_check "Format" bun run check:format
 run_check "Lint" bun run check:lint

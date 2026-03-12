@@ -24,7 +24,6 @@ bun run format
 
 # Database
 bun run db:migrate          # run migrations
-bun run db:seed             # seed demo data (demo@quro.local / password123)
 bun run db:clear            # wipe all data
 ```
 

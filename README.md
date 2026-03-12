@@ -1,323 +1,156 @@
 # Quro
 
-Quro is a full-stack personal finance app for people who want a clear, modern view of their money without managing a maze of spreadsheets.
+Quro is a self-hosted personal finance app for tracking savings, investments, pensions, salary, budgets, goals, and supporting documents in one place.
 
-## Quick links
+## Quick Start
 
-- [What is Quro?](#what-is-quro)
-- [Product features](#product-features)
-- [Tech stack](#tech-stack)
-- [Repository structure](#repository-structure)
-- [Prerequisites](#prerequisites)
-- [Local development](#local-development)
-- [Testing and quality checks](#testing-and-quality-checks)
-- [Docker usage](#docker-usage)
-- [How to fork this repo](#how-to-fork-this-repo)
-- [License](#license)
+Quro is now Docker-first. You only need Docker Compose v2 for the default setup.
 
-## What is Quro?
-
-Quro gives you one beautifully organised place to track your financial life.  
-It combines savings, investments, mortgage, pension, salary, goals, and budgeting into a single experience built around clarity and momentum.
-
-At a glance, Quro helps you:
-
-- understand your current net worth
-- track progress across every major money category
-- work across multiple currencies
-
-## Product features
-
-- Dashboard with net worth snapshots, allocations, and activity
-- Savings account and transaction tracking
-- Investment holdings and buy/sell/dividend tracking
-- Pension pot tracking and contribution history
-- Mortgage tracking (repayments, balances, property links)
-- Salary and payslip history
-- Goals with targets, deadlines, and progress
-- Budget categories and spend tracking
-- Currency conversion support
-
-## Tech stack
-
-- Monorepo with Bun workspaces
-- Frontend: React + Vite + React Router + Tailwind CSS
-- Backend: Bun + Hono + Drizzle ORM
-- Database: PostgreSQL
-- Containerization: Docker + Docker Compose
-
-## Repository structure
-
-```text
-.
-├── packages/
-│   ├── frontend/   # React/Vite app (+ .env/.env.example)
-│   ├── backend/    # Hono API + Drizzle/Postgres (+ .env/.env.example)
-│   └── shared/     # Shared types/utilities
-├── docker-compose.yml
-└── README.md
-```
-
-## Prerequisites
-
-- Bun 1.x
-- Python 3.11+
-- Docker (for infrastructure and full-stack container runs)
-
-## Local development (Bun + Python parser)
-
-1. Install dependencies:
+1. Copy the non-secret Docker config:
 
 ```bash
-bun install
+cp .env.example .env
 ```
 
-2. Create your local env files:
+2. Copy the secret templates:
 
 ```bash
-cp packages/backend/.env.example packages/backend/.env
-cp packages/frontend/.env.example packages/frontend/.env
+for file in secrets/*.example; do cp "$file" "${file%.example}"; done
 ```
 
-Backend env includes MinIO-backed document storage settings used for pension annual-statement PDFs.
-It also includes the parser worker settings for AI-based pension statement import drafts.
-`CORS_ORIGIN` in `packages/backend/.env` defaults to `http://localhost,http://localhost:5173` so the same backend env works for the Docker shell and split frontend/backend local development.
-Leave `VITE_API_URL` unset for same-origin `/api` deployments such as Docker, preview, and production.
-For local split frontend/backend development with Vite on `http://localhost:5173`, set `VITE_API_URL=http://localhost:3000` in `packages/frontend/.env`.
-
-3. Start required infra with Docker (DB and object storage):
+On macOS/Linux, lock those files down locally:
 
 ```bash
-docker compose --env-file packages/backend/.env up -d db minio minio-init
+chmod 600 .env secrets/*.txt
 ```
 
-4. Run database migrations:
+3. Edit the required secret files and replace the placeholder values:
+
+- `secrets/postgres_admin_password.txt`
+- `secrets/postgres_app_password.txt`
+- `secrets/minio_root_password.txt`
+- `secrets/minio_app_secret_key.txt`
+
+Optional secret files can stay blank:
+
+- `secrets/marketstack_api_key.txt`
+- `secrets/hugging_face_hub_token.txt`
+
+4. Start the core stack:
 
 ```bash
-bun run db:migrate
+docker compose up --build -d
 ```
 
-5. (Optional but recommended) Seed demo data:
+5. Open `http://localhost` and create your first account.
+
+If port `80` is already in use on your machine, change `QRO_FRONTEND_PORT` in `.env` and then open `http://localhost:<your-port>`.
+
+## What Runs By Default
+
+The default `docker compose up --build -d` path starts:
+
+- `frontend`: nginx-served web app on `http://localhost`
+- `backend`: internal API container
+- `db`: internal PostgreSQL container
+- `minio`: internal S3-compatible document storage
+- `migrate`: one-shot admin job for DB migrations and runtime-role bootstrap
+- `minio-init`: one-shot admin job that creates the app bucket and bucket-scoped MinIO user
+
+Only the frontend is exposed to the host by default. PostgreSQL, MinIO, the backend API, and the optional AI services stay on internal Docker networks.
+
+## Data and Backups
+
+Runtime data is persisted in bind-mounted folders so users can see where their data lives:
+
+- `./data/postgres`
+- `./data/minio`
+- `./data/vllm-cache` when the pension-import profile is enabled
+
+Logical database backups go to:
+
+- `./backups/db`
+
+If you are upgrading from the older development compose setup that used Docker named volumes such as `quro_pgdata`, note that this public release now uses bind-mounted data in `./data/...`. Existing named-volume data is not auto-migrated into the new layout.
+
+Create a backup:
 
 ```bash
-bun run db:seed
+docker compose run --rm db-tools backup
 ```
 
-6. Start frontend + backend in dev mode:
+Inspect the database with `psql`:
 
 ```bash
-bun run dev
+docker compose run --rm db-tools psql
 ```
 
-7. Start the pension import worker in a second terminal:
+Restore a backup after stopping the app containers that hold DB connections:
 
 ```bash
-set -a
-source packages/backend/.env
-set +a
-bun run --filter '@quro/backend' worker:pension-imports
+docker compose stop backend pension-import-worker
+docker compose run --rm \
+  -e QRO_RESTORE_CONFIRM=restore-db \
+  -e QRO_RESTORE_ALLOW_NON_EMPTY=1 \
+  db-tools restore /backups/db/<dump-file>.dump
+docker compose up -d backend
 ```
 
-8. Start the Python pension parser service in a third terminal:
+The restore flow keeps the existing safety guards: explicit confirmation is required, non-empty restores require an extra override, active DB sessions cause a hard failure, and a pre-restore backup is taken automatically when needed.
+
+More detail is in [docs/database-safety.md](docs/database-safety.md).
+
+## Safe Operations
+
+Safe stop:
 
 ```bash
-set -a
-source packages/backend/.env
-set +a
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r services/pension-parser/requirements.txt ruff pip-audit
-uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
+docker compose down
 ```
 
-Pension statement extraction now uses `vllm` only.
-If your MacBook is too weak for this workload, point `VLLM_BASE_URL` at a reachable GPU host before starting the worker and parser.
-If you skip the worker or parser locally, the app will keep pension PDF import disabled and show `AI off`.
-
-Recommended parser settings:
+Destructive reset:
 
 ```bash
-PENSION_PARSER_TIMEOUT_MS=300000
-PARSER_ALLOW_REGEX_FALLBACK=true
-PARSER_REGEX_ONLY=false
-VLLM_TIMEOUT_SECONDS=180
+docker compose down -v
+rm -rf data
 ```
 
-If `vllm` is temporarily unavailable, set `PARSER_REGEX_ONLY=true` for local flow validation.
+`docker compose down -v` deletes Docker-managed state for the current project. Removing `./data` wipes the bind-mounted database and object storage files. Treat both as destructive operations.
 
-For OCR fallback locally, install system packages used by the parser (`poppler` + `tesseract`, including Dutch language data).
+## Optional Pension Import Profile
 
-9. Open the app:
+The AI-assisted pension statement import stack is optional and stays off by default.
 
-- Frontend: `http://localhost:5173`
-- Backend health: `http://localhost:3000/api/health`
-- Parser health: `http://localhost:8080/health`
-
-### Useful dev commands
+Start it only if you have the extra dependencies, including a compatible GPU for `vllm`:
 
 ```bash
-# Start only frontend
-bun run dev:frontend
-
-# Start only backend
-bun run dev:backend
-
-# Clear all seeded/working data
-bun run db:clear
+docker compose --profile pension-import up --build -d
 ```
 
-### Seeded demo account
+That profile adds:
 
-If you run `bun run db:seed`, a demo user is created:
+- `pension-import-worker`
+- `pension-parser`
+- `vllm`
 
-- Email: `demo@quro.local`
-- Password: `password123`
+If the model pull needs authenticated Hugging Face access, place the token in `secrets/hugging_face_hub_token.txt` before starting the profile.
 
-`bun run db:seed` resets and reseeds the demo user's data only. It should not delete data for other users.
+## Contributor Workflow
 
-## Testing and quality checks
+The public path is Docker-first. If you want the Bun/Python contributor workflow instead, use:
 
-The repo now has Bun-based unit/integration coverage plus a small Playwright browser smoke suite for the MVP flow.
+- [docs/development.md](docs/development.md) for local development
+- [docs/database-safety.md](docs/database-safety.md) for backup, restore, and destructive-operation guardrails
 
-Use the current quality checks:
+Install the checked-in pre-commit hook with:
 
 ```bash
-# Full local CI gate
-bun run ci:check
-
-# Browser smoke suite for the MVP happy path
-bun run test:smoke
-
-# Shared UI smoke coverage
-bun run test:ui
-
-# Lint
-bun run check:lint
-
-# Auto-fix lint issues
-bun run lint:fix
-
-# Prettier check
-bun run check:format
-
-# Prettier write
-bun run format
-
-# Install the checked-in Git hooks
+brew install gitleaks
 bun run hooks:install
 ```
 
-`bun run ci:check` mirrors the checks in `.github/workflows/ci.yml`, including the Python worker and security audits.
-The checked-in pre-commit hook runs the same command once you install it with `bun run hooks:install`.
-It automatically picks up `ruff` and `pip-audit` from `.venv/bin` when present.
-If those Python tools are missing, pre-commit skips the Python-only checks only when the staged changes do not touch `services/pension-parser/`; direct `bun run ci:check` still requires the full toolchain.
-`bun run test:smoke` runs migrations, reseeds the demo user, starts the backend and frontend automatically, signs in through the browser, creates one savings account, one budget category, and one payslip, then verifies the dashboard updates.
-It requires PostgreSQL to be reachable at `127.0.0.1:5432`; on local machines it uses installed Chrome by default, and CI installs Playwright Chromium explicitly.
-If you need to use bundled Chromium locally instead of system Chrome, run `npx playwright install chromium` once and then use `QRO_SMOKE_USE_SYSTEM_CHROME=0 bun run test:smoke`.
-
-For the route-based manual checklist used by UI refactor PRs, see `docs/shared-ui-verification.md`.
-
-## Docker usage
-
-### Run core stack with Docker Compose
-
-This mode runs the app shell in Docker: frontend, backend, database, and MinIO.
-Pension statement import is auto-disabled in this mode because the AI worker stack is not running.
-The pension UI shows an `AI off` badge until the pension-import profile is started.
-The frontend defaults to same-origin `/api` requests here, so nginx handles auth and document download proxying without extra frontend client configuration.
-Because the browser stays on `http://localhost`, CORS is not part of the normal Docker request path.
-`CORS_ORIGIN` only matters if you access `http://localhost:3000` directly from another browser origin such as local Vite on `http://localhost:5173`.
-
-```bash
-docker compose --env-file packages/backend/.env up --build
-```
-
-Services:
-
-- Frontend (nginx): `http://localhost`
-- Backend API: `http://localhost:3000`
-- Postgres: `localhost:5432`
-- MinIO API: `http://localhost:9000`
-- MinIO Console: `http://localhost:9001`
-
-Smoke check after the stack is up:
-
-1. Open `http://localhost` and sign up or sign in.
-2. Refresh a protected page such as the dashboard to confirm the session cookie survives through nginx.
-3. Upload a payslip PDF or open an existing statement PDF, then download it from the salary or pension UI to confirm proxied document responses work through `http://localhost/api/...`.
-
-### Pension import stack (vLLM only)
-
-This profile adds the pension import worker, parser, and `vllm` to the Docker stack.
-Run it on a GPU-capable host.
-
-Start compose with the `pension-import` profile:
-
-```bash
-docker compose --profile pension-import --env-file packages/backend/.env up --build
-```
-
-Additional services:
-
-- vLLM API: `http://localhost:8000`
-- Pension parser API: `http://localhost:8080`
-- Pension import worker: `pension-import-worker` (background service, no public port)
-
-The compose file uses container-internal service URLs automatically for MinIO, the parser, and `vllm`, so the host-facing values in `packages/backend/.env` can stay pointed at `127.0.0.1` for local non-Docker development.
-
-Stop services:
-
-```bash
-docker compose --env-file packages/backend/.env down
-```
-
-Remove containers + volume (clears DB data):
-
-```bash
-docker compose --env-file packages/backend/.env down -v
-```
-
-### Build images directly
-
-```bash
-docker build -t quro-backend -f packages/backend/Dockerfile .
-docker build -t quro-frontend -f packages/frontend/Dockerfile .
-```
-
-Use local development mode for faster UI/API iteration, and Docker full stack mode for regular end-to-end usage.
-
-## How to fork this repo
-
-1. Fork the repository on GitHub.
-2. Clone your fork:
-
-```bash
-git clone <your-fork-url>
-cd quro
-```
-
-3. Add the original repo as upstream:
-
-```bash
-git remote add upstream <original-repo-url>
-```
-
-4. Create a working branch:
-
-```bash
-git checkout -b feature/my-change
-```
-
-5. Commit and push:
-
-```bash
-git add .
-git commit -m "Describe your change"
-git push origin feature/my-change
-```
-
-6. Open a pull request from your fork.
+The Bun `db:*` scripts still exist for contributors, but the public runtime path is the Docker `db-tools` service.
 
 ## License
 
-This project is licensed under the MIT License.
+[MIT](LICENSE)

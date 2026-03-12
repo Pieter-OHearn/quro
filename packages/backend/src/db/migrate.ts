@@ -3,8 +3,9 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { getAdminDatabaseUrl, redactDatabaseUrl } from './config';
 
-const connectionString = process.env.DATABASE_URL || 'postgres://quro:quro@127.0.0.1:5432/quro';
+const connectionString = getAdminDatabaseUrl();
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = resolve(here, 'migrations');
 
@@ -24,6 +25,9 @@ const maxAttempts = 30;
 for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   const migrationClient = postgres(connectionString, { max: 1 });
   try {
+    if (attempt === 1) {
+      console.log(`Running migrations against ${redactDatabaseUrl(connectionString)}`);
+    }
     const db = drizzle(migrationClient);
     await migrate(db, { migrationsFolder });
     console.log('Migrations complete');

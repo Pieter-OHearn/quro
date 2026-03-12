@@ -20,10 +20,20 @@ yarn-debug.log*
 pnpm-debug.log*
 bun-debug.log*
 
+# Local backups
+backups/
+
+# Docker/runtime data
+data/
+
 # Environment files
 .env
 .env.*
 !.env.example
+
+# Local Docker secrets
+secrets/*.txt
+!secrets/*.txt.example
 
 # OS/editor files
 .DS_Store

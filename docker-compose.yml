@@ -1,56 +1,84 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16.11-alpine3.23
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-quro}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quro}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
       POSTGRES_DB: ${POSTGRES_DB:-quro}
-    ports:
-      - '5432:5432'
+    secrets:
+      - postgres_admin_password
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - backend-net
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-quro} -d ${POSTGRES_DB:-quro}']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-qurominio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-qurominio123}
-    command: server /data --console-address ":9001"
-    ports:
-      - '9000:9000'
-      - '9001:9001'
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1']
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 5s
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-quro_root}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        export MINIO_ROOT_PASSWORD="$$(tr -d '\r\n' < /run/secrets/minio_root_password)"
+        exec minio server /data --console-address ":9001"
+    secrets:
+      - minio_root_password
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - backend-net
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   minio-init:
-    image: minio/mc:latest
+    build:
+      context: .
+      dockerfile: docker/minio-init/Dockerfile
+    restart: 'no'
     depends_on:
       minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-qurominio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-qurominio123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-quro_root}
+      MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
-        mc mb -p "local/$$S3_BUCKET" || true
-        mc anonymous set none "local/$$S3_BUCKET" || true
+    secrets:
+      - minio_root_password
+      - minio_app_secret_key
+    networks:
+      - backend-net
+
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
     restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quro}
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
+    secrets:
+      - postgres_admin_password
+      - postgres_app_password
+    entrypoint: ['/bin/sh', '/app/docker/backend/run-migrate.sh']
+    networks:
+      - backend-net
 
   backend:
     build:
@@ -58,59 +86,103 @@ services:
       dockerfile: packages/backend/Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-quro}:${POSTGRES_PASSWORD:-quro}@db:5432/${POSTGRES_DB:-quro}
+      POSTGRES_DB: ${POSTGRES_DB:-quro}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
+      MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
       PORT: '3000'
-      CORS_ORIGIN: '${CORS_ORIGIN:-http://localhost,http://localhost:5173}'
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost,http://localhost:5173}
       S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-qurominio}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-qurominio123}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
-    ports:
-      - '3000:3000'
+      PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-300000}
+      IMPORT_DRAFT_TTL_DAYS: ${IMPORT_DRAFT_TTL_DAYS:-7}
+      IMPORT_WORKER_POLL_INTERVAL_MS: ${IMPORT_WORKER_POLL_INTERVAL_MS:-3000}
+    secrets:
+      - postgres_app_password
+      - minio_app_secret_key
+      - marketstack_api_key
+      - hugging_face_hub_token
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       minio:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+    entrypoint: ['/bin/sh', '/app/docker/backend/with-runtime-env.sh']
+    command: ['bun', 'run', 'start']
+    networks:
+      - frontend-net
+      - backend-net
 
   pension-import-worker:
     build:
       context: .
       dockerfile: packages/backend/Dockerfile
-    command: ['bun', 'run', 'src/workers/pensionImportWorker.ts']
     profiles: ['pension-import']
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-quro}:${POSTGRES_PASSWORD:-quro}@db:5432/${POSTGRES_DB:-quro}
+      POSTGRES_DB: ${POSTGRES_DB:-quro}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
+      MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
       S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-qurominio}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-qurominio123}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
+      PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-300000}
       IMPORT_DRAFT_TTL_DAYS: ${IMPORT_DRAFT_TTL_DAYS:-7}
       IMPORT_WORKER_POLL_INTERVAL_MS: ${IMPORT_WORKER_POLL_INTERVAL_MS:-3000}
-      PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-120000}
+    secrets:
+      - postgres_app_password
+      - minio_app_secret_key
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       minio:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
       pension-parser:
         condition: service_started
+    entrypoint: ['/bin/sh', '/app/docker/backend/with-runtime-env.sh']
+    command: ['bun', 'run', 'worker:pension-imports']
+    networks:
+      - backend-net
+      - ai-net
+
+  db-tools:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    profiles: ['maintenance']
+    restart: 'no'
+    stdin_open: true
+    tty: true
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quro}
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
+    secrets:
+      - postgres_admin_password
+      - postgres_app_password
+    volumes:
+      - ./backups:/app/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ['/bin/sh', '/app/docker/backend/run-db-tools.sh']
+    networks:
+      - backend-net
 
   vllm:
-    image: vllm/vllm-openai:latest
-    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/vllm/Dockerfile
     profiles: ['pension-import']
+    restart: unless-stopped
     command:
       - --model
       - ${VLLM_MODEL:-Qwen/Qwen2.5-14B-Instruct-AWQ}
@@ -122,12 +194,10 @@ services:
       - ${VLLM_GPU_MEMORY_UTILIZATION:-0.92}
       - --max-model-len
       - ${VLLM_MAX_MODEL_LEN:-8192}
-    environment:
-      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
-    ports:
-      - '8000:8000'
+    secrets:
+      - hugging_face_hub_token
     volumes:
-      - vllm-cache:/root/.cache/huggingface
+      - ./data/vllm-cache:/root/.cache/huggingface
     deploy:
       resources:
         reservations:
@@ -135,6 +205,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    networks:
+      - ai-net
 
   pension-parser:
     build:
@@ -151,6 +223,8 @@ services:
     depends_on:
       vllm:
         condition: service_started
+    networks:
+      - ai-net
 
   frontend:
     build:
@@ -158,11 +232,28 @@ services:
       dockerfile: packages/frontend/Dockerfile
     restart: unless-stopped
     ports:
-      - '80:80'
+      - '${QRO_FRONTEND_PORT:-80}:80'
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+    networks:
+      - frontend-net
 
-volumes:
-  pgdata:
-  minio-data:
-  vllm-cache:
+networks:
+  frontend-net:
+  backend-net:
+  ai-net:
+
+secrets:
+  postgres_admin_password:
+    file: ./secrets/postgres_admin_password.txt
+  postgres_app_password:
+    file: ./secrets/postgres_app_password.txt
+  minio_root_password:
+    file: ./secrets/minio_root_password.txt
+  minio_app_secret_key:
+    file: ./secrets/minio_app_secret_key.txt
+  marketstack_api_key:
+    file: ./secrets/marketstack_api_key.txt
+  hugging_face_hub_token:
+    file: ./secrets/hugging_face_hub_token.txt

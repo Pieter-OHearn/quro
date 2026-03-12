@@ -16,6 +16,12 @@ import dashboard from './routes/dashboard';
 import currency from './routes/currency';
 import capabilities from './routes/capabilities';
 import settings from './routes/settings';
+import {
+  getCoreReadinessReport,
+  getHealthReport,
+  getPensionImportReadinessReport,
+  getReadinessStatusCode,
+} from './lib/readiness';
 
 export const app = new Hono();
 
@@ -24,7 +30,15 @@ app.onError(errorHandler);
 
 // Public routes
 app.route('/api/auth', auth);
-app.get('/api/health', (c) => c.json({ status: 'ok' }));
+app.get('/api/health', (c) => c.json(getHealthReport()));
+app.get('/api/readiness', async (c) => {
+  const report = await getCoreReadinessReport();
+  return c.json(report, getReadinessStatusCode(report));
+});
+app.get('/api/readiness/pension-import', async (c) => {
+  const report = await getPensionImportReadinessReport();
+  return c.json(report, getReadinessStatusCode(report));
+});
 
 // Protected routes
 app.use('/api/savings/*', requireAuth);

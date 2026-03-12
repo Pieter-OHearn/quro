@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
-    "db:seed": "bun run src/db/seed.ts"
+    "db:backup": "bun run src/db/backup.ts",
+    "db:restore": "bun run src/db/restore.ts",
+    "db:clear": "bun run src/db/clear.ts",
+    "db:bootstrap-runtime-role": "bun run src/db/bootstrapRuntimeRole.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1003.0",

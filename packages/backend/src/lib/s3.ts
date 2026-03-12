@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadBucketCommand,
 } from '@aws-sdk/client-s3';
 import type { Readable } from 'node:stream';
 
@@ -26,6 +27,13 @@ const REQUIRED_ENV_KEYS = [
 let cachedConfig: S3Config | null = null;
 let cachedClient: S3Client | null = null;
 
+export class S3ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'S3ConfigurationError';
+  }
+}
+
 function parseBooleanEnv(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined) return defaultValue;
   const normalized = value.trim().toLowerCase();
@@ -37,7 +45,9 @@ function loadS3Config(): S3Config {
 
   const missing = REQUIRED_ENV_KEYS.filter((key) => !process.env[key]?.trim());
   if (missing.length > 0) {
-    throw new Error(`Missing required S3 environment variables: ${missing.join(', ')}`);
+    throw new S3ConfigurationError(
+      `Missing required S3 environment variables: ${missing.join(', ')}`,
+    );
   }
 
   cachedConfig = {
@@ -89,6 +99,18 @@ async function readableToBuffer(readable: Readable): Promise<Buffer> {
 
 export function getS3BucketName(): string {
   return loadS3Config().bucket;
+}
+
+export async function checkS3Readiness(): Promise<void> {
+  const client = getS3Client();
+  await client.send(
+    new HeadBucketCommand({
+      Bucket: getS3BucketName(),
+    }),
+    {
+      abortSignal: AbortSignal.timeout(2_000),
+    },
+  );
 }
 
 export async function uploadS3Object(params: {

@@ -1,14 +1,21 @@
-FROM oven/bun:1 AS base
+FROM oven/bun:1.3.10 AS base
 WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends postgresql-client ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY packages/shared/package.json packages/shared/
 COPY packages/backend/package.json packages/backend/
-COPY package.json bunfig.toml ./
-RUN cd packages/backend && bun install
+COPY package.json bun.lock bunfig.toml ./
+RUN cd packages/backend && bun install --frozen-lockfile
 
 COPY packages/shared packages/shared
 COPY packages/backend packages/backend
+COPY docker/backend docker/backend
+
+RUN chmod +x /app/docker/backend/*.sh
 
 WORKDIR /app/packages/backend
-CMD ["sh", "-c", "bun run db:migrate && bun run start"]
+CMD ["bun", "run", "start"]
 EXPOSE 3000

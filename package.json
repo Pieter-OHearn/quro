@@ -26,9 +26,11 @@
     "hooks:install": "sh ./scripts/install-git-hooks.sh",
     "test": "bun test",
     "test:ui": "bun run --filter '@quro/frontend' test",
-    "test:smoke": "bun run db:migrate && bun run db:seed && playwright test",
     "db:migrate": "bun run --filter '@quro/backend' db:migrate",
-    "db:seed": "bun run --filter '@quro/backend' db:seed",
+    "db:backup": "bun run --filter '@quro/backend' db:backup",
+    "db:restore": "bun run --filter '@quro/backend' db:restore",
+    "db:clear": "bun run --filter '@quro/backend' db:clear",
+    "db:bootstrap-runtime-role": "bun run --filter '@quro/backend' db:bootstrap-runtime-role",
     "lint:fix": "bunx eslint packages --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts --fix",
     "format": "prettier --write ."
   },
