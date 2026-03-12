@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { LoadingSpinner } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
@@ -124,6 +125,7 @@ export function Savings() {
     transactions,
     loadingAccounts,
     loadingTxns,
+    queryFailures,
     createAccount,
     updateAccount,
     deleteAccount,
@@ -153,6 +155,10 @@ export function Savings() {
 
   if (loadingAccounts || loadingTxns) {
     return <LoadingSpinner />;
+  }
+
+  if (queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Savings" failedQueries={queryFailures} />;
   }
 
   return (

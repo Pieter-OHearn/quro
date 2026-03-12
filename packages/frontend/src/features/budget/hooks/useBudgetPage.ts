@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import type { BudgetPageData } from '../types';
+import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
   buildCreateBudgetCategoryInput,
   createEmptyCategoryForm,
@@ -11,15 +11,17 @@ import { useBudgetCategories } from './useBudgetCategories';
 import { useBudgetTransactions } from './useBudgetTransactions';
 import { useCreateBudgetCategory } from './useCreateBudgetCategory';
 
-export function useBudgetPage(): BudgetPageData {
+export function useBudgetPage() {
   const { fmtBase, baseCurrency } = useCurrency();
   const fmtDec = (n: number) => fmtBase(n, undefined, true);
   const fmt = (n: number) => fmtBase(n);
-  const { data: categories = [], isLoading: loadingCategories } = useBudgetCategories();
-  const { data: budgetTransactions = [], isLoading: loadingTransactions } = useBudgetTransactions();
+  const categoriesQuery = useBudgetCategories();
+  const transactionsQuery = useBudgetTransactions();
   const createCategory = useCreateBudgetCategory();
   const [showAdd, setShowAdd] = useState(false);
   const [newCat, setNewCat] = useState(createEmptyCategoryForm());
+  const categories = categoriesQuery.data ?? [];
+  const budgetTransactions = transactionsQuery.data ?? [];
 
   const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } =
     deriveBudgetStats(categories);
@@ -34,7 +36,11 @@ export function useBudgetPage(): BudgetPageData {
   };
 
   return {
-    isLoading: loadingCategories || loadingTransactions,
+    isLoading: categoriesQuery.isLoading || transactionsQuery.isLoading,
+    queryFailures: getFailedRouteQueries([
+      { label: 'budget categories', ...categoriesQuery },
+      { label: 'budget transactions', ...transactionsQuery },
+    ]),
     fmt,
     fmtDec,
     baseCurrency,

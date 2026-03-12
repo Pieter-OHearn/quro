@@ -1,3 +1,4 @@
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { ContentSection, PageStack } from '@/components/ui';
 import {
   BudgetCategoriesSection,
@@ -11,6 +12,7 @@ import { useBudgetPage } from './hooks';
 export function Budget() {
   const {
     isLoading,
+    queryFailures,
     fmt,
     fmtDec,
     baseCurrency,
@@ -30,6 +32,9 @@ export function Budget() {
   } = useBudgetPage();
 
   if (isLoading) return <BudgetLoadingState />;
+  if (queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Budget" failedQueries={queryFailures} />;
+  }
 
   return (
     <PageStack>

@@ -1,3 +1,4 @@
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
 import { useGoals } from '@/features/goals/hooks';
 import { parseGoalYear } from '@/features/goals/utils/goal-utils';
@@ -5,6 +6,7 @@ import { usePayslips } from '@/features/salary/hooks';
 import type { DashboardAllocationsSummary } from '@quro/shared';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import { getUserDisplayName } from '@/lib/user';
 import {
   DashboardChartsGrid,
@@ -49,14 +51,30 @@ function useDashboardData(
   fmtBase: DashboardFormatFn,
   convertToBase: (amount: number, currency: string) => number,
 ) {
-  const { data: netWorthData = [], isLoading: loadingNW } = useNetWorthSnapshots();
-  const { data: allocations = EMPTY_ALLOCATIONS_SUMMARY, isLoading: loadingAlloc } =
-    useAssetAllocations();
-  const { data: transactions = [], isLoading: loadingTxns } = useDashboardTransactions();
-  const { data: goals = [], isLoading: loadingGoals } = useGoals();
-  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
+  const netWorthQuery = useNetWorthSnapshots();
+  const allocationsQuery = useAssetAllocations();
+  const transactionsQuery = useDashboardTransactions();
+  const goalsQuery = useGoals();
+  const payslipsQuery = usePayslips();
 
-  const isLoading = loadingNW || loadingAlloc || loadingTxns || loadingGoals || loadingPayslips;
+  const isLoading =
+    netWorthQuery.isLoading ||
+    allocationsQuery.isLoading ||
+    transactionsQuery.isLoading ||
+    goalsQuery.isLoading ||
+    payslipsQuery.isLoading;
+  const queryFailures = getFailedRouteQueries([
+    { label: 'net worth history', ...netWorthQuery },
+    { label: 'asset allocations', ...allocationsQuery },
+    { label: 'recent dashboard activity', ...transactionsQuery },
+    { label: 'goal progress', ...goalsQuery },
+    { label: 'payslips', ...payslipsQuery },
+  ]);
+  const netWorthData = netWorthQuery.data ?? [];
+  const allocations = allocationsQuery.data ?? EMPTY_ALLOCATIONS_SUMMARY;
+  const transactions = transactionsQuery.data ?? [];
+  const goals = goalsQuery.data ?? [];
+  const payslips = payslipsQuery.data ?? [];
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -87,6 +105,7 @@ function useDashboardData(
 
   return {
     isLoading,
+    queryFailures,
     chartData,
     allocationData: allocationSummary.allocationData,
     totalAssets: allocationSummary.totalAssets,
@@ -226,6 +245,9 @@ export function Dashboard() {
   const data = useDashboardData(fmtBase, convertToBase);
 
   if (data.isLoading) return <LoadingSpinner />;
+  if (data.queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Dashboard" failedQueries={data.queryFailures} />;
+  }
 
   return (
     <DashboardPageBody

@@ -3,6 +3,7 @@ import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@
 import { DEFAULT_APP_CAPABILITIES, useAppCapabilities } from '@/lib/useAppCapabilities';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import type { PensionPageState } from '../types';
 import { useCreatePensionPot } from './useCreatePensionPot';
 import { useCreatePensionTransaction } from './useCreatePensionTransaction';
@@ -54,10 +55,9 @@ function usePensionUiState() {
 export function usePensionPageState(): PensionPageState {
   const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
   const { user } = useAuth();
-  const { data: pensions = [], isLoading: loadingPots } = usePensionPots();
-  const { data: pensionTxns = [], isLoading: loadingTransactions } = usePensionTransactions();
-  const { data: pensionDocuments = [], isLoading: loadingDocuments } =
-    usePensionStatementDocuments();
+  const pensionsQuery = usePensionPots();
+  const pensionTransactionsQuery = usePensionTransactions();
+  const pensionDocumentsQuery = usePensionStatementDocuments();
   const capabilitiesQuery = useAppCapabilities();
   const ui = usePensionUiState();
   const createPot = useCreatePensionPot();
@@ -66,6 +66,9 @@ export function usePensionPageState(): PensionPageState {
   const createTxn = useCreatePensionTransaction();
   const updateTxn = useUpdatePensionTransaction();
   const deleteTxn = useDeletePensionTransaction();
+  const pensions = pensionsQuery.data ?? [];
+  const pensionTxns = pensionTransactionsQuery.data ?? [];
+  const pensionDocuments = pensionDocumentsQuery.data ?? [];
   const yearsToRetirement =
     user && user.retirementAge > user.age ? user.retirementAge - user.age : null;
   const computations = usePensionComputations(
@@ -109,7 +112,15 @@ export function usePensionPageState(): PensionPageState {
     pensionImportCapability:
       capabilitiesQuery.data?.pensionStatementImport ??
       DEFAULT_APP_CAPABILITIES.pensionStatementImport,
-    isLoading: loadingPots || loadingTransactions || loadingDocuments,
+    isLoading:
+      pensionsQuery.isLoading ||
+      pensionTransactionsQuery.isLoading ||
+      pensionDocumentsQuery.isLoading,
+    queryFailures: getFailedRouteQueries([
+      { label: 'pension pots', ...pensionsQuery },
+      { label: 'pension transactions', ...pensionTransactionsQuery },
+      { label: 'pension documents', ...pensionDocumentsQuery },
+    ]),
     ...ui,
     ...computations,
     handleSave,

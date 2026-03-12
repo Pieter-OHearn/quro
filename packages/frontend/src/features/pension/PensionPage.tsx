@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type { PensionPot } from '@quro/shared';
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { LoadingSpinner } from '@/components/ui';
 import { useAuth } from '@/lib/AuthContext';
 import {
@@ -77,7 +78,7 @@ function useImportDeepLink(state: ReturnType<typeof usePensionPageState>): void 
   const { pensions, openImportModal } = state;
 
   useEffect(() => {
-    if (state.isLoading) return;
+    if (state.isLoading || state.queryFailures.length > 0) return;
     const resolution = resolveDeepLink(location.state, pensions);
     if (resolution.type === 'none') {
       consumedDeepLinkRef.current = null;
@@ -95,7 +96,15 @@ function useImportDeepLink(state: ReturnType<typeof usePensionPageState>): void 
 
     clearImportState(location.pathname, location.state, navigate);
     openImportModal(resolution.pot, resolution.importId);
-  }, [location.pathname, location.state, navigate, openImportModal, pensions, state.isLoading]);
+  }, [
+    location.pathname,
+    location.state,
+    navigate,
+    openImportModal,
+    pensions,
+    state.isLoading,
+    state.queryFailures.length,
+  ]);
 }
 
 export function Pension() {
@@ -104,6 +113,9 @@ export function Pension() {
   useImportDeepLink(state);
 
   if (state.isLoading) return <LoadingSpinner />;
+  if (state.queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Pension" failedQueries={state.queryFailures} />;
+  }
 
   return (
     <div className="p-6 space-y-6">

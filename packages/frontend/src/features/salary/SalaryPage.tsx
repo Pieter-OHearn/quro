@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Payslip } from '@quro/shared';
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { LoadingState, SegmentedControl } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
   AddPayslipModal,
   PayBreakdownPanel,
@@ -26,19 +28,23 @@ import {
 import type { SavePayslipInput } from './types';
 
 function useSalaryData() {
-  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
-  const { data: salaryHistory = [], isLoading: loadingHistory } = useSalaryHistory();
+  const payslipsQuery = usePayslips();
+  const salaryHistoryQuery = useSalaryHistory();
   const createPayslip = useCreatePayslip();
   const updatePayslip = useUpdatePayslip();
   const deletePayslip = useDeletePayslip();
 
   return {
-    payslips,
-    salaryHistory,
+    payslips: payslipsQuery.data ?? [],
+    salaryHistory: salaryHistoryQuery.data ?? [],
     createPayslip,
     updatePayslip,
     deletePayslip,
-    isLoading: loadingPayslips || loadingHistory,
+    isLoading: payslipsQuery.isLoading || salaryHistoryQuery.isLoading,
+    queryFailures: getFailedRouteQueries([
+      { label: 'payslips', ...payslipsQuery },
+      { label: 'salary history', ...salaryHistoryQuery },
+    ]),
   };
 }
 
@@ -50,8 +56,15 @@ function useSalaryPageState() {
   const [editingPayslip, setEditingPayslip] = useState<Payslip | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const { payslips, salaryHistory, createPayslip, updatePayslip, deletePayslip, isLoading } =
-    useSalaryData();
+  const {
+    payslips,
+    salaryHistory,
+    createPayslip,
+    updatePayslip,
+    deletePayslip,
+    isLoading,
+    queryFailures,
+  } = useSalaryData();
 
   const years = useMemo(() => computeSalaryYears(payslips, currentYear), [payslips, currentYear]);
 
@@ -96,6 +109,7 @@ function useSalaryPageState() {
     updatePayslip,
     deletePayslip,
     isLoading,
+    queryFailures,
     showAdd,
     setShowAdd,
     editingPayslip,
@@ -113,41 +127,29 @@ function useSalaryPageState() {
   };
 }
 
-export function Salary() {
-  const state = useSalaryPageState();
+type SalaryPageState = ReturnType<typeof useSalaryPageState>;
 
-  const handleSave = (payslip: SavePayslipInput) =>
-    state.editingPayslip
-      ? state.updatePayslip.mutateAsync({ id: state.editingPayslip.id, payslip })
-      : state.createPayslip.mutateAsync(payslip);
+type SalaryPageContentProps = {
+  state: SalaryPageState;
+  onSave: (payslip: SavePayslipInput) => Promise<Payslip>;
+  onDelete: (id: number) => void;
+  onCloseModal: () => void;
+};
 
-  const handleDelete = (id: number) => {
-    state.deletePayslip.mutate(id);
-    if (state.selected?.id === id) {
-      state.setSelectedId(null);
-    }
-    if (state.editingPayslip?.id === id) {
-      state.setEditingPayslip(null);
-    }
-  };
-
-  const closeModal = () => {
-    state.setShowAdd(false);
-    state.setEditingPayslip(null);
-  };
-
-  if (state.isLoading) {
-    return <LoadingState />;
-  }
-
+function SalaryPageContent({
+  state,
+  onSave,
+  onDelete,
+  onCloseModal,
+}: Readonly<SalaryPageContentProps>) {
   return (
     <div className="p-6 space-y-6">
       {(state.showAdd || state.editingPayslip) && (
         <AddPayslipModal
           existing={state.editingPayslip ?? undefined}
-          onClose={closeModal}
-          onSave={handleSave}
-          onDelete={handleDelete}
+          onClose={onCloseModal}
+          onSave={onSave}
+          onDelete={onDelete}
           baseCurrency={state.baseCurrency}
         />
       )}
@@ -199,5 +201,46 @@ export function Salary() {
 
       <PensionTrackerLink />
     </div>
+  );
+}
+
+export function Salary() {
+  const state = useSalaryPageState();
+
+  const handleSave = (payslip: SavePayslipInput) =>
+    state.editingPayslip
+      ? state.updatePayslip.mutateAsync({ id: state.editingPayslip.id, payslip })
+      : state.createPayslip.mutateAsync(payslip);
+
+  const handleDelete = (id: number) => {
+    state.deletePayslip.mutate(id);
+    if (state.selected?.id === id) {
+      state.setSelectedId(null);
+    }
+    if (state.editingPayslip?.id === id) {
+      state.setEditingPayslip(null);
+    }
+  };
+
+  const closeModal = () => {
+    state.setShowAdd(false);
+    state.setEditingPayslip(null);
+  };
+
+  if (state.isLoading) {
+    return <LoadingState />;
+  }
+
+  if (state.queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Salary" failedQueries={state.queryFailures} />;
+  }
+
+  return (
+    <SalaryPageContent
+      state={state}
+      onSave={handleSave}
+      onDelete={handleDelete}
+      onCloseModal={closeModal}
+    />
   );
 }

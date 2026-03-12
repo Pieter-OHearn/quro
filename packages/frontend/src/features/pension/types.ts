@@ -10,6 +10,7 @@ import type {
   PensionStatementImportRow,
   PensionTransaction,
 } from '@quro/shared';
+import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 import type { ApiPdfDocument } from '@/lib/pdfDocuments';
 
 export type PensionTxnType = 'contribution' | 'fee' | 'annual_statement';
@@ -114,6 +115,7 @@ export type PensionPageState = {
   documentsByTransactionId: Map<number, PensionStatementDocument>;
   pensionImportCapability: AppCapabilityStatus;
   isLoading: boolean;
+  queryFailures: FailedRouteQuery[];
   showModal: boolean;
   setShowModal: (value: boolean) => void;
   editing: PensionPot | undefined;
