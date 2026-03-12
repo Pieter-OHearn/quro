@@ -9,7 +9,6 @@ import { Salary } from '@/features/salary';
 import { Goals } from '@/features/goals';
 import { Budget } from '@/features/budget';
 import { Pension } from '@/features/pension';
-import { Brand } from '@/features/brand';
 import { LandingPage } from '@/features/landing';
 import { Settings } from '@/features/settings';
 import { useAuth } from '@/lib/AuthContext';
@@ -57,11 +56,6 @@ export const router = createBrowserRouter([
     Component: PublicOnly,
     ErrorBoundary: RouteErrorScreen,
     children: [{ index: true, Component: LandingPage }],
-  },
-  {
-    path: '/brand',
-    Component: Brand,
-    ErrorBoundary: RouteErrorScreen,
   },
   {
     path: '/',

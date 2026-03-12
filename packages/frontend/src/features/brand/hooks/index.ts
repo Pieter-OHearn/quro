@@ -1,1 +1,0 @@
-export { useBrandData } from './useBrandData';
