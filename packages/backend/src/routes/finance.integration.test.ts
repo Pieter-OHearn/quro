@@ -83,6 +83,8 @@ await mock.module('../lib/marketDataClient', () => ({
 }));
 
 const { createIntegrationHelpers } = await import('../test/integration');
+const { db } = await import('../db/client');
+const { pensionStatementImportRows, pensionStatementImports } = await import('../db/schema');
 
 const integration = createIntegrationHelpers('ticket7.integration.quro.test');
 
@@ -1279,5 +1281,290 @@ describe('finance integration', () => {
       },
     );
     await parseJson<ApiDataResponse<{ id: number }>>(deletePotTwoResponse, 200);
+  });
+
+  test('rejects invalid payloads across the remaining finance write paths', async () => {
+    const owner = await integration.signUp('finance-validation');
+
+    const invalidPayslipResponse = await integration.request('/api/salary/payslips', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        month: 'May 2026',
+        date: '2026-05-31',
+        gross: 5000,
+        tax: -1,
+        pension: 250,
+        net: 3250,
+        bonus: null,
+        currency: 'EUR',
+      },
+    });
+    expect(invalidPayslipResponse.status).toBe(400);
+    expect(await invalidPayslipResponse.json()).toEqual({ error: 'Invalid tax' });
+
+    const invalidHoldingResponse = await integration.request('/api/investments/holdings', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Broken Holding',
+        ticker: 'BRKN',
+        currentPrice: 12,
+        currency: 'EUR',
+        sector: 'Other',
+        itemType: 'crypto',
+      },
+    });
+    expect(invalidHoldingResponse.status).toBe(400);
+    expect(await invalidHoldingResponse.json()).toEqual({
+      error: 'Invalid holding item type',
+    });
+
+    const createHoldingResponse = await integration.request('/api/investments/holdings', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'ETF',
+        ticker: 'NDQ',
+        currentPrice: 42.5,
+        currency: 'AUD',
+        sector: 'Technology',
+        itemType: 'etf',
+      },
+    });
+    const createHoldingBody = await parseJson<ApiDataResponse<{ id: number }>>(
+      createHoldingResponse,
+      201,
+    );
+
+    const invalidHoldingTxnResponse = await integration.request(
+      '/api/investments/holding-transactions',
+      {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          holdingId: createHoldingBody.data.id,
+          type: 'dividend',
+          shares: 1,
+          price: 5,
+          date: '2026-03-15',
+          note: 'Should fail',
+        },
+      },
+    );
+    expect(invalidHoldingTxnResponse.status).toBe(400);
+    expect(await invalidHoldingTxnResponse.json()).toEqual({
+      error: 'Dividend transactions cannot include shares',
+    });
+
+    const createPrimaryHomeResponse = await integration.request('/api/investments/properties', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        address: '44 Garden Lane',
+        propertyType: 'Primary Residence',
+        purchasePrice: 425000,
+        currentValue: 480000,
+        mortgage: 0,
+        mortgageId: null,
+        monthlyRent: 0,
+        currency: 'EUR',
+        emoji: 'H',
+      },
+    });
+    const createPrimaryHomeBody = await parseJson<ApiDataResponse<{ id: number }>>(
+      createPrimaryHomeResponse,
+      201,
+    );
+
+    const invalidPropertyTxnResponse = await integration.request(
+      '/api/investments/property-transactions',
+      {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          propertyId: createPrimaryHomeBody.data.id,
+          type: 'rent_income',
+          amount: 1200,
+          interest: null,
+          principal: null,
+          date: '2026-03-15',
+          note: 'Should fail',
+        },
+      },
+    );
+    expect(invalidPropertyTxnResponse.status).toBe(400);
+    expect(await invalidPropertyTxnResponse.json()).toEqual({
+      error: 'Rent and expense transactions are only supported for investment properties',
+    });
+
+    const invalidRepaymentTxnResponse = await integration.request(
+      '/api/investments/property-transactions',
+      {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          propertyId: createPrimaryHomeBody.data.id,
+          type: 'repayment',
+          amount: 900,
+          interest: 250,
+          principal: 650,
+          date: '2026-03-16',
+          note: 'Should fail',
+        },
+      },
+    );
+    expect(invalidRepaymentTxnResponse.status).toBe(400);
+    expect(await invalidRepaymentTxnResponse.json()).toEqual({
+      error: 'Property is not linked to a mortgage',
+    });
+
+    const invalidMortgageResponse = await integration.request('/api/mortgages', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        linkedPropertyId: createPrimaryHomeBody.data.id,
+        propertyAddress: 'Ignored',
+        lender: 'ING',
+        currency: 'EUR',
+        originalAmount: 250000,
+        outstandingBalance: 260000,
+        propertyValue: 480000,
+        monthlyPayment: 1250,
+        interestRate: 3.1,
+        rateType: 'fixed',
+        fixedUntil: '2030-06',
+        termYears: 30,
+        startDate: '2020-01',
+        endDate: '2050-01',
+        overpaymentLimit: 10,
+      },
+    });
+    expect(invalidMortgageResponse.status).toBe(400);
+    expect(await invalidMortgageResponse.json()).toEqual({
+      error: 'Outstanding balance cannot exceed the original amount',
+    });
+
+    const invalidPensionPotResponse = await integration.request('/api/pensions/pots', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Broken Pot',
+        provider: 'Aegon',
+        type: 'defined_contribution',
+        balance: 1000,
+        currency: 'EUR',
+        employeeMonthly: 50,
+        employerMonthly: 25,
+        investmentStrategy: 'Balanced',
+        metadata: {
+          policy: {
+            number: 'ABC',
+          },
+        },
+        color: '#2563eb',
+        emoji: 'P',
+        notes: 'Should fail',
+      },
+    });
+    expect(invalidPensionPotResponse.status).toBe(400);
+    expect(await invalidPensionPotResponse.json()).toEqual({
+      error: 'Metadata values must be strings, numbers, or booleans',
+    });
+
+    const createPensionPotResponse = await integration.request('/api/pensions/pots', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Valid Pot',
+        provider: 'Aegon',
+        type: 'defined_contribution',
+        balance: 5000,
+        currency: 'EUR',
+        employeeMonthly: 100,
+        employerMonthly: 50,
+        investmentStrategy: 'Balanced',
+        metadata: {
+          policyNumber: 'ABC-123',
+        },
+        color: '#1d4ed8',
+        emoji: 'P',
+        notes: 'For import validation',
+      },
+    });
+    const createPensionPotBody = await parseJson<ApiDataResponse<{ id: number }>>(
+      createPensionPotResponse,
+      201,
+    );
+
+    const now = new Date('2026-03-20T10:00:00.000Z');
+    const [importRecord] = await db
+      .insert(pensionStatementImports)
+      .values({
+        userId: owner.user.id,
+        potId: createPensionPotBody.data.id,
+        status: 'ready_for_review',
+        storageKey: 'users/test/imports/statement.pdf',
+        fileName: 'statement.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 128,
+        fileHashSha256: 'hash-123',
+        languageHints: ['en'],
+        createdAt: now,
+        updatedAt: now,
+        expiresAt: new Date('2026-03-27T10:00:00.000Z'),
+      })
+      .returning({ id: pensionStatementImports.id });
+
+    const [importRow] = await db
+      .insert(pensionStatementImportRows)
+      .values({
+        importId: importRecord.id,
+        rowOrder: 0,
+        type: 'fee',
+        amount: '15',
+        taxAmount: '0',
+        date: '2026-03-10',
+        note: '',
+        isEmployer: null,
+        confidence: '0.9',
+        confidenceLabel: 'high',
+        evidence: [],
+        isDerived: false,
+        isDeleted: false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: pensionStatementImportRows.id });
+
+    const invalidImportRowDateResponse = await integration.request(
+      `/api/pensions/imports/${importRecord.id}/rows/${importRow.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          date: '2026-02-30',
+        },
+      },
+    );
+    expect(invalidImportRowDateResponse.status).toBe(400);
+    expect(await invalidImportRowDateResponse.json()).toEqual({
+      error: 'Invalid transaction date',
+    });
+
+    const unknownImportRowFieldResponse = await integration.request(
+      `/api/pensions/imports/${importRecord.id}/rows/${importRow.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          source: 'csv',
+        },
+      },
+    );
+    expect(unknownImportRowFieldResponse.status).toBe(400);
+    expect(await unknownImportRowFieldResponse.json()).toEqual({
+      error: 'Unknown field: source',
+    });
   });
 });

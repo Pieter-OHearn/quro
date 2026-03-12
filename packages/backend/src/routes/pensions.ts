@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { CurrencyCode } from '@quro/shared';
 import { db } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
@@ -16,13 +17,66 @@ import {
   uploadPdfFile,
   validateUploadedPdf,
 } from '../lib/pdfDocuments';
+import {
+  err,
+  isRecord,
+  ok,
+  parseCurrencyField,
+  parseDateString,
+  parseId,
+  parseNumberField,
+  parseOptionalTextField,
+  parsePatchFields,
+  parseRequiredFields,
+  parseTextField,
+  readJsonBody,
+  rejectUnknownFields,
+  type FieldParsers,
+  type ParseResult,
+} from '../lib/requestValidation';
 
 const app = new Hono();
-const MAX_INT32 = 2_147_483_647;
 const TRANSACTION_TYPES = ['contribution', 'fee', 'annual_statement'] as const;
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const PENSION_POT_FIELDS = [
+  'name',
+  'provider',
+  'type',
+  'balance',
+  'currency',
+  'employeeMonthly',
+  'employerMonthly',
+  'investmentStrategy',
+  'metadata',
+  'color',
+  'emoji',
+  'notes',
+] as const;
+const PENSION_TRANSACTION_FIELDS = [
+  'potId',
+  'type',
+  'amount',
+  'taxAmount',
+  'date',
+  'note',
+  'isEmployer',
+] as const;
 
 type PensionTransactionType = (typeof TRANSACTION_TYPES)[number];
+
+type PensionPotPayload = {
+  name: string;
+  provider: string;
+  type: string;
+  balance: number;
+  currency: CurrencyCode;
+  employeeMonthly: number;
+  employerMonthly: number;
+  investmentStrategy: string | null;
+  metadata: Record<string, string>;
+  color: string | null;
+  emoji: string | null;
+  notes: string | null;
+};
 
 type NormalizedPensionTransactionPayload = {
   potId: number;
@@ -75,6 +129,47 @@ type RouteMutationResult =
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+function parseMetadataField(value: unknown): ParseResult<Record<string, string>> {
+  if (value == null) return ok({});
+  if (!isRecord(value)) return err('Metadata must be an object');
+
+  const metadata: Record<string, string> = {};
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    const key = rawKey.trim();
+    if (!key || rawValue == null) continue;
+
+    if (
+      typeof rawValue !== 'string' &&
+      typeof rawValue !== 'number' &&
+      typeof rawValue !== 'boolean'
+    ) {
+      return err('Metadata values must be strings, numbers, or booleans');
+    }
+
+    metadata[key] = String(rawValue).trim();
+  }
+
+  return ok(metadata);
+}
+
+const pensionPotParsers: FieldParsers<PensionPotPayload> = {
+  name: (value) => parseTextField(value, 'Pension name is required'),
+  provider: (value) => parseTextField(value, 'Provider is required'),
+  type: (value) => parseTextField(value, 'Pension type is required'),
+  balance: (value) => parseNumberField(value, 'Balance must be zero or greater', 0),
+  currency: parseCurrencyField,
+  employeeMonthly: (value) =>
+    parseNumberField(value, 'Employee contribution must be zero or greater', 0),
+  employerMonthly: (value) =>
+    parseNumberField(value, 'Employer contribution must be zero or greater', 0),
+  investmentStrategy: (value) =>
+    parseOptionalTextField(value, 'Investment strategy must be a string'),
+  metadata: parseMetadataField,
+  color: (value) => parseOptionalTextField(value, 'Color must be a string'),
+  emoji: (value) => parseOptionalTextField(value, 'Emoji must be a string'),
+  notes: (value) => parseOptionalTextField(value, 'Notes must be a string'),
+};
+
 function toPensionTransactionInsertPayload(
   payload: NormalizedPensionTransactionPayload,
   userId: number,
@@ -88,6 +183,46 @@ function toPensionTransactionInsertPayload(
     date: payload.date,
     note: payload.note,
     isEmployer: payload.isEmployer,
+  };
+}
+
+function toPensionPotInsertPayload(
+  payload: PensionPotPayload,
+  userId: number,
+): typeof pensionPots.$inferInsert {
+  return {
+    userId,
+    name: payload.name,
+    provider: payload.provider,
+    type: payload.type,
+    balance: payload.balance.toString(),
+    currency: payload.currency,
+    employeeMonthly: payload.employeeMonthly.toString(),
+    employerMonthly: payload.employerMonthly.toString(),
+    investmentStrategy: payload.investmentStrategy,
+    metadata: payload.metadata,
+    color: payload.color,
+    emoji: payload.emoji,
+    notes: payload.notes,
+  };
+}
+
+function toPensionPotUpdatePayload(
+  payload: Partial<PensionPotPayload>,
+): Partial<typeof pensionPots.$inferInsert> {
+  return {
+    name: payload.name,
+    provider: payload.provider,
+    type: payload.type,
+    balance: payload.balance?.toString(),
+    currency: payload.currency,
+    employeeMonthly: payload.employeeMonthly?.toString(),
+    employerMonthly: payload.employerMonthly?.toString(),
+    investmentStrategy: payload.investmentStrategy,
+    metadata: payload.metadata,
+    color: payload.color,
+    emoji: payload.emoji,
+    notes: payload.notes,
   };
 }
 
@@ -117,14 +252,52 @@ function parsePensionTransactionType(value: unknown): PensionTransactionType | n
     : null;
 }
 
-function parseId(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > MAX_INT32) return null;
-  return parsed;
+function parsePensionPotCreate(body: unknown): ParseResult<PensionPotPayload> {
+  if (!isRecord(body)) return err('Invalid pension pot payload');
+  const strictCheck = rejectUnknownFields(body, PENSION_POT_FIELDS);
+  if (!strictCheck.ok) return strictCheck;
+  return parseRequiredFields(body, pensionPotParsers);
 }
 
-function normalizeBody(body: unknown): Record<string, unknown> {
-  return body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+function parsePensionPotPatch(body: unknown): ParseResult<Partial<PensionPotPayload>> {
+  if (!isRecord(body)) return err('Invalid pension pot payload');
+  const strictCheck = rejectUnknownFields(body, PENSION_POT_FIELDS);
+  if (!strictCheck.ok) return strictCheck;
+  return parsePatchFields(body, pensionPotParsers);
+}
+
+function extractTransactionBodyFields(body: Record<string, unknown>): Record<string, unknown> {
+  const raw: Record<string, unknown> = {};
+  for (const field of PENSION_TRANSACTION_FIELDS) {
+    if (field in body) raw[field] = body[field];
+  }
+  return raw;
+}
+
+function parsePensionTransactionCreate(
+  body: unknown,
+): ParseResult<NormalizedPensionTransactionPayload> {
+  if (!isRecord(body)) return err('Invalid pension transaction payload');
+  const strictCheck = rejectUnknownFields(body, PENSION_TRANSACTION_FIELDS);
+  if (!strictCheck.ok) return strictCheck;
+
+  const validated = validatePensionTransactionPayload({
+    potId: body.potId,
+    type: body.type,
+    amount: body.amount,
+    taxAmount: body.taxAmount ?? 0,
+    date: body.date,
+    note: body.note,
+    isEmployer: body.isEmployer,
+  });
+  return validated.ok ? ok(validated.data) : err(validated.error);
+}
+
+function parsePensionTransactionPatch(body: unknown): ParseResult<Record<string, unknown>> {
+  if (!isRecord(body)) return err('Invalid pension transaction payload');
+  const strictCheck = rejectUnknownFields(body, PENSION_TRANSACTION_FIELDS);
+  if (!strictCheck.ok) return strictCheck;
+  return ok(extractTransactionBodyFields(body));
 }
 
 function buildPensionDocumentStorageKey(params: {
@@ -153,8 +326,8 @@ function parsePensionTransactionPayloadBase(
   const taxAmount = toFiniteNumber(rawPayload.taxAmount ?? 0);
   if (taxAmount === null) return { ok: false, error: 'Invalid tax amount' };
 
-  const date = typeof rawPayload.date === 'string' ? rawPayload.date : '';
-  if (!ISO_DATE_PATTERN.test(date)) return { ok: false, error: 'Invalid transaction date' };
+  const date = parseDateString(rawPayload.date);
+  if (!date) return { ok: false, error: 'Invalid transaction date' };
 
   return {
     ok: true,
@@ -707,10 +880,15 @@ app.get('/pots/:id', async (c) => {
 
 app.post('/pots', async (c) => {
   const user = getAuthUser(c);
-  const body = await c.req.json();
+  const rawBody = await readJsonBody(c.req, 'Invalid pension pot payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const body = parsePensionPotCreate(rawBody.value);
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+
   const [data] = await db
     .insert(pensionPots)
-    .values({ ...body, userId: user.id })
+    .values(toPensionPotInsertPayload(body.value, user.id))
     .returning();
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -719,11 +897,19 @@ app.patch('/pots/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
-  const body = await c.req.json();
-  const { userId: _ignoredUserId, ...safeBody } = body ?? {};
+
+  const rawBody = await readJsonBody(c.req, 'Invalid pension pot payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const body = parsePensionPotPatch(rawBody.value);
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  if (Object.keys(body.value).length === 0) {
+    return c.json({ error: 'No pension pot fields provided' }, HTTP_STATUS.BAD_REQUEST);
+  }
+
   const [data] = await db
     .update(pensionPots)
-    .set(safeBody)
+    .set(toPensionPotUpdatePayload(body.value))
     .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
@@ -780,20 +966,13 @@ app.get('/transactions/:id', async (c) => {
 
 app.post('/transactions', async (c) => {
   const user = getAuthUser(c);
-  const body = await c.req.json();
-  const raw = normalizeBody(body);
-  const validated = validatePensionTransactionPayload({
-    potId: raw.potId,
-    type: raw.type,
-    amount: raw.amount,
-    taxAmount: raw.taxAmount ?? 0,
-    date: raw.date,
-    note: raw.note,
-    isEmployer: raw.isEmployer,
-  });
+  const rawBody = await readJsonBody(c.req, 'Invalid pension transaction payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const validated = parsePensionTransactionCreate(rawBody.value);
   if (!validated.ok) return c.json({ error: validated.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const result = await createPensionTransaction({ userId: user.id, payload: validated.data });
+  const result = await createPensionTransaction({ userId: user.id, payload: validated.value });
   if (isRouteMutationError(result)) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data }, HTTP_STATUS.CREATED);
 });
@@ -802,11 +981,20 @@ app.patch('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
-  const body = await c.req.json();
+
+  const rawBody = await readJsonBody(c.req, 'Invalid pension transaction payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const body = parsePensionTransactionPatch(rawBody.value);
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  if (Object.keys(body.value).length === 0) {
+    return c.json({ error: 'No pension transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
+  }
+
   const result = await updatePensionTransaction({
     userId: user.id,
     transactionId: id,
-    raw: normalizeBody(body),
+    raw: body.value,
   });
   if (isRouteMutationError(result)) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data });

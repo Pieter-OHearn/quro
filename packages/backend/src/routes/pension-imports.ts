@@ -23,13 +23,29 @@ import {
   PDF_MIME_TYPE,
   validateUploadedPdf,
 } from '../lib/pdfDocuments';
+import {
+  err,
+  isRecord,
+  ok,
+  parseDateString,
+  parseId,
+  readJsonBody,
+  rejectUnknownFields,
+  type ParseResult,
+} from '../lib/requestValidation';
 import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
 
 const app = new Hono();
 
-const MAX_INT32 = 2_147_483_647;
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TRANSACTION_TYPES = ['contribution', 'fee', 'annual_statement'] as const;
+const EDITABLE_IMPORT_ROW_FIELDS = [
+  'type',
+  'amount',
+  'taxAmount',
+  'date',
+  'note',
+  'isEmployer',
+] as const;
 const ACTIVE_IMPORT_STATUSES = ['queued', 'processing', 'ready_for_review', 'committed'] as const;
 const LIST_IMPORT_DEFAULT_STATUSES = [
   'queued',
@@ -126,12 +142,6 @@ type ImportFeedRow = {
   potEmoji: string | null;
 };
 
-function parseId(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > MAX_INT32) return null;
-  return parsed;
-}
-
 function toFiniteNumber(value: unknown): number | null {
   const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
   return Number.isFinite(parsed) ? parsed : null;
@@ -164,8 +174,8 @@ function parsePensionTransactionPayloadBase(
   const taxAmount = toFiniteNumber(rawPayload.taxAmount ?? 0);
   if (taxAmount === null) return { ok: false, error: 'Invalid tax amount' };
 
-  const date = typeof rawPayload.date === 'string' ? rawPayload.date : '';
-  if (!ISO_DATE_PATTERN.test(date)) return { ok: false, error: 'Invalid transaction date' };
+  const date = parseDateString(rawPayload.date);
+  if (!date) return { ok: false, error: 'Invalid transaction date' };
 
   return {
     ok: true,
@@ -246,6 +256,19 @@ function validatePensionTransactionPayload(
   if (parsed.data.type === 'contribution') return validateContributionPayload(parsed.data);
   if (parsed.data.type === 'fee') return validateFeePayload(parsed.data);
   return validateAnnualStatementPayload(parsed.data);
+}
+
+function parseEditableImportRowPatch(body: unknown): ParseResult<Record<string, unknown>> {
+  if (!isRecord(body)) return err('Invalid import row payload');
+  const strictCheck = rejectUnknownFields(body, EDITABLE_IMPORT_ROW_FIELDS);
+  if (!strictCheck.ok) return strictCheck;
+
+  const patch: Record<string, unknown> = {};
+  for (const field of EDITABLE_IMPORT_ROW_FIELDS) {
+    if (field in body) patch[field] = body[field];
+  }
+
+  return ok(patch);
 }
 
 function computePensionTransactionDelta(txn: {
@@ -1028,11 +1051,19 @@ app.patch('/:id/rows/:rowId', async (c) => {
   const existing = await getImportRow(importId, rowId);
   if (!existing) return c.json({ error: 'Import row not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const rawBody = await readJsonBody(c.req, 'Invalid import row payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const body = parseEditableImportRowPatch(rawBody.value);
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  if (Object.keys(body.value).length === 0) {
+    return c.json({ error: 'No import row fields provided' }, HTTP_STATUS.BAD_REQUEST);
+  }
+
   const validated = validateEditableRowUpdate({
     importRecord: editableImport,
     existingRow: existing,
-    body,
+    body: body.value,
   });
   if (!validated.ok) return c.json({ error: validated.error }, HTTP_STATUS.BAD_REQUEST);
 

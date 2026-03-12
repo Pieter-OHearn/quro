@@ -117,6 +117,18 @@ export function parseCurrencyField(value: unknown): ParseResult<CurrencyCode> {
   return isCurrencyCode(value) ? ok(value) : err('Invalid currency');
 }
 
+export function parseBooleanField(value: unknown, error: string): ParseResult<boolean> {
+  return typeof value === 'boolean' ? ok(value) : err(error);
+}
+
+export function parseOptionalBooleanField(
+  value: unknown,
+  error: string,
+): ParseResult<boolean | null> {
+  if (value == null) return ok(null);
+  return typeof value === 'boolean' ? ok(value) : err(error);
+}
+
 export function parseTextField(value: unknown, error: string): ParseResult<string> {
   const parsed = parseNonEmptyString(value);
   return parsed ? ok(parsed) : err(error);

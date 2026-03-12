@@ -17,13 +17,13 @@ import {
   uploadPdfFile,
   validateUploadedPdf,
 } from '../lib/pdfDocuments';
+import { parseId, readJsonBody } from '../lib/requestValidation';
 import { getS3ObjectBytes } from '../lib/s3';
 
 const app = new Hono();
 
 type CurrencyCode = 'EUR' | 'GBP' | 'USD' | 'AUD' | 'NZD' | 'CAD' | 'CHF' | 'SGD';
 
-const MAX_INT32 = 2_147_483_647;
 const DATE_YEAR_LENGTH = 4;
 const ISO_DATE_LENGTH = 10;
 const DECIMAL_RADIX = 10;
@@ -64,12 +64,6 @@ const PAYSLIP_FIELDS = [
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
-
-function parseId(raw: string): number | null {
-  const parsed = Number.parseInt(raw, DECIMAL_RADIX);
-  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > MAX_INT32) return null;
-  return parsed;
-}
 
 const parseNumber = (value: unknown): number | null => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -179,9 +173,9 @@ const payslipFieldParsers: FieldParsers<PayslipInput> = {
   month: (value) => parseTextField(value, 'Invalid month'),
   date: (value) => parseDateField(value, 'Invalid date (expected YYYY-MM-DD)'),
   gross: (value) => parseNumericStringField(value, 'Invalid gross', 0),
-  tax: (value) => parseNumericStringField(value, 'Invalid tax'),
-  pension: (value) => parseNumericStringField(value, 'Invalid pension'),
-  net: (value) => parseNumericStringField(value, 'Invalid net'),
+  tax: (value) => parseNumericStringField(value, 'Invalid tax', 0),
+  pension: (value) => parseNumericStringField(value, 'Invalid pension', 0),
+  net: (value) => parseNumericStringField(value, 'Invalid net', 0),
   bonus: (value) => parseNullableNumericStringField(value, 'Invalid bonus', 0),
   currency: parseCurrencyField,
 };
@@ -340,7 +334,10 @@ app.get('/payslips/:id', async (c) => {
 
 app.post('/payslips', async (c) => {
   const user = getAuthUser(c);
-  const body = parsePayslipCreate(await c.req.json());
+  const rawBody = await readJsonBody(c.req, 'Invalid payslip payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const body = parsePayslipCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
@@ -356,7 +353,10 @@ app.patch('/payslips/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const body = parsePayslipPatch(await c.req.json());
+  const rawBody = await readJsonBody(c.req, 'Invalid payslip payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const body = parsePayslipPatch(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No payslip fields provided' }, HTTP_STATUS.BAD_REQUEST);
