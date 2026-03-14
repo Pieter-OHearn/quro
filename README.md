@@ -151,6 +151,26 @@ bun run hooks:install
 
 The Bun `db:*` scripts still exist for contributors, but the public runtime path is the Docker `db-tools` service.
 
+## Automated Releases & Prebuilt Images
+
+The `main` branch is protected; all changes flow through pull requests that bump `VERSION` (at the repo root) and update `CHANGELOG.md`. Once a PR is merged, the `release` workflow automatically:
+
+- Tags the merge commit with the SemVer stored in `VERSION`.
+- Builds multi-architecture images for the backend (`ghcr.io/<owner>/quro-backend`) and frontend (`ghcr.io/<owner>/quro-frontend`) and pushes both the SemVer tag (for example `v0.0.1`) and `latest`.
+- Publishes a GitHub Release whose notes are sourced from the matching CHANGELOG section.
+- Generates a `docker-compose.release.yml` manifest that references the freshly published images and attaches it to the Release for one-command deployments.
+
+Self-hosters can now deploy without cloning this repository:
+
+```bash
+curl -L https://github.com/<owner>/<repo>/releases/download/v0.0.1/docker-compose.release.yml -o docker-compose.yml
+docker login ghcr.io
+docker compose pull
+docker compose up -d
+```
+
+Replace `<owner>/<repo>` and the version tag with the specific release you want to run. See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed instructions on preparing releases.
+
 ## License
 
 [MIT](LICENSE)

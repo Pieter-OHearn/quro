@@ -63,6 +63,11 @@ wait_for_postgres() {
 }
 
 STARTED_DOCKER_DB=0
+SKIP_DB_CHECKS=0
+
+if [ "${QRO_PRECOMMIT:-0}" = "1" ]; then
+  SKIP_DB_CHECKS=1
+fi
 
 cleanup_started_postgres() {
   if [ "$STARTED_DOCKER_DB" -eq 1 ]; then
@@ -143,8 +148,12 @@ fi
 run_check "Format" bun run check:format
 run_check "Lint" bun run check:lint
 run_check "Typecheck" bun run check:typecheck
-prepare_test_database
-run_check "Tests" bun run check:test
+if [ "$SKIP_DB_CHECKS" -eq 1 ]; then
+  echo "Skipping database-backed tests during pre-commit (set QRO_PRECOMMIT=0 to run everything)."
+else
+  prepare_test_database
+  run_check "Tests" bun run check:test
+fi
 run_check "Build" bun run check:build
 
 if command -v python3 >/dev/null 2>&1; then
