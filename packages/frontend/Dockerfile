@@ -2,6 +2,8 @@ FROM oven/bun:1.3.10 AS build
 WORKDIR /app
 
 COPY packages/shared/package.json packages/shared/
+# Bun workspaces include @quro/backend, so copy its manifest too to avoid lockfile churn
+COPY packages/backend/package.json packages/backend/
 COPY packages/frontend/package.json packages/frontend/
 COPY package.json bun.lock bunfig.toml ./
 RUN cd packages/frontend && bun install --frozen-lockfile

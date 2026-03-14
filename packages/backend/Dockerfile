@@ -5,7 +5,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends postgresql-client ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
+# Bun workspaces include frontend too; copy manifest to keep lockfile consistent
 COPY packages/shared/package.json packages/shared/
+COPY packages/frontend/package.json packages/frontend/
 COPY packages/backend/package.json packages/backend/
 COPY package.json bun.lock bunfig.toml ./
 RUN cd packages/backend && bun install --frozen-lockfile
