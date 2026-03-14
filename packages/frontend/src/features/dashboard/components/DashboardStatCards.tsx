@@ -14,7 +14,7 @@ export function DashboardStatCards({
   fmtBase: DashboardFormatFn;
 }>) {
   return (
-    <StatsGrid>
+    <StatsGrid className={'lg:grid-cols-3 xl:grid-cols-5'}>
       {cards.map((card) => {
         const Icon = card.icon;
         const changeAmount = card.change.amount;
