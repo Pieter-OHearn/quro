@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import type { DataKey } from 'recharts/types/util/types';
 import { cn } from '@/lib/utils';
 import { ChartCard } from '../ChartCard';
 
@@ -15,8 +16,8 @@ export type AreaChartCardProps<T extends Record<string, unknown>> = {
   title: string;
   subtitle: string;
   data: readonly T[];
-  dataKey: keyof T & string;
-  xKey: keyof T & string;
+  dataKey: DataKey<T, number>;
+  xKey: DataKey<T, string | number>;
   color: string;
   height?: number;
   formatValue: (v: number) => string;
@@ -29,8 +30,8 @@ export type AreaChartCardProps<T extends Record<string, unknown>> = {
 
 type ChartContentProps<T extends Record<string, unknown>> = {
   data: readonly T[];
-  dataKey: keyof T & string;
-  xKey: keyof T & string;
+  dataKey: DataKey<T, number>;
+  xKey: DataKey<T, string | number>;
   color: string;
   height: number;
   formatValue: (v: number) => string;
