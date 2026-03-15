@@ -31,7 +31,14 @@ const quoteFixtures = new Map<string, QuoteFixture>([
 ]);
 
 await mock.module('../lib/s3', () => ({
+  S3ConfigurationError: class MockS3ConfigurationError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'S3ConfigurationError';
+    }
+  },
   getS3BucketName: () => 'ticket7-test-bucket',
+  checkS3Readiness: () => Promise.resolve(),
   uploadS3Object: ({ key, body }: { key: string; body: Buffer }) => {
     s3Objects.set(key, new Uint8Array(body));
   },

@@ -8,4 +8,4 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [v0.0.1] - 2026-03-14
 
-- Seed version file and release pipeline scaffolding.
+- First MVP test release: stood up the initial backend/frontend services, Docker orchestration, and CI skeleton to prove the deployment flow end to end.

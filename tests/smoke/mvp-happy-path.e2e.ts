@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const DEMO_EMAIL = 'demo@quro.local';
-const DEMO_PASSWORD = 'password123';
+const BACKEND_ORIGIN =
+  process.env.QRO_SMOKE_BACKEND_ORIGIN ?? process.env.BACKEND_ORIGIN ?? 'http://127.0.0.1:3300';
 
 function normalizeText(value: string | null): string {
   return value?.replace(/\s+/g, ' ').trim() ?? '';
@@ -9,18 +9,39 @@ function normalizeText(value: string | null): string {
 
 test('covers the MVP happy path from sign-in through dashboard verification', async ({ page }) => {
   const runId = Date.now();
+  const smokeEmail = `smoke-${runId}@playwright.quro.test`;
+  const smokePassword = `Smoke-${runId}-Pass123!`;
   const today = new Date();
   const payDate = today.toISOString().slice(0, 10);
   const savingsName = `Smoke Reserve ${runId}`;
   const budgetName = `Smoke Budget ${runId}`;
   const payslipMonth = `Smoke ${payDate} ${runId}`;
 
+  const signupResponse = await page.request.post(`${BACKEND_ORIGIN}/api/auth/signup`, {
+    data: {
+      firstName: 'Playwright',
+      lastName: 'Smoke',
+      email: smokeEmail,
+      password: smokePassword,
+      age: 35,
+      retirementAge: 67,
+    },
+  });
+  expect(signupResponse.status()).toBe(201);
+
+  // Clear the backend session established during signup so the UI flow still hits the
+  // anonymous landing page instead of being auto-redirected to the dashboard.
+  await page.request.post(`${BACKEND_ORIGIN}/api/auth/signout`);
+
   await page.goto('/welcome');
-  await page.getByRole('button', { name: 'Sign In' }).first().click();
+  await page
+    .getByRole('button', { name: /sign in/i })
+    .first()
+    .click();
 
   const signInDialog = page.getByRole('dialog');
-  await signInDialog.getByTestId('signin-email-input').fill(DEMO_EMAIL);
-  await signInDialog.getByTestId('signin-password-input').fill(DEMO_PASSWORD);
+  await signInDialog.getByTestId('signin-email-input').fill(smokeEmail);
+  await signInDialog.getByTestId('signin-password-input').fill(smokePassword);
   await signInDialog.getByRole('button', { name: 'Sign In' }).click();
 
   await expect(page.getByTestId('dashboard-net-worth-value')).toBeVisible();

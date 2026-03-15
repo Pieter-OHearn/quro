@@ -27,6 +27,14 @@ function getLatestTag(): string | null {
   }
 }
 
+function getCommitSha(ref: string): string | null {
+  try {
+    return execSync(`git rev-parse ${ref}`, { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
   const currentRaw = (await readFile(VERSION_FILE, 'utf8')).trim();
   const currentParsed = parseVersion(currentRaw);
@@ -51,8 +59,14 @@ async function main() {
   }
 
   const latestTag = getLatestTag();
-  if (latestTag && compareVersions(currentRaw, latestTag) <= 0) {
-    throw new Error(`VERSION (${currentRaw}) must be greater than latest tag (${latestTag}).`);
+  if (latestTag) {
+    const tagCommit = getCommitSha(latestTag);
+    const headCommit = getCommitSha('HEAD');
+    const tagPointsAtHead = tagCommit !== null && headCommit !== null && tagCommit === headCommit;
+
+    if (!tagPointsAtHead && compareVersions(currentRaw, latestTag) <= 0) {
+      throw new Error(`VERSION (${currentRaw}) must be greater than latest tag (${latestTag}).`);
+    }
   }
 
   console.log(`VERSION OK: ${currentRaw}`);

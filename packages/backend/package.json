@@ -13,7 +13,8 @@
     "db:backup": "bun run src/db/backup.ts",
     "db:restore": "bun run src/db/restore.ts",
     "db:clear": "bun run src/db/clear.ts",
-    "db:bootstrap-runtime-role": "bun run src/db/bootstrapRuntimeRole.ts"
+    "db:bootstrap-runtime-role": "bun run src/db/bootstrapRuntimeRole.ts",
+    "db:seed-demo": "bun run src/db/seedDemoUser.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1003.0",
