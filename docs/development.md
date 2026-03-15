@@ -11,10 +11,12 @@ This guide is for contributors working directly with Bun and Python. If you just
 
 ## Local Setup
 
-1. Install workspace dependencies:
+1. Install workspace dependencies and the pre-commit hook (requires Gitleaks):
 
 ```bash
 bun install
+brew install gitleaks
+bun run hooks:install
 ```
 
 2. Copy the Docker runtime config and secrets. The local Bun workflow reuses the same Postgres and MinIO credentials as the Docker stack:

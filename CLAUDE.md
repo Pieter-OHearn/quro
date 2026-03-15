@@ -33,16 +33,24 @@ Run from within `packages/backend` for migration generation:
 bun run db:generate         # generate new Drizzle migration from schema changes
 ```
 
-**No automated tests exist yet.** The CI pipeline has a placeholder test job.
+Unit and integration tests exist for backend routes and middleware; UI smoke tests cover shared frontend components. Run with `bun run test`. Playwright smoke tests run separately via `bun run test:ui`. Run the full CI suite locally with `bun run ci:check`.
 
 ## Local Dev Setup
 
-Requires Bun 1.x and Docker.
+Requires Bun 1.x and Docker. See [docs/development.md](docs/development.md) for the full guide.
 
 ```bash
+bun install
 cp .env.example .env
-docker compose up -d db     # start PostgreSQL only
+for file in secrets/*.example; do cp "$file" "${file%.example}"; done
+cp packages/backend/.env.example packages/backend/.env
+cp packages/frontend/.env.example packages/frontend/.env
+
+# Start infrastructure (development overlay exposes Postgres + MinIO to host)
+docker compose -f docker-compose.yml -f docker-compose.development.yml up -d db minio minio-init
+
 bun run db:migrate
+bun run db:bootstrap-runtime-role
 bun run dev
 ```
 
@@ -72,7 +80,7 @@ packages/
 
 ### Frontend (`packages/frontend`)
 
-- **Stack:** React 18, Vite 6, React Router 7, TanStack React Query, Tailwind CSS 4, Axios
+- **Stack:** React 19, Vite 8, React Router 7, TanStack React Query, Tailwind CSS 4, Axios
 - **Route guards:** `RequireAuth` redirects unauthenticated users to `/welcome`; `PublicOnly` redirects authenticated users to `/`.
 - **State:** Authentication state lives in `AuthContext`; currency preferences in `CurrencyContext`. Server state is managed entirely via TanStack React Query.
 - **Data fetching pattern:** Each feature module has a `hooks/index.ts` exporting `useQuery`/`useMutation` hooks. Mutations invalidate both the feature's query key and the dashboard query key on success.

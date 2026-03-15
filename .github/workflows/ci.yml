@@ -175,3 +175,10 @@ jobs:
         run: pip install pip-audit
       - name: Python security audit
         run: pip-audit -r services/pension-parser/requirements.txt
+
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [build, build-worker, security]
+    steps:
+      - run: echo "All checks passed"

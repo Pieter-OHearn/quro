@@ -79,7 +79,28 @@ docker compose up -d
 
 4. Open `http://localhost` and create your first account.
 
-Your data is stored locally in `./data` and backups in `./backups/db`. See [docs/database-safety.md](docs/database-safety.md) for backup and restore instructions.
+Your data is stored locally in `./data` (PostgreSQL at `./data/postgres`, documents at `./data/minio`). Back up both together:
+
+```bash
+# Create a PostgreSQL dump
+docker compose run --rm db-tools backup
+
+# Back up document storage (pension PDFs, payslips)
+rsync -av ./data/minio/ /path/to/backup/minio/
+```
+
+Dumps are written to `./backups/db`. To restore:
+
+```bash
+docker compose stop backend
+docker compose run --rm \
+  -e QRO_RESTORE_CONFIRM=restore-db \
+  -e QRO_RESTORE_ALLOW_NON_EMPTY=1 \
+  db-tools restore /backups/db/<dump-file>.dump
+docker compose up -d backend
+```
+
+Restore MinIO by copying your `./data/minio` backup back in place before starting the backend. The DB dump and MinIO snapshot must be from the same point in time.
 
 ## Contributing
 
