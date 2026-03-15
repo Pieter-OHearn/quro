@@ -15,8 +15,8 @@ describe('resolveCorsOrigin', () => {
     ]);
   });
 
-  test('preserves wildcard overrides', () => {
-    expect(resolveCorsOrigin('*')).toBe('*');
+  test('rejects wildcard overrides and falls back to defaults', () => {
+    expect(resolveCorsOrigin('*')).toEqual([...DEFAULT_CORS_ORIGINS]);
   });
 });
 

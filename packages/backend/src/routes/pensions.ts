@@ -129,24 +129,27 @@ type RouteMutationResult =
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+function isMetadataPrimitive(v: unknown): v is string | number | boolean {
+  return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+}
+
 function parseMetadataField(value: unknown): ParseResult<Record<string, string>> {
   if (value == null) return ok({});
   if (!isRecord(value)) return err('Metadata must be an object');
+  if (Object.keys(value).length > 50) return err('Too many metadata keys');
 
   const metadata: Record<string, string> = {};
   for (const [rawKey, rawValue] of Object.entries(value)) {
     const key = rawKey.trim();
     if (!key || rawValue == null) continue;
 
-    if (
-      typeof rawValue !== 'string' &&
-      typeof rawValue !== 'number' &&
-      typeof rawValue !== 'boolean'
-    ) {
+    if (key.length > 100) return err('Metadata key exceeds size limit');
+    if (!isMetadataPrimitive(rawValue))
       return err('Metadata values must be strings, numbers, or booleans');
-    }
 
-    metadata[key] = String(rawValue).trim();
+    const strVal = String(rawValue).trim();
+    if (strVal.length > 1000) return err('Metadata value exceeds size limit');
+    metadata[key] = strVal;
   }
 
   return ok(metadata);

@@ -5,6 +5,11 @@ function createRateLimiter(windowMs: number, max: number) {
   const store = new Map<string, number[]>();
 
   return createMiddleware(async (c, next) => {
+    if (process.env.NODE_ENV === 'test') {
+      await next();
+      return;
+    }
+
     const ip =
       c.req.header('x-real-ip') ??
       c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??

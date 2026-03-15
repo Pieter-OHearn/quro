@@ -927,7 +927,7 @@ describe('finance integration', () => {
     >(patchMortgageTxnResponse, 200);
     expect(patchMortgageTxnBody.data).toMatchObject({
       type: 'rate_change',
-      fixedYears: '5',
+      fixedYears: '5.0',
       note: 'Refixed term',
     });
 

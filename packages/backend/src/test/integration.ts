@@ -40,6 +40,7 @@ type SignUpOverrides = Partial<{
 
 export type AuthSession = {
   cookie: string;
+  csrfToken: string;
   user: {
     id: number;
     email: string;
@@ -56,6 +57,11 @@ function createRequestFunction() {
 
     if (options.cookie) {
       headers.set('Cookie', options.cookie);
+      const csrfMatch = options.cookie.match(/csrf_token=([^;]+)/);
+      const method = (options.method ?? 'GET').toUpperCase();
+      if (csrfMatch && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+        headers.set('X-CSRF-Token', csrfMatch[1]);
+      }
     }
 
     let body: BodyInit | undefined;
@@ -78,9 +84,22 @@ function buildEmail(label: string, emailDomain: string) {
   return `${label}-${crypto.randomUUID().toLowerCase()}@${emailDomain}`;
 }
 
-function extractCookie(response: Response) {
+function extractSessionCookies(response: Response): {
+  cookie: string | null;
+  csrfToken: string | null;
+} {
   const setCookie = response.headers.get('set-cookie');
-  return setCookie ? setCookie.split(';', 1)[0] : null;
+  if (!setCookie) return { cookie: null, csrfToken: null };
+
+  const sessionMatch = setCookie.match(/(?:^|,\s*)session=([^;]+)/);
+  const csrfMatch = setCookie.match(/csrf_token=([^;,]+)/);
+
+  const sessionCookie = sessionMatch ? `session=${sessionMatch[1]}` : null;
+  const csrfToken = csrfMatch?.[1] ?? null;
+  const cookie =
+    sessionCookie && csrfToken ? `${sessionCookie}; csrf_token=${csrfToken}` : sessionCookie;
+
+  return { cookie, csrfToken };
 }
 
 async function parseAuthSessionResponse(response: Response, email: string): Promise<AuthSession> {
@@ -96,13 +115,17 @@ async function parseAuthSessionResponse(response: Response, email: string): Prom
     throw new Error(body.error ?? `Expected auth to succeed for ${email}`);
   }
 
-  const cookie = extractCookie(response);
+  const { cookie, csrfToken } = extractSessionCookies(response);
   if (!cookie) {
     throw new Error(`Expected auth to set a session cookie for ${email}`);
+  }
+  if (!csrfToken) {
+    throw new Error(`Expected auth to set a CSRF token cookie for ${email}`);
   }
 
   return {
     cookie,
+    csrfToken,
     user: {
       id: body.data.id,
       email: body.data.email,
