@@ -127,6 +127,7 @@ export async function uploadS3Object(params: {
       Body: params.body,
       ContentType: params.contentType,
       ContentLength: params.body.byteLength,
+      ServerSideEncryption: 'AES256',
     }),
   );
 }

@@ -48,6 +48,11 @@ function generateSessionId() {
   return Array.from(bytes, (b) => b.toString(HEX_RADIX).padStart(HEX_BYTE_LENGTH, '0')).join('');
 }
 
+function generateCsrfToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(SESSION_ID_BYTES));
+  return Array.from(bytes, (b) => b.toString(HEX_RADIX).padStart(HEX_BYTE_LENGTH, '0')).join('');
+}
+
 function normalizeString(rawValue: unknown, lowercase = false) {
   if (typeof rawValue !== 'string') {
     return '';
@@ -123,16 +128,27 @@ function validateSignUpPayload(
 
 async function createSession(c: Context, userId: number) {
   const sessionId = generateSessionId();
+  const csrfToken = generateCsrfToken();
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE);
+  const secureCookies = process.env.SECURE_COOKIES === 'true';
+  const cookieMaxAge = SESSION_MAX_AGE / 1000;
 
   await db.insert(sessions).values({ id: sessionId, userId, expiresAt });
 
   setCookie(c, 'session', sessionId, {
     httpOnly: true,
-    secure: process.env.SECURE_COOKIES === 'true',
+    secure: secureCookies,
     sameSite: 'Lax',
     path: '/',
-    maxAge: SESSION_MAX_AGE / 1000,
+    maxAge: cookieMaxAge,
+  });
+
+  setCookie(c, 'csrf_token', csrfToken, {
+    httpOnly: false,
+    secure: secureCookies,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: cookieMaxAge,
   });
 }
 
@@ -195,17 +211,7 @@ app.post('/signin', signinRateLimit, async (c) => {
     return c.json({ error: 'Invalid email or password' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
-  const sessionId = generateSessionId();
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE);
-  await db.insert(sessions).values({ id: sessionId, userId: user.id, expiresAt });
-
-  setCookie(c, 'session', sessionId, {
-    httpOnly: true,
-    secure: process.env.SECURE_COOKIES === 'true',
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: SESSION_MAX_AGE / 1000,
-  });
+  await createSession(c, user.id);
 
   const [publicUser] = await db.select(publicUserColumns).from(users).where(eq(users.id, user.id));
   return c.json({ data: publicUser });
@@ -241,6 +247,7 @@ app.post('/signout', async (c) => {
   if (sessionId) {
     await db.delete(sessions).where(eq(sessions.id, sessionId));
     deleteCookie(c, 'session', { path: '/' });
+    deleteCookie(c, 'csrf_token', { path: '/' });
   }
   return c.json({ ok: true });
 });

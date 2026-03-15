@@ -1,93 +1,9 @@
 {
-  "id": "8190428a-b2e4-4e9f-b251-14422bcd06ad",
+  "id": "02fb2bcd-81e7-4a59-82c8-e699a742d7a4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.asset_allocations": {
-      "name": "asset_allocations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "numeric",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "color": {
-          "name": "color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "snapshot_id": {
-          "name": "snapshot_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "asset_allocations_user_id_idx": {
-          "name": "asset_allocations_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "asset_allocations_user_id_users_id_fk": {
-          "name": "asset_allocations_user_id_users_id_fk",
-          "tableFrom": "asset_allocations",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "asset_allocations_snapshot_id_net_worth_snapshots_id_fk": {
-          "name": "asset_allocations_snapshot_id_net_worth_snapshots_id_fk",
-          "tableFrom": "asset_allocations",
-          "tableTo": "net_worth_snapshots",
-          "columnsFrom": ["snapshot_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.budget_categories": {
       "name": "budget_categories",
       "schema": "",
@@ -118,13 +34,13 @@
         },
         "budgeted": {
           "name": "budgeted",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "spent": {
           "name": "spent",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -211,7 +127,7 @@
         },
         "amount": {
           "name": "amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -318,7 +234,7 @@
         },
         "rate": {
           "name": "rate",
-          "type": "numeric",
+          "type": "numeric(12, 6)",
           "primaryKey": false,
           "notNull": true
         },
@@ -367,7 +283,7 @@
         },
         "amount": {
           "name": "amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -439,6 +355,268 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.debt_payments": {
+      "name": "debt_payments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "debt_id": {
+          "name": "debt_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "principal": {
+          "name": "principal",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "interest": {
+          "name": "interest",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "debt_payments_user_id_idx": {
+          "name": "debt_payments_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "debt_payments_user_date_idx": {
+          "name": "debt_payments_user_date_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "debt_payments_debt_id_idx": {
+          "name": "debt_payments_debt_id_idx",
+          "columns": [
+            {
+              "expression": "debt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "debt_payments_user_id_users_id_fk": {
+          "name": "debt_payments_user_id_users_id_fk",
+          "tableFrom": "debt_payments",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "debt_payments_debt_id_debts_id_fk": {
+          "name": "debt_payments_debt_id_debts_id_fk",
+          "tableFrom": "debt_payments",
+          "tableTo": "debts",
+          "columnsFrom": ["debt_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.debts": {
+      "name": "debts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lender": {
+          "name": "lender",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_amount": {
+          "name": "original_amount",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "remaining_balance": {
+          "name": "remaining_balance",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "currency_code",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "interest_rate": {
+          "name": "interest_rate",
+          "type": "numeric(7, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monthly_payment": {
+          "name": "monthly_payment",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "emoji": {
+          "name": "emoji",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "debts_user_id_idx": {
+          "name": "debts_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "debts_user_id_users_id_fk": {
+          "name": "debts_user_id_users_id_fk",
+          "tableFrom": "debts",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.goals": {
       "name": "goals",
       "schema": "",
@@ -475,13 +653,13 @@
         },
         "current_amount": {
           "name": "current_amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "target_amount": {
           "name": "target_amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -505,13 +683,13 @@
         },
         "monthly_contribution": {
           "name": "monthly_contribution",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "monthly_target": {
           "name": "monthly_target",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -588,6 +766,145 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.holding_price_history": {
+      "name": "holding_price_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "holding_id": {
+          "name": "holding_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eod_date": {
+          "name": "eod_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "close_price": {
+          "name": "close_price",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_currency": {
+          "name": "price_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "synced_at": {
+          "name": "synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "holding_price_history_user_date_idx": {
+          "name": "holding_price_history_user_date_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "eod_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "holding_price_history_holding_date_idx": {
+          "name": "holding_price_history_holding_date_idx",
+          "columns": [
+            {
+              "expression": "holding_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "eod_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "holding_price_history_holding_date_unique": {
+          "name": "holding_price_history_holding_date_unique",
+          "columns": [
+            {
+              "expression": "holding_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "eod_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "holding_price_history_user_id_users_id_fk": {
+          "name": "holding_price_history_user_id_users_id_fk",
+          "tableFrom": "holding_price_history",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "holding_price_history_holding_id_holdings_id_fk": {
+          "name": "holding_price_history_holding_id_holdings_id_fk",
+          "tableFrom": "holding_price_history",
+          "tableTo": "holdings",
+          "columnsFrom": ["holding_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.holding_transactions": {
       "name": "holding_transactions",
       "schema": "",
@@ -618,13 +935,13 @@
         },
         "shares": {
           "name": "shares",
-          "type": "numeric",
+          "type": "numeric(19, 6)",
           "primaryKey": false,
           "notNull": false
         },
         "price": {
           "name": "price",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -735,7 +1052,7 @@
         },
         "current_price": {
           "name": "current_price",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -751,6 +1068,30 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "item_type": {
+          "name": "item_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exchange_mic": {
+          "name": "exchange_mic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry": {
+          "name": "industry",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_updated_at": {
+          "name": "price_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -817,19 +1158,19 @@
         },
         "amount": {
           "name": "amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "interest": {
           "name": "interest",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": false
         },
         "principal": {
           "name": "principal",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -847,7 +1188,7 @@
         },
         "fixed_years": {
           "name": "fixed_years",
-          "type": "numeric",
+          "type": "numeric(4, 1)",
           "primaryKey": false,
           "notNull": false
         }
@@ -953,31 +1294,31 @@
         },
         "original_amount": {
           "name": "original_amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "outstanding_balance": {
           "name": "outstanding_balance",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "property_value": {
           "name": "property_value",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "monthly_payment": {
           "name": "monthly_payment",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "interest_rate": {
           "name": "interest_rate",
-          "type": "numeric",
+          "type": "numeric(7, 4)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1013,7 +1354,7 @@
         },
         "overpayment_limit": {
           "name": "overpayment_limit",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": false
         }
@@ -1039,83 +1380,6 @@
         "mortgages_user_id_users_id_fk": {
           "name": "mortgages_user_id_users_id_fk",
           "tableFrom": "mortgages",
-          "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.net_worth_snapshots": {
-      "name": "net_worth_snapshots",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "month": {
-          "name": "month",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "year": {
-          "name": "year",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "total_value": {
-          "name": "total_value",
-          "type": "numeric",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "currency_code",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'EUR'"
-        }
-      },
-      "indexes": {
-        "net_worth_snapshots_user_id_idx": {
-          "name": "net_worth_snapshots_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "net_worth_snapshots_user_id_users_id_fk": {
-          "name": "net_worth_snapshots_user_id_users_id_fk",
-          "tableFrom": "net_worth_snapshots",
           "tableTo": "users",
           "columnsFrom": ["user_id"],
           "columnsTo": ["id"],
@@ -1159,31 +1423,31 @@
         },
         "gross": {
           "name": "gross",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "tax": {
           "name": "tax",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "pension": {
           "name": "pension",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "net": {
           "name": "net",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "bonus": {
           "name": "bonus",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1194,6 +1458,30 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'EUR'"
+        },
+        "document_storage_key": {
+          "name": "document_storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_file_name": {
+          "name": "document_file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_size_bytes": {
+          "name": "document_size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_uploaded_at": {
+          "name": "document_uploaded_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1248,7 +1536,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "payslips_document_fields_chk": {
+          "name": "payslips_document_fields_chk",
+          "value": "((\"payslips\".\"document_storage_key\" is null and \"payslips\".\"document_file_name\" is null and \"payslips\".\"document_size_bytes\" is null and \"payslips\".\"document_uploaded_at\" is null) or (\"payslips\".\"document_storage_key\" is not null and \"payslips\".\"document_file_name\" is not null and \"payslips\".\"document_size_bytes\" is not null and \"payslips\".\"document_uploaded_at\" is not null))"
+        },
+        "payslips_document_size_bytes_chk": {
+          "name": "payslips_document_size_bytes_chk",
+          "value": "\"payslips\".\"document_size_bytes\" is null or \"payslips\".\"document_size_bytes\" > 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.pension_pots": {
@@ -1287,7 +1584,7 @@
         },
         "balance": {
           "name": "balance",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1300,15 +1597,28 @@
         },
         "employee_monthly": {
           "name": "employee_monthly",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "employer_monthly": {
           "name": "employer_monthly",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "investment_strategy": {
+          "name": "investment_strategy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
         },
         "color": {
           "name": "color",
@@ -1363,6 +1673,429 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.pension_statement_import_rows": {
+      "name": "pension_statement_import_rows",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "import_id": {
+          "name": "import_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "row_order": {
+          "name": "row_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tax_amount": {
+          "name": "tax_amount",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "is_employer": {
+          "name": "is_employer",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "confidence_label": {
+          "name": "confidence_label",
+          "type": "pension_import_confidence_label",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'low'"
+        },
+        "evidence": {
+          "name": "evidence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "is_derived": {
+          "name": "is_derived",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "collision_warning": {
+          "name": "collision_warning",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "committed_transaction_id": {
+          "name": "committed_transaction_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pension_statement_import_rows_import_order_idx": {
+          "name": "pension_statement_import_rows_import_order_idx",
+          "columns": [
+            {
+              "expression": "import_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "row_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pension_statement_import_rows_import_deleted_idx": {
+          "name": "pension_statement_import_rows_import_deleted_idx",
+          "columns": [
+            {
+              "expression": "import_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "is_deleted",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pension_statement_import_rows_committed_txn_idx": {
+          "name": "pension_statement_import_rows_committed_txn_idx",
+          "columns": [
+            {
+              "expression": "committed_transaction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pension_statement_import_rows_import_id_pension_statement_imports_id_fk": {
+          "name": "pension_statement_import_rows_import_id_pension_statement_imports_id_fk",
+          "tableFrom": "pension_statement_import_rows",
+          "tableTo": "pension_statement_imports",
+          "columnsFrom": ["import_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "pension_statement_import_rows_committed_transaction_id_pension_transactions_id_fk": {
+          "name": "pension_statement_import_rows_committed_transaction_id_pension_transactions_id_fk",
+          "tableFrom": "pension_statement_import_rows",
+          "tableTo": "pension_transactions",
+          "columnsFrom": ["committed_transaction_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pension_statement_imports": {
+      "name": "pension_statement_imports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pot_id": {
+          "name": "pot_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "pension_import_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "storage_key": {
+          "name": "storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_hash_sha256": {
+          "name": "file_hash_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "statement_period_start": {
+          "name": "statement_period_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "statement_period_end": {
+          "name": "statement_period_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language_hints": {
+          "name": "language_hints",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "model_name": {
+          "name": "model_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_version": {
+          "name": "model_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "committed_at": {
+          "name": "committed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "pension_statement_imports_user_status_idx": {
+          "name": "pension_statement_imports_user_status_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pension_statement_imports_pot_id_idx": {
+          "name": "pension_statement_imports_pot_id_idx",
+          "columns": [
+            {
+              "expression": "pot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pension_statement_imports_hash_idx": {
+          "name": "pension_statement_imports_hash_idx",
+          "columns": [
+            {
+              "expression": "file_hash_sha256",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pension_statement_imports_user_id_users_id_fk": {
+          "name": "pension_statement_imports_user_id_users_id_fk",
+          "tableFrom": "pension_statement_imports",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "pension_statement_imports_pot_id_pension_pots_id_fk": {
+          "name": "pension_statement_imports_pot_id_pension_pots_id_fk",
+          "tableFrom": "pension_statement_imports",
+          "tableTo": "pension_pots",
+          "columnsFrom": ["pot_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.pension_transactions": {
       "name": "pension_transactions",
       "schema": "",
@@ -1393,9 +2126,16 @@
         },
         "amount": {
           "name": "amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "tax_amount": {
+          "name": "tax_amount",
+          "type": "numeric(19, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
         },
         "date": {
           "name": "date",
@@ -1412,6 +2152,30 @@
         "is_employer": {
           "name": "is_employer",
           "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_storage_key": {
+          "name": "document_storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_file_name": {
+          "name": "document_file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_size_bytes": {
+          "name": "document_size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_uploaded_at": {
+          "name": "document_uploaded_at",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         }
@@ -1477,7 +2241,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "pension_transactions_document_fields_chk": {
+          "name": "pension_transactions_document_fields_chk",
+          "value": "((\"pension_transactions\".\"document_storage_key\" is null and \"pension_transactions\".\"document_file_name\" is null and \"pension_transactions\".\"document_size_bytes\" is null and \"pension_transactions\".\"document_uploaded_at\" is null) or (\"pension_transactions\".\"document_storage_key\" is not null and \"pension_transactions\".\"document_file_name\" is not null and \"pension_transactions\".\"document_size_bytes\" is not null and \"pension_transactions\".\"document_uploaded_at\" is not null))"
+        },
+        "pension_transactions_document_size_bytes_chk": {
+          "name": "pension_transactions_document_size_bytes_chk",
+          "value": "\"pension_transactions\".\"document_size_bytes\" is null or \"pension_transactions\".\"document_size_bytes\" > 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.properties": {
@@ -1510,19 +2283,19 @@
         },
         "purchase_price": {
           "name": "purchase_price",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "current_value": {
           "name": "current_value",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "mortgage": {
           "name": "mortgage",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1534,7 +2307,7 @@
         },
         "monthly_rent": {
           "name": "monthly_rent",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1631,19 +2404,19 @@
         },
         "amount": {
           "name": "amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
         "interest": {
           "name": "interest",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": false
         },
         "principal": {
           "name": "principal",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1754,7 +2527,7 @@
         },
         "balance": {
           "name": "balance",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1767,7 +2540,7 @@
         },
         "interest_rate": {
           "name": "interest_rate",
-          "type": "numeric",
+          "type": "numeric(7, 4)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1854,7 +2627,7 @@
         },
         "amount": {
           "name": "amount",
-          "type": "numeric",
+          "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1983,6 +2756,73 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.stock_exchanges": {
+      "name": "stock_exchanges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "mic": {
+          "name": "mic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acronym": {
+          "name": "acronym",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country_code": {
+          "name": "country_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city": {
+          "name": "city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "website": {
+          "name": "website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "stock_exchanges_mic_unique": {
+          "name": "stock_exchanges_mic_unique",
+          "nullsNotDistinct": false,
+          "columns": ["mic"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -1993,8 +2833,14 @@
           "primaryKey": true,
           "notNull": true
         },
-        "name": {
-          "name": "name",
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_name": {
+          "name": "last_name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -2005,11 +2851,53 @@
           "primaryKey": false,
           "notNull": true
         },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "age": {
+          "name": "age",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 35
+        },
+        "retirement_age": {
+          "name": "retirement_age",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 67
+        },
+        "base_currency": {
+          "name": "base_currency",
+          "type": "currency_code",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'EUR'"
+        },
+        "number_format": {
+          "name": "number_format",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'en-US'"
+        },
         "password_hash": {
           "name": "password_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "password_updated_at": {
+          "name": "password_updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2030,6 +2918,87 @@
         }
       },
       "policies": {},
+      "checkConstraints": {
+        "users_age_range_check": {
+          "name": "users_age_range_check",
+          "value": "\"users\".\"age\" between 16 and 100"
+        },
+        "users_retirement_age_range_check": {
+          "name": "users_retirement_age_range_check",
+          "value": "\"users\".\"retirement_age\" between 17 and 80"
+        },
+        "users_retirement_after_age_check": {
+          "name": "users_retirement_after_age_check",
+          "value": "\"users\".\"retirement_age\" > \"users\".\"age\""
+        },
+        "users_number_format_check": {
+          "name": "users_number_format_check",
+          "value": "\"users\".\"number_format\" in ('en-US', 'de-DE')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.worker_heartbeats": {
+      "name": "worker_heartbeats",
+      "schema": "",
+      "columns": {
+        "worker_name": {
+          "name": "worker_name",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_heartbeat_at": {
+          "name": "last_heartbeat_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parser_healthy": {
+          "name": "parser_healthy",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "parser_checked_at": {
+          "name": "parser_checked_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parser_error": {
+          "name": "parser_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     }
@@ -2039,6 +3008,24 @@
       "name": "currency_code",
       "schema": "public",
       "values": ["EUR", "GBP", "USD", "AUD", "NZD", "CAD", "CHF", "SGD"]
+    },
+    "public.pension_import_confidence_label": {
+      "name": "pension_import_confidence_label",
+      "schema": "public",
+      "values": ["high", "medium", "low"]
+    },
+    "public.pension_import_status": {
+      "name": "pension_import_status",
+      "schema": "public",
+      "values": [
+        "queued",
+        "processing",
+        "ready_for_review",
+        "failed",
+        "committed",
+        "expired",
+        "cancelled"
+      ]
     }
   },
   "schemas": {},

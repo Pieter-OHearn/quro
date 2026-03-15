@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { corsMiddleware } from './middleware/cors';
 import { errorHandler } from './middleware/errorHandler';
 import { requireAuth } from './middleware/auth';
+import { requireCsrf } from './middleware/csrf';
 import auth from './routes/auth';
 import savings from './routes/savings';
 import investments from './routes/investments';
@@ -22,10 +23,12 @@ import {
   getPensionImportReadinessReport,
   getReadinessStatusCode,
 } from './lib/readiness';
+import { startSessionCleanup } from './lib/sessionCleanup';
 
 export const app = new Hono();
 
 app.use('*', corsMiddleware);
+app.use('*', requireCsrf);
 app.onError(errorHandler);
 
 // Public routes
@@ -70,7 +73,10 @@ app.route('/api/currency', currency);
 app.route('/api/capabilities', capabilities);
 app.route('/api/settings', settings);
 
+startSessionCleanup();
+
 export default {
   port: parseInt(process.env.PORT || '3000'),
+  hostname: process.env.HOST ?? '0.0.0.0',
   fetch: app.fetch,
 };

@@ -7,8 +7,9 @@ import {
   type UpdateUserProfileInput,
 } from '@quro/shared';
 import { and, eq, ne } from 'drizzle-orm';
+import { getCookie } from 'hono/cookie';
 import { db } from '../db/client';
-import { users } from '../db/schema';
+import { sessions, users } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { publicUserColumns } from '../lib/users';
@@ -206,6 +207,7 @@ app.put('/preferences', async (c) => {
 
 app.put('/password', async (c) => {
   const authUser = getAuthUser(c);
+  const currentSessionId = getCookie(c, 'session') ?? '';
   const parsed = parsePasswordPayload(await c.req.json());
 
   if (!parsed.ok) {
@@ -243,6 +245,10 @@ app.put('/password', async (c) => {
   if (!data) {
     return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
   }
+
+  await db
+    .delete(sessions)
+    .where(and(eq(sessions.userId, authUser.id), ne(sessions.id, currentSessionId)));
 
   return c.json({ data });
 });

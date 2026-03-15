@@ -24,3 +24,18 @@ export const api = axios.create({
   baseURL: apiBaseUrl || undefined,
   withCredentials: true,
 });
+
+const CSRF_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+api.interceptors.request.use((config) => {
+  if (!CSRF_SAFE_METHODS.has((config.method ?? '').toUpperCase())) {
+    const token = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('csrf_token='))
+      ?.split('=')[1];
+    if (token) {
+      config.headers['X-CSRF-Token'] = token;
+    }
+  }
+  return config;
+});
