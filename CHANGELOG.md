@@ -4,8 +4,6 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
-- Placeholder for upcoming changes. Replace this bullet with real notes as part of each pull request.
-
-## [v0.0.1] - 2026-03-14
+## [v0.0.1] - 2026-03-15
 
 - First MVP test release: stood up the initial backend/frontend services, Docker orchestration, and CI skeleton to prove the deployment flow end to end.

@@ -74,10 +74,33 @@ services:
         exec minio server /data --console-address ":9001"
     volumes:
       - ./data/minio:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     secrets:
       - minio_root_password
     networks:
       - backend-net
+
+  release-webhook:
+    image: '${WEBHOOK_IMAGE}:${VERSION}'
+    profiles: ['auto-update']
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - STACK_DIR=${STACK_DIR:-/stack}
+      - STACK_COMPOSE_FILE=${STACK_COMPOSE_FILE:-docker-compose.release.yml}
+      - RELEASE_WEBHOOK_PORT=${RELEASE_WEBHOOK_PORT:-9002}
+      - APPLY_RELEASE_SCRIPT=${APPLY_RELEASE_SCRIPT:-/stack/deploy/auto-update/apply-release.sh}
+    volumes:
+      - ./:/stack
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - '${RELEASE_WEBHOOK_PORT:-9002}:9002'
 
 secrets:
   minio_app_secret_key:
