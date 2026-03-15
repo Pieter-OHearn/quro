@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { HTTPException } from 'hono/http-exception';
 import { deleteS3Object, uploadS3Object } from './s3';
+
+const PDF_MAGIC = Buffer.from('%PDF', 'ascii');
 
 export const PDF_MIME_TYPE = 'application/pdf' as const;
 export const PDF_EXTENSION = '.pdf';
@@ -136,6 +139,11 @@ export async function uploadPdfFile(params: {
   fallbackBaseName: string;
 }): Promise<{ fileName: string; sizeBytes: number; uploadedAt: Date }> {
   const bytes = Buffer.from(await params.file.arrayBuffer());
+
+  if (bytes.length < PDF_MAGIC.length || !bytes.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) {
+    throw new HTTPException(400, { message: 'Uploaded file is not a valid PDF' });
+  }
+
   await uploadS3Object({
     key: params.key,
     body: bytes,

@@ -9,7 +9,12 @@ export function resolveCorsOrigin(rawOrigins = process.env.CORS_ORIGIN): string 
     .filter(Boolean);
 
   if (!origins?.length) return [...DEFAULT_CORS_ORIGINS];
-  if (origins.includes('*')) return '*';
+  if (origins.includes('*')) {
+    console.warn(
+      '[CORS] Wildcard origin is not allowed with credentials. Falling back to defaults.',
+    );
+    return [...DEFAULT_CORS_ORIGINS];
+  }
   return origins.length === 1 ? origins[0] : origins;
 }
 

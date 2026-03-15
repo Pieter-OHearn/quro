@@ -4,6 +4,7 @@ import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { HTTP_STATUS } from '../constants/http';
+import { signinRateLimit, signupRateLimit } from '../middleware/rateLimit';
 import {
   DEFAULT_BASE_CURRENCY,
   DEFAULT_USER_NUMBER_FORMAT,
@@ -128,7 +129,7 @@ async function createSession(c: Context, userId: number) {
 
   setCookie(c, 'session', sessionId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.SECURE_COOKIES === 'true',
     sameSite: 'Lax',
     path: '/',
     maxAge: SESSION_MAX_AGE / 1000,
@@ -137,7 +138,7 @@ async function createSession(c: Context, userId: number) {
 
 // ── Sign Up ─────────────────────────────────────────────────────────────────
 
-app.post('/signup', async (c) => {
+app.post('/signup', signupRateLimit, async (c) => {
   const rawBody = (await c.req.json()) as Record<string, unknown>;
   const validationResult = validateSignUpPayload(parseSignUpPayload(rawBody));
 
@@ -175,7 +176,7 @@ app.post('/signup', async (c) => {
 
 // ── Sign In ─────────────────────────────────────────────────────────────────
 
-app.post('/signin', async (c) => {
+app.post('/signin', signinRateLimit, async (c) => {
   const { email: rawEmail, password: rawPassword } = await c.req.json();
   const email = typeof rawEmail === 'string' ? rawEmail.toLowerCase().trim() : '';
   const password = typeof rawPassword === 'string' ? rawPassword : '';
@@ -200,7 +201,7 @@ app.post('/signin', async (c) => {
 
   setCookie(c, 'session', sessionId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.SECURE_COOKIES === 'true',
     sameSite: 'Lax',
     path: '/',
     maxAge: SESSION_MAX_AGE / 1000,

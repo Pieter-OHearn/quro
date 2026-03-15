@@ -90,6 +90,7 @@ services:
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
       MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
       PORT: '3000'
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost,http://localhost:5173}
       S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
