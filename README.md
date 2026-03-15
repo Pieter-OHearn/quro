@@ -104,7 +104,7 @@ Restore MinIO by copying your `./data/minio` backup back in place before startin
 
 ## Contributing
 
-See [docs/development.md](docs/development.md) for the local development setup and [CONTRIBUTING.md](CONTRIBUTING.md) for the release process.
+See [docs/development.md](docs/development.md) for the local development setup and [CONTRIBUTING.md](docs/CONTRIBUTING.md) for the release process.
 
 Install the pre-commit hook before your first commit:
 

@@ -85,8 +85,8 @@ services:
     networks:
       - backend-net
 
-  release-webhook:
-    image: '${WEBHOOK_IMAGE}:${VERSION}'
+  auto-updater:
+    image: '${AUTO_UPDATER_IMAGE}:${VERSION}'
     profiles: ['auto-update']
     restart: unless-stopped
     env_file:
@@ -94,13 +94,11 @@ services:
     environment:
       - STACK_DIR=${STACK_DIR:-/stack}
       - STACK_COMPOSE_FILE=${STACK_COMPOSE_FILE:-docker-compose.release.yml}
-      - RELEASE_WEBHOOK_PORT=${RELEASE_WEBHOOK_PORT:-9002}
       - APPLY_RELEASE_SCRIPT=${APPLY_RELEASE_SCRIPT:-/stack/deploy/auto-update/apply-release.sh}
+      - POLL_INTERVAL=${POLL_INTERVAL:-3600}
     volumes:
       - ./:/stack
       - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - '${RELEASE_WEBHOOK_PORT:-9002}:9002'
 
 secrets:
   minio_app_secret_key:

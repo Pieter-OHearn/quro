@@ -86,13 +86,13 @@ jobs:
             --tag "$REGISTRY/quro-frontend:$VERSION" \
             --tag "$REGISTRY/quro-frontend:latest" \
             --push .
-      - name: Build release webhook image
+      - name: Build auto-updater image
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --file deploy/release-webhook/Dockerfile \
-            --tag "$REGISTRY/quro-release-webhook:$VERSION" \
-            --tag "$REGISTRY/quro-release-webhook:latest" \
+            --file deploy/auto-updater/Dockerfile \
+            --tag "$REGISTRY/quro-auto-updater:$VERSION" \
+            --tag "$REGISTRY/quro-auto-updater:latest" \
             --push .
 
   publish-release:
@@ -123,7 +123,7 @@ jobs:
         run: |
           FRONTEND_IMAGE="$REGISTRY/quro-frontend" \
           BACKEND_IMAGE="$REGISTRY/quro-backend" \
-          WEBHOOK_IMAGE="$REGISTRY/quro-release-webhook" \
+          AUTO_UPDATER_IMAGE="$REGISTRY/quro-auto-updater" \
           VERSION="$VERSION" \
           envsubst < deploy/docker-compose.release.template.yml > docker-compose.release.yml
       - name: Build auto-update bundle
@@ -139,7 +139,7 @@ jobs:
           cp docker-compose.release.yml "$BUNDLE_DIR/"
           cp deploy/auto-update/apply-release.sh "$BUNDLE_DIR/deploy/auto-update/"
           cp scripts/auto-update/fetch-release.js "$BUNDLE_DIR/scripts/auto-update/"
-          cp docs/device-auto-update-webhook.md "$BUNDLE_DIR/README.md"
+          cp docs/device-auto-update.md "$BUNDLE_DIR/README.md"
           cp .env.example "$BUNDLE_DIR/.env.template"
           cp secrets/*.example "$BUNDLE_DIR/secrets/" || true
           tar -czf "auto-update-bundle-${VERSION}.tar.gz" -C "$BUNDLE_DIR" .
