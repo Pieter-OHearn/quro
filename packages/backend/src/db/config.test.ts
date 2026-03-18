@@ -56,6 +56,13 @@ function createSecretFile(fileName: string, value: string) {
   return filePath;
 }
 
+function clearExplicitDatabaseUrls() {
+  delete process.env.ADMIN_DATABASE_URL;
+  delete process.env.APP_DATABASE_URL;
+  delete process.env.BOOTSTRAP_DATABASE_URL;
+  delete process.env.DATABASE_URL;
+}
+
 describe('database config', () => {
   test('prefers explicit runtime URLs over derived values', () => {
     process.env.APP_DATABASE_URL = 'postgres://app:pw@db:5432/runtime';
@@ -66,6 +73,7 @@ describe('database config', () => {
   });
 
   test('derives runtime URL from Docker env and secret files', () => {
+    clearExplicitDatabaseUrls();
     process.env.POSTGRES_HOST = 'db';
     process.env.POSTGRES_PORT = '5432';
     process.env.POSTGRES_DB = 'quro';
@@ -90,6 +98,7 @@ describe('database config', () => {
   });
 
   test('derives admin and bootstrap URLs from Docker env and secrets', () => {
+    clearExplicitDatabaseUrls();
     process.env.POSTGRES_HOST = 'db';
     process.env.POSTGRES_DB = 'quro';
     process.env.POSTGRES_ADMIN_USER = 'quro_admin';
