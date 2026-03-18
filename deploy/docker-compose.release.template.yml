@@ -26,13 +26,19 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-quro}
       - POSTGRES_APP_USER=${POSTGRES_APP_USER:-quro_app}
       - MINIO_APP_USER=${MINIO_APP_USER:-quro_app}
+      - SECURE_COOKIES=${SECURE_COOKIES:-false}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost,http://localhost:5173}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET=${S3_BUCKET:-quro-documents}
       - S3_REGION=${S3_REGION:-eu-west-1}
       - S3_FORCE_PATH_STYLE=true
+      - PENSION_PARSER_URL=${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
+      - PENSION_PARSER_TIMEOUT_MS=${PENSION_PARSER_TIMEOUT_MS:-300000}
+      - IMPORT_DRAFT_TTL_DAYS=${IMPORT_DRAFT_TTL_DAYS:-7}
+      - IMPORT_WORKER_POLL_INTERVAL_MS=${IMPORT_WORKER_POLL_INTERVAL_MS:-3000}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       minio:
         condition: service_healthy
     secrets:
@@ -40,6 +46,25 @@ services:
       - minio_app_secret_key
     networks:
       - frontend-net
+      - backend-net
+
+  migrate:
+    image: '${BACKEND_IMAGE}:${VERSION}'
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-quro}
+      - POSTGRES_ADMIN_USER=${POSTGRES_ADMIN_USER:-quro_admin}
+      - POSTGRES_APP_USER=${POSTGRES_APP_USER:-quro_app}
+    entrypoint:
+      - /bin/sh
+      - /app/docker/backend/run-migrate.sh
+    secrets:
+      - postgres_admin_password
+      - postgres_app_password
+    networks:
       - backend-net
 
   db:

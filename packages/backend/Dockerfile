@@ -19,5 +19,6 @@ COPY docker/backend docker/backend
 RUN chmod +x /app/docker/backend/*.sh
 
 WORKDIR /app/packages/backend
+ENTRYPOINT ["/bin/sh", "/app/docker/backend/with-runtime-env.sh"]
 CMD ["bun", "run", "start"]
 EXPOSE 3000

@@ -6,7 +6,7 @@ async function main() {
   const config = getRuntimeRoleConfigFromEnv();
   if (!config) {
     console.log(
-      'Skipping runtime-role bootstrap because APP_DATABASE_URL or APP_DB_USER/APP_DB_PASSWORD are not configured.',
+      'Skipping runtime-role bootstrap because no runtime database credentials were configured.',
     );
     return;
   }

@@ -1,4 +1,5 @@
 import { type Sql } from 'postgres';
+import { getRuntimeDatabaseUrl } from './config';
 import { quoteIdentifier } from './maintenance';
 
 function escapeLiteral(value: string) {
@@ -46,7 +47,8 @@ function getFirstNonEmptyValue(values: readonly string[]) {
 }
 
 function parseAppDatabaseUrl() {
-  const appDatabaseUrl = process.env.APP_DATABASE_URL;
+  const appDatabaseUrl =
+    process.env.APP_DATABASE_URL || process.env.DATABASE_URL || getRuntimeDatabaseUrl();
   return appDatabaseUrl ? new URL(appDatabaseUrl) : null;
 }
 
