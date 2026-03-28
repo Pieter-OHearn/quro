@@ -858,6 +858,7 @@ export function Settings() {
   const { user, replaceUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = resolveActiveTab(searchParams.get('tab'));
+  const appVersion = __APP_VERSION__;
 
   const setActiveTab = (nextTab: TabKey): void => {
     setSearchParams({ tab: nextTab });
@@ -944,6 +945,13 @@ export function Settings() {
                   </button>
                 );
               })}
+
+              <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">
+                  App Version
+                </p>
+                <p className="font-mono text-sm font-semibold text-slate-700">{appVersion}</p>
+              </div>
             </nav>
 
             <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">

@@ -5,7 +5,7 @@ COPY packages/shared/package.json packages/shared/
 # Bun workspaces include @quro/backend, so copy its manifest too to avoid lockfile churn
 COPY packages/backend/package.json packages/backend/
 COPY packages/frontend/package.json packages/frontend/
-COPY package.json bun.lock bunfig.toml ./
+COPY package.json bun.lock bunfig.toml VERSION ./
 RUN cd packages/frontend && bun install --frozen-lockfile
 
 COPY packages/shared packages/shared
