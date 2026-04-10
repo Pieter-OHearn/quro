@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "esModuleInterop": true,
-    "types": ["bun"],
+    "types": ["bun", "node"],
     "skipLibCheck": true,
     "paths": {
       "@quro/shared": ["../shared/src"]

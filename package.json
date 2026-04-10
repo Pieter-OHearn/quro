@@ -24,7 +24,7 @@
     "check:security:python": "pip-audit -r services/pension-parser/requirements.txt",
     "ci:check": "sh ./scripts/run-ci-checks.sh",
     "hooks:install": "sh ./scripts/install-git-hooks.sh",
-    "test": "bun test",
+    "test": "sh ./scripts/run-bun-tests.sh",
     "test:smoke": "bunx playwright test",
     "test:ui": "bun run --filter '@quro/frontend' test",
     "db:migrate": "bun run --filter '@quro/backend' db:migrate",
