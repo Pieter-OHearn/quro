@@ -15,7 +15,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@quro/shared": "workspace:*",
     "@tanstack/react-query": "^5.67.0",
-    "axios": "^1.7.0",
+    "axios": "^1.15.0",
     "date-fns": "4.1.0",
     "emoji-picker-react": "^4.18.0",
     "lucide-react": "1.8.0",

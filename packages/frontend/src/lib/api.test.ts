@@ -3,10 +3,10 @@
 import { expect, test } from 'bun:test';
 import { buildApiUrl, resolveApiBaseUrl } from './api';
 
-test('defaults to same-origin api paths when no override is configured', () => {
-  expect(resolveApiBaseUrl(undefined)).toBe('');
-  expect(buildApiUrl('/api/health', undefined)).toBe('/api/health');
-  expect(buildApiUrl('api/health', undefined)).toBe('/api/health');
+test('uses same-origin api paths when no override value is provided', () => {
+  expect(resolveApiBaseUrl('')).toBe('');
+  expect(buildApiUrl('/api/health', '')).toBe('/api/health');
+  expect(buildApiUrl('api/health', '')).toBe('/api/health');
 });
 
 test('applies an explicit API host override for split frontend/backend development', () => {
