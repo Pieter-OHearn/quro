@@ -4,6 +4,10 @@ import { readFile } from 'node:fs/promises';
 
 const version = process.argv[2];
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 if (!version) {
   console.error('Usage: bun scripts/read-changelog-section.ts <version>');
   process.exit(1);
@@ -11,7 +15,8 @@ if (!version) {
 
 async function main() {
   const changelog = await readFile('CHANGELOG.md', 'utf8');
-  const pattern = new RegExp(`^##\\s*\\[?${version}\\]?[^\\n]*$`, 'm');
+  const safeVersion = escapeRegExp(version);
+  const pattern = new RegExp(`^##\\s*\\[?${safeVersion}\\]?[^\\n]*$`, 'm');
   const match = changelog.match(pattern);
   if (!match || match.index === undefined) {
     throw new Error(`Could not find changelog section for ${version}`);
