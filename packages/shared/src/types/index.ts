@@ -531,6 +531,16 @@ export type DashboardTransaction = {
   currency: CurrencyCode;
 };
 
+export type BunqConnection = {
+  id: number;
+  userId: number;
+  bunqUserId: string;
+  lastSyncAt: string | null;
+  syncStatus: 'idle' | 'syncing' | 'error';
+  syncError: string | null;
+  createdAt: string;
+};
+
 export type CurrencyMeta = {
   symbol: string;
   name: string;
