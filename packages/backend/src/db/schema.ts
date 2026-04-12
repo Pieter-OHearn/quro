@@ -33,6 +33,7 @@ export const pensionImportConfidenceLabelEnum = pgEnum('pension_import_confidenc
   'medium',
   'low',
 ]);
+export const bunqSyncStatusEnum = pgEnum('bunq_sync_status', ['idle', 'syncing', 'error']);
 
 const inlinePdfDocumentColumns = () => ({
   documentStorageKey: text('document_storage_key'),
@@ -140,9 +141,14 @@ export const savingsAccounts = pgTable(
     accountType: text('account_type').notNull(),
     color: text('color'),
     emoji: text('emoji'),
+    bunqAccountId: text('bunq_account_id'),
   },
   (table) => ({
     userIdx: index('savings_accounts_user_id_idx').on(table.userId),
+    bunqAccountUnique: uniqueIndex('savings_accounts_user_bunq_account_id_unique').on(
+      table.userId,
+      table.bunqAccountId,
+    ),
   }),
 );
 
@@ -158,10 +164,15 @@ export const savingsTransactions = pgTable(
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
+    bunqTransactionId: text('bunq_transaction_id'),
   },
   (table) => ({
     userIdx: index('savings_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('savings_transactions_user_date_idx').on(table.userId, table.date),
+    bunqTransactionUnique: uniqueIndex('savings_transactions_user_bunq_transaction_id_unique').on(
+      table.userId,
+      table.bunqTransactionId,
+    ),
   }),
 );
 
@@ -604,6 +615,7 @@ export const budgetCategories = pgTable(
     color: text('color'),
     month: text('month').notNull(),
     year: integer('year').notNull(),
+    bunqCategory: text('bunq_category'),
   },
   (table) => ({
     userIdx: index('budget_categories_user_id_idx').on(table.userId),
@@ -622,10 +634,15 @@ export const budgetTransactions = pgTable(
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     merchant: text('merchant').notNull(),
+    bunqTransactionId: text('bunq_transaction_id'),
   },
   (table) => ({
     userIdx: index('budget_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('budget_transactions_user_date_idx').on(table.userId, table.date),
+    bunqTransactionUnique: uniqueIndex('budget_transactions_user_bunq_transaction_id_unique').on(
+      table.userId,
+      table.bunqTransactionId,
+    ),
   }),
 );
 
@@ -656,4 +673,25 @@ export const dashboardTransactions = pgTable(
     userIdx: index('dashboard_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('dashboard_transactions_user_date_idx').on(table.userId, table.date),
   }),
+);
+
+// ── Bunq ─────────────────────────────────────────────────────────────────────
+
+export const bunqConnections = pgTable(
+  'bunq_connections',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    accessToken: text('access_token').notNull(),
+    refreshToken: text('refresh_token').notNull(),
+    tokenExpiresAt: timestamp('token_expires_at').notNull(),
+    bunqUserId: text('bunq_user_id').notNull(),
+    lastSyncAt: timestamp('last_sync_at'),
+    syncStatus: bunqSyncStatusEnum('sync_status').notNull().default('idle'),
+    syncError: text('sync_error'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({ userIdx: index('bunq_connections_user_id_idx').on(t.userId) }),
 );
