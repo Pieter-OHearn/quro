@@ -17,6 +17,7 @@ import dashboard from './routes/dashboard';
 import currency from './routes/currency';
 import capabilities from './routes/capabilities';
 import settings from './routes/settings';
+import bunq from './routes/bunq';
 import {
   getCoreReadinessReport,
   getHealthReport,
@@ -58,6 +59,7 @@ app.use('/api/capabilities', requireAuth);
 app.use('/api/capabilities/*', requireAuth);
 app.use('/api/settings', requireAuth);
 app.use('/api/settings/*', requireAuth);
+app.use('/api/bunq/*', requireAuth);
 
 app.route('/api/savings', savings);
 app.route('/api/investments', investments);
@@ -72,6 +74,7 @@ app.route('/api/dashboard', dashboard);
 app.route('/api/currency', currency);
 app.route('/api/capabilities', capabilities);
 app.route('/api/settings', settings);
+app.route('/api/bunq', bunq);
 
 startSessionCleanup();
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 
-import { fetchMonetaryAccounts, refreshAccessToken, type BunqTokens } from './bunqClient';
+import { fetchMonetaryAccounts, type BunqTokens } from './bunqClient';
 
 const originalFetch = globalThis.fetch;
 
@@ -16,24 +16,11 @@ afterEach(() => {
 });
 
 describe('bunqClient', () => {
-  test('fetchMonetaryAccounts returns refreshed tokens so callers can persist rotation', async () => {
+  test('fetchMonetaryAccounts resolves the user ID and parses account payloads', async () => {
     const fetchMock = mock((input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.endsWith('/token')) {
-        return Promise.resolve(
-          jsonResponse({
-            access_token: 'fresh-access',
-            refresh_token: 'fresh-refresh',
-            expires_in: 3600,
-          }),
-        );
-      }
       if (url.endsWith('/user')) {
-        return Promise.resolve(
-          jsonResponse({
-            Response: [{ UserPerson: { id: 42 } }],
-          }),
-        );
+        return Promise.resolve(jsonResponse({ Response: [{ UserPerson: { id: 42 } }] }));
       }
       if (url.endsWith('/user/42/monetary-account')) {
         return Promise.resolve(
@@ -57,17 +44,10 @@ describe('bunqClient', () => {
 
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    const expiringTokens: BunqTokens = {
-      accessToken: 'stale-access',
-      refreshToken: 'stale-refresh',
-      tokenExpiresAt: new Date(Date.now() + 60_000),
-    };
+    const tokens: BunqTokens = { accessToken: 'access-token' };
+    const result = await fetchMonetaryAccounts(tokens);
 
-    const result = await fetchMonetaryAccounts(expiringTokens);
-
-    expect(result.tokens.accessToken).toBe('fresh-access');
-    expect(result.tokens.refreshToken).toBe('fresh-refresh');
-    expect(result.tokens.tokenExpiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(result.tokens).toEqual(tokens);
     expect(result.data).toEqual([
       {
         id: 7,
@@ -78,22 +58,22 @@ describe('bunqClient', () => {
         status: 'ACTIVE',
       },
     ]);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  test('refreshAccessToken surfaces oauth error_description failures', async () => {
+  test('exchangeCodeForTokens surfaces oauth error_description failures', async () => {
+    const { exchangeCodeForTokens } = await import('./bunqClient');
     globalThis.fetch = mock(() =>
       Promise.resolve(
         jsonResponse(
-          {
-            error: 'invalid_grant',
-            error_description: 'refresh token expired',
-          },
+          { error: 'invalid_grant', error_description: 'authorization code expired' },
           { status: 400 },
         ),
       ),
     ) as unknown as typeof fetch;
 
-    await expect(refreshAccessToken('expired-refresh')).rejects.toThrow('refresh token expired');
+    await expect(exchangeCodeForTokens('expired-code')).rejects.toThrow(
+      'authorization code expired',
+    );
   });
 });
