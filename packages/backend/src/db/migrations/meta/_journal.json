@@ -15,6 +15,13 @@
       "when": 1776008353294,
       "tag": "0001_glamorous_mordo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776513398440,
+      "tag": "0002_pretty_alice",
+      "breakpoints": true
     }
   ]
 }

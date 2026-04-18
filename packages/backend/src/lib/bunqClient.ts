@@ -1,7 +1,5 @@
-const FIVE_MINUTES_MS = 300_000;
 const RATE_LIMIT_RETRY_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
-const DEFAULT_TOKEN_EXPIRY_SECONDS = 3_600;
 
 const isSandbox = process.env.BUNQ_SANDBOX === 'true';
 const API_BASE_URL = isSandbox
@@ -10,6 +8,9 @@ const API_BASE_URL = isSandbox
 const OAUTH_BASE_URL = isSandbox
   ? 'https://api-oauth.sandbox.bunq.com/v1'
   : 'https://api.oauth.bunq.com/v1';
+const OAUTH_AUTHORIZE_URL = isSandbox
+  ? 'https://oauth.sandbox.bunq.com/auth'
+  : 'https://oauth.bunq.com/auth';
 const CLIENT_ID = process.env.BUNQ_CLIENT_ID ?? '';
 const CLIENT_SECRET = process.env.BUNQ_CLIENT_SECRET ?? '';
 const REDIRECT_URI = process.env.BUNQ_REDIRECT_URI ?? '';
@@ -18,11 +19,7 @@ const REDIRECT_URI = process.env.BUNQ_REDIRECT_URI ?? '';
 
 export type BunqTokens = {
   accessToken: string;
-  refreshToken: string;
-  tokenExpiresAt: Date;
 };
-
-export type BunqTokenResponse = BunqTokens & { bunqUserId: string };
 
 export type BunqMonetaryAccount = {
   id: number;
@@ -112,25 +109,17 @@ function apiGet(url: string, accessToken: string): Promise<unknown> {
 }
 
 function oauthPost(params: Readonly<Record<string, string>>): Promise<unknown> {
-  return performFetch(`${OAUTH_BASE_URL}/token`, {
+  const query = new URLSearchParams(params).toString();
+  return performFetch(`${OAUTH_BASE_URL}/token?${query}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params).toString(),
   });
 }
 
 function parseTokens(payload: unknown): BunqTokens {
   if (!isRecord(payload)) throw new Error('Invalid token response from Bunq');
   const accessToken = getString(payload, 'access_token');
-  const refreshToken = getString(payload, 'refresh_token');
-  const expiresIn =
-    typeof payload.expires_in === 'number' ? payload.expires_in : DEFAULT_TOKEN_EXPIRY_SECONDS;
-  if (!accessToken || !refreshToken) throw new Error('Missing tokens in Bunq response');
-  return {
-    accessToken,
-    refreshToken,
-    tokenExpiresAt: new Date(Date.now() + expiresIn * 1_000),
-  };
+  if (!accessToken) throw new Error('Missing access_token in Bunq response');
+  return { accessToken };
 }
 
 async function fetchBunqUserId(accessToken: string): Promise<string> {
@@ -145,14 +134,6 @@ async function fetchBunqUserId(accessToken: string): Promise<string> {
     if (strId) return strId;
   }
   throw new Error('Could not determine Bunq user ID from /user response');
-}
-
-async function ensureFreshTokens(tokens: Readonly<BunqTokens>): Promise<BunqTokens> {
-  if (tokens.tokenExpiresAt.getTime() - Date.now() > FIVE_MINUTES_MS) {
-    return { ...tokens };
-  }
-  const refreshed = await refreshAccessToken(tokens.refreshToken);
-  return refreshed;
 }
 
 function parseCurrencyAmount(data: Readonly<UnknownRecord>): { value: string; currency: string } {
@@ -225,23 +206,21 @@ function parsePayment(data: Readonly<UnknownRecord>): BunqPayment | null {
 
 // ── Exported functions ────────────────────────────────────────────────────────
 
-export async function exchangeCodeForTokens(code: string): Promise<BunqTokenResponse> {
+export function buildOAuthAuthorizeUrl(state: string): string {
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    state,
+  });
+  return `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
+}
+
+export async function exchangeCodeForTokens(code: string): Promise<BunqTokens> {
   const payload = await oauthPost({
     grant_type: 'authorization_code',
     code,
     redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-  });
-  const tokens = parseTokens(payload);
-  const bunqUserId = await fetchBunqUserId(tokens.accessToken);
-  return { ...tokens, bunqUserId };
-}
-
-export async function refreshAccessToken(refreshToken: string): Promise<BunqTokens> {
-  const payload = await oauthPost({
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
     client_id: CLIENT_ID,
     client_secret: CLIENT_SECRET,
   });
@@ -251,15 +230,14 @@ export async function refreshAccessToken(refreshToken: string): Promise<BunqToke
 export async function fetchMonetaryAccounts(
   tokens: Readonly<BunqTokens>,
 ): Promise<BunqDataResult<BunqMonetaryAccount[]>> {
-  const fresh = await ensureFreshTokens(tokens);
-  const userId = await fetchBunqUserId(fresh.accessToken);
+  const userId = await fetchBunqUserId(tokens.accessToken);
   const payload = await apiGet(
     `${API_BASE_URL}/user/${userId}/monetary-account`,
-    fresh.accessToken,
+    tokens.accessToken,
   );
   return {
     data: parseMonetaryAccounts(payload),
-    tokens: fresh,
+    tokens,
   };
 }
 
@@ -269,14 +247,13 @@ export async function fetchPayments(
   accountId: number,
   newerThan?: string,
 ): Promise<BunqDataResult<BunqPayment[]>> {
-  const fresh = await ensureFreshTokens(tokens);
   const url = new URL(`${API_BASE_URL}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
   if (newerThan !== undefined) url.searchParams.set('newer_than', newerThan);
-  const payload = await apiGet(url.toString(), fresh.accessToken);
+  const payload = await apiGet(url.toString(), tokens.accessToken);
   return {
     data: extractBunqItems(payload, 'Payment')
       .map(parsePayment)
       .filter((p): p is BunqPayment => p !== null),
-    tokens: fresh,
+    tokens,
   };
 }

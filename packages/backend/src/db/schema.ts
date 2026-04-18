@@ -685,9 +685,9 @@ export const bunqConnections = pgTable(
       .references(() => users.id)
       .notNull(),
     accessToken: text('access_token').notNull(),
-    refreshToken: text('refresh_token').notNull(),
-    tokenExpiresAt: timestamp('token_expires_at').notNull(),
-    bunqUserId: text('bunq_user_id').notNull(),
+    // Populated on first sync; null immediately after OAuth because retrieving
+    // the user ID requires a separate session bootstrap against the bunq API.
+    bunqUserId: text('bunq_user_id'),
     lastSyncAt: timestamp('last_sync_at'),
     syncStatus: bunqSyncStatusEnum('sync_status').notNull().default('idle'),
     syncError: text('sync_error'),
