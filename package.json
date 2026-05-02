@@ -6,6 +6,9 @@
   ],
   "scripts": {
     "dev": "bun run --filter '@quro/*' dev",
+    "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.development.yml up -d --build db minio minio-init migrate backend frontend",
+    "dev:docker:down": "docker compose -f docker-compose.yml -f docker-compose.development.yml down",
+    "dev:docker:logs": "docker compose -f docker-compose.yml -f docker-compose.development.yml logs -f backend frontend",
     "dev:frontend": "bun run --filter '@quro/frontend' dev",
     "dev:backend": "bun run --filter '@quro/backend' dev",
     "smoke:frontend": "bun run --filter '@quro/frontend' dev -- --host 127.0.0.1 --port 4273",

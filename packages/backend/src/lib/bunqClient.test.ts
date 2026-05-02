@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 
-import { fetchMonetaryAccounts, type BunqTokens } from './bunqClient';
+import { fetchMonetaryAccounts } from './bunqClient';
 
 const originalFetch = globalThis.fetch;
 
@@ -16,39 +16,30 @@ afterEach(() => {
 });
 
 describe('bunqClient', () => {
-  test('fetchMonetaryAccounts resolves the user ID and parses account payloads', async () => {
-    const fetchMock = mock((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/user')) {
-        return Promise.resolve(jsonResponse({ Response: [{ UserPerson: { id: 42 } }] }));
-      }
-      if (url.endsWith('/user/42/monetary-account')) {
-        return Promise.resolve(
-          jsonResponse({
-            Response: [
-              {
-                MonetaryAccountBank: {
-                  id: 7,
-                  description: 'Main account',
-                  balance: { value: '12.34', currency: 'EUR' },
-                  alias: [{ type: 'IBAN', value: 'NL00BUNQ0000000000' }],
-                  status: 'ACTIVE',
-                },
+  test('fetchMonetaryAccounts parses account payloads', async () => {
+    const fetchMock = mock(() =>
+      Promise.resolve(
+        jsonResponse({
+          Response: [
+            {
+              MonetaryAccountBank: {
+                id: 7,
+                description: 'Main account',
+                balance: { value: '12.34', currency: 'EUR' },
+                alias: [{ type: 'IBAN', value: 'NL00BUNQ0000000000' }],
+                status: 'ACTIVE',
               },
-            ],
-          }),
-        );
-      }
-      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`));
-    });
+            },
+          ],
+        }),
+      ),
+    );
 
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    const tokens: BunqTokens = { accessToken: 'access-token' };
-    const result = await fetchMonetaryAccounts(tokens);
+    const result = await fetchMonetaryAccounts('session-token', '42');
 
-    expect(result.tokens).toEqual(tokens);
-    expect(result.data).toEqual([
+    expect(result).toEqual([
       {
         id: 7,
         type: 'BANK',
@@ -58,7 +49,7 @@ describe('bunqClient', () => {
         status: 'ACTIVE',
       },
     ]);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   test('exchangeCodeForTokens surfaces oauth error_description failures', async () => {

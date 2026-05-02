@@ -70,6 +70,11 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
             iconBg={m.bg}
             label={t.note || m.label}
             date={t.date}
+            badge={
+              t.bunqTransactionId
+                ? { text: 'Bunq', className: 'bg-sky-100 text-sky-700' }
+                : undefined
+            }
             amount={
               <div className="text-right flex-shrink-0">
                 <p className={`text-sm font-semibold ${m.color}`}>

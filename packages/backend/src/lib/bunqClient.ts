@@ -1,3 +1,5 @@
+import { createSign, generateKeyPairSync } from 'node:crypto';
+
 const RATE_LIMIT_RETRY_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
 
@@ -21,6 +23,22 @@ export type BunqTokens = {
   accessToken: string;
 };
 
+export type BunqKeyPair = {
+  privateKey: string;
+  publicKey: string;
+};
+
+export type BunqInstallationResult = {
+  installationToken: string;
+  serverPublicKey: string;
+};
+
+export type BunqSessionResult = {
+  sessionToken: string;
+  bunqUserId: string;
+  expiresAt: Date;
+};
+
 export type BunqMonetaryAccount = {
   id: number;
   type: 'BANK' | 'SAVINGS';
@@ -35,7 +53,7 @@ export type BunqPayment = {
   amount: { value: string; currency: string };
   description: string;
   counterpartyAlias: { displayName: string; iban?: string };
-  created: string; // ISO datetime
+  created: string;
   category: string | null;
   type: string;
 };
@@ -43,6 +61,10 @@ export type BunqPayment = {
 export type BunqDataResult<T> = {
   data: T;
   tokens: BunqTokens;
+};
+
+export type BunqMonetaryAccountsResult = BunqDataResult<BunqMonetaryAccount[]> & {
+  bunqUserId: string;
 };
 
 // ── Private helpers ───────────────────────────────────────────────────────────
@@ -88,6 +110,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function signBody(body: string, privateKeyPem: string): string {
+  const signer = createSign('SHA256');
+  signer.update(body);
+  return signer.sign(privateKeyPem, 'base64');
+}
+
 async function performFetch(url: string, init: RequestInit): Promise<unknown> {
   let response = await fetch(url, init);
   if (response.status === RATE_LIMIT_STATUS) {
@@ -102,9 +130,33 @@ async function performFetch(url: string, init: RequestInit): Promise<unknown> {
   return payload;
 }
 
-function apiGet(url: string, accessToken: string): Promise<unknown> {
+function apiGet(url: string, sessionToken: string): Promise<unknown> {
   return performFetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: {
+      'X-Bunq-Client-Authentication': sessionToken,
+      'Cache-Control': 'no-cache',
+      'User-Agent': 'quro/1.0',
+    },
+  });
+}
+
+function apiPost(
+  url: string,
+  body: UnknownRecord,
+  authToken: string,
+  privateKeyPem: string,
+): Promise<unknown> {
+  const bodyStr = JSON.stringify(body);
+  return performFetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Bunq-Client-Authentication': authToken,
+      'X-Bunq-Client-Signature': signBody(bodyStr, privateKeyPem),
+      'Cache-Control': 'no-cache',
+      'User-Agent': 'quro/1.0',
+    },
+    body: bodyStr,
   });
 }
 
@@ -120,20 +172,6 @@ function parseTokens(payload: unknown): BunqTokens {
   const accessToken = getString(payload, 'access_token');
   if (!accessToken) throw new Error('Missing access_token in Bunq response');
   return { accessToken };
-}
-
-async function fetchBunqUserId(accessToken: string): Promise<string> {
-  const payload = await apiGet(`${API_BASE_URL}/user`, accessToken);
-  const userTypes = ['UserPerson', 'UserCompany', 'UserLight', 'UserApiKey'];
-  for (const typeName of userTypes) {
-    const items = extractBunqItems(payload, typeName);
-    if (items.length === 0) continue;
-    const rawId = items[0].id;
-    if (typeof rawId === 'number') return String(rawId);
-    const strId = getString(items[0], 'id');
-    if (strId) return strId;
-  }
-  throw new Error('Could not determine Bunq user ID from /user response');
 }
 
 function parseCurrencyAmount(data: Readonly<UnknownRecord>): { value: string; currency: string } {
@@ -204,7 +242,18 @@ function parsePayment(data: Readonly<UnknownRecord>): BunqPayment | null {
   };
 }
 
+const SESSION_DURATION_SECONDS = 25 * 60;
+
 // ── Exported functions ────────────────────────────────────────────────────────
+
+export function generateKeyPair(): BunqKeyPair {
+  const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+  return { publicKey, privateKey };
+}
 
 export function buildOAuthAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
@@ -227,33 +276,94 @@ export async function exchangeCodeForTokens(code: string): Promise<BunqTokens> {
   return parseTokens(payload);
 }
 
-export async function fetchMonetaryAccounts(
-  tokens: Readonly<BunqTokens>,
-): Promise<BunqDataResult<BunqMonetaryAccount[]>> {
-  const userId = await fetchBunqUserId(tokens.accessToken);
-  const payload = await apiGet(
-    `${API_BASE_URL}/user/${userId}/monetary-account`,
-    tokens.accessToken,
+export async function createInstallation(publicKey: string): Promise<BunqInstallationResult> {
+  const body = JSON.stringify({ client_public_key: publicKey });
+  const payload = await performFetch(`${API_BASE_URL}/installation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': 'quro/1.0' },
+    body,
+  });
+  const tokens = extractBunqItems(payload, 'Token');
+  const serverKeys = extractBunqItems(payload, 'ServerPublicKey');
+  const installationToken = tokens.length > 0 ? getString(tokens[0], 'token') : null;
+  const serverPublicKey =
+    serverKeys.length > 0 ? getString(serverKeys[0], 'server_public_key') : null;
+  if (!installationToken) throw new Error('Missing installation token in Bunq response');
+  if (!serverPublicKey) throw new Error('Missing server public key in Bunq response');
+  return { installationToken, serverPublicKey };
+}
+
+export async function registerDevice(
+  installationToken: string,
+  accessToken: string,
+  privateKey: string,
+): Promise<void> {
+  await apiPost(
+    `${API_BASE_URL}/device-server`,
+    { description: 'Quro Finance', secret: accessToken, permitted_ips: ['*'] },
+    installationToken,
+    privateKey,
   );
-  return {
-    data: parseMonetaryAccounts(payload),
-    tokens,
-  };
+}
+
+export async function createSession(
+  installationToken: string,
+  accessToken: string,
+  privateKey: string,
+): Promise<BunqSessionResult> {
+  const payload = await apiPost(
+    `${API_BASE_URL}/session-server`,
+    { secret: accessToken },
+    installationToken,
+    privateKey,
+  );
+  const tokens = extractBunqItems(payload, 'Token');
+  const sessionToken = tokens.length > 0 ? getString(tokens[0], 'token') : null;
+  if (!sessionToken) throw new Error('Missing session token in Bunq response');
+
+  const userTypes = ['UserPerson', 'UserCompany', 'UserLight', 'UserApiKey'];
+  let bunqUserId: string | null = null;
+  for (const typeName of userTypes) {
+    const items = extractBunqItems(payload, typeName);
+    if (items.length === 0) continue;
+    const rawId = items[0].id;
+    if (typeof rawId === 'number') {
+      bunqUserId = String(rawId);
+      break;
+    }
+    const strId = getString(items[0], 'id');
+    if (strId) {
+      bunqUserId = strId;
+      break;
+    }
+  }
+  if (!bunqUserId) throw new Error('Could not determine Bunq user ID from session response');
+
+  const expiresAt = new Date(Date.now() + SESSION_DURATION_SECONDS * 1000);
+  return { sessionToken, bunqUserId, expiresAt };
+}
+
+export async function fetchMonetaryAccounts(
+  sessionToken: string,
+  bunqUserId: string,
+): Promise<BunqMonetaryAccount[]> {
+  const payload = await apiGet(
+    `${API_BASE_URL}/user/${bunqUserId}/monetary-account`,
+    sessionToken,
+  );
+  return parseMonetaryAccounts(payload);
 }
 
 export async function fetchPayments(
-  tokens: Readonly<BunqTokens>,
+  sessionToken: string,
   bunqUserId: string,
   accountId: number,
   newerThan?: string,
-): Promise<BunqDataResult<BunqPayment[]>> {
+): Promise<BunqPayment[]> {
   const url = new URL(`${API_BASE_URL}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
   if (newerThan !== undefined) url.searchParams.set('newer_than', newerThan);
-  const payload = await apiGet(url.toString(), tokens.accessToken);
-  return {
-    data: extractBunqItems(payload, 'Payment')
-      .map(parsePayment)
-      .filter((p): p is BunqPayment => p !== null),
-    tokens,
-  };
+  const payload = await apiGet(url.toString(), sessionToken);
+  return extractBunqItems(payload, 'Payment')
+    .map(parsePayment)
+    .filter((p): p is BunqPayment => p !== null);
 }

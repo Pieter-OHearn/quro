@@ -1,6 +1,14 @@
 # Development
 
-This guide is for contributors working directly with Bun and Python. If you just want to run Quro locally, use the Docker quick start in the [README](../README.md).
+This guide is for contributors working directly with Bun and Python.
+
+If you just want the fastest local setup for testing, use the Docker path:
+
+```bash
+bun run dev:docker
+```
+
+Then open `http://localhost`. The bunq callback for the Docker setup is `http://localhost/api/bunq/oauth/callback`.
 
 ## Prerequisites
 
@@ -9,7 +17,7 @@ This guide is for contributors working directly with Bun and Python. If you just
 - Docker Compose v2
 - Gitleaks for the checked-in pre-commit hook
 
-## Local Setup
+## Host Setup
 
 1. Install workspace dependencies and the pre-commit hook (requires Gitleaks):
 
@@ -66,6 +74,39 @@ bun run dev
 ```
 
 Frontend Vite defaults to same-origin `/api` in Docker-like environments. For split frontend/backend development on different origins, set `VITE_API_URL=http://localhost:3000` in `packages/frontend/.env`.
+
+## Docker Setup
+
+This is the recommended path if you want the whole app running together with the fewest steps.
+
+1. Make sure the root `.env` exists and points the bunq redirect at the Docker origin:
+
+```bash
+# Create it if needed.
+cp .env.example .env
+```
+
+2. Start the full stack:
+
+```bash
+bun run dev:docker
+```
+
+3. Open `http://localhost`.
+
+The Docker stack publishes:
+
+```bash
+# App UI
+http://localhost
+
+# Database and object storage for host-side tools
+127.0.0.1:5432
+127.0.0.1:9000
+127.0.0.1:9001
+```
+
+For Docker, the backend stays internal to the compose network and Nginx proxies `/api` to it. That means bunq OAuth should use `http://localhost/api/bunq/oauth/callback`.
 
 ## Optional Pension Import Development
 

@@ -7,6 +7,28 @@
 
 Quro is a self-hosted personal finance app that brings budgeting, savings, investing, and long-term planning into one dashboard. It tracks your salary, savings accounts, investments, pensions, and financial goals — and lets you attach supporting documents to keep everything in one place. Open source and built to run on your own hardware.
 
+## Local Docker Dev
+
+If you want the app running locally with the least setup, use the Docker dev stack:
+
+```bash
+bun run dev:docker
+```
+
+Then open `http://localhost`.
+
+For bunq OAuth in this mode, the callback URL is:
+
+```bash
+http://localhost/api/bunq/oauth/callback
+```
+
+The database and object storage are also published locally for tooling:
+
+- Postgres: `127.0.0.1:5432`
+- MinIO API: `127.0.0.1:9000`
+- MinIO console: `127.0.0.1:9001`
+
 ## Screenshots
 
 <table>

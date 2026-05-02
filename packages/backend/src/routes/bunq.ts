@@ -7,6 +7,7 @@ import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { buildOAuthAuthorizeUrl, exchangeCodeForTokens } from '../lib/bunqClient';
+import { syncBunqSavings } from '../services/bunqSavingsSync';
 
 const app = new Hono();
 
@@ -106,6 +107,20 @@ app.delete('/connection', async (c) => {
   await db.delete(bunqConnections).where(eq(bunqConnections.userId, user.id));
 
   return c.json({ data: { ok: true } }, HTTP_STATUS.OK);
+});
+
+app.post('/sync/savings', async (c) => {
+  const user = getAuthUser(c);
+
+  try {
+    await syncBunqSavings(user.id);
+  } catch (e) {
+    console.error('[bunq savings sync error]', e);
+    const message = e instanceof Error ? e.message : 'Bunq savings sync failed';
+    return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
+  }
+
+  return c.json({ data: { ok: true, syncedAt: new Date().toISOString() } }, HTTP_STATUS.OK);
 });
 
 export default app;

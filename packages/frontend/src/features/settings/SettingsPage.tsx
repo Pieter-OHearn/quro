@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Target,
+  RefreshCw,
   Unlink,
   User as UserIcon,
 } from 'lucide-react';
@@ -43,7 +44,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { resolveApiErrorMessage } from '@/lib/pdfDocuments';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
-import { useBunqConnection, useDisconnectBunq } from './hooks';
+import { useBunqConnection, useDisconnectBunq, useSyncBunqSavings } from './hooks';
 
 type TabKey = 'profile' | 'security' | 'preferences' | 'connections';
 
@@ -876,6 +877,7 @@ function formatSyncTime(value: string | null): string {
 function ConnectionsSection() {
   const { data: connection, isLoading } = useBunqConnection();
   const disconnect = useDisconnectBunq();
+  const sync = useSyncBunqSavings();
   const [error, setError] = useState<string | null>(null);
   const { saved, showSaved } = useSavedState();
 
@@ -891,6 +893,15 @@ function ConnectionsSection() {
 
   const handleConnect = () => {
     window.location.href = buildApiUrl('/api/bunq/oauth/start');
+  };
+
+  const handleSync = async () => {
+    setError(null);
+    try {
+      await sync.mutateAsync();
+    } catch (e: unknown) {
+      setError(resolveApiErrorMessage(e, 'Failed to sync Bunq savings'));
+    }
   };
 
   if (isLoading) {
@@ -936,20 +947,33 @@ function ConnectionsSection() {
               )}
             </div>
           </div>
-          <div>
+          <div className="flex items-center gap-2">
             {connection ? (
-              <Button
-                variant="danger"
-                size="sm"
-                leadingIcon={saved ? <Check size={14} /> : <Unlink size={14} />}
-                loading={disconnect.isPending}
-                className={cn(saved && 'bg-emerald-500 hover:bg-emerald-500')}
-                onClick={() => {
-                  void handleDisconnect();
-                }}
-              >
-                {saved ? 'Disconnected' : 'Disconnect'}
-              </Button>
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leadingIcon={<RefreshCw size={14} className={cn(sync.isPending && 'animate-spin')} />}
+                  loading={sync.isPending}
+                  onClick={() => {
+                    void handleSync();
+                  }}
+                >
+                  Sync
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  leadingIcon={saved ? <Check size={14} /> : <Unlink size={14} />}
+                  loading={disconnect.isPending}
+                  className={cn(saved && 'bg-emerald-500 hover:bg-emerald-500')}
+                  onClick={() => {
+                    void handleDisconnect();
+                  }}
+                >
+                  {saved ? 'Disconnected' : 'Disconnect'}
+                </Button>
+              </>
             ) : (
               <Button
                 variant="primary"

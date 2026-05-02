@@ -57,6 +57,7 @@ export type SavingsAccount = {
   accountType: 'Easy Access' | 'Term Deposit';
   color: string;
   emoji: string;
+  bunqAccountId?: string | null;
 };
 
 export type SavingsTransaction = {
@@ -66,6 +67,7 @@ export type SavingsTransaction = {
   amount: number;
   date: string;
   note: string;
+  bunqTransactionId?: string | null;
 };
 
 // ── Ticker Item Types ─────────────────────────────────────────────────────────
