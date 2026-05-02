@@ -150,7 +150,7 @@ jobs:
           cp secrets/*.example "$BUNDLE_DIR/secrets/" || true
           tar -czf "auto-update-bundle-${VERSION}.tar.gz" -C "$BUNDLE_DIR" .
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.VERSION }}
           name: ${{ env.VERSION }}
