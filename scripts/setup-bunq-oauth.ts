@@ -2,8 +2,9 @@
 /**
  * setup-bunq-oauth.ts
  *
- * Registers a production bunq OAuth client via the API and prints the
- * BUNQ_CLIENT_ID / BUNQ_CLIENT_SECRET / BUNQ_REDIRECT_URI env vars.
+ * Registers a production bunq OAuth client via the API and writes the
+ * BUNQ_CLIENT_ID / BUNQ_CLIENT_SECRET / BUNQ_REDIRECT_URI env vars to a local
+ * file with restricted permissions.
  *
  * Usage:
  *   bun run scripts/setup-bunq-oauth.ts <API_KEY> <REDIRECT_URI>
@@ -15,11 +16,15 @@
  *   Profile → Security & Preferences → Developers → API keys → Add API key
  */
 
-import { createSign, generateKeyPairSync } from 'node:crypto';
-import { randomUUID } from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import { generateKeyPairSync, randomUUID, webcrypto } from 'node:crypto';
+import { chmod, writeFile } from 'node:fs/promises';
 
 const API_BASE = 'https://api.bunq.com/v1';
 const APP_NAME = 'Quro';
+const OUTPUT_ENV_PATH = '.env.bunq-oauth';
+const SIGNATURE_ALGORITHM = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } as const;
+const textEncoder = new TextEncoder();
 
 // ── Args ──────────────────────────────────────────────────────────────────────
 
@@ -38,13 +43,28 @@ const { privateKey, publicKey } = generateKeyPairSync('rsa', {
   publicKeyEncoding: { type: 'spki', format: 'pem' },
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
 });
+const signingKey = await webcrypto.subtle.importKey(
+  'pkcs8',
+  pemToArrayBuffer(privateKey),
+  SIGNATURE_ALGORITHM,
+  false,
+  ['sign'],
+);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function sign(body: string): string {
-  const signer = createSign('SHA256');
-  signer.update(body);
-  return signer.sign(privateKey, 'base64');
+function pemToArrayBuffer(pem: string): Uint8Array {
+  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  return new Uint8Array(Buffer.from(base64, 'base64'));
+}
+
+async function signRequestBody(body: string): Promise<string> {
+  const signature = await webcrypto.subtle.sign(
+    SIGNATURE_ALGORITHM,
+    signingKey,
+    textEncoder.encode(body),
+  );
+  return Buffer.from(signature).toString('base64');
 }
 
 function commonHeaders(): Record<string, string> {
@@ -59,11 +79,11 @@ function commonHeaders(): Record<string, string> {
   };
 }
 
-function baseHeaders(authToken: string, body: string): Record<string, string> {
+async function baseHeaders(authToken: string, body: string): Promise<Record<string, string>> {
   return {
     ...commonHeaders(),
     'X-Bunq-Client-Authentication': authToken,
-    'X-Bunq-Client-Signature': sign(body),
+    'X-Bunq-Client-Signature': await signRequestBody(body),
   };
 }
 
@@ -71,7 +91,7 @@ async function bunqPost<T>(path: string, authToken: string, payload: unknown): P
   const body = JSON.stringify(payload);
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: baseHeaders(authToken, body),
+    headers: await baseHeaders(authToken, body),
     body,
   });
   const json = (await res.json()) as {
@@ -88,7 +108,7 @@ async function bunqPost<T>(path: string, authToken: string, payload: unknown): P
 async function bunqGet<T>(path: string, authToken: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'GET',
-    headers: baseHeaders(authToken, ''),
+    headers: await baseHeaders(authToken, ''),
   });
   const json = (await res.json()) as {
     Response?: unknown[];
@@ -129,7 +149,7 @@ if (!installHttpRes.ok) {
 }
 const installRes = installJson;
 const installToken = extractField<string>(installRes.Response, 'Token', 'token');
-console.log(`   ✓ Installation token: ${installToken.slice(0, 12)}…`);
+console.log('   ✓ Installation created');
 
 // ── Step 2: Device registration ───────────────────────────────────────────────
 
@@ -162,8 +182,7 @@ for (const item of sessionRes.Response) {
   if (userId) break;
 }
 if (!userId) throw new Error('Could not extract user ID from session response');
-console.log(`   ✓ Session token: ${sessionToken.slice(0, 12)}…`);
-console.log(`   ✓ User ID: ${userId}`);
+console.log('   ✓ Session created');
 
 // ── Step 4: Create or fetch existing OAuth client ────────────────────────────
 
@@ -176,7 +195,7 @@ try {
     { status: 'ACTIVE' },
   );
   oauthClientId = extractField<number>(createRes.Response, 'Id', 'id');
-  console.log(`   ✓ OAuth client created, id: ${oauthClientId}`);
+  console.log(`   ✓ OAuth client created`);
 } catch (e: unknown) {
   const msg = e instanceof Error ? e.message : '';
   if (!msg.includes('one active OAuth Client')) throw e;
@@ -185,7 +204,7 @@ try {
     sessionToken,
   );
   oauthClientId = extractField<number>(listRes.Response, 'OauthClient', 'id');
-  console.log(`   ℹ️  OAuth client already existed, reusing id: ${oauthClientId}`);
+  console.log(`   ℹ️  OAuth client already existed, reusing it`);
 }
 
 // ── Step 5: Add redirect URI ──────────────────────────────────────────────────
@@ -227,8 +246,16 @@ if (!clientId || !clientSecret) {
 
 // ── Done ──────────────────────────────────────────────────────────────────────
 
-console.log('\n✅ Done! Add these to packages/backend/.env:\n');
-console.log(`BUNQ_CLIENT_ID=${clientId}`);
-console.log(`BUNQ_CLIENT_SECRET=${clientSecret}`);
-console.log(`BUNQ_REDIRECT_URI=${redirectUri}`);
-console.log('BUNQ_SANDBOX=false');
+const envContents = [
+  `BUNQ_CLIENT_ID=${clientId}`,
+  `BUNQ_CLIENT_SECRET=${clientSecret}`,
+  `BUNQ_REDIRECT_URI=${redirectUri}`,
+  'BUNQ_SANDBOX=false',
+  '',
+].join('\n');
+
+await writeFile(OUTPUT_ENV_PATH, envContents, { mode: 0o600 });
+await chmod(OUTPUT_ENV_PATH, 0o600);
+
+console.log(`\n✅ Done! Wrote bunq OAuth env vars to ${OUTPUT_ENV_PATH}.`);
+console.log('Copy them into packages/backend/.env when ready.');
