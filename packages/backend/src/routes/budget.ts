@@ -10,6 +10,7 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  isRecord,
   parseNumber,
   parseNumberField,
   parsePatchFields,
@@ -60,7 +61,10 @@ type BudgetMonth = (typeof BUDGET_MONTHS)[number];
 
 type MonthYearFilter = { month: BudgetMonth; year: number } | null;
 
-function parseMonthYearFilter(rawMonth: string | undefined, rawYear: string | undefined): MonthYearFilter | 'invalid' {
+function parseMonthYearFilter(
+  rawMonth: string | undefined,
+  rawYear: string | undefined,
+): MonthYearFilter | 'invalid' {
   if (!rawMonth && !rawYear) return null;
   if (!rawMonth || !rawYear) return 'invalid';
   if (!BUDGET_MONTHS.includes(rawMonth as BudgetMonth)) return 'invalid';
@@ -250,7 +254,8 @@ function toBudgetTransactionUpdateValues(
 app.get('/categories', async (c) => {
   const user = getAuthUser(c);
   const filter = parseMonthYearFilter(c.req.query('month'), c.req.query('year'));
-  if (filter === 'invalid') return c.json({ error: 'Invalid month or year' }, HTTP_STATUS.BAD_REQUEST);
+  if (filter === 'invalid')
+    return c.json({ error: 'Invalid month or year' }, HTTP_STATUS.BAD_REQUEST);
 
   const conditions = [eq(budgetCategories.userId, user.id)];
   if (filter) {
@@ -258,7 +263,10 @@ app.get('/categories', async (c) => {
     conditions.push(eq(budgetCategories.year, filter.year));
   }
 
-  const data = await db.select().from(budgetCategories).where(and(...conditions));
+  const data = await db
+    .select()
+    .from(budgetCategories)
+    .where(and(...conditions));
   return c.json({ data });
 });
 
@@ -329,13 +337,15 @@ app.get('/transactions', async (c) => {
   const user = getAuthUser(c);
   const categoryId = c.req.query('categoryId');
   const filter = parseMonthYearFilter(c.req.query('month'), c.req.query('year'));
-  if (filter === 'invalid') return c.json({ error: 'Invalid month or year' }, HTTP_STATUS.BAD_REQUEST);
+  if (filter === 'invalid')
+    return c.json({ error: 'Invalid month or year' }, HTTP_STATUS.BAD_REQUEST);
 
   const conditions = [eq(budgetTransactions.userId, user.id)];
 
   if (categoryId) {
     const parsedCategoryId = parseId(categoryId);
-    if (parsedCategoryId === null) return c.json({ error: 'Invalid category id' }, HTTP_STATUS.BAD_REQUEST);
+    if (parsedCategoryId === null)
+      return c.json({ error: 'Invalid category id' }, HTTP_STATUS.BAD_REQUEST);
     conditions.push(eq(budgetTransactions.categoryId, parsedCategoryId));
   }
 
@@ -345,7 +355,10 @@ app.get('/transactions', async (c) => {
     conditions.push(lt(budgetTransactions.date, end));
   }
 
-  const data = await db.select().from(budgetTransactions).where(and(...conditions));
+  const data = await db
+    .select()
+    .from(budgetTransactions)
+    .where(and(...conditions));
   return c.json({ data });
 });
 
@@ -426,10 +439,7 @@ app.delete('/transactions/:id', async (c) => {
 
 app.get('/category-mappings', async (c) => {
   const user = getAuthUser(c);
-  const data = await db
-    .select()
-    .from(categoryMappings)
-    .where(eq(categoryMappings.userId, user.id));
+  const data = await db.select().from(categoryMappings).where(eq(categoryMappings.userId, user.id));
   return c.json({ data });
 });
 
@@ -440,6 +450,9 @@ app.patch('/category-mappings/:id', async (c) => {
 
   const rawBody = await readJsonBody(c.req, 'Invalid mapping payload');
   if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+  if (!isRecord(rawBody.value)) {
+    return c.json({ error: 'Invalid mapping payload' }, HTTP_STATUS.BAD_REQUEST);
+  }
 
   const rejected = rejectUnknownFields(rawBody.value, ['categoryName']);
   if (!rejected.ok) return c.json({ error: rejected.error }, HTTP_STATUS.BAD_REQUEST);

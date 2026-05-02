@@ -91,12 +91,8 @@
           "name": "budget_categories_user_id_users_id_fk",
           "tableFrom": "budget_categories",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -224,12 +220,8 @@
           "name": "budget_transactions_user_id_users_id_fk",
           "tableFrom": "budget_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -237,12 +229,8 @@
           "name": "budget_transactions_category_id_budget_categories_id_fk",
           "tableFrom": "budget_transactions",
           "tableTo": "budget_categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -361,12 +349,8 @@
           "name": "bunq_connections_user_id_users_id_fk",
           "tableFrom": "bunq_connections",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -512,12 +496,8 @@
           "name": "dashboard_transactions_user_id_users_id_fk",
           "tableFrom": "dashboard_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -639,12 +619,8 @@
           "name": "debt_payments_user_id_users_id_fk",
           "tableFrom": "debt_payments",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -652,12 +628,8 @@
           "name": "debt_payments_debt_id_debts_id_fk",
           "tableFrom": "debt_payments",
           "tableTo": "debts",
-          "columnsFrom": [
-            "debt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["debt_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -786,12 +758,8 @@
           "name": "debts_user_id_users_id_fk",
           "tableFrom": "debts",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -939,12 +907,8 @@
           "name": "goals_user_id_users_id_fk",
           "tableFrom": "goals",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1073,12 +1037,8 @@
           "name": "holding_price_history_user_id_users_id_fk",
           "tableFrom": "holding_price_history",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1086,12 +1046,8 @@
           "name": "holding_price_history_holding_id_holdings_id_fk",
           "tableFrom": "holding_price_history",
           "tableTo": "holdings",
-          "columnsFrom": [
-            "holding_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["holding_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1198,12 +1154,8 @@
           "name": "holding_transactions_user_id_users_id_fk",
           "tableFrom": "holding_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1211,12 +1163,8 @@
           "name": "holding_transactions_holding_id_holdings_id_fk",
           "tableFrom": "holding_transactions",
           "tableTo": "holdings",
-          "columnsFrom": [
-            "holding_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["holding_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1321,12 +1269,8 @@
           "name": "holdings_user_id_users_id_fk",
           "tableFrom": "holdings",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1445,12 +1389,8 @@
           "name": "mortgage_transactions_user_id_users_id_fk",
           "tableFrom": "mortgage_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1458,12 +1398,8 @@
           "name": "mortgage_transactions_mortgage_id_mortgages_id_fk",
           "tableFrom": "mortgage_transactions",
           "tableTo": "mortgages",
-          "columnsFrom": [
-            "mortgage_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mortgage_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1598,12 +1534,8 @@
           "name": "mortgages_user_id_users_id_fk",
           "tableFrom": "mortgages",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1748,12 +1680,8 @@
           "name": "payslips_user_id_users_id_fk",
           "tableFrom": "payslips",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1886,12 +1814,8 @@
           "name": "pension_pots_user_id_users_id_fk",
           "tableFrom": "pension_pots",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2095,12 +2019,8 @@
           "name": "pension_statement_import_rows_import_id_pension_statement_imports_id_fk",
           "tableFrom": "pension_statement_import_rows",
           "tableTo": "pension_statement_imports",
-          "columnsFrom": [
-            "import_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["import_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2108,12 +2028,8 @@
           "name": "pension_statement_import_rows_committed_transaction_id_pension_transactions_id_fk",
           "tableFrom": "pension_statement_import_rows",
           "tableTo": "pension_transactions",
-          "columnsFrom": [
-            "committed_transaction_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["committed_transaction_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2312,12 +2228,8 @@
           "name": "pension_statement_imports_user_id_users_id_fk",
           "tableFrom": "pension_statement_imports",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2325,12 +2237,8 @@
           "name": "pension_statement_imports_pot_id_pension_pots_id_fk",
           "tableFrom": "pension_statement_imports",
           "tableTo": "pension_pots",
-          "columnsFrom": [
-            "pot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["pot_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2468,12 +2376,8 @@
           "name": "pension_transactions_user_id_users_id_fk",
           "tableFrom": "pension_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2481,12 +2385,8 @@
           "name": "pension_transactions_pot_id_pension_pots_id_fk",
           "tableFrom": "pension_transactions",
           "tableTo": "pension_pots",
-          "columnsFrom": [
-            "pot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["pot_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2615,12 +2515,8 @@
           "name": "properties_user_id_users_id_fk",
           "tableFrom": "properties",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2733,12 +2629,8 @@
           "name": "property_transactions_user_id_users_id_fk",
           "tableFrom": "property_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2746,12 +2638,8 @@
           "name": "property_transactions_property_id_properties_id_fk",
           "tableFrom": "property_transactions",
           "tableTo": "properties",
-          "columnsFrom": [
-            "property_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["property_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2877,12 +2765,8 @@
           "name": "savings_accounts_user_id_users_id_fk",
           "tableFrom": "savings_accounts",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3010,12 +2894,8 @@
           "name": "savings_transactions_user_id_users_id_fk",
           "tableFrom": "savings_transactions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3023,12 +2903,8 @@
           "name": "savings_transactions_account_id_savings_accounts_id_fk",
           "tableFrom": "savings_transactions",
           "tableTo": "savings_accounts",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3075,12 +2951,8 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3151,9 +3023,7 @@
         "stock_exchanges_mic_unique": {
           "name": "stock_exchanges_mic_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "mic"
-          ]
+          "columns": ["mic"]
         }
       },
       "policies": {},
@@ -3251,9 +3121,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -3346,34 +3214,17 @@
     "public.bunq_sync_status": {
       "name": "bunq_sync_status",
       "schema": "public",
-      "values": [
-        "idle",
-        "syncing",
-        "error"
-      ]
+      "values": ["idle", "syncing", "error"]
     },
     "public.currency_code": {
       "name": "currency_code",
       "schema": "public",
-      "values": [
-        "EUR",
-        "GBP",
-        "USD",
-        "AUD",
-        "NZD",
-        "CAD",
-        "CHF",
-        "SGD"
-      ]
+      "values": ["EUR", "GBP", "USD", "AUD", "NZD", "CAD", "CHF", "SGD"]
     },
     "public.pension_import_confidence_label": {
       "name": "pension_import_confidence_label",
       "schema": "public",
-      "values": [
-        "high",
-        "medium",
-        "low"
-      ]
+      "values": ["high", "medium", "low"]
     },
     "public.pension_import_status": {
       "name": "pension_import_status",
