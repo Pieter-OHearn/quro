@@ -253,21 +253,55 @@ function useAccountModalForm(
 
 export function AccountModal({ existing, onClose, onSave, onDelete }: AccountModalProps) {
   const { form, errors, set, handleSave } = useAccountModalForm(existing, onSave, onClose);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmName, setConfirmName] = useState('');
   const isEdit = Boolean(existing);
+
+  const nameMatches = confirmName.trim() === existing?.name?.trim();
 
   const deleteButton =
     existing && onDelete ? (
       <button
-        onClick={() => {
-          onDelete(existing.id);
-          onClose();
-        }}
+        onClick={() => setConfirmingDelete(true)}
         className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
         title="Delete account"
       >
         <Trash2 size={14} />
       </button>
     ) : undefined;
+
+  if (confirmingDelete && existing) {
+    return (
+      <Modal
+        title="Delete Account"
+        subtitle={`This will permanently delete "${existing.name}" and all its transactions.`}
+        onClose={onClose}
+        footer={
+          <ModalFooter
+            onCancel={() => {
+              setConfirmingDelete(false);
+              setConfirmName('');
+            }}
+            onConfirm={() => {
+              onDelete!(existing.id);
+              onClose();
+            }}
+            confirmLabel="Delete"
+            disabled={!nameMatches}
+          />
+        }
+      >
+        <FormField label={`Type "${existing.name}" to confirm`}>
+          <TextInput
+            value={confirmName}
+            onChange={setConfirmName}
+            placeholder={existing.name}
+            autoFocus
+          />
+        </FormField>
+      </Modal>
+    );
+  }
 
   return (
     <Modal

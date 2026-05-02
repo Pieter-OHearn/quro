@@ -158,7 +158,7 @@ export const savingsTransactions = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     accountId: integer('account_id')
-      .references(() => savingsAccounts.id)
+      .references(() => savingsAccounts.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // deposit | withdrawal | interest
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
