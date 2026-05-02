@@ -6,4 +6,4 @@ pypdf==6.10.0
 httpx==0.28.1
 pdf2image==1.17.0
 pytesseract==0.3.13
-Pillow==12.1.1
+Pillow==12.2.0
