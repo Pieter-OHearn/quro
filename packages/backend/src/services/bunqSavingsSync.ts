@@ -218,13 +218,17 @@ async function markSyncing(connectionId: number): Promise<void> {
     .where(eq(bunqConnections.id, connectionId));
 }
 
-async function markSyncSucceeded(connectionId: number, bunqUserId: string): Promise<void> {
+async function markSyncSucceeded(
+  connectionId: number,
+  bunqUserId: string,
+  updateCursor: boolean,
+): Promise<void> {
   await db
     .update(bunqConnections)
     .set({
       syncStatus: 'idle',
       syncError: null,
-      lastSyncAt: new Date(),
+      ...(updateCursor ? { lastSyncAt: new Date() } : {}),
       bunqUserId,
     })
     .where(eq(bunqConnections.id, connectionId));
@@ -241,7 +245,11 @@ function toNewerThanParam(lastSyncAt: Date | null): string | undefined {
   return lastSyncAt ? lastSyncAt.toISOString() : undefined;
 }
 
-export async function syncBunqSavings(userId: number): Promise<void> {
+export async function syncBunqSavings(
+  userId: number,
+  newerThanOverride?: string,
+  skipCursorUpdate = false,
+): Promise<void> {
   const connection = await loadConnection(userId);
   if (!connection) return;
 
@@ -251,7 +259,7 @@ export async function syncBunqSavings(userId: number): Promise<void> {
     const session = await ensureSession(connection);
     const accounts = await fetchMonetaryAccounts(session.sessionToken, session.bunqUserId);
     const savingsOnly = accounts.filter((a) => a.type === 'SAVINGS');
-    const newerThan = toNewerThanParam(connection.lastSyncAt);
+    const newerThan = newerThanOverride ?? toNewerThanParam(connection.lastSyncAt);
 
     for (const bunqAccount of savingsOnly) {
       const localAccount = await upsertSavingsAccount(userId, bunqAccount);
@@ -266,7 +274,7 @@ export async function syncBunqSavings(userId: number): Promise<void> {
       );
     }
 
-    await markSyncSucceeded(connection.id, session.bunqUserId);
+    await markSyncSucceeded(connection.id, session.bunqUserId, !skipCursorUpdate);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     await markSyncFailed(connection.id, message);

@@ -52,10 +52,14 @@ export type BunqPayment = {
   id: number;
   amount: { value: string; currency: string };
   description: string;
-  counterpartyAlias: { displayName: string; iban?: string };
+  counterpartyAlias: {
+    displayName: string;
+    iban: string | null;
+    merchantCategoryCode: string | null;
+  };
   created: string;
-  category: string | null;
   type: string;
+  subType: string;
 };
 
 export type BunqDataResult<T> = {
@@ -189,10 +193,14 @@ function extractIban(aliases: readonly unknown[]): string | null {
 function buildCounterpartyAlias(
   counterparty: Readonly<UnknownRecord>,
   ibanValue: string | null,
-): { displayName: string; iban?: string } {
+): { displayName: string; iban: string | null; merchantCategoryCode: string | null } {
   const displayName =
     getString(counterparty, 'display_name') ?? getString(counterparty, 'name') ?? '';
-  return ibanValue !== null ? { displayName, iban: ibanValue } : { displayName };
+  return {
+    displayName,
+    iban: ibanValue,
+    merchantCategoryCode: getString(counterparty, 'merchant_category_code'),
+  };
 }
 
 function parseMonetaryAccount(
@@ -237,8 +245,8 @@ function parsePayment(data: Readonly<UnknownRecord>): BunqPayment | null {
     description: getString(data, 'description') ?? '',
     counterpartyAlias: buildCounterpartyAlias(counterparty, ibanValue),
     created: getString(data, 'created') ?? '',
-    category: getString(data, 'category'),
     type: getString(data, 'type') ?? '',
+    subType: getString(data, 'sub_type') ?? '',
   };
 }
 
@@ -347,10 +355,7 @@ export async function fetchMonetaryAccounts(
   sessionToken: string,
   bunqUserId: string,
 ): Promise<BunqMonetaryAccount[]> {
-  const payload = await apiGet(
-    `${API_BASE_URL}/user/${bunqUserId}/monetary-account`,
-    sessionToken,
-  );
+  const payload = await apiGet(`${API_BASE_URL}/user/${bunqUserId}/monetary-account`, sessionToken);
   return parseMonetaryAccounts(payload);
 }
 
@@ -363,7 +368,6 @@ export async function fetchPayments(
   const url = new URL(`${API_BASE_URL}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
   if (newerThan !== undefined) url.searchParams.set('newer_than', newerThan);
   const payload = await apiGet(url.toString(), sessionToken);
-  return extractBunqItems(payload, 'Payment')
-    .map(parsePayment)
-    .filter((p): p is BunqPayment => p !== null);
+  const rawItems = extractBunqItems(payload, 'Payment');
+  return rawItems.map(parsePayment).filter((p): p is BunqPayment => p !== null);
 }

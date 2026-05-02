@@ -21,7 +21,14 @@ export function RecentTransactionsList({
             >
               <span className="text-xl w-8 text-center">{transaction.emoji}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800">{transaction.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-slate-800">{transaction.name}</p>
+                  {transaction.bunqTransactionId && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500 text-white font-medium">
+                      Bunq
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-400">{transaction.date}</span>
                   {transaction.category && transaction.color && (

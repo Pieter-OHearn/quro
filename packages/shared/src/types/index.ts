@@ -492,6 +492,7 @@ export type BudgetTransaction = {
   amount: number;
   date: string;
   merchant: string;
+  bunqTransactionId?: string | null;
 };
 
 export type NetWorthSnapshot = {

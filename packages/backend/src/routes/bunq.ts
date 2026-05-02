@@ -7,6 +7,7 @@ import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { buildOAuthAuthorizeUrl, exchangeCodeForTokens } from '../lib/bunqClient';
+import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 
 const app = new Hono();
@@ -121,6 +122,50 @@ app.post('/sync/savings', async (c) => {
   }
 
   return c.json({ data: { ok: true, syncedAt: new Date().toISOString() } }, HTTP_STATUS.OK);
+});
+
+app.post('/sync/budget', async (c) => {
+  const user = getAuthUser(c);
+
+  try {
+    await syncBunqBudget(user.id);
+  } catch (e) {
+    console.error('[bunq budget sync error]', e);
+    const message = e instanceof Error ? e.message : 'Bunq budget sync failed';
+    return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
+  }
+
+  return c.json({ data: { ok: true, syncedAt: new Date().toISOString() } }, HTTP_STATUS.OK);
+});
+
+app.post('/sync', async (c) => {
+  const user = getAuthUser(c);
+
+  const [connection] = await db
+    .select({ id: bunqConnections.id, lastSyncAt: bunqConnections.lastSyncAt })
+    .from(bunqConnections)
+    .where(eq(bunqConnections.userId, user.id));
+
+  if (!connection) {
+    return c.json({ error: 'No Bunq connection found' }, HTTP_STATUS.NOT_FOUND);
+  }
+
+  const newerThan = connection.lastSyncAt?.toISOString();
+
+  try {
+    await syncBunqSavings(user.id, newerThan, true);
+    await syncBunqBudget(user.id, newerThan);
+    const syncedAt = new Date();
+    await db
+      .update(bunqConnections)
+      .set({ lastSyncAt: syncedAt })
+      .where(eq(bunqConnections.id, connection.id));
+    return c.json({ data: { ok: true, syncedAt: syncedAt.toISOString() } }, HTTP_STATUS.OK);
+  } catch (e) {
+    console.error('[bunq sync error]', e);
+    const message = e instanceof Error ? e.message : 'Bunq sync failed';
+    return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
+  }
 });
 
 export default app;

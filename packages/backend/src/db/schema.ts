@@ -615,7 +615,6 @@ export const budgetCategories = pgTable(
     color: text('color'),
     month: text('month').notNull(),
     year: integer('year').notNull(),
-    bunqCategory: text('bunq_category'),
   },
   (table) => ({
     userIdx: index('budget_categories_user_id_idx').on(table.userId),
@@ -635,6 +634,9 @@ export const budgetTransactions = pgTable(
     date: date('date', { mode: 'string' }).notNull(),
     merchant: text('merchant').notNull(),
     bunqTransactionId: text('bunq_transaction_id'),
+    bunqMcc: text('bunq_mcc'),
+    bunqPaymentType: text('bunq_payment_type'),
+    counterpartyIban: text('counterparty_iban'),
   },
   (table) => ({
     userIdx: index('budget_transactions_user_id_idx').on(table.userId),
@@ -642,6 +644,28 @@ export const budgetTransactions = pgTable(
     bunqTransactionUnique: uniqueIndex('budget_transactions_user_bunq_transaction_id_unique').on(
       table.userId,
       table.bunqTransactionId,
+    ),
+  }),
+);
+
+export const categoryMappings = pgTable(
+  'category_mappings',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    source: text('source').notNull(),
+    sourceKey: text('source_key').notNull(),
+    categoryName: text('category_name').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index('category_mappings_user_id_idx').on(table.userId),
+    userSourceKeyUnique: uniqueIndex('category_mappings_user_source_key_unique').on(
+      table.userId,
+      table.source,
+      table.sourceKey,
     ),
   }),
 );

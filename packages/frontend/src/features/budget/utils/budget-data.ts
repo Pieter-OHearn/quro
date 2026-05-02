@@ -38,6 +38,7 @@ export function mapRecentTransactions(
       date: transaction.date,
       emoji: category?.emoji ?? '\ud83d\udce6',
       color: category?.color,
+      bunqTransactionId: transaction.bunqTransactionId,
     };
   });
 }

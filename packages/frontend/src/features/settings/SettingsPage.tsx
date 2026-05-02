@@ -44,7 +44,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { resolveApiErrorMessage } from '@/lib/pdfDocuments';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
-import { useBunqConnection, useDisconnectBunq, useSyncBunqSavings } from './hooks';
+import { useBunqConnection, useDisconnectBunq, useSyncBunq } from './hooks';
 
 type TabKey = 'profile' | 'security' | 'preferences' | 'connections';
 
@@ -877,7 +877,7 @@ function formatSyncTime(value: string | null): string {
 function ConnectionsSection() {
   const { data: connection, isLoading } = useBunqConnection();
   const disconnect = useDisconnectBunq();
-  const sync = useSyncBunqSavings();
+  const sync = useSyncBunq();
   const [error, setError] = useState<string | null>(null);
   const { saved, showSaved } = useSavedState();
 
@@ -900,7 +900,7 @@ function ConnectionsSection() {
     try {
       await sync.mutateAsync();
     } catch (e: unknown) {
-      setError(resolveApiErrorMessage(e, 'Failed to sync Bunq savings'));
+      setError(resolveApiErrorMessage(e, 'Failed to sync Bunq'));
     }
   };
 
@@ -953,7 +953,9 @@ function ConnectionsSection() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  leadingIcon={<RefreshCw size={14} className={cn(sync.isPending && 'animate-spin')} />}
+                  leadingIcon={
+                    <RefreshCw size={14} className={cn(sync.isPending && 'animate-spin')} />
+                  }
                   loading={sync.isPending}
                   onClick={() => {
                     void handleSync();

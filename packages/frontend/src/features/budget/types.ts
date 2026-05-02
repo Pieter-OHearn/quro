@@ -10,7 +10,7 @@ export type BudgetCategory = Pick<
 
 export type BudgetTx = Pick<
   SharedBudgetTransaction,
-  'id' | 'description' | 'amount' | 'date' | 'categoryId'
+  'id' | 'description' | 'amount' | 'date' | 'categoryId' | 'bunqTransactionId'
 > & {
   merchant?: string;
 };
@@ -37,6 +37,7 @@ export type RecentBudgetTx = {
   date: string;
   emoji: string;
   color?: string;
+  bunqTransactionId?: string | null;
 };
 
 export type BudgetStats = {

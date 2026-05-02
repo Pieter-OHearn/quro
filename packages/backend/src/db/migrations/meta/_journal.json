@@ -36,6 +36,13 @@
       "when": 1777723817636,
       "tag": "0004_pink_forge",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777728826632,
+      "tag": "0005_clumsy_famine",
+      "breakpoints": true
     }
   ]
 }

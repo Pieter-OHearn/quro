@@ -1,8 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
-import { budgetCategories, budgetTransactions } from '../db/schema';
+import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import {
   err,
@@ -57,6 +57,26 @@ const BUDGET_MONTHS = [
 ] as const;
 
 type BudgetMonth = (typeof BUDGET_MONTHS)[number];
+
+type MonthYearFilter = { month: BudgetMonth; year: number } | null;
+
+function parseMonthYearFilter(rawMonth: string | undefined, rawYear: string | undefined): MonthYearFilter | 'invalid' {
+  if (!rawMonth && !rawYear) return null;
+  if (!rawMonth || !rawYear) return 'invalid';
+  if (!BUDGET_MONTHS.includes(rawMonth as BudgetMonth)) return 'invalid';
+  const year = parseInt(rawYear, 10);
+  if (!Number.isFinite(year) || year < MIN_BUDGET_YEAR || year > MAX_BUDGET_YEAR) return 'invalid';
+  return { month: rawMonth as BudgetMonth, year };
+}
+
+function monthYearToDateRange(month: BudgetMonth, year: number): { start: string; end: string } {
+  const monthIndex = BUDGET_MONTHS.indexOf(month);
+  const start = `${year}-${String(monthIndex + 1).padStart(2, '0')}-01`;
+  const nextMonth = monthIndex === 11 ? 1 : monthIndex + 2;
+  const nextYear = monthIndex === 11 ? year + 1 : year;
+  const end = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+  return { start, end };
+}
 
 type BudgetCategoryPayload = {
   name: string;
@@ -229,7 +249,16 @@ function toBudgetTransactionUpdateValues(
 
 app.get('/categories', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(budgetCategories).where(eq(budgetCategories.userId, user.id));
+  const filter = parseMonthYearFilter(c.req.query('month'), c.req.query('year'));
+  if (filter === 'invalid') return c.json({ error: 'Invalid month or year' }, HTTP_STATUS.BAD_REQUEST);
+
+  const conditions = [eq(budgetCategories.userId, user.id)];
+  if (filter) {
+    conditions.push(eq(budgetCategories.month, filter.month));
+    conditions.push(eq(budgetCategories.year, filter.year));
+  }
+
+  const data = await db.select().from(budgetCategories).where(and(...conditions));
   return c.json({ data });
 });
 
@@ -299,27 +328,24 @@ app.delete('/categories/:id', async (c) => {
 app.get('/transactions', async (c) => {
   const user = getAuthUser(c);
   const categoryId = c.req.query('categoryId');
+  const filter = parseMonthYearFilter(c.req.query('month'), c.req.query('year'));
+  if (filter === 'invalid') return c.json({ error: 'Invalid month or year' }, HTTP_STATUS.BAD_REQUEST);
+
+  const conditions = [eq(budgetTransactions.userId, user.id)];
+
   if (categoryId) {
     const parsedCategoryId = parseId(categoryId);
-    if (parsedCategoryId === null) {
-      return c.json({ error: 'Invalid category id' }, HTTP_STATUS.BAD_REQUEST);
-    }
-    const data = await db
-      .select()
-      .from(budgetTransactions)
-      .where(
-        and(
-          eq(budgetTransactions.categoryId, parsedCategoryId),
-          eq(budgetTransactions.userId, user.id),
-        ),
-      );
-    return c.json({ data });
+    if (parsedCategoryId === null) return c.json({ error: 'Invalid category id' }, HTTP_STATUS.BAD_REQUEST);
+    conditions.push(eq(budgetTransactions.categoryId, parsedCategoryId));
   }
 
-  const data = await db
-    .select()
-    .from(budgetTransactions)
-    .where(eq(budgetTransactions.userId, user.id));
+  if (filter) {
+    const { start, end } = monthYearToDateRange(filter.month, filter.year);
+    conditions.push(gte(budgetTransactions.date, start));
+    conditions.push(lt(budgetTransactions.date, end));
+  }
+
+  const data = await db.select().from(budgetTransactions).where(and(...conditions));
   return c.json({ data });
 });
 
@@ -393,6 +419,40 @@ app.delete('/transactions/:id', async (c) => {
     .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  return c.json({ data });
+});
+
+// ── Category mappings ─────────────────────────────────────────────────────────
+
+app.get('/category-mappings', async (c) => {
+  const user = getAuthUser(c);
+  const data = await db
+    .select()
+    .from(categoryMappings)
+    .where(eq(categoryMappings.userId, user.id));
+  return c.json({ data });
+});
+
+app.patch('/category-mappings/:id', async (c) => {
+  const user = getAuthUser(c);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'Invalid mapping id' }, HTTP_STATUS.BAD_REQUEST);
+
+  const rawBody = await readJsonBody(c.req, 'Invalid mapping payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const rejected = rejectUnknownFields(rawBody.value, ['categoryName']);
+  if (!rejected.ok) return c.json({ error: rejected.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const categoryName = parseTextField(rawBody.value, 'categoryName');
+  if (!categoryName.ok) return c.json({ error: categoryName.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const [data] = await db
+    .update(categoryMappings)
+    .set({ categoryName: categoryName.value })
+    .where(and(eq(categoryMappings.id, id), eq(categoryMappings.userId, user.id)))
+    .returning();
+  if (!data) return c.json({ error: 'Mapping not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
 
