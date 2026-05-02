@@ -41,8 +41,9 @@
     "esbuild": ">=0.25.0",
     "eslint-plugin-import/minimatch/brace-expansion": "1.1.13",
     "eslint-plugin-react/minimatch/brace-expansion": "1.1.13",
-    "fast-xml-parser": "5.5.8",
+    "fast-xml-parser": "5.7.0",
     "flatted": "3.4.2",
+    "follow-redirects": "1.16.0",
     "picomatch": "4.0.4"
   },
   "devDependencies": {
