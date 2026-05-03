@@ -4,6 +4,7 @@ import { db } from '../db/client';
 import {
   budgetCategories,
   budgetTransactions,
+  categoryMappings,
   goals,
   holdingPriceHistory,
   holdingTransactions,
@@ -169,6 +170,7 @@ async function cleanupTestUsers(emailPattern: string) {
   await db.delete(pensionPots).where(inArray(pensionPots.userId, userIds));
   await db.delete(budgetTransactions).where(inArray(budgetTransactions.userId, userIds));
   await db.delete(budgetCategories).where(inArray(budgetCategories.userId, userIds));
+  await db.delete(categoryMappings).where(inArray(categoryMappings.userId, userIds));
   await db.delete(goals).where(inArray(goals.userId, userIds));
   await db.delete(sessions).where(inArray(sessions.userId, userIds));
   await db.delete(users).where(inArray(users.id, userIds));

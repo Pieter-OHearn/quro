@@ -72,15 +72,28 @@ cat > "$POLICY_PATH" <<EOF
 }
 EOF
 
-if mc admin user info local "$MINIO_APP_USER" >/dev/null 2>&1; then
-  mc admin user remove local "$MINIO_APP_USER"
-fi
-mc admin user add local "$MINIO_APP_USER" "$MINIO_APP_PASSWORD"
+mc admin user add local "$MINIO_APP_USER" "$MINIO_APP_PASSWORD" 2>/dev/null || true
 
-if mc admin policy info local "$POLICY_NAME" >/dev/null 2>&1; then
-  mc admin policy remove local "$POLICY_NAME"
+if ! mc admin policy info local "$POLICY_NAME" >/dev/null 2>&1; then
+  if ! policy_create_output=$(mc admin policy create local "$POLICY_NAME" "$POLICY_PATH" 2>&1); then
+    if ! mc admin policy info local "$POLICY_NAME" >/dev/null 2>&1; then
+      echo >&2 "$policy_create_output"
+      exit 1
+    fi
+  fi
 fi
-mc admin policy create local "$POLICY_NAME" "$POLICY_PATH"
-mc admin policy attach local "$POLICY_NAME" --user "$MINIO_APP_USER"
+
+if ! policy_attach_output=$(
+  mc admin policy attach local "$POLICY_NAME" --user "$MINIO_APP_USER" 2>&1
+); then
+  policy_entities=$(mc admin policy entities local --policy "$POLICY_NAME" 2>/dev/null || true)
+  case "$policy_entities" in
+    *"$MINIO_APP_USER"*) ;;
+    *)
+      echo >&2 "$policy_attach_output"
+      exit 1
+      ;;
+  esac
+fi
 
 echo "MinIO bucket and app user are ready."

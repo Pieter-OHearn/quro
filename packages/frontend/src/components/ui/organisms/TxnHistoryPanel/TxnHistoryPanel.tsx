@@ -56,7 +56,7 @@ export type TxnHistoryPanelProps = {
   subtitle?: ReactNode;
   stats?: TxnHistoryStat[];
   statsColumns?: number;
-  onAdd: () => void;
+  onAdd?: () => void;
   addLabel?: string;
   accentColor?: string;
   variant?: keyof typeof PANEL_VARIANTS;
@@ -272,7 +272,7 @@ export function TxnHistoryPanel({
   isEmpty,
 }: TxnHistoryPanelProps) {
   const variantStyles = PANEL_VARIANTS[variant];
-  const addButton = (
+  const addButton = onAdd ? (
     <AddTransactionButton
       onAdd={onAdd}
       addLabel={addLabel}
@@ -280,7 +280,7 @@ export function TxnHistoryPanel({
       addButtonSize={addButtonSize}
       fallbackSize={variantStyles.addButtonSize}
     />
-  );
+  ) : null;
   const filterBarAction = addButtonPlacement === 'filterBar' ? addButton : undefined;
   const headerAction = addButtonPlacement === 'header' ? addButton : undefined;
   const body = (

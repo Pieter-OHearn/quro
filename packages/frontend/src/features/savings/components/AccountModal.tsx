@@ -18,8 +18,8 @@ import type { SaveAccountInput } from '../types';
 type AccountModalProps = {
   existing?: SavingsAccount;
   onClose: () => void;
-  onSave: (account: SaveAccountInput) => void;
-  onDelete?: (id: number) => void;
+  onSave: (account: SaveAccountInput) => Promise<void>;
+  onDelete?: (id: number) => Promise<void>;
 };
 
 const ACCOUNT_TYPES: ('Easy Access' | 'Term Deposit')[] = ['Easy Access', 'Term Deposit'];
@@ -107,6 +107,7 @@ type AccountFormBodyProps = {
   form: FormState;
   errors: Record<string, string>;
   set: (field: string, value: string) => void;
+  isBunqSynced?: boolean;
 };
 
 function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
@@ -146,6 +147,7 @@ function AccountAmountFields({
   errors,
   set,
   balanceLabel,
+  isBunqSynced = false,
 }: AccountFormBodyProps & { balanceLabel: string }) {
   return (
     <>
@@ -157,16 +159,22 @@ function AccountAmountFields({
             inputMode="decimal"
             step="0.01"
             value={form.balance}
-            onChange={(v) => set('balance', v)}
+            onChange={(v) => {
+              if (!isBunqSynced) set('balance', v);
+            }}
             error={Boolean(errors.balance)}
             placeholder="18500.00"
+            disabled={isBunqSynced}
           />
         </FormField>
         <FormField label="Currency">
           <SelectInput
             value={form.currency}
-            onChange={(v) => set('currency', v)}
+            onChange={(v) => {
+              if (!isBunqSynced) set('currency', v);
+            }}
             options={CURRENCY_CODES.map((c) => ({ value: c, label: c }))}
+            disabled={isBunqSynced}
           />
         </FormField>
       </div>
@@ -195,7 +203,8 @@ function AccountFormBody({
   errors,
   set,
   isEdit,
-}: AccountFormBodyProps & { isEdit: boolean }) {
+  isBunqSynced = false,
+}: AccountFormBodyProps & { isEdit: boolean; isBunqSynced?: boolean }) {
   return (
     <>
       <AccountBasicFields form={form} errors={errors} set={set} />
@@ -204,6 +213,7 @@ function AccountFormBody({
         errors={errors}
         set={set}
         balanceLabel={isEdit ? 'Balance' : 'Opening Balance'}
+        isBunqSynced={isBunqSynced}
       />
       <InterestPreview balance={form.balance} rate={form.rate} currency={form.currency} />
     </>
@@ -212,11 +222,12 @@ function AccountFormBody({
 
 function useAccountModalForm(
   existing: SavingsAccount | undefined,
-  onSave: (account: SaveAccountInput) => void,
+  onSave: (account: SaveAccountInput) => Promise<void>,
   onClose: () => void,
 ) {
   const [form, setForm] = useState<FormState>(initialFormState(existing));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function set(field: string, value: string): void {
     setForm((f) => ({ ...f, [field]: value }));
@@ -228,46 +239,136 @@ function useAccountModalForm(
       });
   }
 
-  function handleSave(): void {
+  async function handleSave(): Promise<void> {
+    setSubmitError(null);
     const errs = validateAccountForm(form);
     if (Object.keys(errs).length) {
       setErrors(errs);
       return;
     }
-    onSave({
-      ...(existing ? { id: existing.id } : {}),
-      name: form.name.trim(),
-      bank: form.bank.trim(),
-      balance: parseFloat(form.balance),
-      currency: form.currency,
-      interestRate: parseFloat(form.rate),
-      accountType: form.type,
-      color: existing?.color ?? COLORS[Math.floor(Math.random() * COLORS.length)],
-      emoji: form.emoji.trim(),
-    });
-    onClose();
+    try {
+      await onSave({
+        ...(existing ? { id: existing.id } : {}),
+        name: form.name.trim(),
+        bank: form.bank.trim(),
+        balance: parseFloat(form.balance),
+        currency: form.currency,
+        interestRate: parseFloat(form.rate),
+        accountType: form.type,
+        color: existing?.color ?? COLORS[Math.floor(Math.random() * COLORS.length)],
+        emoji: form.emoji.trim(),
+      });
+      onClose();
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Failed to save account');
+    }
   }
 
-  return { form, errors, set, handleSave };
+  return { form, errors, submitError, set, handleSave, setSubmitError };
+}
+
+function SubmitError({ message }: Readonly<{ message: string | null }>) {
+  if (!message) return null;
+  return (
+    <div className="mb-4 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+      {message}
+    </div>
+  );
+}
+
+type DeleteConfirmationProps = {
+  existing: SavingsAccount;
+  confirmName: string;
+  submitError: string | null;
+  onConfirmNameChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+function DeleteConfirmation({
+  existing,
+  confirmName,
+  submitError,
+  onConfirmNameChange,
+  onCancel,
+  onConfirm,
+}: Readonly<DeleteConfirmationProps>) {
+  const nameMatches = confirmName.trim() === existing.name.trim();
+  return (
+    <Modal
+      title="Delete Account"
+      subtitle={`This will permanently delete "${existing.name}" and all its transactions.`}
+      onClose={onCancel}
+      footer={
+        <ModalFooter
+          onCancel={onCancel}
+          onConfirm={onConfirm}
+          confirmLabel="Delete"
+          disabled={!nameMatches}
+        />
+      }
+    >
+      <SubmitError message={submitError} />
+      <FormField label={`Type "${existing.name}" to confirm`}>
+        <TextInput
+          value={confirmName}
+          onChange={onConfirmNameChange}
+          placeholder={existing.name}
+          autoFocus
+        />
+      </FormField>
+    </Modal>
+  );
 }
 
 export function AccountModal({ existing, onClose, onSave, onDelete }: AccountModalProps) {
-  const { form, errors, set, handleSave } = useAccountModalForm(existing, onSave, onClose);
+  const { form, errors, submitError, set, handleSave, setSubmitError } = useAccountModalForm(
+    existing,
+    onSave,
+    onClose,
+  );
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmName, setConfirmName] = useState('');
   const isEdit = Boolean(existing);
+  const isBunqSynced = Boolean(existing?.bunqAccountId);
 
   const deleteButton =
     existing && onDelete ? (
       <button
-        onClick={() => {
-          onDelete(existing.id);
-          onClose();
-        }}
+        onClick={() => setConfirmingDelete(true)}
         className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
         title="Delete account"
       >
         <Trash2 size={14} />
       </button>
     ) : undefined;
+
+  if (confirmingDelete && existing) {
+    const closeDeleteConfirmation = () => {
+      setConfirmingDelete(false);
+      setConfirmName('');
+    };
+    return (
+      <DeleteConfirmation
+        existing={existing}
+        confirmName={confirmName}
+        submitError={submitError}
+        onConfirmNameChange={setConfirmName}
+        onCancel={closeDeleteConfirmation}
+        onConfirm={() => {
+          void (async () => {
+            setSubmitError(null);
+            try {
+              await onDelete!(existing.id);
+              onClose();
+            } catch (e) {
+              setSubmitError(e instanceof Error ? e.message : 'Failed to delete account');
+            }
+          })();
+        }}
+      />
+    );
+  }
 
   return (
     <Modal
@@ -277,13 +378,22 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
       footer={
         <ModalFooter
           onCancel={onClose}
-          onConfirm={handleSave}
+          onConfirm={() => {
+            void handleSave();
+          }}
           confirmLabel={isEdit ? 'Save Changes' : 'Add Account'}
           danger={deleteButton}
         />
       }
     >
-      <AccountFormBody form={form} errors={errors} set={set} isEdit={isEdit} />
+      <SubmitError message={submitError} />
+      <AccountFormBody
+        form={form}
+        errors={errors}
+        set={set}
+        isEdit={isEdit}
+        isBunqSynced={isBunqSynced}
+      />
     </Modal>
   );
 }

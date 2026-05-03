@@ -57,6 +57,7 @@ export type SavingsAccount = {
   accountType: 'Easy Access' | 'Term Deposit';
   color: string;
   emoji: string;
+  bunqAccountId?: string | null;
 };
 
 export type SavingsTransaction = {
@@ -66,6 +67,7 @@ export type SavingsTransaction = {
   amount: number;
   date: string;
   note: string;
+  bunqTransactionId?: string | null;
 };
 
 // ── Ticker Item Types ─────────────────────────────────────────────────────────
@@ -490,6 +492,7 @@ export type BudgetTransaction = {
   amount: number;
   date: string;
   merchant: string;
+  bunqTransactionId?: string | null;
 };
 
 export type NetWorthSnapshot = {
@@ -529,6 +532,16 @@ export type DashboardTransaction = {
   date: string;
   category: string;
   currency: CurrencyCode;
+};
+
+export type BunqConnection = {
+  id: number;
+  userId: number;
+  bunqUserId: string | null;
+  lastSyncAt: string | null;
+  syncStatus: 'idle' | 'syncing' | 'error';
+  syncError: string | null;
+  createdAt: string;
 };
 
 export type CurrencyMeta = {

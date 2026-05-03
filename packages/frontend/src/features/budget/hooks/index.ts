@@ -5,4 +5,5 @@ export { useDeleteBudgetCategory } from './useDeleteBudgetCategory';
 export { useBudgetTransactions } from './useBudgetTransactions';
 export { useCreateBudgetTransaction } from './useCreateBudgetTransaction';
 export { useDeleteBudgetTransaction } from './useDeleteBudgetTransaction';
+export { useUpdateBudgetTransaction } from './useUpdateBudgetTransaction';
 export { useBudgetPage } from './useBudgetPage';

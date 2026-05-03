@@ -28,8 +28,8 @@ type SavingsPageBodyProps = {
   editing: SavingsAccount | undefined;
   addTxnFor: SavingsAccount | null;
   editingTxn: SavingsTransaction | null;
-  onSaveAccount: (account: SaveAccountInput) => void;
-  onDeleteAccount: (id: number) => void;
+  onSaveAccount: (account: SaveAccountInput) => Promise<void>;
+  onDeleteAccount: (id: number) => Promise<void>;
   onSaveTxn: (transaction: SaveTransactionInput) => void;
   onDeleteTxn: (id: number) => void;
   contribChartData: ReturnType<typeof useContribChartData>;
@@ -140,13 +140,13 @@ export function Savings() {
   const [addTxnFor, setAddTxnFor] = useState<SavingsAccount | null>(null);
   const [editingTxn, setEditingTxn] = useState<SavingsTransaction | null>(null);
 
-  const onSaveAccount = (account: SaveAccountInput): void => {
+  const onSaveAccount = async (account: SaveAccountInput): Promise<void> => {
     if (account.id) {
-      updateAccount.mutate(account as SavingsAccount);
+      await updateAccount.mutateAsync(account as SavingsAccount);
       return;
     }
 
-    createAccount.mutate(account);
+    await createAccount.mutateAsync(account);
   };
 
   const { totalInBase, totalInterest, avgRate } = useSavingsMetrics(accounts, convertToBase);
@@ -177,7 +177,7 @@ export function Savings() {
       editing={editing}
       addTxnFor={addTxnFor}
       onSaveAccount={onSaveAccount}
-      onDeleteAccount={(id) => deleteAccount.mutate(id)}
+      onDeleteAccount={(id) => deleteAccount.mutateAsync(id)}
       onSaveTxn={(transaction) => {
         if (transaction.id) {
           const { id, ...payload } = transaction;

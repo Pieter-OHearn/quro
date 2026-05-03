@@ -10,8 +10,8 @@ type SavingsModalsProps = {
   addTxnFor: SavingsAccount | null;
   editingTxn: SavingsTransaction | null;
   onCloseAccountModal: () => void;
-  onSaveAccount: (account: SaveAccountInput) => void;
-  onDeleteAccount: (id: number) => void;
+  onSaveAccount: (account: SaveAccountInput) => Promise<void>;
+  onDeleteAccount: (id: number) => Promise<void>;
   onCloseTxnModal: () => void;
   onSaveTxn: (transaction: SaveTransactionInput) => void;
 };

@@ -72,6 +72,11 @@ function AccountRowMeta({
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-0.5 flex-wrap">
         <p className="text-sm font-semibold text-slate-800">{acc.name}</p>
+        {acc.bunqAccountId && (
+          <Badge tone="info" size="sm">
+            Bunq
+          </Badge>
+        )}
         <Badge tone="neutral" size="sm">
           {acc.accountType}
         </Badge>

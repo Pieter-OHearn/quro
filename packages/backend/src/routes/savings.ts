@@ -1,9 +1,14 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import {
+  toFiniteNumber,
+  toSignedSavingsAmount,
+  updateSavingsAccountBalanceByDelta,
+} from '../lib/savingsBalance';
 import {
   err,
   ok,
@@ -146,11 +151,6 @@ function parseSavingsTransactionPatch(
   return parsePatchFields(body as Record<string, unknown>, savingsTransactionParsers);
 }
 
-function toFiniteNumber(value: unknown): number {
-  const parsed = parseNumber(value);
-  return parsed ?? 0;
-}
-
 function toSavingsAccountInsertValues(
   payload: SavingsAccountPayload,
   userId: number,
@@ -209,11 +209,6 @@ function toSavingsTransactionUpdateValues(
   };
 }
 
-function toSignedSavingsAmount(type: unknown, amount: unknown): number {
-  const absoluteAmount = Math.abs(toFiniteNumber(amount));
-  return type === 'withdrawal' ? -absoluteAmount : absoluteAmount;
-}
-
 async function getOwnedSavingsAccount(accountId: number, userId: number) {
   const [account] = await db
     .select()
@@ -228,20 +223,6 @@ async function getOwnedSavingsTransaction(transactionId: number, userId: number)
     .from(savingsTransactions)
     .where(and(eq(savingsTransactions.id, transactionId), eq(savingsTransactions.userId, userId)));
   return transaction ?? null;
-}
-
-async function updateSavingsAccountBalanceByDelta(
-  accountId: number,
-  userId: number,
-  delta: number,
-): Promise<void> {
-  if (delta === 0) return;
-  await db
-    .update(savingsAccounts)
-    .set({
-      balance: sql`CAST(${savingsAccounts.balance} AS numeric) + ${delta}`,
-    })
-    .where(and(eq(savingsAccounts.id, accountId), eq(savingsAccounts.userId, userId)));
 }
 
 async function syncSavingsBalancesForEditedTransaction(params: {
@@ -412,22 +393,23 @@ app.post('/transactions', async (c) => {
 
   const account = await getOwnedSavingsAccount(body.value.accountId, user.id);
   if (!account) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
+  if (account.bunqAccountId) {
+    return c.json(
+      { error: 'Cannot add manual transactions to a Bunq-synced account' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
 
   const [data] = await db
     .insert(savingsTransactions)
     .values(toSavingsTransactionInsertValues(body.value, user.id))
     .returning();
 
-  await db
-    .update(savingsAccounts)
-    .set({
-      balance: sql`CAST(${savingsAccounts.balance} AS numeric) + ${
-        body.value.type === 'withdrawal'
-          ? -Math.abs(body.value.amount)
-          : Math.abs(body.value.amount)
-      }`,
-    })
-    .where(and(eq(savingsAccounts.id, body.value.accountId), eq(savingsAccounts.userId, user.id)));
+  await updateSavingsAccountBalanceByDelta(
+    body.value.accountId,
+    user.id,
+    toSignedSavingsAmount(body.value.type, body.value.amount),
+  );
 
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -448,6 +430,14 @@ app.patch('/transactions/:id', async (c) => {
 
   const existing = await getOwnedSavingsTransaction(id, user.id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
+  const existingAccount = await getOwnedSavingsAccount(existing.accountId, user.id);
+  if (existingAccount?.bunqAccountId) {
+    return c.json(
+      { error: 'Cannot modify transactions on a Bunq-synced account' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
 
   const nextState = resolveNextSavingsTransactionState(body.value, existing);
   const accountValidationError = await validatePatchedSavingsTransactionAccount({
@@ -484,22 +474,28 @@ app.delete('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
+  const toDelete = await getOwnedSavingsTransaction(id, user.id);
+  if (!toDelete) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
+  const deleteAccount = await getOwnedSavingsAccount(toDelete.accountId, user.id);
+  if (deleteAccount?.bunqAccountId) {
+    return c.json(
+      { error: 'Cannot delete transactions from a Bunq-synced account' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
+
   const [data] = await db
     .delete(savingsTransactions)
     .where(and(eq(savingsTransactions.id, id), eq(savingsTransactions.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  await db
-    .update(savingsAccounts)
-    .set({
-      balance: sql`CAST(${savingsAccounts.balance} AS numeric) + ${
-        data.type === 'withdrawal'
-          ? Math.abs(toFiniteNumber(data.amount))
-          : -Math.abs(toFiniteNumber(data.amount))
-      }`,
-    })
-    .where(and(eq(savingsAccounts.id, data.accountId), eq(savingsAccounts.userId, user.id)));
+  await updateSavingsAccountBalanceByDelta(
+    data.accountId,
+    user.id,
+    -toSignedSavingsAmount(data.type, data.amount),
+  );
 
   return c.json({ data });
 });

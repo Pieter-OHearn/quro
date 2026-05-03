@@ -33,6 +33,7 @@ export const pensionImportConfidenceLabelEnum = pgEnum('pension_import_confidenc
   'medium',
   'low',
 ]);
+export const bunqSyncStatusEnum = pgEnum('bunq_sync_status', ['idle', 'syncing', 'error']);
 
 const inlinePdfDocumentColumns = () => ({
   documentStorageKey: text('document_storage_key'),
@@ -140,9 +141,14 @@ export const savingsAccounts = pgTable(
     accountType: text('account_type').notNull(),
     color: text('color'),
     emoji: text('emoji'),
+    bunqAccountId: text('bunq_account_id'),
   },
   (table) => ({
     userIdx: index('savings_accounts_user_id_idx').on(table.userId),
+    bunqAccountUnique: uniqueIndex('savings_accounts_user_bunq_account_id_unique').on(
+      table.userId,
+      table.bunqAccountId,
+    ),
   }),
 );
 
@@ -152,16 +158,21 @@ export const savingsTransactions = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     accountId: integer('account_id')
-      .references(() => savingsAccounts.id)
+      .references(() => savingsAccounts.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // deposit | withdrawal | interest
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
+    bunqTransactionId: text('bunq_transaction_id'),
   },
   (table) => ({
     userIdx: index('savings_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('savings_transactions_user_date_idx').on(table.userId, table.date),
+    bunqTransactionUnique: uniqueIndex('savings_transactions_user_bunq_transaction_id_unique').on(
+      table.userId,
+      table.bunqTransactionId,
+    ),
   }),
 );
 
@@ -607,6 +618,12 @@ export const budgetCategories = pgTable(
   },
   (table) => ({
     userIdx: index('budget_categories_user_id_idx').on(table.userId),
+    userMonthNameUnique: uniqueIndex('budget_categories_user_month_name_unique').on(
+      table.userId,
+      table.month,
+      table.year,
+      table.name,
+    ),
   }),
 );
 
@@ -622,10 +639,40 @@ export const budgetTransactions = pgTable(
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     merchant: text('merchant').notNull(),
+    bunqTransactionId: text('bunq_transaction_id'),
+    bunqMcc: text('bunq_mcc'),
+    bunqPaymentType: text('bunq_payment_type'),
+    counterpartyIban: text('counterparty_iban'),
   },
   (table) => ({
     userIdx: index('budget_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('budget_transactions_user_date_idx').on(table.userId, table.date),
+    bunqTransactionUnique: uniqueIndex('budget_transactions_user_bunq_transaction_id_unique').on(
+      table.userId,
+      table.bunqTransactionId,
+    ),
+  }),
+);
+
+export const categoryMappings = pgTable(
+  'category_mappings',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    source: text('source').notNull(),
+    sourceKey: text('source_key').notNull(),
+    categoryName: text('category_name').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index('category_mappings_user_id_idx').on(table.userId),
+    userSourceKeyUnique: uniqueIndex('category_mappings_user_source_key_unique').on(
+      table.userId,
+      table.source,
+      table.sourceKey,
+    ),
   }),
 );
 
@@ -656,4 +703,29 @@ export const dashboardTransactions = pgTable(
     userIdx: index('dashboard_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('dashboard_transactions_user_date_idx').on(table.userId, table.date),
   }),
+);
+
+// ── Bunq ─────────────────────────────────────────────────────────────────────
+
+export const bunqConnections = pgTable(
+  'bunq_connections',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    accessToken: text('access_token').notNull(),
+    privateKey: text('private_key'),
+    installationToken: text('installation_token'),
+    serverPublicKey: text('server_public_key'),
+    sessionToken: text('session_token'),
+    sessionId: integer('session_id'),
+    sessionExpiresAt: timestamp('session_expires_at'),
+    bunqUserId: text('bunq_user_id'),
+    lastSyncAt: timestamp('last_sync_at'),
+    syncStatus: bunqSyncStatusEnum('sync_status').notNull().default('idle'),
+    syncError: text('sync_error'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({ userIdx: uniqueIndex('bunq_connections_user_id_idx').on(t.userId) }),
 );
