@@ -1,4 +1,4 @@
-import { and, eq, gte, lt } from 'drizzle-orm';
+import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
@@ -102,6 +102,8 @@ type BudgetTransactionPayload = {
 
 type BudgetCategoryInsert = typeof budgetCategories.$inferInsert;
 type BudgetTransactionInsert = typeof budgetTransactions.$inferInsert;
+type BudgetTransactionRow = typeof budgetTransactions.$inferSelect;
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function parseBudgetMonthField(value: unknown): ParseResult<BudgetMonth> {
   return typeof value === 'string' && BUDGET_MONTHS.includes(value as BudgetMonth)
@@ -177,6 +179,17 @@ function parseBudgetTransactionPatch(
   return parsePatchFields(body as Record<string, unknown>, budgetTransactionParsers);
 }
 
+async function readBudgetTransactionPatch(
+  request: Pick<Request, 'json'>,
+): Promise<ParseResult<Partial<BudgetTransactionPayload>>> {
+  const rawBody = await readJsonBody(request, 'Invalid budget transaction payload');
+  if (!rawBody.ok) return rawBody;
+
+  const body = parseBudgetTransactionPatch(rawBody.value);
+  if (!body.ok) return body;
+  return Object.keys(body.value).length === 0 ? err('No budget transaction fields provided') : body;
+}
+
 async function getOwnedBudgetCategory(categoryId: number, userId: number) {
   const [category] = await db
     .select()
@@ -247,6 +260,35 @@ function toBudgetTransactionUpdateValues(
     date: payload.date,
     merchant: payload.merchant,
   };
+}
+
+async function adjustCategorySpent(
+  tx: DbTransaction,
+  categoryId: number,
+  delta: number,
+): Promise<void> {
+  await tx
+    .update(budgetCategories)
+    .set({ spent: sql`GREATEST(0, ${budgetCategories.spent}::numeric + ${delta}::numeric)::text` })
+    .where(eq(budgetCategories.id, categoryId));
+}
+
+async function adjustSpentForTransactionPatch(
+  tx: DbTransaction,
+  existing: BudgetTransactionRow,
+  nextCategoryId: number,
+  nextAmount: number,
+): Promise<void> {
+  const existingAmount = Number(existing.amount);
+  if (nextCategoryId !== existing.categoryId) {
+    await adjustCategorySpent(tx, existing.categoryId, -existingAmount);
+    await adjustCategorySpent(tx, nextCategoryId, nextAmount);
+    return;
+  }
+
+  if (nextAmount !== existingAmount) {
+    await adjustCategorySpent(tx, existing.categoryId, nextAmount - existingAmount);
+  }
 }
 
 // ── Categories ───────────────────────────────────────────────────────────────
@@ -383,10 +425,14 @@ app.post('/transactions', async (c) => {
   const category = await getOwnedBudgetCategory(body.value.categoryId, user.id);
   if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db
-    .insert(budgetTransactions)
-    .values(toBudgetTransactionInsertValues(body.value, user.id))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(budgetTransactions)
+      .values(toBudgetTransactionInsertValues(body.value, user.id))
+      .returning();
+    await adjustCategorySpent(tx, body.value.categoryId, body.value.amount);
+    return inserted;
+  });
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
@@ -395,29 +441,29 @@ app.patch('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const rawBody = await readJsonBody(c.req, 'Invalid budget transaction payload');
-  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
-
-  const body = parseBudgetTransactionPatch(rawBody.value);
+  const body = await readBudgetTransactionPatch(c.req);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
-  if (Object.keys(body.value).length === 0) {
-    return c.json({ error: 'No budget transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
-  }
 
   const existing = await getOwnedBudgetTransaction(id, user.id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   const nextCategoryId = body.value.categoryId ?? existing.categoryId;
-  if (nextCategoryId !== existing.categoryId) {
+  const existingAmount = Number(existing.amount);
+  const nextAmount = body.value.amount ?? existingAmount;
+  const categoryChanging = nextCategoryId !== existing.categoryId;
+  if (categoryChanging) {
     const category = await getOwnedBudgetCategory(nextCategoryId, user.id);
     if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   }
 
-  const [data] = await db
-    .update(budgetTransactions)
-    .set(toBudgetTransactionUpdateValues(body.value))
-    .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    await adjustSpentForTransactionPatch(tx, existing, nextCategoryId, nextAmount);
+    return tx
+      .update(budgetTransactions)
+      .set(toBudgetTransactionUpdateValues(body.value))
+      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
+      .returning();
+  });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -427,11 +473,21 @@ app.delete('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .delete(budgetTransactions)
-    .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
-    .returning();
+  const existing = await getOwnedBudgetTransaction(id, user.id);
+  if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
+  const [data] = await db.transaction(async (tx) => {
+    const deleted = await tx
+      .delete(budgetTransactions)
+      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
+      .returning();
+    if (deleted[0]) {
+      await adjustCategorySpent(tx, existing.categoryId, -Number(existing.amount));
+    }
+    return deleted;
+  });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
   return c.json({ data });
 });
 
@@ -457,7 +513,7 @@ app.patch('/category-mappings/:id', async (c) => {
   const rejected = rejectUnknownFields(rawBody.value, ['categoryName']);
   if (!rejected.ok) return c.json({ error: rejected.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const categoryName = parseTextField(rawBody.value, 'categoryName');
+  const categoryName = parseTextField(rawBody.value.categoryName, 'categoryName');
   if (!categoryName.ok) return c.json({ error: categoryName.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db

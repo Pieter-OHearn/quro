@@ -5,7 +5,7 @@ import type {
 
 export type BudgetCategory = Pick<
   SharedBudgetCategory,
-  'id' | 'name' | 'budgeted' | 'spent' | 'color' | 'emoji'
+  'id' | 'name' | 'budgeted' | 'spent' | 'color' | 'emoji' | 'month' | 'year'
 >;
 
 export type BudgetTx = Pick<
@@ -33,6 +33,7 @@ export type RecentBudgetTx = {
   id: number;
   name: string;
   category: string;
+  categoryId?: number;
   amount: number;
   date: string;
   emoji: string;
@@ -50,7 +51,14 @@ export type BudgetStats = {
 };
 
 export type CreateBudgetCategoryInput = Omit<SharedBudgetCategory, 'id'>;
-export type UpdateBudgetCategoryInput = SharedBudgetCategory;
+export type UpdateBudgetCategoryInput = { id: number } & Partial<Omit<SharedBudgetCategory, 'id'>>;
+
+export type EditCategoryForm = {
+  name: string;
+  emoji: string;
+  budgeted: string;
+  color: string;
+};
 export type CreateBudgetTransactionInput = Omit<SharedBudgetTransaction, 'id'>;
 
 export type BudgetPageData = {

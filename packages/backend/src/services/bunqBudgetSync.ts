@@ -114,9 +114,15 @@ function isDebit(payment: BunqPayment): boolean {
   return payment.amount.value.trim().startsWith('-');
 }
 
-function isSelfTransfer(payment: BunqPayment, ownIbans: ReadonlySet<string>): boolean {
+function isSelfTransfer(
+  payment: BunqPayment,
+  ownIbans: ReadonlySet<string>,
+  bunqUserId: string,
+): boolean {
   const counterIban = payment.counterpartyAlias.iban;
-  return counterIban !== null && ownIbans.has(counterIban);
+  if (counterIban !== null && ownIbans.has(counterIban)) return true;
+  const counterBunqId = payment.counterpartyAlias.bunqUserId;
+  return counterBunqId !== null && String(counterBunqId) === bunqUserId;
 }
 
 function toTransactionDate(created: string): string {
@@ -226,9 +232,10 @@ async function importBudgetPayment(
   userId: number,
   payment: BunqPayment,
   ownIbans: ReadonlySet<string>,
+  bunqUserId: string,
 ): Promise<void> {
   if (!isDebit(payment)) return;
-  if (isSelfTransfer(payment, ownIbans)) return;
+  if (isSelfTransfer(payment, ownIbans, bunqUserId)) return;
 
   const bunqTransactionId = String(payment.id);
   if (await budgetTxAlreadyImported(userId, bunqTransactionId)) return;
@@ -275,7 +282,7 @@ async function markSyncing(connectionId: number): Promise<void> {
 async function markSyncSucceeded(connectionId: number, bunqUserId: string): Promise<void> {
   await db
     .update(bunqConnections)
-    .set({ syncStatus: 'idle', syncError: null, bunqUserId })
+    .set({ syncStatus: 'idle', syncError: null, bunqUserId, lastSyncAt: new Date() })
     .where(eq(bunqConnections.id, connectionId));
 }
 
@@ -309,7 +316,7 @@ export async function syncBunqBudget(userId: number, newerThanOverride?: string)
         newerThan,
       );
       for (const payment of payments) {
-        await importBudgetPayment(userId, payment, ownIbans);
+        await importBudgetPayment(userId, payment, ownIbans, session.bunqUserId);
       }
     }
 

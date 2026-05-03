@@ -5,68 +5,75 @@ import {
   BudgetChartsRow,
   BudgetLoadingState,
   BudgetSummaryCards,
+  EditCategoryDialog,
   RecentTransactionsList,
 } from './components';
 import { useBudgetPage } from './hooks';
 
 export function Budget() {
-  const {
-    isLoading,
-    queryFailures,
-    fmt,
-    fmtDec,
-    baseCurrency,
-    categories,
-    totalBudgeted,
-    totalSpent,
-    remaining,
-    savingsRate,
-    overBudget,
-    pieData,
-    recentTransactions,
-    showAdd,
-    newCat,
-    toggleAdd,
-    setNewCat,
-    handleAddCategory,
-  } = useBudgetPage();
+  const page = useBudgetPage();
 
-  if (isLoading) return <BudgetLoadingState />;
-  if (queryFailures.length > 0) {
-    return <RouteQueryErrorState routeName="Budget" failedQueries={queryFailures} />;
+  if (page.isLoading) return <BudgetLoadingState />;
+  if (page.queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Budget" failedQueries={page.queryFailures} />;
   }
 
   return (
     <PageStack>
       <ContentSection>
         <BudgetSummaryCards
-          totalBudgeted={totalBudgeted}
-          totalSpent={totalSpent}
-          remaining={remaining}
-          savingsRate={savingsRate}
-          fmt={fmt}
+          totalBudgeted={page.totalBudgeted}
+          totalSpent={page.totalSpent}
+          remaining={page.remaining}
+          savingsRate={page.savingsRate}
+          fmt={page.fmt}
         />
       </ContentSection>
       <ContentSection>
-        <BudgetChartsRow pieData={pieData} categories={categories} fmtDec={fmtDec} fmt={fmt} />
+        <BudgetChartsRow
+          pieData={page.pieData}
+          categories={page.categories}
+          fmtDec={page.fmtDec}
+          fmt={page.fmt}
+        />
       </ContentSection>
       <ContentSection>
         <BudgetCategoriesSection
-          categories={categories}
-          overBudget={overBudget}
-          showAdd={showAdd}
-          newCat={newCat}
-          baseCurrency={baseCurrency}
-          fmt={fmt}
-          fmtDec={fmtDec}
-          onToggleAdd={toggleAdd}
-          onNewCatChange={setNewCat}
-          onAddCategory={handleAddCategory}
+          categories={page.categories}
+          overBudget={page.overBudget}
+          showAdd={page.showAdd}
+          newCat={page.newCat}
+          baseCurrency={page.baseCurrency}
+          fmt={page.fmt}
+          fmtDec={page.fmtDec}
+          selectedMonth={page.selectedMonth}
+          selectedYear={page.selectedYear}
+          isCurrentMonth={page.isCurrentMonth}
+          onPrevMonth={page.navigatePrev}
+          onNextMonth={page.navigateNext}
+          onToggleAdd={page.toggleAdd}
+          onNewCatChange={page.setNewCat}
+          onAddCategory={page.handleAddCategory}
+          onEditCategory={page.setEditingCategory}
         />
       </ContentSection>
       <ContentSection>
-        <RecentTransactionsList transactions={recentTransactions} fmtDec={fmtDec} />
+        <RecentTransactionsList
+          transactions={page.recentTransactions}
+          categories={page.categories}
+          fmtDec={page.fmtDec}
+          onDelete={page.handleDeleteTransaction}
+          onChangeCategory={page.handleChangeTxCategory}
+        />
       </ContentSection>
+      {page.editingCategory && (
+        <EditCategoryDialog
+          category={page.editingCategory}
+          isSaving={page.isUpdating}
+          onSave={page.handleSaveEdit}
+          onClose={() => page.setEditingCategory(null)}
+        />
+      )}
     </PageStack>
   );
 }

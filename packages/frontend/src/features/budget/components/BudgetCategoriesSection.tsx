@@ -1,5 +1,6 @@
 import { Edit3, Plus } from 'lucide-react';
 import type { BudgetCategory, BudgetFormatFn, NewCategoryForm } from '../types';
+import { MonthYearSelector } from './MonthYearSelector';
 
 type BudgetCategoriesSectionProps = {
   categories: BudgetCategory[];
@@ -9,9 +10,15 @@ type BudgetCategoriesSectionProps = {
   baseCurrency: string;
   fmt: BudgetFormatFn;
   fmtDec: BudgetFormatFn;
+  selectedMonth: string;
+  selectedYear: number;
+  isCurrentMonth: boolean;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
   onToggleAdd: () => void;
   onNewCatChange: (value: NewCategoryForm) => void;
   onAddCategory: () => void;
+  onEditCategory: (category: BudgetCategory) => void;
 };
 
 type AddCategoryFormProps = {
@@ -61,7 +68,13 @@ function CategoryRow({
   category,
   fmt,
   fmtDec,
-}: Readonly<{ category: BudgetCategory; fmt: BudgetFormatFn; fmtDec: BudgetFormatFn }>) {
+  onEdit,
+}: Readonly<{
+  category: BudgetCategory;
+  fmt: BudgetFormatFn;
+  fmtDec: BudgetFormatFn;
+  onEdit: (category: BudgetCategory) => void;
+}>) {
   const pct = category.budgeted > 0 ? Math.min((category.spent / category.budgeted) * 100, 100) : 0;
   const over = category.spent > category.budgeted;
   const surplus = category.budgeted - category.spent;
@@ -96,52 +109,14 @@ function CategoryRow({
             />
           </div>
         </div>
-        <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors flex-shrink-0">
+        <button
+          onClick={() => onEdit(category)}
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors flex-shrink-0"
+          aria-label={`Edit ${category.name}`}
+        >
           <Edit3 size={13} />
         </button>
       </div>
-    </div>
-  );
-}
-
-function CategorySectionHeader({
-  overBudget,
-  onToggleAdd,
-}: Readonly<{ overBudget: BudgetCategory[]; onToggleAdd: () => void }>) {
-  return (
-    <div className="flex items-center justify-between mb-5">
-      <div>
-        <h3 className="font-semibold text-slate-900">Budget Categories</h3>
-        {overBudget.length > 0 && (
-          <p className="text-xs text-rose-500 mt-0.5">{overBudget.length} categories over budget</p>
-        )}
-      </div>
-      <button
-        data-testid="budget-add-category-button"
-        onClick={onToggleAdd}
-        className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-      >
-        <Plus size={15} /> Add Category
-      </button>
-    </div>
-  );
-}
-
-function CategoryList({
-  categories,
-  fmt,
-  fmtDec,
-}: Readonly<{ categories: BudgetCategory[]; fmt: BudgetFormatFn; fmtDec: BudgetFormatFn }>) {
-  return (
-    <div className="space-y-2">
-      {categories.map((category) => (
-        <CategoryRow key={category.id} category={category} fmt={fmt} fmtDec={fmtDec} />
-      ))}
-      {categories.length === 0 && (
-        <p className="text-sm text-slate-400 py-8 text-center">
-          No budget categories yet. Click <strong>Add Category</strong> to get started.
-        </p>
-      )}
     </div>
   );
 }
@@ -154,13 +129,45 @@ export function BudgetCategoriesSection({
   baseCurrency,
   fmt,
   fmtDec,
+  selectedMonth,
+  selectedYear,
+  isCurrentMonth,
+  onPrevMonth,
+  onNextMonth,
   onToggleAdd,
   onNewCatChange,
   onAddCategory,
+  onEditCategory,
 }: Readonly<BudgetCategoriesSectionProps>) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <CategorySectionHeader overBudget={overBudget} onToggleAdd={onToggleAdd} />
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-slate-900">Budget Categories</h3>
+            <MonthYearSelector
+              month={selectedMonth}
+              year={selectedYear}
+              isCurrentMonth={isCurrentMonth}
+              onPrev={onPrevMonth}
+              onNext={onNextMonth}
+            />
+          </div>
+          {overBudget.length > 0 && (
+            <p className="text-xs text-rose-500 mt-0.5">
+              {overBudget.length} categories over budget
+            </p>
+          )}
+        </div>
+        <button
+          data-testid="budget-add-category-button"
+          onClick={onToggleAdd}
+          className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
+        >
+          <Plus size={15} /> Add Category
+        </button>
+      </div>
+
       {showAdd && (
         <AddCategoryForm
           newCat={newCat}
@@ -169,7 +176,23 @@ export function BudgetCategoriesSection({
           onAdd={onAddCategory}
         />
       )}
-      <CategoryList categories={categories} fmt={fmt} fmtDec={fmtDec} />
+
+      <div className="space-y-2">
+        {categories.map((category) => (
+          <CategoryRow
+            key={category.id}
+            category={category}
+            fmt={fmt}
+            fmtDec={fmtDec}
+            onEdit={onEditCategory}
+          />
+        ))}
+        {categories.length === 0 && (
+          <p className="text-sm text-slate-400 py-8 text-center">
+            No budget categories yet. Click <strong>Add Category</strong> to get started.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

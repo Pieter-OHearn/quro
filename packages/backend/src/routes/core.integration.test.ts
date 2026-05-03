@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { db } from '../db/client';
+import { categoryMappings } from '../db/schema';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
@@ -654,6 +656,46 @@ describe('budget integration', () => {
     };
     expect(Number(createdTransaction.data.amount)).toBe(89.5);
 
+    const categoryAfterCreateResponse = await integration.request(
+      `/api/budget/categories/${createdCategory.data.id}`,
+      {
+        cookie: owner.cookie,
+      },
+    );
+    expect(categoryAfterCreateResponse.status).toBe(200);
+    const categoryAfterCreate = (await categoryAfterCreateResponse.json()) as {
+      data: {
+        spent: string;
+      };
+    };
+    expect(Number(categoryAfterCreate.data.spent)).toBe(239.5);
+
+    const renameTransactionResponse = await integration.request(
+      `/api/budget/transactions/${createdTransaction.data.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          merchant: 'AH',
+        },
+      },
+    );
+    expect(renameTransactionResponse.status).toBe(200);
+
+    const categoryAfterRenameResponse = await integration.request(
+      `/api/budget/categories/${createdCategory.data.id}`,
+      {
+        cookie: owner.cookie,
+      },
+    );
+    expect(categoryAfterRenameResponse.status).toBe(200);
+    const categoryAfterRename = (await categoryAfterRenameResponse.json()) as {
+      data: {
+        spent: string;
+      };
+    };
+    expect(Number(categoryAfterRename.data.spent)).toBe(239.5);
+
     const filteredTransactionsResponse = await integration.request(
       `/api/budget/transactions?categoryId=${createdCategory.data.id}`,
       {
@@ -697,6 +739,34 @@ describe('budget integration', () => {
     });
     expect(Number(updatedTransaction.data.amount)).toBe(120.75);
 
+    const firstCategoryAfterUpdateResponse = await integration.request(
+      `/api/budget/categories/${createdCategory.data.id}`,
+      {
+        cookie: owner.cookie,
+      },
+    );
+    expect(firstCategoryAfterUpdateResponse.status).toBe(200);
+    const firstCategoryAfterUpdate = (await firstCategoryAfterUpdateResponse.json()) as {
+      data: {
+        spent: string;
+      };
+    };
+    expect(Number(firstCategoryAfterUpdate.data.spent)).toBe(150);
+
+    const secondCategoryAfterUpdateResponse = await integration.request(
+      `/api/budget/categories/${secondCategory.data.id}`,
+      {
+        cookie: owner.cookie,
+      },
+    );
+    expect(secondCategoryAfterUpdateResponse.status).toBe(200);
+    const secondCategoryAfterUpdate = (await secondCategoryAfterUpdateResponse.json()) as {
+      data: {
+        spent: string;
+      };
+    };
+    expect(Number(secondCategoryAfterUpdate.data.spent)).toBe(120.75);
+
     const transactionLookupResponse = await integration.request(
       `/api/budget/transactions/${createdTransaction.data.id}`,
       {
@@ -713,6 +783,20 @@ describe('budget integration', () => {
       },
     );
     expect(deleteTransactionResponse.status).toBe(200);
+
+    const secondCategoryAfterDeleteResponse = await integration.request(
+      `/api/budget/categories/${secondCategory.data.id}`,
+      {
+        cookie: owner.cookie,
+      },
+    );
+    expect(secondCategoryAfterDeleteResponse.status).toBe(200);
+    const secondCategoryAfterDelete = (await secondCategoryAfterDeleteResponse.json()) as {
+      data: {
+        spent: string;
+      };
+    };
+    expect(Number(secondCategoryAfterDelete.data.spent)).toBe(0);
 
     const deleteFirstCategoryResponse = await integration.request(
       `/api/budget/categories/${createdCategory.data.id}`,
@@ -877,6 +961,54 @@ describe('budget integration', () => {
       };
     };
     expect(ownerTransactionLookup.data.categoryId).toBe(ownerCategory.data.id);
+  });
+
+  test('allows owners to update bank category mappings', async () => {
+    const owner = await integration.signUp('budget-mapping-owner');
+    const intruder = await integration.signUp('budget-mapping-intruder');
+
+    const [mapping] = await db
+      .insert(categoryMappings)
+      .values({
+        userId: owner.user.id,
+        source: 'mcc',
+        sourceKey: '5411',
+        categoryName: 'Groceries',
+      })
+      .returning({ id: categoryMappings.id });
+
+    const updateResponse = await integration.request(
+      `/api/budget/category-mappings/${mapping.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          categoryName: 'Food',
+        },
+      },
+    );
+    expect(updateResponse.status).toBe(200);
+    const updated = (await updateResponse.json()) as {
+      data: {
+        categoryName: string;
+      };
+    };
+    expect(updated.data.categoryName).toBe('Food');
+
+    const intruderResponse = await integration.request(
+      `/api/budget/category-mappings/${mapping.id}`,
+      {
+        method: 'PATCH',
+        cookie: intruder.cookie,
+        json: {
+          categoryName: 'Travel',
+        },
+      },
+    );
+    expect(intruderResponse.status).toBe(404);
+    expect(await intruderResponse.json()).toEqual({
+      error: 'Mapping not found',
+    });
   });
 
   test('rejects invalid budget payloads', async () => {

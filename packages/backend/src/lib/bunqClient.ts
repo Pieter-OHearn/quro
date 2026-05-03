@@ -56,6 +56,7 @@ export type BunqPayment = {
     displayName: string;
     iban: string | null;
     merchantCategoryCode: string | null;
+    bunqUserId: number | null;
   };
   created: string;
   type: string;
@@ -193,13 +194,20 @@ function extractIban(aliases: readonly unknown[]): string | null {
 function buildCounterpartyAlias(
   counterparty: Readonly<UnknownRecord>,
   ibanValue: string | null,
-): { displayName: string; iban: string | null; merchantCategoryCode: string | null } {
+): {
+  displayName: string;
+  iban: string | null;
+  merchantCategoryCode: string | null;
+  bunqUserId: number | null;
+} {
   const displayName =
     getString(counterparty, 'display_name') ?? getString(counterparty, 'name') ?? '';
+  const rawId = counterparty.id;
   return {
     displayName,
     iban: ibanValue,
     merchantCategoryCode: getString(counterparty, 'merchant_category_code'),
+    bunqUserId: typeof rawId === 'number' ? rawId : null,
   };
 }
 

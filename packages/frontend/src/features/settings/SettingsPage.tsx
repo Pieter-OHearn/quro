@@ -44,7 +44,14 @@ import { useAuth } from '@/lib/AuthContext';
 import { resolveApiErrorMessage } from '@/lib/pdfDocuments';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
-import { useBunqConnection, useDisconnectBunq, useSyncBunq } from './hooks';
+import {
+  useBunqConnection,
+  useCategoryMappings,
+  useDisconnectBunq,
+  useSyncBunq,
+  useUpdateCategoryMapping,
+  type CategoryMapping,
+} from './hooks';
 
 type TabKey = 'profile' | 'security' | 'preferences' | 'connections';
 
@@ -874,6 +881,60 @@ function formatSyncTime(value: string | null): string {
   });
 }
 
+function MappingRow({ mapping }: Readonly<{ mapping: CategoryMapping }>) {
+  const update = useUpdateCategoryMapping();
+  const [value, setValue] = useState(mapping.categoryName);
+
+  const save = () => {
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== mapping.categoryName) {
+      update.mutate({ id: mapping.id, categoryName: trimmed });
+    } else {
+      setValue(mapping.categoryName);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-2.5 border-b border-slate-100 last:border-0">
+      <span className="text-xs font-mono text-slate-400 shrink-0">
+        {mapping.source.toUpperCase()} {mapping.sourceKey}
+      </span>
+      <input
+        className="flex-1 text-sm text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 focus:outline-none px-1 py-0.5 text-right transition-colors"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+        aria-label={`Category name for ${mapping.sourceKey}`}
+      />
+    </div>
+  );
+}
+
+function CategoryMappingsSection() {
+  const { data: mappings = [], isLoading } = useCategoryMappings();
+
+  if (isLoading) return null;
+  if (mappings.length === 0) return null;
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-slate-900 mb-1">Bank category rules</h4>
+      <p className="text-xs text-slate-500 mb-3">
+        These rules map your bank's categories to Quro's budget categories. Changes apply to future
+        syncs only.
+      </p>
+      <div className="rounded-xl border border-slate-200 px-4 py-1">
+        {mappings.map((mapping) => (
+          <MappingRow key={mapping.id} mapping={mapping} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ConnectionsSection() {
   const { data: connection, isLoading } = useBunqConnection();
   const disconnect = useDisconnectBunq();
@@ -989,6 +1050,8 @@ function ConnectionsSection() {
           </div>
         </div>
       </div>
+
+      <CategoryMappingsSection />
     </div>
   );
 }

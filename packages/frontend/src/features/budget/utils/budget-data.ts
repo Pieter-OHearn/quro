@@ -34,6 +34,7 @@ export function mapRecentTransactions(
       id: transaction.id,
       name: transaction.merchant || transaction.description,
       category: category?.name ?? '',
+      categoryId: transaction.categoryId,
       amount: transaction.amount,
       date: transaction.date,
       emoji: category?.emoji ?? '\ud83d\udce6',
