@@ -104,6 +104,14 @@ describe('auth integration', () => {
     expect(await protectedResponse.json()).toEqual({
       error: 'Authentication required',
     });
+
+    const bunqCallbackResponse = await integration.request(
+      '/api/bunq/oauth/callback?state=state&code=code',
+    );
+    expect(bunqCallbackResponse.status).toBe(401);
+    expect(await bunqCallbackResponse.json()).toEqual({
+      error: 'Authentication required',
+    });
   });
 });
 
@@ -1099,6 +1107,21 @@ describe('budget integration', () => {
     expect(await unknownFieldPatchResponse.json()).toEqual({
       error: 'Unknown field: cap',
     });
+  });
+});
+
+describe('bunq integration', () => {
+  test('returns not found for sync requests without a Bunq connection', async () => {
+    const owner = await integration.signUp('bunq-no-connection');
+
+    for (const path of ['/api/bunq/sync', '/api/bunq/sync/savings', '/api/bunq/sync/budget']) {
+      const response = await integration.request(path, {
+        method: 'POST',
+        cookie: owner.cookie,
+      });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: 'No Bunq connection found' });
+    }
   });
 });
 

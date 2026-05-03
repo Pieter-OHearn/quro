@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   budgetCategories,
@@ -42,6 +42,17 @@ const BUDGET_MONTHS = [
 const MCC_SOURCE = 'mcc';
 
 type BunqConnectionRow = typeof bunqConnections.$inferSelect;
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type BunqSyncIssue = {
+  accountId?: number;
+  paymentId?: string;
+  message: string;
+};
+export type BunqSyncResult = {
+  status: 'skipped' | 'success' | 'partial';
+  syncedAt: Date | null;
+  issues: BunqSyncIssue[];
+};
 
 async function loadConnection(userId: number): Promise<BunqConnectionRow | null> {
   const [connection] = await db
@@ -90,6 +101,7 @@ async function ensureSession(connection: BunqConnectionRow): Promise<BunqSession
   if (isSessionValid(connection) && connection.bunqUserId) {
     return {
       sessionToken: connection.sessionToken!,
+      sessionId: connection.sessionId,
       bunqUserId: connection.bunqUserId,
       expiresAt: connection.sessionExpiresAt!,
     };
@@ -102,6 +114,7 @@ async function ensureSession(connection: BunqConnectionRow): Promise<BunqSession
     .update(bunqConnections)
     .set({
       sessionToken: session.sessionToken,
+      sessionId: session.sessionId,
       sessionExpiresAt: session.expiresAt,
       bunqUserId: session.bunqUserId,
     })
@@ -134,32 +147,24 @@ function toTransactionDate(created: string): string {
 function parseMonthYear(dateStr: string): { month: string; year: number } {
   const [yearStr, monthStr] = dateStr.split('-');
   const monthIndex = parseInt(monthStr, 10) - 1;
-  return { month: BUDGET_MONTHS[monthIndex], year: parseInt(yearStr, 10) };
-}
-
-async function budgetTxAlreadyImported(
-  userId: number,
-  bunqTransactionId: string,
-): Promise<boolean> {
-  const [existing] = await db
-    .select({ id: budgetTransactions.id })
-    .from(budgetTransactions)
-    .where(
-      and(
-        eq(budgetTransactions.userId, userId),
-        eq(budgetTransactions.bunqTransactionId, bunqTransactionId),
-      ),
-    );
-  return Boolean(existing);
+  if (Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex >= BUDGET_MONTHS.length) {
+    throw new Error(`Invalid Bunq payment date: ${dateStr}`);
+  }
+  const year = parseInt(yearStr, 10);
+  if (Number.isNaN(year)) {
+    throw new Error(`Invalid Bunq payment date: ${dateStr}`);
+  }
+  return { month: BUDGET_MONTHS[monthIndex], year };
 }
 
 async function findOrCreateCategoryByName(
+  tx: DbTransaction,
   userId: number,
   name: string,
   month: string,
   year: number,
 ): Promise<number> {
-  const [existing] = await db
+  const [existing] = await tx
     .select({ id: budgetCategories.id })
     .from(budgetCategories)
     .where(
@@ -174,7 +179,7 @@ async function findOrCreateCategoryByName(
   if (existing) return existing.id;
 
   const preset = CATEGORY_PRESETS[name] ?? DEFAULT_CATEGORY_PRESET;
-  const [inserted] = await db
+  const [inserted] = await tx
     .insert(budgetCategories)
     .values({
       userId,
@@ -185,6 +190,15 @@ async function findOrCreateCategoryByName(
       color: preset.color,
       month,
       year,
+    })
+    .onConflictDoUpdate({
+      target: [
+        budgetCategories.userId,
+        budgetCategories.month,
+        budgetCategories.year,
+        budgetCategories.name,
+      ],
+      set: { name },
     })
     .returning({ id: budgetCategories.id });
 
@@ -228,6 +242,52 @@ async function resolveCategoryName(userId: number, payment: BunqPayment): Promis
   return UNCATEGORISED_NAME;
 }
 
+async function claimMatchingManualBudgetTransaction(
+  tx: DbTransaction,
+  userId: number,
+  payment: BunqPayment,
+  amount: number,
+  dateStr: string,
+  bunqTransactionId: string,
+): Promise<boolean> {
+  const [manualMatch] = await tx
+    .select({ id: budgetTransactions.id })
+    .from(budgetTransactions)
+    .where(
+      and(
+        eq(budgetTransactions.userId, userId),
+        isNull(budgetTransactions.bunqTransactionId),
+        eq(budgetTransactions.amount, amount.toString()),
+        eq(budgetTransactions.date, dateStr),
+        eq(budgetTransactions.merchant, payment.counterpartyAlias.displayName || ''),
+        eq(budgetTransactions.description, payment.description || ''),
+      ),
+    )
+    .orderBy(asc(budgetTransactions.id))
+    .limit(1);
+
+  if (!manualMatch) return false;
+
+  const claimed = await tx
+    .update(budgetTransactions)
+    .set({
+      bunqTransactionId,
+      bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
+      bunqPaymentType: payment.type || null,
+      counterpartyIban: payment.counterpartyAlias.iban,
+    })
+    .where(
+      and(
+        eq(budgetTransactions.id, manualMatch.id),
+        eq(budgetTransactions.userId, userId),
+        isNull(budgetTransactions.bunqTransactionId),
+      ),
+    )
+    .returning({ id: budgetTransactions.id });
+
+  return claimed.length > 0;
+}
+
 async function importBudgetPayment(
   userId: number,
   payment: BunqPayment,
@@ -237,35 +297,53 @@ async function importBudgetPayment(
   if (!isDebit(payment)) return;
   if (isSelfTransfer(payment, ownIbans, bunqUserId)) return;
 
-  const bunqTransactionId = String(payment.id);
-  if (await budgetTxAlreadyImported(userId, bunqTransactionId)) return;
-
   const dateStr = toTransactionDate(payment.created);
   const { month, year } = parseMonthYear(dateStr);
   const amount = Math.abs(Number(payment.amount.value) || 0);
+  if (amount <= 0) return;
+  const bunqTransactionId = String(payment.id);
 
   const categoryName = await resolveCategoryName(userId, payment);
-  const categoryId = await findOrCreateCategoryByName(userId, categoryName, month, year);
+  await db.transaction(async (tx) => {
+    const claimedManual = await claimMatchingManualBudgetTransaction(
+      tx,
+      userId,
+      payment,
+      amount,
+      dateStr,
+      bunqTransactionId,
+    );
+    if (claimedManual) return;
 
-  await db.insert(budgetTransactions).values({
-    userId,
-    categoryId,
-    description: payment.description || '',
-    amount: amount.toString(),
-    date: dateStr,
-    merchant: payment.counterpartyAlias.displayName || '',
-    bunqTransactionId,
-    bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
-    bunqPaymentType: payment.type || null,
-    counterpartyIban: payment.counterpartyAlias.iban,
+    const categoryId = await findOrCreateCategoryByName(tx, userId, categoryName, month, year);
+    const inserted = await tx
+      .insert(budgetTransactions)
+      .values({
+        userId,
+        categoryId,
+        description: payment.description || '',
+        amount: amount.toString(),
+        date: dateStr,
+        merchant: payment.counterpartyAlias.displayName || '',
+        bunqTransactionId,
+        bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
+        bunqPaymentType: payment.type || null,
+        counterpartyIban: payment.counterpartyAlias.iban,
+      })
+      .onConflictDoNothing({
+        target: [budgetTransactions.userId, budgetTransactions.bunqTransactionId],
+      })
+      .returning({ id: budgetTransactions.id });
+
+    if (inserted.length === 0) return;
+
+    await tx
+      .update(budgetCategories)
+      .set({
+        spent: sql`${budgetCategories.spent} + ${amount.toString()}`,
+      })
+      .where(eq(budgetCategories.id, categoryId));
   });
-
-  await db
-    .update(budgetCategories)
-    .set({
-      spent: sql`${budgetCategories.spent} + ${amount.toString()}`,
-    })
-    .where(eq(budgetCategories.id, categoryId));
 }
 
 function collectOwnIbans(accounts: readonly BunqMonetaryAccount[]): Set<string> {
@@ -279,10 +357,20 @@ async function markSyncing(connectionId: number): Promise<void> {
     .where(eq(bunqConnections.id, connectionId));
 }
 
-async function markSyncSucceeded(connectionId: number, bunqUserId: string): Promise<void> {
+async function markSyncSucceeded(
+  connectionId: number,
+  bunqUserId: string,
+  syncedAt: Date,
+  updateCursor: boolean,
+): Promise<void> {
   await db
     .update(bunqConnections)
-    .set({ syncStatus: 'idle', syncError: null, bunqUserId, lastSyncAt: new Date() })
+    .set({
+      syncStatus: 'idle',
+      syncError: null,
+      bunqUserId,
+      ...(updateCursor ? { lastSyncAt: syncedAt } : {}),
+    })
     .where(eq(bunqConnections.id, connectionId));
 }
 
@@ -293,11 +381,69 @@ async function markSyncFailed(connectionId: number, message: string): Promise<vo
     .where(eq(bunqConnections.id, connectionId));
 }
 
-export async function syncBunqBudget(userId: number, newerThanOverride?: string): Promise<void> {
+async function importBudgetPaymentsForAccount(params: {
+  userId: number;
+  account: BunqMonetaryAccount;
+  sessionToken: string;
+  bunqUserId: string;
+  ownIbans: ReadonlySet<string>;
+  newerThan: string | undefined;
+}): Promise<BunqSyncIssue[]> {
+  const payments = await fetchPayments(
+    params.sessionToken,
+    params.bunqUserId,
+    params.account.id,
+    params.newerThan,
+  );
+  const issues: BunqSyncIssue[] = [];
+  for (const payment of payments) {
+    try {
+      await importBudgetPayment(params.userId, payment, params.ownIbans, params.bunqUserId);
+    } catch (error) {
+      issues.push({
+        accountId: params.account.id,
+        paymentId: String(payment.id),
+        message: error instanceof Error ? error.message : 'Budget payment import failed',
+      });
+    }
+  }
+  return issues;
+}
+
+async function finishBudgetSync(params: {
+  connection: BunqConnectionRow;
+  bunqUserId: string;
+  syncedAt: Date;
+  issues: BunqSyncIssue[];
+  updateCursor: boolean;
+}): Promise<BunqSyncResult> {
+  if (params.issues.length > 0) {
+    await markSyncFailed(
+      params.connection.id,
+      `${params.issues.length} Bunq budget payment(s) failed to import`,
+    );
+    return { status: 'partial', syncedAt: params.syncedAt, issues: params.issues };
+  }
+
+  await markSyncSucceeded(
+    params.connection.id,
+    params.bunqUserId,
+    params.syncedAt,
+    params.updateCursor,
+  );
+  return { status: 'success', syncedAt: params.syncedAt, issues: [] };
+}
+
+export async function syncBunqBudget(
+  userId: number,
+  newerThanOverride?: string,
+  skipCursorUpdate = false,
+): Promise<BunqSyncResult> {
   const connection = await loadConnection(userId);
-  if (!connection) return;
+  if (!connection) return { status: 'skipped', syncedAt: null, issues: [] };
 
   await markSyncing(connection.id);
+  const issues: BunqSyncIssue[] = [];
 
   try {
     const session = await ensureSession(connection);
@@ -309,18 +455,26 @@ export async function syncBunqBudget(userId: number, newerThanOverride?: string)
       (connection.lastSyncAt ? connection.lastSyncAt.toISOString() : undefined);
 
     for (const account of bankAccounts) {
-      const payments = await fetchPayments(
-        session.sessionToken,
-        session.bunqUserId,
-        account.id,
-        newerThan,
+      issues.push(
+        ...(await importBudgetPaymentsForAccount({
+          userId,
+          account,
+          sessionToken: session.sessionToken,
+          bunqUserId: session.bunqUserId,
+          ownIbans,
+          newerThan,
+        })),
       );
-      for (const payment of payments) {
-        await importBudgetPayment(userId, payment, ownIbans, session.bunqUserId);
-      }
     }
 
-    await markSyncSucceeded(connection.id, session.bunqUserId);
+    const syncedAt = new Date();
+    return finishBudgetSync({
+      connection,
+      bunqUserId: session.bunqUserId,
+      syncedAt,
+      issues,
+      updateCursor: !skipCursorUpdate,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     await markSyncFailed(connection.id, message);

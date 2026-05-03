@@ -537,7 +537,7 @@ export type DashboardTransaction = {
 export type BunqConnection = {
   id: number;
   userId: number;
-  bunqUserId: string;
+  bunqUserId: string | null;
   lastSyncAt: string | null;
   syncStatus: 'idle' | 'syncing' | 'error';
   syncError: string | null;

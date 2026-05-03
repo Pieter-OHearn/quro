@@ -6,7 +6,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { buildOAuthAuthorizeUrl, exchangeCodeForTokens } from '../lib/bunqClient';
+import { buildOAuthAuthorizeUrl, deleteSession, exchangeCodeForTokens } from '../lib/bunqClient';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 
@@ -15,7 +15,26 @@ const app = new Hono();
 const STATE_COOKIE = 'bunq_oauth_state';
 const STATE_MAX_AGE_SECONDS = 600;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? '';
-const FRONTEND_SETTINGS_PATH = `${FRONTEND_ORIGIN}/settings`;
+const FRONTEND_SETTINGS_PATH = FRONTEND_ORIGIN
+  ? `${FRONTEND_ORIGIN}/settings`
+  : 'http://localhost:5173/settings';
+
+function logBunqError(label: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : 'Unknown Bunq error';
+  console.error(label, { message });
+}
+
+function mergeSyncResults(
+  savingsResult: Awaited<ReturnType<typeof syncBunqSavings>>,
+  budgetResult: Awaited<ReturnType<typeof syncBunqBudget>>,
+) {
+  const issues = [...savingsResult.issues, ...budgetResult.issues];
+  return {
+    ok: issues.length === 0,
+    status: issues.length > 0 ? 'partial' : 'success',
+    issues,
+  };
+}
 
 app.get('/oauth/start', (c) => {
   const state = randomBytes(32).toString('hex');
@@ -51,30 +70,31 @@ app.get('/oauth/callback', async (c) => {
   try {
     const tokens = await exchangeCodeForTokens(code);
 
-    const [existing] = await db
-      .select({ id: bunqConnections.id })
-      .from(bunqConnections)
-      .where(eq(bunqConnections.userId, user.id));
-
-    if (existing) {
-      await db
-        .update(bunqConnections)
-        .set({
-          accessToken: tokens.accessToken,
-          syncStatus: 'idle',
-          syncError: null,
-        })
-        .where(eq(bunqConnections.id, existing.id));
-    } else {
-      await db.insert(bunqConnections).values({
+    await db
+      .insert(bunqConnections)
+      .values({
         userId: user.id,
         accessToken: tokens.accessToken,
+      })
+      .onConflictDoUpdate({
+        target: bunqConnections.userId,
+        set: {
+          accessToken: tokens.accessToken,
+          privateKey: null,
+          installationToken: null,
+          serverPublicKey: null,
+          sessionToken: null,
+          sessionId: null,
+          sessionExpiresAt: null,
+          bunqUserId: null,
+          syncStatus: 'idle',
+          syncError: null,
+        },
       });
-    }
 
     return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=connected`);
   } catch (e) {
-    console.error('[bunq oauth callback error]', e);
+    logBunqError('[bunq oauth callback error]', e);
     return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
   }
 });
@@ -105,6 +125,22 @@ app.get('/connection', async (c) => {
 app.delete('/connection', async (c) => {
   const user = getAuthUser(c);
 
+  const [connection] = await db
+    .select({
+      sessionToken: bunqConnections.sessionToken,
+      sessionId: bunqConnections.sessionId,
+    })
+    .from(bunqConnections)
+    .where(eq(bunqConnections.userId, user.id));
+
+  if (connection?.sessionToken && connection.sessionId !== null) {
+    try {
+      await deleteSession(connection.sessionToken, connection.sessionId);
+    } catch (error) {
+      logBunqError('[bunq session delete error]', error);
+    }
+  }
+
   await db.delete(bunqConnections).where(eq(bunqConnections.userId, user.id));
 
   return c.json({ data: { ok: true } }, HTTP_STATUS.OK);
@@ -114,28 +150,50 @@ app.post('/sync/savings', async (c) => {
   const user = getAuthUser(c);
 
   try {
-    await syncBunqSavings(user.id);
+    const result = await syncBunqSavings(user.id);
+    if (result.status === 'skipped') {
+      return c.json({ error: 'No Bunq connection found' }, HTTP_STATUS.NOT_FOUND);
+    }
+    if (result.status === 'partial') {
+      return c.json(
+        { data: { ok: false, status: result.status, issues: result.issues } },
+        HTTP_STATUS.OK,
+      );
+    }
+    return c.json(
+      { data: { ok: true, status: result.status, syncedAt: result.syncedAt?.toISOString() } },
+      HTTP_STATUS.OK,
+    );
   } catch (e) {
-    console.error('[bunq savings sync error]', e);
+    logBunqError('[bunq savings sync error]', e);
     const message = e instanceof Error ? e.message : 'Bunq savings sync failed';
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
-
-  return c.json({ data: { ok: true, syncedAt: new Date().toISOString() } }, HTTP_STATUS.OK);
 });
 
 app.post('/sync/budget', async (c) => {
   const user = getAuthUser(c);
 
   try {
-    await syncBunqBudget(user.id);
+    const result = await syncBunqBudget(user.id);
+    if (result.status === 'skipped') {
+      return c.json({ error: 'No Bunq connection found' }, HTTP_STATUS.NOT_FOUND);
+    }
+    if (result.status === 'partial') {
+      return c.json(
+        { data: { ok: false, status: result.status, issues: result.issues } },
+        HTTP_STATUS.OK,
+      );
+    }
+    return c.json(
+      { data: { ok: true, status: result.status, syncedAt: result.syncedAt?.toISOString() } },
+      HTTP_STATUS.OK,
+    );
   } catch (e) {
-    console.error('[bunq budget sync error]', e);
+    logBunqError('[bunq budget sync error]', e);
     const message = e instanceof Error ? e.message : 'Bunq budget sync failed';
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
-
-  return c.json({ data: { ok: true, syncedAt: new Date().toISOString() } }, HTTP_STATUS.OK);
 });
 
 app.post('/sync', async (c) => {
@@ -153,16 +211,22 @@ app.post('/sync', async (c) => {
   const newerThan = connection.lastSyncAt?.toISOString();
 
   try {
-    await syncBunqSavings(user.id, newerThan, true);
-    await syncBunqBudget(user.id, newerThan);
+    const savingsResult = await syncBunqSavings(user.id, newerThan, true);
+    const budgetResult = await syncBunqBudget(user.id, newerThan, true);
+    const combined = mergeSyncResults(savingsResult, budgetResult);
     const syncedAt = new Date();
-    await db
-      .update(bunqConnections)
-      .set({ lastSyncAt: syncedAt })
-      .where(eq(bunqConnections.id, connection.id));
-    return c.json({ data: { ok: true, syncedAt: syncedAt.toISOString() } }, HTTP_STATUS.OK);
+    if (combined.ok) {
+      await db
+        .update(bunqConnections)
+        .set({ lastSyncAt: syncedAt, syncStatus: 'idle', syncError: null })
+        .where(eq(bunqConnections.id, connection.id));
+    }
+    return c.json(
+      { data: { ...combined, syncedAt: combined.ok ? syncedAt.toISOString() : null } },
+      HTTP_STATUS.OK,
+    );
   } catch (e) {
-    console.error('[bunq sync error]', e);
+    logBunqError('[bunq sync error]', e);
     const message = e instanceof Error ? e.message : 'Bunq sync failed';
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }

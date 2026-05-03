@@ -102,7 +102,6 @@ type BudgetTransactionPayload = {
 
 type BudgetCategoryInsert = typeof budgetCategories.$inferInsert;
 type BudgetTransactionInsert = typeof budgetTransactions.$inferInsert;
-type BudgetTransactionRow = typeof budgetTransactions.$inferSelect;
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function parseBudgetMonthField(value: unknown): ParseResult<BudgetMonth> {
@@ -269,26 +268,8 @@ async function adjustCategorySpent(
 ): Promise<void> {
   await tx
     .update(budgetCategories)
-    .set({ spent: sql`GREATEST(0, ${budgetCategories.spent}::numeric + ${delta}::numeric)::text` })
+    .set({ spent: sql`GREATEST(0, ${budgetCategories.spent} + ${delta}::numeric)` })
     .where(eq(budgetCategories.id, categoryId));
-}
-
-async function adjustSpentForTransactionPatch(
-  tx: DbTransaction,
-  existing: BudgetTransactionRow,
-  nextCategoryId: number,
-  nextAmount: number,
-): Promise<void> {
-  const existingAmount = Number(existing.amount);
-  if (nextCategoryId !== existing.categoryId) {
-    await adjustCategorySpent(tx, existing.categoryId, -existingAmount);
-    await adjustCategorySpent(tx, nextCategoryId, nextAmount);
-    return;
-  }
-
-  if (nextAmount !== existingAmount) {
-    await adjustCategorySpent(tx, existing.categoryId, nextAmount - existingAmount);
-  }
 }
 
 // ── Categories ───────────────────────────────────────────────────────────────
@@ -444,26 +425,44 @@ app.patch('/transactions/:id', async (c) => {
   const body = await readBudgetTransactionPatch(c.req);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const existing = await getOwnedBudgetTransaction(id, user.id);
-  if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(budgetTransactions)
+      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)));
+    if (!existing) return null;
 
-  const nextCategoryId = body.value.categoryId ?? existing.categoryId;
-  const existingAmount = Number(existing.amount);
-  const nextAmount = body.value.amount ?? existingAmount;
-  const categoryChanging = nextCategoryId !== existing.categoryId;
-  if (categoryChanging) {
-    const category = await getOwnedBudgetCategory(nextCategoryId, user.id);
-    if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
-  }
+    const nextCategoryId = body.value.categoryId ?? existing.categoryId;
+    const categoryChanging = nextCategoryId !== existing.categoryId;
+    if (categoryChanging) {
+      const [category] = await tx
+        .select({ id: budgetCategories.id })
+        .from(budgetCategories)
+        .where(and(eq(budgetCategories.id, nextCategoryId), eq(budgetCategories.userId, user.id)));
+      if (!category) return 'category-not-found' as const;
+    }
 
-  const [data] = await db.transaction(async (tx) => {
-    await adjustSpentForTransactionPatch(tx, existing, nextCategoryId, nextAmount);
-    return tx
+    const [updated] = await tx
       .update(budgetTransactions)
       .set(toBudgetTransactionUpdateValues(body.value))
       .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
       .returning();
+    if (!updated) return null;
+
+    const existingAmount = Number(existing.amount);
+    const nextAmount = body.value.amount ?? existingAmount;
+    if (nextCategoryId !== existing.categoryId) {
+      await adjustCategorySpent(tx, existing.categoryId, -existingAmount);
+      await adjustCategorySpent(tx, nextCategoryId, nextAmount);
+    } else if (nextAmount !== existingAmount) {
+      await adjustCategorySpent(tx, existing.categoryId, nextAmount - existingAmount);
+    }
+    return updated;
   });
+  if (result === 'category-not-found') {
+    return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
+  }
+  const data = result;
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });

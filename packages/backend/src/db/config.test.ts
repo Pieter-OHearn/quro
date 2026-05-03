@@ -63,6 +63,13 @@ function clearExplicitDatabaseUrls() {
   delete process.env.DATABASE_URL;
 }
 
+function clearDerivedDatabasePasswords() {
+  delete process.env.APP_DB_PASSWORD;
+  delete process.env.POSTGRES_ADMIN_PASSWORD;
+  delete process.env.POSTGRES_APP_PASSWORD;
+  delete process.env.POSTGRES_PASSWORD;
+}
+
 describe('database config', () => {
   test('prefers explicit runtime URLs over derived values', () => {
     process.env.APP_DATABASE_URL = 'postgres://app:pw@db:5432/runtime';
@@ -74,6 +81,7 @@ describe('database config', () => {
 
   test('derives runtime URL from Docker env and secret files', () => {
     clearExplicitDatabaseUrls();
+    clearDerivedDatabasePasswords();
     process.env.POSTGRES_HOST = 'db';
     process.env.POSTGRES_PORT = '5432';
     process.env.POSTGRES_DB = 'quro';
@@ -99,6 +107,7 @@ describe('database config', () => {
 
   test('derives admin and bootstrap URLs from Docker env and secrets', () => {
     clearExplicitDatabaseUrls();
+    clearDerivedDatabasePasswords();
     process.env.POSTGRES_HOST = 'db';
     process.env.POSTGRES_DB = 'quro';
     process.env.POSTGRES_ADMIN_USER = 'quro_admin';
@@ -114,6 +123,7 @@ describe('database config', () => {
   test('uses Docker-safe defaults instead of localhost fallbacks', () => {
     delete process.env.APP_DATABASE_URL;
     delete process.env.DATABASE_URL;
+    clearDerivedDatabasePasswords();
     delete process.env.POSTGRES_HOST;
     delete process.env.DATABASE_HOST;
     delete process.env.POSTGRES_DB;

@@ -43,6 +43,13 @@
       "when": 1777728826632,
       "tag": "0005_clumsy_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777730000000,
+      "tag": "0006_bunq_sync_hardening",
+      "breakpoints": true
     }
   ]
 }

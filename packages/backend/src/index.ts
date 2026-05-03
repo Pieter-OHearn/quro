@@ -59,7 +59,11 @@ app.use('/api/capabilities', requireAuth);
 app.use('/api/capabilities/*', requireAuth);
 app.use('/api/settings', requireAuth);
 app.use('/api/settings/*', requireAuth);
-app.use('/api/bunq/*', requireAuth);
+app.use('/api/bunq/oauth/start', requireAuth);
+app.use('/api/bunq/oauth/callback', requireAuth);
+app.use('/api/bunq/connection', requireAuth);
+app.use('/api/bunq/sync', requireAuth);
+app.use('/api/bunq/sync/*', requireAuth);
 
 app.route('/api/savings', savings);
 app.route('/api/investments', investments);

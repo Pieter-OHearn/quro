@@ -618,6 +618,12 @@ export const budgetCategories = pgTable(
   },
   (table) => ({
     userIdx: index('budget_categories_user_id_idx').on(table.userId),
+    userMonthNameUnique: uniqueIndex('budget_categories_user_month_name_unique').on(
+      table.userId,
+      table.month,
+      table.year,
+      table.name,
+    ),
   }),
 );
 
@@ -713,6 +719,7 @@ export const bunqConnections = pgTable(
     installationToken: text('installation_token'),
     serverPublicKey: text('server_public_key'),
     sessionToken: text('session_token'),
+    sessionId: integer('session_id'),
     sessionExpiresAt: timestamp('session_expires_at'),
     bunqUserId: text('bunq_user_id'),
     lastSyncAt: timestamp('last_sync_at'),
@@ -720,5 +727,5 @@ export const bunqConnections = pgTable(
     syncError: text('sync_error'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
-  (t) => ({ userIdx: index('bunq_connections_user_id_idx').on(t.userId) }),
+  (t) => ({ userIdx: uniqueIndex('bunq_connections_user_id_idx').on(t.userId) }),
 );

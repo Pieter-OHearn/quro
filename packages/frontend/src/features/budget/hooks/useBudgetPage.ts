@@ -102,9 +102,9 @@ export function useBudgetPage() {
     setShowAdd(false);
   };
 
-  const handleSaveEdit = (form: EditCategoryForm) => {
+  const handleSaveEdit = async (form: EditCategoryForm) => {
     if (!editingCategory) return;
-    updateCategory.mutate({
+    await updateCategory.mutateAsync({
       id: editingCategory.id,
       name: form.name.trim() || editingCategory.name,
       emoji: form.emoji || editingCategory.emoji,

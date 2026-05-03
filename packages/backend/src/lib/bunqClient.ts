@@ -1,4 +1,4 @@
-import { createSign, generateKeyPairSync } from 'node:crypto';
+import { createSign, generateKeyPairSync, randomUUID } from 'node:crypto';
 
 const RATE_LIMIT_RETRY_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
@@ -35,6 +35,7 @@ export type BunqInstallationResult = {
 
 export type BunqSessionResult = {
   sessionToken: string;
+  sessionId: number | null;
   bunqUserId: string;
   expiresAt: Date;
 };
@@ -75,6 +76,11 @@ export type BunqMonetaryAccountsResult = BunqDataResult<BunqMonetaryAccount[]> &
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 type UnknownRecord = Record<string, unknown>;
+type BunqPagination = {
+  olderUrl: string | null;
+  newerUrl: string | null;
+  futureUrl: string | null;
+};
 
 function isRecord(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -111,6 +117,23 @@ function extractBunqItems(payload: unknown, typeName: string): Readonly<UnknownR
   });
 }
 
+function extractPagination(payload: unknown): BunqPagination | null {
+  if (!isRecord(payload)) return null;
+  const response = payload.Response;
+  if (!Array.isArray(response)) return null;
+  for (const item of response) {
+    if (!isRecord(item)) continue;
+    const pagination = item.Pagination;
+    if (!isRecord(pagination)) continue;
+    return {
+      olderUrl: getString(pagination, 'older_url'),
+      newerUrl: getString(pagination, 'newer_url'),
+      futureUrl: getString(pagination, 'future_url'),
+    };
+  }
+  return null;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -133,6 +156,11 @@ async function performFetch(url: string, init: RequestInit): Promise<unknown> {
     throw new Error(msg ?? `Bunq request failed (${response.status}): ${url}`);
   }
   return payload;
+}
+
+function resolveApiUrl(pathOrUrl: string): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  return `${API_BASE_URL}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
 }
 
 function apiGet(url: string, sessionToken: string): Promise<unknown> {
@@ -158,6 +186,7 @@ function apiPost(
       'Content-Type': 'application/json',
       'X-Bunq-Client-Authentication': authToken,
       'X-Bunq-Client-Signature': signBody(bodyStr, privateKeyPem),
+      'X-Bunq-Client-Request-Id': randomUUID(),
       'Cache-Control': 'no-cache',
       'User-Agent': 'quro/1.0',
     },
@@ -260,6 +289,19 @@ function parsePayment(data: Readonly<UnknownRecord>): BunqPayment | null {
 
 const SESSION_DURATION_SECONDS = 25 * 60;
 
+function parseSessionUserId(payload: unknown): string {
+  const userTypes = ['UserPerson', 'UserCompany', 'UserLight', 'UserApiKey'];
+  for (const typeName of userTypes) {
+    const items = extractBunqItems(payload, typeName);
+    if (items.length === 0) continue;
+    const rawId = items[0].id;
+    if (typeof rawId === 'number') return String(rawId);
+    const strId = getString(items[0], 'id');
+    if (strId) return strId;
+  }
+  throw new Error('Could not determine Bunq user ID from session response');
+}
+
 // ── Exported functions ────────────────────────────────────────────────────────
 
 export function generateKeyPair(): BunqKeyPair {
@@ -336,27 +378,14 @@ export async function createSession(
   const tokens = extractBunqItems(payload, 'Token');
   const sessionToken = tokens.length > 0 ? getString(tokens[0], 'token') : null;
   if (!sessionToken) throw new Error('Missing session token in Bunq response');
+  const rawSessionId = tokens.length > 0 ? tokens[0].id : null;
+  const sessionId = typeof rawSessionId === 'number' ? rawSessionId : null;
+  if (sessionId === null) throw new Error('Missing session ID in Bunq response');
 
-  const userTypes = ['UserPerson', 'UserCompany', 'UserLight', 'UserApiKey'];
-  let bunqUserId: string | null = null;
-  for (const typeName of userTypes) {
-    const items = extractBunqItems(payload, typeName);
-    if (items.length === 0) continue;
-    const rawId = items[0].id;
-    if (typeof rawId === 'number') {
-      bunqUserId = String(rawId);
-      break;
-    }
-    const strId = getString(items[0], 'id');
-    if (strId) {
-      bunqUserId = strId;
-      break;
-    }
-  }
-  if (!bunqUserId) throw new Error('Could not determine Bunq user ID from session response');
+  const bunqUserId = parseSessionUserId(payload);
 
   const expiresAt = new Date(Date.now() + SESSION_DURATION_SECONDS * 1000);
-  return { sessionToken, bunqUserId, expiresAt };
+  return { sessionToken, sessionId, bunqUserId, expiresAt };
 }
 
 export async function fetchMonetaryAccounts(
@@ -373,9 +402,41 @@ export async function fetchPayments(
   accountId: number,
   newerThan?: string,
 ): Promise<BunqPayment[]> {
+  const cutoffTime = newerThan ? Date.parse(newerThan) : null;
+  const payments: BunqPayment[] = [];
   const url = new URL(`${API_BASE_URL}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
-  if (newerThan !== undefined) url.searchParams.set('newer_than', newerThan);
-  const payload = await apiGet(url.toString(), sessionToken);
-  const rawItems = extractBunqItems(payload, 'Payment');
-  return rawItems.map(parsePayment).filter((p): p is BunqPayment => p !== null);
+  url.searchParams.set('count', '200');
+
+  let nextUrl: string | null = url.toString();
+  while (nextUrl) {
+    const payload = await apiGet(resolveApiUrl(nextUrl), sessionToken);
+    const page = extractBunqItems(payload, 'Payment')
+      .map(parsePayment)
+      .filter((p): p is BunqPayment => p !== null);
+    let reachedCutoff = false;
+    for (const payment of page) {
+      const createdTime = Date.parse(payment.created);
+      if (!Number.isFinite(createdTime)) continue;
+      if (cutoffTime !== null && createdTime <= cutoffTime) {
+        reachedCutoff = true;
+        continue;
+      }
+      payments.push(payment);
+    }
+    if (reachedCutoff) break;
+    nextUrl = extractPagination(payload)?.olderUrl ?? null;
+  }
+
+  return payments;
+}
+
+export async function deleteSession(sessionToken: string, sessionId: number): Promise<void> {
+  await performFetch(`${API_BASE_URL}/session/${sessionId}`, {
+    method: 'DELETE',
+    headers: {
+      'X-Bunq-Client-Authentication': sessionToken,
+      'Cache-Control': 'no-cache',
+      'User-Agent': 'quro/1.0',
+    },
+  });
 }

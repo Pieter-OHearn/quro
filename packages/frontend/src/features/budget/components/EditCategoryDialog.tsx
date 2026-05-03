@@ -43,9 +43,18 @@ function ColorSwatches({ selected, onSelect }: Readonly<ColorSwatchesProps>) {
 type EditCategoryDialogProps = {
   category: BudgetCategory;
   isSaving: boolean;
-  onSave: (form: EditCategoryForm) => void;
+  onSave: (form: EditCategoryForm) => Promise<void>;
   onClose: () => void;
 };
+
+function DialogError({ message }: Readonly<{ message: string | null }>) {
+  if (!message) return null;
+  return (
+    <div className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+      {message}
+    </div>
+  );
+}
 
 export function EditCategoryDialog({
   category,
@@ -59,6 +68,7 @@ export function EditCategoryDialog({
     budgeted: String(category.budgeted),
     color: category.color,
   });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm({
@@ -72,6 +82,15 @@ export function EditCategoryDialog({
   const set = <K extends keyof EditCategoryForm>(key: K, value: EditCategoryForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const handleSave = async () => {
+    setError(null);
+    try {
+      await onSave(form);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save category');
+    }
+  };
+
   return (
     <Modal
       title="Edit category"
@@ -82,12 +101,15 @@ export function EditCategoryDialog({
         <ModalFooter
           confirmLabel={isSaving ? 'Saving…' : 'Save'}
           disabled={isSaving}
-          onConfirm={() => onSave(form)}
+          onConfirm={() => {
+            void handleSave();
+          }}
           onCancel={onClose}
         />
       }
     >
       <div className="space-y-4">
+        <DialogError message={error} />
         <div className="flex gap-3">
           <EmojiPickerField label="Icon" value={form.emoji} onChange={(e) => set('emoji', e)} />
           <FormField label="Name" className="flex-1">
