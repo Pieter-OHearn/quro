@@ -25,6 +25,7 @@ import {
   getReadinessStatusCode,
 } from './lib/readiness';
 import { startSessionCleanup } from './lib/sessionCleanup';
+import { startBunqSyncScheduler } from './lib/bunqSyncScheduler';
 
 export const app = new Hono();
 
@@ -81,6 +82,7 @@ app.route('/api/settings', settings);
 app.route('/api/bunq', bunq);
 
 startSessionCleanup();
+startBunqSyncScheduler();
 
 export default {
   port: parseInt(process.env.PORT || '3000'),
