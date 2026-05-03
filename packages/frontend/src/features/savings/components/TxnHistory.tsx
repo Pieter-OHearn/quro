@@ -45,7 +45,7 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
       filterOptions={FILTER_OPTIONS}
       filter={filter}
       onFilterChange={(key) => setFilter(key as TxnType | 'all')}
-      onAdd={onAdd}
+      onAdd={account.bunqAccountId ? undefined : onAdd}
       isEmpty={sorted.length === 0}
       footer={
         totalPages > 1 ? (

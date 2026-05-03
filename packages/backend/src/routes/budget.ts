@@ -481,7 +481,7 @@ app.delete('/transactions/:id', async (c) => {
       .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
       .returning();
     if (deleted[0]) {
-      await adjustCategorySpent(tx, existing.categoryId, -Number(existing.amount));
+      await adjustCategorySpent(tx, deleted[0].categoryId, -Number(deleted[0].amount));
     }
     return deleted;
   });

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
@@ -19,6 +19,33 @@ const FRONTEND_SETTINGS_PATH = FRONTEND_ORIGIN
   ? `${FRONTEND_ORIGIN}/settings`
   : 'http://localhost:5173/settings';
 
+const BUNQ_STATE_KEY = process.env.BUNQ_CLIENT_SECRET ?? '';
+
+function buildOAuthState(userId: number, nonce: string): string {
+  const payload = `${userId}:${nonce}`;
+  const sig = createHmac('sha256', BUNQ_STATE_KEY).update(payload).digest('hex');
+  return `${payload}.${sig}`;
+}
+
+function verifyOAuthState(state: string, userId: number): boolean {
+  const dotIdx = state.lastIndexOf('.');
+  if (dotIdx === -1) return false;
+  const payload = state.slice(0, dotIdx);
+  const sig = state.slice(dotIdx + 1);
+  const expectedSig = createHmac('sha256', BUNQ_STATE_KEY).update(payload).digest('hex');
+  try {
+    const expectedBuf = Buffer.from(expectedSig, 'hex');
+    const actualBuf = Buffer.from(sig, 'hex');
+    if (expectedBuf.length !== actualBuf.length) return false;
+    if (!timingSafeEqual(expectedBuf, actualBuf)) return false;
+  } catch {
+    return false;
+  }
+  const colonIdx = payload.indexOf(':');
+  if (colonIdx === -1) return false;
+  return parseInt(payload.slice(0, colonIdx), 10) === userId;
+}
+
 function logBunqError(label: string, error: unknown): void {
   const message = error instanceof Error ? error.message : 'Unknown Bunq error';
   console.error(label, { message });
@@ -37,7 +64,9 @@ function mergeSyncResults(
 }
 
 app.get('/oauth/start', (c) => {
-  const state = randomBytes(32).toString('hex');
+  const user = getAuthUser(c);
+  const nonce = randomBytes(32).toString('hex');
+  const state = buildOAuthState(user.id, nonce);
 
   setCookie(c, STATE_COOKIE, state, {
     httpOnly: true,
@@ -66,6 +95,10 @@ app.get('/oauth/callback', async (c) => {
   }
 
   const user = getAuthUser(c);
+
+  if (!verifyOAuthState(storedState, user.id)) {
+    return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
+  }
 
   try {
     const tokens = await exchangeCodeForTokens(code);

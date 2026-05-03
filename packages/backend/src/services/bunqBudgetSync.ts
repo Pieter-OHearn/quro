@@ -293,9 +293,11 @@ async function importBudgetPayment(
   payment: BunqPayment,
   ownIbans: ReadonlySet<string>,
   bunqUserId: string,
+  accountCurrency: string,
 ): Promise<void> {
   if (!isDebit(payment)) return;
   if (isSelfTransfer(payment, ownIbans, bunqUserId)) return;
+  if (payment.amount.currency !== accountCurrency) return;
 
   const dateStr = toTransactionDate(payment.created);
   const { month, year } = parseMonthYear(dateStr);
@@ -398,7 +400,13 @@ async function importBudgetPaymentsForAccount(params: {
   const issues: BunqSyncIssue[] = [];
   for (const payment of payments) {
     try {
-      await importBudgetPayment(params.userId, payment, params.ownIbans, params.bunqUserId);
+      await importBudgetPayment(
+        params.userId,
+        payment,
+        params.ownIbans,
+        params.bunqUserId,
+        params.account.balance.currency,
+      );
     } catch (error) {
       issues.push({
         accountId: params.account.id,

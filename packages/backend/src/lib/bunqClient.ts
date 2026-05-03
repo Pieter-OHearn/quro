@@ -415,7 +415,7 @@ export async function fetchPayments(
       .filter((p): p is BunqPayment => p !== null);
     let reachedCutoff = false;
     for (const payment of page) {
-      const createdTime = Date.parse(payment.created);
+      const createdTime = Date.parse(payment.created.replace(' ', 'T') + 'Z');
       if (!Number.isFinite(createdTime)) continue;
       if (cutoffTime !== null && createdTime <= cutoffTime) {
         reachedCutoff = true;

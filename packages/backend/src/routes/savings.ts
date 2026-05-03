@@ -393,6 +393,12 @@ app.post('/transactions', async (c) => {
 
   const account = await getOwnedSavingsAccount(body.value.accountId, user.id);
   if (!account) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
+  if (account.bunqAccountId) {
+    return c.json(
+      { error: 'Cannot add manual transactions to a Bunq-synced account' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
 
   const [data] = await db
     .insert(savingsTransactions)
@@ -424,6 +430,14 @@ app.patch('/transactions/:id', async (c) => {
 
   const existing = await getOwnedSavingsTransaction(id, user.id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
+  const existingAccount = await getOwnedSavingsAccount(existing.accountId, user.id);
+  if (existingAccount?.bunqAccountId) {
+    return c.json(
+      { error: 'Cannot modify transactions on a Bunq-synced account' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
 
   const nextState = resolveNextSavingsTransactionState(body.value, existing);
   const accountValidationError = await validatePatchedSavingsTransactionAccount({
@@ -459,6 +473,17 @@ app.delete('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
+
+  const toDelete = await getOwnedSavingsTransaction(id, user.id);
+  if (!toDelete) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
+  const deleteAccount = await getOwnedSavingsAccount(toDelete.accountId, user.id);
+  if (deleteAccount?.bunqAccountId) {
+    return c.json(
+      { error: 'Cannot delete transactions from a Bunq-synced account' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
 
   const [data] = await db
     .delete(savingsTransactions)
