@@ -59,9 +59,11 @@ export function Budget() {
       </ContentSection>
       <ContentSection>
         <RecentTransactionsList
-          transactions={page.recentTransactions}
+          transactions={page.monthlyTransactions}
           categories={page.categories}
           fmtDec={page.fmtDec}
+          selectedMonth={page.selectedMonth}
+          selectedYear={page.selectedYear}
           onDelete={page.handleDeleteTransaction}
           onChangeCategory={page.handleChangeTxCategory}
         />

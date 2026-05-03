@@ -370,6 +370,103 @@ describe('savings integration', () => {
     });
   });
 
+  test('removes savings accounts without deleting transactions unless cascade is explicit', async () => {
+    const owner = await integration.signUp('savings-remove-preserve');
+
+    const createAccountResponse = await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Closed Reserve',
+        bank: 'Monzo',
+        balance: 300,
+        currency: 'EUR',
+        interestRate: 1.2,
+        accountType: 'Easy Access',
+        color: '#2563eb',
+        emoji: 'R',
+      },
+    });
+    expect(createAccountResponse.status).toBe(201);
+    const account = (await createAccountResponse.json()) as {
+      data: {
+        id: number;
+      };
+    };
+
+    const createTransactionResponse = await integration.request('/api/savings/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        accountId: account.data.id,
+        type: 'deposit',
+        amount: 75,
+        date: '2026-03-20',
+        note: 'Historical top up',
+      },
+    });
+    expect(createTransactionResponse.status).toBe(201);
+    const transaction = (await createTransactionResponse.json()) as {
+      data: {
+        id: number;
+      };
+    };
+
+    const removeAccountResponse = await integration.request(
+      `/api/savings/accounts/${account.data.id}`,
+      {
+        method: 'DELETE',
+        cookie: owner.cookie,
+      },
+    );
+    expect(removeAccountResponse.status).toBe(200);
+    const removedAccount = (await removeAccountResponse.json()) as {
+      data: {
+        archivedAt: string | null;
+      };
+    };
+    expect(removedAccount.data.archivedAt).toBeTruthy();
+
+    const activeAccountsResponse = await integration.request('/api/savings/accounts', {
+      cookie: owner.cookie,
+    });
+    expect(activeAccountsResponse.status).toBe(200);
+    const activeAccounts = (await activeAccountsResponse.json()) as {
+      data: Array<{ id: number }>;
+    };
+    expect(activeAccounts.data.some((row) => row.id === account.data.id)).toBe(false);
+
+    const transactionsResponse = await integration.request('/api/savings/transactions', {
+      cookie: owner.cookie,
+    });
+    expect(transactionsResponse.status).toBe(200);
+    const transactions = (await transactionsResponse.json()) as {
+      data: Array<{ id: number; accountId: number }>;
+    };
+    const preservedTransaction = transactions.data.find((row) => row.id === transaction.data.id);
+    expect(preservedTransaction).toMatchObject({
+      id: transaction.data.id,
+      accountId: account.data.id,
+    });
+
+    const cascadeDeleteResponse = await integration.request(
+      `/api/savings/accounts/${account.data.id}?cascade=true`,
+      {
+        method: 'DELETE',
+        cookie: owner.cookie,
+      },
+    );
+    expect(cascadeDeleteResponse.status).toBe(200);
+
+    const deletedTransactionLookupResponse = await integration.request(
+      `/api/savings/transactions/${transaction.data.id}`,
+      {
+        cookie: owner.cookie,
+      },
+    );
+    expect(deletedTransactionLookupResponse.status).toBe(404);
+  });
+
   test('enforces account ownership and rejects invalid transaction account ids', async () => {
     const owner = await integration.signUp('savings-cross-owner');
     const intruder = await integration.signUp('savings-cross-intruder');

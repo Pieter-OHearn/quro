@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   budgetCategories,
@@ -43,6 +43,11 @@ const MCC_SOURCE = 'mcc';
 
 type BunqConnectionRow = typeof bunqConnections.$inferSelect;
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type BudgetCategoryTemplate = {
+  budgeted: string;
+  emoji: string | null;
+  color: string | null;
+};
 export type BunqSyncIssue = {
   accountId?: number;
   paymentId?: string;
@@ -157,7 +162,48 @@ function parseMonthYear(dateStr: string): { month: string; year: number } {
   return { month: BUDGET_MONTHS[monthIndex], year };
 }
 
-async function findOrCreateCategoryByName(
+const budgetCategoryMonthIndex = sql<number>`case ${budgetCategories.month}
+  when 'Jan' then 0
+  when 'Feb' then 1
+  when 'Mar' then 2
+  when 'Apr' then 3
+  when 'May' then 4
+  when 'Jun' then 5
+  when 'Jul' then 6
+  when 'Aug' then 7
+  when 'Sep' then 8
+  when 'Oct' then 9
+  when 'Nov' then 10
+  when 'Dec' then 11
+  else -1
+end`;
+
+async function findLatestCategoryTemplate(
+  tx: DbTransaction,
+  userId: number,
+  name: string,
+): Promise<BudgetCategoryTemplate | null> {
+  const [template] = await tx
+    .select({
+      budgeted: budgetCategories.budgeted,
+      emoji: budgetCategories.emoji,
+      color: budgetCategories.color,
+    })
+    .from(budgetCategories)
+    .where(
+      and(
+        eq(budgetCategories.userId, userId),
+        eq(budgetCategories.name, name),
+        gt(budgetCategories.budgeted, '0'),
+      ),
+    )
+    .orderBy(desc(budgetCategories.year), desc(budgetCategoryMonthIndex), desc(budgetCategories.id))
+    .limit(1);
+
+  return template ?? null;
+}
+
+export async function findOrCreateCategoryByName(
   tx: DbTransaction,
   userId: number,
   name: string,
@@ -179,15 +225,16 @@ async function findOrCreateCategoryByName(
   if (existing) return existing.id;
 
   const preset = CATEGORY_PRESETS[name] ?? DEFAULT_CATEGORY_PRESET;
+  const template = await findLatestCategoryTemplate(tx, userId, name);
   const [inserted] = await tx
     .insert(budgetCategories)
     .values({
       userId,
       name,
-      emoji: preset.emoji,
-      budgeted: '0',
+      emoji: template?.emoji ?? preset.emoji,
+      budgeted: template?.budgeted ?? '0',
       spent: '0',
-      color: preset.color,
+      color: template?.color ?? preset.color,
       month,
       year,
     })

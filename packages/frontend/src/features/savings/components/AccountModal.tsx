@@ -11,15 +11,16 @@ import {
   TextInput,
   SelectInput,
   EmojiPickerField,
+  Button,
 } from '@/components/ui';
 import type { SavingsAccount } from '@quro/shared';
-import type { SaveAccountInput } from '../types';
+import type { DeleteSavingsAccountMode, SaveAccountInput } from '../types';
 
 type AccountModalProps = {
   existing?: SavingsAccount;
   onClose: () => void;
   onSave: (account: SaveAccountInput) => Promise<void>;
-  onDelete?: (id: number) => Promise<void>;
+  onDelete?: (id: number, mode: DeleteSavingsAccountMode) => Promise<void>;
 };
 
 const ACCOUNT_TYPES: ('Easy Access' | 'Term Deposit')[] = ['Easy Access', 'Term Deposit'];
@@ -282,7 +283,7 @@ type DeleteConfirmationProps = {
   submitError: string | null;
   onConfirmNameChange: (value: string) => void;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (mode: DeleteSavingsAccountMode) => void;
 };
 
 function DeleteConfirmation({
@@ -296,16 +297,33 @@ function DeleteConfirmation({
   const nameMatches = confirmName.trim() === existing.name.trim();
   return (
     <Modal
-      title="Delete Account"
-      subtitle={`This will permanently delete "${existing.name}" and all its transactions.`}
+      title="Remove Account"
+      subtitle={`Remove keeps "${existing.name}" transactions for history. Delete all removes the account and its transactions.`}
       onClose={onCancel}
       footer={
-        <ModalFooter
-          onCancel={onCancel}
-          onConfirm={onConfirm}
-          confirmLabel="Delete"
-          disabled={!nameMatches}
-        />
+        <>
+          <Button onClick={onCancel} variant="secondary" size="lg" className="flex-1">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onConfirm('preserveTransactions')}
+            disabled={!nameMatches}
+            variant="primary"
+            size="lg"
+            className="flex-1"
+          >
+            Remove
+          </Button>
+          <Button
+            onClick={() => onConfirm('deleteTransactions')}
+            disabled={!nameMatches}
+            variant="danger"
+            size="lg"
+            className="flex-1"
+          >
+            Delete all
+          </Button>
+        </>
       }
     >
       <SubmitError message={submitError} />
@@ -337,7 +355,7 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
       <button
         onClick={() => setConfirmingDelete(true)}
         className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-        title="Delete account"
+        title="Remove account"
       >
         <Trash2 size={14} />
       </button>
@@ -355,11 +373,11 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
         submitError={submitError}
         onConfirmNameChange={setConfirmName}
         onCancel={closeDeleteConfirmation}
-        onConfirm={() => {
+        onConfirm={(mode) => {
           void (async () => {
             setSubmitError(null);
             try {
-              await onDelete!(existing.id);
+              await onDelete!(existing.id, mode);
               onClose();
             } catch (e) {
               setSubmitError(e instanceof Error ? e.message : 'Failed to delete account');

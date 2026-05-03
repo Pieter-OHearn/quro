@@ -142,6 +142,7 @@ export const savingsAccounts = pgTable(
     color: text('color'),
     emoji: text('emoji'),
     bunqAccountId: text('bunq_account_id'),
+    archivedAt: timestamp('archived_at'),
   },
   (table) => ({
     userIdx: index('savings_accounts_user_id_idx').on(table.userId),

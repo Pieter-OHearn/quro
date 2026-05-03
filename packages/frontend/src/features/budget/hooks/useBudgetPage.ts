@@ -5,7 +5,7 @@ import {
   buildCreateBudgetCategoryInput,
   createEmptyCategoryForm,
   deriveBudgetStats,
-  mapRecentTransactions,
+  mapMonthlyTransactions,
 } from '../utils/budget-data';
 import type { BudgetCategory, EditCategoryForm } from '../types';
 import { useBudgetCategories } from './useBudgetCategories';
@@ -88,7 +88,7 @@ export function useBudgetPage() {
   const budgetTransactions = transactionsQuery.data ?? [];
   const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } =
     deriveBudgetStats(categories);
-  const recentTransactions = mapRecentTransactions(budgetTransactions, categories);
+  const monthlyTransactions = mapMonthlyTransactions(budgetTransactions, categories);
 
   const handleAddCategory = () => {
     if (!newCat.name || !newCat.budgeted) return;
@@ -131,7 +131,7 @@ export function useBudgetPage() {
     savingsRate,
     overBudget,
     pieData,
-    recentTransactions,
+    monthlyTransactions,
     ...monthSelection,
     showAdd,
     newCat,

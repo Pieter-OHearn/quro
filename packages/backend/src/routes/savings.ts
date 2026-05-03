@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
@@ -209,11 +209,26 @@ function toSavingsTransactionUpdateValues(
   };
 }
 
-async function getOwnedSavingsAccount(accountId: number, userId: number) {
+function getSavingsAccountPredicate(
+  accountId: number,
+  userId: number,
+  options: { includeArchived?: boolean } = {},
+) {
+  const basePredicate = and(eq(savingsAccounts.id, accountId), eq(savingsAccounts.userId, userId));
+  return options.includeArchived
+    ? basePredicate
+    : and(basePredicate, isNull(savingsAccounts.archivedAt));
+}
+
+async function getOwnedSavingsAccount(
+  accountId: number,
+  userId: number,
+  options: { includeArchived?: boolean } = {},
+) {
   const [account] = await db
     .select()
     .from(savingsAccounts)
-    .where(and(eq(savingsAccounts.id, accountId), eq(savingsAccounts.userId, userId)));
+    .where(getSavingsAccountPredicate(accountId, userId, options));
   return account ?? null;
 }
 
@@ -279,7 +294,15 @@ async function validatePatchedSavingsTransactionAccount(params: {
 
 app.get('/accounts', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, user.id));
+  const includeArchived = c.req.query('includeArchived') === 'true';
+  const data = await db
+    .select()
+    .from(savingsAccounts)
+    .where(
+      includeArchived
+        ? eq(savingsAccounts.userId, user.id)
+        : and(eq(savingsAccounts.userId, user.id), isNull(savingsAccounts.archivedAt)),
+    );
   return c.json({ data });
 });
 
@@ -325,7 +348,7 @@ app.patch('/accounts/:id', async (c) => {
   const [data] = await db
     .update(savingsAccounts)
     .set(toSavingsAccountUpdateValues(body.value))
-    .where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, user.id)))
+    .where(getSavingsAccountPredicate(id, user.id))
     .returning();
   if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
@@ -336,9 +359,19 @@ app.delete('/accounts/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid account id' }, HTTP_STATUS.BAD_REQUEST);
 
+  if (c.req.query('cascade') === 'true') {
+    const [data] = await db
+      .delete(savingsAccounts)
+      .where(getSavingsAccountPredicate(id, user.id, { includeArchived: true }))
+      .returning();
+    if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
+    return c.json({ data });
+  }
+
   const [data] = await db
-    .delete(savingsAccounts)
-    .where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, user.id)))
+    .update(savingsAccounts)
+    .set({ archivedAt: new Date() })
+    .where(getSavingsAccountPredicate(id, user.id))
     .returning();
   if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
@@ -431,7 +464,9 @@ app.patch('/transactions/:id', async (c) => {
   const existing = await getOwnedSavingsTransaction(id, user.id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const existingAccount = await getOwnedSavingsAccount(existing.accountId, user.id);
+  const existingAccount = await getOwnedSavingsAccount(existing.accountId, user.id, {
+    includeArchived: true,
+  });
   if (existingAccount?.bunqAccountId) {
     return c.json(
       { error: 'Cannot modify transactions on a Bunq-synced account' },
@@ -477,7 +512,9 @@ app.delete('/transactions/:id', async (c) => {
   const toDelete = await getOwnedSavingsTransaction(id, user.id);
   if (!toDelete) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const deleteAccount = await getOwnedSavingsAccount(toDelete.accountId, user.id);
+  const deleteAccount = await getOwnedSavingsAccount(toDelete.accountId, user.id, {
+    includeArchived: true,
+  });
   if (deleteAccount?.bunqAccountId) {
     return c.json(
       { error: 'Cannot delete transactions from a Bunq-synced account' },

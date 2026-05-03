@@ -74,7 +74,7 @@ export type BudgetPageData = {
   savingsRate: number;
   overBudget: BudgetCategory[];
   pieData: PieEntry[];
-  recentTransactions: RecentBudgetTx[];
+  monthlyTransactions: RecentBudgetTx[];
   showAdd: boolean;
   newCat: NewCategoryForm;
   toggleAdd: () => void;

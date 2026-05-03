@@ -3,13 +3,15 @@ import { useCreateSavingsTransaction } from './useCreateSavingsTransaction';
 import { useDeleteSavingsAccount } from './useDeleteSavingsAccount';
 import { useDeleteSavingsTransaction } from './useDeleteSavingsTransaction';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
-import { useSavingsAccounts } from './useSavingsAccounts';
+import { useSavingsAccountsQuery } from './useSavingsAccounts';
 import { useSavingsTransactions } from './useSavingsTransactions';
 import { useUpdateSavingsAccount } from './useUpdateSavingsAccount';
 import { useUpdateSavingsTransaction } from './useUpdateSavingsTransaction';
 
 export function useSavingsData() {
-  const accountsQuery = useSavingsAccounts();
+  const accountsQuery = useSavingsAccountsQuery(true);
+  const accounts = accountsQuery.data ?? [];
+  const activeAccounts = accounts.filter((account) => !account.archivedAt);
   const transactionsQuery = useSavingsTransactions();
   const createAccount = useCreateSavingsAccount();
   const updateAccount = useUpdateSavingsAccount();
@@ -19,7 +21,8 @@ export function useSavingsData() {
   const deleteTxn = useDeleteSavingsTransaction();
 
   return {
-    accounts: accountsQuery.data ?? [],
+    accounts: activeAccounts,
+    allAccounts: accounts,
     transactions: transactionsQuery.data ?? [],
     loadingAccounts: accountsQuery.isLoading,
     loadingTxns: transactionsQuery.isLoading,

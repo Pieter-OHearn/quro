@@ -71,23 +71,33 @@ export function buildContribChartData(
 export function buildGrowthChartData(
   transactions: SavingsTransaction[],
   accounts: SavingsAccount[],
-  totalInBase: number,
   convertToBase: ConvertToBaseFn,
 ): SavingsChartDatum[] {
+  function isArchivedAtCutoff(account: SavingsAccount, cutoff: string): boolean {
+    return Boolean(account.archivedAt && account.archivedAt.slice(0, 10) <= cutoff);
+  }
+
   return MONTH_PREFIXES.map(({ label, prefix }) => {
     const cutoff = `${prefix}-31`;
-    const futureTransactions = transactions.filter((transaction) => transaction.date > cutoff);
 
-    const futureEffect = futureTransactions.reduce((sum, transaction) => {
-      const account = accounts.find((item) => item.id === transaction.accountId);
-      const amountInBase = convertToBase(transaction.amount, account?.currency ?? 'EUR');
+    const savingsAtCutoff = accounts.reduce((sum, account) => {
+      if (isArchivedAtCutoff(account, cutoff)) return sum;
 
-      return transaction.type === 'withdrawal' ? sum - amountInBase : sum + amountInBase;
+      const futureEffect = transactions
+        .filter((transaction) => transaction.accountId === account.id && transaction.date > cutoff)
+        .reduce((transactionSum, transaction) => {
+          const amountInBase = convertToBase(transaction.amount, account.currency);
+          return transaction.type === 'withdrawal'
+            ? transactionSum - amountInBase
+            : transactionSum + amountInBase;
+        }, 0);
+
+      return sum + convertToBase(account.balance, account.currency) - futureEffect;
     }, 0);
 
     return {
       month: label,
-      savings: Math.max(0, Math.round(totalInBase - futureEffect)),
+      savings: Math.max(0, Math.round(savingsAtCutoff)),
     };
   });
 }

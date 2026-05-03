@@ -58,6 +58,7 @@ export type SavingsAccount = {
   color: string;
   emoji: string;
   bunqAccountId?: string | null;
+  archivedAt?: string | null;
 };
 
 export type SavingsTransaction = {

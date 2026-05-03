@@ -1,7 +1,7 @@
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { AccountModal } from './AccountModal';
 import { AddTxnModal } from './AddTxnModal';
-import type { SaveAccountInput, SaveTransactionInput } from '../types';
+import type { DeleteSavingsAccountMode, SaveAccountInput, SaveTransactionInput } from '../types';
 
 type SavingsModalsProps = {
   accounts: SavingsAccount[];
@@ -11,7 +11,7 @@ type SavingsModalsProps = {
   editingTxn: SavingsTransaction | null;
   onCloseAccountModal: () => void;
   onSaveAccount: (account: SaveAccountInput) => Promise<void>;
-  onDeleteAccount: (id: number) => Promise<void>;
+  onDeleteAccount: (id: number, mode: DeleteSavingsAccountMode) => Promise<void>;
   onCloseTxnModal: () => void;
   onSaveTxn: (transaction: SaveTransactionInput) => void;
 };

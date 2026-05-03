@@ -23,11 +23,11 @@ export function deriveBudgetStats(categories: readonly BudgetCategory[]): Budget
   return { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData };
 }
 
-export function mapRecentTransactions(
+export function mapMonthlyTransactions(
   budgetTransactions: readonly BudgetTx[],
   categories: readonly BudgetCategory[],
 ): RecentBudgetTx[] {
-  return budgetTransactions.slice(0, 10).map((transaction) => {
+  return budgetTransactions.map((transaction) => {
     const category = categories.find((item) => item.id === transaction.categoryId);
 
     return {

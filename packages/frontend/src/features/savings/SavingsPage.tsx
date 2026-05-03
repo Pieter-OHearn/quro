@@ -10,7 +10,7 @@ import {
   useSavingsData,
   useSavingsMetrics,
 } from './hooks';
-import type { SaveAccountInput, SaveTransactionInput } from './types';
+import type { DeleteSavingsAccountMode, SaveAccountInput, SaveTransactionInput } from './types';
 
 type SavingsPageBodyProps = {
   accounts: SavingsAccount[];
@@ -29,7 +29,7 @@ type SavingsPageBodyProps = {
   addTxnFor: SavingsAccount | null;
   editingTxn: SavingsTransaction | null;
   onSaveAccount: (account: SaveAccountInput) => Promise<void>;
-  onDeleteAccount: (id: number) => Promise<void>;
+  onDeleteAccount: (id: number, mode: DeleteSavingsAccountMode) => Promise<void>;
   onSaveTxn: (transaction: SaveTransactionInput) => void;
   onDeleteTxn: (id: number) => void;
   contribChartData: ReturnType<typeof useContribChartData>;
@@ -122,6 +122,7 @@ export function Savings() {
   const { fmtBase, fmtNative, convertToBase, isForeign, baseCurrency } = useCurrency();
   const {
     accounts,
+    allAccounts,
     transactions,
     loadingAccounts,
     loadingTxns,
@@ -150,8 +151,8 @@ export function Savings() {
   };
 
   const { totalInBase, totalInterest, avgRate } = useSavingsMetrics(accounts, convertToBase);
-  const contribChartData = useContribChartData(transactions, accounts, convertToBase);
-  const growthChartData = useGrowthChartData(transactions, accounts, totalInBase, convertToBase);
+  const contribChartData = useContribChartData(transactions, allAccounts, convertToBase);
+  const growthChartData = useGrowthChartData(transactions, allAccounts, convertToBase);
 
   if (loadingAccounts || loadingTxns) {
     return <LoadingSpinner />;
@@ -177,7 +178,7 @@ export function Savings() {
       editing={editing}
       addTxnFor={addTxnFor}
       onSaveAccount={onSaveAccount}
-      onDeleteAccount={(id) => deleteAccount.mutateAsync(id)}
+      onDeleteAccount={(id, mode) => deleteAccount.mutateAsync({ id, mode })}
       onSaveTxn={(transaction) => {
         if (transaction.id) {
           const { id, ...payload } = transaction;

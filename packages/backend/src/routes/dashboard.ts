@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   budgetTransactions,
@@ -35,6 +35,12 @@ const toNumber = (value: unknown): number => {
 
 function toUtcTimestamp(value: string): number {
   return Date.parse(`${value}T00:00:00Z`);
+}
+
+function toOptionalTimestamp(value: Date | string | null | undefined): number | null {
+  if (!value) return null;
+  const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function monthStartUtc(timestamp: number): number {
@@ -103,6 +109,7 @@ function computeSharesByHolding(
 }
 
 type SavingsAccountRow = { id: number; balance: unknown; currency: string };
+type HistoricalSavingsAccountRow = SavingsAccountRow & { archivedAt?: Date | string | null };
 type SavingsTransactionRow = { accountId: number; type: string; amount: unknown; date: string };
 type HoldingRow = { id: number; currentPrice: unknown; currency: string };
 type HoldingTransactionRow = { holdingId: number; type: string; shares: unknown; date: string };
@@ -412,7 +419,10 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
     userDebts,
   ] = await Promise.all([
     getRatesToBaseCurrency(),
-    db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, userId)),
+    db
+      .select()
+      .from(savingsAccounts)
+      .where(and(eq(savingsAccounts.userId, userId), isNull(savingsAccounts.archivedAt))),
     db.select().from(holdings).where(eq(holdings.userId, userId)),
     db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
     db.select().from(properties).where(eq(properties.userId, userId)),
@@ -454,12 +464,15 @@ function buildRollingMonths() {
 }
 
 function computeSavingsAtCutoff(
-  accounts: readonly SavingsAccountRow[],
+  accounts: readonly HistoricalSavingsAccountRow[],
   txnsByAccountId: ReadonlyMap<number, readonly DatedSavingsTransaction[]>,
   cutoff: number,
   rates: Map<string, number>,
 ): number {
   return accounts.reduce((sum, account) => {
+    const archivedAt = toOptionalTimestamp(account.archivedAt);
+    if (archivedAt !== null && archivedAt <= cutoff) return sum;
+
     let balance = toNumber(account.balance);
     for (const transaction of txnsByAccountId.get(account.id) ?? []) {
       if (transaction.timestamp <= cutoff) continue;
@@ -559,7 +572,7 @@ function computePropertyEquityAtCutoff(
 
 type NetWorthSourceData = {
   rates: Map<string, number>;
-  savings: SavingsAccountRow[];
+  savings: HistoricalSavingsAccountRow[];
   savingsTransactions: SavingsTransactionRow[];
   holdings: HoldingRow[];
   holdingTransactions: HoldingTransactionRow[];
@@ -666,9 +679,10 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
 }
 
 function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
+  const activeSavings = sourceData.savings.filter((account) => !account.archivedAt);
   const allocationSummary = computeDerivedAllocations(
     sourceData.rates,
-    sourceData.savings,
+    activeSavings,
     sourceData.holdings,
     sourceData.holdingTransactions,
     sourceData.properties,
