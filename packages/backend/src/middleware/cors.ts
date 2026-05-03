@@ -1,6 +1,6 @@
 import { cors } from 'hono/cors';
 
-export const DEFAULT_CORS_ORIGINS = ['http://localhost', 'http://localhost:5173'] as const;
+export const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'] as const;
 
 export function resolveCorsOrigin(rawOrigins = process.env.CORS_ORIGIN): string | string[] {
   const origins = rawOrigins

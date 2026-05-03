@@ -72,7 +72,7 @@ Signin and signup are exempt because the CSRF token does not exist yet when thes
 
 ## CORS
 
-CORS is configured via the `CORS_ORIGIN` environment variable, which accepts a comma-separated list of allowed origins. The backend defaults to `http://localhost` and `http://localhost:5173` if no value is set.
+CORS is configured via the `CORS_ORIGIN` environment variable, which accepts a comma-separated list of allowed origins. The backend defaults to `http://localhost:3000` and `http://localhost:5173` if no value is set.
 
 Wildcard (`*`) origins are explicitly rejected at startup — using `*` with `credentials: true` is both unsafe and invalid per the Fetch spec. If `CORS_ORIGIN=*` is set, the backend logs a warning and falls back to the default list.
 
@@ -132,7 +132,7 @@ This limits the blast radius of an application-layer bug — the app role cannot
 
 The Docker Compose network topology isolates services:
 
-- The `frontend` container (Nginx) is the only service with a host port binding (`80` by default). It sits on `frontend-net`.
+- The `frontend` container (Nginx) is the only service with a host port binding (`3000` by default). It sits on `frontend-net`.
 - The `backend` container sits on both `frontend-net` (reachable by Nginx) and `backend-net` (reachable by DB and MinIO).
 - PostgreSQL (`db`) and MinIO are on `backend-net` only — they are not reachable from the host or from the frontend container.
 - The AI services (`vllm`, `pension-parser`) are on a separate `ai-net` alongside the `pension-import-worker`. The main backend cannot reach `vllm` or `pension-parser` directly.

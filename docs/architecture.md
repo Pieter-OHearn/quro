@@ -1,6 +1,6 @@
 # Architecture
 
-Quro is a self-hosted personal finance app intended for home/LAN use over plain HTTP. This document covers service topology, request flow, the pension import pipeline, and the conventions shared across all features.
+Quro is a self-hosted personal finance app intended for home/LAN use over plain HTTP. This document covers service topology, request flow, bunq integration, the pension import pipeline, and the conventions shared across all features.
 
 ---
 
@@ -17,11 +17,11 @@ Quro is a self-hosted personal finance app intended for home/LAN use over plain 
 
 ### Host-exposed ports
 
-| Service               | Host port                  | Notes                                    |
-| --------------------- | -------------------------- | ---------------------------------------- |
-| `frontend`            | `${QRO_FRONTEND_PORT:-80}` | Nginx, the only entry point for browsers |
-| `minio`               | none (internal only)       | Console on :9001 is not exposed          |
-| `db`, `backend`, etc. | none                       | Internal only                            |
+| Service               | Host port                    | Notes                                    |
+| --------------------- | ---------------------------- | ---------------------------------------- |
+| `frontend`            | `${QRO_FRONTEND_PORT:-3000}` | Nginx, the only entry point for browsers |
+| `minio`               | none (internal only)         | Console on :9001 is not exposed          |
+| `db`, `backend`, etc. | none                         | Internal only                            |
 
 ### Network map
 
@@ -29,7 +29,7 @@ Three Docker bridge networks isolate traffic. Services are only placed on networ
 
 ```mermaid
 graph LR
-  Browser -->|":80 (QRO_FRONTEND_PORT)"| frontend
+  Browser -->|":3000 (QRO_FRONTEND_PORT)"| frontend
 
   subgraph "default profile"
     frontend["frontend (Nginx)"]
@@ -124,7 +124,35 @@ The global error handler (`src/middleware/errorHandler.ts`) catches any unhandle
 
 ---
 
-## 4. Pension Import Pipeline
+## 4. bunq Integration
+
+The bunq integration is optional and runs inside the main backend process. There is no separate Docker profile or worker container for it.
+
+### OAuth and connection routes
+
+The Settings page starts OAuth by sending the browser to `/api/bunq/oauth/start`. The backend creates an HMAC-signed state token, stores it in an HTTP-only `bunq_oauth_state` cookie for 10 minutes, and redirects to bunq's OAuth authorisation URL.
+
+bunq redirects back to `/api/bunq/oauth/callback`. The backend validates the state cookie, exchanges the authorisation code with `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI`, then upserts a row in `bunq_connections` with the returned access token. The frontend reads connection status through `GET /api/bunq/connection` and disconnects with `DELETE /api/bunq/connection`.
+
+Manual sync endpoints are mounted under the same protected route group:
+
+- `POST /api/bunq/sync` — syncs savings and budget data together and advances the shared cursor when both succeed.
+- `POST /api/bunq/sync/savings` — syncs bunq `SAVINGS` monetary accounts into Quro savings accounts and transactions.
+- `POST /api/bunq/sync/budget` — syncs bunq `BANK` monetary account payments into budget transactions.
+
+### Sync behaviour
+
+The sync services reuse the stored bunq access token to create or refresh a bunq API installation/session. Session material (`private_key`, `installation_token`, `server_public_key`, `session_token`, `session_id`, `session_expires_at`) is cached in `bunq_connections` so normal syncs do not repeat the full bootstrap on every request.
+
+Savings sync creates or updates local savings accounts for bunq savings accounts, imports payments into `savings_transactions`, and detaches local accounts whose bunq account ID no longer appears in the latest bunq account list. Budget sync imports bank payments into `budget_transactions`, skips self-transfers, maps merchant category codes through `category_mappings`, and stores bunq metadata for idempotency and review.
+
+### Background sync scheduler
+
+`src/index.ts` starts `startBunqSyncScheduler()` when the backend starts. The scheduler runs in-process once per hour, selects every user with a row in `bunq_connections`, and calls `syncBunqSavings(userId)` followed by `syncBunqBudget(userId)`. Failures are logged and written back to the connection's `sync_status` / `sync_error` fields; they do not stop the scheduler from trying later users or future hourly cycles.
+
+---
+
+## 5. Pension Import Pipeline
 
 This is the most complex feature. It spans multiple services and has a well-defined status lifecycle.
 
@@ -216,7 +244,7 @@ The frontend (`useAppCapabilities.ts`) polls this endpoint every 15 s and uses t
 
 ---
 
-## 5. The @quro/shared Package
+## 6. The @quro/shared Package
 
 `packages/shared` is a TypeScript-only package with no runtime dependencies. It exports all types that cross the HTTP API boundary — every request body, response payload, and enumeration used by both the frontend and backend.
 
@@ -227,14 +255,14 @@ Both `packages/backend` and `packages/frontend` import from it as `@quro/shared`
 Notable exports:
 
 - Primitive enumerations: `CurrencyCode`, `NumberFormatPreference`, `DebtType`, `TickerItemType`
-- Domain types: `User`, `SavingsAccount`, `Holding`, `PensionPot`, `Mortgage`, `Debt`, `Payslip`, `Goal`, `BudgetCategory`, etc.
+- Domain types: `User`, `SavingsAccount`, `Holding`, `PensionPot`, `Mortgage`, `Debt`, `Payslip`, `Goal`, `BudgetCategory`, `BunqConnection`, etc.
 - Import pipeline types: `PensionStatementImport`, `PensionStatementImportRow`, `PensionImportStatus`, `PensionImportConfidenceLabel`
 - Capabilities types: `AppCapabilities`, `AppCapabilityStatus`, `AppCapabilityReason`
 - Currency helpers: `CURRENCY_META`, `isCurrencyCode`, `CURRENCY_CODES`
 
 ---
 
-## 6. Feature Module Pattern
+## 7. Feature Module Pattern
 
 All features follow a consistent structure on both sides of the stack.
 
@@ -265,7 +293,7 @@ Feature query keys are simple arrays like `['savings']`, `['pension']`, `['inves
 
 ---
 
-## 7. Database Notes
+## 8. Database Notes
 
 ### Currency and monetary precision
 
@@ -290,3 +318,7 @@ Credentials are supplied via Docker secrets (files in `./secrets/`) and never ap
 - `pension_statement_imports` + `pension_statement_import_rows` — the two tables that back the import pipeline. Import rows reference the parent import via `import_id` with `ON DELETE CASCADE`. Committed rows carry a `committed_transaction_id` FK back to `pension_transactions`.
 - Inline PDF document columns (`document_storage_key`, `document_file_name`, `document_size_bytes`, `document_uploaded_at`) are reused on both `pension_transactions` and `payslips` via a shared column factory. A check constraint enforces that all four are either all null or all non-null.
 - `holding_price_history` — end-of-day price history for investment holdings, with a unique index on `(holding_id, eod_date)`.
+- `bunq_connections` — one row per connected user, enforced by a unique index on `user_id`. It stores the OAuth access token, cached API session fields, bunq user ID, last successful sync cursor, and sync status/error.
+- `savings_accounts.bunq_account_id`, `savings_transactions.bunq_transaction_id`, and `budget_transactions.bunq_transaction_id` — bunq identifiers used to make repeated syncs idempotent. Transaction IDs are unique per user.
+- `budget_transactions.bunq_mcc`, `budget_transactions.bunq_payment_type`, and `budget_transactions.counterparty_iban` — bunq payment metadata retained for budget categorisation and review.
+- `category_mappings` — stores per-user category decisions by source/source key. bunq budget sync currently uses `source = 'mcc'` to remember merchant category code mappings.

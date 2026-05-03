@@ -8,7 +8,7 @@ If you just want the fastest local setup for testing, use the Docker path:
 bun run dev:docker
 ```
 
-Then open `http://localhost`. The bunq callback for the Docker setup is `http://localhost/api/bunq/oauth/callback`.
+Then open `http://localhost:3000`. The bunq callback for the Docker setup is `http://localhost:3000/api/bunq/oauth/callback`.
 
 ## Prerequisites
 
@@ -92,13 +92,13 @@ cp .env.example .env
 bun run dev:docker
 ```
 
-3. Open `http://localhost`.
+3. Open `http://localhost:3000`.
 
 The Docker stack publishes:
 
 ```bash
 # App UI
-http://localhost
+http://localhost:3000
 
 # Database and object storage for host-side tools
 127.0.0.1:5432
@@ -106,7 +106,7 @@ http://localhost
 127.0.0.1:9001
 ```
 
-For Docker, the backend stays internal to the compose network and Nginx proxies `/api` to it. That means bunq OAuth should use `http://localhost/api/bunq/oauth/callback`.
+For Docker, the backend stays internal to the compose network and Nginx proxies `/api` to it. That means bunq OAuth should use `http://localhost:3000/api/bunq/oauth/callback`.
 
 ## Optional Pension Import Development
 

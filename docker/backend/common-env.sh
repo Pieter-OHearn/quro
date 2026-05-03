@@ -88,3 +88,15 @@ load_optional_api_keys() {
     export HUGGING_FACE_HUB_TOKEN="$hugging_face_token"
   fi
 }
+
+load_bunq_env() {
+  bunq_client_id=$(read_optional_secret /run/secrets/bunq_client_id || true)
+  if [ -n "${bunq_client_id:-}" ]; then
+    export BUNQ_CLIENT_ID="$bunq_client_id"
+  fi
+
+  bunq_client_secret=$(read_optional_secret /run/secrets/bunq_client_secret || true)
+  if [ -n "${bunq_client_secret:-}" ]; then
+    export BUNQ_CLIENT_SECRET="$bunq_client_secret"
+  fi
+}

@@ -91,7 +91,7 @@ services:
       MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
       PORT: '3000'
       SECURE_COOKIES: ${SECURE_COOKIES:-false}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost,http://localhost:5173}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:5173}
       S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}

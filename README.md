@@ -15,12 +15,12 @@ If you want the app running locally with the least setup, use the Docker dev sta
 bun run dev:docker
 ```
 
-Then open `http://localhost`.
+Then open `http://localhost:3000`.
 
 For bunq OAuth in this mode, the callback URL is:
 
 ```bash
-http://localhost/api/bunq/oauth/callback
+http://localhost:3000/api/bunq/oauth/callback
 ```
 
 The database and object storage are also published locally for tooling:
@@ -91,6 +91,8 @@ Edit each file under `secrets/` to set your own passwords and keys.
 
 > The investments feature (ticker lookup and price sync) requires a free [Marketstack](https://marketstack.com) API key. Sign up at marketstack.com, copy your access key, and paste it into `secrets/marketstack_api_key.txt`. The rest of the app works without it.
 
+> The bunq integration is optional. To connect a bunq account, register a bunq OAuth client with the callback URL `http://localhost:3000/api/bunq/oauth/callback`, then set `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI` in your release environment. The rest of the app works without it; savings and budget data can still be entered manually.
+
 3. Authenticate with the GitHub Container Registry and start the stack:
 
 ```bash
@@ -99,7 +101,7 @@ docker compose pull
 docker compose up -d
 ```
 
-4. Open `http://localhost` and create your first account.
+4. Open `http://localhost:3000` and create your first account.
 
 Your data is stored locally in `./data` (PostgreSQL at `./data/postgres`, documents at `./data/minio`). Back up both together:
 
