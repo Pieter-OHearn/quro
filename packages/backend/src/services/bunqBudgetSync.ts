@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { BUDGET_MONTHS, type BudgetMonth } from '@quro/shared';
 import { db } from '../db/client';
 import {
   budgetCategories,
@@ -24,21 +25,6 @@ import {
   MCC_DEFAULTS,
   UNCATEGORISED_NAME,
 } from './bunqCategoryRules';
-
-const BUDGET_MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
 
 const MCC_SOURCE = 'mcc';
 
@@ -150,32 +136,28 @@ function toTransactionDate(created: string): string {
   return trimmed.slice(0, 10);
 }
 
-function parseMonthYear(dateStr: string): { month: string; year: number } {
+function parseMonthYear(dateStr: string): { month: BudgetMonth; year: number } {
   const [yearStr, monthStr] = dateStr.split('-');
   const monthIndex = parseInt(monthStr, 10) - 1;
   if (Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex >= BUDGET_MONTHS.length) {
     throw new Error(`Invalid Bunq payment date: ${dateStr}`);
   }
+  const month = BUDGET_MONTHS[monthIndex];
   const year = parseInt(yearStr, 10);
-  if (Number.isNaN(year)) {
+  if (!month || Number.isNaN(year)) {
     throw new Error(`Invalid Bunq payment date: ${dateStr}`);
   }
-  return { month: BUDGET_MONTHS[monthIndex], year };
+  return { month, year };
 }
 
-const budgetCategoryMonthIndex = sql<number>`case ${budgetCategories.month}
-  when 'Jan' then 0
-  when 'Feb' then 1
-  when 'Mar' then 2
-  when 'Apr' then 3
-  when 'May' then 4
-  when 'Jun' then 5
-  when 'Jul' then 6
-  when 'Aug' then 7
-  when 'Sep' then 8
-  when 'Oct' then 9
-  when 'Nov' then 10
-  when 'Dec' then 11
+const budgetCategoryMonthIndex = sql<number>`case
+  ${sql.join(
+    BUDGET_MONTHS.map(
+      (month, index) =>
+        sql`when ${budgetCategories.month} = ${sql.raw(`'${month}'`)} then ${sql.raw(String(index))}`,
+    ),
+    sql.raw(' '),
+  )}
   else -1
 end`;
 

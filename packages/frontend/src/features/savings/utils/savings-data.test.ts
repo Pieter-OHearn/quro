@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { expect, test } from 'bun:test';
+import { afterEach, expect, setSystemTime, test } from 'bun:test';
 import type { SavingsAccount } from '@quro/shared';
 import { buildGrowthChartData } from './savings-data';
 
@@ -16,7 +16,13 @@ const accountBase: SavingsAccount = {
   emoji: 'R',
 };
 
+afterEach(() => {
+  setSystemTime();
+});
+
 test('keeps archived savings accounts in past history but removes them after archive', () => {
+  setSystemTime(new Date('2026-05-04T12:00:00Z'));
+
   const data = buildGrowthChartData(
     [
       {
@@ -40,4 +46,25 @@ test('keeps archived savings accounts in past history but removes them after arc
   expect(data.find((point) => point.month === 'Nov')?.savings).toBe(750);
   expect(data.find((point) => point.month === 'Dec')?.savings).toBe(1000);
   expect(data.find((point) => point.month === 'Jan')?.savings).toBe(0);
+});
+
+test('includes transactions from the final local day of each month', () => {
+  setSystemTime(new Date('2026-06-15T12:00:00Z'));
+
+  const data = buildGrowthChartData(
+    [
+      {
+        id: 1,
+        accountId: 1,
+        type: 'deposit',
+        amount: 100,
+        date: '2026-05-31',
+        note: 'Month-end top up',
+      },
+    ],
+    [accountBase],
+    (value) => value,
+  );
+
+  expect(data.find((point) => point.month === 'May')?.savings).toBe(1000);
 });

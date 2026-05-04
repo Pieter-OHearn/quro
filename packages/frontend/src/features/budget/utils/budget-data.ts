@@ -6,6 +6,7 @@ import type {
   NewCategoryForm,
   RecentBudgetTx,
 } from '../types';
+import { formatBudgetMonthFromDate } from '@quro/shared';
 
 export const createEmptyCategoryForm = (): NewCategoryForm => ({ name: '', budgeted: '' });
 
@@ -58,7 +59,7 @@ export function buildCreateBudgetCategoryInput(
     budgeted: Number.parseFloat(newCategory.budgeted),
     spent: 0,
     color: '#94a3b8',
-    month: now.toLocaleString('en-US', { month: 'short' }),
+    month: formatBudgetMonthFromDate(now),
     year: now.getFullYear(),
   };
 }

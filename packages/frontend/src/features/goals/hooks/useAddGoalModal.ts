@@ -4,21 +4,27 @@ import type { Goal, GoalType } from '@quro/shared';
 import type { CreateGoalInput, GoalFormField, GoalFormState } from '../types';
 import { GOAL_TYPE_META, COLORS } from '../utils/goals-constants';
 import { buildGoalPayload } from '../utils/goal-utils';
+import { buildDefaultGoalDeadline, getCurrentGoalYear } from '../utils/goal-years';
 
-const defaultForm = (): GoalFormState => ({
-  name: '',
-  emoji: '🎯',
-  color: COLORS[0],
-  notes: '',
-  deadline: 'Dec 2026',
-  year: String(new Date().getFullYear()),
-  current: '',
-  target: '',
-  monthlyContrib: '',
-  monthlyTarget: '',
-  totalMonths: '12',
-  unit: '',
-});
+const defaultForm = (): GoalFormState => {
+  const now = new Date();
+  const currentYear = getCurrentGoalYear(now);
+
+  return {
+    name: '',
+    emoji: '🎯',
+    color: COLORS[0],
+    notes: '',
+    deadline: buildDefaultGoalDeadline(now),
+    year: String(currentYear),
+    current: '',
+    target: '',
+    monthlyContrib: '',
+    monthlyTarget: '',
+    totalMonths: '12',
+    unit: '',
+  };
+};
 
 export function useAddGoalModal(onSave: (goal: CreateGoalInput) => void, onClose: () => void) {
   const { baseCurrency } = useCurrency();

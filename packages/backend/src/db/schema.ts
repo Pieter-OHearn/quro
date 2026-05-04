@@ -15,8 +15,14 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import {
+  CURRENCY_CODES,
+  MAX_RETIREMENT_AGE,
+  MAX_USER_AGE,
+  MIN_RETIREMENT_AGE,
+  MIN_USER_AGE,
+} from '@quro/shared';
 
-const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
 export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
 export const pensionImportStatusEnum = pgEnum('pension_import_status', [
   'queued',
@@ -86,10 +92,15 @@ export const users = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => ({
-    ageRangeCheck: check('users_age_range_check', sql`${table.age} between 16 and 100`),
+    ageRangeCheck: check(
+      'users_age_range_check',
+      sql`${table.age} between ${sql.raw(String(MIN_USER_AGE))} and ${sql.raw(String(MAX_USER_AGE))}`,
+    ),
     retirementAgeRangeCheck: check(
       'users_retirement_age_range_check',
-      sql`${table.retirementAge} between 17 and 80`,
+      sql`${table.retirementAge} between ${sql.raw(String(MIN_RETIREMENT_AGE))} and ${sql.raw(
+        String(MAX_RETIREMENT_AGE),
+      )}`,
     ),
     retirementAfterAgeCheck: check(
       'users_retirement_after_age_check',

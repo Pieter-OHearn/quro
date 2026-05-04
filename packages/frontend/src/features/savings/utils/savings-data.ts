@@ -15,11 +15,12 @@ function buildRollingMonthBuckets(monthCount = 7): MonthBucket[] {
     const month = monthStartDate.getMonth() + 1;
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
     const monthEndDate = new Date(year, month, 0);
+    const cutoff = `${prefix}-${String(monthEndDate.getDate()).padStart(2, '0')}`;
 
     return {
       label: monthStartDate.toLocaleString('en-GB', { month: 'short' }),
       prefix,
-      cutoff: monthEndDate.toISOString().slice(0, 10),
+      cutoff,
     };
   }).reverse();
 }

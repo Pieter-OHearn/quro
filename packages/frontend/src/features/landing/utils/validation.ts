@@ -1,9 +1,13 @@
+import {
+  MAX_RETIREMENT_AGE,
+  MAX_USER_AGE,
+  MIN_PASSWORD_LENGTH,
+  MIN_RETIREMENT_AGE,
+  MIN_USER_AGE,
+} from '@quro/shared';
 import type { LandingErrorMap, SignInFormValues, SignUpFormValues } from '../types';
 
 const EMAIL_REGEX = /\S+@\S+\.\S+/;
-const MIN_PASSWORD_LENGTH = 8;
-const MIN_AGE = 18;
-const MAX_AGE = 100;
 
 function parseAge(value: string) {
   const normalized = value.trim();
@@ -36,7 +40,9 @@ function getCurrentAgeError(age: number | null) {
     return 'Enter your age';
   }
 
-  return age < MIN_AGE || age > MAX_AGE ? `Age must be between ${MIN_AGE} and ${MAX_AGE}` : null;
+  return age < MIN_USER_AGE || age > MAX_USER_AGE
+    ? `Age must be between ${MIN_USER_AGE} and ${MAX_USER_AGE}`
+    : null;
 }
 
 function getRetirementAgeError(retirementAge: number | null, currentAge: number | null) {
@@ -44,8 +50,8 @@ function getRetirementAgeError(retirementAge: number | null, currentAge: number 
     return 'Enter your retirement age';
   }
 
-  if (retirementAge < MIN_AGE || retirementAge > MAX_AGE) {
-    return `Age must be between ${MIN_AGE} and ${MAX_AGE}`;
+  if (retirementAge < MIN_RETIREMENT_AGE || retirementAge > MAX_RETIREMENT_AGE) {
+    return `Retirement age must be between ${MIN_RETIREMENT_AGE} and ${MAX_RETIREMENT_AGE}`;
   }
 
   return currentAge !== null && retirementAge <= currentAge
@@ -58,7 +64,9 @@ function getPasswordError(password: string) {
     return 'Password is required';
   }
 
-  return password.length < MIN_PASSWORD_LENGTH ? 'At least 8 characters' : null;
+  return password.length < MIN_PASSWORD_LENGTH
+    ? `At least ${MIN_PASSWORD_LENGTH} characters`
+    : null;
 }
 
 function getConfirmPasswordError(confirm: string, password: string) {

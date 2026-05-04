@@ -1,5 +1,10 @@
 import { Hono } from 'hono';
 import {
+  MAX_RETIREMENT_AGE,
+  MAX_USER_AGE,
+  MIN_PASSWORD_LENGTH,
+  MIN_RETIREMENT_AGE,
+  MIN_USER_AGE,
   isNumberFormatPreference,
   isCurrencyCode,
   type UpdateUserPasswordInput,
@@ -16,7 +21,6 @@ import { publicUserColumns } from '../lib/users';
 
 const app = new Hono();
 
-const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type ParseResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -49,11 +53,20 @@ function parseProfilePayload(payload: unknown): ParseResult<UpdateUserProfileInp
   if (!email || !EMAIL_PATTERN.test(email)) {
     return { ok: false, error: 'Enter a valid email address' };
   }
-  if (age === null || age < 16 || age > 100) {
-    return { ok: false, error: 'Age must be between 16 and 100' };
+  if (age === null || age < MIN_USER_AGE || age > MAX_USER_AGE) {
+    return { ok: false, error: `Age must be between ${MIN_USER_AGE} and ${MAX_USER_AGE}` };
   }
-  if (retirementAge === null || retirementAge <= age || retirementAge > 80) {
-    return { ok: false, error: `Retirement age must be between ${age + 1} and 80` };
+
+  const minRetirementAge = Math.max(age + 1, MIN_RETIREMENT_AGE);
+  if (
+    retirementAge === null ||
+    retirementAge < minRetirementAge ||
+    retirementAge > MAX_RETIREMENT_AGE
+  ) {
+    return {
+      ok: false,
+      error: `Retirement age must be between ${minRetirementAge} and ${MAX_RETIREMENT_AGE}`,
+    };
   }
 
   return {

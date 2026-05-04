@@ -1,32 +1,117 @@
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import type { AmortizationRow, OverpaymentImpact, PaymentBreakdownRow } from '../types';
 
-const SCHEDULE_START_YEAR = 2026;
-const SCHEDULE_END_YEAR = 2047;
 const SCHEDULE_YEAR_STEP = 2;
 const MONTHS_PER_YEAR = 12;
+const SCHEDULE_MONTH_STEP = SCHEDULE_YEAR_STEP * MONTHS_PER_YEAR;
 const PAYMENT_BREAKDOWN_LIMIT = 6;
 const ISO_YEAR_MONTH_LENGTH = 7;
 
-export function generateSchedule(
-  balance: number,
-  rate: number,
-  monthlyPayment: number,
-): AmortizationRow[] {
-  const schedule: AmortizationRow[] = [];
-  const monthlyRate = rate / 100 / 12;
-  for (let year = SCHEDULE_START_YEAR; year <= SCHEDULE_END_YEAR; year += SCHEDULE_YEAR_STEP) {
-    const interest = balance * monthlyRate * 12;
-    const principal = monthlyPayment * 12 - interest;
-    balance = Math.max(0, balance - principal);
-    schedule.push({
-      year: year.toString(),
-      balance: Math.round(balance),
-      principal: Math.round(principal),
-      interest: Math.round(interest),
-    });
-    if (balance === 0) break;
+type YearMonth = { year: number; monthIndex: number };
+
+function parseYearMonth(value: string): YearMonth | null {
+  const [yearPart, monthPart] = value.slice(0, ISO_YEAR_MONTH_LENGTH).split('-');
+  const year = Number.parseInt(yearPart ?? '', 10);
+  const month = Number.parseInt(monthPart ?? '', 10);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return null;
+  return { year, monthIndex: month - 1 };
+}
+
+function getCurrentYearMonth(today: Date): YearMonth {
+  return { year: today.getFullYear(), monthIndex: today.getMonth() };
+}
+
+function monthsBetween(start: YearMonth, end: YearMonth): number {
+  return (end.year - start.year) * MONTHS_PER_YEAR + end.monthIndex - start.monthIndex;
+}
+
+function addMonths(start: YearMonth, monthOffset: number): YearMonth {
+  const total = start.year * MONTHS_PER_YEAR + start.monthIndex + monthOffset;
+  return {
+    year: Math.floor(total / MONTHS_PER_YEAR),
+    monthIndex: ((total % MONTHS_PER_YEAR) + MONTHS_PER_YEAR) % MONTHS_PER_YEAR,
+  };
+}
+
+function calculateContractRemainingMonths(mortgage: MortgageType, today: Date): number | null {
+  const current = getCurrentYearMonth(today);
+  const explicitEnd = parseYearMonth(mortgage.endDate);
+  if (explicitEnd) return Math.max(0, monthsBetween(current, explicitEnd) + 1);
+
+  const start = parseYearMonth(mortgage.startDate);
+  if (!start || mortgage.termYears <= 0) return null;
+
+  const elapsedMonths = Math.max(0, monthsBetween(start, current));
+  return Math.max(0, mortgage.termYears * MONTHS_PER_YEAR - elapsedMonths);
+}
+
+function calculateProjectionMonths(
+  mortgage: MortgageType,
+  monthsRemainingRaw: number | null,
+  today: Date,
+): number {
+  if (monthsRemainingRaw != null && Number.isFinite(monthsRemainingRaw)) {
+    return Math.max(0, Math.ceil(monthsRemainingRaw));
   }
+
+  const contractMonths = calculateContractRemainingMonths(mortgage, today);
+  if (contractMonths != null) return contractMonths;
+
+  return Math.max(0, mortgage.termYears * MONTHS_PER_YEAR);
+}
+
+function buildScheduleRow(
+  date: YearMonth,
+  balance: number,
+  principal: number,
+  interest: number,
+): AmortizationRow {
+  return {
+    year: String(date.year),
+    balance: Math.round(balance),
+    principal: Math.round(principal),
+    interest: Math.round(interest),
+  };
+}
+
+export function generateSchedule(
+  mortgage: MortgageType,
+  monthsRemainingRaw: number | null,
+  today = new Date(),
+): AmortizationRow[] {
+  let balance = mortgage.outstandingBalance;
+  const schedule: AmortizationRow[] = [];
+  const start = getCurrentYearMonth(today);
+  const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
+  const projectionMonths = calculateProjectionMonths(mortgage, monthsRemainingRaw, today);
+  let principalSinceLastPoint = 0;
+  let interestSinceLastPoint = 0;
+
+  schedule.push(buildScheduleRow(start, balance, 0, 0));
+
+  for (let monthNumber = 1; monthNumber <= projectionMonths && balance > 0; monthNumber += 1) {
+    const interest = Math.max(0, balance * monthlyRate);
+    const principal = Math.min(balance, Math.max(0, mortgage.monthlyPayment - interest));
+    balance = Math.max(0, balance - principal);
+    principalSinceLastPoint += principal;
+    interestSinceLastPoint += interest;
+
+    const shouldSample =
+      monthNumber % SCHEDULE_MONTH_STEP === 0 || monthNumber === projectionMonths || balance === 0;
+    if (!shouldSample) continue;
+
+    schedule.push({
+      ...buildScheduleRow(
+        addMonths(start, monthNumber),
+        balance,
+        principalSinceLastPoint,
+        interestSinceLastPoint,
+      ),
+    });
+    principalSinceLastPoint = 0;
+    interestSinceLastPoint = 0;
+  }
+
   return schedule;
 }
 
@@ -113,7 +198,7 @@ export function formatTermReduction(monthsReduced: number): string {
 }
 
 export function computeMortgageMetrics(mortgage: MortgageType, txns: MortgageTransaction[]) {
-  const monthlyRate = mortgage.interestRate / 100 / 12;
+  const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
   const monthsRemainingRaw = calculateRemainingMonths(
     mortgage.outstandingBalance,
     monthlyRate,
@@ -131,11 +216,7 @@ export function computeMortgageMetrics(mortgage: MortgageType, txns: MortgageTra
     paidPct: (paid / mortgage.originalAmount) * 100,
     monthsRemaining,
     yearsRemaining: Math.floor(monthsRemaining / 12),
-    amortization: generateSchedule(
-      mortgage.outstandingBalance,
-      mortgage.interestRate,
-      mortgage.monthlyPayment,
-    ),
+    amortization: generateSchedule(mortgage, monthsRemainingRaw),
     paymentBreakdown,
     overpaymentImpact,
   };

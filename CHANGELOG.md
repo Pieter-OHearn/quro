@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [v0.1.2] - 2026-05-04
+
+- Support joint account budget imports from Bunq.
+- Preserve transaction history when removing savings accounts, with optional full delete.
+- Refactor Debts page into modular components.
+- Improve mortgage amortization calculations with dynamic projection periods and per-month precision.
+- Add mortgage metrics unit tests.
+- Enhance validation utilities and password constraints in shared types.
+- Improve goals feature with dedicated year utilities.
+- Update backend schema for Bunq account metadata tagging.
+
 ## [v0.1.1] - 2026-05-03
 
 - Allow savings accounts to be removed without deleting their transaction history, while keeping an explicit full-delete option for removing both the account and its transactions.

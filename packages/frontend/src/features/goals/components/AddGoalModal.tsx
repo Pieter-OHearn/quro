@@ -3,6 +3,7 @@ import { FormField, Modal, ModalFooter, SelectInput, Textarea, TextInput } from 
 import type { GoalType } from '@quro/shared';
 import { useAddGoalModal } from '../hooks';
 import { COLORS, GOAL_TYPE_META } from '../utils/goals-constants';
+import { buildDefaultGoalDeadline, buildGoalYearOptions } from '../utils/goal-years';
 import type { AddGoalModalProps, GoalFormField, GoalFormState, GoalMeta } from '../types';
 
 type SetField = (key: GoalFormField, value: string) => void;
@@ -230,7 +231,7 @@ function GoalDetailsDateRow({
     <div className="grid grid-cols-2 gap-3">
       <FormField label="Deadline">
         <TextInput
-          placeholder="Dec 2026"
+          placeholder={buildDefaultGoalDeadline()}
           value={form.deadline}
           onChange={(value) => setField('deadline', value)}
         />
@@ -238,7 +239,7 @@ function GoalDetailsDateRow({
       <FormField label="Year">
         <SelectInput
           value={form.year}
-          options={['2025', '2026', '2027', '2028', '2029', '2030']}
+          options={buildGoalYearOptions()}
           onChange={(value) => setField('year', value)}
         />
       </FormField>

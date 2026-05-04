@@ -1,5 +1,6 @@
 import { and, eq, gte, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { isBudgetMonth, toBudgetMonthIndex, type BudgetMonth } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
@@ -42,22 +43,6 @@ const BUDGET_TRANSACTION_FIELDS = [
   'date',
   'merchant',
 ] as const;
-const BUDGET_MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-type BudgetMonth = (typeof BUDGET_MONTHS)[number];
 
 type MonthYearFilter = { month: BudgetMonth; year: number } | null;
 
@@ -67,14 +52,14 @@ function parseMonthYearFilter(
 ): MonthYearFilter | 'invalid' {
   if (!rawMonth && !rawYear) return null;
   if (!rawMonth || !rawYear) return 'invalid';
-  if (!BUDGET_MONTHS.includes(rawMonth as BudgetMonth)) return 'invalid';
+  if (!isBudgetMonth(rawMonth)) return 'invalid';
   const year = parseInt(rawYear, 10);
   if (!Number.isFinite(year) || year < MIN_BUDGET_YEAR || year > MAX_BUDGET_YEAR) return 'invalid';
-  return { month: rawMonth as BudgetMonth, year };
+  return { month: rawMonth, year };
 }
 
 function monthYearToDateRange(month: BudgetMonth, year: number): { start: string; end: string } {
-  const monthIndex = BUDGET_MONTHS.indexOf(month);
+  const monthIndex = toBudgetMonthIndex(month);
   const start = `${year}-${String(monthIndex + 1).padStart(2, '0')}-01`;
   const nextMonth = monthIndex === 11 ? 1 : monthIndex + 2;
   const nextYear = monthIndex === 11 ? year + 1 : year;
@@ -105,9 +90,7 @@ type BudgetTransactionInsert = typeof budgetTransactions.$inferInsert;
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function parseBudgetMonthField(value: unknown): ParseResult<BudgetMonth> {
-  return typeof value === 'string' && BUDGET_MONTHS.includes(value as BudgetMonth)
-    ? ok(value as BudgetMonth)
-    : err('Invalid month');
+  return isBudgetMonth(value) ? ok(value) : err('Invalid month');
 }
 
 function parsePositiveNumberField(value: unknown, error: string): ParseResult<number> {

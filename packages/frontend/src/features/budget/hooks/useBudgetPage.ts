@@ -1,4 +1,10 @@
 import { useState } from 'react';
+import {
+  BUDGET_MONTHS,
+  formatBudgetMonthFromDate,
+  toBudgetMonthIndex,
+  type BudgetMonth,
+} from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
@@ -15,36 +21,23 @@ import { useUpdateBudgetCategory } from './useUpdateBudgetCategory';
 import { useDeleteBudgetTransaction } from './useDeleteBudgetTransaction';
 import { useUpdateBudgetTransaction } from './useUpdateBudgetTransaction';
 
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-type Month = (typeof MONTHS)[number];
-
 function currentMonthYear() {
   const now = new Date();
-  return { month: MONTHS[now.getMonth()] as Month, year: now.getFullYear() };
+  return { month: formatBudgetMonthFromDate(now), year: now.getFullYear() };
 }
 
-function shiftMonth(month: Month, year: number, delta: number) {
-  const total = year * 12 + MONTHS.indexOf(month) + delta;
-  return { month: MONTHS[((total % 12) + 12) % 12] as Month, year: Math.floor(total / 12) };
+function shiftMonth(month: BudgetMonth, year: number, delta: number) {
+  const total = year * 12 + toBudgetMonthIndex(month) + delta;
+  const nextMonthIndex = ((total % 12) + 12) % 12;
+  return {
+    month: BUDGET_MONTHS[nextMonthIndex] ?? BUDGET_MONTHS[0],
+    year: Math.floor(total / 12),
+  };
 }
 
 function useBudgetMonthSelection() {
   const current = currentMonthYear();
-  const [selectedMonth, setSelectedMonth] = useState<Month>(current.month);
+  const [selectedMonth, setSelectedMonth] = useState<BudgetMonth>(current.month);
   const [selectedYear, setSelectedYear] = useState(current.year);
   const isCurrentMonth = selectedMonth === current.month && selectedYear === current.year;
 
@@ -95,7 +88,7 @@ export function useBudgetPage() {
     createCategory.mutate(
       buildCreateBudgetCategoryInput(
         newCat,
-        new Date(monthSelection.selectedYear, MONTHS.indexOf(monthSelection.selectedMonth)),
+        new Date(monthSelection.selectedYear, toBudgetMonthIndex(monthSelection.selectedMonth)),
       ),
     );
     setNewCat(createEmptyCategoryForm());

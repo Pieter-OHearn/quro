@@ -10,7 +10,15 @@ import type {
   UpdateUserProfileInput,
   User,
 } from '@quro/shared';
-import { formatNumber, NUMBER_FORMATS } from '@quro/shared';
+import {
+  formatNumber,
+  MAX_RETIREMENT_AGE,
+  MAX_USER_AGE,
+  MIN_PASSWORD_LENGTH,
+  MIN_RETIREMENT_AGE,
+  MIN_USER_AGE,
+  NUMBER_FORMATS,
+} from '@quro/shared';
 import {
   AlertTriangle,
   Calendar,
@@ -174,7 +182,7 @@ function getPasswordStrength(password: string): StrengthState {
   }
 
   let score = 0;
-  if (password.length >= 8) score += 1;
+  if (password.length >= MIN_PASSWORD_LENGTH) score += 1;
   if (password.length >= 12) score += 1;
   if (/[A-Z]/.test(password)) score += 1;
   if (/[0-9]/.test(password)) score += 1;
@@ -304,11 +312,16 @@ function buildProfilePayload(form: ProfileFormState) {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
     errors.email = 'Enter a valid email address';
   }
-  if (age === null || age < 16 || age > 100) errors.age = 'Age must be between 16 and 100';
+  if (age === null || age < MIN_USER_AGE || age > MAX_USER_AGE) {
+    errors.age = `Age must be between ${MIN_USER_AGE} and ${MAX_USER_AGE}`;
+  }
+
+  const minRetirementAge =
+    age === null ? MIN_RETIREMENT_AGE : Math.max(age + 1, MIN_RETIREMENT_AGE);
   if (retirementAge === null) {
     errors.retirementAge = 'Target retirement age is required';
-  } else if (age !== null && (retirementAge <= age || retirementAge > 80)) {
-    errors.retirementAge = `Must be between ${age + 1} and 80`;
+  } else if (retirementAge < minRetirementAge || retirementAge > MAX_RETIREMENT_AGE) {
+    errors.retirementAge = `Must be between ${minRetirementAge} and ${MAX_RETIREMENT_AGE}`;
   }
 
   if (Object.keys(errors).length > 0 || age === null || retirementAge === null) {
@@ -449,8 +462,8 @@ function ProfileSection({ user, replaceUser, initials }: Readonly<ProfileSection
             icon={Calendar}
             type="number"
             inputMode="numeric"
-            min={16}
-            max={100}
+            min={MIN_USER_AGE}
+            max={MAX_USER_AGE}
             value={form.age}
             error={Boolean(errors.age)}
             onChange={(value) => {
@@ -464,8 +477,8 @@ function ProfileSection({ user, replaceUser, initials }: Readonly<ProfileSection
             icon={Target}
             type="number"
             inputMode="numeric"
-            min={17}
-            max={80}
+            min={MIN_RETIREMENT_AGE}
+            max={MAX_RETIREMENT_AGE}
             value={form.retirementAge}
             error={Boolean(errors.retirementAge)}
             onChange={(value) => {
@@ -540,7 +553,9 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
   const handleSave = async () => {
     const nextErrors: Record<string, string> = {};
     if (!form.currentPassword) nextErrors.currentPassword = 'Enter your current password';
-    if (form.nextPassword.length < 8) nextErrors.nextPassword = 'Must be at least 8 characters';
+    if (form.nextPassword.length < MIN_PASSWORD_LENGTH) {
+      nextErrors.nextPassword = `Must be at least ${MIN_PASSWORD_LENGTH} characters`;
+    }
     if (form.nextPassword !== form.confirmPassword) {
       nextErrors.confirmPassword = 'Passwords do not match';
     }
@@ -608,7 +623,7 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
 
         <FormField label="New password" required error={errors.nextPassword}>
           <PasswordInput
-            placeholder="Minimum 8 characters"
+            placeholder={`Minimum ${MIN_PASSWORD_LENGTH} characters`}
             value={form.nextPassword}
             show={showNextPassword}
             error={Boolean(errors.nextPassword)}
@@ -636,7 +651,10 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
               </div>
               <div className="mt-3 grid gap-1 text-xs sm:grid-cols-2">
                 {[
-                  { label: '8+ characters', valid: form.nextPassword.length >= 8 },
+                  {
+                    label: `${MIN_PASSWORD_LENGTH}+ characters`,
+                    valid: form.nextPassword.length >= MIN_PASSWORD_LENGTH,
+                  },
                   { label: 'Uppercase letter', valid: /[A-Z]/.test(form.nextPassword) },
                   { label: 'Number', valid: /[0-9]/.test(form.nextPassword) },
                   { label: 'Symbol', valid: /[^A-Za-z0-9]/.test(form.nextPassword) },

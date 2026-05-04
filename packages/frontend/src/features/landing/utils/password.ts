@@ -1,6 +1,6 @@
+import { MIN_PASSWORD_LENGTH } from '@quro/shared';
 import type { PasswordStrength } from '../types';
 
-const MIN_PASSWORD_LENGTH = 8;
 export const PASSWORD_STRENGTH_LEVELS = ['Weak', 'Fair', 'Good', 'Strong'] as const;
 const PASSWORD_STRENGTH_COLORS = [
   'bg-rose-400',

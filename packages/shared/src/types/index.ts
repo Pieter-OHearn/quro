@@ -8,10 +8,46 @@ export type NumberFormatPreference = (typeof NUMBER_FORMATS)[number];
 
 export const DEFAULT_NUMBER_FORMAT: NumberFormatPreference = 'en-US';
 
+export const MIN_PASSWORD_LENGTH = 8;
+export const MIN_USER_AGE = 16;
+export const MAX_USER_AGE = 100;
+export const MIN_RETIREMENT_AGE = 17;
+export const MAX_RETIREMENT_AGE = 80;
+
+export const BUDGET_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+export type BudgetMonth = (typeof BUDGET_MONTHS)[number];
+
 const NUMBER_FORMAT_SET = new Set<string>(NUMBER_FORMATS);
+const BUDGET_MONTH_SET = new Set<string>(BUDGET_MONTHS);
 
 export function isNumberFormatPreference(value: unknown): value is NumberFormatPreference {
   return typeof value === 'string' && NUMBER_FORMAT_SET.has(value);
+}
+
+export function isBudgetMonth(value: unknown): value is BudgetMonth {
+  return typeof value === 'string' && BUDGET_MONTH_SET.has(value);
+}
+
+export function toBudgetMonthIndex(month: BudgetMonth): number {
+  return BUDGET_MONTHS.indexOf(month);
+}
+
+export function formatBudgetMonthFromDate(date: Date): BudgetMonth {
+  return BUDGET_MONTHS[date.getMonth()] ?? BUDGET_MONTHS[0];
 }
 
 export type User = {
@@ -482,7 +518,7 @@ export type BudgetCategory = {
   budgeted: number;
   spent: number;
   color: string;
-  month: string;
+  month: BudgetMonth;
   year: number;
 };
 

@@ -1,5 +1,12 @@
 import { Hono, type Context } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import {
+  MAX_RETIREMENT_AGE,
+  MAX_USER_AGE,
+  MIN_PASSWORD_LENGTH,
+  MIN_RETIREMENT_AGE,
+  MIN_USER_AGE,
+} from '@quro/shared';
 import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
@@ -18,7 +25,6 @@ const app = new Hono();
 const SESSION_ID_BYTES = 32;
 const HEX_RADIX = 16;
 const HEX_BYTE_LENGTH = 2;
-const MIN_PASSWORD_LENGTH = 8;
 const SESSION_DURATION_DAYS = 30;
 const HOURS_PER_DAY = 24;
 const MINUTES_PER_HOUR = 60;
@@ -95,24 +101,51 @@ function parseSignUpPayload(rawBody: Record<string, unknown>): SignUpPayload {
   };
 }
 
+function getRequiredSignupError(payload: SignUpPayload): string | null {
+  return !payload.firstName || !payload.lastName || !payload.email || !payload.password
+    ? 'First name, last name, email, and password are required'
+    : null;
+}
+
+function getPasswordError(password: string): string | null {
+  return password.length < MIN_PASSWORD_LENGTH
+    ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
+    : null;
+}
+
+function getSignupAgeError(age: number | null): string | null {
+  return age === null || age < MIN_USER_AGE || age > MAX_USER_AGE
+    ? `Age must be between ${MIN_USER_AGE} and ${MAX_USER_AGE}`
+    : null;
+}
+
+function getSignupRetirementAgeError(
+  retirementAge: number | null,
+  age: number | null,
+): string | null {
+  if (
+    retirementAge === null ||
+    retirementAge < MIN_RETIREMENT_AGE ||
+    retirementAge > MAX_RETIREMENT_AGE
+  ) {
+    return `Retirement age must be between ${MIN_RETIREMENT_AGE} and ${MAX_RETIREMENT_AGE}`;
+  }
+
+  return age !== null && retirementAge <= age
+    ? 'Retirement age must be greater than current age'
+    : null;
+}
+
 function validateSignUpPayload(
   payload: SignUpPayload,
 ): { error: string } | { data: ValidSignUpPayload } {
-  if (!payload.firstName || !payload.lastName || !payload.email || !payload.password) {
-    return { error: 'First name, last name, email, and password are required' };
-  }
+  const error =
+    getRequiredSignupError(payload) ??
+    getPasswordError(payload.password) ??
+    getSignupAgeError(payload.age) ??
+    getSignupRetirementAgeError(payload.retirementAge, payload.age);
 
-  if (payload.password.length < MIN_PASSWORD_LENGTH) {
-    return { error: 'Password must be at least 8 characters' };
-  }
-
-  if (payload.age === null || payload.retirementAge === null) {
-    return { error: 'Age values must be whole numbers' };
-  }
-
-  if (payload.retirementAge <= payload.age) {
-    return { error: 'Retirement age must be greater than current age' };
-  }
+  if (error) return { error };
 
   return {
     data: {
@@ -120,8 +153,8 @@ function validateSignUpPayload(
       lastName: payload.lastName,
       email: payload.email,
       password: payload.password,
-      age: payload.age,
-      retirementAge: payload.retirementAge,
+      age: payload.age!,
+      retirementAge: payload.retirementAge!,
     },
   };
 }
