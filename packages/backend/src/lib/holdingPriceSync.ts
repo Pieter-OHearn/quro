@@ -3,7 +3,9 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client';
 import { holdingPriceHistory, holdings } from '../db/schema';
 import { getMarketDataClient } from './marketDataClient';
-import { MARKETSTACK_EOD_SYMBOL_LIMIT } from './marketstackClient';
+import { toYahooSymbol } from './yahooFinanceClient';
+
+const QUOTE_BATCH_SIZE = 50;
 
 type HoldingRow = typeof holdings.$inferSelect;
 type QuoteByTicker = Record<
@@ -80,8 +82,8 @@ function toTradeDate(value: string | null): Date {
 
 function chunkSymbols(symbols: string[]): string[][] {
   const chunks: string[][] = [];
-  for (let index = 0; index < symbols.length; index += MARKETSTACK_EOD_SYMBOL_LIMIT) {
-    chunks.push(symbols.slice(index, index + MARKETSTACK_EOD_SYMBOL_LIMIT));
+  for (let index = 0; index < symbols.length; index += QUOTE_BATCH_SIZE) {
+    chunks.push(symbols.slice(index, index + QUOTE_BATCH_SIZE));
   }
   return chunks;
 }
@@ -126,16 +128,17 @@ async function fetchQuotesBySymbol(symbols: string[]): Promise<{
 
 function validateHoldingQuote(
   holding: HoldingRow,
+  yahooSymbol: string,
   quotes: QuoteByTicker,
   symbolFetchErrors: Map<string, string>,
 ): HoldingQuoteCheck {
   const ticker = normalizeTicker(holding.ticker);
-  const fetchError = symbolFetchErrors.get(ticker);
+  const fetchError = symbolFetchErrors.get(yahooSymbol);
   if (fetchError) {
     return { issue: buildIssue(holding.id, ticker, fetchError) };
   }
 
-  const quote = quotes[ticker];
+  const quote = quotes[yahooSymbol];
   if (!quote) {
     return { issue: buildIssue(holding.id, ticker, 'No EOD quote returned by provider') };
   }
@@ -252,14 +255,22 @@ export async function syncHoldingPricesForUser(
   options: { holdingIds?: number[] } = {},
 ): Promise<HoldingPriceSyncOutcome> {
   const userHoldings = await getUserHoldingsForSync(userId, options.holdingIds);
-  const symbols = [...new Set(userHoldings.map((holding) => normalizeTicker(holding.ticker)))];
-  const { quotes, symbolFetchErrors } = await fetchQuotesBySymbol(symbols);
+
+  const syncableHoldings = userHoldings.filter((h) => !h.excludeFromSync);
+
+  // Build exchange-aware symbols (e.g. CBA + XASX → CBA.AX for Yahoo Finance)
+  const yahooSymbolByHoldingId = new Map<number, string>(
+    syncableHoldings.map((h) => [h.id, toYahooSymbol(normalizeTicker(h.ticker), h.exchangeMic)]),
+  );
+  const uniqueYahooSymbols = [...new Set(yahooSymbolByHoldingId.values())];
+  const { quotes, symbolFetchErrors } = await fetchQuotesBySymbol(uniqueYahooSymbols);
 
   const updates: UpdatedHoldingPrice[] = [];
   const issues: HoldingIssue[] = [];
 
-  for (const holding of userHoldings) {
-    const quoteCheck = validateHoldingQuote(holding, quotes, symbolFetchErrors);
+  for (const holding of syncableHoldings) {
+    const yahooSymbol = yahooSymbolByHoldingId.get(holding.id) ?? normalizeTicker(holding.ticker);
+    const quoteCheck = validateHoldingQuote(holding, yahooSymbol, quotes, symbolFetchErrors);
     if ('issue' in quoteCheck) {
       issues.push(quoteCheck.issue);
       continue;
@@ -286,10 +297,10 @@ export async function syncHoldingPricesForUser(
 
   return {
     summary: {
-      requestedHoldings: userHoldings.length,
-      requestedSymbols: symbols.length,
+      requestedHoldings: syncableHoldings.length,
+      requestedSymbols: uniqueYahooSymbols.length,
       updatedHoldings: updates.length,
-      skippedHoldings: userHoldings.length - updates.length,
+      skippedHoldings: syncableHoldings.length - updates.length,
       issues,
       syncedAt: new Date().toISOString(),
     },

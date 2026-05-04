@@ -209,6 +209,8 @@ export type Holding = {
   exchangeMic?: string | null;
   industry?: string | null;
   priceUpdatedAt?: string | null;
+  manualPrice?: number | null;
+  excludeFromSync?: boolean;
 };
 
 export type HoldingTransaction = {

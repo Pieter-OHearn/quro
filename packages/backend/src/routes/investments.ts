@@ -53,6 +53,8 @@ const HOLDING_FIELDS = [
   'exchangeMic',
   'industry',
   'priceUpdatedAt',
+  'manualPrice',
+  'excludeFromSync',
 ] as const;
 const HOLDING_CREATE_FIELDS = [...HOLDING_FIELDS, 'priceCurrency', 'eodDate'] as const;
 const HOLDING_TRANSACTION_FIELDS = [
@@ -169,6 +171,8 @@ type HoldingPayload = {
   exchangeMic: string | null;
   industry: string | null;
   priceUpdatedAt: Date | null;
+  manualPrice: number | null;
+  excludeFromSync: boolean;
 };
 
 type HoldingCreatePayload = HoldingPayload & {
@@ -265,6 +269,12 @@ const holdingParsers: FieldParsers<HoldingPayload> = {
   exchangeMic: (value) => parseOptionalTextField(value, 'Exchange MIC must be a string'),
   industry: (value) => parseOptionalTextField(value, 'Industry must be a string'),
   priceUpdatedAt: (value) => parseOptionalTimestampField(value, 'Invalid priceUpdatedAt timestamp'),
+  manualPrice: (value) =>
+    parseOptionalNormalizedDecimalField(value, 'Manual price must be a valid number', 0),
+  excludeFromSync: (value) =>
+    value === undefined || typeof value === 'boolean'
+      ? ok(value ?? false)
+      : err('excludeFromSync must be a boolean'),
 };
 
 const holdingTransactionParsers: FieldParsers<HoldingTransactionPayload> = {
@@ -545,6 +555,8 @@ function toHoldingInsertValues(
     exchangeMic: payload.exchangeMic,
     industry: payload.industry,
     priceUpdatedAt: payload.priceUpdatedAt,
+    manualPrice: payload.manualPrice?.toString() ?? null,
+    excludeFromSync: payload.excludeFromSync,
   };
 }
 
@@ -561,6 +573,9 @@ function toHoldingUpdateValues(
     exchangeMic: payload.exchangeMic,
     industry: payload.industry,
     priceUpdatedAt: payload.priceUpdatedAt,
+    manualPrice:
+      payload.manualPrice === undefined ? undefined : (payload.manualPrice?.toString() ?? null),
+    excludeFromSync: payload.excludeFromSync,
   };
 }
 

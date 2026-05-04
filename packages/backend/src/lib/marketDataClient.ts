@@ -1,5 +1,5 @@
 import type { TickerItemType, TickerLookupExchange } from '@quro/shared';
-import { MarketstackMarketDataClient } from './marketstackClient';
+import { YahooFinanceMarketDataClient } from './yahooFinanceClient';
 
 export type TickerLookupProfile = {
   name: string;
@@ -29,6 +29,6 @@ let singletonClient: MarketDataClient | null = null;
 
 export function getMarketDataClient(): MarketDataClient {
   if (singletonClient) return singletonClient;
-  singletonClient = new MarketstackMarketDataClient();
+  singletonClient = new YahooFinanceMarketDataClient();
   return singletonClient;
 }

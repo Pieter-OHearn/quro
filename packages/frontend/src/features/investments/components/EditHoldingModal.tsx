@@ -38,6 +38,8 @@ type HoldingForm = {
   priceUpdatedAt: string;
   lookupPriceCurrency: string;
   lookupEodDate: string;
+  manualPrice: string;
+  excludeFromSync: boolean;
   initShares: string;
   initPrice: string;
   initDate: string;
@@ -332,6 +334,8 @@ function buildHolding(form: HoldingForm, existing: Holding | undefined): Holding
     exchangeMic: form.exchangeMic || null,
     industry: form.industry || null,
     priceUpdatedAt: form.priceUpdatedAt || null,
+    manualPrice: toNormalizedNumber(form.manualPrice),
+    excludeFromSync: form.excludeFromSync,
   };
 }
 
@@ -350,6 +354,8 @@ function buildInitialForm(existing: Holding | undefined): HoldingForm {
       priceUpdatedAt: '',
       lookupPriceCurrency: '',
       lookupEodDate: '',
+      manualPrice: '',
+      excludeFromSync: false,
       initShares: '',
       initPrice: '',
       initDate: today,
@@ -367,6 +373,8 @@ function buildInitialForm(existing: Holding | undefined): HoldingForm {
     priceUpdatedAt: existing.priceUpdatedAt ?? '',
     lookupPriceCurrency: '',
     lookupEodDate: '',
+    manualPrice: existing.manualPrice != null ? existing.manualPrice.toString() : '',
+    excludeFromSync: existing.excludeFromSync ?? false,
     initShares: '',
     initPrice: '',
     initDate: today,
@@ -401,11 +409,18 @@ function useHoldingFormState(existing: Holding | undefined) {
 
   function set(field: string, value: string): void {
     const normalizedValue =
-      field === 'currentPrice' || field === 'initPrice' || field === 'initShares'
+      field === 'currentPrice' ||
+      field === 'initPrice' ||
+      field === 'initShares' ||
+      field === 'manualPrice'
         ? normalizeDecimalInput(value)
         : value;
     setForm((previous) => ({ ...previous, [field]: normalizedValue }));
     setErrors((previous) => ({ ...previous, [field]: '' }));
+  }
+
+  function setExcludeFromSync(value: boolean): void {
+    setForm((previous) => ({ ...previous, excludeFromSync: value }));
   }
 
   async function handleFind() {
@@ -416,12 +431,67 @@ function useHoldingFormState(existing: Holding | undefined) {
     }
   }
 
-  return { form, errors, setErrors, searchTicker, setSearchTicker, tickerLookup, set, handleFind };
+  return {
+    form,
+    errors,
+    setErrors,
+    searchTicker,
+    setSearchTicker,
+    tickerLookup,
+    set,
+    setExcludeFromSync,
+    handleFind,
+  };
+}
+
+type PriceControlsSectionProps = {
+  form: HoldingForm;
+  onChange: (field: string, value: string) => void;
+  onToggleExcludeFromSync: (value: boolean) => void;
+};
+
+function PriceControlsSection({
+  form,
+  onChange,
+  onToggleExcludeFromSync,
+}: PriceControlsSectionProps) {
+  return (
+    <div className="border-t border-dashed border-slate-200 pt-4 mt-1">
+      <p className="text-xs font-semibold text-slate-600 mb-3">Price Controls</p>
+      <FormField label="Manual Price" hint="Overrides the synced price when set">
+        <TextInput
+          type="text"
+          inputMode="decimal"
+          value={form.manualPrice}
+          onChange={(value) => onChange('manualPrice', value)}
+          placeholder="Leave blank to use synced price"
+        />
+      </FormField>
+      <label className="flex items-center gap-2.5 mt-3 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={form.excludeFromSync}
+          onChange={(e) => onToggleExcludeFromSync(e.target.checked)}
+          className="w-4 h-4 rounded border-slate-300 accent-indigo-600"
+        />
+        <span className="text-sm text-slate-700">Exclude from price sync</span>
+      </label>
+    </div>
+  );
 }
 
 export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHoldingModalProps) {
-  const { form, errors, setErrors, searchTicker, setSearchTicker, tickerLookup, set, handleFind } =
-    useHoldingFormState(existing);
+  const {
+    form,
+    errors,
+    setErrors,
+    searchTicker,
+    setSearchTicker,
+    tickerLookup,
+    set,
+    setExcludeFromSync,
+    handleFind,
+  } = useHoldingFormState(existing);
   const isNew = !existing;
 
   function handleSave() {
@@ -473,6 +543,11 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
         />
       )}
       <HoldingBaseFields form={form} errors={errors} onChange={set} />
+      <PriceControlsSection
+        form={form}
+        onChange={set}
+        onToggleExcludeFromSync={setExcludeFromSync}
+      />
       {isNew && (
         <InitialBuySection form={form} errors={errors} currency={form.currency} onChange={set} />
       )}

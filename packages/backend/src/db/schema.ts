@@ -217,6 +217,8 @@ export const holdings = pgTable(
     exchangeMic: text('exchange_mic'),
     industry: text('industry'),
     priceUpdatedAt: timestamp('price_updated_at'),
+    manualPrice: numeric('manual_price', { precision: 19, scale: 2 }),
+    excludeFromSync: boolean('exclude_from_sync').default(false).notNull(),
   },
   (table) => ({
     userIdx: index('holdings_user_id_idx').on(table.userId),

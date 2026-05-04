@@ -71,6 +71,18 @@ type HoldingRowMetrics = {
   txnCount: number;
 };
 
+function getEffectivePrice(holding: Holding): number {
+  const manual = holding.manualPrice != null ? Number(holding.manualPrice) : null;
+  return manual != null && Number.isFinite(manual) ? manual : holding.currentPrice;
+}
+
+function formatSyncDate(priceUpdatedAt: string | null | undefined): string | null {
+  if (!priceUpdatedAt) return null;
+  const date = new Date(priceUpdatedAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
 function computeHoldingRowMetrics(
   holding: Holding,
   holdingTxns: HoldingTransaction[],
@@ -78,11 +90,12 @@ function computeHoldingRowMetrics(
   convertToBase: (value: number, currency: string) => number,
   isForeign: (currency: string) => boolean,
 ): HoldingRowMetrics {
-  const nativeValue = position.shares * holding.currentPrice;
+  const price = getEffectivePrice(holding);
+  const nativeValue = position.shares * price;
   const valueInBase = convertToBase(nativeValue, holding.currency);
-  const gain = (holding.currentPrice - position.avgCost) * position.shares;
+  const gain = (price - position.avgCost) * position.shares;
   const gainPctHolding =
-    position.avgCost > 0 ? ((holding.currentPrice - position.avgCost) / position.avgCost) * 100 : 0;
+    position.avgCost > 0 ? ((price - position.avgCost) / position.avgCost) * 100 : 0;
   const foreign = isForeign(holding.currency);
   const txnCount = holdingTxns.filter((t) => t.holdingId === holding.id).length;
   return { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount };
@@ -183,10 +196,21 @@ function HoldingValueCells({
         </p>
       </div>
       <div className="col-span-2 text-right">
-        <p className="text-sm font-semibold text-slate-800">
-          {fmtNative(holding.currentPrice, holding.currency, true)}
+        <div className="flex items-center justify-end gap-1">
+          <p className="text-sm font-semibold text-slate-800">
+            {fmtNative(getEffectivePrice(holding), holding.currency, true)}
+          </p>
+          {holding.manualPrice != null && (
+            <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-medium">
+              M
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] text-slate-400">
+          {holding.excludeFromSync
+            ? 'sync off'
+            : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency)}
         </p>
-        <p className="text-xs text-slate-400">{holding.currency}</p>
       </div>
       <div className="col-span-2 text-right">
         <p className="text-sm font-semibold text-slate-800">{fmtBase(valueInBase)}</p>

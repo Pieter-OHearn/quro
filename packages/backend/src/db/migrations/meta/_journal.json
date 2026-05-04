@@ -71,6 +71,13 @@
       "when": 1777730300000,
       "tag": "0009_budget_bunq_account_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777909802049,
+      "tag": "0010_nifty_nextwave",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [Unreleased]
+
+- Add Yahoo Finance-backed market data lookup and price syncing for investment holdings.
+- Add manual holding price overrides and an option to exclude holdings from automatic price sync.
+- Show manual price and sync status in the brokerage holdings table.
+
 ## [v0.1.2] - 2026-05-04
 
 - Support joint account budget imports from Bunq.

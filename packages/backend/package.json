@@ -21,7 +21,8 @@
     "@quro/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.16",
-    "postgres": "^3.4.0"
+    "postgres": "^3.4.0",
+    "yahoo-finance2": "^3.14.0"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
