@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
-## [Unreleased]
+## [v0.1.3] - 2026-05-04
 
 - Switch investment market data lookup and price syncing to Yahoo Finance, removing the Marketstack API key and deployment wiring.
 - Add manual holding price overrides and an option to exclude holdings from automatic price sync.
