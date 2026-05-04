@@ -19,7 +19,7 @@ import {
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
-import { lookupTicker } from '../lib/marketstack';
+import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
 import {
   err,
@@ -1043,7 +1043,7 @@ app.get('/holding-price-history', async (c) => {
   return c.json({ data });
 });
 
-// ── Ticker Lookup (Marketstack) ──────────────────────────────────────────────
+// ── Ticker Lookup ────────────────────────────────────────────────────────────
 
 app.get('/ticker-lookup/:symbol', async (c) => {
   const symbol = c.req.param('symbol');
@@ -1072,7 +1072,7 @@ app.get('/ticker-lookup/:symbol', async (c) => {
   }
 });
 
-// ── Sync Holding Prices (Marketstack EOD) ────────────────────────────────────
+// ── Sync Holding Prices ───────────────────────────────────────────────────────
 
 app.post('/holdings/sync-prices', async (c) => {
   const user = getAuthUser(c);

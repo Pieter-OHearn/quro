@@ -9,7 +9,7 @@ import type {
 
 const DATE_PART_LENGTH = 10;
 
-// Maps Marketstack MIC codes → Yahoo Finance exchange suffix.
+// Maps exchange MIC codes to Yahoo Finance exchange suffixes.
 // US exchanges (XNAS, XNYS, XASE, ARCX, BATS, etc.) have no suffix.
 const MIC_TO_YAHOO_SUFFIX: Readonly<Record<string, string>> = {
   XASX: '.AX', // Australia

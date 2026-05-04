@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
-- Add Yahoo Finance-backed market data lookup and price syncing for investment holdings.
+- Switch investment market data lookup and price syncing to Yahoo Finance, removing the Marketstack API key and deployment wiring.
 - Add manual holding price overrides and an option to exclude holdings from automatic price sync.
 - Show manual price and sync status in the brokerage holdings table.
 - Fix salary growth history charts so mixed-currency entries in the same year render as one combined annual bar.

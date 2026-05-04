@@ -78,11 +78,6 @@ load_storage_env() {
 }
 
 load_optional_api_keys() {
-  marketstack_key=$(read_optional_secret /run/secrets/marketstack_api_key || true)
-  if [ -n "${marketstack_key:-}" ]; then
-    export MARKETSTACK_API_KEY="$marketstack_key"
-  fi
-
   hugging_face_token=$(read_optional_secret /run/secrets/hugging_face_hub_token || true)
   if [ -n "${hugging_face_token:-}" ]; then
     export HUGGING_FACE_HUB_TOKEN="$hugging_face_token"

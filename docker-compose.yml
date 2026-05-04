@@ -108,7 +108,6 @@ services:
     secrets:
       - postgres_app_password
       - minio_app_secret_key
-      - marketstack_api_key
       - hugging_face_hub_token
     depends_on:
       migrate:
@@ -259,7 +258,5 @@ secrets:
     file: ./secrets/minio_root_password.txt
   minio_app_secret_key:
     file: ./secrets/minio_app_secret_key.txt
-  marketstack_api_key:
-    file: ./secrets/marketstack_api_key.txt
   hugging_face_hub_token:
     file: ./secrets/hugging_face_hub_token.txt

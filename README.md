@@ -89,7 +89,7 @@ for file in secrets/*.example; do cp "$file" "${file%.example}"; done
 
 Edit each file under `secrets/` to set your own passwords and keys.
 
-> The investments feature (ticker lookup and price sync) requires a free [Marketstack](https://marketstack.com) API key. Sign up at marketstack.com, copy your access key, and paste it into `secrets/marketstack_api_key.txt`. The rest of the app works without it.
+> The investments feature (ticker lookup and price sync) uses Yahoo Finance for market data and does not require a separate API key. The rest of the app works without it.
 
 > The bunq integration is optional. To connect a bunq account, register a bunq OAuth client with the callback URL `http://localhost:3000/api/bunq/oauth/callback`, then set `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI` in your release environment. The rest of the app works without it; savings and budget data can still be entered manually.
 

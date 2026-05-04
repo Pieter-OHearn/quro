@@ -43,7 +43,7 @@ All API requests go to `/api/*`. In the Docker stack, Nginx proxies these to `ht
 
 ### What Is Well Documented
 
-- **Self-hosting quickstart** (`README.md`): Clear, minimal, easy to follow. The note about the optional Marketstack API key is well placed.
+- **Self-hosting quickstart** (`README.md`): Clear, minimal, easy to follow. The note about Yahoo Finance-backed market data is well placed.
 - **Local dev setup** (`docs/development.md`): The six-step walkthrough covering the development compose override, credential files, optional pension-import stack, and DB helper commands is thorough.
 - **Database safety** (`docs/database-safety.md`): Excellent coverage of the data model, backup/restore procedures, role separation, and the migration path from old Docker volumes.
 - **Auto-update webhook** (`docs/device-auto-update-webhook.md`): Detailed and actionable; covers polling mode as a fallback.
@@ -85,7 +85,7 @@ These are factual errors in the current documentation relative to the actual cod
 **Operational gaps:**
 
 - **MinIO / document storage is not documented for operators.** Self-hosters know their data lives in `./data` but there is no guidance on backing up or restoring MinIO objects, or on what happens if the bucket is missing.
-- **MarketStack API key scope is too brief.** The README mentions the key is needed for investments but does not explain what features degrade without it or how price sync works (lazy on-demand vs. scheduled).
+- **Yahoo Finance market-data scope is too brief.** The README explains that investments use Yahoo Finance, but it does not explain what features degrade if market data is unavailable or how price sync works (lazy on-demand vs. scheduled).
 - **Security architecture is scattered.** CSRF protection, session management, HTTP-only cookies, role separation, and security headers are implemented carefully but are never described together. A security-conscious self-hoster or reviewer has to piece this together from code.
 
 **API documentation:**
@@ -130,4 +130,4 @@ A new contributor would have no guidance on the pension import system, the capab
 
 10. **Add MinIO backup guidance** to `docs/database-safety.md`: Explain what is stored in MinIO (pension PDFs), how to back up the `./data/minio` directory, and how a restore interacts with DB document metadata.
 11. **Add a security overview**: A short `docs/security.md` (or section in `docs/architecture.md`) describing session management, CSRF protection, the role separation model, and the Nginx security headers. Useful for self-hosters and security reviewers.
-12. **Expand MarketStack documentation**: Explain which features degrade without the API key, how the lazy price-sync works, and any rate-limit considerations.
+12. **Expand market-data documentation**: Explain which features degrade when market data is unavailable, how the lazy price-sync works, and any rate-limit considerations.
