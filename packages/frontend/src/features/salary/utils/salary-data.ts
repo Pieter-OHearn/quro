@@ -23,6 +23,20 @@ const getPayslipAnnualGross = (payslip: Pick<Payslip, 'gross' | 'bonus'>): numbe
 const percentageOfTotal = (value: number, total: number): number =>
   total > 0 ? (value / total) * 100 : 0;
 
+const buildSalaryChartDataFromHistory = (
+  salaryHistory: readonly SalaryHistoryEntry[],
+  convertToBase: (amount: number, fromCurrency: CurrencyCode) => number,
+): SalaryChartEntry[] =>
+  Array.from(
+    salaryHistory.reduce((grossByYear, entry) => {
+      const annualTotal = grossByYear.get(entry.year) ?? 0;
+      grossByYear.set(entry.year, annualTotal + convertToBase(entry.annualSalary, entry.currency));
+      return grossByYear;
+    }, new Map<number, number>()),
+  )
+    .sort(([leftYear], [rightYear]) => leftYear - rightYear)
+    .map(([year, gross]) => ({ year: String(year), gross }));
+
 export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => {
   const totalPay = getPayslipBreakdownTotal(payslip);
   const hasTaxCorrection = payslip.tax < 0;
@@ -149,12 +163,7 @@ export function computeSalaryMetrics(
 
   const salaryChartData: SalaryChartEntry[] =
     salaryHistory.length > 0
-      ? [...salaryHistory]
-          .sort((left, right) => left.year - right.year)
-          .map((entry) => ({
-            year: String(entry.year),
-            gross: convertToBase(entry.annualSalary, entry.currency),
-          }))
+      ? buildSalaryChartDataFromHistory(salaryHistory, convertToBase)
       : Array.from(
           allPayslips.reduce((grossByYear, payslip) => {
             const year = parsePayslipYear(payslip, currentYear);
