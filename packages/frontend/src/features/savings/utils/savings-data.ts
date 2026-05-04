@@ -1,6 +1,28 @@
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
-import { MONTH_PREFIXES } from '../constants';
-import type { ConvertToBaseFn, SavingsChartDatum, SavingsContributionDatum } from '../types';
+import type {
+  ConvertToBaseFn,
+  MonthBucket,
+  SavingsChartDatum,
+  SavingsContributionDatum,
+} from '../types';
+
+function buildRollingMonthBuckets(monthCount = 7): MonthBucket[] {
+  const now = new Date();
+
+  return Array.from({ length: monthCount }, (_, index) => {
+    const monthStartDate = new Date(now.getFullYear(), now.getMonth() - index, 1);
+    const year = monthStartDate.getFullYear();
+    const month = monthStartDate.getMonth() + 1;
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    const monthEndDate = new Date(year, month, 0);
+
+    return {
+      label: monthStartDate.toLocaleString('en-GB', { month: 'short' }),
+      prefix,
+      cutoff: monthEndDate.toISOString().slice(0, 10),
+    };
+  }).reverse();
+}
 
 export function computeSavingsMetrics(
   accounts: SavingsAccount[],
@@ -45,16 +67,19 @@ export function buildContribChartData(
     return convertToBase(transaction.amount, account?.currency ?? 'EUR');
   }
 
-  return MONTH_PREFIXES.map(({ label, prefix }) => {
+  return buildRollingMonthBuckets().map(({ label, prefix }) => {
     const monthTransactions = transactions.filter((transaction) =>
       transaction.date.startsWith(prefix),
     );
+
     const deposits = monthTransactions
       .filter((transaction) => transaction.type === 'deposit')
       .reduce((sum, transaction) => sum + toBase(transaction), 0);
+
     const withdrawals = monthTransactions
       .filter((transaction) => transaction.type === 'withdrawal')
       .reduce((sum, transaction) => sum + toBase(transaction), 0);
+
     const interest = monthTransactions
       .filter((transaction) => transaction.type === 'interest')
       .reduce((sum, transaction) => sum + toBase(transaction), 0);
@@ -77,9 +102,7 @@ export function buildGrowthChartData(
     return Boolean(account.archivedAt && account.archivedAt.slice(0, 10) <= cutoff);
   }
 
-  return MONTH_PREFIXES.map(({ label, prefix }) => {
-    const cutoff = `${prefix}-31`;
-
+  return buildRollingMonthBuckets().map(({ label, cutoff }) => {
     const savingsAtCutoff = accounts.reduce((sum, account) => {
       if (isArchivedAtCutoff(account, cutoff)) return sum;
 
@@ -87,6 +110,7 @@ export function buildGrowthChartData(
         .filter((transaction) => transaction.accountId === account.id && transaction.date > cutoff)
         .reduce((transactionSum, transaction) => {
           const amountInBase = convertToBase(transaction.amount, account.currency);
+
           return transaction.type === 'withdrawal'
             ? transactionSum - amountInBase
             : transactionSum + amountInBase;

@@ -35,7 +35,7 @@ describe('resolveCorsOrigin', () => {
 describe('createCorsMiddleware', () => {
   test('allows the Docker frontend origin through preflight requests', async () => {
     const app = new Hono();
-    app.use('*', createCorsMiddleware());
+    app.use('*', createCorsMiddleware(''));
     app.get('/api/health', (c) => c.json({ status: 'ok' }));
 
     const response = await app.request('http://localhost:3000/api/health', {

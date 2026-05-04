@@ -64,6 +64,13 @@
       "when": 1777730200000,
       "tag": "0008_archive_savings_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777730300000,
+      "tag": "0009_budget_bunq_account_tags",
+      "breakpoints": true
     }
   ]
 }

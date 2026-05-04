@@ -56,16 +56,6 @@ export const TXN_TYPE_LIST: TxnTypeMeta[] = [
   },
 ];
 
-export const MONTH_PREFIXES: { label: string; prefix: string }[] = [
-  { label: 'Aug', prefix: '2025-08' },
-  { label: 'Sep', prefix: '2025-09' },
-  { label: 'Oct', prefix: '2025-10' },
-  { label: 'Nov', prefix: '2025-11' },
-  { label: 'Dec', prefix: '2025-12' },
-  { label: 'Jan', prefix: '2026-01' },
-  { label: 'Feb', prefix: '2026-02' },
-];
-
 export const FILTER_OPTIONS = [
   { key: 'all', label: 'All' },
   { key: 'deposit', label: 'Deposits' },

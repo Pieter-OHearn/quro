@@ -13,6 +13,7 @@ import {
   type BunqPayment,
   type BunqSessionResult,
 } from '../lib/bunqClient';
+import { toBunqNewerThanCursor } from '../lib/bunqSyncCursor';
 
 const DEFAULT_BUNQ_COLOR = '#3b82f6';
 const DEFAULT_BUNQ_EMOJI = '🏦';
@@ -272,10 +273,6 @@ async function detachOrphanedBunqSavingsAccounts(
   }
 }
 
-function toNewerThanParam(lastSyncAt: Date | null): string | undefined {
-  return lastSyncAt ? lastSyncAt.toISOString() : undefined;
-}
-
 export async function syncBunqSavings(
   userId: number,
   newerThanOverride?: string,
@@ -292,7 +289,7 @@ export async function syncBunqSavings(
     const accounts = await fetchMonetaryAccounts(session.sessionToken, session.bunqUserId);
     const savingsOnly = accounts.filter((a) => a.type === 'SAVINGS');
     const activeBunqAccountIds = new Set(savingsOnly.map((a) => String(a.id)));
-    const newerThan = newerThanOverride ?? toNewerThanParam(connection.lastSyncAt);
+    const newerThan = newerThanOverride ?? toBunqNewerThanCursor(connection.lastSyncAt);
 
     for (const bunqAccount of savingsOnly) {
       const localAccount = await upsertSavingsAccount(userId, bunqAccount);

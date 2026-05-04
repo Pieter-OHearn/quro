@@ -17,6 +17,7 @@ import {
   type BunqPayment,
   type BunqSessionResult,
 } from '../lib/bunqClient';
+import { toBunqNewerThanCursor } from '../lib/bunqSyncCursor';
 import {
   CATEGORY_PRESETS,
   DEFAULT_CATEGORY_PRESET,
@@ -293,6 +294,7 @@ async function claimMatchingManualBudgetTransaction(
   tx: DbTransaction,
   userId: number,
   payment: BunqPayment,
+  account: BunqMonetaryAccount,
   amount: number,
   dateStr: string,
   bunqTransactionId: string,
@@ -321,6 +323,10 @@ async function claimMatchingManualBudgetTransaction(
       bunqTransactionId,
       bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
       bunqPaymentType: payment.type || null,
+      sourceProvider: 'bunq',
+      sourceAccountId: String(account.id),
+      sourceAccountName: account.description || null,
+      sourceAccountType: account.type,
       counterpartyIban: payment.counterpartyAlias.iban,
     })
     .where(
@@ -338,13 +344,13 @@ async function claimMatchingManualBudgetTransaction(
 async function importBudgetPayment(
   userId: number,
   payment: BunqPayment,
+  account: BunqMonetaryAccount,
   ownIbans: ReadonlySet<string>,
   bunqUserId: string,
-  accountCurrency: string,
 ): Promise<void> {
   if (!isDebit(payment)) return;
   if (isSelfTransfer(payment, ownIbans, bunqUserId)) return;
-  if (payment.amount.currency !== accountCurrency) return;
+  if (payment.amount.currency !== account.balance.currency) return;
 
   const dateStr = toTransactionDate(payment.created);
   const { month, year } = parseMonthYear(dateStr);
@@ -358,6 +364,7 @@ async function importBudgetPayment(
       tx,
       userId,
       payment,
+      account,
       amount,
       dateStr,
       bunqTransactionId,
@@ -377,6 +384,10 @@ async function importBudgetPayment(
         bunqTransactionId,
         bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
         bunqPaymentType: payment.type || null,
+        sourceProvider: 'bunq',
+        sourceAccountId: String(account.id),
+        sourceAccountName: account.description || null,
+        sourceAccountType: account.type,
         counterpartyIban: payment.counterpartyAlias.iban,
       })
       .onConflictDoNothing({
@@ -450,9 +461,9 @@ async function importBudgetPaymentsForAccount(params: {
       await importBudgetPayment(
         params.userId,
         payment,
+        params.account,
         params.ownIbans,
         params.bunqUserId,
-        params.account.balance.currency,
       );
     } catch (error) {
       issues.push({
@@ -504,10 +515,8 @@ export async function syncBunqBudget(
     const session = await ensureSession(connection);
     const accounts = await fetchMonetaryAccounts(session.sessionToken, session.bunqUserId);
     const ownIbans = collectOwnIbans(accounts);
-    const bankAccounts = accounts.filter((a) => a.type === 'BANK');
-    const newerThan =
-      newerThanOverride ??
-      (connection.lastSyncAt ? connection.lastSyncAt.toISOString() : undefined);
+    const bankAccounts = accounts.filter((a) => a.type === 'BANK' || a.type === 'JOINT');
+    const newerThan = newerThanOverride ?? toBunqNewerThanCursor(connection.lastSyncAt);
 
     for (const account of bankAccounts) {
       issues.push(

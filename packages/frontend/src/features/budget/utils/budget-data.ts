@@ -40,6 +40,10 @@ export function mapMonthlyTransactions(
       emoji: category?.emoji ?? '\ud83d\udce6',
       color: category?.color,
       bunqTransactionId: transaction.bunqTransactionId,
+      sourceProvider: transaction.sourceProvider,
+      sourceAccountId: transaction.sourceAccountId,
+      sourceAccountName: transaction.sourceAccountName,
+      sourceAccountType: transaction.sourceAccountType,
     };
   });
 }

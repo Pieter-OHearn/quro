@@ -30,6 +30,15 @@ describe('bunqClient', () => {
                 status: 'ACTIVE',
               },
             },
+            {
+              MonetaryAccountJoint: {
+                id: 8,
+                description: 'Joint account',
+                balance: { value: '56.78', currency: 'EUR' },
+                alias: [{ type: 'IBAN', value: 'NL00BUNQ1111111111' }],
+                status: 'ACTIVE',
+              },
+            },
           ],
         }),
       ),
@@ -46,6 +55,14 @@ describe('bunqClient', () => {
         description: 'Main account',
         balance: { value: '12.34', currency: 'EUR' },
         iban: 'NL00BUNQ0000000000',
+        status: 'ACTIVE',
+      },
+      {
+        id: 8,
+        type: 'JOINT',
+        description: 'Joint account',
+        balance: { value: '56.78', currency: 'EUR' },
+        iban: 'NL00BUNQ1111111111',
         status: 'ACTIVE',
       },
     ]);

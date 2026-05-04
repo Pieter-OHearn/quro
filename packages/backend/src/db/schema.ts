@@ -643,6 +643,10 @@ export const budgetTransactions = pgTable(
     bunqTransactionId: text('bunq_transaction_id'),
     bunqMcc: text('bunq_mcc'),
     bunqPaymentType: text('bunq_payment_type'),
+    sourceProvider: text('source_provider'),
+    sourceAccountId: text('source_account_id'),
+    sourceAccountName: text('source_account_name'),
+    sourceAccountType: text('source_account_type'),
     counterpartyIban: text('counterparty_iban'),
   },
   (table) => ({

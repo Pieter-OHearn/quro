@@ -23,3 +23,9 @@ export type DeleteSavingsAccountMode = 'preserveTransactions' | 'deleteTransacti
 
 export type SaveAccountInput = Omit<SavingsAccount, 'id'> & { id?: number };
 export type SaveTransactionInput = Omit<SavingsTransaction, 'id'> & { id?: number };
+
+export type MonthBucket = {
+  label: string;
+  prefix: string;
+  cutoff: string;
+};

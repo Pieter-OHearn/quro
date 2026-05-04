@@ -42,7 +42,7 @@ export type BunqSessionResult = {
 
 export type BunqMonetaryAccount = {
   id: number;
-  type: 'BANK' | 'SAVINGS';
+  type: 'BANK' | 'JOINT' | 'SAVINGS';
   description: string;
   balance: { value: string; currency: string };
   iban: string | null;
@@ -247,7 +247,12 @@ function parseMonetaryAccount(
   const rawId = data.id;
   const id = typeof rawId === 'number' ? rawId : null;
   if (id === null) return null;
-  const type = typeName === 'MonetaryAccountSavings' ? 'SAVINGS' : 'BANK';
+  const type =
+    typeName === 'MonetaryAccountSavings'
+      ? 'SAVINGS'
+      : typeName === 'MonetaryAccountJoint'
+        ? 'JOINT'
+        : 'BANK';
   const balanceData = isRecord(data.balance) ? data.balance : {};
   const aliases = Array.isArray(data.alias) ? data.alias : [];
   return {
@@ -261,7 +266,7 @@ function parseMonetaryAccount(
 }
 
 function parseMonetaryAccounts(payload: unknown): BunqMonetaryAccount[] {
-  const types = ['MonetaryAccountBank', 'MonetaryAccountSavings'];
+  const types = ['MonetaryAccountBank', 'MonetaryAccountJoint', 'MonetaryAccountSavings'];
   return types.flatMap((typeName) =>
     extractBunqItems(payload, typeName)
       .map((data) => parseMonetaryAccount(typeName, data))

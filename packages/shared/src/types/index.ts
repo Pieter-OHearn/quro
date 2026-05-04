@@ -494,6 +494,10 @@ export type BudgetTransaction = {
   date: string;
   merchant: string;
   bunqTransactionId?: string | null;
+  sourceProvider?: string | null;
+  sourceAccountId?: string | null;
+  sourceAccountName?: string | null;
+  sourceAccountType?: 'BANK' | 'JOINT' | 'SAVINGS' | string | null;
 };
 
 export type NetWorthSnapshot = {
