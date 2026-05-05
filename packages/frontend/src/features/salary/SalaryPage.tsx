@@ -75,7 +75,10 @@ function useSalaryPageState() {
   }, [activeYear, years, currentYear]);
 
   const yearPayslips = useMemo(
-    () => payslips.filter((payslip) => parsePayslipYear(payslip, currentYear) === activeYear),
+    () =>
+      payslips
+        .filter((payslip) => parsePayslipYear(payslip, currentYear) === activeYear)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [payslips, activeYear, currentYear],
   );
 
