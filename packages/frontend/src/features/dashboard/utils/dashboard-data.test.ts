@@ -161,6 +161,7 @@ test('computes dashboard stats from normalized mixed-currency activity and paysl
 
   expect(stats.totalIncome).toBeCloseTo(92.2, 10);
   expect(stats.totalExpenses).toBeCloseTo(29.5, 10);
+  expect(stats.totalSavingsDeposited).toBeCloseTo(46.1, 10);
   expect(stats.monthlyCategoryChange('Savings')).toBeCloseTo(46.1, 10);
   expect(stats.monthlySalaryValue).toBeCloseTo((2300 + 200) * 1.18, 10);
   expect(stats.salaryTrendChange).toBe(0);

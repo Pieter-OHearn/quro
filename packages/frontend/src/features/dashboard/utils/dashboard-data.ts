@@ -237,10 +237,11 @@ export const computeNWMetrics = (
 export const buildMonthlySummaryItems = (
   income: number,
   expenses: number,
+  savingsDeposited: number,
   fmtBase: DashboardFormatFn,
 ): MonthlySummaryItem[] => [
   {
-    label: 'Total Income',
+    label: 'Monthly Income',
     value: fmtBase(income, undefined, true),
     icon: '\ud83d\udcb0',
     bg: 'bg-emerald-50',
@@ -248,7 +249,7 @@ export const buildMonthlySummaryItems = (
     border: 'border-emerald-100',
   },
   {
-    label: 'Total Expenses',
+    label: 'Monthly Expenses',
     value: fmtBase(expenses, undefined, true),
     icon: '\ud83d\udce4',
     bg: 'bg-rose-50',
@@ -257,7 +258,7 @@ export const buildMonthlySummaryItems = (
   },
   {
     label: 'Monthly Savings',
-    value: fmtBase(income - expenses, undefined, true),
+    value: fmtBase(savingsDeposited, undefined, true),
     icon: '\ud83c\udfe6',
     bg: 'bg-indigo-50',
     text: 'text-indigo-700',
@@ -283,11 +284,15 @@ export function computeDashboardTxnStats(
   const totalExpenses = monthTxns
     .filter((tx) => tx.type === 'expense')
     .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+  const totalSavingsDeposited = monthTxns
+    .filter((tx) => tx.type === 'transfer' && tx.category === 'Savings')
+    .reduce((s, tx) => s - tx.amount, 0);
   return {
     monthlyCategoryChange,
     monthlySalaryValue,
     salaryTrendChange,
     totalIncome,
     totalExpenses,
+    totalSavingsDeposited,
   };
 }

@@ -73,6 +73,7 @@ export type DashboardTxnStats = {
   salaryTrendChange: number;
   totalIncome: number;
   totalExpenses: number;
+  totalSavingsDeposited: number;
 };
 
 export type NetWorthMetricData = { month: string; year: number; value: number };

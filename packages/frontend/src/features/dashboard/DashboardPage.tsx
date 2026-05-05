@@ -47,6 +47,12 @@ const computeAnnualGross = (
   return convertToBase(latest.gross * 12, latest.currency);
 };
 
+const buildAllocationsByName = (allocationData: ReadonlyArray<{ name: string; value: number }>) =>
+  allocationData.reduce<Record<string, number>>((acc, item) => {
+    acc[item.name] = item.value;
+    return acc;
+  }, {});
+
 function useDashboardData(
   fmtBase: DashboardFormatFn,
   convertToBase: (amount: number, currency: string) => number,
@@ -86,13 +92,7 @@ function useDashboardData(
   );
   const chartData = normalizeNetWorthSnapshots(netWorthData, convertToBase);
   const allocationSummary = normalizeAssetAllocations(allocations, convertToBase);
-  const allocationByName = allocationSummary.allocationData.reduce<Record<string, number>>(
-    (acc, item) => {
-      acc[item.name] = item.value;
-      return acc;
-    },
-    {},
-  );
+  const allocationByName = buildAllocationsByName(allocationSummary.allocationData);
 
   const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, allocationSummary.netWorth);
   const {
@@ -101,6 +101,7 @@ function useDashboardData(
     salaryTrendChange,
     totalIncome,
     totalExpenses,
+    totalSavingsDeposited,
   } = computeDashboardTxnStats(convertedTransactions, payslips, convertToBase);
 
   return {
@@ -126,7 +127,12 @@ function useDashboardData(
     displayedRecentTransactions: [...currentMonthTransactions]
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, DASHBOARD_TXN_LIMIT),
-    monthlySummaryItems: buildMonthlySummaryItems(totalIncome, totalExpenses, fmtBase),
+    monthlySummaryItems: buildMonthlySummaryItems(
+      totalIncome,
+      totalExpenses,
+      totalSavingsDeposited,
+      fmtBase,
+    ),
   };
 }
 
