@@ -2,8 +2,14 @@ import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router';
 import { formatNumber, type Goal, type GoalType } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
+import type { GoalProgressContext } from '@/features/goals/types';
 import { GOAL_TYPE_META } from '@/features/goals/utils/goals-constants';
-import { getGoalPct, normalizeGoalType } from '@/features/goals/utils/goal-utils';
+import {
+  getGoalPct,
+  normalizeGoalType,
+  resolveGoalCurrentAmount,
+  resolveInvestHabitMonthsCompleted,
+} from '@/features/goals/utils/goal-utils';
 import type { CompactFormatFn } from '../types';
 
 const TYPE_BADGE_LABEL: Record<GoalType, string> = {
@@ -28,7 +34,7 @@ const getAnnualBarColor = (goal: Goal, type: GoalType, clampedPct: number): stri
   const color = goal.color || '#6366f1';
   if (type !== 'annual') return color;
   const lowerIsBetter =
-    goal.unit === '€/mo' && (goal.currentAmount || 0) > (goal.targetAmount || 0);
+    Boolean(goal.unit?.endsWith('/mo')) && (goal.currentAmount || 0) > (goal.targetAmount || 0);
   if (lowerIsBetter && clampedPct < 100) return '#f59e0b';
   return color;
 };
@@ -37,13 +43,17 @@ const buildSalaryValueParts = (
   goal: Goal,
   annualGross: number,
   fmtBase: CompactFormatFn,
+  toBase: (n: number) => number,
 ): { primary: string; secondary: string } => ({
   primary: fmtBase(annualGross),
-  secondary: ` \u2192 ${fmtBase(goal.targetAmount || 0)}`,
+  secondary: ` \u2192 ${fmtBase(toBase(goal.targetAmount || 0))}`,
 });
 
-const buildInvestHabitValueParts = (goal: Goal): { primary: string; secondary: string } => ({
-  primary: `${goal.monthsCompleted ?? 0}/${goal.totalMonths ?? 12}`,
+const buildInvestHabitValueParts = (
+  goal: Goal,
+  context: GoalProgressContext,
+): { primary: string; secondary: string } => ({
+  primary: `${resolveInvestHabitMonthsCompleted(goal, context)}/${goal.totalMonths ?? 12}`,
   secondary: ' months',
 });
 
@@ -60,46 +70,60 @@ const buildAnnualValueParts = (
 
 const buildAmountValueParts = (
   goal: Goal,
+  currentAmount: number,
   fmtBase: CompactFormatFn,
+  toBase: (n: number) => number,
 ): { primary: string; secondary: string } => ({
-  primary: fmtBase(goal.currentAmount || 0),
-  secondary: ` / ${fmtBase(goal.targetAmount || 0)}`,
+  primary: fmtBase(currentAmount),
+  secondary: ` / ${fmtBase(toBase(goal.targetAmount || 0))}`,
 });
 
 const buildValueParts = (
   goal: Goal,
   type: GoalType,
-  annualGross: number,
+  currentAmount: number,
+  context: GoalProgressContext,
   fmtBase: CompactFormatFn,
   numberFormat: ReturnType<typeof useCurrency>['numberFormat'],
+  toBase: (n: number) => number,
 ): { primary: string; secondary?: string } => {
   switch (type) {
     case 'salary':
-      return buildSalaryValueParts(goal, annualGross, fmtBase);
+      return buildSalaryValueParts(goal, context.annualGross, fmtBase, toBase);
     case 'invest_habit':
-      return buildInvestHabitValueParts(goal);
+      return buildInvestHabitValueParts(goal, context);
     case 'annual':
       return buildAnnualValueParts(goal, numberFormat);
     default:
-      return buildAmountValueParts(goal, fmtBase);
+      return buildAmountValueParts(goal, currentAmount, fmtBase, toBase);
   }
 };
 
-const buildSalarySubtext = (goal: Goal, annualGross: number): string => {
+const buildSalarySubtext = (
+  goal: Goal,
+  annualGross: number,
+  toBase: (n: number) => number,
+): string => {
   if (annualGross <= 0) return 'Add a payslip to track this goal';
-  const raisePct = ((goal.targetAmount || 0) / annualGross - 1) * 100;
+  const raisePct = (toBase(goal.targetAmount || 0) / annualGross - 1) * 100;
   if (raisePct <= 0) return 'Target reached';
   return `+${raisePct.toFixed(1)}% raise needed`;
 };
 
-const buildInvestHabitSubtext = (goal: Goal): string =>
-  `${goal.monthsCompleted ?? 0} of ${goal.totalMonths ?? 12} months hit`;
+const buildInvestHabitSubtext = (goal: Goal, context: GoalProgressContext): string =>
+  `${resolveInvestHabitMonthsCompleted(goal, context)} of ${goal.totalMonths ?? 12} months hit`;
 
 const buildAnnualSubtext = (clampedPct: number): string => `currently ${clampedPct.toFixed(0)}%`;
 
-const buildAmountSubtext = (goal: Goal, clampedPct: number, fmtBase: CompactFormatFn): string => {
-  const monthlyContrib = goal.monthlyContribution || 0;
-  const remaining = Math.max(0, (goal.targetAmount || 0) - (goal.currentAmount || 0));
+const buildAmountSubtext = (
+  goal: Goal,
+  currentAmount: number,
+  clampedPct: number,
+  fmtBase: CompactFormatFn,
+  toBase: (n: number) => number,
+): string => {
+  const monthlyContrib = toBase(goal.monthlyContribution || 0);
+  const remaining = Math.max(0, toBase(goal.targetAmount || 0) - currentAmount);
   if (monthlyContrib > 0 && remaining > 0) {
     const monthsLeft = Math.ceil(remaining / monthlyContrib);
     return `${monthsLeft} months left at ${fmtBase(monthlyContrib)}/mo`;
@@ -110,22 +134,24 @@ const buildAmountSubtext = (goal: Goal, clampedPct: number, fmtBase: CompactForm
 const buildGoalSubtext = (
   goal: Goal,
   type: GoalType,
+  currentAmount: number,
   clampedPct: number,
-  annualGross: number,
+  context: GoalProgressContext,
   fmtBase: CompactFormatFn,
+  toBase: (n: number) => number,
 ): string => {
   const notes = goal.notes.trim();
   if (notes.length > 0) return notes;
 
   switch (type) {
     case 'salary':
-      return buildSalarySubtext(goal, annualGross);
+      return buildSalarySubtext(goal, context.annualGross, toBase);
     case 'invest_habit':
-      return buildInvestHabitSubtext(goal);
+      return buildInvestHabitSubtext(goal, context);
     case 'annual':
       return buildAnnualSubtext(clampedPct);
     default:
-      return buildAmountSubtext(goal, clampedPct, fmtBase);
+      return buildAmountSubtext(goal, currentAmount, clampedPct, fmtBase, toBase);
   }
 };
 
@@ -143,20 +169,41 @@ function GoalTypePill({ type }: Readonly<{ type: GoalType }>) {
 
 function GoalProgressItem({
   goal,
-  annualGross,
+  goalProgressContext,
   fmtBase,
 }: Readonly<{
   goal: Goal;
-  annualGross: number;
+  goalProgressContext: GoalProgressContext;
   fmtBase: CompactFormatFn;
 }>) {
-  const { numberFormat } = useCurrency();
+  const { numberFormat, convertToBase } = useCurrency();
+  const toBase = (n: number) => convertToBase(n, goal.currency);
   const type = normalizeGoalType(goal);
-  const pct = getGoalPct(goal, annualGross);
+  const sourceResolution = resolveGoalCurrentAmount(goal, goalProgressContext);
+  const pct = getGoalPct(goal, goalProgressContext);
   const clampedPct = Math.max(0, Math.min(pct, 100));
   const barColor = getAnnualBarColor(goal, type, clampedPct);
-  const valueParts = buildValueParts(goal, type, annualGross, fmtBase, numberFormat);
-  const subtext = buildGoalSubtext(goal, type, clampedPct, annualGross, fmtBase);
+  const valueParts = buildValueParts(
+    goal,
+    type,
+    sourceResolution.currentAmount,
+    goalProgressContext,
+    fmtBase,
+    numberFormat,
+    toBase,
+  );
+  const subtext =
+    sourceResolution.status === 'missing'
+      ? 'Linked source unavailable - using saved amount'
+      : buildGoalSubtext(
+          goal,
+          type,
+          sourceResolution.currentAmount,
+          clampedPct,
+          goalProgressContext,
+          fmtBase,
+          toBase,
+        );
 
   return (
     <div className="space-y-2.5">
@@ -190,12 +237,12 @@ function GoalProgressItem({
 
 export function GoalsOverviewCard({
   goals,
-  annualGross,
+  goalProgressContext,
   currentYear,
   fmtBase,
 }: Readonly<{
   goals: readonly Goal[];
-  annualGross: number;
+  goalProgressContext: GoalProgressContext;
   currentYear: number;
   fmtBase: CompactFormatFn;
 }>) {
@@ -219,7 +266,7 @@ export function GoalsOverviewCard({
             <GoalProgressItem
               key={goal.id}
               goal={goal}
-              annualGross={annualGross}
+              goalProgressContext={goalProgressContext}
               fmtBase={fmtBase}
             />
           ))}

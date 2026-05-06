@@ -493,9 +493,22 @@ export type SalaryHistory = {
 
 export type GoalType = 'savings' | 'salary' | 'invest_habit' | 'portfolio' | 'net_worth' | 'annual';
 
+export const GOAL_SOURCE_TYPES = [
+  'manual',
+  'salary_latest_gross',
+  'savings_account',
+  'portfolio_total',
+  'net_worth_total',
+  'invest_habit_buys',
+] as const;
+
+export type GoalSourceType = (typeof GOAL_SOURCE_TYPES)[number];
+
 export type Goal = {
   id: number;
   type?: GoalType | null;
+  sourceType: GoalSourceType;
+  sourceId?: number | null;
   name: string;
   emoji: string;
   currentAmount: number;

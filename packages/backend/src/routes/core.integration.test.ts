@@ -1252,10 +1252,14 @@ describe('goals integration', () => {
     const createdGoal = (await createGoalResponse.json()) as {
       data: {
         id: number;
+        sourceType: string;
+        sourceId: number | null;
         currentAmount: string;
         targetAmount: string;
       };
     };
+    expect(createdGoal.data.sourceType).toBe('manual');
+    expect(createdGoal.data.sourceId).toBeNull();
     expect(Number(createdGoal.data.currentAmount)).toBe(1200);
     expect(Number(createdGoal.data.targetAmount)).toBe(10000);
 
@@ -1310,6 +1314,244 @@ describe('goals integration', () => {
     expect(await deletedGoalLookupResponse.json()).toEqual({
       error: 'Goal not found',
     });
+  });
+
+  test('persists and validates linked goal sources', async () => {
+    const owner = await integration.signUp('goals-source-owner');
+    const intruder = await integration.signUp('goals-source-intruder');
+
+    const createOwnerAccountResponse = await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Emergency Fund',
+        bank: 'Monzo',
+        balance: 2500,
+        currency: 'EUR',
+        interestRate: 2,
+        accountType: 'Easy Access',
+        color: '#2563eb',
+        emoji: 'E',
+      },
+    });
+    expect(createOwnerAccountResponse.status).toBe(201);
+    const ownerAccount = (await createOwnerAccountResponse.json()) as {
+      data: {
+        id: number;
+      };
+    };
+
+    const createIntruderAccountResponse = await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: intruder.cookie,
+      json: {
+        name: 'Private Pot',
+        bank: 'Starling',
+        balance: 9999,
+        currency: 'EUR',
+        interestRate: 1.5,
+        accountType: 'Easy Access',
+        color: '#dc2626',
+        emoji: 'P',
+      },
+    });
+    expect(createIntruderAccountResponse.status).toBe(201);
+    const intruderAccount = (await createIntruderAccountResponse.json()) as {
+      data: {
+        id: number;
+      };
+    };
+
+    const createLinkedGoalResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'savings',
+        sourceType: 'savings_account',
+        sourceId: ownerAccount.data.id,
+        name: 'Emergency Fund',
+        emoji: 'E',
+        currentAmount: 0,
+        targetAmount: 10000,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Savings',
+        monthlyContribution: 300,
+        monthlyTarget: null,
+        monthsCompleted: null,
+        totalMonths: null,
+        unit: null,
+        color: '#2563eb',
+        notes: '',
+        currency: 'EUR',
+      },
+    });
+    expect(createLinkedGoalResponse.status).toBe(201);
+    const linkedGoal = (await createLinkedGoalResponse.json()) as {
+      data: {
+        id: number;
+        sourceType: string;
+        sourceId: number | null;
+      };
+    };
+    expect(linkedGoal.data.sourceType).toBe('savings_account');
+    expect(linkedGoal.data.sourceId).toBe(ownerAccount.data.id);
+
+    const createSalaryGoalResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'salary',
+        name: 'Promotion',
+        emoji: 'S',
+        currentAmount: 0,
+        targetAmount: 90000,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Career',
+        monthlyContribution: 0,
+        monthlyTarget: null,
+        monthsCompleted: null,
+        totalMonths: null,
+        unit: null,
+        color: '#16a34a',
+        notes: '',
+        currency: 'EUR',
+      },
+    });
+    expect(createSalaryGoalResponse.status).toBe(201);
+    const salaryGoal = (await createSalaryGoalResponse.json()) as {
+      data: {
+        sourceType: string;
+        sourceId: number | null;
+      };
+    };
+    expect(salaryGoal.data.sourceType).toBe('salary_latest_gross');
+    expect(salaryGoal.data.sourceId).toBeNull();
+
+    const crossUserSourceCreateResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'savings',
+        sourceType: 'savings_account',
+        sourceId: intruderAccount.data.id,
+        name: 'Wrong Pot',
+        currentAmount: 0,
+        targetAmount: 5000,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Savings',
+        monthlyContribution: 100,
+        currency: 'EUR',
+      },
+    });
+    expect(crossUserSourceCreateResponse.status).toBe(400);
+    expect(await crossUserSourceCreateResponse.json()).toEqual({
+      error: 'Savings account source not found',
+    });
+
+    const crossUserSourcePatchResponse = await integration.request(
+      `/api/goals/${linkedGoal.data.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          sourceId: intruderAccount.data.id,
+        },
+      },
+    );
+    expect(crossUserSourcePatchResponse.status).toBe(400);
+    expect(await crossUserSourcePatchResponse.json()).toEqual({
+      error: 'Savings account source not found',
+    });
+  });
+
+  test('allows unlinking and relinking goal sources', async () => {
+    const owner = await integration.signUp('goals-relink-owner');
+
+    const createAccountResponse = await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Vacation Fund',
+        bank: 'Wise',
+        balance: 3200,
+        currency: 'USD',
+        interestRate: 0.5,
+        accountType: 'Easy Access',
+        color: '#3b82f6',
+        emoji: 'V',
+      },
+    });
+    expect(createAccountResponse.status).toBe(201);
+    const account = (await createAccountResponse.json()) as {
+      data: { id: number };
+    };
+
+    const createGoalResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'savings',
+        sourceType: 'savings_account',
+        sourceId: account.data.id,
+        name: 'Vacation 2026',
+        emoji: 'V',
+        currentAmount: 0,
+        targetAmount: 5000,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Travel',
+        monthlyContribution: 400,
+        currency: 'USD',
+      },
+    });
+    expect(createGoalResponse.status).toBe(201);
+    const linkedGoal = (await createGoalResponse.json()) as {
+      data: {
+        id: number;
+        sourceType: string;
+        sourceId: number | null;
+      };
+    };
+    expect(linkedGoal.data.sourceType).toBe('savings_account');
+    expect(linkedGoal.data.sourceId).toBe(account.data.id);
+
+    const unlinkResponse = await integration.request(`/api/goals/${linkedGoal.data.id}`, {
+      method: 'PATCH',
+      cookie: owner.cookie,
+      json: {
+        sourceType: 'manual',
+      },
+    });
+    expect(unlinkResponse.status).toBe(200);
+    const unlinkedGoal = (await unlinkResponse.json()) as {
+      data: {
+        sourceType: string;
+        sourceId: number | null;
+      };
+    };
+    expect(unlinkedGoal.data.sourceType).toBe('manual');
+    expect(unlinkedGoal.data.sourceId).toBeNull();
+
+    const relinkResponse = await integration.request(`/api/goals/${linkedGoal.data.id}`, {
+      method: 'PATCH',
+      cookie: owner.cookie,
+      json: {
+        sourceType: 'savings_account',
+        sourceId: account.data.id,
+      },
+    });
+    expect(relinkResponse.status).toBe(200);
+    const relinkedGoal = (await relinkResponse.json()) as {
+      data: {
+        sourceType: string;
+        sourceId: number | null;
+      };
+    };
+    expect(relinkedGoal.data.sourceType).toBe('savings_account');
+    expect(relinkedGoal.data.sourceId).toBe(account.data.id);
   });
 
   test('enforces goal ownership boundaries', async () => {
@@ -1477,6 +1719,173 @@ describe('goals integration', () => {
     expect(unknownFieldPatchResponse.status).toBe(400);
     expect(await unknownFieldPatchResponse.json()).toEqual({
       error: 'Unknown field: progress',
+    });
+  });
+
+  test('creates and validates auto-linked goal source types', async () => {
+    const owner = await integration.signUp('goals-auto-source');
+
+    const createPortfolioGoal = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'portfolio',
+        name: 'Portfolio 100k',
+        emoji: 'P',
+        currentAmount: 0,
+        targetAmount: 100000,
+        deadline: '2027-12',
+        year: 2027,
+        category: 'Investing',
+        monthlyContribution: 0,
+        currency: 'EUR',
+      },
+    });
+    expect(createPortfolioGoal.status).toBe(201);
+    const portfolioGoal = (await createPortfolioGoal.json()) as {
+      data: { sourceType: string; sourceId: number | null };
+    };
+    expect(portfolioGoal.data.sourceType).toBe('portfolio_total');
+    expect(portfolioGoal.data.sourceId).toBeNull();
+
+    const createNetWorthGoal = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'net_worth',
+        name: 'Net Worth 500k',
+        emoji: 'N',
+        currentAmount: 0,
+        targetAmount: 500000,
+        deadline: '2030-12',
+        year: 2030,
+        category: 'Net Worth',
+        monthlyContribution: 0,
+        currency: 'EUR',
+      },
+    });
+    expect(createNetWorthGoal.status).toBe(201);
+    const netWorthGoal = (await createNetWorthGoal.json()) as {
+      data: { sourceType: string; sourceId: number | null };
+    };
+    expect(netWorthGoal.data.sourceType).toBe('net_worth_total');
+    expect(netWorthGoal.data.sourceId).toBeNull();
+
+    const createInvestHabitGoal = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'invest_habit',
+        name: 'Monthly Buys',
+        emoji: 'I',
+        currentAmount: 0,
+        targetAmount: 0,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Investing',
+        monthlyContribution: 0,
+        monthlyTarget: 500,
+        monthsCompleted: 0,
+        totalMonths: 12,
+        currency: 'EUR',
+      },
+    });
+    expect(createInvestHabitGoal.status).toBe(201);
+    const investHabitGoal = (await createInvestHabitGoal.json()) as {
+      data: { sourceType: string; sourceId: number | null };
+    };
+    expect(investHabitGoal.data.sourceType).toBe('invest_habit_buys');
+    expect(investHabitGoal.data.sourceId).toBeNull();
+
+    const wrongSourceForPortfolio = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'portfolio',
+        sourceType: 'manual',
+        name: 'Should Fail',
+        emoji: 'X',
+        currentAmount: 0,
+        targetAmount: 50000,
+        deadline: '2027-12',
+        year: 2027,
+        category: 'Investing',
+        monthlyContribution: 0,
+        currency: 'EUR',
+      },
+    });
+    expect(wrongSourceForPortfolio.status).toBe(400);
+    expect(await wrongSourceForPortfolio.json()).toEqual({
+      error: 'Portfolio goals must use the portfolio total source',
+    });
+
+    const wrongSourceForNetWorth = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'net_worth',
+        sourceType: 'manual',
+        name: 'Should Fail',
+        emoji: 'X',
+        currentAmount: 0,
+        targetAmount: 100000,
+        deadline: '2027-12',
+        year: 2027,
+        category: 'Net Worth',
+        monthlyContribution: 0,
+        currency: 'EUR',
+      },
+    });
+    expect(wrongSourceForNetWorth.status).toBe(400);
+    expect(await wrongSourceForNetWorth.json()).toEqual({
+      error: 'Net worth goals must use the net worth total source',
+    });
+
+    const wrongSourceForInvestHabit = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'invest_habit',
+        sourceType: 'manual',
+        name: 'Should Fail',
+        emoji: 'X',
+        currentAmount: 0,
+        targetAmount: 0,
+        deadline: '2026-12',
+        year: 2026,
+        category: 'Investing',
+        monthlyContribution: 0,
+        monthlyTarget: 500,
+        totalMonths: 12,
+        currency: 'EUR',
+      },
+    });
+    expect(wrongSourceForInvestHabit.status).toBe(400);
+    expect(await wrongSourceForInvestHabit.json()).toEqual({
+      error: 'Invest habit goals must use the invest habit buys source',
+    });
+
+    const sourceIdOnPortfolio = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'portfolio',
+        sourceType: 'portfolio_total',
+        sourceId: 42,
+        name: 'Should Fail',
+        emoji: 'X',
+        currentAmount: 0,
+        targetAmount: 50000,
+        deadline: '2027-12',
+        year: 2027,
+        category: 'Investing',
+        monthlyContribution: 0,
+        currency: 'EUR',
+      },
+    });
+    expect(sourceIdOnPortfolio.status).toBe(400);
+    expect(await sourceIdOnPortfolio.json()).toEqual({
+      error: 'Portfolio total goals cannot include a source id',
     });
   });
 });

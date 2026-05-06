@@ -1,8 +1,10 @@
-import type { Goal, GoalType } from '@quro/shared';
+import { GOAL_SOURCE_TYPES, type Goal, type GoalSourceType, type GoalType } from '@quro/shared';
 
 type ApiGoal = Omit<
   Goal,
   | 'type'
+  | 'sourceType'
+  | 'sourceId'
   | 'currentAmount'
   | 'targetAmount'
   | 'year'
@@ -12,6 +14,8 @@ type ApiGoal = Omit<
   | 'totalMonths'
 > & {
   type?: GoalType | string | null;
+  sourceType?: GoalSourceType | string | null;
+  sourceId?: number | string | null;
   currentAmount: number | string;
   targetAmount: number | string;
   year?: number | string | null;
@@ -51,9 +55,19 @@ const normalizeGoalType = (value: GoalType | string | null | undefined): GoalTyp
   return GOAL_TYPES.includes(value as GoalType) ? (value as GoalType) : 'savings';
 };
 
+const normalizeGoalSourceType = (
+  value: GoalSourceType | string | null | undefined,
+  type: GoalType,
+): GoalSourceType => {
+  if (!value) return type === 'salary' ? 'salary_latest_gross' : 'manual';
+  return GOAL_SOURCE_TYPES.includes(value as GoalSourceType) ? (value as GoalSourceType) : 'manual';
+};
+
 export const normalizeGoal = (goal: ApiGoal): Goal => ({
   ...goal,
   type: normalizeGoalType(goal.type),
+  sourceType: normalizeGoalSourceType(goal.sourceType, normalizeGoalType(goal.type)),
+  sourceId: toNullableInteger(goal.sourceId),
   currentAmount: toNumber(goal.currentAmount),
   targetAmount: toNumber(goal.targetAmount),
   year: toNullableInteger(goal.year),

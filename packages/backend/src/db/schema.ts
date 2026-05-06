@@ -594,6 +594,8 @@ export const goals = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     type: text('type'),
+    sourceType: text('source_type').notNull().default('manual'),
+    sourceId: integer('source_id'),
     name: text('name').notNull(),
     emoji: text('emoji'),
     currentAmount: numeric('current_amount', { precision: 19, scale: 2 }).notNull(),
@@ -612,6 +614,15 @@ export const goals = pgTable(
   },
   (table) => ({
     userIdx: index('goals_user_id_idx').on(table.userId),
+    sourceIdx: index('goals_source_idx').on(table.sourceType, table.sourceId),
+    sourceTypeCheck: check(
+      'goals_source_type_check',
+      sql`${table.sourceType} in ('manual', 'salary_latest_gross', 'savings_account', 'portfolio_total', 'net_worth_total', 'invest_habit_buys')`,
+    ),
+    sourceIdCheck: check(
+      'goals_source_id_check',
+      sql`((${table.sourceType} = 'savings_account' and ${table.sourceId} is not null and ${table.sourceId} > 0) or (${table.sourceType} <> 'savings_account' and ${table.sourceId} is null))`,
+    ),
   }),
 );
 

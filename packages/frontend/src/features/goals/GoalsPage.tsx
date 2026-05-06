@@ -4,7 +4,7 @@ import { useGoalsPage } from './hooks';
 export function Goals() {
   const state = useGoalsPage();
 
-  if (state.loadingGoals || state.loadingPayslips) {
+  if (state.loadingGoals || state.loadingPayslips || state.loadingSavingsAccounts) {
     return <GoalsLoadingState />;
   }
 

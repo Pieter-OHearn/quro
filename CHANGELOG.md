@@ -2,11 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
-## [Unreleased]
+## [v0.2.0] - 2026-05-06
 
 - Show actual savings deposits in monthly summary card.
 - Order the payslip table by payday.
 - Add holding price sync scheduler to keep prices up to date.
+- Add goal linking system with four new source types: portfolio goals auto-resolve from live brokerage value, net worth goals auto-resolve from live net worth calculation, invest habit goals auto-track monthly completion by counting distinct months with buy transactions, and savings account goals now link to real accounts.
 
 ## [v0.1.3] - 2026-05-04
 

@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import type { Goal, GoalType } from '@quro/shared';
+import type { Goal, GoalSourceType, GoalType, SavingsAccount } from '@quro/shared';
 import type { LucideIcon } from 'lucide-react';
 
 export type GoalStatus = 'complete' | 'on_track' | 'at_risk' | 'pending';
@@ -27,6 +27,7 @@ export type GoalFormState = {
   monthlyTarget: string;
   totalMonths: string;
   unit: string;
+  sourceId: string;
 };
 
 export type GoalFormField = keyof GoalFormState;
@@ -42,6 +43,8 @@ export type UpdateGoalInput = { id: number } & Partial<Omit<Goal, 'id'>>;
 export type ApiGoal = Omit<
   Goal,
   | 'type'
+  | 'sourceType'
+  | 'sourceId'
   | 'currentAmount'
   | 'targetAmount'
   | 'year'
@@ -51,6 +54,8 @@ export type ApiGoal = Omit<
   | 'totalMonths'
 > & {
   type?: GoalType | string | null;
+  sourceType?: GoalSourceType | string | null;
+  sourceId?: number | string | null;
   currentAmount: number | string;
   targetAmount: number | string;
   year?: number | string | null;
@@ -80,6 +85,7 @@ export type GoalStatCard = {
 
 export type GoalsComputations = {
   annualGross: number;
+  goalProgressContext: GoalProgressContext;
   years: number[];
   yearGoals: Goal[];
   filteredGoals: Goal[];
@@ -91,6 +97,7 @@ export type GoalsPageState = {
   goals: Goal[];
   loadingGoals: boolean;
   loadingPayslips: boolean;
+  loadingSavingsAccounts: boolean;
   currentYear: number;
   activeYear: number;
   setActiveYear: (year: number) => void;
@@ -99,6 +106,7 @@ export type GoalsPageState = {
   showAdd: boolean;
   setShowAdd: (show: boolean) => void;
   annualGross: number;
+  goalProgressContext: GoalProgressContext;
   years: number[];
   yearGoals: Goal[];
   filteredGoals: Goal[];
@@ -106,4 +114,18 @@ export type GoalsPageState = {
   handleDelete: (id: number) => void;
   handleUpdateMonths: (id: number, delta: number) => void;
   handleAddGoal: (goal: CreateGoalInput) => void;
+};
+
+export type GoalProgressSavingsAccount = Pick<
+  SavingsAccount,
+  'id' | 'name' | 'balance' | 'currency' | 'archivedAt'
+>;
+
+export type GoalProgressContext = {
+  annualGross: number;
+  savingsAccounts: readonly GoalProgressSavingsAccount[];
+  portfolioTotal: number;
+  netWorth: number;
+  investHabitBuyMonths: ReadonlyMap<number, ReadonlySet<string>>;
+  convertToBase: (amount: number, fromCurrency: string) => number;
 };

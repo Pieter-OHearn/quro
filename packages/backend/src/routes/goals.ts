@@ -1,8 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { GOAL_SOURCE_TYPES, type GoalSourceType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
-import { goals } from '../db/schema';
+import { goals, savingsAccounts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import {
   err,
@@ -28,6 +29,8 @@ const MAX_GOAL_YEAR = 9999;
 
 const GOAL_FIELDS = [
   'type',
+  'sourceType',
+  'sourceId',
   'name',
   'emoji',
   'currentAmount',
@@ -57,6 +60,8 @@ type GoalType = (typeof GOAL_TYPES)[number];
 
 type GoalPayload = {
   type: GoalType;
+  sourceType: GoalSourceType;
+  sourceId: number | null;
   name: string;
   emoji: string | null;
   currentAmount: number;
@@ -82,8 +87,17 @@ function parseGoalTypeField(value: unknown): ParseResult<GoalType> {
     : err('Invalid goal type');
 }
 
+function parseGoalSourceTypeField(value: unknown): ParseResult<GoalSourceType> {
+  if (value == null || value === '') return ok('manual');
+  return typeof value === 'string' && GOAL_SOURCE_TYPES.includes(value as GoalSourceType)
+    ? ok(value as GoalSourceType)
+    : err('Invalid goal source type');
+}
+
 const goalParsers: FieldParsers<GoalPayload> = {
   type: parseGoalTypeField,
+  sourceType: parseGoalSourceTypeField,
+  sourceId: (value) => parseOptionalIntegerField(value, 'Invalid goal source id', 1),
   name: (value) => parseTextField(value, 'Goal name is required'),
   emoji: (value) => parseOptionalTextField(value, 'Goal emoji must be a string'),
   currentAmount: (value) => parseNumberField(value, 'Current amount must be zero or greater', 0),
@@ -109,6 +123,8 @@ function toGoalInsertValues(payload: GoalPayload, userId: number): GoalInsert {
   return {
     userId,
     type: payload.type,
+    sourceType: payload.sourceType,
+    sourceId: payload.sourceId,
     name: payload.name,
     emoji: payload.emoji,
     currentAmount: payload.currentAmount.toString(),
@@ -146,6 +162,71 @@ function validateInvestHabitGoal(payload: GoalPayload): string | null {
   return null;
 }
 
+function validateManualGoalSource(payload: GoalPayload): string | null {
+  return payload.sourceId === null ? null : 'Manual goals cannot include a source id';
+}
+
+function validateLatestSalaryGoalSource(payload: GoalPayload): string | null {
+  if (payload.type !== 'salary') {
+    return 'Latest salary can only be linked to salary goals';
+  }
+  return payload.sourceId === null ? null : 'Latest salary goals cannot include a source id';
+}
+
+function validateSavingsAccountGoalSource(payload: GoalPayload): string | null {
+  if (payload.type !== 'savings') {
+    return 'Savings accounts can only be linked to savings goals';
+  }
+  return payload.sourceId === null ? 'Savings account source id is required' : null;
+}
+
+function validatePortfolioTotalGoalSource(payload: GoalPayload): string | null {
+  if (payload.type !== 'portfolio') {
+    return 'Portfolio total can only be linked to portfolio goals';
+  }
+  return payload.sourceId === null ? null : 'Portfolio total goals cannot include a source id';
+}
+
+function validateNetWorthTotalGoalSource(payload: GoalPayload): string | null {
+  if (payload.type !== 'net_worth') {
+    return 'Net worth total can only be linked to net worth goals';
+  }
+  return payload.sourceId === null ? null : 'Net worth total goals cannot include a source id';
+}
+
+function validateInvestHabitBuysGoalSource(payload: GoalPayload): string | null {
+  if (payload.type !== 'invest_habit') {
+    return 'Invest habit buys can only be linked to invest habit goals';
+  }
+  return payload.sourceId === null ? null : 'Invest habit buys goals cannot include a source id';
+}
+
+const GOAL_SOURCE_VALIDATORS: Record<GoalSourceType, (payload: GoalPayload) => string | null> = {
+  manual: validateManualGoalSource,
+  salary_latest_gross: validateLatestSalaryGoalSource,
+  savings_account: validateSavingsAccountGoalSource,
+  portfolio_total: validatePortfolioTotalGoalSource,
+  net_worth_total: validateNetWorthTotalGoalSource,
+  invest_habit_buys: validateInvestHabitBuysGoalSource,
+};
+
+function validateGoalSource(payload: GoalPayload): string | null {
+  if (payload.type === 'salary' && payload.sourceType !== 'salary_latest_gross') {
+    return 'Salary goals must use the latest salary source';
+  }
+  if (payload.type === 'portfolio' && payload.sourceType !== 'portfolio_total') {
+    return 'Portfolio goals must use the portfolio total source';
+  }
+  if (payload.type === 'net_worth' && payload.sourceType !== 'net_worth_total') {
+    return 'Net worth goals must use the net worth total source';
+  }
+  if (payload.type === 'invest_habit' && payload.sourceType !== 'invest_habit_buys') {
+    return 'Invest habit goals must use the invest habit buys source';
+  }
+
+  return GOAL_SOURCE_VALIDATORS[payload.sourceType](payload);
+}
+
 function requiresTargetAmount(type: GoalType): boolean {
   return type !== 'invest_habit';
 }
@@ -162,7 +243,24 @@ function validateGoalPayload(payload: GoalPayload): string | null {
     return 'Target amount must be greater than zero';
   }
 
-  return null;
+  return validateGoalSource(payload);
+}
+
+function applyGoalSourceDefaults(payload: GoalPayload, body: Record<string, unknown>): GoalPayload {
+  if ('sourceType' in body) return payload;
+  if (payload.type === 'salary') {
+    return { ...payload, sourceType: 'salary_latest_gross', sourceId: null };
+  }
+  if (payload.type === 'portfolio') {
+    return { ...payload, sourceType: 'portfolio_total', sourceId: null };
+  }
+  if (payload.type === 'net_worth') {
+    return { ...payload, sourceType: 'net_worth_total', sourceId: null };
+  }
+  if (payload.type === 'invest_habit') {
+    return { ...payload, sourceType: 'invest_habit_buys', sourceId: null };
+  }
+  return payload;
 }
 
 function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
@@ -175,8 +273,9 @@ function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
   const parsed = parseRequiredFields(body as Record<string, unknown>, goalParsers);
   if (!parsed.ok) return parsed;
 
-  const validationError = validateGoalPayload(parsed.value);
-  return validationError ? err(validationError) : parsed;
+  const value = applyGoalSourceDefaults(parsed.value, body as Record<string, unknown>);
+  const validationError = validateGoalPayload(value);
+  return validationError ? err(validationError) : ok(value);
 }
 
 function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>> {
@@ -204,8 +303,17 @@ function mergeGoalPayload(
   patch: Partial<GoalPayload>,
   existing: typeof goals.$inferSelect,
 ): ParseResult<GoalPayload> {
+  const sourceId =
+    patch.sourceId !== undefined
+      ? patch.sourceId
+      : patch.sourceType === undefined
+        ? existing.sourceId
+        : null;
+
   return parseGoalCreate({
     type: pickPatchedValue(patch.type, existing.type),
+    sourceType: pickPatchedValue(patch.sourceType, existing.sourceType),
+    sourceId,
     name: pickPatchedValue(patch.name, existing.name),
     emoji: pickPatchedValue(patch.emoji, existing.emoji),
     currentAmount: patch.currentAmount ?? existing.currentAmount,
@@ -222,6 +330,24 @@ function mergeGoalPayload(
     notes: pickPatchedValue(patch.notes, existing.notes),
     currency: pickPatchedValue(patch.currency, existing.currency),
   });
+}
+
+async function validateGoalSourceOwnership(
+  payload: GoalPayload,
+  userId: number,
+): Promise<string | null> {
+  if (payload.sourceType !== 'savings_account') return null;
+  if (payload.sourceId === null) return 'Savings account source id is required';
+
+  const [account] = await db
+    .select({ id: savingsAccounts.id })
+    .from(savingsAccounts)
+    .where(and(eq(savingsAccounts.id, payload.sourceId), eq(savingsAccounts.userId, userId)));
+  return account ? null : 'Savings account source not found';
+}
+
+function didPatchGoalSource(patch: Partial<GoalPayload>): boolean {
+  return patch.sourceType !== undefined || patch.sourceId !== undefined;
 }
 
 app.get('/', async (c) => {
@@ -248,6 +374,9 @@ app.post('/', async (c) => {
   const body = parseGoalCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
+  const sourceError = await validateGoalSourceOwnership(body.value, user.id);
+  if (sourceError) return c.json({ error: sourceError }, HTTP_STATUS.BAD_REQUEST);
+
   const [data] = await db.insert(goals).values(toGoalInsertValues(body.value, user.id)).returning();
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -271,6 +400,11 @@ app.patch('/:id', async (c) => {
 
   const merged = mergeGoalPayload(body.value, existing);
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
+
+  if (didPatchGoalSource(body.value)) {
+    const sourceError = await validateGoalSourceOwnership(merged.value, user.id);
+    if (sourceError) return c.json({ error: sourceError }, HTTP_STATUS.BAD_REQUEST);
+  }
 
   const [data] = await db
     .update(goals)

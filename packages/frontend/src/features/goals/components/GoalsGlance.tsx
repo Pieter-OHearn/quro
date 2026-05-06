@@ -1,16 +1,22 @@
 import type { Goal } from '@quro/shared';
+import type { GoalProgressContext } from '../types';
 import { STATUS_META } from '../utils/goals-constants';
-import { getGoalPct, getGoalStatus, normalizeGoalType } from '../utils/goal-utils';
+import {
+  getGoalPct,
+  getGoalStatus,
+  normalizeGoalType,
+  resolveInvestHabitMonthsCompleted,
+} from '../utils/goal-utils';
 
 type GlanceItemProps = {
   goal: Goal;
-  annualGross: number;
+  goalProgressContext: GoalProgressContext;
   currentYear: number;
 };
 
-function GlanceItem({ goal, annualGross, currentYear }: Readonly<GlanceItemProps>) {
-  const pct = getGoalPct(goal, annualGross);
-  const status = getGoalStatus(goal, annualGross, currentYear);
+function GlanceItem({ goal, goalProgressContext, currentYear }: Readonly<GlanceItemProps>) {
+  const pct = getGoalPct(goal, goalProgressContext);
+  const status = getGoalStatus(goal, goalProgressContext, currentYear);
   const type = normalizeGoalType(goal);
 
   return (
@@ -21,7 +27,7 @@ function GlanceItem({ goal, annualGross, currentYear }: Readonly<GlanceItemProps
           <span className="text-xs font-medium text-slate-700 truncate">{goal.name}</span>
           <span className="text-xs font-semibold text-slate-500 flex-shrink-0 ml-2">
             {type === 'invest_habit'
-              ? `${goal.monthsCompleted ?? 0}/${goal.totalMonths ?? 12}mo`
+              ? `${resolveInvestHabitMonthsCompleted(goal, goalProgressContext)}/${goal.totalMonths ?? 12}mo`
               : `${pct.toFixed(0)}%`}
           </span>
         </div>
@@ -46,14 +52,14 @@ function GlanceItem({ goal, annualGross, currentYear }: Readonly<GlanceItemProps
 
 type GoalsGlanceProps = {
   yearGoals: readonly Goal[];
-  annualGross: number;
+  goalProgressContext: GoalProgressContext;
   currentYear: number;
   activeYear: number;
 };
 
 export function GoalsGlance({
   yearGoals,
-  annualGross,
+  goalProgressContext,
   currentYear,
   activeYear,
 }: Readonly<GoalsGlanceProps>) {
@@ -63,12 +69,12 @@ export function GoalsGlance({
       <p className="text-xs text-slate-400 mb-5">All goals sorted by progress</p>
       <div className="space-y-3">
         {[...yearGoals]
-          .sort((a, b) => getGoalPct(b, annualGross) - getGoalPct(a, annualGross))
+          .sort((a, b) => getGoalPct(b, goalProgressContext) - getGoalPct(a, goalProgressContext))
           .map((goal) => (
             <GlanceItem
               key={goal.id}
               goal={goal}
-              annualGross={annualGross}
+              goalProgressContext={goalProgressContext}
               currentYear={currentYear}
             />
           ))}

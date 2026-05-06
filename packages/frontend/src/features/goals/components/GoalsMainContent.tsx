@@ -33,7 +33,7 @@ export function GoalsMainContent({ state }: Readonly<GoalsMainContentProps>) {
       />
       <GoalsCardGrid
         filteredGoals={state.filteredGoals}
-        annualGross={state.annualGross}
+        goalProgressContext={state.goalProgressContext}
         currentYear={state.currentYear}
         activeFilter={state.activeFilter}
         activeYear={state.activeYear}

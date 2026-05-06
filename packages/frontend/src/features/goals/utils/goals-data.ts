@@ -1,17 +1,19 @@
 import { Calendar, CheckCircle2, Target, Trophy } from 'lucide-react';
 import type { Goal } from '@quro/shared';
-import type { GoalStatCard, GoalStatsData } from '../types';
+import type { GoalProgressContext, GoalStatCard, GoalStatsData } from '../types';
 import { getGoalStatus, parseGoalYear } from './goal-utils';
 
 export const computeGoalStats = (
   yearGoals: readonly Goal[],
-  annualGross: number,
+  context: GoalProgressContext,
   currentYear: number,
 ): GoalStatsData => {
   const count = (status: string) =>
-    yearGoals.filter((goal) => getGoalStatus(goal, annualGross, currentYear) === status).length;
+    yearGoals.filter((goal) => getGoalStatus(goal, context, currentYear) === status).length;
   const monthly = yearGoals.reduce(
-    (sum, goal) => sum + (goal.monthlyContribution || goal.monthlyTarget || 0),
+    (sum, goal) =>
+      sum +
+      context.convertToBase(goal.monthlyContribution || goal.monthlyTarget || 0, goal.currency),
     0,
   );
 

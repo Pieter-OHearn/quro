@@ -1,13 +1,24 @@
 import { AlertCircle, ArrowUpRight, Check, CheckCircle2, Minus, Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { Goal, GoalType } from '@quro/shared';
-import type { GoalMeta, GoalStatus } from '../types';
+import type { GoalMeta, GoalProgressContext, GoalStatus } from '../types';
 import { GOAL_TYPE_META, MONTHS, STATUS_META } from '../utils/goals-constants';
-import { getGoalPct, getGoalStatus, normalizeGoalType } from '../utils/goal-utils';
+import {
+  getGoalPct,
+  getGoalStatus,
+  normalizeGoalType,
+  normalizeGoalSourceType,
+  resolveGoalCurrentAmount,
+  resolveInvestHabitMonthsCompleted,
+  type GoalCurrentAmountResolution,
+} from '../utils/goal-utils';
+
+const PREVIOUS_MONTH_DELTA = -1;
+const NEXT_MONTH_DELTA = 1;
 
 type GoalCardProps = {
   goal: Goal;
-  annualGross: number;
+  goalProgressContext: GoalProgressContext;
   currentYear: number;
   onDelete: (id: number) => void;
   onUpdateMonths: (id: number, delta: number) => void;
@@ -214,7 +225,7 @@ function InvestHabitControls({
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={() => onUpdateMonths(goalId, -1)}
+        onClick={() => onUpdateMonths(goalId, PREVIOUS_MONTH_DELTA)}
         disabled={monthsCompleted <= 0}
         className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30 transition-colors"
       >
@@ -222,7 +233,7 @@ function InvestHabitControls({
       </button>
       <span className="text-xs text-slate-500 px-1">{monthsCompleted}</span>
       <button
-        onClick={() => onUpdateMonths(goalId, 1)}
+        onClick={() => onUpdateMonths(goalId, NEXT_MONTH_DELTA)}
         disabled={monthsCompleted >= totalMonths}
         className="w-7 h-7 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 disabled:opacity-30 transition-colors"
       >
@@ -241,6 +252,7 @@ type InvestHabitCardProps = {
   status: GoalStatus;
   fmtBase: (n: number) => string;
   onUpdateMonths: (id: number, delta: number) => void;
+  isLinked: boolean;
 };
 
 function InvestHabitProgress({
@@ -287,6 +299,7 @@ function GoalCardInvestHabit({
   status,
   fmtBase,
   onUpdateMonths,
+  isLinked,
 }: Readonly<InvestHabitCardProps>) {
   return (
     <>
@@ -297,7 +310,7 @@ function GoalCardInvestHabit({
         totalMonths={totalMonths}
         fmtBase={fmtBase}
       />
-      {status !== 'complete' && (
+      {status !== 'complete' && !isLinked && (
         <div className="flex items-center justify-end">
           <InvestHabitControls
             goalId={goal.id}
@@ -419,7 +432,13 @@ function GoalNameAndBadges({
   goal,
   status,
   meta,
-}: Readonly<{ goal: Goal; status: GoalStatus; meta: GoalMeta }>) {
+  sourceResolution,
+}: Readonly<{
+  goal: Goal;
+  status: GoalStatus;
+  meta: GoalMeta;
+  sourceResolution: GoalCurrentAmountResolution;
+}>) {
   const { Icon } = meta;
   const statusMeta = STATUS_META[status];
 
@@ -446,9 +465,31 @@ function GoalNameAndBadges({
             <Icon size={10} className="inline-block mr-1" />
             {meta.label}
           </span>
+          {sourceResolution.status !== 'manual' && (
+            <span
+              className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                sourceResolution.status === 'linked'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-amber-50 text-amber-700'
+              }`}
+            >
+              <Link2Icon status={sourceResolution.status} />
+              {sourceResolution.status === 'linked' ? sourceResolution.label : 'Source unavailable'}
+            </span>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function Link2Icon({ status }: Readonly<{ status: GoalCurrentAmountResolution['status'] }>) {
+  return (
+    <span
+      className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${
+        status === 'linked' ? 'bg-emerald-500' : 'bg-amber-500'
+      }`}
+    />
   );
 }
 
@@ -456,16 +497,23 @@ function GoalCardHeader({
   goal,
   status,
   meta,
+  sourceResolution,
   onDelete,
 }: Readonly<{
   goal: Goal;
   status: GoalStatus;
   meta: GoalMeta;
+  sourceResolution: GoalCurrentAmountResolution;
   onDelete: (id: number) => void;
 }>) {
   return (
     <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
-      <GoalNameAndBadges goal={goal} status={status} meta={meta} />
+      <GoalNameAndBadges
+        goal={goal}
+        status={status}
+        meta={meta}
+        sourceResolution={sourceResolution}
+      />
       <div className="flex items-center gap-1 flex-shrink-0">
         <span className="text-xs text-slate-400 mr-1">{`🗓 ${goal.deadline}`}</span>
         <button
@@ -485,8 +533,11 @@ type GoalBodyContentProps = {
   status: GoalStatus;
   color: string;
   clampedPct: number;
+  currentAmount: number;
   annualGross: number;
+  goalProgressContext: GoalProgressContext;
   fmtBase: (n: number) => string;
+  toBase: (n: number) => number;
   onUpdateMonths: (id: number, delta: number) => void;
 };
 
@@ -499,15 +550,15 @@ const getInvestHabitNumbers = (goal: Goal) => ({
   totalMonths: goal.totalMonths ?? 12,
 });
 
-const getGoalAmounts = (goal: Goal) => ({
-  currentAmount: goal.currentAmount || 0,
-  targetAmount: goal.targetAmount || 0,
-  monthlyContrib: goal.monthlyContribution || 0,
+const getGoalAmounts = (goal: Goal, currentAmount: number, toBase: (n: number) => number) => ({
+  currentAmount,
+  targetAmount: toBase(goal.targetAmount || 0),
+  monthlyContrib: toBase(goal.monthlyContribution || 0),
 });
 
 function renderAnnualGoal(props: GoalBodyContentProps) {
-  const { goal, color, clampedPct, status } = props;
-  const { currentAmount, targetAmount } = getGoalAmounts(goal);
+  const { goal, color, clampedPct, status, currentAmount, toBase } = props;
+  const { targetAmount } = getGoalAmounts(goal, currentAmount, toBase);
 
   return (
     <GoalCardAnnual
@@ -516,15 +567,27 @@ function renderAnnualGoal(props: GoalBodyContentProps) {
       currentAmount={currentAmount}
       targetAmount={targetAmount}
       clampedPct={clampedPct}
-      lowerIsBetter={goal.unit === '€/mo' && currentAmount > targetAmount}
+      lowerIsBetter={Boolean(goal.unit?.endsWith('/mo')) && currentAmount > targetAmount}
       status={status}
     />
   );
 }
 
 function renderGoalTypeContent(props: GoalBodyContentProps) {
-  const { goal, type, status, color, clampedPct, annualGross, fmtBase, onUpdateMonths } = props;
-  const { currentAmount, targetAmount, monthlyContrib } = getGoalAmounts(goal);
+  const {
+    goal,
+    type,
+    status,
+    color,
+    clampedPct,
+    currentAmount,
+    annualGross,
+    goalProgressContext,
+    fmtBase,
+    toBase,
+    onUpdateMonths,
+  } = props;
+  const { targetAmount, monthlyContrib } = getGoalAmounts(goal, currentAmount, toBase);
 
   if (isSavingsLike(type)) {
     return (
@@ -553,18 +616,21 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
   }
 
   if (type === 'invest_habit') {
-    const { monthlyTarget, monthsCompleted, totalMonths } = getInvestHabitNumbers(goal);
+    const { monthlyTarget, totalMonths } = getInvestHabitNumbers(goal);
+    const monthsCompleted = resolveInvestHabitMonthsCompleted(goal, goalProgressContext);
+    const isLinked = normalizeGoalSourceType(goal) === 'invest_habit_buys';
 
     return (
       <GoalCardInvestHabit
         goal={goal}
         color={color}
-        monthlyTarget={monthlyTarget}
+        monthlyTarget={toBase(monthlyTarget)}
         monthsCompleted={monthsCompleted}
         totalMonths={totalMonths}
         status={status}
         fmtBase={fmtBase}
         onUpdateMonths={onUpdateMonths}
+        isLinked={isLinked}
       />
     );
   }
@@ -589,15 +655,17 @@ function GoalCardBody(props: Readonly<GoalBodyContentProps>) {
 
 export function GoalCard({
   goal,
-  annualGross,
+  goalProgressContext,
   currentYear,
   onDelete,
   onUpdateMonths,
 }: Readonly<GoalCardProps>) {
-  const { fmtBase } = useCurrency();
+  const { fmtBase, convertToBase } = useCurrency();
+  const toBase = (n: number) => convertToBase(n, goal.currency);
 
-  const pct = getGoalPct(goal, annualGross);
-  const status = getGoalStatus(goal, annualGross, currentYear);
+  const sourceResolution = resolveGoalCurrentAmount(goal, goalProgressContext);
+  const pct = getGoalPct(goal, goalProgressContext);
+  const status = getGoalStatus(goal, goalProgressContext, currentYear);
   const type = normalizeGoalType(goal);
   const meta = GOAL_TYPE_META[type];
   const color = goal.color || '#6366f1';
@@ -607,15 +675,24 @@ export function GoalCard({
     <div
       className={`bg-white rounded-2xl border shadow-sm transition-all hover:shadow-md flex flex-col ${status === 'complete' ? 'border-emerald-200' : 'border-slate-100'}`}
     >
-      <GoalCardHeader goal={goal} status={status} meta={meta} onDelete={onDelete} />
+      <GoalCardHeader
+        goal={goal}
+        status={status}
+        meta={meta}
+        sourceResolution={sourceResolution}
+        onDelete={onDelete}
+      />
       <GoalCardBody
         goal={goal}
         type={type}
         status={status}
         color={color}
         clampedPct={clampedPct}
-        annualGross={annualGross}
+        currentAmount={sourceResolution.currentAmount}
+        annualGross={goalProgressContext.annualGross}
+        goalProgressContext={goalProgressContext}
         fmtBase={fmtBase}
+        toBase={toBase}
         onUpdateMonths={onUpdateMonths}
       />
     </div>

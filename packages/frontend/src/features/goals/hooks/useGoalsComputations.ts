@@ -1,6 +1,11 @@
 import { useEffect, useMemo } from 'react';
-import type { Goal } from '@quro/shared';
-import type { FilterKey, GoalsComputations } from '../types';
+import type { DashboardAllocationsSummary, Goal, HoldingTransaction } from '@quro/shared';
+import type {
+  FilterKey,
+  GoalProgressContext,
+  GoalProgressSavingsAccount,
+  GoalsComputations,
+} from '../types';
 import { GOAL_TYPE_META } from '../utils/goals-constants';
 import { computeGoalStats, computeGoalYears } from '../utils/goals-data';
 import { normalizeGoalType, parseGoalYear } from '../utils/goal-utils';
@@ -8,11 +13,53 @@ import { normalizeGoalType, parseGoalYear } from '../utils/goal-utils';
 type SalaryPoint = {
   gross: number;
   date: string;
+  currency: string;
 };
+
+const MONTH_PAD_LENGTH = 2;
+
+function computeInvestHabitBuyMonths(
+  holdingTxns: readonly HoldingTransaction[],
+): ReadonlyMap<number, ReadonlySet<string>> {
+  const yearMap = new Map<number, Set<string>>();
+  for (const txn of holdingTxns) {
+    if (txn.type !== 'buy' || !txn.date) continue;
+    const date = new Date(txn.date + 'T00:00:00Z');
+    const year = date.getUTCFullYear();
+    const monthKey = `${year}-${String(date.getUTCMonth() + 1).padStart(MONTH_PAD_LENGTH, '0')}`;
+    let months = yearMap.get(year);
+    if (!months) {
+      months = new Set();
+      yearMap.set(year, months);
+    }
+    months.add(monthKey);
+  }
+  return yearMap;
+}
+
+function computeAllocationsContext(
+  allocations: DashboardAllocationsSummary | null,
+  convertToBase: (amount: number, fromCurrency: string) => number,
+): { portfolioTotal: number; netWorth: number } {
+  if (!allocations) return { portfolioTotal: 0, netWorth: 0 };
+  const currency = allocations.allocations[0]?.currency ?? 'EUR';
+  const totalAssets = allocations.allocations.reduce(
+    (sum, a) => sum + convertToBase(a.value, a.currency),
+    0,
+  );
+  const brokerage = allocations.allocations.find((a) => a.name === 'Brokerage');
+  const portfolioTotal = brokerage ? convertToBase(brokerage.value, brokerage.currency) : 0;
+  const netWorth = totalAssets - convertToBase(allocations.liabilitiesTotal, currency);
+  return { portfolioTotal, netWorth };
+}
 
 export function useGoalsComputations(
   goals: Goal[],
   payslips: SalaryPoint[],
+  savingsAccounts: GoalProgressSavingsAccount[],
+  allocations: DashboardAllocationsSummary | null,
+  holdingTxns: readonly HoldingTransaction[],
+  convertToBase: (amount: number, fromCurrency: string) => number,
   currentYear: number,
   activeYear: number,
   activeFilter: FilterKey,
@@ -21,8 +68,31 @@ export function useGoalsComputations(
   const annualGross = useMemo(() => {
     if (payslips.length === 0) return 0;
     const latest = [...payslips].sort((a, b) => b.date.localeCompare(a.date))[0];
-    return (latest?.gross ?? 0) * 12;
-  }, [payslips]);
+    if (!latest) return 0;
+    return convertToBase(latest.gross * 12, latest.currency);
+  }, [convertToBase, payslips]);
+
+  const { portfolioTotal, netWorth } = useMemo(
+    () => computeAllocationsContext(allocations, convertToBase),
+    [allocations, convertToBase],
+  );
+
+  const investHabitBuyMonths = useMemo(
+    () => computeInvestHabitBuyMonths(holdingTxns),
+    [holdingTxns],
+  );
+
+  const goalProgressContext = useMemo<GoalProgressContext>(
+    () => ({
+      annualGross,
+      savingsAccounts,
+      portfolioTotal,
+      netWorth,
+      investHabitBuyMonths,
+      convertToBase,
+    }),
+    [annualGross, convertToBase, savingsAccounts, portfolioTotal, netWorth, investHabitBuyMonths],
+  );
 
   const years = useMemo(() => computeGoalYears(goals, currentYear), [goals, currentYear]);
 
@@ -50,9 +120,9 @@ export function useGoalsComputations(
   );
 
   const stats = useMemo(
-    () => computeGoalStats(yearGoals, annualGross, currentYear),
-    [yearGoals, annualGross, currentYear],
+    () => computeGoalStats(yearGoals, goalProgressContext, currentYear),
+    [yearGoals, goalProgressContext, currentYear],
   );
 
-  return { annualGross, years, yearGoals, filteredGoals, stats };
+  return { annualGross, goalProgressContext, years, yearGoals, filteredGoals, stats };
 }

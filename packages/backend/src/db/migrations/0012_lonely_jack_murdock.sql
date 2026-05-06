@@ -1,0 +1,2 @@
+ALTER TABLE "goals" DROP CONSTRAINT "goals_source_type_check";--> statement-breakpoint
+ALTER TABLE "goals" ADD CONSTRAINT "goals_source_type_check" CHECK ("goals"."source_type" in ('manual', 'salary_latest_gross', 'savings_account', 'portfolio_total', 'net_worth_total', 'invest_habit_buys'));

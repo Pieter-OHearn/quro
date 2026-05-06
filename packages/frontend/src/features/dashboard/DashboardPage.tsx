@@ -1,9 +1,13 @@
+import { useMemo } from 'react';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
 import { useGoals } from '@/features/goals/hooks';
+import type { GoalProgressContext } from '@/features/goals/types';
 import { parseGoalYear } from '@/features/goals/utils/goal-utils';
+import { useHoldingTransactions } from '@/features/investments/hooks';
 import { usePayslips } from '@/features/salary/hooks';
-import type { DashboardAllocationsSummary } from '@quro/shared';
+import { useSavingsAccounts } from '@/features/savings/hooks';
+import type { DashboardAllocationsSummary, HoldingTransaction } from '@quro/shared';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
@@ -31,6 +35,7 @@ import { useAssetAllocations, useDashboardTransactions, useNetWorthSnapshots } f
 
 const DASHBOARD_GOAL_LIMIT = 4;
 const DASHBOARD_TXN_LIMIT = 6;
+const MONTH_KEY_PAD_LENGTH = 2;
 const EMPTY_ALLOCATIONS_SUMMARY: DashboardAllocationsSummary = {
   allocations: [],
   liabilitiesTotal: 0,
@@ -53,37 +58,83 @@ const buildAllocationsByName = (allocationData: ReadonlyArray<{ name: string; va
     return acc;
   }, {});
 
-function useDashboardData(
-  fmtBase: DashboardFormatFn,
-  convertToBase: (amount: number, currency: string) => number,
-) {
+const buildMonthKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(MONTH_KEY_PAD_LENGTH, '0')}`;
+
+function computeInvestHabitBuyMonths(
+  holdingTxns: readonly HoldingTransaction[],
+): ReadonlyMap<number, ReadonlySet<string>> {
+  const yearMap = new Map<number, Set<string>>();
+  for (const txn of holdingTxns) {
+    if (txn.type !== 'buy' || !txn.date) continue;
+    const date = new Date(txn.date + 'T00:00:00Z');
+    const year = date.getUTCFullYear();
+    const monthKey = `${year}-${String(date.getUTCMonth() + 1).padStart(MONTH_KEY_PAD_LENGTH, '0')}`;
+    let months = yearMap.get(year);
+    if (!months) {
+      months = new Set();
+      yearMap.set(year, months);
+    }
+    months.add(monthKey);
+  }
+  return yearMap;
+}
+
+function useDashboardQueries() {
   const netWorthQuery = useNetWorthSnapshots();
   const allocationsQuery = useAssetAllocations();
   const transactionsQuery = useDashboardTransactions();
   const goalsQuery = useGoals();
   const payslipsQuery = usePayslips();
-
-  const isLoading =
-    netWorthQuery.isLoading ||
-    allocationsQuery.isLoading ||
-    transactionsQuery.isLoading ||
-    goalsQuery.isLoading ||
-    payslipsQuery.isLoading;
-  const queryFailures = getFailedRouteQueries([
+  const savingsAccountsQuery = useSavingsAccounts();
+  const holdingTxnsQuery = useHoldingTransactions();
+  const routeQueries = [
     { label: 'net worth history', ...netWorthQuery },
     { label: 'asset allocations', ...allocationsQuery },
     { label: 'recent dashboard activity', ...transactionsQuery },
     { label: 'goal progress', ...goalsQuery },
     { label: 'payslips', ...payslipsQuery },
-  ]);
-  const netWorthData = netWorthQuery.data ?? [];
-  const allocations = allocationsQuery.data ?? EMPTY_ALLOCATIONS_SUMMARY;
-  const transactions = transactionsQuery.data ?? [];
-  const goals = goalsQuery.data ?? [];
-  const payslips = payslipsQuery.data ?? [];
+    { label: 'savings accounts', ...savingsAccountsQuery },
+    { label: 'holding transactions', ...holdingTxnsQuery },
+  ];
+
+  return {
+    netWorthQuery,
+    allocationsQuery,
+    transactionsQuery,
+    goalsQuery,
+    payslipsQuery,
+    savingsAccountsQuery,
+    holdingTxnsQuery,
+    isLoading: routeQueries.some((query) => query.isLoading),
+    queryFailures: getFailedRouteQueries(routeQueries),
+  };
+}
+
+type DashboardQueries = ReturnType<typeof useDashboardQueries>;
+
+function getDashboardQueryData(queries: DashboardQueries) {
+  return {
+    netWorthData: queries.netWorthQuery.data ?? [],
+    allocations: queries.allocationsQuery.data ?? EMPTY_ALLOCATIONS_SUMMARY,
+    transactions: queries.transactionsQuery.data ?? [],
+    goals: queries.goalsQuery.data ?? [],
+    payslips: queries.payslipsQuery.data ?? [],
+    savingsAccounts: queries.savingsAccountsQuery.data ?? [],
+    holdingTxns: queries.holdingTxnsQuery.data ?? [],
+  };
+}
+
+function useDashboardData(
+  fmtBase: DashboardFormatFn,
+  convertToBase: (amount: number, currency: string) => number,
+) {
+  const queries = useDashboardQueries();
+  const { netWorthData, allocations, transactions, goals, payslips, savingsAccounts, holdingTxns } =
+    getDashboardQueryData(queries);
   const today = new Date();
   const currentYear = today.getFullYear();
-  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthKey = buildMonthKey(today);
   const annualGross = computeAnnualGross(payslips, convertToBase);
   const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
   const convertedTransactions = normalizeDashboardTransactions(transactions, convertToBase);
@@ -93,6 +144,18 @@ function useDashboardData(
   const chartData = normalizeNetWorthSnapshots(netWorthData, convertToBase);
   const allocationSummary = normalizeAssetAllocations(allocations, convertToBase);
   const allocationByName = buildAllocationsByName(allocationSummary.allocationData);
+  const investHabitBuyMonths = useMemo(
+    () => computeInvestHabitBuyMonths(holdingTxns),
+    [holdingTxns],
+  );
+  const goalProgressContext: GoalProgressContext = {
+    annualGross,
+    savingsAccounts,
+    portfolioTotal: allocationByName['Brokerage'] ?? 0,
+    netWorth: allocationSummary.netWorth,
+    investHabitBuyMonths,
+    convertToBase,
+  };
 
   const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, allocationSummary.netWorth);
   const {
@@ -105,8 +168,8 @@ function useDashboardData(
   } = computeDashboardTxnStats(convertedTransactions, payslips, convertToBase);
 
   return {
-    isLoading,
-    queryFailures,
+    isLoading: queries.isLoading,
+    queryFailures: queries.queryFailures,
     chartData,
     allocationData: allocationSummary.allocationData,
     totalAssets: allocationSummary.totalAssets,
@@ -122,6 +185,7 @@ function useDashboardData(
     monthChange,
     ytdPct,
     annualGross,
+    goalProgressContext,
     currentYear,
     displayedGoals: yearGoals.slice(0, DASHBOARD_GOAL_LIMIT),
     displayedRecentTransactions: [...currentMonthTransactions]
@@ -152,7 +216,7 @@ function DashboardBottomCards({ data }: { data: DashboardData }) {
     displayedGoals,
     recentTransactions,
     monthlySummaryItems,
-    annualGross,
+    goalProgressContext,
     currentYear,
   } = data;
 
@@ -166,7 +230,7 @@ function DashboardBottomCards({ data }: { data: DashboardData }) {
         />
         <GoalsOverviewCard
           goals={displayedGoals}
-          annualGross={annualGross}
+          goalProgressContext={goalProgressContext}
           currentYear={currentYear}
           fmtBase={fmtBase}
         />

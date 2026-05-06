@@ -1,12 +1,12 @@
 import type { Goal } from '@quro/shared';
-import type { FilterKey } from '../types';
+import type { FilterKey, GoalProgressContext } from '../types';
 import { GoalCard } from './GoalCard';
 import { GoalsEmptyState } from './GoalsEmptyState';
 import { GoalsGlance } from './GoalsGlance';
 
 type GoalsCardGridProps = {
   filteredGoals: Goal[];
-  annualGross: number;
+  goalProgressContext: GoalProgressContext;
   currentYear: number;
   activeFilter: FilterKey;
   activeYear: number;
@@ -18,7 +18,7 @@ type GoalsCardGridProps = {
 
 export function GoalsCardGrid({
   filteredGoals,
-  annualGross,
+  goalProgressContext,
   currentYear,
   activeFilter,
   activeYear,
@@ -38,7 +38,7 @@ export function GoalsCardGrid({
           <GoalCard
             key={goal.id}
             goal={goal}
-            annualGross={annualGross}
+            goalProgressContext={goalProgressContext}
             currentYear={currentYear}
             onDelete={onDelete}
             onUpdateMonths={onUpdateMonths}
@@ -47,7 +47,7 @@ export function GoalsCardGrid({
       </div>
       <GoalsGlance
         yearGoals={yearGoals}
-        annualGross={annualGross}
+        goalProgressContext={goalProgressContext}
         currentYear={currentYear}
         activeYear={activeYear}
       />

@@ -1,4 +1,4 @@
-import type { Goal, GoalType } from '@quro/shared';
+import { GOAL_SOURCE_TYPES, type Goal, type GoalSourceType, type GoalType } from '@quro/shared';
 import type { ApiGoal } from '../types';
 
 const GOAL_TYPES: GoalType[] = [
@@ -39,6 +39,14 @@ const normalizeGoalTypeValue = (value: GoalType | string | null | undefined): Go
   return GOAL_TYPES.includes(value as GoalType) ? (value as GoalType) : 'savings';
 };
 
+const normalizeGoalSourceTypeValue = (
+  value: GoalSourceType | string | null | undefined,
+  type: GoalType,
+): GoalSourceType => {
+  if (!value) return type === 'salary' ? 'salary_latest_gross' : 'manual';
+  return GOAL_SOURCE_TYPES.includes(value as GoalSourceType) ? (value as GoalSourceType) : 'manual';
+};
+
 const resolveGoalYear = (goal: ApiGoal): number =>
   toNullableInteger(goal.year) ?? inferYearFromDeadline(goal.deadline) ?? new Date().getFullYear();
 
@@ -73,6 +81,8 @@ const normalizeGoalNumbers = (goal: ApiGoal) => ({
 export const normalizeGoal = (goal: ApiGoal): Goal => ({
   ...goal,
   ...normalizeGoalMeta(goal),
+  sourceType: normalizeGoalSourceTypeValue(goal.sourceType, normalizeGoalTypeValue(goal.type)),
+  sourceId: toNullableInteger(goal.sourceId),
   ...normalizeGoalDisplay(goal),
   ...normalizeGoalNumbers(goal),
 });
