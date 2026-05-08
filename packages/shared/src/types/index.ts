@@ -524,6 +524,8 @@ export type Goal = {
   color: string;
   notes: string;
   currency: CurrencyCode;
+  startMonth?: string | null;
+  missedMonths?: string[] | null;
 };
 
 export type BudgetCategory = {

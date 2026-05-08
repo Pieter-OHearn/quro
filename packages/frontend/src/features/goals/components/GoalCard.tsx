@@ -1,4 +1,12 @@
-import { AlertCircle, ArrowUpRight, Check, CheckCircle2, Minus, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  Minus,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { Goal, GoalType } from '@quro/shared';
 import type { GoalMeta, GoalProgressContext, GoalStatus } from '../types';
@@ -21,7 +29,9 @@ type GoalCardProps = {
   goalProgressContext: GoalProgressContext;
   currentYear: number;
   onDelete: (id: number) => void;
+  onEdit: (id: number) => void;
   onUpdateMonths: (id: number, delta: number) => void;
+  onToggleMissedMonth: (id: number, monthKey: string) => void;
 };
 
 function ProgressBar({ pct, color }: Readonly<{ pct: number; color: string }>) {
@@ -188,6 +198,102 @@ function GoalCardSalary({
   );
 }
 
+const MONTH_ABBR = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function buildMonthRange(startDeadline: string, endDeadline: string): string[] {
+  const parse = (d: string) => {
+    const m = d.match(/^([A-Za-z]+)\s+(\d{4})$/);
+    if (!m) return null;
+    const mo = MONTH_ABBR.indexOf(m[1]);
+    return mo === -1 ? null : { year: Number(m[2]), month: mo };
+  };
+  const s = parse(startDeadline);
+  const e = parse(endDeadline);
+  if (!s || !e) return [];
+  const keys: string[] = [];
+  let { year, month } = s;
+  while (year < e.year || (year === e.year && month <= e.month)) {
+    keys.push(`${year}-${String(month + 1).padStart(2, '0')}`);
+    month++;
+    if (month > 11) {
+      month = 0;
+      year++;
+    }
+  }
+  return keys;
+}
+
+function monthCellTitle(done: boolean, missed: boolean, isFuture: boolean): string {
+  if (done) return 'Completed';
+  if (missed) return 'Missed (click to unmark)';
+  if (isFuture) return 'Future';
+  return 'Mark as missed';
+}
+
+function monthCellBg(done: boolean, missed: boolean, isFuture: boolean, color: string): string {
+  if (done) return color;
+  if (missed) return '#f59e0b';
+  if (isFuture) return '#f1f5f9';
+  return '#e2e8f0';
+}
+
+function CalendarMonthGrid({
+  monthKeys,
+  completedKeys,
+  missedMonths,
+  color,
+  onToggle,
+}: Readonly<{
+  monthKeys: string[];
+  completedKeys: ReadonlySet<string>;
+  missedMonths: readonly string[];
+  color: string;
+  onToggle: (monthKey: string) => void;
+}>) {
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  return (
+    <div
+      className="grid gap-px"
+      style={{ gridTemplateColumns: `repeat(${Math.min(monthKeys.length, 12)}, 1fr)` }}
+    >
+      {monthKeys.map((key) => {
+        const done = completedKeys.has(key);
+        const missed = missedMonths.includes(key);
+        const isFuture = key > currentKey;
+        const label = MONTH_ABBR[Number(key.split('-')[1]) - 1]?.[0] ?? '';
+        return (
+          <div key={key} className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              disabled={done || isFuture}
+              onClick={() => !done && !isFuture && onToggle(key)}
+              title={monthCellTitle(done, missed, isFuture)}
+              className={`w-full aspect-square rounded-sm transition-all ${isFuture || done ? 'cursor-default' : 'cursor-pointer hover:opacity-70'}`}
+              style={{ backgroundColor: monthCellBg(done, missed, isFuture, color) }}
+            />
+            <span className="text-[8px] text-slate-400 leading-none">{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function InvestHabitMonthGrid({
   totalMonths,
   monthsCompleted,
@@ -252,21 +358,35 @@ type InvestHabitCardProps = {
   status: GoalStatus;
   fmtBase: (n: number) => string;
   onUpdateMonths: (id: number, delta: number) => void;
+  onToggleMissedMonth: (id: number, monthKey: string) => void;
   isLinked: boolean;
+  completedMonthKeys: ReadonlySet<string>;
 };
 
 function InvestHabitProgress({
+  goal,
   color,
   monthlyTarget,
   monthsCompleted,
   totalMonths,
   fmtBase,
+  completedMonthKeys,
+  onToggleMissedMonth,
 }: Readonly<
   Pick<
     InvestHabitCardProps,
-    'color' | 'monthlyTarget' | 'monthsCompleted' | 'totalMonths' | 'fmtBase'
-  >
+    | 'color'
+    | 'monthlyTarget'
+    | 'monthsCompleted'
+    | 'totalMonths'
+    | 'fmtBase'
+    | 'completedMonthKeys'
+    | 'onToggleMissedMonth'
+  > & { goal: Goal }
 >) {
+  const monthKeys =
+    goal.startMonth && goal.deadline ? buildMonthRange(goal.startMonth, goal.deadline) : null;
+
   return (
     <div>
       <div className="flex justify-between mb-2">
@@ -275,11 +395,21 @@ function InvestHabitProgress({
           {monthsCompleted}/{totalMonths} months
         </span>
       </div>
-      <InvestHabitMonthGrid
-        totalMonths={totalMonths}
-        monthsCompleted={monthsCompleted}
-        color={color}
-      />
+      {monthKeys ? (
+        <CalendarMonthGrid
+          monthKeys={monthKeys}
+          completedKeys={completedMonthKeys}
+          missedMonths={goal.missedMonths ?? []}
+          color={color}
+          onToggle={(key) => onToggleMissedMonth(goal.id, key)}
+        />
+      ) : (
+        <InvestHabitMonthGrid
+          totalMonths={totalMonths}
+          monthsCompleted={monthsCompleted}
+          color={color}
+        />
+      )}
       <div className="mt-3">
         <p className="font-bold text-slate-900">{fmtBase(monthlyTarget * monthsCompleted)}</p>
         <p className="text-xs text-slate-400">
@@ -299,16 +429,21 @@ function GoalCardInvestHabit({
   status,
   fmtBase,
   onUpdateMonths,
+  onToggleMissedMonth,
   isLinked,
+  completedMonthKeys,
 }: Readonly<InvestHabitCardProps>) {
   return (
     <>
       <InvestHabitProgress
+        goal={goal}
         color={color}
         monthlyTarget={monthlyTarget}
         monthsCompleted={monthsCompleted}
         totalMonths={totalMonths}
         fmtBase={fmtBase}
+        completedMonthKeys={completedMonthKeys}
+        onToggleMissedMonth={onToggleMissedMonth}
       />
       {status !== 'complete' && !isLinked && (
         <div className="flex items-center justify-end">
@@ -499,12 +634,14 @@ function GoalCardHeader({
   meta,
   sourceResolution,
   onDelete,
+  onEdit,
 }: Readonly<{
   goal: Goal;
   status: GoalStatus;
   meta: GoalMeta;
   sourceResolution: GoalCurrentAmountResolution;
   onDelete: (id: number) => void;
+  onEdit: (id: number) => void;
 }>) {
   return (
     <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
@@ -516,6 +653,12 @@ function GoalCardHeader({
       />
       <div className="flex items-center gap-1 flex-shrink-0">
         <span className="text-xs text-slate-400 mr-1">{`🗓 ${goal.deadline}`}</span>
+        <button
+          onClick={() => onEdit(goal.id)}
+          className="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 transition-colors"
+        >
+          <Pencil size={13} />
+        </button>
         <button
           onClick={() => onDelete(goal.id)}
           className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors"
@@ -539,6 +682,7 @@ type GoalBodyContentProps = {
   fmtBase: (n: number) => string;
   toBase: (n: number) => number;
   onUpdateMonths: (id: number, delta: number) => void;
+  onToggleMissedMonth: (id: number, monthKey: string) => void;
 };
 
 const isSavingsLike = (type: GoalType) =>
@@ -586,6 +730,7 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
     fmtBase,
     toBase,
     onUpdateMonths,
+    onToggleMissedMonth,
   } = props;
   const { targetAmount, monthlyContrib } = getGoalAmounts(goal, currentAmount, toBase);
 
@@ -619,6 +764,10 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
     const { monthlyTarget, totalMonths } = getInvestHabitNumbers(goal);
     const monthsCompleted = resolveInvestHabitMonthsCompleted(goal, goalProgressContext);
     const isLinked = normalizeGoalSourceType(goal) === 'invest_habit_buys';
+    const year = goal.year ?? new Date().getFullYear();
+    const completedMonthKeys = isLinked
+      ? (goalProgressContext.investHabitBuyMonths.get(year) ?? new Set<string>())
+      : new Set<string>();
 
     return (
       <GoalCardInvestHabit
@@ -630,7 +779,9 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
         status={status}
         fmtBase={fmtBase}
         onUpdateMonths={onUpdateMonths}
+        onToggleMissedMonth={onToggleMissedMonth}
         isLinked={isLinked}
+        completedMonthKeys={completedMonthKeys}
       />
     );
   }
@@ -658,7 +809,9 @@ export function GoalCard({
   goalProgressContext,
   currentYear,
   onDelete,
+  onEdit,
   onUpdateMonths,
+  onToggleMissedMonth,
 }: Readonly<GoalCardProps>) {
   const { fmtBase, convertToBase } = useCurrency();
   const toBase = (n: number) => convertToBase(n, goal.currency);
@@ -681,6 +834,7 @@ export function GoalCard({
         meta={meta}
         sourceResolution={sourceResolution}
         onDelete={onDelete}
+        onEdit={onEdit}
       />
       <GoalCardBody
         goal={goal}
@@ -694,6 +848,7 @@ export function GoalCard({
         fmtBase={fmtBase}
         toBase={toBase}
         onUpdateMonths={onUpdateMonths}
+        onToggleMissedMonth={onToggleMissedMonth}
       />
     </div>
   );

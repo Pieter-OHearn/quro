@@ -12,7 +12,9 @@ type GoalsCardGridProps = {
   activeYear: number;
   yearGoals: Goal[];
   onDelete: (id: number) => void;
+  onEdit: (id: number) => void;
   onUpdateMonths: (id: number, delta: number) => void;
+  onToggleMissedMonth: (id: number, monthKey: string) => void;
   onAdd: () => void;
 };
 
@@ -24,7 +26,9 @@ export function GoalsCardGrid({
   activeYear,
   yearGoals,
   onDelete,
+  onEdit,
   onUpdateMonths,
+  onToggleMissedMonth,
   onAdd,
 }: Readonly<GoalsCardGridProps>) {
   if (filteredGoals.length === 0) {
@@ -41,7 +45,9 @@ export function GoalsCardGrid({
             goalProgressContext={goalProgressContext}
             currentYear={currentYear}
             onDelete={onDelete}
+            onEdit={onEdit}
             onUpdateMonths={onUpdateMonths}
+            onToggleMissedMonth={onToggleMissedMonth}
           />
         ))}
       </div>

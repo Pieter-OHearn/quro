@@ -3,52 +3,78 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
 import type { Goal, GoalType } from '@quro/shared';
-import type { CreateGoalInput, GoalFormField, GoalFormState } from '../types';
+import type { GoalFormField, GoalFormState, UpdateGoalInput } from '../types';
 import { GOAL_TYPE_META, COLORS } from '../utils/goals-constants';
-import { buildGoalPayload } from '../utils/goal-utils';
-import { buildDefaultGoalDeadline, getCurrentGoalYear } from '../utils/goal-years';
+import { buildGoalPayload, normalizeGoalType } from '../utils/goal-utils';
 
-const defaultForm = (): GoalFormState => {
+const monthNames = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function deadlineToDateString(deadline: string): string {
+  if (!deadline) return '';
+  const match = deadline.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!match) return '';
+  const month = monthNames.indexOf(match[1]);
+  if (month === -1) return '';
+  return `${match[2]}-${String(month + 1).padStart(2, '0')}-01`;
+}
+
+function currentMonthDateString(): string {
   const now = new Date();
-  const currentYear = getCurrentGoalYear(now);
   const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-01`;
+}
 
+function goalAmountFields(goal: Goal) {
   return {
-    name: '',
-    emoji: '🎯',
-    color: COLORS[0],
-    notes: '',
-    deadline: buildDefaultGoalDeadline(now),
-    year: String(currentYear),
-    current: '',
-    target: '',
-    monthlyContrib: '',
-    monthlyTarget: '',
-    totalMonths: '12',
-    unit: '',
-    sourceId: '',
-    startMonth: `${currentYear}-${month}-01`,
-    currency: '',
+    current: String(goal.currentAmount ?? ''),
+    target: String(goal.targetAmount ?? ''),
+    monthlyContrib: String(goal.monthlyContribution ?? ''),
+    monthlyTarget: String(goal.monthlyTarget ?? ''),
+    totalMonths: String(goal.totalMonths ?? 12),
   };
-};
+}
 
-const SOURCE_TYPE_DEFAULTS: Partial<Record<GoalType, Goal['sourceType']>> = {
-  salary: 'salary_latest_gross',
-  portfolio: 'portfolio_total',
-  net_worth: 'net_worth_total',
-  invest_habit: 'invest_habit_buys',
-};
+function goalToFormState(goal: Goal, baseCurrency: string): GoalFormState {
+  return {
+    name: goal.name,
+    emoji: goal.emoji,
+    color: goal.color ?? COLORS[0],
+    notes: goal.notes ?? '',
+    deadline: goal.deadline,
+    year: String(goal.year ?? new Date().getFullYear()),
+    ...goalAmountFields(goal),
+    unit: goal.unit ?? '',
+    sourceId: goal.sourceId != null ? String(goal.sourceId) : '',
+    startMonth:
+      goal.startMonth != null ? deadlineToDateString(goal.startMonth) : currentMonthDateString(),
+    currency: goal.currency ?? baseCurrency,
+  };
+}
 
-export function useAddGoalModal(onSave: (goal: CreateGoalInput) => void, onClose: () => void) {
+export function useEditGoalModal(
+  goal: Goal,
+  onUpdate: (input: UpdateGoalInput) => void,
+  onClose: () => void,
+) {
   const { baseCurrency, convertToBase, fmtBase } = useCurrency();
   const savingsAccountsQuery = useSavingsAccounts();
   const allocationsQuery = useAssetAllocations();
-  const [step, setStep] = useState<'type' | 'details'>('type');
-  const [type, setType] = useState<GoalType>('savings');
-  const [form, setForm] = useState<GoalFormState>(() => ({
-    ...defaultForm(),
-    currency: baseCurrency,
-  }));
+
+  const type = normalizeGoalType(goal);
+  const [form, setForm] = useState<GoalFormState>(() => goalToFormState(goal, baseCurrency));
 
   const { portfolioTotal, netWorth } = useMemo(() => {
     const allocs = allocationsQuery.data;
@@ -75,10 +101,10 @@ export function useAddGoalModal(onSave: (goal: CreateGoalInput) => void, onClose
   const handleSave = () => {
     if (saveDisabled) return;
 
-    const base: Omit<Goal, 'id'> = {
+    const base = {
       type,
-      sourceType: SOURCE_TYPE_DEFAULTS[type] ?? 'manual',
-      sourceId: null,
+      sourceType: goal.sourceType,
+      sourceId: goal.sourceId ?? null,
       name: form.name.trim(),
       emoji: form.emoji,
       color: form.color,
@@ -89,14 +115,17 @@ export function useAddGoalModal(onSave: (goal: CreateGoalInput) => void, onClose
       targetAmount: 0,
       monthlyContribution: 0,
       monthlyTarget: null,
-      monthsCompleted: null,
+      monthsCompleted: goal.monthsCompleted ?? null,
       totalMonths: null,
       unit: null,
       category: GOAL_TYPE_META[type].label,
       currency: (form.currency || baseCurrency) as Goal['currency'],
+      startMonth: null,
+      missedMonths: goal.missedMonths ?? null,
     };
 
-    onSave(buildGoalPayload(type, base, form));
+    const payload = buildGoalPayload(type as GoalType, base as never, form);
+    onUpdate({ id: goal.id, ...payload });
     onClose();
   };
 
@@ -108,13 +137,10 @@ export function useAddGoalModal(onSave: (goal: CreateGoalInput) => void, onClose
     loadingSavingsAccounts: savingsAccountsQuery.isLoading,
     portfolioTotal,
     netWorth,
-    step,
     type,
     form,
     setField,
     handleSave,
-    setType,
-    setStep,
     saveDisabled,
   };
 }

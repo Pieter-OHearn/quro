@@ -1,4 +1,5 @@
 export { AddGoalModal } from './AddGoalModal';
+export { EditGoalModal } from './EditGoalModal';
 export { GoalCard } from './GoalCard';
 export { GoalsCardGrid } from './GoalsCardGrid';
 export { GoalsEmptyState } from './GoalsEmptyState';

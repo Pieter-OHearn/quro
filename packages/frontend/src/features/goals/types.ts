@@ -28,6 +28,8 @@ export type GoalFormState = {
   totalMonths: string;
   unit: string;
   sourceId: string;
+  startMonth: string;
+  currency: string;
 };
 
 export type GoalFormField = keyof GoalFormState;
@@ -35,6 +37,7 @@ export type GoalFormField = keyof GoalFormState;
 export type AddGoalModalProps = {
   onClose: () => void;
   onSave: (goal: CreateGoalInput) => void;
+  initialFilter?: FilterKey;
 };
 
 export type CreateGoalInput = Omit<Goal, 'id'>;
@@ -63,6 +66,8 @@ export type ApiGoal = Omit<
   monthlyTarget?: number | string | null;
   monthsCompleted?: number | string | null;
   totalMonths?: number | string | null;
+  startMonth?: string | null;
+  missedMonths?: string[] | null;
 };
 
 export type GoalStatsData = {
@@ -105,6 +110,8 @@ export type GoalsPageState = {
   setActiveFilter: (filter: FilterKey) => void;
   showAdd: boolean;
   setShowAdd: (show: boolean) => void;
+  editingGoal: Goal | null;
+  setEditingGoal: (goal: Goal | null) => void;
   annualGross: number;
   goalProgressContext: GoalProgressContext;
   years: number[];
@@ -114,6 +121,8 @@ export type GoalsPageState = {
   handleDelete: (id: number) => void;
   handleUpdateMonths: (id: number, delta: number) => void;
   handleAddGoal: (goal: CreateGoalInput) => void;
+  handleUpdateGoal: (input: UpdateGoalInput) => void;
+  handleToggleMissedMonth: (goalId: number, monthKey: string) => void;
 };
 
 export type GoalProgressSavingsAccount = Pick<

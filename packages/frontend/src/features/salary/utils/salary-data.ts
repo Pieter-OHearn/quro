@@ -35,7 +35,7 @@ const buildSalaryChartDataFromHistory = (
     }, new Map<number, number>()),
   )
     .sort(([leftYear], [rightYear]) => leftYear - rightYear)
-    .map(([year, gross]) => ({ year: String(year), gross }));
+    .map(([year, gross]) => ({ year: String(year), gross, net: gross }));
 
 export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => {
   const totalPay = getPayslipBreakdownTotal(payslip);
@@ -161,22 +161,27 @@ export function computeSalaryMetrics(
     0,
   );
 
+  const payslipDataByYear = allPayslips.reduce((byYear, payslip) => {
+    const year = parsePayslipYear(payslip, currentYear);
+    const existing = byYear.get(year) ?? { gross: 0, net: 0 };
+    byYear.set(year, {
+      gross: existing.gross + convertToBase(getPayslipAnnualGross(payslip), payslip.currency),
+      net: existing.net + convertToBase(payslip.net, payslip.currency),
+    });
+    return byYear;
+  }, new Map<number, { gross: number; net: number }>());
+
   const salaryChartData: SalaryChartEntry[] =
     salaryHistory.length > 0
-      ? buildSalaryChartDataFromHistory(salaryHistory, convertToBase)
-      : Array.from(
-          allPayslips.reduce((grossByYear, payslip) => {
-            const year = parsePayslipYear(payslip, currentYear);
-            const annualTotal = grossByYear.get(year) ?? 0;
-            grossByYear.set(
-              year,
-              annualTotal + convertToBase(getPayslipAnnualGross(payslip), payslip.currency),
-            );
-            return grossByYear;
-          }, new Map<number, number>()),
-        )
+      ? buildSalaryChartDataFromHistory(salaryHistory, convertToBase).map((entry) => {
+          const payslipData = payslipDataByYear.get(Number(entry.year));
+          return payslipData !== undefined
+            ? { year: entry.year, gross: payslipData.gross, net: payslipData.net }
+            : entry;
+        })
+      : Array.from(payslipDataByYear)
           .sort(([leftYear], [rightYear]) => leftYear - rightYear)
-          .map(([year, gross]) => ({ year: String(year), gross }));
+          .map(([year, { gross, net }]) => ({ year: String(year), gross, net }));
 
   const salaryGrowthPct =
     salaryChartData.length >= MIN_GROWTH_POINTS && salaryChartData[0].gross > 0

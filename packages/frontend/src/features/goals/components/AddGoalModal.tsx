@@ -7,12 +7,21 @@ import {
   Textarea,
   TextInput,
   DateInput,
+  MonthInput,
   CurrencyInput,
+  EmojiPickerField,
 } from '@/components/ui';
 import type { GoalType, SavingsAccount } from '@quro/shared';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddGoalModal } from '../hooks';
 import { COLORS, GOAL_TYPE_META } from '../utils/goals-constants';
-import type { AddGoalModalProps, GoalFormField, GoalFormState, GoalMeta } from '../types';
+import type {
+  AddGoalModalProps,
+  FilterKey,
+  GoalFormField,
+  GoalFormState,
+  GoalMeta,
+} from '../types';
 
 type SetField = (key: GoalFormField, value: string) => void;
 
@@ -51,6 +60,19 @@ function deadlineToDateString(deadline: string): string {
   return `${year}-${monthPad}-01`;
 }
 
+function monthsBetween(startDeadline: string, endDeadline: string): number {
+  const parseDeadline = (d: string) => {
+    const m = d.match(/^([A-Za-z]+)\s+(\d{4})$/);
+    if (!m) return null;
+    const mo = monthNames.indexOf(m[1]);
+    return mo === -1 ? null : { year: Number(m[2]), month: mo };
+  };
+  const s = parseDeadline(startDeadline);
+  const e = parseDeadline(endDeadline);
+  if (!s || !e) return 0;
+  return Math.max(0, (e.year - s.year) * 12 + (e.month - s.month) + 1);
+}
+
 type AmountFieldsSavingsPortfolioProps = {
   type: GoalType;
   form: GoalFormState;
@@ -61,40 +83,6 @@ type AmountFieldsSavingsPortfolioProps = {
   convertToBase: (amount: number, fromCurrency: string) => number;
   fmtBase: (amount: number, fromCurrency?: string, decimals?: boolean) => string;
 };
-
-function GoalTypeStep({ onSelect }: Readonly<{ onSelect: (type: GoalType) => void }>) {
-  return (
-    <div className="p-6">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-        Select goal type
-      </p>
-      <div className="grid grid-cols-2 gap-3">
-        {(Object.entries(GOAL_TYPE_META) as [GoalType, GoalMeta][]).map(([goalType, meta]) => {
-          const { Icon, bg, text } = meta;
-          return (
-            <button
-              key={goalType}
-              onClick={() => onSelect(goalType)}
-              className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-left group"
-            >
-              <div
-                className={`w-9 h-9 rounded-xl ${bg} ${text} flex items-center justify-center flex-shrink-0 mt-0.5`}
-              >
-                <Icon size={16} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-800 group-hover:text-indigo-700 leading-tight">
-                  {meta.label}
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{meta.description}</p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 const buildSavingsSourceOptions = (
   savingsAccounts: readonly SavingsAccount[],
@@ -115,6 +103,7 @@ function SavingsSourceSelector({
   selectedSource,
   convertToBase,
   fmtBase,
+  baseCurrency,
 }: Readonly<
   Omit<AmountFieldsSavingsPortfolioProps, 'type'> & {
     selectedSource: SavingsAccount | undefined;
@@ -135,6 +124,7 @@ function SavingsSourceSelector({
             'current',
             account ? String(convertToBase(account.balance, account.currency)) : '',
           );
+          setField('currency', account ? account.currency : baseCurrency);
         }}
       />
       <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
@@ -149,18 +139,18 @@ function SavingsSourceSelector({
 
 function LinkedCurrentAmountSummary({
   selectedSource,
-  fmtBase,
+  fmtNative,
 }: Readonly<{
   selectedSource: SavingsAccount;
-  fmtBase: AmountFieldsSavingsPortfolioProps['fmtBase'];
+  fmtNative: (amount: number, currency: string) => string;
 }>) {
   return (
-    <div className="col-span-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5">
+    <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
         Linked Current Amount
       </p>
       <p className="mt-0.5 text-sm font-semibold text-slate-800">
-        {fmtBase(selectedSource.balance, selectedSource.currency)}
+        {fmtNative(selectedSource.balance, selectedSource.currency)}
       </p>
     </div>
   );
@@ -169,14 +159,15 @@ function LinkedCurrentAmountSummary({
 function ManualCurrentAmountField({
   form,
   setField,
-}: Readonly<Pick<AmountFieldsSavingsPortfolioProps, 'form' | 'setField'>>) {
+  baseCurrency,
+}: Readonly<Pick<AmountFieldsSavingsPortfolioProps, 'form' | 'setField' | 'baseCurrency'>>) {
   return (
     <FormField label="Current Amount">
-      <TextInput
-        type="number"
+      <CurrencyInput
+        currency={baseCurrency}
         inputMode="decimal"
         step="0.01"
-        placeholder="0"
+        placeholder="0.00"
         value={form.current}
         onChange={(value) => setField('current', value)}
       />
@@ -187,14 +178,15 @@ function ManualCurrentAmountField({
 function TargetAmountField({
   form,
   setField,
-}: Readonly<Pick<AmountFieldsSavingsPortfolioProps, 'form' | 'setField'>>) {
+  baseCurrency,
+}: Readonly<Pick<AmountFieldsSavingsPortfolioProps, 'form' | 'setField' | 'baseCurrency'>>) {
   return (
     <FormField label="Target Amount" required>
-      <TextInput
-        type="number"
+      <CurrencyInput
+        currency={baseCurrency}
         inputMode="decimal"
         step="0.01"
-        placeholder="15000"
+        placeholder="15000.00"
         value={form.target}
         onChange={(value) => setField('target', value)}
       />
@@ -245,14 +237,34 @@ function AutoLinkedSourceSummary({
   );
 }
 
+function DeadlineField({ form, setField }: Readonly<{ form: GoalFormState; setField: SetField }>) {
+  const handleDateChange = (dateStr: string) => {
+    if (!dateStr) return;
+    const deadline = dateStringToDeadline(dateStr);
+    const year = dateStr.split('-')[0];
+    setField('deadline', deadline);
+    setField('year', year);
+  };
+  return (
+    <FormField label="Deadline">
+      <DateInput value={deadlineToDateString(form.deadline)} onChange={handleDateChange} />
+    </FormField>
+  );
+}
+
 function AmountFieldsSavingsPortfolio(
   props: Readonly<AmountFieldsSavingsPortfolioProps & { portfolioTotal: number; netWorth: number }>,
 ) {
-  const { type, form, setField, savingsAccounts, fmtBase, portfolioTotal, netWorth } = props;
+  const { type, form, setField, savingsAccounts, fmtBase, baseCurrency, portfolioTotal, netWorth } =
+    props;
+  const { fmtNative } = useCurrency();
+  const accountCurrency = form.currency || baseCurrency;
   const selectedSource =
     type === 'savings'
       ? savingsAccounts.find((account) => String(account.id) === form.sourceId)
       : undefined;
+
+  const isPortfolioOrNetWorth = type === 'portfolio' || type === 'net_worth';
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -275,11 +287,16 @@ function AmountFieldsSavingsPortfolio(
       )}
       {type === 'savings' &&
         (selectedSource ? (
-          <LinkedCurrentAmountSummary selectedSource={selectedSource} fmtBase={fmtBase} />
+          <LinkedCurrentAmountSummary selectedSource={selectedSource} fmtNative={fmtNative} />
         ) : (
-          <ManualCurrentAmountField form={form} setField={setField} />
+          <ManualCurrentAmountField
+            form={form}
+            setField={setField}
+            baseCurrency={accountCurrency}
+          />
         ))}
-      <TargetAmountField form={form} setField={setField} />
+      <TargetAmountField form={form} setField={setField} baseCurrency={accountCurrency} />
+      {isPortfolioOrNetWorth && <DeadlineField form={form} setField={setField} />}
     </div>
   );
 }
@@ -287,21 +304,25 @@ function AmountFieldsSavingsPortfolio(
 function AmountFieldsSalary({
   form,
   setField,
-}: Readonly<{ form: GoalFormState; setField: SetField }>) {
+  baseCurrency,
+}: Readonly<{ form: GoalFormState; setField: SetField; baseCurrency: string }>) {
   return (
-    <FormField label="Target Annual Gross" required>
-      <TextInput
-        type="number"
-        inputMode="decimal"
-        step="0.01"
-        placeholder="90000"
-        value={form.target}
-        onChange={(value) => setField('target', value)}
-      />
-      <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
-        <Link2 size={10} /> Current salary auto-linked from your Salary page
-      </p>
-    </FormField>
+    <div className="grid grid-cols-2 gap-3">
+      <FormField label="Target Annual Gross" required>
+        <CurrencyInput
+          currency={baseCurrency}
+          inputMode="decimal"
+          step="0.01"
+          placeholder="90000.00"
+          value={form.target}
+          onChange={(value) => setField('target', value)}
+        />
+        <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+          <Link2 size={10} /> Current salary auto-linked from your Salary page
+        </p>
+      </FormField>
+      <DeadlineField form={form} setField={setField} />
+    </div>
   );
 }
 
@@ -338,7 +359,17 @@ function AmountFieldsAnnual({
   );
 }
 
-function AmountFieldsInvestHabitLinked({
+function dateToMonthString(dateStr: string): string {
+  if (!dateStr) return '';
+  return dateStr.substring(0, 7);
+}
+
+function deadlineToMonthString(deadline: string): string {
+  const dateStr = deadlineToDateString(deadline);
+  return dateStr ? dateStr.substring(0, 7) : '';
+}
+
+function AmountFieldsInvestHabit({
   form,
   setField,
   baseCurrency,
@@ -347,29 +378,44 @@ function AmountFieldsInvestHabitLinked({
   setField: SetField;
   baseCurrency: string;
 }>) {
+  const handleStartMonthChange = (monthStr: string) => {
+    setField('startMonth', monthStr ? `${monthStr}-01` : '');
+  };
+
+  const handleEndMonthChange = (monthStr: string) => {
+    if (!monthStr) return;
+    const deadline = dateStringToDeadline(`${monthStr}-01`);
+    const year = monthStr.split('-')[0];
+    setField('deadline', deadline);
+    setField('year', year);
+  };
+
+  const startDeadline = form.startMonth ? dateStringToDeadline(form.startMonth) : '';
+  const rangeMonths =
+    startDeadline && form.deadline ? monthsBetween(startDeadline, form.deadline) : 0;
+
   return (
     <div className="grid grid-cols-2 gap-3">
-      <FormField label={`Monthly Target (${baseCurrency})`} required>
-        <TextInput
-          type="number"
+      <FormField label={`Monthly Target (${baseCurrency})`} required className="col-span-2">
+        <CurrencyInput
+          currency={baseCurrency}
           inputMode="decimal"
           step="0.01"
-          placeholder="500"
+          placeholder="500.00"
           value={form.monthlyTarget}
           onChange={(value) => setField('monthlyTarget', value)}
         />
       </FormField>
-      <FormField label="Months in Period">
-        <TextInput
-          type="number"
-          placeholder="12"
-          value={form.totalMonths}
-          onChange={(value) => setField('totalMonths', value)}
-        />
+      <FormField label="Start Month">
+        <MonthInput value={dateToMonthString(form.startMonth)} onChange={handleStartMonthChange} />
+      </FormField>
+      <FormField label="End Month">
+        <MonthInput value={deadlineToMonthString(form.deadline)} onChange={handleEndMonthChange} />
       </FormField>
       <div className="col-span-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5">
         <p className="text-[10px] text-slate-400 flex items-center gap-1">
           <Link2 size={10} /> Monthly buy transactions auto-tracked from your investments.
+          {rangeMonths > 0 && ` ${rangeMonths} month${rangeMonths > 1 ? 's' : ''} in range.`}
         </p>
       </div>
     </div>
@@ -415,11 +461,10 @@ function GoalDetailsAmountFields({
       />
     );
   }
-  if (type === 'salary') return <AmountFieldsSalary form={form} setField={setField} />;
+  if (type === 'salary')
+    return <AmountFieldsSalary form={form} setField={setField} baseCurrency={baseCurrency} />;
   if (type === 'invest_habit') {
-    return (
-      <AmountFieldsInvestHabitLinked form={form} setField={setField} baseCurrency={baseCurrency} />
-    );
+    return <AmountFieldsInvestHabit form={form} setField={setField} baseCurrency={baseCurrency} />;
   }
   if (type === 'annual') return <AmountFieldsAnnual form={form} setField={setField} />;
   return null;
@@ -430,15 +475,13 @@ function GoalDetailsNameRow({
   setField,
 }: Readonly<{ form: GoalFormState; setField: SetField }>) {
   return (
-    <div className="flex gap-3">
-      <FormField label="Icon" className="w-14 flex-shrink-0">
-        <TextInput
-          className="h-[42px] px-0 text-center text-xl"
-          value={form.emoji}
-          onChange={(value) => setField('emoji', value)}
-          maxLength={2}
-        />
-      </FormField>
+    <div className="flex gap-3 items-end">
+      <EmojiPickerField
+        value={form.emoji}
+        onChange={(emoji) => setField('emoji', emoji)}
+        pickerHeight={350}
+        pickerWidth={280}
+      />
       <FormField label="Goal Name" required className="flex-1">
         <TextInput
           placeholder="e.g. Hit 100k salary"
@@ -446,52 +489,6 @@ function GoalDetailsNameRow({
           onChange={(value) => setField('name', value)}
         />
       </FormField>
-    </div>
-  );
-}
-
-function GoalDetailsDateRow({
-  form,
-  setField,
-}: Readonly<{ form: GoalFormState; setField: SetField }>) {
-  const handleDateChange = (dateStr: string) => {
-    if (!dateStr) return;
-    const deadline = dateStringToDeadline(dateStr);
-    const year = dateStr.split('-')[0];
-    setField('deadline', deadline);
-    setField('year', year);
-  };
-
-  const dateValue = deadlineToDateString(form.deadline);
-
-  return (
-    <FormField label="Deadline">
-      <DateInput value={dateValue} onChange={handleDateChange} />
-    </FormField>
-  );
-}
-
-function GoalDetailsDeadlineContributionRow({
-  form,
-  setField,
-  baseCurrency,
-}: Readonly<{ form: GoalFormState; setField: SetField; baseCurrency: string }>) {
-  const handleDateChange = (dateStr: string) => {
-    if (!dateStr) return;
-    const deadline = dateStringToDeadline(dateStr);
-    const year = dateStr.split('-')[0];
-    setField('deadline', deadline);
-    setField('year', year);
-  };
-
-  const dateValue = deadlineToDateString(form.deadline);
-
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <FormField label="Deadline">
-        <DateInput value={dateValue} onChange={handleDateChange} />
-      </FormField>
-      <MonthlyContributionField form={form} setField={setField} baseCurrency={baseCurrency} />
     </div>
   );
 }
@@ -518,7 +515,47 @@ function GoalColorPicker({
   );
 }
 
-function GoalDetailsStep({
+function GoalTypeStep({
+  onSelect,
+  filterKey,
+}: Readonly<{ onSelect: (type: GoalType) => void; filterKey?: FilterKey }>) {
+  const entries = (Object.entries(GOAL_TYPE_META) as [GoalType, GoalMeta][]).filter(
+    ([, meta]) => !filterKey || filterKey === 'all' || meta.filterKey === filterKey,
+  );
+  return (
+    <div className="p-6">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+        Select goal type
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {entries.map(([goalType, meta]) => {
+          const { Icon, bg, text } = meta;
+          return (
+            <button
+              key={goalType}
+              onClick={() => onSelect(goalType)}
+              className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-left group"
+            >
+              <div
+                className={`w-9 h-9 rounded-xl ${bg} ${text} flex items-center justify-center flex-shrink-0 mt-0.5`}
+              >
+                <Icon size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800 group-hover:text-indigo-700 leading-tight">
+                  {meta.label}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{meta.description}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function GoalDetailsStep({
   type,
   form,
   setField,
@@ -543,6 +580,8 @@ function GoalDetailsStep({
   netWorth: number;
   onBack: () => void;
 }>) {
+  const showSeparateDeadline = type === 'savings' || type === 'annual';
+
   return (
     <div className="p-6 space-y-4">
       <button
@@ -569,15 +608,19 @@ function GoalDetailsStep({
         portfolioTotal={portfolioTotal}
         netWorth={netWorth}
       />
-      {type === 'savings' ? (
-        <GoalDetailsDeadlineContributionRow
-          form={form}
-          setField={setField}
-          baseCurrency={baseCurrency}
-        />
-      ) : (
-        <GoalDetailsDateRow form={form} setField={setField} />
-      )}
+      {showSeparateDeadline &&
+        (type === 'savings' ? (
+          <div className="grid grid-cols-2 gap-3">
+            <DeadlineField form={form} setField={setField} />
+            <MonthlyContributionField
+              form={form}
+              setField={setField}
+              baseCurrency={form.currency || baseCurrency}
+            />
+          </div>
+        ) : (
+          <DeadlineField form={form} setField={setField} />
+        ))}
       <GoalColorPicker selected={form.color} onSelect={(color) => setField('color', color)} />
       <FormField label="Notes" hint="optional">
         <Textarea
@@ -591,7 +634,12 @@ function GoalDetailsStep({
   );
 }
 
-export function AddGoalModal({ onClose, onSave }: Readonly<AddGoalModalProps>) {
+const SINGLE_TYPE_FROM_FILTER: Partial<Record<FilterKey, GoalType>> = {
+  savings: 'savings',
+  career: 'salary',
+};
+
+export function AddGoalModal({ onClose, onSave, initialFilter }: Readonly<AddGoalModalProps>) {
   const {
     baseCurrency,
     convertToBase,
@@ -607,11 +655,25 @@ export function AddGoalModal({ onClose, onSave }: Readonly<AddGoalModalProps>) {
     handleSave,
     setType,
     setStep,
+    saveDisabled,
   } = useAddGoalModal(onSave, onClose);
+
+  const singleType = initialFilter ? SINGLE_TYPE_FROM_FILTER[initialFilter] : undefined;
+  const effectiveStep = singleType ? 'details' : step;
+  const effectiveType = singleType ?? type;
+
   const subtitle =
-    step === 'type'
+    effectiveStep === 'type'
       ? 'Choose a goal type to get started'
-      : `${GOAL_TYPE_META[type].label} - fill in the details`;
+      : `${GOAL_TYPE_META[effectiveType].label} - fill in the details`;
+
+  const handleTypeSelect = (selectedType: GoalType) => {
+    setType(selectedType);
+    if (selectedType !== 'savings') setField('sourceId', '');
+    setStep('details');
+  };
+
+  const filterKey = !singleType && initialFilter !== 'all' ? initialFilter : undefined;
 
   return (
     <Modal
@@ -622,27 +684,21 @@ export function AddGoalModal({ onClose, onSave }: Readonly<AddGoalModalProps>) {
       scrollable
       bodyClassName="p-0 space-y-0"
       footer={
-        step === 'details' ? (
+        effectiveStep === 'details' ? (
           <ModalFooter
             onCancel={onClose}
             onConfirm={handleSave}
             confirmLabel="Save Goal"
-            disabled={!form.name.trim()}
+            disabled={saveDisabled}
           />
         ) : undefined
       }
     >
-      {step === 'type' ? (
-        <GoalTypeStep
-          onSelect={(selectedType) => {
-            setType(selectedType);
-            if (selectedType !== 'savings') setField('sourceId', '');
-            setStep('details');
-          }}
-        />
+      {effectiveStep === 'type' ? (
+        <GoalTypeStep onSelect={handleTypeSelect} filterKey={filterKey} />
       ) : (
         <GoalDetailsStep
-          type={type}
+          type={effectiveType}
           form={form}
           setField={setField}
           baseCurrency={baseCurrency}
@@ -652,7 +708,7 @@ export function AddGoalModal({ onClose, onSave }: Readonly<AddGoalModalProps>) {
           fmtBase={fmtBase}
           portfolioTotal={portfolioTotal}
           netWorth={netWorth}
-          onBack={() => setStep('type')}
+          onBack={singleType ? onClose : () => setStep('type')}
         />
       )}
     </Modal>
