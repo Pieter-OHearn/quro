@@ -1,6 +1,15 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
+All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
+
+## [v0.2.1] - 2026-05-08
+
+- Add goal editing with month-based tracking, including start month and missed month support.
+- Add automatic currency rate syncing and caching backed by the database, with Yahoo Finance sync on startup, scheduled daily refreshes, stale metadata handling, and safer failure behaviour for missing non-EUR rates.
+- Improve session query performance with additional indexes.
+- Improve the iOS web app experience.
+- Fix modal backdrop viewport coverage.
+- Improve salary growth history by showing stacked net pay and deductions when payslip data is available.
 
 ## [v0.2.0] - 2026-05-06
 
