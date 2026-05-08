@@ -1419,8 +1419,8 @@ export function ImportPensionStatementModal({
   const displayFileName = controller.fileName || controller.importQuery.data?.fileName || '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4">
+      <div className="absolute -inset-4 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div
         className={`relative bg-white rounded-2xl shadow-2xl w-full overflow-hidden flex flex-col ${
           reviewLayout ? 'max-w-3xl max-h-[90vh]' : 'max-w-lg'

@@ -126,9 +126,9 @@ export function Modal({
   bodyClassName,
 }: ModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4">
       <div
-        className={cn('absolute inset-0 bg-black/40 backdrop-blur-sm', backdropClassName)}
+        className={cn('absolute -inset-4 bg-black/40 backdrop-blur-sm', backdropClassName)}
         onClick={onClose}
       />
       <div
