@@ -60,7 +60,7 @@ const GOAL_TYPES = [
 
 type GoalType = (typeof GOAL_TYPES)[number];
 
-type GoalPayload = {
+export type GoalPayload = {
   type: GoalType;
   sourceType: GoalSourceType;
   sourceId: number | null;
@@ -156,7 +156,7 @@ function toGoalInsertValues(payload: GoalPayload, userId: number): GoalInsert {
   };
 }
 
-function exceedsGoalDuration(payload: GoalPayload): boolean {
+export function exceedsGoalDuration(payload: GoalPayload): boolean {
   return (
     payload.monthsCompleted != null &&
     payload.totalMonths != null &&
@@ -164,7 +164,7 @@ function exceedsGoalDuration(payload: GoalPayload): boolean {
   );
 }
 
-function validateInvestHabitGoal(payload: GoalPayload): string | null {
+export function validateInvestHabitGoal(payload: GoalPayload): string | null {
   if (payload.type !== 'invest_habit') return null;
   if (payload.monthlyTarget == null || payload.monthlyTarget <= 0) {
     return 'Monthly target must be greater than zero';
@@ -223,7 +223,7 @@ const GOAL_SOURCE_VALIDATORS: Record<GoalSourceType, (payload: GoalPayload) => s
   invest_habit_buys: validateInvestHabitBuysGoalSource,
 };
 
-function validateGoalSource(payload: GoalPayload): string | null {
+export function validateGoalSource(payload: GoalPayload): string | null {
   if (payload.type === 'salary' && payload.sourceType !== 'salary_latest_gross') {
     return 'Salary goals must use the latest salary source';
   }
@@ -259,7 +259,10 @@ function validateGoalPayload(payload: GoalPayload): string | null {
   return validateGoalSource(payload);
 }
 
-function applyGoalSourceDefaults(payload: GoalPayload, body: Record<string, unknown>): GoalPayload {
+export function applyGoalSourceDefaults(
+  payload: GoalPayload,
+  body: Record<string, unknown>,
+): GoalPayload {
   if ('sourceType' in body) return payload;
   if (payload.type === 'salary') {
     return { ...payload, sourceType: 'salary_latest_gross', sourceId: null };
@@ -276,7 +279,7 @@ function applyGoalSourceDefaults(payload: GoalPayload, body: Record<string, unkn
   return payload;
 }
 
-function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
+export function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return err('Invalid goal payload');
   }
@@ -291,7 +294,7 @@ function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
   return validationError ? err(validationError) : ok(value);
 }
 
-function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>> {
+export function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return err('Invalid goal payload');
   }
@@ -312,7 +315,7 @@ async function getOwnedGoal(goalId: number, userId: number) {
   return goal ?? null;
 }
 
-function mergeGoalPayload(
+export function mergeGoalPayload(
   patch: Partial<GoalPayload>,
   existing: typeof goals.$inferSelect,
 ): ParseResult<GoalPayload> {
