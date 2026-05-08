@@ -716,13 +716,24 @@ export const categoryMappings = pgTable(
 
 // ── Currency ─────────────────────────────────────────────────────────────────
 
-export const currencyRates = pgTable('currency_rates', {
-  id: serial('id').primaryKey(),
-  fromCurrency: currencyCodeEnum('from_currency').notNull(),
-  toCurrency: currencyCodeEnum('to_currency').notNull(),
-  rate: numeric('rate', { precision: 12, scale: 6 }).notNull(),
-  updatedAt: text('updated_at').notNull(),
-});
+export const currencyRates = pgTable(
+  'currency_rates',
+  {
+    id: serial('id').primaryKey(),
+    fromCurrency: currencyCodeEnum('from_currency').notNull(),
+    toCurrency: currencyCodeEnum('to_currency').notNull(),
+    rate: numeric('rate', { precision: 12, scale: 6 }).notNull(),
+    provider: text('provider').notNull(),
+    sourceDate: date('source_date', { mode: 'string' }).notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    fromToUnique: uniqueIndex('currency_rates_from_to_unique').on(
+      table.fromCurrency,
+      table.toCurrency,
+    ),
+  }),
+);
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 

@@ -8,6 +8,7 @@ const DEFAULT_DEMO_PASSWORD = 'password123';
 
 // Approximate rates to EUR (2026 Q1). Used only when the table is empty so
 // the frontend's currency-rates gate doesn't block CI smoke tests.
+const SEED_RATE_PROVIDER = 'seed';
 const SEED_RATES = [
   { fromCurrency: 'GBP' as const, toCurrency: 'EUR' as const, rate: '1.18' },
   { fromCurrency: 'USD' as const, toCurrency: 'EUR' as const, rate: '0.92' },
@@ -22,8 +23,16 @@ async function ensureCurrencyRates(db: ReturnType<typeof createDb>['db']): Promi
   const [existing] = await db.select({ id: currencyRates.id }).from(currencyRates).limit(1);
   if (existing) return;
 
-  const updatedAt = new Date().toISOString().slice(0, 10);
-  await db.insert(currencyRates).values(SEED_RATES.map((r) => ({ ...r, updatedAt })));
+  const updatedAt = new Date();
+  const sourceDate = updatedAt.toISOString().slice(0, 10);
+  await db.insert(currencyRates).values(
+    SEED_RATES.map((r) => ({
+      ...r,
+      provider: SEED_RATE_PROVIDER,
+      sourceDate,
+      updatedAt,
+    })),
+  );
   console.log(`Seeded ${SEED_RATES.length} currency rates.`);
 }
 

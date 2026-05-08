@@ -44,6 +44,7 @@
     "esbuild": ">=0.25.0",
     "eslint-plugin-import/minimatch/brace-expansion": "1.1.13",
     "eslint-plugin-react/minimatch/brace-expansion": "1.1.13",
+    "fast-xml-builder": "1.2.0",
     "fast-xml-parser": "5.7.0",
     "flatted": "3.4.2",
     "follow-redirects": "1.16.0",
@@ -52,17 +53,17 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
-    "@typescript-eslint/eslint-plugin": "^8.58.1",
-    "@typescript-eslint/parser": "^8.58.1",
-    "eslint": "^10.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-sonarjs": "^4.0.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-sonarjs": "^4.0.3",
     "eslint-plugin-unicorn": "^64.0.0",
     "eslint-plugin-unused-imports": "^4.4.1",
-    "prettier": "^3.8.2",
-    "typescript": "^6.0.2"
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
   }
 }

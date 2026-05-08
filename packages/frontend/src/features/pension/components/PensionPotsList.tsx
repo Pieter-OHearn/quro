@@ -120,7 +120,7 @@ function PensionPotDetails({
           <Info size={13} className="mt-0.5 flex-shrink-0" />
           <span>
             This pot is held in <strong>{pot.currency}</strong>. The {baseCurrency} equivalent uses
-            the server-backed FX rates currently loaded in Quro.
+            the synced FX rates currently loaded in Quro.
           </span>
         </div>
       )}

@@ -47,10 +47,10 @@ type CurrencyDropdownProps = {
 };
 
 function formatRatesUpdatedAt(updatedAt: string | null): string {
-  if (!updatedAt) return 'Server-backed FX rates';
+  if (!updatedAt) return 'Synced FX rates';
 
   const parsed = new Date(updatedAt);
-  if (Number.isNaN(parsed.getTime())) return 'Server-backed FX rates';
+  if (Number.isNaN(parsed.getTime())) return 'Synced FX rates';
 
   return `Rates updated ${parsed.toLocaleString('en-GB', {
     day: 'numeric',

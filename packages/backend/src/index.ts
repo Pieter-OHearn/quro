@@ -27,6 +27,7 @@ import {
 import { startSessionCleanup } from './lib/sessionCleanup';
 import { startBunqSyncScheduler } from './lib/bunqSyncScheduler';
 import { startHoldingPriceSyncScheduler } from './lib/holdingPriceSyncScheduler';
+import { startCurrencyRateSyncScheduler } from './lib/currencyRateSyncScheduler';
 
 export const app = new Hono();
 
@@ -85,6 +86,7 @@ app.route('/api/bunq', bunq);
 startSessionCleanup();
 startBunqSyncScheduler();
 startHoldingPriceSyncScheduler();
+startCurrencyRateSyncScheduler();
 
 export default {
   port: parseInt(process.env.PORT || '3000'),

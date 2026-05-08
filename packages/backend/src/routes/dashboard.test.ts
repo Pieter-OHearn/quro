@@ -19,6 +19,21 @@ describe('dashboard debt integration helpers', () => {
     expect(summary.debtCount).toBe(1);
   });
 
+  test('does not silently convert missing FX rates as 1:1', () => {
+    expect(() =>
+      computeDerivedAllocations(
+        new Map([['EUR', 1]]),
+        [{ id: 1, balance: '1500', currency: 'GBP' }] as any,
+        [] as any,
+        [] as any,
+        [] as any,
+        [] as any,
+        [] as any,
+        [] as any,
+      ),
+    ).toThrow('Missing FX rate for GBP -> EUR');
+  });
+
   test('subtracts non-mortgage debts from historical and current net worth', () => {
     const today = new Date();
     const todayIso = today.toISOString().slice(0, 10);

@@ -7,7 +7,7 @@ import { CurrencyRatesUnavailableError } from './useCurrencyRates';
 test('uses the FX fallback only for genuine currency-rate availability errors', () => {
   expect(
     getCurrencyRatesFailureMode(
-      new CurrencyRatesUnavailableError('Missing server-backed FX rates for: CHF'),
+      new CurrencyRatesUnavailableError('Missing synced FX rates for: CHF'),
     ),
   ).toBe('fx-unavailable');
 });

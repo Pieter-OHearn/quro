@@ -3,7 +3,6 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   budgetTransactions,
-  currencyRates,
   debtPayments,
   debts,
   holdingTransactions,
@@ -19,9 +18,11 @@ import {
   savingsTransactions,
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { convertToBaseCurrency, FX_BASE_CURRENCY } from '../lib/currencyRateCache';
+import { getCurrentRatesToBaseCurrency } from '../lib/currencyRateSync';
 
 const app = new Hono();
-const BASE_CURRENCY = 'EUR';
+const BASE_CURRENCY = FX_BASE_CURRENCY;
 const NET_WORTH_HISTORY_MONTHS = 7;
 
 const toNumber = (value: unknown): number => {
@@ -62,23 +63,12 @@ function formatMonthShort(monthStart: number): string {
   return new Date(monthStart).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
 }
 
-async function getRatesToBaseCurrency() {
-  const rows = await db
-    .select({ fromCurrency: currencyRates.fromCurrency, rate: currencyRates.rate })
-    .from(currencyRates)
-    .where(eq(currencyRates.toCurrency, BASE_CURRENCY));
-
-  const rates = new Map<string, number>();
-  for (const row of rows) {
-    rates.set(row.fromCurrency, toNumber(row.rate));
-  }
-  rates.set(BASE_CURRENCY, 1);
-  return rates;
+function getRatesToBaseCurrency(): Promise<Map<string, number>> {
+  return getCurrentRatesToBaseCurrency(BASE_CURRENCY);
 }
 
 const convertToBase = (amount: number, currency: string, rates: Map<string, number>) => {
-  const rate = rates.get(currency) ?? 1;
-  return amount * rate;
+  return convertToBaseCurrency(amount, currency, rates);
 };
 
 type DerivedAllocation = {
@@ -603,11 +593,7 @@ async function safeLoad<T>(label: string, query: Promise<T>, fallback: T): Promi
 }
 
 async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceData> {
-  const rates = await safeLoad(
-    'currency rates',
-    getRatesToBaseCurrency(),
-    new Map([[BASE_CURRENCY, 1]]),
-  );
+  const rates = await getRatesToBaseCurrency();
   const [
     savings,
     savingsTransactionsData,

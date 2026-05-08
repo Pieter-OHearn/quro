@@ -84,9 +84,9 @@ function CurrencyRatesFallback({ detail, onRetry }: Readonly<CurrencyRatesFallba
           Converted balances are paused
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Quro could not load the server-backed FX rates required to render converted totals safely.
-          Native balances remain stored, but cross-currency views stay blocked until the rate source
-          is available again.
+          Quro could not load the synced FX rates required to render converted totals safely. Native
+          balances remain stored, but cross-currency views stay blocked until the rate source is
+          available again.
         </p>
         {detail ? (
           <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
@@ -120,7 +120,7 @@ function renderCurrencyRatesGate(
   ratesQuery: CurrencyRatesQueryState,
 ): ReactNode | null {
   if (hasUser && !authLoading && ratesQuery.isPending) {
-    return <LoadingSpinner className="min-h-screen" label="Loading server-backed currency rates" />;
+    return <LoadingSpinner className="min-h-screen" label="Loading synced currency rates" />;
   }
 
   if (hasUser && ratesQuery.isError) {
@@ -137,7 +137,7 @@ function renderCurrencyRatesGate(
 
     throw ratesQuery.error instanceof Error
       ? ratesQuery.error
-      : new Error('Failed to load server-backed currency rates');
+      : new Error('Failed to load synced currency rates');
   }
 
   return null;
@@ -192,7 +192,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
     const converted = convertCurrencyAmount(amount, safeCurrency, baseCurrency, table);
     if (converted === null) {
-      throw new Error(`Missing server-backed FX rate for ${safeCurrency} -> ${baseCurrency}`);
+      throw new Error(`Missing synced FX rate for ${safeCurrency} -> ${baseCurrency}`);
     }
 
     return converted;

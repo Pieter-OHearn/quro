@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { useAuth } from './AuthContext';
 import { api } from './api';
 import {
@@ -8,6 +9,7 @@ import {
 } from './currencyRates';
 
 export const CURRENCY_RATES_QUERY_KEY = ['currency', 'rates'] as const;
+const SERVICE_UNAVAILABLE_STATUS = 503;
 
 export class CurrencyRatesUnavailableError extends Error {
   constructor(message: string) {
@@ -34,15 +36,30 @@ export function useCurrencyRates() {
     queryKey: CURRENCY_RATES_QUERY_KEY,
     enabled: Boolean(user),
     queryFn: async (): Promise<CurrencyRateTable> => {
-      const { data } = await api.get('/api/currency/rates');
-      if (!Array.isArray(data?.data)) {
+      let data: unknown;
+      try {
+        const response = await api.get('/api/currency/rates');
+        data = response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === SERVICE_UNAVAILABLE_STATUS) {
+          const message =
+            typeof error.response.data?.error === 'string'
+              ? error.response.data.error
+              : 'Currency rates are unavailable';
+          throw new CurrencyRatesUnavailableError(message);
+        }
+        throw error;
+      }
+
+      const payload = data as { data?: unknown };
+      if (!Array.isArray(payload.data)) {
         throw new CurrencyRatesUnavailableError('Invalid currency rates response');
       }
 
-      const table = createCurrencyRateTable(data.data as CurrencyRateApiRow[]);
+      const table = createCurrencyRateTable(payload.data as CurrencyRateApiRow[]);
       if (table.missingCurrencies.length > 0) {
         throw new CurrencyRatesUnavailableError(
-          `Missing server-backed FX rates for: ${table.missingCurrencies.join(', ')}`,
+          `Missing synced FX rates for: ${table.missingCurrencies.join(', ')}`,
         );
       }
 
