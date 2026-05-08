@@ -57,7 +57,7 @@ export const resolveGoalCurrentAmount = (
       currentAmount: context.annualGross,
       sourceType,
       status: 'linked',
-      label: 'Latest payslip gross',
+      label: 'Year-to-date gross',
     };
   }
 
@@ -207,12 +207,59 @@ const buildSalaryPayload = (base: CreateGoalInput, form: GoalFormState): CreateG
   return base;
 };
 
+const monthNames = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function deadlineStringToYearMonth(deadline: string): { year: number; month: number } | null {
+  const match = deadline.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!match) return null;
+  const month = monthNames.indexOf(match[1]);
+  if (month === -1) return null;
+  return { year: Number(match[2]), month };
+}
+
+function monthsBetweenDeadlines(startDeadline: string, endDeadline: string): number {
+  const start = deadlineStringToYearMonth(startDeadline);
+  const end = deadlineStringToYearMonth(endDeadline);
+  if (!start || !end) return 12;
+  return Math.max(1, (end.year - start.year) * 12 + (end.month - start.month) + 1);
+}
+
+function dateStringToDeadline(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr + 'T00:00:00Z');
+  const month = monthNames[date.getUTCMonth()];
+  const year = date.getUTCFullYear();
+  return `${month} ${year}`;
+}
+
 const buildInvestHabitPayload = (base: CreateGoalInput, form: GoalFormState): CreateGoalInput => {
   base.sourceType = 'invest_habit_buys';
   base.sourceId = null;
   base.monthlyTarget = Number.parseFloat(form.monthlyTarget) || 0;
-  base.monthsCompleted = 0;
-  base.totalMonths = Number.parseInt(form.totalMonths, 10) || 12;
+  base.monthsCompleted = base.monthsCompleted ?? 0;
+
+  const startDeadline = form.startMonth ? dateStringToDeadline(form.startMonth) : null;
+  base.startMonth = startDeadline;
+
+  if (startDeadline && base.deadline) {
+    base.totalMonths = monthsBetweenDeadlines(startDeadline, base.deadline);
+  } else {
+    base.totalMonths = Number.parseInt(form.totalMonths, 10) || 12;
+  }
+
   return base;
 };
 

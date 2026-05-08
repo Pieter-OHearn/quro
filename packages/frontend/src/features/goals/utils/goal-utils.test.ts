@@ -217,7 +217,7 @@ test('normalizes missing source type to salary_latest_gross for salary goals', (
   expect(resolveGoalCurrentAmount(goal, baseContext)).toMatchObject({
     currentAmount: 84000,
     status: 'linked',
-    label: 'Latest payslip gross',
+    label: 'Year-to-date gross',
   });
 });
 

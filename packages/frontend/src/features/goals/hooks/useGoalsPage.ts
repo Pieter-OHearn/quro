@@ -5,7 +5,7 @@ import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useHoldingTransactions } from '@/features/investments/hooks';
 import { usePayslips } from '@/features/salary/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
-import type { FilterKey, GoalsPageState } from '../types';
+import type { FilterKey, GoalsPageState, UpdateGoalInput } from '../types';
 import { useCreateGoal } from './useCreateGoal';
 import { useDeleteGoal } from './useDeleteGoal';
 import { useGoals } from './useGoals';
@@ -27,6 +27,7 @@ export function useGoalsPage(): GoalsPageState {
   const [activeYear, setActiveYear] = useState(currentYear);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [showAdd, setShowAdd] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
   const { annualGross, goalProgressContext, years, yearGoals, filteredGoals, stats } =
     useGoalsComputations(
@@ -42,13 +43,9 @@ export function useGoalsPage(): GoalsPageState {
       setActiveYear,
     );
 
-  const handleDelete = (id: number) => {
-    deleteGoal.mutate(id);
-  };
-
-  const handleAddGoal = (goal: Omit<Goal, 'id'>) => {
-    createGoal.mutate(goal);
-  };
+  const handleDelete = (id: number) => deleteGoal.mutate(id);
+  const handleAddGoal = (goal: Omit<Goal, 'id'>) => createGoal.mutate(goal);
+  const handleUpdateGoal = (input: UpdateGoalInput) => updateGoal.mutate(input);
 
   const handleUpdateMonths = (id: number, delta: number) => {
     const goal = goals.find((item) => item.id === id);
@@ -61,6 +58,16 @@ export function useGoalsPage(): GoalsPageState {
         Math.min((goal.monthsCompleted ?? 0) + delta, goal.totalMonths ?? 12),
       ),
     });
+  };
+
+  const handleToggleMissedMonth = (goalId: number, monthKey: string) => {
+    const goal = goals.find((g) => g.id === goalId);
+    if (!goal) return;
+    const current = goal.missedMonths ?? [];
+    const updated = current.includes(monthKey)
+      ? current.filter((m) => m !== monthKey)
+      : [...current, monthKey];
+    updateGoal.mutate({ id: goalId, missedMonths: updated });
   };
 
   return {
@@ -76,6 +83,8 @@ export function useGoalsPage(): GoalsPageState {
     setActiveFilter,
     showAdd,
     setShowAdd,
+    editingGoal,
+    setEditingGoal,
     annualGross,
     goalProgressContext,
     years,
@@ -85,5 +94,7 @@ export function useGoalsPage(): GoalsPageState {
     handleDelete,
     handleUpdateMonths,
     handleAddGoal,
+    handleUpdateGoal,
+    handleToggleMissedMonth,
   };
 }

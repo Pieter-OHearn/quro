@@ -12,6 +12,7 @@ import { normalizeGoalType, parseGoalYear } from '../utils/goal-utils';
 
 type SalaryPoint = {
   gross: number;
+  bonus: number | null;
   date: string;
   currency: string;
 };
@@ -66,11 +67,14 @@ export function useGoalsComputations(
   setActiveYear: (year: number) => void,
 ): GoalsComputations {
   const annualGross = useMemo(() => {
-    if (payslips.length === 0) return 0;
-    const latest = [...payslips].sort((a, b) => b.date.localeCompare(a.date))[0];
-    if (!latest) return 0;
-    return convertToBase(latest.gross * 12, latest.currency);
-  }, [convertToBase, payslips]);
+    const yearPayslips = payslips.filter(
+      (p) => new Date(p.date + 'T00:00:00Z').getUTCFullYear() === currentYear,
+    );
+    return yearPayslips.reduce(
+      (sum, p) => sum + convertToBase(p.gross + (p.bonus ?? 0), p.currency),
+      0,
+    );
+  }, [convertToBase, payslips, currentYear]);
 
   const { portfolioTotal, netWorth } = useMemo(
     () => computeAllocationsContext(allocations, convertToBase),

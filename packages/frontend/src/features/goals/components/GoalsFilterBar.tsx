@@ -5,6 +5,8 @@ import type { FilterKey } from '../types';
 import { FILTERS, GOAL_TYPE_META } from '../utils/goals-constants';
 import { normalizeGoalType, parseGoalYear } from '../utils/goal-utils';
 
+const FILTER_HAS_SINGLE_TYPE = new Set<FilterKey>(['savings', 'career']);
+
 type FilterCountBadgeProps = {
   filterKey: FilterKey;
   activeFilter: FilterKey;
@@ -41,7 +43,7 @@ type GoalsFilterBarProps = {
   currentYear: number;
   goals: readonly Goal[];
   onFilterChange: (key: FilterKey) => void;
-  onAdd: () => void;
+  onAdd: (filter?: FilterKey) => void;
 };
 
 export function GoalsFilterBar({
@@ -52,6 +54,10 @@ export function GoalsFilterBar({
   onFilterChange,
   onAdd,
 }: Readonly<GoalsFilterBarProps>) {
+  const handleAdd = () => {
+    onAdd(activeFilter !== 'all' ? activeFilter : undefined);
+  };
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <SegmentedControl
@@ -77,10 +83,13 @@ export function GoalsFilterBar({
       <div className="flex-1" />
       <button
         type="button"
-        onClick={onAdd}
+        onClick={handleAdd}
         className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl transition-colors"
       >
-        <Plus size={15} /> Add Goal
+        <Plus size={15} />
+        {FILTER_HAS_SINGLE_TYPE.has(activeFilter)
+          ? `Add ${FILTERS.find((f) => f.key === activeFilter)?.label ?? ''} Goal`
+          : 'Add Goal'}
       </button>
     </div>
   );

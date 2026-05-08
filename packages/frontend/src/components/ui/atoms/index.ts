@@ -3,6 +3,7 @@ export * from './Button';
 export * from './Card';
 export * from './CurrencyInput';
 export * from './DateInput';
+export * from './MonthInput';
 export * from './IconButton';
 export * from './LoadingSpinner';
 export * from './PasswordInput';

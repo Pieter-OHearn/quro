@@ -611,6 +611,8 @@ export const goals = pgTable(
     color: text('color'),
     notes: text('notes'),
     currency: currencyCodeEnum('currency').default('EUR').notNull(),
+    startMonth: text('start_month'),
+    missedMonths: jsonb('missed_months').$type<string[]>(),
   },
   (table) => ({
     userIdx: index('goals_user_id_idx').on(table.userId),

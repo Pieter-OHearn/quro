@@ -46,6 +46,8 @@ const GOAL_FIELDS = [
   'color',
   'notes',
   'currency',
+  'startMonth',
+  'missedMonths',
 ] as const;
 const GOAL_TYPES = [
   'savings',
@@ -77,6 +79,8 @@ type GoalPayload = {
   color: string | null;
   notes: string | null;
   currency: 'EUR' | 'GBP' | 'USD' | 'AUD' | 'NZD' | 'CAD' | 'CHF' | 'SGD';
+  startMonth: string | null;
+  missedMonths: string[] | null;
 };
 
 type GoalInsert = typeof goals.$inferInsert;
@@ -117,6 +121,13 @@ const goalParsers: FieldParsers<GoalPayload> = {
   color: (value) => parseOptionalTextField(value, 'Goal color must be a string'),
   notes: (value) => parseOptionalTextField(value, 'Goal notes must be a string'),
   currency: parseCurrencyField,
+  startMonth: (value) => parseOptionalTextField(value, 'Start month must be a string'),
+  missedMonths: (value) => {
+    if (value == null) return ok(null);
+    if (Array.isArray(value) && value.every((item) => typeof item === 'string'))
+      return ok(value as string[]);
+    return err('Missed months must be an array of strings');
+  },
 };
 
 function toGoalInsertValues(payload: GoalPayload, userId: number): GoalInsert {
@@ -140,6 +151,8 @@ function toGoalInsertValues(payload: GoalPayload, userId: number): GoalInsert {
     color: payload.color,
     notes: payload.notes,
     currency: payload.currency,
+    startMonth: payload.startMonth,
+    missedMonths: payload.missedMonths,
   };
 }
 
@@ -329,6 +342,11 @@ function mergeGoalPayload(
     color: pickPatchedValue(patch.color, existing.color),
     notes: pickPatchedValue(patch.notes, existing.notes),
     currency: pickPatchedValue(patch.currency, existing.currency),
+    startMonth: pickPatchedValue(patch.startMonth, existing.startMonth),
+    missedMonths:
+      patch.missedMonths === undefined
+        ? (existing.missedMonths as string[] | null)
+        : patch.missedMonths,
   });
 }
 
