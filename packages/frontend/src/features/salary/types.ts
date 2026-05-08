@@ -15,6 +15,7 @@ export type SalaryStatCard = {
 export type SalaryChartEntry = {
   year: string;
   gross: number;
+  net: number;
 };
 
 export type SalaryHistoryEntry = Pick<SalaryHistory, 'year' | 'annualSalary' | 'currency'>;
