@@ -18,6 +18,7 @@ import { sessions, users } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { publicUserColumns } from '../lib/users';
+import { changePasswordRateLimit } from '../middleware/rateLimit';
 
 const app = new Hono();
 
@@ -218,7 +219,7 @@ app.put('/preferences', async (c) => {
   return c.json({ data });
 });
 
-app.put('/password', async (c) => {
+app.put('/password', changePasswordRateLimit, async (c) => {
   const authUser = getAuthUser(c);
   const currentSessionId = getCookie(c, 'session') ?? '';
   const parsed = parsePasswordPayload(await c.req.json());
