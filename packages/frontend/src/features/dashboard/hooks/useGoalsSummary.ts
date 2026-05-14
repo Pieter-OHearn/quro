@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { normalizeGoal, type ApiGoal } from './goal-normalizer';
+import { normalizeGoal } from '@/features/goals/hooks/goal-normalizer';
+import type { ApiGoal } from '@/features/goals/types';
 
 export function useGoalsSummary() {
   return useQuery({
