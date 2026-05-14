@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { Debt, DebtPayment } from '@quro/shared';
-import { LoadingState, PageStack } from '@/components/ui';
+import { ArchiveOrDeleteDialog, LoadingState, PageStack } from '@/components/ui';
 import { DebtFormModal } from './components/DebtFormModal';
 import { DebtPaymentModal } from './components/DebtPaymentModal';
+import { DebtsArchivedSection } from './components/DebtsArchivedSection';
 import { DebtsPageLayout } from './components/DebtsPageLayout';
 import {
   useCreateDebt,
@@ -79,9 +80,9 @@ function DebtModals({
   );
 }
 
-export function Debts() {
-  const { data: debts = [], isLoading: loadingDebts } = useDebts();
-  const { data: payments = [], isLoading: loadingPayments } = useDebtPayments();
+function useDebtsPageState() {
+  const debtsQuery = useDebts();
+  const paymentsQuery = useDebtPayments();
   const createDebt = useCreateDebt();
   const updateDebt = useUpdateDebt();
   const deleteDebt = useDeleteDebt();
@@ -93,34 +94,50 @@ export function Debts() {
   const [debtModalOpen, setDebtModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [paymentDebt, setPaymentDebt] = useState<Debt | null>(null);
-  const { filteredDebts, paymentsByDebtId } = useDebtCollections(debts, payments, filter);
+  const [debtPendingDelete, setDebtPendingDelete] = useState<Debt | null>(null);
 
-  const openAddDebtModal = () => {
-    setEditingDebt(null);
-    setDebtModalOpen(true);
+  return {
+    debtsQuery,
+    paymentsQuery,
+    createDebt,
+    updateDebt,
+    deleteDebt,
+    createDebtPayment,
+    deleteDebtPayment,
+    expandedDebtId,
+    setExpandedDebtId,
+    filter,
+    setFilter,
+    debtModalOpen,
+    setDebtModalOpen,
+    editingDebt,
+    setEditingDebt,
+    paymentDebt,
+    setPaymentDebt,
+    debtPendingDelete,
+    setDebtPendingDelete,
   };
+}
 
-  const openEditDebtModal = (debt: Debt) => {
-    setEditingDebt(debt);
-    setDebtModalOpen(true);
-  };
-
-  const closeDebtModal = () => {
-    setDebtModalOpen(false);
-    setEditingDebt(null);
-  };
+export function Debts() {
+  const state = useDebtsPageState();
+  const debts = state.debtsQuery.data ?? [];
+  const payments = state.paymentsQuery.data ?? [];
+  const { filteredDebts, paymentsByDebtId } = useDebtCollections(debts, payments, state.filter);
 
   const handleSaveDebt = async (payload: CreateDebtPayload, debtId?: number) => {
-    if (debtId != null) await updateDebt.mutateAsync({ id: debtId, ...payload });
-    else await createDebt.mutateAsync(payload);
+    if (debtId != null) await state.updateDebt.mutateAsync({ id: debtId, ...payload });
+    else await state.createDebt.mutateAsync(payload);
   };
 
-  const handleDeleteDebt = (debtId: number) => {
-    if (expandedDebtId === debtId) setExpandedDebtId(null);
-    deleteDebt.mutate(debtId);
+  const confirmDeleteDebt = (mode: 'preservePayments' | 'deletePayments') => {
+    if (!state.debtPendingDelete) return;
+    if (state.expandedDebtId === state.debtPendingDelete.id) state.setExpandedDebtId(null);
+    state.deleteDebt.mutate({ id: state.debtPendingDelete.id, mode });
+    state.setDebtPendingDelete(null);
   };
 
-  if (loadingDebts || loadingPayments) return <LoadingState compact />;
+  if (state.debtsQuery.isLoading || state.paymentsQuery.isLoading) return <LoadingState compact />;
 
   return (
     <PageStack>
@@ -128,29 +145,55 @@ export function Debts() {
         debts={debts}
         filteredDebts={filteredDebts}
         paymentsByDebtId={paymentsByDebtId}
-        filter={filter}
-        expandedDebtId={expandedDebtId}
-        onFilterChange={setFilter}
-        onAddDebt={openAddDebtModal}
+        filter={state.filter}
+        expandedDebtId={state.expandedDebtId}
+        onFilterChange={state.setFilter}
+        onAddDebt={() => {
+          state.setEditingDebt(null);
+          state.setDebtModalOpen(true);
+        }}
         onToggleDebt={(debtId) =>
-          setExpandedDebtId((current) => (current === debtId ? null : debtId))
+          state.setExpandedDebtId((current) => (current === debtId ? null : debtId))
         }
-        onEditDebt={openEditDebtModal}
-        onDeleteDebt={handleDeleteDebt}
-        onLogPayment={setPaymentDebt}
-        onDeletePayment={(id) => deleteDebtPayment.mutate(id)}
+        onEditDebt={(debt) => {
+          state.setEditingDebt(debt);
+          state.setDebtModalOpen(true);
+        }}
+        onDeleteDebt={(debtId) => {
+          const target = debts.find((entry) => entry.id === debtId);
+          if (target) state.setDebtPendingDelete(target);
+        }}
+        onLogPayment={state.setPaymentDebt}
+        onDeletePayment={(id) => state.deleteDebtPayment.mutate(id)}
       />
       <DebtModals
-        debtModalOpen={debtModalOpen}
-        editingDebt={editingDebt}
-        paymentDebt={paymentDebt}
-        onCloseDebtModal={closeDebtModal}
-        onClosePaymentModal={() => setPaymentDebt(null)}
+        debtModalOpen={state.debtModalOpen}
+        editingDebt={state.editingDebt}
+        paymentDebt={state.paymentDebt}
+        onCloseDebtModal={() => {
+          state.setDebtModalOpen(false);
+          state.setEditingDebt(null);
+        }}
+        onClosePaymentModal={() => state.setPaymentDebt(null)}
         onSaveDebt={handleSaveDebt}
         onCreatePayment={async (payload) => {
-          await createDebtPayment.mutateAsync(payload);
+          await state.createDebtPayment.mutateAsync(payload);
         }}
       />
+      {state.debtPendingDelete ? (
+        <ArchiveOrDeleteDialog
+          entityLabel="Debt"
+          entityName={state.debtPendingDelete.name}
+          balance={state.debtPendingDelete.remainingBalance}
+          balanceCurrency={state.debtPendingDelete.currency}
+          balanceLabel="outstanding balance"
+          childrenLabel="payment history"
+          onArchive={() => confirmDeleteDebt('preservePayments')}
+          onDelete={() => confirmDeleteDebt('deletePayments')}
+          onCancel={() => state.setDebtPendingDelete(null)}
+        />
+      ) : null}
+      <DebtsArchivedSection />
     </PageStack>
   );
 }

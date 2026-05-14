@@ -3,6 +3,7 @@ import type { Mortgage as MortgageType } from '@quro/shared';
 import { EmptyState, LoadingState } from '@/components/ui';
 import {
   AddMortgageModal,
+  MortgageArchivedSection,
   MortgageCharts,
   MortgageHeroCard,
   MortgageModals,
@@ -31,7 +32,7 @@ function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
           onSave={state.handleSaveMortgage}
         />
       )}
-      <div className="min-h-[70vh] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <EmptyState
           icon={Home}
           title="No mortgages yet"
@@ -42,6 +43,7 @@ function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
           }}
         />
       </div>
+      <MortgageArchivedSection />
     </div>
   );
 }
@@ -123,6 +125,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
         onDelete={state.handleDeleteTxn}
       />
       <MortgageTips mortgage={mortgage} fmt={state.fmt} overpaymentImpact={overpaymentImpact} />
+      <MortgageArchivedSection />
     </div>
   );
 }

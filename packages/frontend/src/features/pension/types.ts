@@ -98,7 +98,7 @@ export type UpdatePensionImportRowPayload = Partial<
 >;
 
 export type DeletePotMutation = {
-  mutate: (id: number) => void;
+  mutate: (input: { id: number; mode?: 'preserveTransactions' | 'deleteTransactions' }) => void;
 };
 
 export type SavePensionTransactionInput = Omit<PensionTransaction, 'id'> & { id?: number };

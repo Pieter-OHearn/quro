@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { Check, Loader2, Search, Trash2 } from 'lucide-react';
 import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
-import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
+import {
+  ArchiveOrDeleteDialog,
+  Modal,
+  ModalFooter,
+  FormField,
+  SelectInput,
+  TextInput,
+} from '@/components/ui';
 import {
   ITEM_TYPE_LABELS,
   TICKER_ITEM_TYPES,
@@ -10,9 +17,12 @@ import {
   type TickerLookupResult,
 } from '@quro/shared';
 import { useTickerLookup } from '../hooks/useTickerLookup';
+import type { DeleteHoldingMode } from '../hooks/useDeleteHolding';
 
 type EditHoldingModalProps = {
   existing?: Holding;
+  /** Current native-currency value of the holding (shares × price), if known. */
+  currentValue?: number | null;
   onClose: () => void;
   onSave: (
     h: Holding,
@@ -23,7 +33,7 @@ type EditHoldingModalProps = {
       priceUpdatedAt?: string | null;
     },
   ) => void;
-  onDelete?: (id: number) => void;
+  onDelete?: (id: number, mode: DeleteHoldingMode) => void;
 };
 
 type HoldingForm = {
@@ -383,18 +393,15 @@ function buildInitialForm(existing: Holding | undefined): HoldingForm {
 
 function buildDeleteButton(
   existing: Holding | undefined,
-  onDelete: ((id: number) => void) | undefined,
-  onClose: () => void,
+  onDelete: ((id: number, mode: DeleteHoldingMode) => void) | undefined,
+  onRequestConfirm: () => void,
 ): React.ReactNode {
   if (!existing || !onDelete) return undefined;
   return (
     <button
-      onClick={() => {
-        onDelete(existing.id);
-        onClose();
-      }}
+      onClick={onRequestConfirm}
       className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-      title="Delete holding"
+      title="Remove holding"
     >
       <Trash2 size={14} />
     </button>
@@ -480,7 +487,114 @@ function PriceControlsSection({
   );
 }
 
-export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHoldingModalProps) {
+function HoldingDeleteDialog({
+  existing,
+  currentValue,
+  onDelete,
+  onCancel,
+  onClose,
+}: Readonly<{
+  existing: Holding;
+  currentValue: number | null | undefined;
+  onDelete: (id: number, mode: DeleteHoldingMode) => void;
+  onCancel: () => void;
+  onClose: () => void;
+}>) {
+  return (
+    <ArchiveOrDeleteDialog
+      entityLabel="Holding"
+      entityName={existing.name}
+      balance={currentValue ?? null}
+      balanceCurrency={existing.currency}
+      balanceLabel="value"
+      childrenLabel="buy and sell history"
+      onArchive={() => {
+        onDelete(existing.id, 'preserveTransactions');
+        onCancel();
+        onClose();
+      }}
+      onDelete={() => {
+        onDelete(existing.id, 'deleteTransactions');
+        onCancel();
+        onClose();
+      }}
+      onCancel={onCancel}
+    />
+  );
+}
+
+function HoldingModalBody({
+  isNew,
+  form,
+  errors,
+  searchTicker,
+  onSearchTickerChange,
+  onFind,
+  tickerLookup,
+  set,
+  onToggleExcludeFromSync,
+}: Readonly<{
+  isNew: boolean;
+  form: HoldingForm;
+  errors: Record<string, string>;
+  searchTicker: string;
+  onSearchTickerChange: (value: string) => void;
+  onFind: () => void;
+  tickerLookup: ReturnType<typeof useTickerLookup>;
+  set: (field: string, value: string) => void;
+  onToggleExcludeFromSync: (value: boolean) => void;
+}>) {
+  return (
+    <>
+      {isNew && (
+        <TickerSearch
+          searchTicker={searchTicker}
+          onSearchTickerChange={onSearchTickerChange}
+          onFind={onFind}
+          isLoading={tickerLookup.isLoading}
+          error={tickerLookup.error}
+          foundName={tickerLookup.data?.name ?? null}
+        />
+      )}
+      <HoldingBaseFields form={form} errors={errors} onChange={set} />
+      <PriceControlsSection
+        form={form}
+        onChange={set}
+        onToggleExcludeFromSync={onToggleExcludeFromSync}
+      />
+      {isNew && (
+        <InitialBuySection form={form} errors={errors} currency={form.currency} onChange={set} />
+      )}
+    </>
+  );
+}
+
+function buildHoldingSavePayload(form: HoldingForm, existing: Holding | undefined) {
+  const isNew = !existing;
+  const initialBuy = isNew
+    ? {
+        shares: toNormalizedNumber(form.initShares) ?? 0,
+        price: toNormalizedNumber(form.initPrice) ?? 0,
+        date: form.initDate,
+      }
+    : undefined;
+  const lookupSnapshot = isNew
+    ? {
+        priceCurrency: form.lookupPriceCurrency || null,
+        eodDate: form.lookupEodDate || null,
+        priceUpdatedAt: form.priceUpdatedAt || null,
+      }
+    : undefined;
+  return { initialBuy, lookupSnapshot };
+}
+
+export function EditHoldingModal({
+  existing,
+  currentValue,
+  onClose,
+  onSave,
+  onDelete,
+}: EditHoldingModalProps) {
   const {
     form,
     errors,
@@ -493,6 +607,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
     handleFind,
   } = useHoldingFormState(existing);
   const isNew = !existing;
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   function handleSave() {
     const errs = validateHoldingForm(form, existing);
@@ -500,20 +615,7 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
       setErrors(errs);
       return;
     }
-    const initialBuy = isNew
-      ? {
-          shares: toNormalizedNumber(form.initShares) ?? 0,
-          price: toNormalizedNumber(form.initPrice) ?? 0,
-          date: form.initDate,
-        }
-      : undefined;
-    const lookupSnapshot = isNew
-      ? {
-          priceCurrency: form.lookupPriceCurrency || null,
-          eodDate: form.lookupEodDate || null,
-          priceUpdatedAt: form.priceUpdatedAt || null,
-        }
-      : undefined;
+    const { initialBuy, lookupSnapshot } = buildHoldingSavePayload(form, existing);
     onSave(buildHolding(form, existing), initialBuy, lookupSnapshot);
     onClose();
   }
@@ -528,29 +630,30 @@ export function EditHoldingModal({ existing, onClose, onSave, onDelete }: EditHo
           onCancel={onClose}
           onConfirm={handleSave}
           confirmLabel={isNew ? 'Add Holding' : 'Save Changes'}
-          danger={buildDeleteButton(existing, onDelete, onClose)}
+          danger={buildDeleteButton(existing, onDelete, () => setConfirmingDelete(true))}
         />
       }
     >
-      {isNew && (
-        <TickerSearch
-          searchTicker={searchTicker}
-          onSearchTickerChange={setSearchTicker}
-          onFind={() => void handleFind()}
-          isLoading={tickerLookup.isLoading}
-          error={tickerLookup.error}
-          foundName={tickerLookup.data?.name ?? null}
-        />
-      )}
-      <HoldingBaseFields form={form} errors={errors} onChange={set} />
-      <PriceControlsSection
+      <HoldingModalBody
+        isNew={isNew}
         form={form}
-        onChange={set}
+        errors={errors}
+        searchTicker={searchTicker}
+        onSearchTickerChange={setSearchTicker}
+        onFind={() => void handleFind()}
+        tickerLookup={tickerLookup}
+        set={set}
         onToggleExcludeFromSync={setExcludeFromSync}
       />
-      {isNew && (
-        <InitialBuySection form={form} errors={errors} currency={form.currency} onChange={set} />
-      )}
+      {confirmingDelete && existing && onDelete ? (
+        <HoldingDeleteDialog
+          existing={existing}
+          currentValue={currentValue}
+          onDelete={onDelete}
+          onCancel={() => setConfirmingDelete(false)}
+          onClose={onClose}
+        />
+      ) : null}
     </Modal>
   );
 }

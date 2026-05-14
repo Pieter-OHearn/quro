@@ -1,10 +1,10 @@
 export { useContribChartData } from './useContribChartData';
 export { useCreateSavingsAccount } from './useCreateSavingsAccount';
 export { useCreateSavingsTransaction } from './useCreateSavingsTransaction';
-export { useDeleteSavingsAccount } from './useDeleteSavingsAccount';
+export { useDeleteSavingsAccount, useUnarchiveSavingsAccount } from './useDeleteSavingsAccount';
 export { useDeleteSavingsTransaction } from './useDeleteSavingsTransaction';
 export { useGrowthChartData } from './useGrowthChartData';
-export { useSavingsAccounts } from './useSavingsAccounts';
+export { useSavingsAccounts, useSavingsAccountsQuery } from './useSavingsAccounts';
 export { useSavingsData } from './useSavingsData';
 export { useSavingsMetrics } from './useSavingsMetrics';
 export { useSavingsTransactions } from './useSavingsTransactions';

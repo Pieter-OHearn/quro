@@ -377,6 +377,20 @@ app.delete('/accounts/:id', async (c) => {
   return c.json({ data });
 });
 
+app.post('/accounts/:id/unarchive', async (c) => {
+  const user = getAuthUser(c);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'Invalid account id' }, HTTP_STATUS.BAD_REQUEST);
+
+  const [data] = await db
+    .update(savingsAccounts)
+    .set({ archivedAt: null })
+    .where(and(eq(savingsAccounts.id, id), eq(savingsAccounts.userId, user.id)))
+    .returning();
+  if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
+  return c.json({ data });
+});
+
 // ── Transactions ─────────────────────────────────────────────────────────────
 
 app.get('/transactions', async (c) => {

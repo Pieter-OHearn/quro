@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Edit3, Info, Lock, Plus, Trash2 } from 'lucide-react';
 import type { AppCapabilityStatus, PensionPot, PensionTransaction } from '@quro/shared';
-import { Badge, IconButton } from '@/components/ui';
+import { ArchiveOrDeleteDialog, Badge, IconButton } from '@/components/ui';
 import { TYPE_COLORS } from '../constants';
 import type {
   ConvertToBaseFn,
@@ -425,6 +425,41 @@ function PensionPotCard({
   );
 }
 
+function PensionPotDeleteDialog({
+  pot,
+  pensionTxns,
+  deletePot,
+  onClose,
+}: Readonly<{
+  pot: PensionPot;
+  pensionTxns: PensionTransaction[];
+  deletePot: DeletePotMutation;
+  onClose: () => void;
+}>) {
+  const balance = computeCurrentPensionBalance(
+    pot,
+    pensionTxns.filter((txn) => txn.potId === pot.id),
+  );
+  return (
+    <ArchiveOrDeleteDialog
+      entityLabel="Pension pot"
+      entityName={pot.name}
+      balance={balance}
+      balanceCurrency={pot.currency}
+      childrenLabel="contributions and history"
+      onArchive={() => {
+        deletePot.mutate({ id: pot.id, mode: 'preserveTransactions' });
+        onClose();
+      }}
+      onDelete={() => {
+        deletePot.mutate({ id: pot.id, mode: 'deleteTransactions' });
+        onClose();
+      }}
+      onCancel={onClose}
+    />
+  );
+}
+
 function PensionPotsListItems({
   pensions,
   pensionTxns,
@@ -443,6 +478,7 @@ function PensionPotsListItems({
   baseCurrency,
   pensionImportCapability,
 }: Readonly<PensionPotsListProps>) {
+  const [potPendingDelete, setPotPendingDelete] = useState<PensionPot | null>(null);
   return (
     <div className="divide-y divide-slate-50">
       {pensions.length === 0 && (
@@ -463,7 +499,10 @@ function PensionPotsListItems({
           baseCurrency={baseCurrency}
           onEdit={(item) => setEditing(item)}
           onToggle={setExpanded}
-          onDelete={(id) => deletePot.mutate(id)}
+          onDelete={(id) => {
+            const target = pensions.find((entry) => entry.id === id);
+            if (target) setPotPendingDelete(target);
+          }}
           onAddTxn={(pot) => {
             setEditingTxn(null);
             setAddTxnForPot(pot);
@@ -479,6 +518,14 @@ function PensionPotsListItems({
           pensionImportCapability={pensionImportCapability}
         />
       ))}
+      {potPendingDelete ? (
+        <PensionPotDeleteDialog
+          pot={potPendingDelete}
+          pensionTxns={pensionTxns}
+          deletePot={deletePot}
+          onClose={() => setPotPendingDelete(null)}
+        />
+      ) : null}
     </div>
   );
 }

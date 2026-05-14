@@ -78,8 +78,8 @@ export function useInvestmentActions(
   }
   return {
     handleSaveHolding,
-    handleDeleteHolding: (id: number) => {
-      deleteHolding.mutate(id);
+    handleDeleteHolding: (id, mode = 'preserveTransactions') => {
+      deleteHolding.mutate({ id, mode });
       if (ui.expandedHoldingId === id) ui.setExpandedHoldingId(null);
     },
     handleAddHoldingTxn: (transaction) =>

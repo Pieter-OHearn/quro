@@ -88,7 +88,7 @@ export type InvestmentActions = {
       priceUpdatedAt?: string | null;
     },
   ) => void;
-  handleDeleteHolding: (id: number) => void;
+  handleDeleteHolding: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   handleAddHoldingTxn: (transaction: SaveHoldingTxnInput) => void;
   handleDeleteHoldingTxn: (id: number) => void;
   handleUpdateProperty: (id: number, value: number, rent: number) => void;
@@ -124,7 +124,7 @@ export type HoldingModalsProps = {
       priceUpdatedAt?: string | null;
     },
   ) => void;
-  onDeleteHolding: (id: number) => void;
+  onDeleteHolding: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   onCloseAddHoldingTxn: () => void;
   onSaveHoldingTxn: (transaction: SaveHoldingTxnInput) => void;
 };

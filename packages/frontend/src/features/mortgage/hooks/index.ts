@@ -1,10 +1,10 @@
 export { useAddMortgageForm } from './useAddMortgageForm';
 export { useCreateMortgage } from './useCreateMortgage';
 export { useCreateMortgageTransaction } from './useCreateMortgageTransaction';
-export { useDeleteMortgage } from './useDeleteMortgage';
+export { useDeleteMortgage, useUnarchiveMortgage } from './useDeleteMortgage';
 export { useDeleteMortgageTransaction } from './useDeleteMortgageTransaction';
 export { useMortgageModals } from './useMortgageModals';
-export { useMortgages } from './useMortgages';
+export { useArchivedMortgages, useMortgages } from './useMortgages';
 export { useMortgageTransactions } from './useMortgageTransactions';
 export { useMortgageTxnModal } from './useMortgageTxnModal';
 export { useUpdateMortgage } from './useUpdateMortgage';

@@ -954,7 +954,7 @@ describe('finance integration', () => {
     await parseJson<ApiDataResponse<{ id: number }>>(deleteMortgageTxnResponse, 200);
 
     const deleteMortgageResponse = await integration.request(
-      `/api/mortgages/${createMortgageBody.data.id}`,
+      `/api/mortgages/${createMortgageBody.data.id}?cascade=true`,
       {
         method: 'DELETE',
         cookie: owner.cookie,
@@ -1573,5 +1573,282 @@ describe('finance integration', () => {
     expect(await unknownImportRowFieldResponse.json()).toEqual({
       error: 'Unknown field: source',
     });
+  });
+
+  test('archives holdings, pensions, mortgages, and debts by default and cascades only with ?cascade=true', async () => {
+    const owner = await integration.signUp('archive-owner');
+
+    // ── Holdings ───────────────────────────────────────────────────────────
+    const holdingCreate = await integration.request('/api/investments/holdings', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Archive Test Co',
+        ticker: 'arch',
+        currentPrice: '100',
+        currency: 'USD',
+        sector: 'Other',
+        itemType: 'equity',
+      },
+    });
+    const holding = await parseJson<ApiDataResponse<{ id: number }>>(holdingCreate, 201);
+
+    const holdingTxnCreate = await integration.request('/api/investments/holding-transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        holdingId: holding.data.id,
+        type: 'buy',
+        shares: 5,
+        price: 100,
+        date: '2026-03-01',
+      },
+    });
+    const holdingTxn = await parseJson<ApiDataResponse<{ id: number }>>(holdingTxnCreate, 201);
+
+    const archiveHolding = await integration.request(
+      `/api/investments/holdings/${holding.data.id}`,
+      { method: 'DELETE', cookie: owner.cookie },
+    );
+    const archivedHolding = await parseJson<ApiDataResponse<{ archivedAt: string | null }>>(
+      archiveHolding,
+      200,
+    );
+    expect(archivedHolding.data.archivedAt).toBeTruthy();
+
+    const activeHoldings = await integration.request('/api/investments/holdings', {
+      cookie: owner.cookie,
+    });
+    const activeHoldingsBody = await parseJson<ApiDataResponse<Array<{ id: number }>>>(
+      activeHoldings,
+      200,
+    );
+    expect(activeHoldingsBody.data.some((row) => row.id === holding.data.id)).toBe(false);
+
+    const allHoldings = await integration.request(
+      '/api/investments/holdings?includeArchived=true',
+      { cookie: owner.cookie },
+    );
+    const allHoldingsBody = await parseJson<ApiDataResponse<Array<{ id: number }>>>(
+      allHoldings,
+      200,
+    );
+    expect(allHoldingsBody.data.some((row) => row.id === holding.data.id)).toBe(true);
+
+    const heldTxnLookup = await integration.request(
+      `/api/investments/holding-transactions/${holdingTxn.data.id}`,
+      { cookie: owner.cookie },
+    );
+    expect(heldTxnLookup.status).toBe(200);
+
+    const unarchiveHolding = await integration.request(
+      `/api/investments/holdings/${holding.data.id}/unarchive`,
+      { method: 'POST', cookie: owner.cookie },
+    );
+    const unarchivedHolding = await parseJson<ApiDataResponse<{ archivedAt: string | null }>>(
+      unarchiveHolding,
+      200,
+    );
+    expect(unarchivedHolding.data.archivedAt).toBeNull();
+
+    const cascadeHolding = await integration.request(
+      `/api/investments/holdings/${holding.data.id}?cascade=true`,
+      { method: 'DELETE', cookie: owner.cookie },
+    );
+    expect(cascadeHolding.status).toBe(200);
+    const cascadedTxnLookup = await integration.request(
+      `/api/investments/holding-transactions/${holdingTxn.data.id}`,
+      { cookie: owner.cookie },
+    );
+    expect(cascadedTxnLookup.status).toBe(404);
+
+    // ── Pension pots ───────────────────────────────────────────────────────
+    const potCreate = await integration.request('/api/pensions/pots', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Workplace Pension',
+        provider: 'Aviva',
+        type: 'workplace',
+        balance: 12000,
+        currency: 'GBP',
+        employeeMonthly: 200,
+        employerMonthly: 200,
+      },
+    });
+    const pot = await parseJson<ApiDataResponse<{ id: number }>>(potCreate, 201);
+
+    const potTxnCreate = await integration.request('/api/pensions/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        potId: pot.data.id,
+        type: 'contribution',
+        amount: 400,
+        date: '2026-03-15',
+        isEmployer: false,
+      },
+    });
+    const potTxn = await parseJson<ApiDataResponse<{ id: number }>>(potTxnCreate, 201);
+
+    const archivePot = await integration.request(`/api/pensions/pots/${pot.data.id}`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect(
+      (await parseJson<ApiDataResponse<{ archivedAt: string | null }>>(archivePot, 200)).data
+        .archivedAt,
+    ).toBeTruthy();
+
+    const activePots = await integration.request('/api/pensions/pots', { cookie: owner.cookie });
+    const activePotsBody = await parseJson<ApiDataResponse<Array<{ id: number }>>>(activePots, 200);
+    expect(activePotsBody.data.some((row) => row.id === pot.data.id)).toBe(false);
+
+    await integration.request(`/api/pensions/pots/${pot.data.id}/unarchive`, {
+      method: 'POST',
+      cookie: owner.cookie,
+    });
+
+    const cascadePot = await integration.request(`/api/pensions/pots/${pot.data.id}?cascade=true`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect(cascadePot.status).toBe(200);
+    const cascadedPotTxn = await integration.request(
+      `/api/pensions/transactions/${potTxn.data.id}`,
+      { cookie: owner.cookie },
+    );
+    expect(cascadedPotTxn.status).toBe(404);
+
+    // ── Mortgages ──────────────────────────────────────────────────────────
+    const propertyForMortgage = await integration.request('/api/investments/properties', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        address: '99 Archive Lane',
+        propertyType: 'house',
+        purchasePrice: 250000,
+        currentValue: 300000,
+        mortgage: 0,
+        monthlyRent: 0,
+        currency: 'EUR',
+      },
+    });
+    const propertyForMortgageBody = await parseJson<ApiDataResponse<{ id: number }>>(
+      propertyForMortgage,
+      201,
+    );
+
+    const mortgageCreate = await integration.request('/api/mortgages', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        linkedPropertyId: propertyForMortgageBody.data.id,
+        lender: 'Test Bank',
+        originalAmount: 200000,
+        outstandingBalance: 150000,
+        monthlyPayment: 800,
+        interestRate: 2.5,
+        rateType: 'fixed',
+        fixedUntil: '2030-01-01',
+        termYears: 25,
+        startDate: '2020-01-01',
+        endDate: '2045-01-01',
+      },
+    });
+    const mortgage = await parseJson<ApiDataResponse<{ id: number }>>(mortgageCreate, 201);
+
+    const mortgageTxnCreate = await integration.request('/api/mortgages/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        mortgageId: mortgage.data.id,
+        type: 'repayment',
+        amount: 800,
+        principal: 500,
+        interest: 300,
+        date: '2026-03-01',
+      },
+    });
+    const mortgageTxn = await parseJson<ApiDataResponse<{ id: number }>>(mortgageTxnCreate, 201);
+
+    const archiveMortgage = await integration.request(`/api/mortgages/${mortgage.data.id}`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect(
+      (await parseJson<ApiDataResponse<{ archivedAt: string | null }>>(archiveMortgage, 200)).data
+        .archivedAt,
+    ).toBeTruthy();
+
+    const activeMortgages = await integration.request('/api/mortgages', { cookie: owner.cookie });
+    const activeMortgagesBody = await parseJson<ApiDataResponse<Array<{ id: number }>>>(
+      activeMortgages,
+      200,
+    );
+    expect(activeMortgagesBody.data.some((row) => row.id === mortgage.data.id)).toBe(false);
+
+    await integration.request(`/api/mortgages/${mortgage.data.id}/unarchive`, {
+      method: 'POST',
+      cookie: owner.cookie,
+    });
+
+    const cascadeMortgage = await integration.request(
+      `/api/mortgages/${mortgage.data.id}?cascade=true`,
+      { method: 'DELETE', cookie: owner.cookie },
+    );
+    expect(cascadeMortgage.status).toBe(200);
+    const cascadedMortgageTxn = await integration.request(
+      `/api/mortgages/transactions/${mortgageTxn.data.id}`,
+      { cookie: owner.cookie },
+    );
+    expect(cascadedMortgageTxn.status).toBe(404);
+
+    // ── Debts ──────────────────────────────────────────────────────────────
+    const debtCreate = await integration.request('/api/debts', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Credit card',
+        type: 'credit_card',
+        lender: 'Test Bank',
+        originalAmount: 5000,
+        remainingBalance: 3000,
+        currency: 'EUR',
+        interestRate: 18.9,
+        monthlyPayment: 200,
+        startDate: '2025-01-01',
+        color: '#ef4444',
+        emoji: '💳',
+      },
+    });
+    const debt = await parseJson<ApiDataResponse<{ id: number }>>(debtCreate, 201);
+
+    const archiveDebt = await integration.request(`/api/debts/${debt.data.id}`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect(
+      (await parseJson<ApiDataResponse<{ archivedAt: string | null }>>(archiveDebt, 200)).data
+        .archivedAt,
+    ).toBeTruthy();
+
+    const activeDebts = await integration.request('/api/debts', { cookie: owner.cookie });
+    const activeDebtsBody = await parseJson<ApiDataResponse<Array<{ id: number }>>>(
+      activeDebts,
+      200,
+    );
+    expect(activeDebtsBody.data.some((row) => row.id === debt.data.id)).toBe(false);
+
+    await integration.request(`/api/debts/${debt.data.id}/unarchive`, {
+      method: 'POST',
+      cookie: owner.cookie,
+    });
+
+    const cascadeDebt = await integration.request(`/api/debts/${debt.data.id}?cascade=true`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect(cascadeDebt.status).toBe(200);
   });
 });

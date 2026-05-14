@@ -63,6 +63,11 @@ function HoldingModals({
       {(showAddHolding || editingHolding) && (
         <EditHoldingModal
           existing={editingHolding ?? undefined}
+          currentValue={
+            editingHolding
+              ? (positions[editingHolding.id]?.shares ?? 0) * editingHolding.currentPrice
+              : null
+          }
           onClose={onCloseEditHolding}
           onSave={onSaveHolding}
           onDelete={onDeleteHolding}
