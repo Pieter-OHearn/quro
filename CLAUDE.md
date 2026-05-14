@@ -14,7 +14,7 @@ bun run dev:frontend
 bun run dev:backend
 
 # Build
-bun run build               # builds frontend only
+bun run build               # builds frontend and backend
 
 # Linting & formatting
 bun run lint

@@ -35,7 +35,9 @@
     "db:restore": "bun run --filter '@quro/backend' db:restore",
     "db:clear": "bun run --filter '@quro/backend' db:clear",
     "db:bootstrap-runtime-role": "bun run --filter '@quro/backend' db:bootstrap-runtime-role",
+    "lint": "bunx eslint packages --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts",
     "lint:fix": "bunx eslint packages --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts --fix",
+    "format:check": "prettier --check .",
     "format": "prettier --write .",
     "version:bump": "bun scripts/bump-version.ts",
     "version:verify": "bun scripts/verify-version-bump.ts"
