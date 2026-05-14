@@ -730,6 +730,12 @@ app.delete('/:id', async (c) => {
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id), isNull(mortgages.archivedAt)))
     .returning();
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+
+  await db
+    .update(properties)
+    .set({ mortgageId: null, mortgage: 0 } as any)
+    .where(and(eq(properties.mortgageId, id), eq(properties.userId, user.id)));
+
   return c.json({ data });
 });
 
