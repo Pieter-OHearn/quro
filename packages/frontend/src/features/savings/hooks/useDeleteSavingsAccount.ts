@@ -7,6 +7,11 @@ type DeleteSavingsAccountInput = {
   mode: DeleteSavingsAccountMode;
 };
 
+function invalidateSavings(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['savings'] });
+  void qc.invalidateQueries({ queryKey: ['dashboard'] });
+}
+
 export function useDeleteSavingsAccount() {
   const queryClient = useQueryClient();
 
@@ -16,9 +21,17 @@ export function useDeleteSavingsAccount() {
         params: mode === 'deleteTransactions' ? { cascade: true } : undefined,
       });
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['savings'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    onSuccess: () => invalidateSavings(queryClient),
+  });
+}
+
+export function useUnarchiveSavingsAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await api.post(`/api/savings/accounts/${id}/unarchive`);
     },
+    onSuccess: () => invalidateSavings(queryClient),
   });
 }

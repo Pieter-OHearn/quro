@@ -1,6 +1,7 @@
 export { AddMortgageModal } from './AddMortgageModal';
 export { AddMortgageTxnModal } from './AddMortgageTxnModal';
 export { MortgageCharts } from './MortgageCharts';
+export { MortgageArchivedSection } from './MortgageArchivedSection';
 export { MortgageHeroCard } from './MortgageHeroCard';
 export { MortgageModals } from './MortgageModals';
 export { MortgageRepaymentProgress } from './MortgageRepaymentProgress';

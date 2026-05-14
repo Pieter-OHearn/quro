@@ -226,6 +226,7 @@ export const holdings = pgTable(
     priceUpdatedAt: timestamp('price_updated_at'),
     manualPrice: numeric('manual_price', { precision: 19, scale: 2 }),
     excludeFromSync: boolean('exclude_from_sync').default(false).notNull(),
+    archivedAt: timestamp('archived_at'),
   },
   (table) => ({
     userIdx: index('holdings_user_id_idx').on(table.userId),
@@ -238,7 +239,7 @@ export const holdingTransactions = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     holdingId: integer('holding_id')
-      .references(() => holdings.id)
+      .references(() => holdings.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // buy | sell | dividend
     shares: numeric('shares', { precision: 19, scale: 6 }),
@@ -309,7 +310,7 @@ export const propertyTransactions = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     propertyId: integer('property_id')
-      .references(() => properties.id)
+      .references(() => properties.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // repayment | valuation | rent_income | expense
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
@@ -343,6 +344,7 @@ export const pensionPots = pgTable(
     color: text('color'),
     emoji: text('emoji'),
     notes: text('notes'),
+    archivedAt: timestamp('archived_at'),
   },
   (table) => ({
     userIdx: index('pension_pots_user_id_idx').on(table.userId),
@@ -355,7 +357,7 @@ export const pensionTransactions = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     potId: integer('pot_id')
-      .references(() => pensionPots.id)
+      .references(() => pensionPots.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // contribution | fee | annual_statement
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
@@ -489,6 +491,7 @@ export const mortgages = pgTable(
     startDate: text('start_date').notNull(),
     endDate: text('end_date').notNull(),
     overpaymentLimit: numeric('overpayment_limit', { precision: 19, scale: 2 }),
+    archivedAt: timestamp('archived_at'),
   },
   (table) => ({
     userIdx: index('mortgages_user_id_idx').on(table.userId),
@@ -501,7 +504,7 @@ export const mortgageTransactions = pgTable(
     id: serial('id').primaryKey(),
     userId: integer('user_id').references(() => users.id),
     mortgageId: integer('mortgage_id')
-      .references(() => mortgages.id)
+      .references(() => mortgages.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // repayment | valuation | rate_change
     amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
@@ -539,6 +542,7 @@ export const debts = pgTable(
     color: text('color').notNull(),
     emoji: text('emoji').notNull(),
     notes: text('notes'),
+    archivedAt: timestamp('archived_at'),
   },
   (table) => ({
     userIdx: index('debts_user_id_idx').on(table.userId),

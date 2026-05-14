@@ -11,20 +11,16 @@ export const requireAuth = createMiddleware(async (c, next) => {
     return c.json({ error: 'Authentication required' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
-  const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-  if (!session || session.expiresAt < new Date()) {
+  const [row] = await db
+    .select({ id: users.id, email: users.email, expiresAt: sessions.expiresAt })
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(eq(sessions.id, sessionId));
+
+  if (!row || row.expiresAt < new Date()) {
     return c.json({ error: 'Session expired' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
-  const [user] = await db
-    .select({ id: users.id, email: users.email })
-    .from(users)
-    .where(eq(users.id, session.userId));
-
-  if (!user) {
-    return c.json({ error: 'User not found' }, HTTP_STATUS.UNAUTHORIZED);
-  }
-
-  c.set('user', user);
+  c.set('user', { id: row.id, email: row.email });
   await next();
 });

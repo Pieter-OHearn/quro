@@ -16,7 +16,7 @@ import {
   propertyTransactions,
   stockExchanges,
 } from '../db/schema';
-import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { lookupTicker } from '../lib/marketData';
@@ -932,7 +932,15 @@ async function resolvePropertyMortgagePatch(params: {
 
 app.get('/holdings', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(holdings).where(eq(holdings.userId, user.id));
+  const includeArchived = c.req.query('includeArchived') === 'true';
+  const data = await db
+    .select()
+    .from(holdings)
+    .where(
+      includeArchived
+        ? eq(holdings.userId, user.id)
+        : and(eq(holdings.userId, user.id), isNull(holdings.archivedAt)),
+    );
   return c.json({ data });
 });
 
@@ -1012,8 +1020,33 @@ app.delete('/holdings/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid holding id' }, HTTP_STATUS.BAD_REQUEST);
+
+  if (c.req.query('cascade') === 'true') {
+    const [data] = await db
+      .delete(holdings)
+      .where(and(eq(holdings.id, id), eq(holdings.userId, user.id)))
+      .returning();
+    if (!data) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
+    return c.json({ data });
+  }
+
   const [data] = await db
-    .delete(holdings)
+    .update(holdings)
+    .set({ archivedAt: new Date() })
+    .where(and(eq(holdings.id, id), eq(holdings.userId, user.id), isNull(holdings.archivedAt)))
+    .returning();
+  if (!data) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
+  return c.json({ data });
+});
+
+app.post('/holdings/:id/unarchive', async (c) => {
+  const user = getAuthUser(c);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'Invalid holding id' }, HTTP_STATUS.BAD_REQUEST);
+
+  const [data] = await db
+    .update(holdings)
+    .set({ archivedAt: null })
     .where(and(eq(holdings.id, id), eq(holdings.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);

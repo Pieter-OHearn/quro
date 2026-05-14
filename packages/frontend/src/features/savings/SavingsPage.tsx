@@ -4,6 +4,7 @@ import { LoadingSpinner } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { AccountsList, SavingsCharts, SavingsModals, SavingsStats } from './components';
+import { SavingsArchivedSection } from './components/SavingsArchivedSection';
 import {
   useContribChartData,
   useGrowthChartData,
@@ -110,6 +111,7 @@ function SavingsPageBodyContent(props: Readonly<SavingsPageBodyProps>) {
         onEditTxn={handleEditTxn}
         onDeleteTxn={props.onDeleteTxn}
       />
+      <SavingsArchivedSection />
     </div>
   );
 }

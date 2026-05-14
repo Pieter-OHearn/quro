@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { DEBT_TYPES, isCurrencyCode, type CurrencyCode, type DebtType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
@@ -475,7 +475,15 @@ app.delete('/payments/:id', async (c) => {
 
 app.get('/', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(debts).where(eq(debts.userId, user.id));
+  const includeArchived = c.req.query('includeArchived') === 'true';
+  const data = await db
+    .select()
+    .from(debts)
+    .where(
+      includeArchived
+        ? eq(debts.userId, user.id)
+        : and(eq(debts.userId, user.id), isNull(debts.archivedAt)),
+    );
   return c.json({ data });
 });
 
@@ -515,11 +523,34 @@ app.delete('/:id', async (c) => {
   const debtId = parseId(c.req.param('id'));
   if (debtId == null) return c.json({ error: 'Invalid debt id' }, HTTP_STATUS.BAD_REQUEST);
 
+  if (c.req.query('cascade') === 'true') {
+    const [data] = await db
+      .delete(debts)
+      .where(and(eq(debts.id, debtId), eq(debts.userId, user.id)))
+      .returning();
+    if (!data) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
+    return c.json({ data });
+  }
+
   const [data] = await db
-    .delete(debts)
+    .update(debts)
+    .set({ archivedAt: new Date() })
+    .where(and(eq(debts.id, debtId), eq(debts.userId, user.id), isNull(debts.archivedAt)))
+    .returning();
+  if (!data) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
+  return c.json({ data });
+});
+
+app.post('/:id/unarchive', async (c) => {
+  const user = getAuthUser(c);
+  const debtId = parseId(c.req.param('id'));
+  if (debtId == null) return c.json({ error: 'Invalid debt id' }, HTTP_STATUS.BAD_REQUEST);
+
+  const [data] = await db
+    .update(debts)
+    .set({ archivedAt: null })
     .where(and(eq(debts.id, debtId), eq(debts.userId, user.id)))
     .returning();
-
   if (!data) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });

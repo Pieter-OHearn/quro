@@ -4,7 +4,7 @@ export { useCommitPensionStatementImport } from './useCommitPensionStatementImpo
 export { useCreatePensionPot } from './useCreatePensionPot';
 export { useCreatePensionStatementImport } from './useCreatePensionStatementImport';
 export { useCreatePensionTransaction } from './useCreatePensionTransaction';
-export { useDeletePensionPot } from './useDeletePensionPot';
+export { useDeletePensionPot, useUnarchivePensionPot } from './useDeletePensionPot';
 export { useDeletePensionStatementImportRow } from './useDeletePensionStatementImportRow';
 export { useDeletePensionStatementDocument } from './useDeletePensionStatementDocument';
 export { useDeletePensionTransaction } from './useDeletePensionTransaction';
@@ -15,7 +15,7 @@ export {
   usePensionImportNotifications,
   PENSION_IMPORT_NOTIFICATIONS_QUERY_KEY,
 } from './usePensionImportNotifications';
-export { usePensionPots } from './usePensionPots';
+export { useArchivedPensionPots, usePensionPots } from './usePensionPots';
 export { usePensionStatementImport } from './usePensionStatementImport';
 export { usePensionStatementImports } from './usePensionStatementImports';
 export { usePensionStatementImportRows } from './usePensionStatementImportRows';
