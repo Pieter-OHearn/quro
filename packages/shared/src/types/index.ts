@@ -491,7 +491,16 @@ export type SalaryHistory = {
   currency: CurrencyCode;
 };
 
-export type GoalType = 'savings' | 'salary' | 'invest_habit' | 'portfolio' | 'net_worth' | 'annual';
+export const GOAL_TYPES = [
+  'savings',
+  'salary',
+  'invest_habit',
+  'portfolio',
+  'net_worth',
+  'annual',
+] as const;
+
+export type GoalType = (typeof GOAL_TYPES)[number];
 
 export const GOAL_SOURCE_TYPES = [
   'manual',

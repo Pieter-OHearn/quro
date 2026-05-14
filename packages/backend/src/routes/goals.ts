@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { GOAL_SOURCE_TYPES, type GoalSourceType } from '@quro/shared';
+import { GOAL_SOURCE_TYPES, GOAL_TYPES, type GoalSourceType, type GoalType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { goals, savingsAccounts } from '../db/schema';
@@ -49,16 +49,6 @@ const GOAL_FIELDS = [
   'startMonth',
   'missedMonths',
 ] as const;
-const GOAL_TYPES = [
-  'savings',
-  'salary',
-  'invest_habit',
-  'portfolio',
-  'net_worth',
-  'annual',
-] as const;
-
-type GoalType = (typeof GOAL_TYPES)[number];
 
 export type GoalPayload = {
   type: GoalType;
