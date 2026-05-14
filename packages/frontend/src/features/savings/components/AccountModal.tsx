@@ -5,13 +5,13 @@ import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
 import { formatFixedInputValue } from '@/lib/utils';
 import {
+  ArchiveOrDeleteDialog,
   Modal,
   ModalFooter,
   FormField,
   TextInput,
   SelectInput,
   EmojiPickerField,
-  Button,
 } from '@/components/ui';
 import type { SavingsAccount } from '@quro/shared';
 import type { DeleteSavingsAccountMode, SaveAccountInput } from '../types';
@@ -277,68 +277,6 @@ function SubmitError({ message }: Readonly<{ message: string | null }>) {
   );
 }
 
-type DeleteConfirmationProps = {
-  existing: SavingsAccount;
-  confirmName: string;
-  submitError: string | null;
-  onConfirmNameChange: (value: string) => void;
-  onCancel: () => void;
-  onConfirm: (mode: DeleteSavingsAccountMode) => void;
-};
-
-function DeleteConfirmation({
-  existing,
-  confirmName,
-  submitError,
-  onConfirmNameChange,
-  onCancel,
-  onConfirm,
-}: Readonly<DeleteConfirmationProps>) {
-  const nameMatches = confirmName.trim() === existing.name.trim();
-  return (
-    <Modal
-      title="Remove Account"
-      subtitle={`Remove keeps "${existing.name}" transactions for history. Delete all removes the account and its transactions.`}
-      onClose={onCancel}
-      footer={
-        <>
-          <Button onClick={onCancel} variant="secondary" size="lg" className="flex-1">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => onConfirm('preserveTransactions')}
-            disabled={!nameMatches}
-            variant="primary"
-            size="lg"
-            className="flex-1"
-          >
-            Remove
-          </Button>
-          <Button
-            onClick={() => onConfirm('deleteTransactions')}
-            disabled={!nameMatches}
-            variant="danger"
-            size="lg"
-            className="flex-1"
-          >
-            Delete all
-          </Button>
-        </>
-      }
-    >
-      <SubmitError message={submitError} />
-      <FormField label={`Type "${existing.name}" to confirm`}>
-        <TextInput
-          value={confirmName}
-          onChange={onConfirmNameChange}
-          placeholder={existing.name}
-          autoFocus
-        />
-      </FormField>
-    </Modal>
-  );
-}
-
 export function AccountModal({ existing, onClose, onSave, onDelete }: AccountModalProps) {
   const { form, errors, submitError, set, handleSave, setSubmitError } = useAccountModalForm(
     existing,
@@ -346,7 +284,6 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
     onClose,
   );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [confirmName, setConfirmName] = useState('');
   const isEdit = Boolean(existing);
   const isBunqSynced = Boolean(existing?.bunqAccountId);
 
@@ -361,32 +298,18 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
       </button>
     ) : undefined;
 
-  if (confirmingDelete && existing) {
-    const closeDeleteConfirmation = () => {
-      setConfirmingDelete(false);
-      setConfirmName('');
-    };
-    return (
-      <DeleteConfirmation
-        existing={existing}
-        confirmName={confirmName}
-        submitError={submitError}
-        onConfirmNameChange={setConfirmName}
-        onCancel={closeDeleteConfirmation}
-        onConfirm={(mode) => {
-          void (async () => {
-            setSubmitError(null);
-            try {
-              await onDelete!(existing.id, mode);
-              onClose();
-            } catch (e) {
-              setSubmitError(e instanceof Error ? e.message : 'Failed to delete account');
-            }
-          })();
-        }}
-      />
-    );
-  }
+  const runDelete = (mode: DeleteSavingsAccountMode) => {
+    if (!existing || !onDelete) return;
+    void (async () => {
+      setSubmitError(null);
+      try {
+        await onDelete(existing.id, mode);
+        onClose();
+      } catch (e) {
+        setSubmitError(e instanceof Error ? e.message : 'Failed to delete account');
+      }
+    })();
+  };
 
   return (
     <Modal
@@ -412,6 +335,24 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
         isEdit={isEdit}
         isBunqSynced={isBunqSynced}
       />
+      {confirmingDelete && existing ? (
+        <ArchiveOrDeleteDialog
+          entityLabel="Account"
+          entityName={existing.name}
+          balance={existing.balance}
+          balanceCurrency={existing.currency}
+          childrenLabel="transactions"
+          onArchive={() => {
+            runDelete('preserveTransactions');
+            setConfirmingDelete(false);
+          }}
+          onDelete={() => {
+            runDelete('deleteTransactions');
+            setConfirmingDelete(false);
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      ) : null}
     </Modal>
   );
 }

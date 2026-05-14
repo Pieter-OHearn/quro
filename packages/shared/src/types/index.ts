@@ -211,6 +211,7 @@ export type Holding = {
   priceUpdatedAt?: string | null;
   manualPrice?: number | null;
   excludeFromSync?: boolean;
+  archivedAt?: string | null;
 };
 
 export type HoldingTransaction = {
@@ -271,6 +272,7 @@ export type PensionPot = {
   color: string;
   emoji: string;
   notes: string;
+  archivedAt?: string | null;
 };
 
 export type PensionTransaction = {
@@ -419,6 +421,7 @@ export type Mortgage = {
   startDate: string;
   endDate: string;
   overpaymentLimit: number;
+  archivedAt?: string | null;
 };
 
 export type MortgageTransaction = {
@@ -459,6 +462,7 @@ export type Debt = {
   color: string;
   emoji: string;
   notes: string | null;
+  archivedAt?: string | null;
 };
 
 export type DebtPayment = {

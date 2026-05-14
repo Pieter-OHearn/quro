@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { CurrencyCode } from '@quro/shared';
 import { db } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { getS3ObjectBytes } from '../lib/s3';
@@ -865,7 +865,15 @@ async function deletePensionTransaction(params: {
 
 app.get('/pots', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(pensionPots).where(eq(pensionPots.userId, user.id));
+  const includeArchived = c.req.query('includeArchived') === 'true';
+  const data = await db
+    .select()
+    .from(pensionPots)
+    .where(
+      includeArchived
+        ? eq(pensionPots.userId, user.id)
+        : and(eq(pensionPots.userId, user.id), isNull(pensionPots.archivedAt)),
+    );
   return c.json({ data });
 });
 
@@ -923,8 +931,35 @@ app.delete('/pots/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
+
+  if (c.req.query('cascade') === 'true') {
+    const [data] = await db
+      .delete(pensionPots)
+      .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)))
+      .returning();
+    if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
+    return c.json({ data });
+  }
+
   const [data] = await db
-    .delete(pensionPots)
+    .update(pensionPots)
+    .set({ archivedAt: new Date() })
+    .where(
+      and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id), isNull(pensionPots.archivedAt)),
+    )
+    .returning();
+  if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
+  return c.json({ data });
+});
+
+app.post('/pots/:id/unarchive', async (c) => {
+  const user = getAuthUser(c);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
+
+  const [data] = await db
+    .update(pensionPots)
+    .set({ archivedAt: null })
     .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);

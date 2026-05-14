@@ -5,6 +5,7 @@ import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { LoadingSpinner } from '@/components/ui';
 import { useAuth } from '@/lib/AuthContext';
 import {
+  PensionArchivedSection,
   PensionGrowthChart,
   PensionHeroBanner,
   PensionModals,
@@ -160,6 +161,7 @@ export function Pension() {
         baseCurrency={state.baseCurrency}
         pensionImportCapability={state.pensionImportCapability}
       />
+      <PensionArchivedSection pensionTxns={state.pensionTxns} />
       <PensionRetirementProjection
         totalInBase={state.totalInBase}
         projected={state.projected}

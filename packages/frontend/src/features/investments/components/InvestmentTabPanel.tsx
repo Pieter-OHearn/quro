@@ -18,6 +18,7 @@ import type {
 } from '../types';
 import type { Position } from '../utils/position';
 import { BrokerageTab } from './BrokerageTab';
+import { HoldingsArchivedSection } from './HoldingsArchivedSection';
 import { PropertyTab } from './PropertyTab';
 
 type InvestmentTabPanelProps = {
@@ -75,32 +76,35 @@ function renderBrokerageTab({
   };
 
   return (
-    <BrokerageTab
-      activeHoldings={activeHoldings}
-      closedHoldings={closedHoldings}
-      holdingTxns={holdingTxns}
-      positions={positions}
-      baseCurrency={baseCurrency}
-      totalDividendsBase={stats.totalDividendsBase}
-      totalRealizedBase={stats.totalRealizedBase}
-      totalBrokerageBase={stats.totalBrokerageBase}
-      totalGainBase={stats.totalGainBase}
-      gainPct={stats.gainPct}
-      expandedHoldingId={ui.expandedHoldingId}
-      fmtBase={fmtBase}
-      fmtNative={fmtNative}
-      convertToBase={convertToBase}
-      isForeign={isForeign}
-      onAddHolding={handleAddHolding}
-      onEditHolding={ui.setEditingHolding}
-      onToggleExpanded={toggleHoldingExpanded}
-      onAddTxnForHolding={handleAddTxnForHolding}
-      onEditTxn={handleEditHoldingTxn}
-      onDeleteTxn={actions.handleDeleteHoldingTxn}
-      onSyncPrices={onSyncPrices}
-      isSyncingPrices={isSyncingPrices}
-      syncSummary={syncSummary}
-    />
+    <>
+      <BrokerageTab
+        activeHoldings={activeHoldings}
+        closedHoldings={closedHoldings}
+        holdingTxns={holdingTxns}
+        positions={positions}
+        baseCurrency={baseCurrency}
+        totalDividendsBase={stats.totalDividendsBase}
+        totalRealizedBase={stats.totalRealizedBase}
+        totalBrokerageBase={stats.totalBrokerageBase}
+        totalGainBase={stats.totalGainBase}
+        gainPct={stats.gainPct}
+        expandedHoldingId={ui.expandedHoldingId}
+        fmtBase={fmtBase}
+        fmtNative={fmtNative}
+        convertToBase={convertToBase}
+        isForeign={isForeign}
+        onAddHolding={handleAddHolding}
+        onEditHolding={ui.setEditingHolding}
+        onToggleExpanded={toggleHoldingExpanded}
+        onAddTxnForHolding={handleAddTxnForHolding}
+        onEditTxn={handleEditHoldingTxn}
+        onDeleteTxn={actions.handleDeleteHoldingTxn}
+        onSyncPrices={onSyncPrices}
+        isSyncingPrices={isSyncingPrices}
+        syncSummary={syncSummary}
+      />
+      <HoldingsArchivedSection holdingTxns={holdingTxns} />
+    </>
   );
 }
 

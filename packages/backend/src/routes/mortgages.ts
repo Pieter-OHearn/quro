@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { CurrencyCode } from '@quro/shared';
 import { db } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import {
@@ -562,7 +562,15 @@ function toMortgageTransactionValues(
 
 app.get('/', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(mortgages).where(eq(mortgages.userId, user.id));
+  const includeArchived = c.req.query('includeArchived') === 'true';
+  const data = await db
+    .select()
+    .from(mortgages)
+    .where(
+      includeArchived
+        ? eq(mortgages.userId, user.id)
+        : and(eq(mortgages.userId, user.id), isNull(mortgages.archivedAt)),
+    );
   return c.json({ data });
 });
 
@@ -702,13 +710,43 @@ app.delete('/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
+  if (c.req.query('cascade') === 'true') {
+    await db
+      .update(properties)
+      .set({ mortgageId: null, mortgage: 0 } as any)
+      .where(and(eq(properties.mortgageId, id), eq(properties.userId, user.id)));
+
+    const [data] = await db
+      .delete(mortgages)
+      .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
+      .returning();
+    if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+    return c.json({ data });
+  }
+
+  const [data] = await db
+    .update(mortgages)
+    .set({ archivedAt: new Date() })
+    .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id), isNull(mortgages.archivedAt)))
+    .returning();
+  if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+
   await db
     .update(properties)
     .set({ mortgageId: null, mortgage: 0 } as any)
     .where(and(eq(properties.mortgageId, id), eq(properties.userId, user.id)));
 
+  return c.json({ data });
+});
+
+app.post('/:id/unarchive', async (c) => {
+  const user = getAuthUser(c);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
+
   const [data] = await db
-    .delete(mortgages)
+    .update(mortgages)
+    .set({ archivedAt: null })
     .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);

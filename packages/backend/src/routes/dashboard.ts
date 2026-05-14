@@ -98,10 +98,12 @@ function computeSharesByHolding(
   return map;
 }
 
+type Archivable = { archivedAt?: Date | string | null };
+
 type SavingsAccountRow = { id: number; balance: unknown; currency: string };
-type HistoricalSavingsAccountRow = SavingsAccountRow & { archivedAt?: Date | string | null };
+type HistoricalSavingsAccountRow = SavingsAccountRow & Archivable;
 type SavingsTransactionRow = { accountId: number; type: string; amount: unknown; date: string };
-type HoldingRow = { id: number; currentPrice: unknown; currency: string };
+type HoldingRow = { id: number; currentPrice: unknown; currency: string } & Archivable;
 type HoldingTransactionRow = { holdingId: number; type: string; shares: unknown; date: string };
 type PropertyRow = {
   id: number;
@@ -119,7 +121,7 @@ type PropertyTransactionRow = {
   principal: unknown;
   date: string;
 };
-type PensionPotRow = { id: number; balance: unknown; currency: string };
+type PensionPotRow = { id: number; balance: unknown; currency: string } & Archivable;
 type PensionTransactionRow = {
   potId: number;
   type: string;
@@ -127,8 +129,8 @@ type PensionTransactionRow = {
   taxAmount: unknown;
   date: string;
 };
-type MortgageRow = { id: number; outstandingBalance: unknown };
-type DebtRow = { id: number; remainingBalance: unknown; currency: string };
+type MortgageRow = { id: number; outstandingBalance: unknown } & Archivable;
+type DebtRow = { id: number; remainingBalance: unknown; currency: string } & Archivable;
 type DebtPaymentRow = {
   debtId: number;
   amount: unknown;
@@ -329,6 +331,7 @@ function computeDebtLiabilitiesAtCutoff(
   rates: Map<string, number>,
 ): number {
   return debts.reduce((sum, debt) => {
+    if (isArchivedAtCutoff(debt, cutoff)) return sum;
     let balance = toNumber(debt.remainingBalance);
     for (const payment of paymentsByDebtId.get(debt.id) ?? []) {
       if (payment.timestamp <= cutoff) continue;
@@ -413,12 +416,24 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
       .select()
       .from(savingsAccounts)
       .where(and(eq(savingsAccounts.userId, userId), isNull(savingsAccounts.archivedAt))),
-    db.select().from(holdings).where(eq(holdings.userId, userId)),
+    db
+      .select()
+      .from(holdings)
+      .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
     db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
     db.select().from(properties).where(eq(properties.userId, userId)),
-    db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
-    db.select().from(mortgages).where(eq(mortgages.userId, userId)),
-    db.select().from(debts).where(eq(debts.userId, userId)),
+    db
+      .select()
+      .from(pensionPots)
+      .where(and(eq(pensionPots.userId, userId), isNull(pensionPots.archivedAt))),
+    db
+      .select()
+      .from(mortgages)
+      .where(and(eq(mortgages.userId, userId), isNull(mortgages.archivedAt))),
+    db
+      .select()
+      .from(debts)
+      .where(and(eq(debts.userId, userId), isNull(debts.archivedAt))),
   ]);
   return computeDerivedAllocations(
     rates,
@@ -460,8 +475,7 @@ function computeSavingsAtCutoff(
   rates: Map<string, number>,
 ): number {
   return accounts.reduce((sum, account) => {
-    const archivedAt = toOptionalTimestamp(account.archivedAt);
-    if (archivedAt !== null && archivedAt <= cutoff) return sum;
+    if (isArchivedAtCutoff(account, cutoff)) return sum;
 
     let balance = toNumber(account.balance);
     for (const transaction of txnsByAccountId.get(account.id) ?? []) {
@@ -473,6 +487,11 @@ function computeSavingsAtCutoff(
   }, 0);
 }
 
+function isArchivedAtCutoff(entity: Archivable, cutoff: number): boolean {
+  const archivedAt = toOptionalTimestamp(entity.archivedAt);
+  return archivedAt !== null && archivedAt <= cutoff;
+}
+
 function computePensionAtCutoff(
   pots: readonly PensionPotRow[],
   txnsByPotId: ReadonlyMap<number, readonly DatedPensionTransaction[]>,
@@ -480,6 +499,7 @@ function computePensionAtCutoff(
   rates: Map<string, number>,
 ): number {
   return pots.reduce((sum, pot) => {
+    if (isArchivedAtCutoff(pot, cutoff)) return sum;
     let balance = toNumber(pot.balance);
     for (const transaction of txnsByPotId.get(pot.id) ?? []) {
       if (transaction.timestamp <= cutoff) continue;
@@ -496,6 +516,7 @@ function computeBrokerageAtCutoff(
   rates: Map<string, number>,
 ): number {
   return portfolioHoldings.reduce((sum, holding) => {
+    if (isArchivedAtCutoff(holding, cutoff)) return sum;
     let shares = 0;
     for (const transaction of txnsByHoldingId.get(holding.id) ?? []) {
       if (transaction.timestamp > cutoff) break;
@@ -505,6 +526,18 @@ function computeBrokerageAtCutoff(
     const value = Math.max(0, shares) * toNumber(holding.currentPrice);
     return sum + convertToBase(value, holding.currency, rates);
   }, 0);
+}
+
+function buildActiveMortgageBalanceAtCutoff(
+  userMortgages: readonly MortgageRow[],
+  cutoff: number,
+): Map<number, number> {
+  const balances = new Map<number, number>();
+  for (const mortgage of userMortgages) {
+    if (isArchivedAtCutoff(mortgage, cutoff)) continue;
+    balances.set(mortgage.id, toNumber(mortgage.outstandingBalance));
+  }
+  return balances;
 }
 
 function computePropertyEquityAtCutoff(
@@ -665,16 +698,17 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
 }
 
 function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
-  const activeSavings = sourceData.savings.filter((account) => !account.archivedAt);
+  const dropArchived = <T extends Archivable>(rows: readonly T[]): T[] =>
+    rows.filter((row) => !row.archivedAt);
   const allocationSummary = computeDerivedAllocations(
     sourceData.rates,
-    activeSavings,
-    sourceData.holdings,
+    dropArchived(sourceData.savings),
+    dropArchived(sourceData.holdings),
     sourceData.holdingTransactions,
     sourceData.properties,
-    sourceData.pensions,
-    sourceData.mortgages,
-    sourceData.debts,
+    dropArchived(sourceData.pensions),
+    dropArchived(sourceData.mortgages),
+    dropArchived(sourceData.debts),
   );
   const currentMonth = monthStartUtc(Date.now());
   const totalValue =
@@ -728,7 +762,6 @@ export function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHi
     datedDebtPayments,
     (transaction) => transaction.debtId,
   );
-  const mortgageBalanceById = buildMortgageBalanceById(sourceData.mortgages);
 
   return months.map((month, index) => {
     const savings = computeSavingsAtCutoff(
@@ -746,7 +779,7 @@ export function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHi
     const propertyEquity = computePropertyEquityAtCutoff(
       sourceData.properties,
       propertiesById,
-      mortgageBalanceById,
+      buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, month.cutoff),
       month.cutoff,
       sourceData.rates,
     );

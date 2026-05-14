@@ -1,4 +1,6 @@
 export * from './AreaChartCard';
+export * from './ArchiveOrDeleteDialog';
+export * from './ArchivedItemsSection';
 export * from './ChartCard';
 export * from './DataTable';
 export * from './Modal';

@@ -4,6 +4,7 @@ export { PensionGrowthChart } from './PensionGrowthChart';
 export { PensionHeroBanner } from './PensionHeroBanner';
 export { PensionModal } from './PensionModal';
 export { PensionModals } from './PensionModals';
+export { PensionArchivedSection } from './PensionArchivedSection';
 export { PensionPotsList } from './PensionPotsList';
 export { PensionRetirementProjection } from './PensionRetirementProjection';
 export { PensionSummaryStats } from './PensionSummaryStats';
