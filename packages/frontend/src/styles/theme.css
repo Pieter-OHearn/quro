@@ -1,127 +1,198 @@
-@custom-variant dark (&:is(.dark *));
+/**
+ * Quro design tokens.
+ *
+ * Two-layer system:
+ *   1. Raw CSS variables defined on :root — the source of truth.
+ *   2. `@theme inline` maps them to Tailwind utility namespaces (color, radius,
+ *      shadow, motion, etc.) via var() so utilities respond to value changes
+ *      at runtime.
+ *
+ * Prefer semantic tokens (bg-brand, text-fg-muted, border-border-subtle, etc.)
+ * in shared primitives. Do not introduce raw Tailwind palette values
+ * (bg-indigo-600, text-slate-500, …) when a token already covers the use case.
+ *
+ * Dark mode is not wired up — when it lands, add a `.dark { … }` block here
+ * that overrides the same raw variables.
+ */
 
 :root {
+  /* Typography. */
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
-  --destructive: #d4183d;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
-  --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  --font-weight-medium: 500;
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* Brand (indigo). */
+  --brand: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-disabled: #818cf8;
+  --brand-border: #a5b4fc;
+  --brand-soft: #eef2ff;
+  --brand-soft-strong: #e0e7ff;
+  /* Matches brand-hover today, but names text-on-tint intent separately from interaction state. */
+  --brand-fg: #4338ca;
+
+  /* Surface (page, card, and hover backgrounds). */
+  --surface: #ffffff;
+  --surface-sunken: #f8fafc;
+  --surface-muted: #f1f5f9;
+  --surface-inverse: #0a0f1e;
+  --surface-inverse-raised: #1b2550;
+
+  /* Border. */
+  --border-subtle: #f1f5f9;
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  /* Foreground / text. */
+  --fg: #0f172a;
+  --fg-strong: #334155;
+  --fg-muted: #475569;
+  --fg-subtle: #64748b;
+  --fg-faint: #94a3b8;
+  --fg-disabled: #cbd5e1;
+  --fg-inverted: #ffffff;
+
+  /* Status — success. */
+  --success: #059669;
+  --success-fg: #047857;
+  --success-soft: #ecfdf5;
+  --success-soft-strong: #d1fae5;
+  --success-border: #a7f3d0;
+
+  /* Status — warning. */
+  --warning: #d97706;
+  --warning-fg: #b45309;
+  --warning-soft: #fffbeb;
+  --warning-soft-strong: #fef3c7;
+  --warning-border: #fde68a;
+
+  /* Status — danger. */
+  --danger: #f43f5e;
+  --danger-fg: #be123c;
+  --danger-soft: #fff1f2;
+  --danger-soft-strong: #ffe4e6;
+  --danger-border: #fecdd3;
+
+  /* Status — info. */
+  --info: #0284c7;
+  --info-fg: #0369a1;
+  --info-soft: #f0f9ff;
+  --info-soft-strong: #e0f2fe;
+  --info-border: #bae6fd;
+
+  /* Focus ring. */
+  --focus-ring: #a5b4fc;
+  --focus-ring-width: 2px;
+
+  /* Shadows. */
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-popover: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-brand: 0 4px 6px -1px rgb(79 70 229 / 0.2);
+
+  /* Motion. */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 300ms;
+  --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /*
+   * Radius scale.
+   *
+   * Note: this overrides Tailwind's default `rounded-sm/-md/-lg/-xl` values
+   * (which would be 0.125 / 0.375 / 0.5 / 0.75rem). The override exists because
+   * the entire app was built against these larger values; ~240 `rounded-*`
+   * usages depend on them. Treat this as a load-bearing visual baseline.
+   */
+  --radius: 0.625rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-input-background: var(--input-background);
-  --color-switch-background: var(--switch-background);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-disabled: var(--brand-disabled);
+  --color-brand-border: var(--brand-border);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-strong: var(--brand-soft-strong);
+  --color-brand-fg: var(--brand-fg);
+
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-surface-inverse-raised: var(--surface-inverse-raised);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-strong: var(--fg-strong);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-faint: var(--fg-faint);
+  --color-fg-disabled: var(--fg-disabled);
+  --color-fg-inverted: var(--fg-inverted);
+
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-strong: var(--success-soft-strong);
+  --color-success-border: var(--success-border);
+
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-strong: var(--warning-soft-strong);
+  --color-warning-border: var(--warning-border);
+
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-strong: var(--danger-soft-strong);
+  --color-danger-border: var(--danger-border);
+
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-strong: var(--info-soft-strong);
+  --color-info-border: var(--info-border);
+
+  --color-focus-ring: var(--focus-ring);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-popover: var(--shadow-popover);
+  --shadow-overlay: var(--shadow-overlay);
+  --shadow-brand: var(--shadow-brand);
+
+  --duration-fast: var(--motion-fast);
+  --duration-base: var(--motion-base);
+  --duration-slow: var(--motion-slow);
+  --ease-standard: var(--motion-ease-standard);
+  --ease-emphasized: var(--motion-ease-emphasized);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/**
+ * Financial number typography.
+ * Use on any number column or value that needs to align visually across rows
+ * (balances, amounts, rates). Locks tabular figures and lining numerals.
+ */
+@utility font-numeric {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border-default outline-focus-ring/50;
   }
 
   html,
@@ -132,7 +203,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-surface text-fg;
     margin: 0;
     min-height: 100dvh;
   }
@@ -148,9 +219,10 @@
   }
 
   /**
-  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
-  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
-  */
+   * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+   * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg)
+   * automatically override them.
+   */
 
   html {
     font-size: var(--font-size);

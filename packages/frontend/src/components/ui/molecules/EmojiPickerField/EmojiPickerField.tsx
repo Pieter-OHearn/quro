@@ -48,9 +48,9 @@ function getPickerPos(buttonEl: HTMLButtonElement, pickerWidth: number, pickerHe
 }
 
 function getButtonBorderClass(error: string | undefined, open: boolean): string {
-  if (error) return 'border-rose-300 bg-rose-50';
-  if (open) return 'border-indigo-400 bg-indigo-50';
-  return 'border-slate-200 bg-slate-50';
+  if (error) return 'border-danger-border bg-danger-soft';
+  if (open) return 'border-brand-border bg-brand-soft';
+  return 'border-border-default bg-surface-sunken';
 }
 
 function useOutsideClose(
@@ -128,15 +128,13 @@ export function EmojiPickerField({
 
   return (
     <div className={cn('flex-shrink-0', containerClassName)}>
-      {label && (
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
-      )}
+      {label && <label className="block text-xs font-semibold text-fg-muted mb-1.5">{label}</label>}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'w-14 h-[42px] rounded-xl border text-xl flex items-center justify-center transition-all hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300',
+          'w-14 h-[42px] rounded-xl border text-xl flex items-center justify-center transition-all hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus-ring',
           getButtonBorderClass(error, open),
           buttonClassName,
         )}
@@ -154,7 +152,7 @@ export function EmojiPickerField({
           pickerWidth={pickerWidth}
         />
       )}
-      {error && <p className="text-xs text-rose-500 mt-1">{error}</p>}
+      {error && <p className="text-xs text-danger mt-1">{error}</p>}
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function TxnTypeSelector<T extends string>({
               'flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all',
               active
                 ? `${t.borderColor} ${t.bg} ${t.color}`
-                : 'border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50',
+                : 'border-border-default text-fg-faint hover:border-border-strong hover:bg-surface-sunken',
             )}
           >
             <Icon size={15} />

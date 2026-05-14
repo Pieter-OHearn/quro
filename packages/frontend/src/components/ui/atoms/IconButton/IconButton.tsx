@@ -3,9 +3,9 @@ import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const VARIANT_CLASSES = {
-  danger: 'text-slate-200 hover:bg-rose-50 hover:text-rose-400',
-  ghost: 'text-slate-300 hover:bg-slate-100 hover:text-slate-500',
-  subtle: 'text-slate-400 hover:bg-slate-100 hover:text-slate-600',
+  danger: 'text-border-default hover:bg-danger-soft hover:text-danger',
+  ghost: 'text-fg-disabled hover:bg-surface-muted hover:text-fg-subtle',
+  subtle: 'text-fg-faint hover:bg-surface-muted hover:text-fg-muted',
 } as const;
 
 const SIZE_CLASSES = {

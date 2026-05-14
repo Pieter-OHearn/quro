@@ -47,7 +47,7 @@ export function ChartCard({
           {footer}
         </>
       ) : (
-        <div className={cn('py-12 text-center text-sm text-slate-400', emptyStateClassName)}>
+        <div className={cn('py-12 text-center text-sm text-fg-faint', emptyStateClassName)}>
           {emptyMessage}
         </div>
       )}

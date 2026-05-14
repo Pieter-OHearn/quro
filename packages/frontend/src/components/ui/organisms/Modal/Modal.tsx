@@ -60,7 +60,7 @@ export function ModalHeader({
   return (
     <div
       className={cn(
-        'bg-gradient-to-r from-[#0a0f1e] to-[#1a1f3e] px-6 py-5 flex items-center justify-between',
+        'bg-gradient-to-r from-surface-inverse to-surface-inverse-raised px-6 py-5 flex items-center justify-between',
         scrollable && 'flex-shrink-0',
         isCentered && 'relative block text-center',
         className,
@@ -72,7 +72,7 @@ export function ModalHeader({
             type="button"
             onClick={onClose}
             className={cn(
-              'absolute top-4 right-4 p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors',
+              'absolute top-4 right-4 p-2 rounded-xl hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
               closeButtonClassName,
             )}
           >
@@ -80,9 +80,11 @@ export function ModalHeader({
           </button>
           <div className={cn('min-w-0 flex flex-col items-center', contentClassName)}>
             {visual}
-            <h2 className={cn('font-bold text-white', titleClassName)}>{title}</h2>
+            <h2 className={cn('font-bold text-fg-inverted', titleClassName)}>{title}</h2>
             {subtitle && (
-              <p className={cn('text-xs text-indigo-300 mt-0.5', subtitleClassName)}>{subtitle}</p>
+              <p className={cn('text-xs text-brand-border mt-0.5', subtitleClassName)}>
+                {subtitle}
+              </p>
             )}
           </div>
         </>
@@ -90,16 +92,18 @@ export function ModalHeader({
         <>
           <div className={cn('min-w-0 pr-4', contentClassName)}>
             {visual}
-            <h2 className={cn('font-bold text-white', titleClassName)}>{title}</h2>
+            <h2 className={cn('font-bold text-fg-inverted', titleClassName)}>{title}</h2>
             {subtitle && (
-              <p className={cn('text-xs text-indigo-300 mt-0.5', subtitleClassName)}>{subtitle}</p>
+              <p className={cn('text-xs text-brand-border mt-0.5', subtitleClassName)}>
+                {subtitle}
+              </p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
             className={cn(
-              'p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors',
+              'p-2 rounded-xl hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
               closeButtonClassName,
             )}
           >
@@ -128,12 +132,15 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4">
       <div
-        className={cn('absolute -inset-4 bg-black/40 backdrop-blur-sm', backdropClassName)}
+        className={cn(
+          'absolute -inset-4 bg-surface-inverse/40 backdrop-blur-sm',
+          backdropClassName,
+        )}
         onClick={onClose}
       />
       <div
         className={cn(
-          'relative bg-white rounded-2xl shadow-2xl w-full overflow-hidden',
+          'relative bg-surface rounded-2xl shadow-overlay w-full overflow-hidden',
           MAX_WIDTH_MAP[maxWidth],
           scrollable && 'flex flex-col max-h-[90vh]',
           contentClassName,
@@ -156,7 +163,7 @@ export function Modal({
         {footer && (
           <div
             className={cn(
-              'px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3',
+              'px-6 py-4 bg-surface-sunken border-t border-border-subtle flex gap-3',
               scrollable && 'flex-shrink-0',
             )}
           >

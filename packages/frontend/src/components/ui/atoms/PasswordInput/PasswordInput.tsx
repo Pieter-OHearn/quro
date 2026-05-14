@@ -40,7 +40,7 @@ export function PasswordInput({
         disabled={disabled}
         aria-label={show ? 'Hide password' : 'Show password'}
         aria-pressed={show}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:text-slate-300"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-faint transition-colors hover:text-fg-muted disabled:cursor-not-allowed disabled:text-fg-disabled"
         onClick={onToggle}
       >
         {show ? <EyeOff size={16} /> : <Eye size={16} />}

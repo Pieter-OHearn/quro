@@ -4,12 +4,12 @@ import { useId } from 'react';
 //
 // Design: 64×64 viewBox, centre (32,32), ring radius 20
 //
-//  • Ghost ring   — full circle, white, opacity 0.06 — adds depth
+//  • Ghost ring   — full circle, inverted foreground, opacity 0.06 — adds depth
 //  • Main Q arc   — 315° clockwise sweep (gap 30°→75° at lower-right)
-//                   white stroke, round caps
+//                   inverted foreground stroke, round caps
 //  • Tail         — quadratic bezier from arc end, sweeping UP-RIGHT
 //                   indigo→purple gradient, tangent-smooth to arc end
-//  • Centre dot   — small white filled circle
+//  • Centre dot   — small inverted foreground filled circle
 //
 // The tail direction (up-right) echoes the clockwise tangent at 30° on the
 // ring: (sin 30°, −cos 30°) ≈ (0.5, −0.866), so the bezier control point is
@@ -43,13 +43,13 @@ type LogoColors = {
 
 function getLogoColors(inverted: boolean): LogoColors {
   return {
-    arcStroke: inverted ? '#0a0f1e' : 'white',
+    arcStroke: inverted ? 'var(--surface-inverse)' : 'var(--fg-inverted)',
     arcOpacity: inverted ? 0.88 : 0.92,
     ghostOpacity: 0.06,
-    dotFill: inverted ? '#6366f1' : 'white',
+    dotFill: inverted ? 'var(--brand)' : 'var(--fg-inverted)',
     dotOpacity: inverted ? 1 : 0.72,
-    tailA: inverted ? '#6366f1' : '#818cf8',
-    tailB: inverted ? '#8b5cf6' : '#c084fc',
+    tailA: inverted ? 'var(--brand)' : 'var(--brand-disabled)',
+    tailB: inverted ? 'var(--brand-hover)' : 'var(--brand-border)',
   };
 }
 
@@ -60,8 +60,8 @@ function LogoDefs({ id, showBg, tailA, tailB }: LogoDefsProps) {
     <defs>
       {showBg && (
         <linearGradient id={`${id}bg`} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0d1627" />
-          <stop offset="100%" stopColor="#1b2550" />
+          <stop offset="0%" stopColor="var(--surface-inverse)" />
+          <stop offset="100%" stopColor="var(--surface-inverse-raised)" />
         </linearGradient>
       )}
       <linearGradient

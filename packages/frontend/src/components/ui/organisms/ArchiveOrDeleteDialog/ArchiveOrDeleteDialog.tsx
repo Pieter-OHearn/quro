@@ -165,7 +165,7 @@ export function ArchiveOrDeleteDialog({
       }
     >
       {hasNonZeroBalance && !hideArchive ? (
-        <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="flex gap-2 rounded-xl border border-warning-border bg-warning-soft p-3 text-sm text-warning-fg">
           <AlertTriangle size={18} className="shrink-0 mt-0.5" />
           <p>
             <span className="font-medium">Recommended:</span> delete permanently. Archiving with a

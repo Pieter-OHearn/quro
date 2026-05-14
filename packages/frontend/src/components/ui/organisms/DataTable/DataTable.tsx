@@ -70,12 +70,12 @@ export function DataTable({
         >
           {colGroup}
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/60">
+            <tr className="border-b border-border-subtle bg-surface-sunken/60">
               {columns.map((column) => (
                 <th
                   key={column.key}
                   className={cn(
-                    'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap',
+                    'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-fg-faint whitespace-nowrap',
                     ALIGNMENT_CLASSES[column.align ?? 'left'],
                     column.headerClassName,
                   )}
@@ -90,7 +90,7 @@ export function DataTable({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-12 text-center text-sm text-slate-400"
+                  className="px-4 py-12 text-center text-sm text-fg-faint"
                 >
                   {emptyState}
                 </td>

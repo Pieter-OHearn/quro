@@ -232,17 +232,17 @@ const smokeCases: readonly SmokeCase[] = [
             key: 'deposit',
             label: 'Deposit',
             icon: PiggyBank,
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-50',
-            borderColor: 'border-emerald-200',
+            color: 'text-success',
+            bg: 'bg-success-soft',
+            borderColor: 'border-success-border',
           },
           {
             key: 'transfer',
             label: 'Transfer',
             icon: ArrowDownUp,
-            color: 'text-indigo-600',
-            bg: 'bg-indigo-50',
-            borderColor: 'border-indigo-200',
+            color: 'text-brand',
+            bg: 'bg-brand-soft',
+            borderColor: 'border-brand-border',
           },
         ]}
       />

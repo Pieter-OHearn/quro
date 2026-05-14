@@ -10,10 +10,10 @@ const SIZE_CLASSES = {
 } as const;
 
 const TONE_CLASSES = {
-  brand: 'text-indigo-500',
+  brand: 'text-brand',
   current: 'text-current',
-  inverse: 'text-white',
-  muted: 'text-slate-400',
+  inverse: 'text-fg-inverted',
+  muted: 'text-fg-faint',
 } as const;
 
 export type SpinnerProps = Omit<ComponentPropsWithoutRef<typeof Loader2>, 'size'> & {

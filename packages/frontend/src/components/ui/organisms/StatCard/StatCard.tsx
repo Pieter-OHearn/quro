@@ -4,11 +4,11 @@ import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 
 const COLOR_MAP = {
-  indigo: 'bg-indigo-50 text-indigo-600',
-  emerald: 'bg-emerald-50 text-emerald-600',
-  sky: 'bg-sky-50 text-sky-600',
-  amber: 'bg-amber-50 text-amber-600',
-  rose: 'bg-rose-50 text-rose-500',
+  indigo: 'bg-brand-soft text-brand',
+  emerald: 'bg-success-soft text-success',
+  sky: 'bg-info-soft text-info',
+  amber: 'bg-warning-soft text-warning',
+  rose: 'bg-danger-soft text-danger',
 } as const;
 
 export type StatCardProps = {
@@ -47,31 +47,31 @@ function StatCardContent({
         {href && (
           <ArrowRight
             size={14}
-            className="text-slate-300 group-hover:text-slate-500 transition-colors"
+            className="text-fg-disabled group-hover:text-fg-subtle transition-colors"
           />
         )}
       </div>
-      <p className="text-xs text-slate-500 mb-1">{label}</p>
-      <p className={cn('font-bold text-slate-900', valueClassName)}>{value}</p>
+      <p className="text-xs text-fg-subtle mb-1">{label}</p>
+      <p className={cn('font-bold text-fg', valueClassName)}>{value}</p>
       {change && (
         <div
           className={cn(
             'group/trend relative flex items-center gap-1 mt-1 text-xs',
-            change.positive ? 'text-emerald-600' : 'text-rose-500',
+            change.positive ? 'text-success' : 'text-danger',
           )}
         >
           {change.value.includes('%') &&
             (change.positive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />)}
           <span>{change.value}</span>
-          {change.details && <CircleHelp size={12} className="text-slate-400" />}
+          {change.details && <CircleHelp size={12} className="text-fg-faint" />}
           {change.details && (
-            <span className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[11px] leading-relaxed text-slate-600 opacity-0 shadow-lg transition-opacity group-hover/trend:opacity-100">
+            <span className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-64 rounded-lg border border-border-default bg-surface px-2.5 py-2 text-[11px] leading-relaxed text-fg-muted opacity-0 shadow-popover transition-opacity group-hover/trend:opacity-100">
               {change.details}
             </span>
           )}
         </div>
       )}
-      {subtitle && !change && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+      {subtitle && !change && <p className="text-xs text-fg-faint mt-1">{subtitle}</p>}
     </>
   );
 }
@@ -95,7 +95,7 @@ export function StatCard({
         to={href}
         data-testid={testId}
         className={cn(
-          'bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow group',
+          'bg-surface rounded-2xl p-5 border border-border-subtle shadow-card hover:shadow-popover transition-shadow group',
           className,
         )}
       >
@@ -106,7 +106,10 @@ export function StatCard({
   return (
     <div
       data-testid={testId}
-      className={cn('bg-white rounded-2xl p-5 border border-slate-100 shadow-sm', className)}
+      className={cn(
+        'bg-surface rounded-2xl p-5 border border-border-subtle shadow-card',
+        className,
+      )}
     >
       <StatCardContent {...contentProps} />
     </div>
