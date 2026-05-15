@@ -465,7 +465,7 @@ function HoldingRow(props: HoldingRowProps) {
         </DataTableCell>
       </DataTableRow>
       {isExpanded && (
-        <DataTableRow>
+        <DataTableRow mobileCard={false}>
           <DataTableCell colSpan={6} className="p-0">
             <HoldingHistory
               holding={holding}
@@ -909,7 +909,7 @@ function ClosedHoldingExpandedRow({
   'holding' | 'holdingTxns' | 'onAddTxnForHolding' | 'onDeleteTxn' | 'onEditTxn' | 'position'
 >) {
   return (
-    <DataTableRow>
+    <DataTableRow mobileCard={false}>
       <DataTableCell colSpan={5} className="p-0">
         <HoldingHistory
           holding={holding}

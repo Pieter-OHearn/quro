@@ -111,6 +111,7 @@ export type DataTableProps = {
 export type DataTableRowProps = ComponentPropsWithoutRef<'tr'> & {
   selected?: boolean;
   interactive?: boolean;
+  mobileCard?: boolean;
 };
 
 export type DataTableCellProps = ComponentPropsWithoutRef<'td'> & {
@@ -166,6 +167,11 @@ function getColumnDataLabel(label: ReactNode): string | undefined {
   return undefined;
 }
 
+function getRowTabIndex(isKeyboardInteractive: boolean, tabIndex: DataTableRowProps['tabIndex']) {
+  if (!isKeyboardInteractive) return tabIndex;
+  return tabIndex ?? 0;
+}
+
 // Optional column overrides intentionally collapse several table configuration paths.
 // eslint-disable-next-line complexity
 function resolveCellConfig({
@@ -194,6 +200,7 @@ function resolveCellConfig({
 export function DataTableRow({
   selected = false,
   interactive = false,
+  mobileCard = true,
   className,
   children,
   onClick,
@@ -203,7 +210,7 @@ export function DataTableRow({
 }: Readonly<DataTableRowProps>) {
   const tableContext = useDataTableContext();
   const tableVariant = tableContext?.tableVariant ?? 'default';
-  const isKeyboardInteractive = interactive && onClick;
+  const isKeyboardInteractive = Boolean(interactive && onClick);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTableRowElement>) {
     onKeyDown?.(event);
@@ -218,7 +225,9 @@ export function DataTableRow({
   return (
     <tr
       className={cn(
-        'group border-b border-border-subtle transition-colors max-md:block max-md:rounded-lg max-md:border max-md:border-border-subtle max-md:bg-surface max-md:p-3 max-md:shadow-card',
+        'group border-b border-border-subtle transition-colors max-md:block',
+        mobileCard &&
+          'max-md:rounded-lg max-md:border max-md:border-border-subtle max-md:bg-surface max-md:p-3 max-md:shadow-card',
         TABLE_VARIANT_CLASSES[tableVariant].row,
         interactive && 'cursor-pointer hover:bg-surface-sunken',
         selected && 'bg-brand-soft',
@@ -226,7 +235,7 @@ export function DataTableRow({
       )}
       onClick={onClick}
       onKeyDown={handleKeyDown}
-      tabIndex={isKeyboardInteractive ? (tabIndex ?? 0) : tabIndex}
+      tabIndex={getRowTabIndex(isKeyboardInteractive, tabIndex)}
       {...props}
     >
       {children}

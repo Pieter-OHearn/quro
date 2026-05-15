@@ -32,6 +32,7 @@ type SmokeCase = {
   name: string;
   element: ReactElement;
   includes: readonly string[];
+  excludes?: readonly string[];
 };
 
 const noop = () => {};
@@ -308,6 +309,20 @@ const smokeCases: readonly SmokeCase[] = [
     includes: ['font-numeric', 'font-semibold', 'px-3 py-2.5', 'Amount', 'EUR 42.00'],
   },
   {
+    name: 'DataTable can render mobile expansion rows without card padding',
+    element: (
+      <DataTable columns={[{ key: 'asset', header: 'Asset' }]}>
+        <DataTableRow mobileCard={false}>
+          <DataTableCell colSpan={1} className="p-0">
+            Expanded panel
+          </DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: ['colSpan="1"', 'p-0', 'Expanded panel'],
+    excludes: ['max-md:shadow-card'],
+  },
+  {
     name: 'DataTable renders toolbar and filter slots',
     element: (
       <DataTable
@@ -471,6 +486,9 @@ for (const smokeCase of smokeCases) {
 
     for (const fragment of smokeCase.includes) {
       expect(markup).toContain(fragment);
+    }
+    for (const fragment of smokeCase.excludes ?? []) {
+      expect(markup).not.toContain(fragment);
     }
   });
 }

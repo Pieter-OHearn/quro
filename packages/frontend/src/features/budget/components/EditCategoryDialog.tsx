@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EmojiPickerField, FormField, Modal, ModalFooter } from '@/components/ui';
 import type { BudgetCategory, EditCategoryForm } from '../types';
 
@@ -118,10 +118,15 @@ export function EditCategoryDialog({
 }: Readonly<EditCategoryDialogProps>) {
   const [form, setForm] = useState<EditCategoryForm>(toCategoryForm(category));
   const [error, setError] = useState<string | null>(null);
+  const resetKey = mode === 'create' ? 'create' : `edit-${category.id}`;
+  const resetKeyRef = useRef(resetKey);
 
   useEffect(() => {
+    if (resetKeyRef.current === resetKey) return;
+    resetKeyRef.current = resetKey;
     setForm(toCategoryForm(category));
-  }, [category]);
+    setError(null);
+  }, [category, resetKey]);
 
   const set = <K extends keyof EditCategoryForm>(key: K, value: EditCategoryForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
