@@ -16,6 +16,7 @@ import {
   type HoldingPriceSyncResult,
   type HoldingTransaction,
 } from '@quro/shared';
+import { DataTable, DataTableCell, DataTableRow, type DataTableColumn } from '@/components/ui';
 import type { Position } from '../utils/position';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
@@ -70,6 +71,105 @@ type HoldingRowMetrics = {
   foreign: boolean;
   txnCount: number;
 };
+
+function buildBrokerageHoldingColumns(baseCurrency: string): readonly DataTableColumn[] {
+  return [
+    {
+      key: 'asset',
+      header: 'Asset',
+      mobileLabel: 'Asset',
+      width: '25%',
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'position',
+      header: 'Position',
+      align: 'right',
+      mobileLabel: 'Position',
+      width: '16%',
+      numeric: true,
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'current',
+      header: 'Current',
+      align: 'right',
+      mobileLabel: 'Current',
+      width: '16%',
+      numeric: true,
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'value',
+      header: `Value (${baseCurrency})`,
+      align: 'right',
+      mobileLabel: 'Value',
+      width: '16%',
+      numeric: true,
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'gain',
+      header: 'Gain / Loss',
+      align: 'right',
+      mobileLabel: 'Gain / Loss',
+      width: '18%',
+      numeric: true,
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'actions',
+      header: '',
+      priority: 'actions',
+      width: '9%',
+      cellClassName: 'px-6 py-3.5',
+    },
+  ];
+}
+
+const CLOSED_HOLDING_COLUMNS: readonly DataTableColumn[] = [
+  {
+    key: 'asset',
+    header: 'Asset',
+    mobileLabel: 'Asset',
+    width: '40%',
+    cellClassName: 'px-6 py-3.5',
+  },
+  {
+    key: 'sold',
+    header: 'Sold Price',
+    align: 'right',
+    mobileLabel: 'Sold Price',
+    width: '18%',
+    numeric: true,
+    cellClassName: 'px-6 py-3.5',
+  },
+  {
+    key: 'dividends',
+    header: 'Dividends',
+    align: 'right',
+    mobileLabel: 'Dividends',
+    width: '18%',
+    numeric: true,
+    cellClassName: 'px-6 py-3.5',
+  },
+  {
+    key: 'realized',
+    header: 'Realized P&L',
+    align: 'right',
+    mobileLabel: 'Realized P&L',
+    width: '18%',
+    numeric: true,
+    cellClassName: 'px-6 py-3.5',
+  },
+  {
+    key: 'actions',
+    header: '',
+    priority: 'actions',
+    width: '6%',
+    cellClassName: 'px-6 py-3.5',
+  },
+];
 
 function getEffectivePrice(holding: Holding): number {
   const manual = holding.manualPrice != null ? Number(holding.manualPrice) : null;
@@ -187,37 +287,45 @@ function HoldingValueCells({
 }: HoldingValueCellsProps) {
   return (
     <>
-      <div className="col-span-2 text-right">
-        <p className="text-sm font-semibold text-slate-800">
-          {position.shares.toFixed(4).replace(/\.?0+$/, '')}
-        </p>
-        <p className="text-xs text-slate-400">
-          @ {fmtNative(position.avgCost, holding.currency, true)}
-        </p>
-      </div>
-      <div className="col-span-2 text-right">
-        <div className="flex items-center justify-end gap-1">
+      <DataTableCell columnKey="position">
+        <div>
           <p className="text-sm font-semibold text-slate-800">
-            {fmtNative(getEffectivePrice(holding), holding.currency, true)}
+            {position.shares.toFixed(4).replace(/\.?0+$/, '')}
           </p>
-          {holding.manualPrice != null && (
-            <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-medium">
-              M
-            </span>
+          <p className="text-xs text-slate-400">
+            @ {fmtNative(position.avgCost, holding.currency, true)}
+          </p>
+        </div>
+      </DataTableCell>
+      <DataTableCell columnKey="current">
+        <div>
+          <div className="flex items-center justify-end gap-1">
+            <p className="text-sm font-semibold text-slate-800">
+              {fmtNative(getEffectivePrice(holding), holding.currency, true)}
+            </p>
+            {holding.manualPrice != null && (
+              <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-medium">
+                M
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-400">
+            {holding.excludeFromSync
+              ? 'sync off'
+              : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency)}
+          </p>
+        </div>
+      </DataTableCell>
+      <DataTableCell columnKey="value">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">{fmtBase(valueInBase)}</p>
+          {foreign && (
+            <p className="text-xs text-amber-600">
+              {fmtNative(nativeValue, holding.currency, true)}
+            </p>
           )}
         </div>
-        <p className="text-[10px] text-slate-400">
-          {holding.excludeFromSync
-            ? 'sync off'
-            : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency)}
-        </p>
-      </div>
-      <div className="col-span-2 text-right">
-        <p className="text-sm font-semibold text-slate-800">{fmtBase(valueInBase)}</p>
-        {foreign && (
-          <p className="text-xs text-amber-600">{fmtNative(nativeValue, holding.currency, true)}</p>
-        )}
-      </div>
+      </DataTableCell>
     </>
   );
 }
@@ -300,9 +408,11 @@ function HoldingRow(props: HoldingRowProps) {
     computeHoldingRowMetrics(holding, holdingTxns, position, convertToBase, isForeign);
 
   return (
-    <div key={holding.id}>
-      <div className="grid grid-cols-12 gap-2 px-6 py-3.5 hover:bg-slate-50/60 transition-colors items-center">
-        <HoldingAssetCell holding={holding} foreign={foreign} txnCount={txnCount} />
+    <>
+      <DataTableRow interactive>
+        <DataTableCell columnKey="asset">
+          <HoldingAssetCell holding={holding} foreign={foreign} txnCount={txnCount} />
+        </DataTableCell>
         <HoldingValueCells
           holding={holding}
           position={position}
@@ -312,30 +422,38 @@ function HoldingRow(props: HoldingRowProps) {
           fmtBase={fmtBase}
           fmtNative={fmtNative}
         />
-        <HoldingGainCell
-          gain={gain}
-          gainPctHolding={gainPctHolding}
-          holding={holding}
-          fmtNative={fmtNative}
-        />
-        <HoldingRowActions
-          holding={holding}
-          isExpanded={isExpanded}
-          onEditHolding={onEditHolding}
-          onToggleExpanded={onToggleExpanded}
-        />
-      </div>
+        <DataTableCell columnKey="gain">
+          <HoldingGainCell
+            gain={gain}
+            gainPctHolding={gainPctHolding}
+            holding={holding}
+            fmtNative={fmtNative}
+          />
+        </DataTableCell>
+        <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+          <HoldingRowActions
+            holding={holding}
+            isExpanded={isExpanded}
+            onEditHolding={onEditHolding}
+            onToggleExpanded={onToggleExpanded}
+          />
+        </DataTableCell>
+      </DataTableRow>
       {isExpanded && (
-        <HoldingHistory
-          holding={holding}
-          holdingTxns={holdingTxns}
-          position={position}
-          onAddTxnForHolding={props.onAddTxnForHolding}
-          onEditTxn={props.onEditTxn}
-          onDeleteTxn={props.onDeleteTxn}
-        />
+        <DataTableRow>
+          <DataTableCell colSpan={6} className="p-0">
+            <HoldingHistory
+              holding={holding}
+              holdingTxns={holdingTxns}
+              position={position}
+              onAddTxnForHolding={props.onAddTxnForHolding}
+              onEditTxn={props.onEditTxn}
+              onDeleteTxn={props.onDeleteTxn}
+            />
+          </DataTableCell>
+        </DataTableRow>
       )}
-    </div>
+    </>
   );
 }
 
@@ -385,6 +503,7 @@ type BrokerageHoldingsListProps = {
   holdings: Holding[];
   holdingTxns: HoldingTransaction[];
   positions: Record<number, Position>;
+  baseCurrency: string;
   expandedHoldingId: number | null;
   fmtBase: (value: number, currency?: string, compact?: boolean) => string;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
@@ -401,6 +520,7 @@ function BrokerageHoldingsList({
   holdings,
   holdingTxns,
   positions,
+  baseCurrency,
   expandedHoldingId,
   fmtBase,
   fmtNative,
@@ -413,7 +533,13 @@ function BrokerageHoldingsList({
   onDeleteTxn,
 }: BrokerageHoldingsListProps) {
   return (
-    <div className="divide-y divide-slate-50">
+    <DataTable
+      variant="plain"
+      tableVariant="expandable"
+      columns={buildBrokerageHoldingColumns(baseCurrency)}
+      tableLayout="fixed"
+      minWidth={960}
+    >
       {holdings.map((holding) => (
         <HoldingRow
           key={holding.id}
@@ -432,7 +558,7 @@ function BrokerageHoldingsList({
           onDeleteTxn={onDeleteTxn}
         />
       ))}
-    </div>
+    </DataTable>
   );
 }
 
@@ -489,18 +615,22 @@ function ClosedHoldingPriceCell({
 }) {
   if (lastSellPrice === null) {
     return (
-      <div className="col-span-2 text-right">
-        <p className="text-sm text-slate-300">—</p>
-        <p className="text-xs text-slate-300">no sells</p>
-      </div>
+      <DataTableCell columnKey="sold">
+        <div>
+          <p className="text-sm text-slate-300">—</p>
+          <p className="text-xs text-slate-300">no sells</p>
+        </div>
+      </DataTableCell>
     );
   }
 
   return (
-    <div className="col-span-2 text-right">
-      <p className="text-sm text-slate-500">{fmtNative(lastSellPrice, holding.currency, true)}</p>
-      <p className="text-xs text-slate-300">last sell</p>
-    </div>
+    <DataTableCell columnKey="sold">
+      <div>
+        <p className="text-sm text-slate-500">{fmtNative(lastSellPrice, holding.currency, true)}</p>
+        <p className="text-xs text-slate-300">last sell</p>
+      </div>
+    </DataTableCell>
   );
 }
 
@@ -521,23 +651,25 @@ function ClosedHoldingDividendsCell({
 }) {
   if (totalDividends <= 0) {
     return (
-      <div className="col-span-2 text-right">
+      <DataTableCell columnKey="dividends">
         <p className="text-sm text-slate-300">—</p>
-      </div>
+      </DataTableCell>
     );
   }
 
   return (
-    <div className="col-span-2 text-right">
-      <p className="text-sm font-semibold text-slate-500">
-        +{fmtBase(convertToBase(totalDividends, holding.currency))}
-      </p>
-      {foreign && (
-        <p className="text-xs text-amber-600">
-          +{fmtNative(totalDividends, holding.currency, true)}
+    <DataTableCell columnKey="dividends">
+      <div>
+        <p className="text-sm font-semibold text-slate-500">
+          +{fmtBase(convertToBase(totalDividends, holding.currency))}
         </p>
-      )}
-    </div>
+        {foreign && (
+          <p className="text-xs text-amber-600">
+            +{fmtNative(totalDividends, holding.currency, true)}
+          </p>
+        )}
+      </div>
+    </DataTableCell>
   );
 }
 
@@ -555,20 +687,23 @@ function ClosedHoldingRealizedCell({
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 }) {
   return (
-    <div
-      className={`col-span-2 text-right ${realizedGain >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}
+    <DataTableCell
+      columnKey="realized"
+      className={realizedGain >= 0 ? 'text-emerald-500' : 'text-rose-400'}
     >
-      <div className="flex items-center justify-end gap-0.5">
-        {realizedGain >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
-        <p className="text-sm font-semibold">
-          {realizedGain >= 0 ? '+' : ''}
-          {fmtNative(realizedGain, holding.currency, true)}
+      <div>
+        <div className="flex items-center justify-end gap-0.5">
+          {realizedGain >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+          <p className="text-sm font-semibold">
+            {realizedGain >= 0 ? '+' : ''}
+            {fmtNative(realizedGain, holding.currency, true)}
+          </p>
+        </div>
+        <p className="text-xs">
+          {costBasis > 0 ? `${realizedPct >= 0 ? '+' : ''}${realizedPct.toFixed(1)}%` : '—'}
         </p>
       </div>
-      <p className="text-xs">
-        {costBasis > 0 ? `${realizedPct >= 0 ? '+' : ''}${realizedPct.toFixed(1)}%` : '—'}
-      </p>
-    </div>
+    </DataTableCell>
   );
 }
 
@@ -620,6 +755,61 @@ function ClosedHoldingAssetCell({
   );
 }
 
+function ClosedHoldingActionCell({
+  holding,
+  isExpanded,
+  onEditHolding,
+  onToggleExpanded,
+}: Pick<ClosedHoldingRowProps, 'holding' | 'isExpanded' | 'onEditHolding' | 'onToggleExpanded'>) {
+  return (
+    <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+      <div className="flex items-center justify-end gap-0.5">
+        <button
+          onClick={() => onEditHolding(holding)}
+          className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-300 hover:text-slate-500 transition-colors"
+          title="Edit holding"
+        >
+          <Edit3 size={13} />
+        </button>
+        <button
+          onClick={() => onToggleExpanded(holding.id)}
+          className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-300 hover:text-slate-500 transition-colors"
+          title={isExpanded ? 'Collapse' : 'View transactions'}
+        >
+          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      </div>
+    </DataTableCell>
+  );
+}
+
+function ClosedHoldingExpandedRow({
+  holding,
+  holdingTxns,
+  position,
+  onAddTxnForHolding,
+  onEditTxn,
+  onDeleteTxn,
+}: Pick<
+  ClosedHoldingRowProps,
+  'holding' | 'holdingTxns' | 'onAddTxnForHolding' | 'onDeleteTxn' | 'onEditTxn' | 'position'
+>) {
+  return (
+    <DataTableRow>
+      <DataTableCell colSpan={5} className="p-0">
+        <HoldingHistory
+          holding={holding}
+          holdingTxns={holdingTxns}
+          position={position}
+          onAddTxnForHolding={onAddTxnForHolding}
+          onEditTxn={onEditTxn}
+          onDeleteTxn={onDeleteTxn}
+        />
+      </DataTableCell>
+    </DataTableRow>
+  );
+}
+
 function ClosedHoldingRow({
   holding,
   holdingTxns,
@@ -643,13 +833,15 @@ function ClosedHoldingRow({
   );
 
   return (
-    <div>
-      <div className="grid grid-cols-12 gap-2 px-6 py-3.5 items-center hover:bg-slate-100/50 transition-colors">
-        <ClosedHoldingAssetCell
-          holding={holding}
-          txnCount={txnCount}
-          isForeign={isForeignHolding}
-        />
+    <>
+      <DataTableRow interactive>
+        <DataTableCell columnKey="asset">
+          <ClosedHoldingAssetCell
+            holding={holding}
+            txnCount={txnCount}
+            isForeign={isForeignHolding}
+          />
+        </DataTableCell>
 
         <ClosedHoldingPriceCell
           lastSellPrice={lastSellPrice}
@@ -672,26 +864,16 @@ function ClosedHoldingRow({
           fmtNative={fmtNative}
         />
 
-        <div className="col-span-1 flex items-center justify-end gap-0.5">
-          <button
-            onClick={() => onEditHolding(holding)}
-            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-300 hover:text-slate-500 transition-colors"
-            title="Edit holding"
-          >
-            <Edit3 size={13} />
-          </button>
-          <button
-            onClick={() => onToggleExpanded(holding.id)}
-            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-300 hover:text-slate-500 transition-colors"
-            title={isExpanded ? 'Collapse' : 'View transactions'}
-          >
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
-      </div>
+        <ClosedHoldingActionCell
+          holding={holding}
+          isExpanded={isExpanded}
+          onEditHolding={onEditHolding}
+          onToggleExpanded={onToggleExpanded}
+        />
+      </DataTableRow>
 
       {isExpanded && (
-        <HoldingHistory
+        <ClosedHoldingExpandedRow
           holding={holding}
           holdingTxns={holdingTxns}
           position={position}
@@ -700,7 +882,7 @@ function ClosedHoldingRow({
           onDeleteTxn={onDeleteTxn}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -829,36 +1011,33 @@ function ClosedHoldingsTable({
   onDeleteTxn: (id: number) => void;
 }) {
   return (
-    <>
-      <div className="grid grid-cols-12 gap-2 px-6 py-2 text-[10px] font-semibold text-slate-300 uppercase tracking-wide bg-slate-50/90">
-        <span className="col-span-5">Asset</span>
-        <span className="col-span-2 text-right">Sold Price</span>
-        <span className="col-span-2 text-right">Dividends</span>
-        <span className="col-span-2 text-right">Realized P&L</span>
-        <span className="col-span-1"></span>
-      </div>
-
-      <div className="divide-y divide-slate-100/80 bg-slate-50/50">
-        {closedHoldings.map((holding) => (
-          <ClosedHoldingRow
-            key={holding.id}
-            holding={holding}
-            holdingTxns={holdingTxns}
-            position={positions[holding.id]}
-            isExpanded={expandedHoldingId === holding.id}
-            fmtBase={fmtBase}
-            fmtNative={fmtNative}
-            convertToBase={convertToBase}
-            isForeign={isForeign}
-            onEditHolding={onEditHolding}
-            onToggleExpanded={onToggleExpanded}
-            onAddTxnForHolding={onAddTxnForHolding}
-            onEditTxn={onEditTxn}
-            onDeleteTxn={onDeleteTxn}
-          />
-        ))}
-      </div>
-    </>
+    <DataTable
+      variant="plain"
+      tableVariant="expandable"
+      columns={CLOSED_HOLDING_COLUMNS}
+      tableLayout="fixed"
+      minWidth={900}
+      className="bg-slate-50/50"
+    >
+      {closedHoldings.map((holding) => (
+        <ClosedHoldingRow
+          key={holding.id}
+          holding={holding}
+          holdingTxns={holdingTxns}
+          position={positions[holding.id]}
+          isExpanded={expandedHoldingId === holding.id}
+          fmtBase={fmtBase}
+          fmtNative={fmtNative}
+          convertToBase={convertToBase}
+          isForeign={isForeign}
+          onEditHolding={onEditHolding}
+          onToggleExpanded={onToggleExpanded}
+          onAddTxnForHolding={onAddTxnForHolding}
+          onEditTxn={onEditTxn}
+          onDeleteTxn={onDeleteTxn}
+        />
+      ))}
+    </DataTable>
   );
 }
 
@@ -940,7 +1119,6 @@ function ClosedHoldingsSection({
 type BrokerageHeaderProps = {
   activeHoldingsCount: number;
   totalHoldingsCount: number;
-  baseCurrency: string;
   onAddHolding: () => void;
   onSyncPrices: () => void;
   isSyncingPrices: boolean;
@@ -950,7 +1128,6 @@ type BrokerageHeaderProps = {
 function BrokerageHeader({
   activeHoldingsCount,
   totalHoldingsCount,
-  baseCurrency,
   onAddHolding,
   onSyncPrices,
   isSyncingPrices,
@@ -997,14 +1174,6 @@ function BrokerageHeader({
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-12 gap-2 px-6 pb-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-        <span className="col-span-3">Asset</span>
-        <span className="col-span-2 text-right">Position</span>
-        <span className="col-span-2 text-right">Current</span>
-        <span className="col-span-2 text-right">Value ({baseCurrency})</span>
-        <span className="col-span-2 text-right">Gain / Loss</span>
-        <span className="col-span-1"></span>
-      </div>
       {totalHoldingsCount > activeHoldingsCount && (
         <p className="px-6 pb-2 text-[11px] text-slate-400">
           {totalHoldingsCount - activeHoldingsCount} closed holdings excluded from sync and active
@@ -1036,7 +1205,6 @@ export function BrokerageTab(props: BrokerageTabProps) {
       <BrokerageHeader
         activeHoldingsCount={activeHoldings.length}
         totalHoldingsCount={activeHoldings.length + closedHoldings.length}
-        baseCurrency={baseCurrency}
         onAddHolding={onAddHolding}
         onSyncPrices={onSyncPrices}
         isSyncingPrices={isSyncingPrices}
@@ -1046,6 +1214,7 @@ export function BrokerageTab(props: BrokerageTabProps) {
         holdings={activeHoldings}
         holdingTxns={holdingTxns}
         positions={positions}
+        baseCurrency={baseCurrency}
         expandedHoldingId={expandedHoldingId}
         fmtBase={fmtBase}
         fmtNative={fmtNative}

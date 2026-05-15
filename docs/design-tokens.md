@@ -57,3 +57,33 @@ Quro does not have a dark mode today. When it is added, override the same raw
 variables under a `.dark { … }` block in `theme.css` and toggle the class on
 the document root — every token automatically picks up the new value at
 runtime, so no component code has to change.
+
+## Component decision rules
+
+Use `DataTable` for comparable records where columns carry meaning across rows:
+salary payslips, debt payments, pension import review rows, investment holdings,
+closed holdings, account balances, and future sortable/filterable datasets. Put
+alignment, mobile labels, priority, widths, and numeric typography in the
+`columns` config; row cells should reference columns with `columnKey`.
+
+Use `TxnHistoryPanel` / `TxnRow` for chronological activity feeds where each row
+is read as an event summary rather than compared column-by-column: mortgage,
+pension, property, holding, and savings transaction histories. Keep these as
+rows unless the UI needs desktop headers or aligned numeric comparison.
+
+Use card grids for independent objects where scanning depends on object state or
+visual grouping rather than shared columns: goal cards, property cards, account
+cards, debt cards, and dashboard overview cards.
+
+Current audit status:
+
+| Surface                         | Decision                     | Notes                                                   |
+| ------------------------------- | ---------------------------- | ------------------------------------------------------- |
+| Salary payslip history          | `DataTable`                  | Financial table with selected rows.                     |
+| Debt payment history            | `DataTable`                  | Compact financial table.                                |
+| Investment active holdings      | `DataTable`                  | Expandable financial table.                             |
+| Investment closed holdings      | `DataTable`                  | Expandable financial table.                             |
+| Pension statement import review | `DataTable`                  | Editable review table.                                  |
+| Transaction history panels      | `TxnHistoryPanel` / `TxnRow` | Event feeds; do not force into tables by default.       |
+| Budget categories               | Follow-up audit              | Likely table-like because budget/spent columns compare. |
+| Recent transactions             | Row list                     | Activity feed, not a comparative table.                 |

@@ -23,8 +23,7 @@ import {
   type JobPhase,
   type PensionImportModalStep,
 } from '../hooks/usePensionImportModalController';
-
-const GRID = '130px 86px 112px 1fr 74px 64px';
+import { DataTable, DataTableCell, DataTableRow } from '@/components/ui';
 
 type ImportPensionStatementModalProps = {
   pot: PensionPot;
@@ -45,13 +44,12 @@ type RowDraft = {
 
 type TypeMeta = {
   label: string;
-  accent: string;
 };
 
 const TYPE_META: Record<PensionStatementImportRow['type'], TypeMeta> = {
-  contribution: { label: 'Contribution', accent: 'bg-emerald-400' },
-  fee: { label: 'Fee', accent: 'bg-rose-400' },
-  annual_statement: { label: 'Annual Statement', accent: 'bg-amber-400' },
+  contribution: { label: 'Contribution' },
+  fee: { label: 'Fee' },
+  annual_statement: { label: 'Annual Statement' },
 };
 
 const CONF_META: Record<ConfidenceLevel, { label: string; cls: string }> = {
@@ -666,22 +664,26 @@ function ReviewDeletedRow({
   onToggleDelete: (row: PensionStatementImportRow) => Promise<void>;
 }>) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-100 opacity-50">
-      <div className="w-1 flex-shrink-0" />
-      <span className="text-xs text-slate-400 line-through flex-1">
-        {typeMeta.label} · {draft.amount} · {draft.date}
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          void onToggleDelete(row);
-        }}
-        disabled={isRowBusy}
-        className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors flex-shrink-0 disabled:opacity-60"
-      >
-        {deleting ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />} Undo
-      </button>
-    </div>
+    <DataTableRow className="bg-slate-50 opacity-50">
+      <DataTableCell colSpan={6} className="px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <div className="w-1 flex-shrink-0" />
+          <span className="text-xs text-slate-400 line-through flex-1">
+            {typeMeta.label} · {draft.amount} · {draft.date}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              void onToggleDelete(row);
+            }}
+            disabled={isRowBusy}
+            className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors flex-shrink-0 disabled:opacity-60"
+          >
+            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />} Undo
+          </button>
+        </div>
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -833,20 +835,14 @@ function ReviewEditableRow({
   onToggleReviewed,
   onToggleDelete,
 }: Readonly<RowActionProps>) {
-  const typeMeta = TYPE_META[draft.type] ?? TYPE_META.contribution;
   const confidenceMeta = CONF_META[row.confidenceLabel];
 
   return (
-    <div
-      className={`flex items-start rounded-xl border transition-all overflow-hidden ${getReviewRowContainerClass(isSaved)}`}
-    >
-      <div className={`w-1 self-stretch flex-shrink-0 ${typeMeta.accent}`} />
-      <div
-        className="flex-1 grid gap-2 px-3 py-3 items-start min-w-0"
-        style={{ gridTemplateColumns: GRID }}
-      >
+    <DataTableRow className={`border transition-all ${getReviewRowContainerClass(isSaved)}`}>
+      <DataTableCell columnKey="type">
         <ReviewTypeCell row={row} draft={draft} onPatch={onPatch} />
-
+      </DataTableCell>
+      <DataTableCell columnKey="amount">
         <input
           type="number"
           step="0.01"
@@ -855,16 +851,22 @@ function ReviewEditableRow({
           className="text-xs rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-300 text-slate-700 w-full"
           placeholder="0.00"
         />
-
+      </DataTableCell>
+      <DataTableCell columnKey="date">
         <input
           type="date"
           value={draft.date}
           onChange={(event) => onPatch(row, { date: event.target.value })}
           className="text-xs rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-300 text-slate-700 w-full"
         />
-
+      </DataTableCell>
+      <DataTableCell columnKey="note">
         <ReviewNoteCell row={row} draft={draft} onPatch={onPatch} />
+      </DataTableCell>
+      <DataTableCell columnKey="confidence">
         <ReviewConfidenceCell row={row} confidenceMeta={confidenceMeta} />
+      </DataTableCell>
+      <DataTableCell columnKey="actions">
         <ReviewActionsCell
           row={row}
           isSaved={isSaved}
@@ -874,8 +876,8 @@ function ReviewEditableRow({
           onToggleReviewed={onToggleReviewed}
           onToggleDelete={onToggleDelete}
         />
-      </div>
-    </div>
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -981,25 +983,6 @@ function ReviewSummaryChips({
   );
 }
 
-function ReviewTableHeader() {
-  return (
-    <div className="sticky top-0 z-10 bg-slate-50 border-b border-slate-100 px-5 py-2.5 flex items-center">
-      <div className="w-1 mr-3 flex-shrink-0" />
-      <div
-        className="flex-1 grid gap-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider"
-        style={{ gridTemplateColumns: GRID }}
-      >
-        <span>Type</span>
-        <span>Amount</span>
-        <span>Date</span>
-        <span>Note</span>
-        <span className="text-center">Confidence</span>
-        <span className="text-right">Actions</span>
-      </div>
-    </div>
-  );
-}
-
 type ReviewRowsListProps = {
   rows: PensionStatementImportRow[];
   savingRowId: number | null;
@@ -1022,7 +1005,57 @@ function ReviewRowsList({
   onToggleDelete,
 }: Readonly<ReviewRowsListProps>) {
   return (
-    <div className="px-5 py-3 space-y-2">
+    <DataTable
+      variant="plain"
+      density="compact"
+      tableVariant="editable"
+      columns={[
+        {
+          key: 'type',
+          header: 'Type',
+          mobileLabel: 'Type',
+          width: 130,
+          cellClassName: 'px-3 py-3',
+        },
+        {
+          key: 'amount',
+          header: 'Amount',
+          mobileLabel: 'Amount',
+          width: 86,
+          numeric: true,
+          cellClassName: 'px-3 py-3',
+        },
+        {
+          key: 'date',
+          header: 'Date',
+          mobileLabel: 'Date',
+          width: 112,
+          cellClassName: 'px-3 py-3',
+        },
+        { key: 'note', header: 'Note', mobileLabel: 'Note', cellClassName: 'px-3 py-3' },
+        {
+          key: 'confidence',
+          header: 'Confidence',
+          align: 'center',
+          mobileLabel: 'Confidence',
+          width: 100,
+          cellClassName: 'px-3 py-3',
+        },
+        {
+          key: 'actions',
+          header: 'Actions',
+          align: 'right',
+          mobileLabel: 'Actions',
+          priority: 'actions',
+          width: 84,
+          cellClassName: 'px-3 py-3',
+        },
+      ]}
+      tableLayout="fixed"
+      minWidth={760}
+      className="px-5 py-3"
+      bodyClassName="rounded-xl border border-slate-100"
+    >
       {rows.map((row) => (
         <ReviewRow
           key={row.id}
@@ -1037,7 +1070,7 @@ function ReviewRowsList({
           onToggleDelete={onToggleDelete}
         />
       ))}
-    </div>
+    </DataTable>
   );
 }
 
@@ -1187,7 +1220,6 @@ function ReviewStep({
       />
 
       <div className="flex-1 overflow-y-auto">
-        <ReviewTableHeader />
         <ReviewRowsList
           rows={rows}
           savingRowId={savingRowId}

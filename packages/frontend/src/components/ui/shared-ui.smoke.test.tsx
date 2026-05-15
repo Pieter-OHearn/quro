@@ -24,6 +24,7 @@ import { PanelHeader } from './molecules/PanelHeader';
 import { RowActions } from './molecules/RowActions';
 import { SegmentedControl } from './molecules/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
+import { DataTable, DataTableCell, DataTableRow } from './organisms/DataTable';
 import { Modal } from './organisms/Modal';
 import { ContentSection, PageStack } from './templates';
 
@@ -207,6 +208,137 @@ const smokeCases: readonly SmokeCase[] = [
       </RowActions>
     ),
     includes: ['data-smoke="row-actions"', 'Edit', 'Delete'],
+  },
+  {
+    name: 'DataTable renders desktop table and custom row cells',
+    element: (
+      <DataTable
+        title="Transactions"
+        subtitle="2 rows"
+        columns={[
+          { key: 'name', header: 'Name', width: '60%' },
+          { key: 'amount', header: 'Amount', align: 'right', width: '40%' },
+        ]}
+      >
+        <DataTableRow>
+          <DataTableCell columnKey="name">Rent</DataTableCell>
+          <DataTableCell columnKey="amount">EUR 1,250.00</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: ['Transactions', '<table', '<thead', '<tbody', 'Rent', 'EUR 1,250.00'],
+  },
+  {
+    name: 'DataTable renders mobile metadata and lower priority cells',
+    element: (
+      <DataTable
+        title="Accounts"
+        columns={[
+          { key: 'account', header: 'Account', mobileLabel: 'Account', priority: 'primary' },
+          { key: 'note', header: 'Note', mobileLabel: 'Note', priority: 'secondary' },
+        ]}
+      >
+        <DataTableRow interactive selected>
+          <DataTableCell columnKey="account">Checking</DataTableCell>
+          <DataTableCell columnKey="note">Hidden on mobile</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: [
+      'data-priority="secondary"',
+      'data-mobile-label="Note"',
+      'max-md:hidden',
+      'Checking',
+      'Hidden on mobile',
+    ],
+  },
+  {
+    name: 'DataTable applies column cell metadata',
+    element: (
+      <DataTable
+        density="compact"
+        tableVariant="financial"
+        columns={[
+          {
+            key: 'amount',
+            header: 'Amount',
+            align: 'right',
+            mobileLabel: 'Amount',
+            numeric: true,
+            cellClassName: 'font-semibold',
+          },
+        ]}
+      >
+        <DataTableRow>
+          <DataTableCell columnKey="amount">EUR 42.00</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: ['font-numeric', 'font-semibold', 'px-3 py-2.5', 'Amount', 'EUR 42.00'],
+  },
+  {
+    name: 'DataTable renders toolbar and filter slots',
+    element: (
+      <DataTable
+        title="Goals"
+        toolbar={<Button size="sm">Add goal</Button>}
+        filters={<TextInput value="travel" onChange={noop} aria-label="Filter goals" />}
+        columns={[{ key: 'goal', header: 'Goal' }]}
+      >
+        <DataTableRow>
+          <DataTableCell>Travel fund</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: ['Add goal', 'aria-label="Filter goals"', 'value="travel"', 'Travel fund'],
+  },
+  {
+    name: 'DataTable renders empty state',
+    element: (
+      <DataTable
+        title="Budgets"
+        columns={[{ key: 'budget', header: 'Budget' }]}
+        isEmpty
+        emptyState="No budgets yet."
+      />
+    ),
+    includes: ['colSpan="1"', 'No budgets yet.'],
+  },
+  {
+    name: 'DataTable renders loading state',
+    element: (
+      <DataTable
+        title="Rates"
+        columns={[{ key: 'currency', header: 'Currency' }]}
+        isLoading
+        loadingState="Loading rates"
+      />
+    ),
+    includes: ['role="status"', 'Loading rates'],
+  },
+  {
+    name: 'DataTable renders footer slot',
+    element: (
+      <DataTable
+        title="Debts"
+        columns={[{ key: 'debt', header: 'Debt' }]}
+        footer={
+          <Pagination
+            page={1}
+            totalPages={2}
+            rangeStart={1}
+            rangeEnd={10}
+            totalCount={20}
+            onChange={noop}
+          />
+        }
+      >
+        <DataTableRow>
+          <DataTableCell>Student loan</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: ['Student loan', 'aria-label="Next page"'],
   },
   {
     name: 'DateNoteRow renders shared date and note fields',

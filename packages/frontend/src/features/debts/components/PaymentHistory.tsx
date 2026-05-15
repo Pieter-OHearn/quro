@@ -1,6 +1,6 @@
 import type { Debt, DebtPayment } from '@quro/shared';
 import { Clock, Plus, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button, DataTable, DataTableCell, DataTableRow } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { formatShortDate } from '../utils/forms';
 
@@ -32,52 +32,69 @@ function PaymentHistoryTable({
   const { fmtNative } = useCurrency();
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-100">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50">
-            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">
-              Date
-            </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">
-              Amount
-            </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">
-              Principal
-            </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">
-              Interest
-            </th>
-            <th className="w-10 px-3 py-2" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-50">
-          {sortedPayments.map((payment) => (
-            <tr key={payment.id} className="group hover:bg-slate-50/60">
-              <td className="px-3 py-2.5 text-slate-600">{formatShortDate(payment.date)}</td>
-              <td className="px-3 py-2.5 text-right font-semibold text-slate-800">
-                {fmtNative(payment.amount, debt.currency, true)}
-              </td>
-              <td className="px-3 py-2.5 text-right font-medium text-emerald-600">
-                {fmtNative(payment.principal, debt.currency, true)}
-              </td>
-              <td className="px-3 py-2.5 text-right text-rose-500">
-                {fmtNative(payment.interest, debt.currency, true)}
-              </td>
-              <td className="px-3 py-2.5 text-right">
-                <button
-                  type="button"
-                  onClick={() => onDeletePayment(payment.id)}
-                  className="rounded-md p-1 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      variant="plain"
+      density="compact"
+      tableVariant="financial"
+      columns={[
+        { key: 'date', header: 'Date', mobileLabel: 'Date' },
+        {
+          key: 'amount',
+          header: 'Amount',
+          align: 'right',
+          mobileLabel: 'Amount',
+          numeric: true,
+          cellClassName: 'font-semibold text-slate-800',
+        },
+        {
+          key: 'principal',
+          header: 'Principal',
+          align: 'right',
+          mobileLabel: 'Principal',
+          numeric: true,
+          cellClassName: 'font-medium text-emerald-600',
+        },
+        {
+          key: 'interest',
+          header: 'Interest',
+          align: 'right',
+          mobileLabel: 'Interest',
+          priority: 'secondary',
+          numeric: true,
+          cellClassName: 'text-rose-500',
+        },
+        { key: 'actions', header: '', priority: 'actions', width: 40 },
+      ]}
+      className="rounded-xl border border-slate-100"
+      tableClassName="text-xs"
+      bodyClassName="md:overflow-hidden"
+    >
+      {sortedPayments.map((payment) => (
+        <DataTableRow key={payment.id} interactive>
+          <DataTableCell columnKey="date" className="text-slate-600">
+            {formatShortDate(payment.date)}
+          </DataTableCell>
+          <DataTableCell columnKey="amount">
+            {fmtNative(payment.amount, debt.currency, true)}
+          </DataTableCell>
+          <DataTableCell columnKey="principal">
+            {fmtNative(payment.principal, debt.currency, true)}
+          </DataTableCell>
+          <DataTableCell columnKey="interest">
+            {fmtNative(payment.interest, debt.currency, true)}
+          </DataTableCell>
+          <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+            <button
+              type="button"
+              onClick={() => onDeletePayment(payment.id)}
+              className="rounded-md p-1 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 max-md:opacity-100"
+            >
+              <Trash2 size={12} />
+            </button>
+          </DataTableCell>
+        </DataTableRow>
+      ))}
+    </DataTable>
   );
 }
 
