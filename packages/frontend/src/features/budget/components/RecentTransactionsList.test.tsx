@@ -79,6 +79,8 @@ test('RecentTransactionsList renders shared table rows with mobile-critical tran
   expect(markup).toContain('data-mobile-label="Amount"');
   expect(markup).toContain('data-mobile-label="Date"');
   expect(markup).toContain('data-mobile-label="Category"');
+  expect(markup).toContain('aria-sort="descending"');
+  expect(markup).toContain('aria-label="Sort by Amount"');
   expect(markup).toContain('Albert Heijn');
   expect(markup).toContain('-€42.35');
   expect(markup).toContain('2026-05-14');
@@ -86,6 +88,22 @@ test('RecentTransactionsList renders shared table rows with mobile-critical tran
   expect(markup).toContain('Bunq');
   expect(markup).toContain('Joint');
   expect(markup).toContain('aria-label="Edit transaction"');
+});
+
+test('RecentTransactionsList defaults to newest transactions first', () => {
+  const markup = renderToStaticMarkup(
+    <RecentTransactionsList
+      transactions={[transactions[1], transactions[0]]}
+      categories={categories}
+      fmtDec={fmtDec}
+      selectedMonth="May"
+      selectedYear={2026}
+      onDelete={noop}
+      onChangeCategory={noop}
+    />,
+  );
+
+  expect(markup.indexOf('Albert Heijn')).toBeLessThan(markup.indexOf('Coffee Bar'));
 });
 
 test('RecentTransactionsList renders a clear empty state', () => {

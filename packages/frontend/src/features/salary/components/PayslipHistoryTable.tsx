@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { CURRENCY_META, type Payslip } from '@quro/shared';
 import {
   Badge,
@@ -8,6 +9,7 @@ import {
   IconButton,
   RowActions,
   type DataTableColumn,
+  type DataTableSortState,
 } from '@/components/ui';
 import { buildApiDownloadUrl } from '@/lib/pdfDocuments';
 import { formatDate } from '@/lib/utils';
@@ -23,8 +25,19 @@ type PayslipTableProps = {
   onEdit: (payslip: Payslip) => void;
 };
 
+const SORT_ASCENDING = 1;
+const SORT_DESCENDING = -1;
+
 const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
-  { key: 'month', header: 'Month', mobileLabel: 'Month', priority: 'primary', width: '28%' },
+  {
+    key: 'month',
+    header: 'Month',
+    mobileLabel: 'Month',
+    priority: 'primary',
+    width: '28%',
+    sortable: true,
+    defaultSortDirection: 'desc',
+  },
   {
     key: 'gross',
     header: 'Gross',
@@ -32,6 +45,8 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
     mobileLabel: 'Gross',
     width: '15%',
     numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
     cellClassName: 'whitespace-nowrap font-semibold text-slate-800',
   },
   {
@@ -42,6 +57,8 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
     priority: 'secondary',
     width: '15%',
     numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
     cellClassName: 'whitespace-nowrap',
   },
   {
@@ -52,6 +69,8 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
     priority: 'secondary',
     width: '15%',
     numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
     cellClassName: 'whitespace-nowrap',
   },
   {
@@ -61,6 +80,8 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
     mobileLabel: 'Net pay',
     width: '15%',
     numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
     cellClassName: 'whitespace-nowrap font-bold text-emerald-600',
   },
   { key: 'actions', header: '', priority: 'actions', width: 96 },
@@ -166,6 +187,24 @@ function PayslipTableRow({
   );
 }
 
+function sortPayslips(payslips: readonly Payslip[], sort: DataTableSortState): Payslip[] {
+  const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
+
+  return [...payslips].sort((a, b) => {
+    const comparison = getPayslipSortComparison(a, b, sort.columnKey);
+
+    return comparison * direction || b.date.localeCompare(a.date) || b.id - a.id;
+  });
+}
+
+function getPayslipSortComparison(a: Payslip, b: Payslip, columnKey: string) {
+  if (columnKey === 'gross') return a.gross - b.gross;
+  if (columnKey === 'tax') return a.tax - b.tax;
+  if (columnKey === 'pension') return a.pension - b.pension;
+  if (columnKey === 'net') return a.net - b.net;
+  return a.date.localeCompare(b.date);
+}
+
 export function PayslipHistoryTable({
   payslips,
   selected,
@@ -174,6 +213,9 @@ export function PayslipHistoryTable({
   onAdd,
   onEdit,
 }: Readonly<PayslipTableProps>) {
+  const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'month', direction: 'desc' });
+  const sortedPayslips = useMemo(() => sortPayslips(payslips, sort), [payslips, sort]);
+
   return (
     <DataTable
       title="Payslip History"
@@ -190,6 +232,8 @@ export function PayslipHistoryTable({
         </Button>
       }
       columns={PAYSLIP_COLUMNS}
+      sort={sort}
+      onSortChange={setSort}
       isEmpty={payslips.length === 0}
       emptyState={
         <>
@@ -200,7 +244,7 @@ export function PayslipHistoryTable({
       tableLayout="fixed"
       tableVariant="financial"
     >
-      {payslips.map((payslip) => (
+      {sortedPayslips.map((payslip) => (
         <PayslipTableRow
           key={payslip.id}
           payslip={payslip}

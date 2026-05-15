@@ -12,21 +12,38 @@ import {
   Pagination,
   RowActions,
   type DataTableColumn,
+  type DataTableSortState,
 } from '@/components/ui';
 import type { BudgetCategory, BudgetFormatFn, RecentBudgetTx } from '../types';
 
 const PAGE_SIZE = 6;
+const SORT_ASCENDING = 1;
+const SORT_DESCENDING = -1;
 
 const TRANSACTION_COLUMNS: readonly DataTableColumn[] = [
-  { key: 'transaction', header: 'Transaction', mobileLabel: 'Transaction', width: '38%' },
+  {
+    key: 'transaction',
+    header: 'Transaction',
+    mobileLabel: 'Transaction',
+    width: '38%',
+    sortable: true,
+  },
   {
     key: 'date',
     header: 'Date',
     mobileLabel: 'Date',
     width: '16%',
+    sortable: true,
+    defaultSortDirection: 'desc',
     cellClassName: 'whitespace-nowrap text-slate-500',
   },
-  { key: 'category', header: 'Category', mobileLabel: 'Category', width: '20%' },
+  {
+    key: 'category',
+    header: 'Category',
+    mobileLabel: 'Category',
+    width: '20%',
+    sortable: true,
+  },
   {
     key: 'amount',
     header: 'Amount',
@@ -34,6 +51,8 @@ const TRANSACTION_COLUMNS: readonly DataTableColumn[] = [
     mobileLabel: 'Amount',
     width: '16%',
     numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
     cellClassName: 'whitespace-nowrap font-semibold text-slate-800',
   },
   { key: 'actions', header: '', priority: 'actions', width: 64 },
@@ -180,10 +199,16 @@ function useMonthlyTransactionPagination(
   selectedYear: number,
 ) {
   const [currentPage, setCurrentPage] = useState(1);
-  const sortedTransactions = useMemo(
-    () => [...transactions].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id),
-    [transactions],
-  );
+  const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'date', direction: 'desc' });
+  const sortedTransactions = useMemo(() => {
+    const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
+
+    return [...transactions].sort((a, b) => {
+      const comparison = getTransactionSortComparison(a, b, sort.columnKey);
+
+      return comparison * direction || b.date.localeCompare(a.date) || b.id - a.id;
+    });
+  }, [sort, transactions]);
   const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * PAGE_SIZE;
@@ -195,7 +220,7 @@ function useMonthlyTransactionPagination(
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, sort]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -208,8 +233,17 @@ function useMonthlyTransactionPagination(
     safeCurrentPage,
     rangeStart,
     rangeEnd,
+    sort,
+    setSort,
     handlePageChange,
   };
+}
+
+function getTransactionSortComparison(a: RecentBudgetTx, b: RecentBudgetTx, columnKey: string) {
+  if (columnKey === 'transaction') return a.name.localeCompare(b.name);
+  if (columnKey === 'category') return (a.category ?? '').localeCompare(b.category ?? '');
+  if (columnKey === 'amount') return a.amount - b.amount;
+  return a.date.localeCompare(b.date);
 }
 
 export function RecentTransactionsList({
@@ -236,6 +270,8 @@ export function RecentTransactionsList({
           </Badge>
         }
         columns={TRANSACTION_COLUMNS}
+        sort={pagination.sort}
+        onSortChange={pagination.setSort}
         isEmpty={!hasTransactions}
         emptyState="No transactions for this month."
         minWidth={760}

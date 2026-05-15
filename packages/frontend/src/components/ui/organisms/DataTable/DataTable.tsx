@@ -6,6 +6,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '../../atoms';
 import { PanelHeader } from '../../molecules';
@@ -67,8 +68,17 @@ export type DataTableColumn = {
   priority?: keyof typeof PRIORITY_CLASSES;
   mobileLabel?: ReactNode;
   numeric?: boolean;
+  sortable?: boolean;
+  defaultSortDirection?: DataTableSortDirection;
   headerClassName?: string;
   cellClassName?: string;
+};
+
+export type DataTableSortDirection = 'asc' | 'desc';
+
+export type DataTableSortState = {
+  columnKey: string;
+  direction: DataTableSortDirection;
 };
 
 export type DataTableProps = {
@@ -88,6 +98,8 @@ export type DataTableProps = {
   emptyState?: ReactNode;
   loadingState?: ReactNode;
   colGroup?: ReactNode;
+  sort?: DataTableSortState;
+  onSortChange?: (sort: DataTableSortState) => void;
   minWidth?: number | string;
   tableLayout?: 'auto' | 'fixed';
   className?: string;
@@ -271,30 +283,115 @@ export function DataTableCell({
 }
 
 type DataTableHeaderProps = Pick<DataTableProps, 'columns'> &
+  Pick<DataTableProps, 'onSortChange' | 'sort'> &
   Required<Pick<DataTableProps, 'density' | 'tableVariant'>>;
 
-function DataTableHeader({ columns, density, tableVariant }: DataTableHeaderProps) {
+function getNextSort(column: DataTableColumn, sort?: DataTableSortState): DataTableSortState {
+  if (sort?.columnKey !== column.key) {
+    return {
+      columnKey: column.key,
+      direction: column.defaultSortDirection ?? 'asc',
+    };
+  }
+
+  return {
+    columnKey: column.key,
+    direction: sort.direction === 'asc' ? 'desc' : 'asc',
+  };
+}
+
+function getSortLabel(column: DataTableColumn, sort?: DataTableSortState): string {
+  const label = getColumnDataLabel(column.header ?? column.mobileLabel ?? column.key) ?? column.key;
+  if (sort?.columnKey !== column.key) return `Sort by ${label}`;
+  return `Sort by ${label} ${sort.direction === 'asc' ? 'descending' : 'ascending'}`;
+}
+
+function SortIcon({
+  isActive,
+  direction,
+}: Readonly<{
+  isActive: boolean;
+  direction?: DataTableSortDirection;
+}>) {
+  if (!isActive) return <ArrowUpDown size={9} className="opacity-25" aria-hidden />;
+  if (direction === 'asc') return <ArrowUp size={10} className="opacity-60" aria-hidden />;
+  return <ArrowDown size={10} className="opacity-60" aria-hidden />;
+}
+
+function getHeaderAriaSort(column: DataTableColumn, sort?: DataTableSortState) {
+  if (!column.sortable) return undefined;
+  if (sort?.columnKey !== column.key) return 'none';
+  return sort.direction === 'asc' ? 'ascending' : 'descending';
+}
+
+type DataTableHeaderCellProps = {
+  column: DataTableColumn;
+  density: keyof typeof DENSITY_CLASSES;
+  onSortChange?: (sort: DataTableSortState) => void;
+  sort?: DataTableSortState;
+};
+
+function DataTableHeaderCell({
+  column,
+  density,
+  onSortChange,
+  sort,
+}: Readonly<DataTableHeaderCellProps>) {
+  return (
+    <th
+      scope="col"
+      aria-sort={getHeaderAriaSort(column, sort)}
+      style={getColumnStyle(column.width)}
+      data-priority={column.priority ?? 'primary'}
+      data-mobile-label={getColumnDataLabel(column.mobileLabel)}
+      className={cn(
+        'text-xs font-semibold uppercase tracking-wide text-fg-faint whitespace-nowrap',
+        DENSITY_CLASSES[density].header,
+        ALIGNMENT_CLASSES[column.align ?? 'left'],
+        column.numeric && 'font-numeric',
+        column.headerClassName,
+      )}
+    >
+      {column.sortable && onSortChange ? (
+        <button
+          type="button"
+          aria-label={getSortLabel(column, sort)}
+          onClick={() => onSortChange(getNextSort(column, sort))}
+          className={cn(
+            'inline-flex max-w-full items-center gap-0.5 text-xs font-semibold uppercase tracking-wide leading-none text-inherit transition-colors hover:text-fg-muted focus-visible:outline-none focus-visible:text-fg-muted',
+            sort?.columnKey === column.key && 'text-fg-muted',
+          )}
+        >
+          <span className="truncate">{column.header}</span>
+          <SortIcon isActive={sort?.columnKey === column.key} direction={sort?.direction} />
+        </button>
+      ) : (
+        column.header
+      )}
+    </th>
+  );
+}
+
+function DataTableHeader({
+  columns,
+  density,
+  onSortChange,
+  sort,
+  tableVariant,
+}: DataTableHeaderProps) {
   return (
     <thead className="max-md:hidden">
       <tr
         className={cn('border-b border-border-subtle', TABLE_VARIANT_CLASSES[tableVariant].header)}
       >
         {columns.map((column) => (
-          <th
+          <DataTableHeaderCell
             key={column.key}
-            style={getColumnStyle(column.width)}
-            data-priority={column.priority ?? 'primary'}
-            data-mobile-label={getColumnDataLabel(column.mobileLabel)}
-            className={cn(
-              'text-xs font-semibold uppercase tracking-wide text-fg-faint whitespace-nowrap',
-              DENSITY_CLASSES[density].header,
-              ALIGNMENT_CLASSES[column.align ?? 'left'],
-              column.numeric && 'font-numeric',
-              column.headerClassName,
-            )}
-          >
-            {column.header}
-          </th>
+            column={column}
+            density={density}
+            onSortChange={onSortChange}
+            sort={sort}
+          />
         ))}
       </tr>
     </thead>
@@ -351,6 +448,75 @@ function DataTableBody({
   );
 }
 
+type DataTableElementProps = Pick<
+  DataTableProps,
+  | 'bodyClassName'
+  | 'children'
+  | 'colGroup'
+  | 'columns'
+  | 'emptyState'
+  | 'isEmpty'
+  | 'isLoading'
+  | 'loadingState'
+  | 'minWidth'
+  | 'onSortChange'
+  | 'sort'
+  | 'tableClassName'
+  | 'tableLayout'
+> &
+  Required<Pick<DataTableProps, 'density' | 'tableVariant'>>;
+
+function DataTableElement({
+  bodyClassName,
+  children,
+  colGroup,
+  columns,
+  density,
+  emptyState,
+  isEmpty,
+  isLoading,
+  loadingState,
+  minWidth,
+  onSortChange,
+  sort,
+  tableClassName,
+  tableLayout,
+  tableVariant,
+}: DataTableElementProps) {
+  return (
+    <div className={cn('overflow-visible md:overflow-x-auto', bodyClassName)}>
+      <table
+        className={cn(
+          'w-full text-sm max-md:block',
+          typeof minWidth !== 'undefined' && 'md:min-w-[var(--datatable-min-width)]',
+          tableLayout === 'fixed' && 'table-fixed',
+          tableClassName,
+        )}
+        style={getTableStyle(minWidth)}
+      >
+        {colGroup}
+        <DataTableHeader
+          columns={columns}
+          density={density}
+          onSortChange={onSortChange}
+          sort={sort}
+          tableVariant={tableVariant}
+        />
+        <DataTableBody
+          columns={columns}
+          density={density}
+          emptyState={emptyState}
+          isEmpty={isEmpty}
+          isLoading={isLoading}
+          loadingState={loadingState}
+        >
+          {children}
+        </DataTableBody>
+      </table>
+    </div>
+  );
+}
+
 function DataTableContent({
   action,
   bodyClassName,
@@ -366,6 +532,8 @@ function DataTableContent({
   isLoading,
   loadingState,
   minWidth,
+  onSortChange,
+  sort,
   subtitle,
   tableClassName,
   tableLayout,
@@ -399,30 +567,24 @@ function DataTableContent({
         </div>
       ) : null}
 
-      <div className={cn('overflow-visible md:overflow-x-auto', bodyClassName)}>
-        <table
-          className={cn(
-            'w-full text-sm max-md:block',
-            typeof minWidth !== 'undefined' && 'md:min-w-[var(--datatable-min-width)]',
-            tableLayout === 'fixed' && 'table-fixed',
-            tableClassName,
-          )}
-          style={getTableStyle(minWidth)}
-        >
-          {colGroup}
-          <DataTableHeader columns={columns} density={density} tableVariant={tableVariant} />
-          <DataTableBody
-            columns={columns}
-            density={density}
-            emptyState={emptyState}
-            isEmpty={isEmpty}
-            isLoading={isLoading}
-            loadingState={loadingState}
-          >
-            {children}
-          </DataTableBody>
-        </table>
-      </div>
+      <DataTableElement
+        bodyClassName={bodyClassName}
+        colGroup={colGroup}
+        columns={columns}
+        density={density}
+        emptyState={emptyState}
+        isEmpty={isEmpty}
+        isLoading={isLoading}
+        loadingState={loadingState}
+        minWidth={minWidth}
+        onSortChange={onSortChange}
+        sort={sort}
+        tableClassName={tableClassName}
+        tableLayout={tableLayout}
+        tableVariant={tableVariant}
+      >
+        {children}
+      </DataTableElement>
 
       {footer ? <div className="border-t border-border-subtle px-4 py-3">{footer}</div> : null}
     </DataTableContext.Provider>

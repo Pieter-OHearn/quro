@@ -4,4 +4,6 @@ export type {
   DataTableColumn,
   DataTableProps,
   DataTableRowProps,
+  DataTableSortDirection,
+  DataTableSortState,
 } from './DataTable';

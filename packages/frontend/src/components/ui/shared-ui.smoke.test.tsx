@@ -229,6 +229,37 @@ const smokeCases: readonly SmokeCase[] = [
     includes: ['Transactions', '<table', '<thead', '<tbody', 'Rent', 'EUR 1,250.00'],
   },
   {
+    name: 'DataTable renders sortable column headers',
+    element: (
+      <DataTable
+        title="Sortable transactions"
+        columns={[
+          { key: 'name', header: 'Name', sortable: true },
+          {
+            key: 'amount',
+            header: 'Amount',
+            align: 'right',
+            sortable: true,
+            defaultSortDirection: 'desc',
+          },
+        ]}
+        sort={{ columnKey: 'amount', direction: 'desc' }}
+        onSortChange={noop}
+      >
+        <DataTableRow>
+          <DataTableCell columnKey="name">Rent</DataTableCell>
+          <DataTableCell columnKey="amount">EUR 1,250.00</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: [
+      'aria-sort="none"',
+      'aria-sort="descending"',
+      'aria-label="Sort by Amount ascending"',
+      'Sort by Name',
+    ],
+  },
+  {
     name: 'DataTable renders mobile metadata and lower priority cells',
     element: (
       <DataTable
