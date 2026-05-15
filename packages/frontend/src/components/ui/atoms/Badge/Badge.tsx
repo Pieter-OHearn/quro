@@ -8,13 +8,13 @@ const SIZE_CLASSES = {
 } as const;
 
 const TONE_CLASSES = {
-  brand: 'bg-indigo-100 text-indigo-700',
-  info: 'bg-sky-100 text-sky-700',
-  neutral: 'bg-slate-100 text-slate-600',
-  muted: 'bg-slate-100 text-slate-500',
-  success: 'bg-emerald-100 text-emerald-600',
-  warning: 'bg-amber-100 text-amber-700',
-  warningSoft: 'bg-amber-50 text-amber-700',
+  brand: 'bg-brand-soft-strong text-brand-fg',
+  info: 'bg-info-soft-strong text-info-fg',
+  neutral: 'bg-surface-muted text-fg-muted',
+  muted: 'bg-surface-muted text-fg-subtle',
+  success: 'bg-success-soft-strong text-success-fg',
+  warning: 'bg-warning-soft-strong text-warning-fg',
+  warningSoft: 'bg-warning-soft text-warning-fg',
 } as const;
 
 export type BadgeProps = HTMLAttributes<HTMLSpanElement> & {

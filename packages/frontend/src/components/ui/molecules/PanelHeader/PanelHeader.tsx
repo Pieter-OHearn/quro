@@ -35,16 +35,16 @@ export function PanelHeader({
     <div
       className={cn(
         'flex items-center justify-between gap-4',
-        divider && 'border-b border-slate-100',
+        divider && 'border-b border-border-subtle',
         SPACING_CLASSES[spacing],
         className,
       )}
       {...props}
     >
       <div className={cn('min-w-0', contentClassName)}>
-        <h3 className={cn('font-semibold text-slate-900', titleClassName)}>{title}</h3>
+        <h3 className={cn('font-semibold text-fg', titleClassName)}>{title}</h3>
         {subtitle && (
-          <p className={cn('text-xs text-slate-400 mt-0.5', subtitleClassName)}>{subtitle}</p>
+          <p className={cn('text-xs text-fg-faint mt-0.5', subtitleClassName)}>{subtitle}</p>
         )}
       </div>
       {action && <div className={cn('flex-shrink-0', actionClassName)}>{action}</div>}

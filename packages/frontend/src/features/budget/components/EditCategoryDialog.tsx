@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EmojiPickerField, FormField, Modal, ModalFooter } from '@/components/ui';
 import type { BudgetCategory, EditCategoryForm } from '../types';
 
@@ -42,10 +42,30 @@ function ColorSwatches({ selected, onSelect }: Readonly<ColorSwatchesProps>) {
 
 type EditCategoryDialogProps = {
   category: BudgetCategory;
+  mode?: 'create' | 'edit';
   isSaving: boolean;
   onSave: (form: EditCategoryForm) => Promise<void>;
   onClose: () => void;
 };
+
+type CategoryFieldsProps = {
+  form: EditCategoryForm;
+  set: <K extends keyof EditCategoryForm>(key: K, value: EditCategoryForm[K]) => void;
+};
+
+function toCategoryForm(category: BudgetCategory): EditCategoryForm {
+  return {
+    name: category.name,
+    emoji: category.emoji,
+    budgeted: String(category.budgeted),
+    color: category.color,
+  };
+}
+
+function getConfirmLabel(mode: 'create' | 'edit', isSaving: boolean) {
+  if (isSaving) return 'Saving…';
+  return mode === 'create' ? 'Add Category' : 'Save';
+}
 
 function DialogError({ message }: Readonly<{ message: string | null }>) {
   if (!message) return null;
@@ -56,28 +76,57 @@ function DialogError({ message }: Readonly<{ message: string | null }>) {
   );
 }
 
+function CategoryFields({ form, set }: Readonly<CategoryFieldsProps>) {
+  return (
+    <>
+      <div className="flex gap-3">
+        <EmojiPickerField label="Icon" value={form.emoji} onChange={(e) => set('emoji', e)} />
+        <FormField label="Name" className="flex-1">
+          <input
+            data-testid="budget-category-name-input"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+          />
+        </FormField>
+      </div>
+      <FormField label="Monthly budget (€)">
+        <input
+          data-testid="budget-category-budget-input"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="0.01"
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          value={form.budgeted}
+          onChange={(e) => set('budgeted', e.target.value)}
+        />
+      </FormField>
+      <FormField label="Colour">
+        <ColorSwatches selected={form.color} onSelect={(c) => set('color', c)} />
+      </FormField>
+    </>
+  );
+}
+
 export function EditCategoryDialog({
   category,
+  mode = 'edit',
   isSaving,
   onSave,
   onClose,
 }: Readonly<EditCategoryDialogProps>) {
-  const [form, setForm] = useState<EditCategoryForm>({
-    name: category.name,
-    emoji: category.emoji,
-    budgeted: String(category.budgeted),
-    color: category.color,
-  });
+  const [form, setForm] = useState<EditCategoryForm>(toCategoryForm(category));
   const [error, setError] = useState<string | null>(null);
+  const resetKey = mode === 'create' ? 'create' : `edit-${category.id}`;
+  const resetKeyRef = useRef(resetKey);
 
   useEffect(() => {
-    setForm({
-      name: category.name,
-      emoji: category.emoji,
-      budgeted: String(category.budgeted),
-      color: category.color,
-    });
-  }, [category]);
+    if (resetKeyRef.current === resetKey) return;
+    resetKeyRef.current = resetKey;
+    setForm(toCategoryForm(category));
+    setError(null);
+  }, [category, resetKey]);
 
   const set = <K extends keyof EditCategoryForm>(key: K, value: EditCategoryForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -93,13 +142,13 @@ export function EditCategoryDialog({
 
   return (
     <Modal
-      title="Edit category"
+      title={mode === 'create' ? 'Add category' : 'Edit category'}
       subtitle={`${category.month} ${category.year}`}
       onClose={onClose}
       maxWidth="sm"
       footer={
         <ModalFooter
-          confirmLabel={isSaving ? 'Saving…' : 'Save'}
+          confirmLabel={getConfirmLabel(mode, isSaving)}
           disabled={isSaving}
           onConfirm={() => {
             void handleSave();
@@ -110,30 +159,7 @@ export function EditCategoryDialog({
     >
       <div className="space-y-4">
         <DialogError message={error} />
-        <div className="flex gap-3">
-          <EmojiPickerField label="Icon" value={form.emoji} onChange={(e) => set('emoji', e)} />
-          <FormField label="Name" className="flex-1">
-            <input
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              value={form.name}
-              onChange={(e) => set('name', e.target.value)}
-            />
-          </FormField>
-        </div>
-        <FormField label="Monthly budget (€)">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            value={form.budgeted}
-            onChange={(e) => set('budgeted', e.target.value)}
-          />
-        </FormField>
-        <FormField label="Colour">
-          <ColorSwatches selected={form.color} onSelect={(c) => set('color', c)} />
-        </FormField>
+        <CategoryFields form={form} set={set} />
       </div>
     </Modal>
   );

@@ -3,12 +3,10 @@ import type {
   BudgetStats,
   BudgetTx,
   CreateBudgetCategoryInput,
-  NewCategoryForm,
+  EditCategoryForm,
   RecentBudgetTx,
 } from '../types';
 import { formatBudgetMonthFromDate } from '@quro/shared';
-
-export const createEmptyCategoryForm = (): NewCategoryForm => ({ name: '', budgeted: '' });
 
 export function deriveBudgetStats(categories: readonly BudgetCategory[]): BudgetStats {
   const totalBudgeted = categories.reduce((sum, category) => sum + category.budgeted, 0);
@@ -50,15 +48,15 @@ export function mapMonthlyTransactions(
 }
 
 export function buildCreateBudgetCategoryInput(
-  newCategory: NewCategoryForm,
+  newCategory: EditCategoryForm,
   now = new Date(),
 ): CreateBudgetCategoryInput {
   return {
-    name: newCategory.name,
-    emoji: '\ud83d\udce6',
-    budgeted: Number.parseFloat(newCategory.budgeted),
+    name: newCategory.name.trim(),
+    emoji: newCategory.emoji || '\ud83d\udce6',
+    budgeted: Number.parseFloat(newCategory.budgeted) || 0,
     spent: 0,
-    color: '#94a3b8',
+    color: newCategory.color || '#94a3b8',
     month: formatBudgetMonthFromDate(now),
     year: now.getFullYear(),
   };

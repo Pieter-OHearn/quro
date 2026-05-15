@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { IconButton } from '@/components/ui';
 
 type MonthYearSelectorProps = {
   month: string;
@@ -17,24 +18,26 @@ export function MonthYearSelector({
 }: Readonly<MonthYearSelectorProps>) {
   return (
     <div className="flex items-center gap-1">
-      <button
+      <IconButton
         onClick={onPrev}
-        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-        aria-label="Previous month"
-      >
-        <ChevronLeft size={15} />
-      </button>
-      <span className="min-w-[90px] text-center text-sm font-medium text-slate-700">
+        icon={ChevronLeft}
+        label="Previous month"
+        size="sm"
+        variant="subtle"
+        className="h-7 w-7"
+      />
+      <span className="min-w-[90px] text-center text-sm font-medium text-fg-muted">
         {month} {year}
       </span>
-      <button
+      <IconButton
         onClick={onNext}
         disabled={isCurrentMonth}
-        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        aria-label="Next month"
-      >
-        <ChevronRight size={15} />
-      </button>
+        icon={ChevronRight}
+        label="Next month"
+        size="sm"
+        variant="subtle"
+        className="h-7 w-7"
+      />
     </div>
   );
 }

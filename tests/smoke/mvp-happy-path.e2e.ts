@@ -67,9 +67,10 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
 
   await page.getByRole('link', { name: 'Budget', exact: true }).click();
   await page.getByTestId('budget-add-category-button').click();
-  await page.getByTestId('budget-category-name-input').fill(budgetName);
-  await page.getByTestId('budget-category-budget-input').fill('321');
-  await page.getByTestId('budget-category-submit-button').click();
+  const budgetDialog = page.getByRole('dialog');
+  await budgetDialog.getByTestId('budget-category-name-input').fill(budgetName);
+  await budgetDialog.getByTestId('budget-category-budget-input').fill('321');
+  await budgetDialog.getByRole('button', { name: 'Add Category' }).click();
 
   await expect(page.locator('p').filter({ hasText: budgetName }).first()).toBeVisible();
 

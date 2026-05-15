@@ -70,22 +70,26 @@ function ChartContent<T extends Record<string, unknown>>({
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={[...data]}>
         <ChartGradient id={gradientId} color={color} />
-        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
         <XAxis
           dataKey={xKey}
-          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          tick={{ fontSize: 11, fill: 'var(--fg-faint)' }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          tick={{ fontSize: 11, fill: 'var(--fg-faint)' }}
           axisLine={false}
           tickLine={false}
           tickFormatter={yTickFormatter}
         />
         <Tooltip
           formatter={(value) => [formatValue(Number(value) || 0), title]}
-          contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+          contentStyle={{
+            borderRadius: '12px',
+            border: '1px solid var(--border-default)',
+            fontSize: '12px',
+          }}
         />
         <Area
           type="monotone"

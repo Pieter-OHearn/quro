@@ -49,24 +49,24 @@ function ArchivedRow<T extends ArchivedItem>({
 }>) {
   const archivedLabel = formatArchivedAt(item.archivedAt);
   return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/60 transition-colors">
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-surface-sunken/60 transition-colors">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-700 truncate">{item.name}</p>
-        <p className="text-xs text-slate-400">
+        <p className="text-sm font-medium text-fg-strong truncate">{item.name}</p>
+        <p className="text-xs text-fg-faint">
           {archivedLabel ? `Archived ${archivedLabel}` : 'Archived'}
           {renderMeta ? <> · {renderMeta(item)}</> : null}
         </p>
       </div>
       <button
         onClick={() => onUnarchive(item)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border-default text-fg-muted hover:bg-surface-sunken text-xs transition-colors"
         title="Restore"
       >
         <RotateCcw size={12} /> Restore
       </button>
       <button
         onClick={() => onRequestDelete(item)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 text-xs transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-danger-border text-danger hover:bg-danger-soft text-xs transition-colors"
         title="Delete permanently"
       >
         <Trash2 size={12} /> Delete
@@ -85,14 +85,14 @@ function SectionHeader({
   return (
     <button
       onClick={onToggle}
-      className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50/80 transition-colors"
+      className="w-full flex items-center gap-2 px-4 py-3 hover:bg-surface-sunken/80 transition-colors"
     >
-      <Archive size={14} className="text-slate-400" />
-      <span className="text-sm font-medium text-slate-600">{title}</span>
-      <span className="text-xs text-slate-400">
+      <Archive size={14} className="text-fg-faint" />
+      <span className="text-sm font-medium text-fg-muted">{title}</span>
+      <span className="text-xs text-fg-faint">
         {count} item{count === 1 ? '' : 's'}
       </span>
-      <Chevron size={16} className="ml-auto text-slate-400" />
+      <Chevron size={16} className="ml-auto text-fg-faint" />
     </button>
   );
 }
@@ -115,7 +115,7 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
   const balance = pendingDelete && getBalance ? getBalance(pendingDelete) : null;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <div className="bg-surface border border-border-default rounded-2xl overflow-hidden">
       <SectionHeader
         title={title}
         count={items.length}
@@ -123,7 +123,7 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
         onToggle={() => setExpanded((value) => !value)}
       />
       {expanded ? (
-        <div className="divide-y divide-slate-100 border-t border-slate-100">
+        <div className="divide-y divide-border-subtle border-t border-border-subtle">
           {items.map((item) => (
             <ArchivedRow
               key={item.id}

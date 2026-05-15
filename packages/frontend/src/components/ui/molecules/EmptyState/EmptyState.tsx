@@ -28,12 +28,12 @@ export type EmptyStateProps = {
 
 const TONE_CLASSES = {
   brand: {
-    iconWrapper: 'bg-indigo-50',
-    icon: 'text-indigo-300',
+    iconWrapper: 'bg-brand-soft',
+    icon: 'text-brand-border',
   },
   neutral: {
-    iconWrapper: 'bg-slate-100',
-    icon: 'text-slate-300',
+    iconWrapper: 'bg-surface-muted',
+    icon: 'text-fg-disabled',
   },
 } as const;
 
@@ -48,7 +48,7 @@ function getActionIcon(icon: ReactNode | undefined, compact: boolean) {
 
 function getTitleClasses(compact: boolean, titleClassName?: string) {
   return cn(
-    compact ? 'text-sm font-medium text-slate-500' : 'mb-1 font-semibold text-slate-800',
+    compact ? 'text-sm font-medium text-fg-subtle' : 'mb-1 font-semibold text-fg-strong',
     titleClassName,
   );
 }
@@ -61,9 +61,9 @@ function getDescriptionClasses(
   return cn(
     compact
       ? hasAction
-        ? 'mt-1 mb-4 text-xs text-slate-400'
-        : 'mt-1 text-xs text-slate-400'
-      : 'mb-6 max-w-xs text-sm text-slate-400',
+        ? 'mt-1 mb-4 text-xs text-fg-faint'
+        : 'mt-1 text-xs text-fg-faint'
+      : 'mb-6 max-w-xs text-sm text-fg-faint',
     descriptionClassName,
   );
 }

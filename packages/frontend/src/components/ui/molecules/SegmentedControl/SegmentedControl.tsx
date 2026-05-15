@@ -3,9 +3,10 @@ import { cn } from '@/lib/utils';
 
 const WRAPPER_CLASSES = {
   pill: 'flex items-center gap-2 flex-wrap',
-  contained: 'flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl p-1 flex-wrap',
+  contained:
+    'flex items-center gap-1.5 bg-surface border border-border-default rounded-xl p-1 flex-wrap',
   soft: 'flex items-center gap-1 flex-wrap',
-  underline: 'flex border-b border-slate-100',
+  underline: 'flex border-b border-border-subtle',
 } as const;
 
 const BUTTON_CLASSES = {
@@ -18,25 +19,26 @@ const BUTTON_CLASSES = {
 } as const;
 
 const PILL_ACTIVE_TONE_CLASSES = {
-  dark: 'bg-[#0a0f1e] text-white border-[#0a0f1e] shadow-sm',
-  indigo: 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20',
+  dark: 'bg-surface-inverse text-fg-inverted border-surface-inverse shadow-card',
+  indigo: 'bg-brand text-fg-inverted border-brand shadow-brand',
 } as const;
 
 const PILL_INACTIVE_TONE_CLASSES = {
-  dark: 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
-  indigo: 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600',
+  dark: 'bg-surface border-border-default text-fg-muted hover:bg-surface-sunken',
+  indigo:
+    'bg-surface border-border-default text-fg-muted hover:border-brand-border hover:text-brand',
 } as const;
 
 const ACTIVE_CLASSES = {
-  contained: 'bg-indigo-600 text-white shadow-sm',
-  soft: 'bg-indigo-100 text-indigo-700 font-medium',
-  underline: 'border-indigo-600 bg-indigo-50/40 text-indigo-600',
+  contained: 'bg-brand text-fg-inverted shadow-card',
+  soft: 'bg-brand-soft-strong text-brand-fg font-medium',
+  underline: 'border-brand bg-brand-soft/40 text-brand',
 } as const;
 
 const INACTIVE_CLASSES = {
-  contained: 'text-slate-600 hover:bg-slate-50',
-  soft: 'text-slate-500 hover:bg-slate-100',
-  underline: 'text-slate-500 hover:text-slate-700',
+  contained: 'text-fg-muted hover:bg-surface-sunken',
+  soft: 'text-fg-subtle hover:bg-surface-muted',
+  underline: 'text-fg-subtle hover:text-fg-strong',
 } as const;
 
 type SegmentedControlVariant = keyof typeof WRAPPER_CLASSES;

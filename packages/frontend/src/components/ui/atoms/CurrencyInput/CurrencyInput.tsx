@@ -27,7 +27,7 @@ export function CurrencyInput({
 }: CurrencyInputProps) {
   return (
     <div className={cn('relative', containerClassName)}>
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-fg-faint">
         {currency}
       </span>
       <TextInput

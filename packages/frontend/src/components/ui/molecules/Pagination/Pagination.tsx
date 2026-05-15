@@ -3,11 +3,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_BUTTON_CLASS_NAME =
-  'w-7 h-7 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400';
+  'w-7 h-7 rounded-md text-fg-faint hover:bg-surface-muted hover:text-fg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-fg-faint';
 
 const PAGE_BUTTON_CLASS_NAME = 'w-7 h-7 rounded-md text-xs font-semibold transition-colors';
-const ACTIVE_PAGE_CLASS_NAME = 'bg-indigo-600 text-white';
-const INACTIVE_PAGE_CLASS_NAME = 'text-slate-500 hover:bg-slate-100';
+const ACTIVE_PAGE_CLASS_NAME = 'bg-brand text-fg-inverted';
+const INACTIVE_PAGE_CLASS_NAME = 'text-fg-subtle hover:bg-surface-muted';
 const DEFAULT_VISIBLE_PAGE_COUNT = 5;
 
 function clampPage(page: number, totalPages: number) {
@@ -65,12 +65,12 @@ export function Pagination({
   return (
     <div
       className={cn(
-        'mt-3 flex items-center justify-between gap-2 border-t border-slate-200/80 pt-3 flex-wrap',
+        'mt-3 flex items-center justify-between gap-2 border-t border-border-default/80 pt-3 flex-wrap',
         className,
       )}
       {...props}
     >
-      <p className={cn('text-xs text-slate-400', rangeClassName)}>
+      <p className={cn('text-xs text-fg-faint', rangeClassName)}>
         {rangeStart}-{rangeEnd} of {totalCount}
       </p>
       <div className="flex items-center gap-1">

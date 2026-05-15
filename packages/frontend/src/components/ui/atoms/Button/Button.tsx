@@ -3,12 +3,13 @@ import { cn } from '@/lib/utils';
 import { Spinner } from '../Spinner';
 
 const VARIANT_CLASSES = {
-  primary: 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400',
+  primary: 'bg-brand text-fg-inverted hover:bg-brand-hover disabled:bg-brand-disabled',
   secondary:
-    'border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-transparent',
+    'border border-border-default text-fg-muted hover:bg-surface-muted disabled:text-fg-faint disabled:hover:bg-transparent',
   danger:
-    'border border-rose-100 text-rose-500 hover:bg-rose-50 disabled:text-rose-300 disabled:hover:bg-transparent',
-  ghost: 'text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent',
+    'border border-danger-border text-danger hover:bg-danger-soft disabled:text-danger/60 disabled:hover:bg-transparent',
+  ghost:
+    'text-fg-muted hover:bg-surface-muted disabled:text-fg-disabled disabled:hover:bg-transparent',
 } as const;
 
 const SIZE_CLASSES = {

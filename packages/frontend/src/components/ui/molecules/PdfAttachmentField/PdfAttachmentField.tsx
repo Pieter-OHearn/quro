@@ -68,13 +68,13 @@ function ActionButton({ busy, className, label, onClick }: Readonly<ActionButton
 
 function EmptyPdfState({ busy, helperText, onChoosePdf }: Readonly<EmptyPdfStateProps>) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3">
-      <div className="text-xs text-slate-500">{helperText}</div>
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border-strong bg-surface px-3 py-3">
+      <div className="text-xs text-fg-subtle">{helperText}</div>
       <button
         type="button"
         onClick={onChoosePdf}
         disabled={busy}
-        className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-200 disabled:opacity-60"
+        className="rounded-lg bg-brand-soft-strong px-3 py-1.5 text-xs font-semibold text-brand-fg transition-colors hover:bg-brand-border disabled:opacity-60"
       >
         Choose PDF
       </button>
@@ -92,30 +92,30 @@ function SelectedPdfState({
   onSelectedAction,
 }: Readonly<SelectedPdfStateProps>) {
   return (
-    <div className="rounded-lg border border-indigo-100 bg-white px-2.5 py-2 text-xs text-slate-600">
-      <p className="font-medium text-slate-700">Selected: {selectedFile.name}</p>
+    <div className="rounded-lg border border-brand-soft-strong bg-surface px-2.5 py-2 text-xs text-fg-muted">
+      <p className="font-medium text-fg-strong">Selected: {selectedFile.name}</p>
       <p>{formatPdfFileSize(selectedFile.size)}</p>
-      <p className="mt-1 text-[11px] text-slate-500">{selectedHint}</p>
+      <p className="mt-1 text-[11px] text-fg-subtle">{selectedHint}</p>
       <div className="mt-2 flex items-center gap-2">
         {onSelectedAction && selectedActionLabel && (
           <ActionButton
             busy={busy}
             onClick={onSelectedAction}
             label={selectedActionLabel}
-            className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+            className="bg-brand-soft-strong text-brand-fg hover:bg-brand-border"
           />
         )}
         <ActionButton
           busy={busy}
           onClick={onChoosePdf}
           label="Choose Different PDF"
-          className="text-slate-600 hover:bg-slate-100"
+          className="text-fg-muted hover:bg-surface-muted"
         />
         <ActionButton
           busy={busy}
           onClick={onClearFile}
           label="Clear Selection"
-          className="text-rose-600 hover:bg-rose-50"
+          className="text-danger hover:bg-danger-soft"
         />
       </div>
     </div>
@@ -130,8 +130,8 @@ function AttachedPdfState({
   onRemoveDocument,
 }: Readonly<AttachedPdfStateProps>) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600">
-      <p className="font-medium text-slate-700">Attached: {document.fileName}</p>
+    <div className="rounded-lg border border-border-default bg-surface px-2.5 py-2 text-xs text-fg-muted">
+      <p className="font-medium text-fg-strong">Attached: {document.fileName}</p>
       <p>{formatPdfFileSize(document.sizeBytes)}</p>
       <div className="mt-2 flex items-center gap-2">
         {downloadUrl && (
@@ -139,7 +139,7 @@ function AttachedPdfState({
             href={downloadUrl}
             target="_blank"
             rel="noreferrer"
-            className={`${actionClass} text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700`}
+            className={`${actionClass} text-brand hover:bg-brand-soft hover:text-brand-fg`}
           >
             View PDF
           </a>
@@ -148,14 +148,14 @@ function AttachedPdfState({
           busy={busy}
           onClick={onChoosePdf}
           label="Replace PDF"
-          className="text-slate-600 hover:bg-slate-100"
+          className="text-fg-muted hover:bg-surface-muted"
         />
         {onRemoveDocument && (
           <ActionButton
             busy={busy}
             onClick={() => void onRemoveDocument()}
             label="Remove PDF"
-            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+            className="text-danger hover:bg-danger-soft hover:text-danger-fg"
           />
         )}
       </div>
@@ -198,7 +198,7 @@ export function PdfAttachmentField({
 
   return (
     <FormField label={label} error={fileError}>
-      <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+      <div className="space-y-2 rounded-xl border border-border-default bg-surface-sunken px-3 py-3">
         <input
           id={inputId}
           ref={inputRef}

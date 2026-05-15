@@ -1,6 +1,13 @@
+import { useMemo, useState } from 'react';
 import type { Debt, DebtPayment } from '@quro/shared';
 import { Clock, Plus, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui';
+import {
+  Button,
+  DataTable,
+  DataTableCell,
+  DataTableRow,
+  type DataTableSortState,
+} from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { formatShortDate } from '../utils/forms';
 
@@ -11,9 +18,56 @@ type PaymentHistoryProps = {
   onDeletePayment: (id: number) => void;
 };
 
+const SORT_ASCENDING = 1;
+const SORT_DESCENDING = -1;
+
 type PaymentHistoryTableProps = Omit<PaymentHistoryProps, 'onLogPayment' | 'payments'> & {
   sortedPayments: DebtPayment[];
+  sort: DataTableSortState;
+  onSortChange: (sort: DataTableSortState) => void;
 };
+
+const PAYMENT_COLUMNS = [
+  {
+    key: 'date',
+    header: 'Date',
+    mobileLabel: 'Date',
+    sortable: true,
+    defaultSortDirection: 'desc',
+  },
+  {
+    key: 'amount',
+    header: 'Amount',
+    align: 'right',
+    mobileLabel: 'Amount',
+    numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
+    cellClassName: 'font-semibold text-slate-800',
+  },
+  {
+    key: 'principal',
+    header: 'Principal',
+    align: 'right',
+    mobileLabel: 'Principal',
+    numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
+    cellClassName: 'font-medium text-emerald-600',
+  },
+  {
+    key: 'interest',
+    header: 'Interest',
+    align: 'right',
+    mobileLabel: 'Interest',
+    priority: 'secondary',
+    numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
+    cellClassName: 'text-rose-500',
+  },
+  { key: 'actions', header: '', priority: 'actions', width: 40 },
+] as const;
 
 function PaymentHistoryEmpty() {
   return (
@@ -26,59 +80,69 @@ function PaymentHistoryEmpty() {
 
 function PaymentHistoryTable({
   debt,
+  onSortChange,
+  sort,
   sortedPayments,
   onDeletePayment,
 }: Readonly<PaymentHistoryTableProps>) {
   const { fmtNative } = useCurrency();
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-100">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50">
-            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-400">
-              Date
-            </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">
-              Amount
-            </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">
-              Principal
-            </th>
-            <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-slate-400">
-              Interest
-            </th>
-            <th className="w-10 px-3 py-2" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-50">
-          {sortedPayments.map((payment) => (
-            <tr key={payment.id} className="group hover:bg-slate-50/60">
-              <td className="px-3 py-2.5 text-slate-600">{formatShortDate(payment.date)}</td>
-              <td className="px-3 py-2.5 text-right font-semibold text-slate-800">
-                {fmtNative(payment.amount, debt.currency, true)}
-              </td>
-              <td className="px-3 py-2.5 text-right font-medium text-emerald-600">
-                {fmtNative(payment.principal, debt.currency, true)}
-              </td>
-              <td className="px-3 py-2.5 text-right text-rose-500">
-                {fmtNative(payment.interest, debt.currency, true)}
-              </td>
-              <td className="px-3 py-2.5 text-right">
-                <button
-                  type="button"
-                  onClick={() => onDeletePayment(payment.id)}
-                  className="rounded-md p-1 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      variant="plain"
+      density="compact"
+      tableVariant="financial"
+      columns={PAYMENT_COLUMNS}
+      sort={sort}
+      onSortChange={onSortChange}
+      className="rounded-xl border border-slate-100"
+      tableClassName="text-xs"
+      bodyClassName="md:overflow-hidden"
+    >
+      {sortedPayments.map((payment) => (
+        <DataTableRow key={payment.id} interactive>
+          <DataTableCell columnKey="date" className="text-slate-600">
+            {formatShortDate(payment.date)}
+          </DataTableCell>
+          <DataTableCell columnKey="amount">
+            {fmtNative(payment.amount, debt.currency, true)}
+          </DataTableCell>
+          <DataTableCell columnKey="principal">
+            {fmtNative(payment.principal, debt.currency, true)}
+          </DataTableCell>
+          <DataTableCell columnKey="interest">
+            {fmtNative(payment.interest, debt.currency, true)}
+          </DataTableCell>
+          <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+            <button
+              type="button"
+              onClick={() => onDeletePayment(payment.id)}
+              className="rounded-md p-1 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 max-md:opacity-100"
+            >
+              <Trash2 size={12} />
+            </button>
+          </DataTableCell>
+        </DataTableRow>
+      ))}
+    </DataTable>
   );
+}
+
+function sortDebtPayments(payments: readonly DebtPayment[], sort: DataTableSortState) {
+  const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
+
+  return [...payments].sort((left, right) => {
+    const comparison = getDebtPaymentSortComparison(left, right, sort.columnKey);
+
+    return comparison * direction || right.date.localeCompare(left.date) || right.id - left.id;
+  });
+}
+
+function getDebtPaymentSortComparison(left: DebtPayment, right: DebtPayment, columnKey: string) {
+  if (columnKey === 'amount') return left.amount - right.amount;
+  if (columnKey === 'principal') return left.principal - right.principal;
+  if (columnKey === 'interest') return left.interest - right.interest;
+  return left.date.localeCompare(right.date);
 }
 
 export function PaymentHistory({
@@ -87,7 +151,8 @@ export function PaymentHistory({
   onLogPayment,
   onDeletePayment,
 }: Readonly<PaymentHistoryProps>) {
-  const sortedPayments = [...payments].sort((left, right) => right.date.localeCompare(left.date));
+  const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'date', direction: 'desc' });
+  const sortedPayments = useMemo(() => sortDebtPayments(payments, sort), [payments, sort]);
 
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">
@@ -111,6 +176,8 @@ export function PaymentHistory({
         <PaymentHistoryTable
           debt={debt}
           sortedPayments={sortedPayments}
+          sort={sort}
+          onSortChange={setSort}
           onDeletePayment={onDeletePayment}
         />
       )}

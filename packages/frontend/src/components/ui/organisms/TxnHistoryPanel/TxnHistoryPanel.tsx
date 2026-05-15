@@ -19,9 +19,9 @@ export type TxnHistoryStat = {
 
 const PANEL_VARIANTS = {
   embedded: {
-    bodyClassName: 'border-t border-slate-100 bg-slate-50/60 p-4',
+    bodyClassName: 'border-t border-border-subtle bg-surface-sunken/60 p-4',
     statsClassName: 'mb-4',
-    statClassName: 'bg-white rounded-xl px-3 py-2.5 border border-slate-100',
+    statClassName: 'bg-surface rounded-xl px-3 py-2.5 border border-border-subtle',
     filterBarClassName: 'mb-3',
     listClassName: 'space-y-1.5',
     emptyStateClassName: 'py-5',
@@ -29,10 +29,10 @@ const PANEL_VARIANTS = {
   },
   card: {
     bodyClassName: '',
-    statsClassName: 'px-5 py-5 border-b border-slate-50',
-    statClassName: 'bg-slate-50 rounded-xl px-3 py-2.5',
-    filterBarClassName: 'px-5 py-3 border-b border-slate-50',
-    listClassName: 'divide-y divide-slate-50',
+    statsClassName: 'px-5 py-5 border-b border-border-subtle',
+    statClassName: 'bg-surface-sunken rounded-xl px-3 py-2.5',
+    filterBarClassName: 'px-5 py-3 border-b border-border-subtle',
+    listClassName: 'divide-y divide-border-subtle',
     emptyStateClassName: 'py-10',
     addButtonSize: 'md',
   },
@@ -85,8 +85,8 @@ function StatsGrid({ stats, statsColumns, className, statClassName }: StatsGridP
     <div className={cn('grid gap-3', columnsClass, className)}>
       {stats.map(({ label, value, color }) => (
         <div key={label} className={cn('rounded-xl px-3 py-2.5', statClassName)}>
-          <p className="text-[10px] text-slate-400 mb-0.5">{label}</p>
-          <p className={cn('text-sm font-semibold', color ?? 'text-slate-800')}>{value}</p>
+          <p className="text-[10px] text-fg-faint mb-0.5">{label}</p>
+          <p className={cn('text-sm font-semibold', color ?? 'text-fg-strong')}>{value}</p>
         </div>
       ))}
     </div>
@@ -111,8 +111,8 @@ function FilterBar({
   return (
     <div className={cn('flex items-center justify-between flex-wrap gap-2', className)}>
       <div className="flex items-center gap-1">
-        <Filter size={12} className="text-slate-400" />
-        <span className="text-xs text-slate-400 mr-1">Filter:</span>
+        <Filter size={12} className="text-fg-faint" />
+        <span className="text-xs text-fg-faint mr-1">Filter:</span>
         <SegmentedControl
           options={filterOptions.map((option) => ({
             value: option.key,
@@ -138,7 +138,7 @@ type AddButtonProps = Pick<
 function AddTransactionButton({
   onAdd,
   addLabel = 'Add Transaction',
-  accentColor = 'bg-indigo-600 hover:bg-indigo-700',
+  accentColor = 'bg-brand hover:bg-brand-hover',
   addButtonSize,
   fallbackSize,
 }: AddButtonProps) {
@@ -191,9 +191,9 @@ function TxnHistoryBody({
 }: TxnHistoryBodyProps) {
   const resolvedStats = stats && stats.length > 0 ? stats : undefined;
   const content = isEmpty ? (
-    <p className={cn('text-center text-slate-400 text-sm', variantStyles.emptyStateClassName)}>
+    <p className={cn('text-center text-fg-faint text-sm', variantStyles.emptyStateClassName)}>
       {emptyMessage}{' '}
-      <button onClick={onAdd} className="text-indigo-500 hover:underline">
+      <button onClick={onAdd} className="text-brand hover:underline">
         Add one
       </button>
     </p>
@@ -262,7 +262,7 @@ export function TxnHistoryPanel({
   statsColumns,
   onAdd,
   addLabel = 'Add Transaction',
-  accentColor = 'bg-indigo-600 hover:bg-indigo-700',
+  accentColor = 'bg-brand hover:bg-brand-hover',
   variant = 'embedded',
   addButtonPlacement = 'filterBar',
   addButtonSize,
@@ -348,7 +348,7 @@ export function TxnRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 group border border-transparent hover:border-slate-100 transition-all',
+        'flex items-center gap-3 bg-surface rounded-xl px-3 py-2.5 group border border-transparent hover:border-border-subtle transition-all',
         className,
       )}
     >
@@ -363,14 +363,14 @@ export function TxnRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className={cn('text-xs font-medium text-slate-700', labelClassName)}>{label}</p>
+          <p className={cn('text-xs font-medium text-fg-strong', labelClassName)}>{label}</p>
           {badge && (
             <Badge size="xs" className={badge.className}>
               {badge.text}
             </Badge>
           )}
         </div>
-        <p className={cn('text-[10px] text-slate-400', dateClassName)}>{formatDate(date)}</p>
+        <p className={cn('text-[10px] text-fg-faint', dateClassName)}>{formatDate(date)}</p>
       </div>
       {amount}
       <RowActions

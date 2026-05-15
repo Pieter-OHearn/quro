@@ -1,9 +1,62 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil } from 'lucide-react';
-import { Button, Modal, ModalFooter, Pagination } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  DataTable,
+  DataTableCell,
+  DataTableRow,
+  IconButton,
+  Modal,
+  ModalFooter,
+  Pagination,
+  RowActions,
+  type DataTableColumn,
+  type DataTableSortState,
+} from '@/components/ui';
 import type { BudgetCategory, BudgetFormatFn, RecentBudgetTx } from '../types';
 
 const PAGE_SIZE = 6;
+const SORT_ASCENDING = 1;
+const SORT_DESCENDING = -1;
+
+const TRANSACTION_COLUMNS: readonly DataTableColumn[] = [
+  {
+    key: 'transaction',
+    header: 'Transaction',
+    mobileLabel: 'Transaction',
+    width: '38%',
+    sortable: true,
+  },
+  {
+    key: 'date',
+    header: 'Date',
+    mobileLabel: 'Date',
+    width: '16%',
+    sortable: true,
+    defaultSortDirection: 'desc',
+    cellClassName: 'whitespace-nowrap text-slate-500',
+  },
+  {
+    key: 'category',
+    header: 'Category',
+    mobileLabel: 'Category',
+    width: '20%',
+    sortable: true,
+  },
+  {
+    key: 'amount',
+    header: 'Amount',
+    align: 'right',
+    mobileLabel: 'Amount',
+    width: '16%',
+    numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
+    cellClassName: 'whitespace-nowrap font-semibold text-slate-800',
+  },
+  { key: 'actions', header: '', priority: 'actions', width: 64 },
+];
 
 type EditModalProps = {
   transaction: RecentBudgetTx;
@@ -76,47 +129,57 @@ type RowProps = {
 
 function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
   return (
-    <div className="group flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors">
-      <span className="text-xl w-8 text-center">{transaction.emoji}</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-slate-800">{transaction.name}</p>
-          {transaction.bunqTransactionId && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500 text-white font-medium">
-              Bunq
-            </span>
-          )}
-          {transaction.sourceProvider === 'bunq' && transaction.sourceAccountType === 'JOINT' && (
-            <span
-              className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium"
-              title={transaction.sourceAccountName ?? 'Joint account'}
-            >
-              Joint
-            </span>
-          )}
+    <DataTableRow interactive>
+      <DataTableCell columnKey="transaction">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="w-8 shrink-0 text-center text-xl">{transaction.emoji}</span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-sm font-medium text-slate-800">{transaction.name}</p>
+              {transaction.bunqTransactionId && (
+                <Badge tone="info" size="sm" className="bg-blue-500 text-white">
+                  Bunq
+                </Badge>
+              )}
+              {transaction.sourceProvider === 'bunq' &&
+                transaction.sourceAccountType === 'JOINT' && (
+                  <Badge
+                    tone="success"
+                    size="sm"
+                    title={transaction.sourceAccountName ?? 'Joint account'}
+                  >
+                    Joint
+                  </Badge>
+                )}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">{transaction.date}</span>
-          {transaction.category && transaction.color && (
-            <span
-              className="text-[10px] px-2 py-0.5 rounded-full text-white"
-              style={{ backgroundColor: transaction.color }}
-            >
-              {transaction.category}
-            </span>
-          )}
-        </div>
-      </div>
-      <p className="font-semibold text-slate-800 tabular-nums">-{fmtDec(transaction.amount)}</p>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="p-1 rounded-lg text-slate-300 opacity-100 transition-opacity hover:text-slate-600 sm:opacity-0 sm:group-hover:opacity-100"
-        aria-label="Edit transaction"
-      >
-        <Pencil size={13} />
-      </button>
-    </div>
+      </DataTableCell>
+      <DataTableCell columnKey="date">{transaction.date}</DataTableCell>
+      <DataTableCell columnKey="category">
+        {transaction.category && transaction.color ? (
+          <Badge size="sm" className="text-white" style={{ backgroundColor: transaction.color }}>
+            {transaction.category}
+          </Badge>
+        ) : (
+          <span className="text-slate-400">Uncategorized</span>
+        )}
+      </DataTableCell>
+      <DataTableCell columnKey="amount">-{fmtDec(transaction.amount)}</DataTableCell>
+      <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+        <RowActions>
+          <IconButton
+            type="button"
+            onClick={onEdit}
+            icon={Pencil}
+            label="Edit transaction"
+            title="Edit transaction"
+            variant="ghost"
+            size="sm"
+          />
+        </RowActions>
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -136,10 +199,16 @@ function useMonthlyTransactionPagination(
   selectedYear: number,
 ) {
   const [currentPage, setCurrentPage] = useState(1);
-  const sortedTransactions = useMemo(
-    () => [...transactions].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id),
-    [transactions],
-  );
+  const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'date', direction: 'desc' });
+  const sortedTransactions = useMemo(() => {
+    const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
+
+    return [...transactions].sort((a, b) => {
+      const comparison = getTransactionSortComparison(a, b, sort.columnKey);
+
+      return comparison * direction || b.date.localeCompare(a.date) || b.id - a.id;
+    });
+  }, [sort, transactions]);
   const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * PAGE_SIZE;
@@ -151,7 +220,7 @@ function useMonthlyTransactionPagination(
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, sort]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -164,8 +233,17 @@ function useMonthlyTransactionPagination(
     safeCurrentPage,
     rangeStart,
     rangeEnd,
+    sort,
+    setSort,
     handlePageChange,
   };
+}
+
+function getTransactionSortComparison(a: RecentBudgetTx, b: RecentBudgetTx, columnKey: string) {
+  if (columnKey === 'transaction') return a.name.localeCompare(b.name);
+  if (columnKey === 'category') return (a.category ?? '').localeCompare(b.category ?? '');
+  if (columnKey === 'amount') return a.amount - b.amount;
+  return a.date.localeCompare(b.date);
 }
 
 export function RecentTransactionsList({
@@ -179,33 +257,28 @@ export function RecentTransactionsList({
 }: Readonly<RecentTransactionsListProps>) {
   const [editing, setEditing] = useState<RecentBudgetTx | null>(null);
   const pagination = useMonthlyTransactionPagination(transactions, selectedMonth, selectedYear);
+  const hasTransactions = pagination.sortedTransactions.length > 0;
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-slate-900">Monthly Transactions</h3>
-          <p className="mt-0.5 text-xs text-slate-400">
-            {selectedMonth} {selectedYear}
-          </p>
-        </div>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-          {pagination.sortedTransactions.length}
-        </span>
-      </div>
-      {pagination.sortedTransactions.length > 0 ? (
-        <div>
-          <div className="space-y-2">
-            {pagination.paginatedTransactions.map((tx) => (
-              <TransactionRow
-                key={tx.id}
-                transaction={tx}
-                fmtDec={fmtDec}
-                onEdit={() => setEditing(tx)}
-              />
-            ))}
-          </div>
-          {pagination.totalPages > 1 && (
+    <>
+      <DataTable
+        title="Monthly Transactions"
+        subtitle={`${selectedMonth} ${selectedYear}`}
+        action={
+          <Badge tone="neutral" size="md">
+            {pagination.sortedTransactions.length}
+          </Badge>
+        }
+        columns={TRANSACTION_COLUMNS}
+        sort={pagination.sort}
+        onSortChange={pagination.setSort}
+        isEmpty={!hasTransactions}
+        emptyState="No transactions for this month."
+        minWidth={760}
+        tableLayout="fixed"
+        tableVariant="financial"
+        footer={
+          hasTransactions && pagination.totalPages > 1 ? (
             <Pagination
               page={pagination.safeCurrentPage}
               totalPages={pagination.totalPages}
@@ -214,11 +287,18 @@ export function RecentTransactionsList({
               totalCount={pagination.sortedTransactions.length}
               onChange={pagination.handlePageChange}
             />
-          )}
-        </div>
-      ) : (
-        <p className="text-sm text-slate-400 py-8 text-center">No transactions for this month.</p>
-      )}
+          ) : null
+        }
+      >
+        {pagination.paginatedTransactions.map((tx) => (
+          <TransactionRow
+            key={tx.id}
+            transaction={tx}
+            fmtDec={fmtDec}
+            onEdit={() => setEditing(tx)}
+          />
+        ))}
+      </DataTable>
       {editing && (
         <EditTransactionModal
           transaction={editing}
@@ -228,6 +308,6 @@ export function RecentTransactionsList({
           onClose={() => setEditing(null)}
         />
       )}
-    </div>
+    </>
   );
 }
