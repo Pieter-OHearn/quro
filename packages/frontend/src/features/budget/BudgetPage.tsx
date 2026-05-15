@@ -41,9 +41,6 @@ export function Budget() {
         <BudgetCategoriesSection
           categories={page.categories}
           overBudget={page.overBudget}
-          showAdd={page.showAdd}
-          newCat={page.newCat}
-          baseCurrency={page.baseCurrency}
           fmt={page.fmt}
           fmtDec={page.fmtDec}
           selectedMonth={page.selectedMonth}
@@ -51,9 +48,7 @@ export function Budget() {
           isCurrentMonth={page.isCurrentMonth}
           onPrevMonth={page.navigatePrev}
           onNextMonth={page.navigateNext}
-          onToggleAdd={page.toggleAdd}
-          onNewCatChange={page.setNewCat}
-          onAddCategory={page.handleAddCategory}
+          onAddCategory={page.openAddCategory}
           onEditCategory={page.setEditingCategory}
         />
       </ContentSection>
@@ -68,12 +63,21 @@ export function Budget() {
           onChangeCategory={page.handleChangeTxCategory}
         />
       </ContentSection>
+      {page.isAddingCategory && (
+        <EditCategoryDialog
+          category={page.addCategoryDraft}
+          mode="create"
+          isSaving={page.isSavingCategory}
+          onSave={page.handleAddCategory}
+          onClose={page.closeCategoryDialog}
+        />
+      )}
       {page.editingCategory && (
         <EditCategoryDialog
           category={page.editingCategory}
-          isSaving={page.isUpdating}
+          isSaving={page.isSavingCategory}
           onSave={page.handleSaveEdit}
-          onClose={() => page.setEditingCategory(null)}
+          onClose={page.closeCategoryDialog}
         />
       )}
     </PageStack>

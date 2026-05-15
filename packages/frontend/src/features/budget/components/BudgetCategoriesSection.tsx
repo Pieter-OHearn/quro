@@ -1,13 +1,12 @@
-import { Edit3, Plus } from 'lucide-react';
-import type { BudgetCategory, BudgetFormatFn, NewCategoryForm } from '../types';
+import { Edit3, Plus, WalletCards } from 'lucide-react';
+import { Button, Card, EmptyState, IconButton, PanelHeader } from '@/components/ui';
+import { cn } from '@/lib/utils';
+import type { BudgetCategory, BudgetFormatFn } from '../types';
 import { MonthYearSelector } from './MonthYearSelector';
 
 type BudgetCategoriesSectionProps = {
   categories: BudgetCategory[];
   overBudget: BudgetCategory[];
-  showAdd: boolean;
-  newCat: NewCategoryForm;
-  baseCurrency: string;
   fmt: BudgetFormatFn;
   fmtDec: BudgetFormatFn;
   selectedMonth: string;
@@ -15,51 +14,51 @@ type BudgetCategoriesSectionProps = {
   isCurrentMonth: boolean;
   onPrevMonth: () => void;
   onNextMonth: () => void;
-  onToggleAdd: () => void;
-  onNewCatChange: (value: NewCategoryForm) => void;
   onAddCategory: () => void;
   onEditCategory: (category: BudgetCategory) => void;
 };
 
-type AddCategoryFormProps = {
-  newCat: NewCategoryForm;
-  baseCurrency: string;
-  onChange: (value: NewCategoryForm) => void;
-  onAdd: () => void;
-};
-
-function AddCategoryForm({
-  newCat,
-  baseCurrency,
-  onChange,
-  onAdd,
-}: Readonly<AddCategoryFormProps>) {
+function CategoryProgress({
+  category,
+  over,
+  pct,
+}: Readonly<{ category: BudgetCategory; over: boolean; pct: number }>) {
   return (
-    <div className="mb-5 p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex gap-3">
-      <input
-        data-testid="budget-category-name-input"
-        className="flex-1 rounded-xl border border-indigo-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        placeholder="Category name"
-        value={newCat.name}
-        onChange={(event) => onChange({ ...newCat, name: event.target.value })}
+    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
+      <div
+        className="h-full rounded-full transition-all"
+        style={{
+          width: `${over ? 100 : pct}%`,
+          backgroundColor: over ? 'var(--danger)' : category.color,
+        }}
       />
-      <input
-        data-testid="budget-category-budget-input"
-        className="w-36 rounded-xl border border-indigo-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        placeholder={`Budget (${baseCurrency})`}
-        inputMode="decimal"
-        type="number"
-        step="0.01"
-        value={newCat.budgeted}
-        onChange={(event) => onChange({ ...newCat, budgeted: event.target.value })}
-      />
-      <button
-        data-testid="budget-category-submit-button"
-        onClick={onAdd}
-        className="rounded-xl bg-indigo-600 text-white text-sm px-4 py-2 hover:bg-indigo-700 transition-colors"
-      >
-        Add
-      </button>
+    </div>
+  );
+}
+
+function CategoryAmounts({
+  over,
+  spent,
+  surplus,
+  budgeted,
+  fmt,
+  fmtDec,
+}: Readonly<{
+  over: boolean;
+  spent: number;
+  surplus: number;
+  budgeted: number;
+  fmt: BudgetFormatFn;
+  fmtDec: BudgetFormatFn;
+}>) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-numeric md:justify-end">
+      <span className={cn('font-semibold', over ? 'text-danger' : 'text-fg-muted')}>
+        {fmtDec(spent)} / {fmt(budgeted)}
+      </span>
+      <span className={over ? 'font-semibold text-danger' : 'text-success'}>
+        {over ? `-${fmt(Math.abs(surplus))}` : `+${fmt(surplus)} left`}
+      </span>
     </div>
   );
 }
@@ -81,42 +80,80 @@ function CategoryRow({
 
   return (
     <div
-      className={`p-3 rounded-xl transition-colors ${over ? 'bg-rose-50 border border-rose-100' : 'hover:bg-slate-50'}`}
+      className={cn(
+        'rounded-xl border p-3 transition-colors',
+        over
+          ? 'border-danger-border bg-danger-soft'
+          : 'border-transparent hover:border-border-subtle hover:bg-surface-muted',
+      )}
     >
-      <div className="flex items-center gap-3">
-        <span className="text-xl w-8 text-center">{category.emoji}</span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-sm font-medium text-slate-800">{category.name}</p>
-            <div className="flex items-center gap-3 text-xs">
-              <span className={over ? 'text-rose-600 font-semibold' : 'text-slate-500'}>
-                {fmtDec(category.spent)} / {fmt(category.budgeted)}
-              </span>
-              {over ? (
-                <span className="text-rose-500 font-semibold">-{fmt(Math.abs(surplus))}</span>
-              ) : (
-                <span className="text-emerald-600">+{fmt(surplus)} left</span>
-              )}
-            </div>
-          </div>
-          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${over ? 100 : pct}%`,
-                backgroundColor: over ? '#f43f5e' : category.color,
-              }}
+      <div className="flex items-start gap-3">
+        <span className="w-8 flex-shrink-0 text-center text-xl leading-8">{category.emoji}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <p className="truncate text-sm font-medium text-fg-strong">{category.name}</p>
+            <CategoryAmounts
+              over={over}
+              spent={category.spent}
+              surplus={surplus}
+              budgeted={category.budgeted}
+              fmt={fmt}
+              fmtDec={fmtDec}
             />
           </div>
+          <div className="mt-2">
+            <CategoryProgress category={category} over={over} pct={pct} />
+          </div>
         </div>
-        <button
+        <IconButton
           onClick={() => onEdit(category)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors flex-shrink-0"
-          aria-label={`Edit ${category.name}`}
-        >
-          <Edit3 size={13} />
-        </button>
+          icon={Edit3}
+          label={`Edit ${category.name}`}
+          variant="subtle"
+          size="sm"
+        />
       </div>
+    </div>
+  );
+}
+
+function CategoryList({
+  categories,
+  fmt,
+  fmtDec,
+  onAddCategory,
+  onEditCategory,
+}: Readonly<{
+  categories: BudgetCategory[];
+  fmt: BudgetFormatFn;
+  fmtDec: BudgetFormatFn;
+  onAddCategory: () => void;
+  onEditCategory: (category: BudgetCategory) => void;
+}>) {
+  if (categories.length === 0) {
+    return (
+      <EmptyState
+        icon={WalletCards}
+        title="No budget categories yet"
+        description="Click Add Category to get started."
+        action={{ label: 'Add Category', onClick: onAddCategory, icon: <Plus size={15} /> }}
+        compact
+        tone="neutral"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2 p-3">
+      {categories.map((category) => (
+        <CategoryRow
+          key={category.id}
+          category={category}
+          fmt={fmt}
+          fmtDec={fmtDec}
+          onEdit={onEditCategory}
+        />
+      ))}
     </div>
   );
 }
@@ -124,9 +161,6 @@ function CategoryRow({
 export function BudgetCategoriesSection({
   categories,
   overBudget,
-  showAdd,
-  newCat,
-  baseCurrency,
   fmt,
   fmtDec,
   selectedMonth,
@@ -134,17 +168,21 @@ export function BudgetCategoriesSection({
   isCurrentMonth,
   onPrevMonth,
   onNextMonth,
-  onToggleAdd,
-  onNewCatChange,
   onAddCategory,
   onEditCategory,
 }: Readonly<BudgetCategoriesSectionProps>) {
+  const subtitle =
+    overBudget.length > 0 ? `${overBudget.length} categories over budget` : undefined;
+
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-slate-900">Budget Categories</h3>
+    <Card padding="none" className="overflow-hidden">
+      <PanelHeader
+        title="Budget Categories"
+        subtitle={subtitle}
+        className="max-md:flex-col max-md:items-start"
+        actionClassName="max-md:w-full"
+        action={
+          <div className="flex flex-wrap items-center justify-end gap-3 max-md:w-full max-md:justify-between">
             <MonthYearSelector
               month={selectedMonth}
               year={selectedYear}
@@ -152,47 +190,23 @@ export function BudgetCategoriesSection({
               onPrev={onPrevMonth}
               onNext={onNextMonth}
             />
+            <Button
+              data-testid="budget-add-category-button"
+              onClick={onAddCategory}
+              leadingIcon={<Plus size={15} />}
+            >
+              Add Category
+            </Button>
           </div>
-          {overBudget.length > 0 && (
-            <p className="text-xs text-rose-500 mt-0.5">
-              {overBudget.length} categories over budget
-            </p>
-          )}
-        </div>
-        <button
-          data-testid="budget-add-category-button"
-          onClick={onToggleAdd}
-          className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
-        >
-          <Plus size={15} /> Add Category
-        </button>
-      </div>
-
-      {showAdd && (
-        <AddCategoryForm
-          newCat={newCat}
-          baseCurrency={baseCurrency}
-          onChange={onNewCatChange}
-          onAdd={onAddCategory}
-        />
-      )}
-
-      <div className="space-y-2">
-        {categories.map((category) => (
-          <CategoryRow
-            key={category.id}
-            category={category}
-            fmt={fmt}
-            fmtDec={fmtDec}
-            onEdit={onEditCategory}
-          />
-        ))}
-        {categories.length === 0 && (
-          <p className="text-sm text-slate-400 py-8 text-center">
-            No budget categories yet. Click <strong>Add Category</strong> to get started.
-          </p>
-        )}
-      </div>
-    </div>
+        }
+      />
+      <CategoryList
+        categories={categories}
+        fmt={fmt}
+        fmtDec={fmtDec}
+        onAddCategory={onAddCategory}
+        onEditCategory={onEditCategory}
+      />
+    </Card>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   BUDGET_MONTHS,
   formatBudgetMonthFromDate,
@@ -9,7 +9,6 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
   buildCreateBudgetCategoryInput,
-  createEmptyCategoryForm,
   deriveBudgetStats,
   mapMonthlyTransactions,
 } from '../utils/budget-data';
@@ -20,6 +19,9 @@ import { useCreateBudgetCategory } from './useCreateBudgetCategory';
 import { useUpdateBudgetCategory } from './useUpdateBudgetCategory';
 import { useDeleteBudgetTransaction } from './useDeleteBudgetTransaction';
 import { useUpdateBudgetTransaction } from './useUpdateBudgetTransaction';
+
+const PREVIOUS_MONTH_DELTA = -1;
+const NEXT_MONTH_DELTA = 1;
 
 function currentMonthYear() {
   const now = new Date();
@@ -46,53 +48,61 @@ function useBudgetMonthSelection() {
     selectedYear,
     isCurrentMonth,
     navigatePrev: () => {
-      const n = shiftMonth(selectedMonth, selectedYear, -1);
+      const n = shiftMonth(selectedMonth, selectedYear, PREVIOUS_MONTH_DELTA);
       setSelectedMonth(n.month);
       setSelectedYear(n.year);
     },
     navigateNext: () => {
       if (isCurrentMonth) return;
-      const n = shiftMonth(selectedMonth, selectedYear, 1);
+      const n = shiftMonth(selectedMonth, selectedYear, NEXT_MONTH_DELTA);
       setSelectedMonth(n.month);
       setSelectedYear(n.year);
     },
   };
 }
 
-export function useBudgetPage() {
-  const { fmtBase, baseCurrency } = useCurrency();
-  const fmt = (n: number) => fmtBase(n);
-  const fmtDec = (n: number) => fmtBase(n, undefined, true);
+function createAddCategoryDraft(month: BudgetMonth, year: number): BudgetCategory {
+  return {
+    id: 0,
+    name: '',
+    emoji: '\ud83d\udce6',
+    budgeted: 0,
+    spent: 0,
+    color: '#94a3b8',
+    month,
+    year,
+  };
+}
 
-  const monthSelection = useBudgetMonthSelection();
-  const [showAdd, setShowAdd] = useState(false);
-  const [newCat, setNewCat] = useState(createEmptyCategoryForm());
+function useBudgetCategoryDialog(monthSelection: ReturnType<typeof useBudgetMonthSelection>) {
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<BudgetCategory | null>(null);
-
-  const monthQuery = { month: monthSelection.selectedMonth, year: monthSelection.selectedYear };
-  const categoriesQuery = useBudgetCategories(monthQuery);
-  const transactionsQuery = useBudgetTransactions(monthQuery);
   const createCategory = useCreateBudgetCategory();
   const updateCategory = useUpdateBudgetCategory();
-  const deleteTransaction = useDeleteBudgetTransaction();
-  const updateTransaction = useUpdateBudgetTransaction();
+  const addCategoryDraft = useMemo(
+    () => createAddCategoryDraft(monthSelection.selectedMonth, monthSelection.selectedYear),
+    [monthSelection.selectedMonth, monthSelection.selectedYear],
+  );
 
-  const categories = categoriesQuery.data ?? [];
-  const budgetTransactions = transactionsQuery.data ?? [];
-  const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } =
-    deriveBudgetStats(categories);
-  const monthlyTransactions = mapMonthlyTransactions(budgetTransactions, categories);
+  const openAddCategory = () => {
+    setEditingCategory(null);
+    setIsAddingCategory(true);
+  };
 
-  const handleAddCategory = () => {
-    if (!newCat.name || !newCat.budgeted) return;
-    createCategory.mutate(
+  const closeCategoryDialog = () => {
+    setEditingCategory(null);
+    setIsAddingCategory(false);
+  };
+
+  const handleAddCategory = async (form: EditCategoryForm) => {
+    if (!form.name.trim()) return;
+    await createCategory.mutateAsync(
       buildCreateBudgetCategoryInput(
-        newCat,
+        form,
         new Date(monthSelection.selectedYear, toBudgetMonthIndex(monthSelection.selectedMonth)),
       ),
     );
-    setNewCat(createEmptyCategoryForm());
-    setShowAdd(false);
+    setIsAddingCategory(false);
   };
 
   const handleSaveEdit = async (form: EditCategoryForm) => {
@@ -108,6 +118,39 @@ export function useBudgetPage() {
   };
 
   return {
+    isAddingCategory,
+    addCategoryDraft,
+    openAddCategory,
+    closeCategoryDialog,
+    handleAddCategory,
+    editingCategory,
+    setEditingCategory,
+    handleSaveEdit,
+    isSavingCategory: createCategory.isPending || updateCategory.isPending,
+  };
+}
+
+export function useBudgetPage() {
+  const { fmtBase } = useCurrency();
+  const fmt = (n: number) => fmtBase(n);
+  const fmtDec = (n: number) => fmtBase(n, undefined, true);
+
+  const monthSelection = useBudgetMonthSelection();
+  const categoryDialog = useBudgetCategoryDialog(monthSelection);
+
+  const monthQuery = { month: monthSelection.selectedMonth, year: monthSelection.selectedYear };
+  const categoriesQuery = useBudgetCategories(monthQuery);
+  const transactionsQuery = useBudgetTransactions(monthQuery);
+  const deleteTransaction = useDeleteBudgetTransaction();
+  const updateTransaction = useUpdateBudgetTransaction();
+
+  const categories = categoriesQuery.data ?? [];
+  const budgetTransactions = transactionsQuery.data ?? [];
+  const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } =
+    deriveBudgetStats(categories);
+  const monthlyTransactions = mapMonthlyTransactions(budgetTransactions, categories);
+
+  return {
     isLoading: categoriesQuery.isLoading || transactionsQuery.isLoading,
     queryFailures: getFailedRouteQueries([
       { label: 'budget categories', ...categoriesQuery },
@@ -115,7 +158,6 @@ export function useBudgetPage() {
     ]),
     fmt,
     fmtDec,
-    baseCurrency,
     categories,
     budgetTransactions,
     totalBudgeted,
@@ -126,15 +168,7 @@ export function useBudgetPage() {
     pieData,
     monthlyTransactions,
     ...monthSelection,
-    showAdd,
-    newCat,
-    toggleAdd: () => setShowAdd((v) => !v),
-    setNewCat,
-    handleAddCategory,
-    editingCategory,
-    setEditingCategory,
-    handleSaveEdit,
-    isUpdating: updateCategory.isPending,
+    ...categoryDialog,
     handleDeleteTransaction: (id: number) => deleteTransaction.mutate(id),
     handleChangeTxCategory: (id: number, categoryId: number) =>
       updateTransaction.mutate({ id, categoryId }),
