@@ -1669,7 +1669,7 @@ describe('finance integration', () => {
       json: {
         name: 'Workplace Pension',
         provider: 'Aviva',
-        type: 'workplace',
+        type: 'Workplace Pension',
         balance: 12000,
         currency: 'GBP',
         employeeMonthly: 200,
