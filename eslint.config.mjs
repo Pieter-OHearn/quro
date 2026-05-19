@@ -76,6 +76,15 @@ export default [
         '@typescript-eslint/parser': ['.ts', '.tsx', '.cts', '.mts'],
       },
       'import/resolver': {
+        typescript: {
+          alwaysTryTypes: true,
+          noWarnOnMultipleProjects: true,
+          project: [
+            'packages/frontend/tsconfig.json',
+            'packages/backend/tsconfig.json',
+            'packages/shared/tsconfig.json',
+          ],
+        },
         node: {
           extensions: ['.js', '.cjs', '.mjs', '.jsx', '.ts', '.tsx', '.cts', '.mts', '.d.ts'],
         },
