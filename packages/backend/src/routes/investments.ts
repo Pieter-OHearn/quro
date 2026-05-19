@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import {
+  HOLDING_TRANSACTION_TYPES,
+  PROPERTY_TRANSACTION_TYPES,
   parseTickerItemType,
   type CurrencyCode,
+  type HoldingTransactionType,
+  type PropertyTransactionType,
   type TickerItemType,
   type TickerLookupExchange,
   type TickerLookupResult,
@@ -85,8 +89,6 @@ const PROPERTY_TRANSACTION_FIELDS = [
   'date',
   'note',
 ] as const;
-const HOLDING_TRANSACTION_TYPES = ['buy', 'sell', 'dividend'] as const;
-const PROPERTY_TRANSACTION_TYPES = ['repayment', 'valuation', 'rent_income', 'expense'] as const;
 const INVESTMENT_PROPERTY_TYPE_KEYS = new Set([
   'buy-to-let',
   'investment',
@@ -157,9 +159,6 @@ function parseHoldingPriceHistoryQuery(input: {
     },
   };
 }
-
-type HoldingTransactionType = (typeof HOLDING_TRANSACTION_TYPES)[number];
-type PropertyTransactionType = (typeof PROPERTY_TRANSACTION_TYPES)[number];
 
 type HoldingPayload = {
   name: string;

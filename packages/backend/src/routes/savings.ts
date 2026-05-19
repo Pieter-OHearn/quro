@@ -1,5 +1,11 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
+import {
+  SAVINGS_ACCOUNT_TYPES,
+  SAVINGS_TRANSACTION_TYPES,
+  type SavingsAccountType,
+  type SavingsTransactionType,
+} from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
@@ -41,11 +47,6 @@ const SAVINGS_ACCOUNT_FIELDS = [
   'emoji',
 ] as const;
 const SAVINGS_TRANSACTION_FIELDS = ['accountId', 'type', 'amount', 'date', 'note'] as const;
-const SAVINGS_ACCOUNT_TYPES = ['Easy Access', 'Term Deposit'] as const;
-const SAVINGS_TRANSACTION_TYPES = ['deposit', 'withdrawal', 'interest'] as const;
-
-type SavingsAccountType = (typeof SAVINGS_ACCOUNT_TYPES)[number];
-type SavingsTransactionType = (typeof SAVINGS_TRANSACTION_TYPES)[number];
 
 type SavingsAccountPayload = {
   name: string;

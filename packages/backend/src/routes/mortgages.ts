@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
-import type { CurrencyCode } from '@quro/shared';
+import {
+  MORTGAGE_TRANSACTION_TYPES,
+  type CurrencyCode,
+  type MortgageTransactionType,
+} from '@quro/shared';
 import { db } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -51,10 +55,7 @@ const MORTGAGE_TRANSACTION_FIELDS = [
   'note',
   'fixedYears',
 ] as const;
-const MORTGAGE_TRANSACTION_TYPES = ['repayment', 'valuation', 'rate_change'] as const;
-
 type MortgageRateType = 'Fixed' | 'Variable';
-type MortgageTransactionType = (typeof MORTGAGE_TRANSACTION_TYPES)[number];
 
 type MortgagePayload = {
   linkedPropertyId: number;
