@@ -1,8 +1,17 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTP_STATUS } from '../constants/http';
 
-function createRateLimiter(windowMs: number, max: number) {
+export function createRateLimiter(windowMs: number, max: number) {
   const store = new Map<string, number[]>();
+
+  const cleanup = setInterval(() => {
+    const cutoff = Date.now() - windowMs;
+    for (const [ip, hits] of store.entries()) {
+      if (hits.every((t) => t <= cutoff)) store.delete(ip);
+    }
+  }, windowMs);
+
+  cleanup.unref();
 
   return createMiddleware(async (c, next) => {
     if (process.env.NODE_ENV === 'test') {
