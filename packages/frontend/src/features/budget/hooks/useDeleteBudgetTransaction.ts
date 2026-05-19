@@ -9,6 +9,7 @@ export function useDeleteBudgetTransaction() {
       await api.delete(`/api/budget/transactions/${id}`);
     },
     onSuccess: () => {
+      // id-only input carries no month/year; broad invalidation until input type is extended
       void queryClient.invalidateQueries({ queryKey: ['budget'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },

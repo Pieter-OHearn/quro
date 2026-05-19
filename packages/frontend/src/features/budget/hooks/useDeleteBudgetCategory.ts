@@ -9,6 +9,7 @@ export function useDeleteBudgetCategory() {
       await api.delete(`/api/budget/categories/${id}`);
     },
     onSuccess: () => {
+      // id-only input carries no month/year; broad invalidation until input type is extended
       void queryClient.invalidateQueries({ queryKey: ['budget'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },

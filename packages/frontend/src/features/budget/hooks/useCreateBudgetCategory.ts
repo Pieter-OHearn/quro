@@ -10,8 +10,13 @@ export function useCreateBudgetCategory() {
       const { data } = await api.post('/api/budget/categories', category);
       return data.data;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['budget'] });
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['budget', 'categories', variables.month, variables.year],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['budget', 'transactions', variables.month, variables.year],
+      });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
