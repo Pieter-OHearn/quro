@@ -988,7 +988,7 @@ describe('finance integration', () => {
       json: {
         name: 'Work Pension',
         provider: 'Aegon',
-        type: 'defined_contribution',
+        type: 'Workplace Pension',
         balance: 10000,
         currency: 'GBP',
         employeeMonthly: 200,
@@ -1010,7 +1010,7 @@ describe('finance integration', () => {
       json: {
         name: 'Old Employer Pension',
         provider: 'Vanguard',
-        type: 'defined_contribution',
+        type: 'Workplace Pension',
         balance: 2000,
         currency: 'EUR',
         employeeMonthly: 0,
@@ -1031,7 +1031,7 @@ describe('finance integration', () => {
       json: {
         name: 'Foreign Pot',
         provider: 'Other',
-        type: 'defined_contribution',
+        type: 'Personal Pension',
         balance: 500,
         currency: 'USD',
         employeeMonthly: 10,
@@ -1458,7 +1458,7 @@ describe('finance integration', () => {
       json: {
         name: 'Broken Pot',
         provider: 'Aegon',
-        type: 'defined_contribution',
+        type: 'Workplace Pension',
         balance: 1000,
         currency: 'EUR',
         employeeMonthly: 50,
@@ -1485,7 +1485,7 @@ describe('finance integration', () => {
       json: {
         name: 'Valid Pot',
         provider: 'Aegon',
-        type: 'defined_contribution',
+        type: 'Workplace Pension',
         balance: 5000,
         currency: 'EUR',
         employeeMonthly: 100,
@@ -1669,7 +1669,7 @@ describe('finance integration', () => {
       json: {
         name: 'Workplace Pension',
         provider: 'Aviva',
-        type: 'workplace',
+        type: 'Workplace Pension',
         balance: 12000,
         currency: 'GBP',
         employeeMonthly: 200,

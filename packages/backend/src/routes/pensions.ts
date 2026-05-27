@@ -1,5 +1,11 @@
 import { Hono } from 'hono';
-import type { CurrencyCode } from '@quro/shared';
+import {
+  PENSION_POT_TYPES,
+  PENSION_TRANSACTION_TYPES,
+  type CurrencyCode,
+  type PensionPotType,
+  type PensionTransactionType,
+} from '@quro/shared';
 import { db } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
@@ -36,7 +42,6 @@ import {
 } from '../lib/requestValidation';
 
 const app = new Hono();
-const TRANSACTION_TYPES = ['contribution', 'fee', 'annual_statement'] as const;
 const PENSION_POT_FIELDS = [
   'name',
   'provider',
@@ -61,12 +66,10 @@ const PENSION_TRANSACTION_FIELDS = [
   'isEmployer',
 ] as const;
 
-type PensionTransactionType = (typeof TRANSACTION_TYPES)[number];
-
 type PensionPotPayload = {
   name: string;
   provider: string;
-  type: string;
+  type: PensionPotType;
   balance: number;
   currency: CurrencyCode;
   employeeMonthly: number;
@@ -158,7 +161,10 @@ function parseMetadataField(value: unknown): ParseResult<Record<string, string>>
 const pensionPotParsers: FieldParsers<PensionPotPayload> = {
   name: (value) => parseTextField(value, 'Pension name is required'),
   provider: (value) => parseTextField(value, 'Provider is required'),
-  type: (value) => parseTextField(value, 'Pension type is required'),
+  type: (value) =>
+    typeof value === 'string' && PENSION_POT_TYPES.includes(value as PensionPotType)
+      ? ok(value as PensionPotType)
+      : err('Invalid pension type'),
   balance: (value) => parseNumberField(value, 'Balance must be zero or greater', 0),
   currency: parseCurrencyField,
   employeeMonthly: (value) =>
@@ -250,7 +256,7 @@ function toFiniteNumber(value: unknown): number | null {
 
 function parsePensionTransactionType(value: unknown): PensionTransactionType | null {
   if (typeof value !== 'string') return null;
-  return TRANSACTION_TYPES.includes(value as PensionTransactionType)
+  return PENSION_TRANSACTION_TYPES.includes(value as PensionTransactionType)
     ? (value as PensionTransactionType)
     : null;
 }

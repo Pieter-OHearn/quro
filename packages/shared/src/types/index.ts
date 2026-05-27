@@ -83,6 +83,9 @@ export type UpdateUserPasswordInput = {
   nextPassword: string;
 };
 
+export const SAVINGS_ACCOUNT_TYPES = ['Easy Access', 'Term Deposit'] as const;
+export type SavingsAccountType = (typeof SAVINGS_ACCOUNT_TYPES)[number];
+
 export type SavingsAccount = {
   id: number;
   name: string;
@@ -90,17 +93,20 @@ export type SavingsAccount = {
   balance: number;
   currency: CurrencyCode;
   interestRate: number;
-  accountType: 'Easy Access' | 'Term Deposit';
+  accountType: SavingsAccountType;
   color: string;
   emoji: string;
   bunqAccountId?: string | null;
   archivedAt?: string | null;
 };
 
+export const SAVINGS_TRANSACTION_TYPES = ['deposit', 'withdrawal', 'interest'] as const;
+export type SavingsTransactionType = (typeof SAVINGS_TRANSACTION_TYPES)[number];
+
 export type SavingsTransaction = {
   id: number;
   accountId: number;
-  type: 'deposit' | 'withdrawal' | 'interest';
+  type: SavingsTransactionType;
   amount: number;
   date: string;
   note: string;
@@ -214,10 +220,13 @@ export type Holding = {
   archivedAt?: string | null;
 };
 
+export const HOLDING_TRANSACTION_TYPES = ['buy', 'sell', 'dividend'] as const;
+export type HoldingTransactionType = (typeof HOLDING_TRANSACTION_TYPES)[number];
+
 export type HoldingTransaction = {
   id: number;
   holdingId: number;
-  type: 'buy' | 'sell' | 'dividend';
+  type: HoldingTransactionType;
   shares: number | null;
   price: number;
   date: string;
@@ -247,10 +256,18 @@ export type Property = {
   emoji: string;
 };
 
+export const PROPERTY_TRANSACTION_TYPES = [
+  'repayment',
+  'valuation',
+  'rent_income',
+  'expense',
+] as const;
+export type PropertyTransactionType = (typeof PROPERTY_TRANSACTION_TYPES)[number];
+
 export type PropertyTransaction = {
   id: number;
   propertyId: number;
-  type: 'repayment' | 'valuation' | 'rent_income' | 'expense';
+  type: PropertyTransactionType;
   amount: number;
   interest: number | null;
   principal: number | null;
@@ -258,11 +275,19 @@ export type PropertyTransaction = {
   note: string;
 };
 
+export const PENSION_POT_TYPES = [
+  'Workplace Pension',
+  'Personal Pension',
+  'State Pension',
+  'Other',
+] as const;
+export type PensionPotType = (typeof PENSION_POT_TYPES)[number];
+
 export type PensionPot = {
   id: number;
   name: string;
   provider: string;
-  type: 'Workplace Pension' | 'Personal Pension' | 'State Pension' | 'Other';
+  type: PensionPotType;
   balance: number;
   currency: CurrencyCode;
   employeeMonthly: number;
@@ -275,10 +300,13 @@ export type PensionPot = {
   archivedAt?: string | null;
 };
 
+export const PENSION_TRANSACTION_TYPES = ['contribution', 'fee', 'annual_statement'] as const;
+export type PensionTransactionType = (typeof PENSION_TRANSACTION_TYPES)[number];
+
 export type PensionTransaction = {
   id: number;
   potId: number;
-  type: 'contribution' | 'fee' | 'annual_statement';
+  type: PensionTransactionType;
   amount: number;
   taxAmount: number;
   date: string;
@@ -424,10 +452,13 @@ export type Mortgage = {
   archivedAt?: string | null;
 };
 
+export const MORTGAGE_TRANSACTION_TYPES = ['repayment', 'valuation', 'rate_change'] as const;
+export type MortgageTransactionType = (typeof MORTGAGE_TRANSACTION_TYPES)[number];
+
 export type MortgageTransaction = {
   id: number;
   mortgageId: number;
-  type: 'repayment' | 'valuation' | 'rate_change';
+  type: MortgageTransactionType;
   amount: number;
   interest: number | null;
   principal: number | null;
