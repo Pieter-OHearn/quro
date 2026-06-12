@@ -1,6 +1,7 @@
 import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } from 'lucide-react';
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/ui';
+import { JointBadge } from '@/features/partner';
 import type { Mortgage, Property, PropertyTransaction } from '@quro/shared';
 import { getPropertyMortgageBalance } from '../utils/position';
 import { PropertyTxnHistory } from './PropertyTxnHistory';
@@ -302,6 +303,7 @@ function PropertyCardHeader({
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 truncate">{property.address}</p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <JointBadge isJoint={property.isJoint} ownerUserId={property.userId} size="xs" />
             <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
               {property.propertyType}
             </span>

@@ -14,6 +14,7 @@ import {
   EmojiPickerField,
 } from '@/components/ui';
 import type { SavingsAccount } from '@quro/shared';
+import { JointToggleField } from '@/features/partner';
 import type { DeleteSavingsAccountMode, SaveAccountInput } from '../types';
 
 type AccountModalProps = {
@@ -43,6 +44,7 @@ type FormState = {
   rate: string;
   type: 'Easy Access' | 'Term Deposit';
   emoji: string;
+  isJoint: boolean;
 };
 
 function validateAccountForm(form: FormState): Record<string, string> {
@@ -67,6 +69,7 @@ function initialFormState(existing?: SavingsAccount): FormState {
       rate: '',
       type: 'Easy Access',
       emoji: '\ud83c\udfe6',
+      isJoint: false,
     };
   }
   return {
@@ -77,6 +80,7 @@ function initialFormState(existing?: SavingsAccount): FormState {
     rate: formatFixedInputValue(existing.interestRate),
     type: existing.accountType as 'Easy Access' | 'Term Deposit',
     emoji: existing.emoji,
+    isJoint: existing.isJoint,
   };
 }
 
@@ -107,7 +111,7 @@ function InterestPreview({
 type AccountFormBodyProps = {
   form: FormState;
   errors: Record<string, string>;
-  set: (field: string, value: string) => void;
+  set: (field: string, value: string | boolean) => void;
   isBunqSynced?: boolean;
 };
 
@@ -216,6 +220,7 @@ function AccountFormBody({
         balanceLabel={isEdit ? 'Balance' : 'Opening Balance'}
         isBunqSynced={isBunqSynced}
       />
+      <JointToggleField checked={form.isJoint} onChange={(checked) => set('isJoint', checked)} />
       <InterestPreview balance={form.balance} rate={form.rate} currency={form.currency} />
     </>
   );
@@ -230,7 +235,7 @@ function useAccountModalForm(
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  function set(field: string, value: string): void {
+  function set(field: string, value: string | boolean): void {
     setForm((f) => ({ ...f, [field]: value }));
     if (errors[field])
       setErrors((e) => {
@@ -258,6 +263,7 @@ function useAccountModalForm(
         accountType: form.type,
         color: existing?.color ?? COLORS[Math.floor(Math.random() * COLORS.length)],
         emoji: form.emoji.trim(),
+        isJoint: form.isJoint,
       });
       onClose();
     } catch (e) {

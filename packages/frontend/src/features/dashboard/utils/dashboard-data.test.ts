@@ -82,6 +82,7 @@ test('normalizes dashboard payload rows using each row currency metadata', () =>
       date: '2026-03-05',
       category: 'Investment',
       currency: 'GBP',
+      isJoint: false,
     },
     {
       id: 2,
@@ -91,6 +92,7 @@ test('normalizes dashboard payload rows using each row currency metadata', () =>
       date: '2026-03-06',
       category: 'Property',
       currency: 'USD',
+      isJoint: false,
     },
   ];
 
@@ -120,6 +122,7 @@ test('computes dashboard stats from normalized mixed-currency activity and paysl
         date: `${currentMonthKey}-05`,
         category: 'Salary',
         currency: 'USD',
+        isJoint: false,
       },
       {
         id: 2,
@@ -129,6 +132,7 @@ test('computes dashboard stats from normalized mixed-currency activity and paysl
         date: `${currentMonthKey}-07`,
         category: 'Budget',
         currency: 'GBP',
+        isJoint: false,
       },
       {
         id: 3,
@@ -138,6 +142,7 @@ test('computes dashboard stats from normalized mixed-currency activity and paysl
         date: `${currentMonthKey}-09`,
         category: 'Savings',
         currency: 'USD',
+        isJoint: false,
       },
     ] satisfies DashboardTransactionPayload[],
     convertToEur,
@@ -165,4 +170,54 @@ test('computes dashboard stats from normalized mixed-currency activity and paysl
   expect(stats.monthlyCategoryChange('Savings')).toBeCloseTo(46.1, 10);
   expect(stats.monthlySalaryValue).toBeCloseTo((2300 + 200) * 1.18, 10);
   expect(stats.salaryTrendChange).toBe(0);
+});
+
+test('halves joint transactions in monthly stats but keeps full display amounts', () => {
+  const convertToEur = createConvertToBase('EUR');
+  const currentMonthKey = toMonthKey(new Date());
+  const transactions = normalizeDashboardTransactions(
+    [
+      {
+        id: 1,
+        name: 'Joint savings deposit',
+        type: 'transfer',
+        amount: -500,
+        date: `${currentMonthKey}-04`,
+        category: 'Savings',
+        currency: 'EUR',
+        isJoint: true,
+      },
+      {
+        id: 2,
+        name: 'Personal savings deposit',
+        type: 'transfer',
+        amount: -200,
+        date: `${currentMonthKey}-05`,
+        category: 'Savings',
+        currency: 'EUR',
+        isJoint: false,
+      },
+      {
+        id: 3,
+        name: 'Joint rent income',
+        type: 'income',
+        amount: 1000,
+        date: `${currentMonthKey}-06`,
+        category: 'Property',
+        currency: 'EUR',
+        isJoint: true,
+      },
+    ] satisfies DashboardTransactionPayload[],
+    convertToEur,
+  );
+
+  // Display rows keep the full amount; only aggregates are weighted.
+  expect(transactions[0]?.amount).toBe(-500);
+  expect(transactions[0]?.isJoint).toBe(true);
+
+  const stats = computeDashboardTxnStats(transactions, [], convertToEur);
+
+  expect(stats.totalSavingsDeposited).toBe(500 / 2 + 200);
+  expect(stats.totalIncome).toBe(1000 / 2);
+  expect(stats.monthlyCategoryChange('Savings')).toBe(500 / 2 + 200);
 });

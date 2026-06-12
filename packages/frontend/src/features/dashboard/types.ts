@@ -10,6 +10,7 @@ export type DashboardTransaction = {
   date: string;
   type: string;
   amount: number;
+  isJoint: boolean;
 };
 
 export type AllocationItem = {

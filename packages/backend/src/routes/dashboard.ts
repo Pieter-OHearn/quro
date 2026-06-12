@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   budgetTransactions,
@@ -20,10 +20,13 @@ import {
 import { getAuthUser } from '../lib/authUser';
 import { convertToBaseCurrency, FX_BASE_CURRENCY } from '../lib/currencyRateCache';
 import { getCurrentRatesToBaseCurrency } from '../lib/currencyRateSync';
+import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 
 const app = new Hono();
 const BASE_CURRENCY = FX_BASE_CURRENCY;
 const NET_WORTH_HISTORY_MONTHS = 7;
+// Joint assets count half for each partner so the two dashboards sum to reality.
+const JOINT_WEIGHT = 0.5;
 
 const toNumber = (value: unknown): number => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -219,6 +222,126 @@ function resolveCurrency(
   return currencyById.get(id) ?? fallback;
 }
 
+// ── Joint-asset weighting ────────────────────────────────────────────────────
+// All net-worth/allocation formulas are linear in an asset's monetary fields,
+// so pre-scaling joint rows (and their transactions) by JOINT_WEIGHT halves
+// their contribution exactly without touching the compute functions.
+
+function buildJointIdSet(rows: ReadonlyArray<{ id: number; isJoint: boolean }>): Set<number> {
+  const ids = new Set<number>();
+  for (const row of rows) {
+    if (row.isJoint) ids.add(row.id);
+  }
+  return ids;
+}
+
+function weighJointSavingsAccounts(
+  rows: ReadonlyArray<typeof savingsAccounts.$inferSelect>,
+): HistoricalSavingsAccountRow[] {
+  return rows.map((row) =>
+    row.isJoint ? { ...row, balance: toNumber(row.balance) * JOINT_WEIGHT } : row,
+  );
+}
+
+function weighJointSavingsTransactions(
+  rows: ReadonlyArray<typeof savingsTransactions.$inferSelect>,
+  jointAccountIds: ReadonlySet<number>,
+): SavingsTransactionRow[] {
+  return rows.map((row) =>
+    jointAccountIds.has(row.accountId)
+      ? { ...row, amount: toNumber(row.amount) * JOINT_WEIGHT }
+      : row,
+  );
+}
+
+function weighJointProperties(
+  rows: ReadonlyArray<typeof properties.$inferSelect>,
+): Array<PropertyRow & { isJoint: boolean }> {
+  return rows.map((row) =>
+    row.isJoint
+      ? {
+          ...row,
+          purchasePrice: toNumber(row.purchasePrice) * JOINT_WEIGHT,
+          currentValue: toNumber(row.currentValue) * JOINT_WEIGHT,
+          mortgage: toNumber(row.mortgage) * JOINT_WEIGHT,
+        }
+      : row,
+  );
+}
+
+function weighJointPropertyTransactions(
+  rows: ReadonlyArray<typeof propertyTransactions.$inferSelect>,
+  jointPropertyIds: ReadonlySet<number>,
+): PropertyTransactionRow[] {
+  return rows.map((row) =>
+    jointPropertyIds.has(row.propertyId)
+      ? {
+          ...row,
+          amount: toNumber(row.amount) * JOINT_WEIGHT,
+          interest: row.interest == null ? null : toNumber(row.interest) * JOINT_WEIGHT,
+          principal: row.principal == null ? null : toNumber(row.principal) * JOINT_WEIGHT,
+        }
+      : row,
+  );
+}
+
+function weighJointMortgages(
+  rows: ReadonlyArray<typeof mortgages.$inferSelect>,
+): Array<MortgageRow & { isJoint: boolean }> {
+  return rows.map((row) =>
+    row.isJoint
+      ? { ...row, outstandingBalance: toNumber(row.outstandingBalance) * JOINT_WEIGHT }
+      : row,
+  );
+}
+
+type JointScopedSourceRows = {
+  savings: Array<typeof savingsAccounts.$inferSelect>;
+  savingsTransactions: Array<typeof savingsTransactions.$inferSelect>;
+  properties: Array<typeof properties.$inferSelect>;
+  propertyTransactions: Array<typeof propertyTransactions.$inferSelect>;
+  mortgages: Array<typeof mortgages.$inferSelect>;
+};
+
+async function loadJointScopedRows(userId: number): Promise<JointScopedSourceRows> {
+  const partnerId = await getAcceptedPartnerId(userId);
+  const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
+  const propertyAccess = ownedOrJointPredicate(properties, userId, partnerId);
+  const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
+
+  const [savings, savingsTxns, propertyRows, propertyTxns, mortgageRows] = await Promise.all([
+    safeLoad('savings accounts', db.select().from(savingsAccounts).where(savingsAccess), []),
+    safeLoad(
+      'savings transactions',
+      db
+        .select(getTableColumns(savingsTransactions))
+        .from(savingsTransactions)
+        .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
+        .where(savingsAccess),
+      [],
+    ),
+    safeLoad('properties', db.select().from(properties).where(propertyAccess), []),
+    safeLoad(
+      'property transactions',
+      db
+        .select(getTableColumns(propertyTransactions))
+        .from(propertyTransactions)
+        .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
+        .where(propertyAccess),
+      [],
+    ),
+    safeLoad('mortgages', db.select().from(mortgages).where(mortgageAccess), []),
+  ]);
+
+  return {
+    savings,
+    savingsTransactions: savingsTxns,
+    properties: propertyRows,
+    propertyTransactions: propertyTxns,
+    mortgages: mortgageRows,
+  };
+}
+
 function buildDatedSavingsTransactions(
   transactions: readonly SavingsTransactionRow[],
 ): DatedSavingsTransaction[] {
@@ -401,48 +524,32 @@ export function computeDerivedAllocations(
 }
 
 async function buildDerivedAllocations(userId: number): Promise<DerivedAllocationSummary> {
-  const [
-    rates,
-    userSavings,
-    userHoldings,
-    userHoldingTxns,
-    userProperties,
-    userPensions,
-    userMortgages,
-    userDebts,
-  ] = await Promise.all([
-    getRatesToBaseCurrency(),
-    db
-      .select()
-      .from(savingsAccounts)
-      .where(and(eq(savingsAccounts.userId, userId), isNull(savingsAccounts.archivedAt))),
-    db
-      .select()
-      .from(holdings)
-      .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
-    db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-    db.select().from(properties).where(eq(properties.userId, userId)),
-    db
-      .select()
-      .from(pensionPots)
-      .where(and(eq(pensionPots.userId, userId), isNull(pensionPots.archivedAt))),
-    db
-      .select()
-      .from(mortgages)
-      .where(and(eq(mortgages.userId, userId), isNull(mortgages.archivedAt))),
-    db
-      .select()
-      .from(debts)
-      .where(and(eq(debts.userId, userId), isNull(debts.archivedAt))),
-  ]);
+  const [rates, jointScoped, userHoldings, userHoldingTxns, userPensions, userDebts] =
+    await Promise.all([
+      getRatesToBaseCurrency(),
+      loadJointScopedRows(userId),
+      db
+        .select()
+        .from(holdings)
+        .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
+      db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
+      db
+        .select()
+        .from(pensionPots)
+        .where(and(eq(pensionPots.userId, userId), isNull(pensionPots.archivedAt))),
+      db
+        .select()
+        .from(debts)
+        .where(and(eq(debts.userId, userId), isNull(debts.archivedAt))),
+    ]);
   return computeDerivedAllocations(
     rates,
-    userSavings,
+    weighJointSavingsAccounts(jointScoped.savings.filter((row) => !row.archivedAt)),
     userHoldings,
     userHoldingTxns,
-    userProperties,
+    weighJointProperties(jointScoped.properties),
     userPensions,
-    userMortgages,
+    weighJointMortgages(jointScoped.mortgages.filter((row) => !row.archivedAt)),
     userDebts,
   );
 }
@@ -628,38 +735,19 @@ async function safeLoad<T>(label: string, query: Promise<T>, fallback: T): Promi
 async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceData> {
   const rates = await getRatesToBaseCurrency();
   const [
-    savings,
-    savingsTransactionsData,
+    jointScoped,
     holdingsData,
     holdingTransactionsData,
-    propertiesData,
-    propertyTransactionsData,
     pensions,
     pensionTransactionsData,
-    mortgagesData,
     debtsData,
     debtPaymentsData,
   ] = await Promise.all([
-    safeLoad(
-      'savings accounts',
-      db.select().from(savingsAccounts).where(eq(savingsAccounts.userId, userId)),
-      [],
-    ),
-    safeLoad(
-      'savings transactions',
-      db.select().from(savingsTransactions).where(eq(savingsTransactions.userId, userId)),
-      [],
-    ),
+    loadJointScopedRows(userId),
     safeLoad('holdings', db.select().from(holdings).where(eq(holdings.userId, userId)), []),
     safeLoad(
       'holding transactions',
       db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-      [],
-    ),
-    safeLoad('properties', db.select().from(properties).where(eq(properties.userId, userId)), []),
-    safeLoad(
-      'property transactions',
-      db.select().from(propertyTransactions).where(eq(propertyTransactions.userId, userId)),
       [],
     ),
     safeLoad(
@@ -672,7 +760,6 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
       db.select().from(pensionTransactions).where(eq(pensionTransactions.userId, userId)),
       [],
     ),
-    safeLoad('mortgages', db.select().from(mortgages).where(eq(mortgages.userId, userId)), []),
     safeLoad('debts', db.select().from(debts).where(eq(debts.userId, userId)), []),
     safeLoad(
       'debt payments',
@@ -683,15 +770,21 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
 
   return {
     rates,
-    savings,
-    savingsTransactions: savingsTransactionsData,
+    savings: weighJointSavingsAccounts(jointScoped.savings),
+    savingsTransactions: weighJointSavingsTransactions(
+      jointScoped.savingsTransactions,
+      buildJointIdSet(jointScoped.savings),
+    ),
     holdings: holdingsData,
     holdingTransactions: holdingTransactionsData,
-    properties: propertiesData,
-    propertyTransactions: propertyTransactionsData,
+    properties: weighJointProperties(jointScoped.properties),
+    propertyTransactions: weighJointPropertyTransactions(
+      jointScoped.propertyTransactions,
+      buildJointIdSet(jointScoped.properties),
+    ),
     pensions,
     pensionTransactions: pensionTransactionsData,
-    mortgages: mortgagesData,
+    mortgages: weighJointMortgages(jointScoped.mortgages),
     debts: debtsData,
     debtPayments: debtPaymentsData,
   };
@@ -860,8 +953,30 @@ type DebtActivityRow = {
   note?: string | null;
 };
 
-function mapSavingsTxn(row: SavingsActivityRow, currencyByAccountId: ReadonlyMap<number, string>) {
-  const currency = resolveCurrency(currencyByAccountId, row.accountId);
+type ParentAssetInfo = { currency: string; isJoint: boolean };
+
+function buildParentInfoById(
+  rows: ReadonlyArray<{ id: number; currency: string; isJoint: boolean }>,
+): Map<number, ParentAssetInfo> {
+  const infos = new Map<number, ParentAssetInfo>();
+  for (const row of rows) {
+    infos.set(row.id, { currency: row.currency, isJoint: row.isJoint });
+  }
+  return infos;
+}
+
+function resolveParentInfo(
+  infoById: ReadonlyMap<number, ParentAssetInfo>,
+  id: number,
+): ParentAssetInfo {
+  return infoById.get(id) ?? { currency: BASE_CURRENCY, isJoint: false };
+}
+
+function mapSavingsTxn(
+  row: SavingsActivityRow,
+  infoByAccountId: ReadonlyMap<number, ParentAssetInfo>,
+) {
+  const { currency, isJoint } = resolveParentInfo(infoByAccountId, row.accountId);
   if (row.type === 'interest') {
     return {
       name: row.note || 'Savings interest',
@@ -870,6 +985,7 @@ function mapSavingsTxn(row: SavingsActivityRow, currencyByAccountId: ReadonlyMap
       date: row.date,
       category: 'Savings',
       currency,
+      isJoint,
     };
   }
   const isDeposit = row.type === 'deposit';
@@ -880,6 +996,7 @@ function mapSavingsTxn(row: SavingsActivityRow, currencyByAccountId: ReadonlyMap
     date: row.date,
     category: 'Savings',
     currency,
+    isJoint,
   };
 }
 
@@ -893,6 +1010,7 @@ function mapHoldingTxn(row: HoldingActivityRow, currencyByHoldingId: ReadonlyMap
       date: row.date,
       category: 'Investment',
       currency,
+      isJoint: false,
     };
   }
   const gross = toNumber(row.shares) * toNumber(row.price);
@@ -904,14 +1022,15 @@ function mapHoldingTxn(row: HoldingActivityRow, currencyByHoldingId: ReadonlyMap
     date: row.date,
     category: 'Investment',
     currency,
+    isJoint: false,
   };
 }
 
 function mapPropertyTxn(
   row: PropertyActivityRow,
-  currencyByPropertyId: ReadonlyMap<number, string>,
+  infoByPropertyId: ReadonlyMap<number, ParentAssetInfo>,
 ) {
-  const currency = resolveCurrency(currencyByPropertyId, row.propertyId);
+  const { currency, isJoint } = resolveParentInfo(infoByPropertyId, row.propertyId);
   const isIncome = row.type === 'rent_income';
   return {
     name: row.note || (isIncome ? 'Rent income' : 'Property expense'),
@@ -920,6 +1039,7 @@ function mapPropertyTxn(
     date: row.date,
     category: 'Property',
     currency,
+    isJoint,
   };
 }
 
@@ -931,6 +1051,7 @@ function mapPayslipActivity(row: PayslipActivityRow) {
     date: row.date,
     category: 'Salary',
     currency: row.currency,
+    isJoint: false,
   };
 }
 
@@ -942,20 +1063,23 @@ function mapBudgetActivity(row: BudgetActivityRow) {
     date: row.date,
     category: 'Budget',
     currency: BASE_CURRENCY,
+    isJoint: false,
   };
 }
 
 function mapMortgageTxn(
   row: MortgageActivityRow,
-  mortgageCurrencyById: ReadonlyMap<number, string>,
+  infoByMortgageId: ReadonlyMap<number, ParentAssetInfo>,
 ) {
+  const { currency, isJoint } = resolveParentInfo(infoByMortgageId, row.mortgageId);
   return {
     name: row.note || 'Mortgage repayment',
     type: 'expense' as const,
     amount: -Math.abs(toNumber(row.amount)),
     date: row.date,
     category: 'Mortgage',
-    currency: resolveCurrency(mortgageCurrencyById, row.mortgageId),
+    currency,
+    isJoint,
   };
 }
 
@@ -967,6 +1091,7 @@ function mapDebtPayment(row: DebtActivityRow, debtCurrencyById: ReadonlyMap<numb
     date: row.date,
     category: 'Debt',
     currency: resolveCurrency(debtCurrencyById, row.debtId),
+    isJoint: false,
   };
 }
 
@@ -987,6 +1112,7 @@ function mapPensionTxn(
       date: row.date,
       category: 'Pension',
       currency,
+      isJoint: false,
     };
   }
 
@@ -1000,6 +1126,7 @@ function mapPensionTxn(
       date: row.date,
       category: 'Pension',
       currency,
+      isJoint: false,
     };
   }
 
@@ -1010,6 +1137,7 @@ function mapPensionTxn(
     date: row.date,
     category: 'Pension',
     currency,
+    isJoint: false,
   };
 }
 
@@ -1022,51 +1150,108 @@ export function buildActivityList(
   debtRows: readonly DebtActivityRow[],
   pensionRows: readonly PensionActivityRow[],
   propertyRows: readonly PropertyActivityRow[],
-  savingsCurrencyByAccountId: ReadonlyMap<number, string>,
+  savingsInfoByAccountId: ReadonlyMap<number, ParentAssetInfo>,
   holdingCurrencyById: ReadonlyMap<number, string>,
-  mortgageCurrencyById: ReadonlyMap<number, string>,
+  mortgageInfoById: ReadonlyMap<number, ParentAssetInfo>,
   debtCurrencyById: ReadonlyMap<number, string>,
   pensionCurrencyByPotId: ReadonlyMap<number, string>,
-  propertyCurrencyById: ReadonlyMap<number, string>,
+  propertyInfoById: ReadonlyMap<number, ParentAssetInfo>,
 ) {
   return [
     ...payslipRows.map(mapPayslipActivity),
     ...budgetRows.map(mapBudgetActivity),
-    ...savingsRows.map((row) => mapSavingsTxn(row, savingsCurrencyByAccountId)),
+    ...savingsRows.map((row) => mapSavingsTxn(row, savingsInfoByAccountId)),
     ...holdingRows.map((row) => mapHoldingTxn(row, holdingCurrencyById)),
     ...mortgageRows
       .filter((row) => row.type === 'repayment')
-      .map((row) => mapMortgageTxn(row, mortgageCurrencyById)),
+      .map((row) => mapMortgageTxn(row, mortgageInfoById)),
     ...debtRows.map((row) => mapDebtPayment(row, debtCurrencyById)),
     ...pensionRows.map((row) => mapPensionTxn(row, pensionCurrencyByPotId)),
     ...propertyRows
       .filter((row) => row.type === 'rent_income' || row.type === 'expense')
-      .map((row) => mapPropertyTxn(row, propertyCurrencyById)),
+      .map((row) => mapPropertyTxn(row, propertyInfoById)),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((row, index) => ({ id: index + 1, ...row }));
 }
 
+type JointScopedActivityRows = {
+  savingsTxns: SavingsActivityRow[];
+  savingsParents: Array<{ id: number; currency: string; isJoint: boolean }>;
+  mortgageTxns: MortgageActivityRow[];
+  mortgageParents: Array<{ id: number; currency: string; isJoint: boolean }>;
+  propertyTxns: PropertyActivityRow[];
+  propertyParents: Array<{ id: number; currency: string; isJoint: boolean }>;
+};
+
+async function loadJointScopedActivityRows(userId: number): Promise<JointScopedActivityRows> {
+  const partnerId = await getAcceptedPartnerId(userId);
+  const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
+  const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
+  const propertyAccess = ownedOrJointPredicate(properties, userId, partnerId);
+
+  const [
+    savingsTxns,
+    savingsParents,
+    mortgageTxns,
+    mortgageParents,
+    propertyTxns,
+    propertyParents,
+  ] = await Promise.all([
+    db
+      .select(getTableColumns(savingsTransactions))
+      .from(savingsTransactions)
+      .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
+      .where(savingsAccess),
+    db
+      .select({
+        id: savingsAccounts.id,
+        currency: savingsAccounts.currency,
+        isJoint: savingsAccounts.isJoint,
+      })
+      .from(savingsAccounts)
+      .where(savingsAccess),
+    db
+      .select(getTableColumns(mortgageTransactions))
+      .from(mortgageTransactions)
+      .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+      .where(mortgageAccess),
+    db
+      .select({ id: mortgages.id, currency: mortgages.currency, isJoint: mortgages.isJoint })
+      .from(mortgages)
+      .where(mortgageAccess),
+    db
+      .select(getTableColumns(propertyTransactions))
+      .from(propertyTransactions)
+      .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
+      .where(propertyAccess),
+    db
+      .select({ id: properties.id, currency: properties.currency, isJoint: properties.isJoint })
+      .from(properties)
+      .where(propertyAccess),
+  ]);
+
+  return {
+    savingsTxns,
+    savingsParents,
+    mortgageTxns,
+    mortgageParents,
+    propertyTxns,
+    propertyParents,
+  };
+}
+
 app.get('/transactions', async (c) => {
   const user = getAuthUser(c);
-  const [p, b, s, sa, h, ho, m, mo, d, doRows, pe, po, pr, ps] = await Promise.all([
+  const [jointScoped, p, b, h, ho, d, doRows, pe, po] = await Promise.all([
+    loadJointScopedActivityRows(user.id),
     db.select().from(payslips).where(eq(payslips.userId, user.id)),
     db.select().from(budgetTransactions).where(eq(budgetTransactions.userId, user.id)),
-    db.select().from(savingsTransactions).where(eq(savingsTransactions.userId, user.id)),
-    db
-      .select({ id: savingsAccounts.id, currency: savingsAccounts.currency })
-      .from(savingsAccounts)
-      .where(eq(savingsAccounts.userId, user.id)),
     db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, user.id)),
     db
       .select({ id: holdings.id, currency: holdings.currency })
       .from(holdings)
       .where(eq(holdings.userId, user.id)),
-    db.select().from(mortgageTransactions).where(eq(mortgageTransactions.userId, user.id)),
-    db
-      .select({ id: mortgages.id, currency: mortgages.currency })
-      .from(mortgages)
-      .where(eq(mortgages.userId, user.id)),
     db.select().from(debtPayments).where(eq(debtPayments.userId, user.id)),
     db
       .select({ id: debts.id, currency: debts.currency })
@@ -1077,28 +1262,23 @@ app.get('/transactions', async (c) => {
       .select({ id: pensionPots.id, currency: pensionPots.currency })
       .from(pensionPots)
       .where(eq(pensionPots.userId, user.id)),
-    db.select().from(propertyTransactions).where(eq(propertyTransactions.userId, user.id)),
-    db
-      .select({ id: properties.id, currency: properties.currency })
-      .from(properties)
-      .where(eq(properties.userId, user.id)),
   ]);
   return c.json({
     data: buildActivityList(
       p,
       b,
-      s,
+      jointScoped.savingsTxns,
       h,
-      m,
+      jointScoped.mortgageTxns,
       d,
       pe,
-      pr,
-      buildCurrencyById(sa),
+      jointScoped.propertyTxns,
+      buildParentInfoById(jointScoped.savingsParents),
       buildCurrencyById(ho),
-      buildCurrencyById(mo),
+      buildParentInfoById(jointScoped.mortgageParents),
       buildCurrencyById(doRows),
       buildCurrencyById(po),
-      buildCurrencyById(ps),
+      buildParentInfoById(jointScoped.propertyParents),
     ),
   });
 });

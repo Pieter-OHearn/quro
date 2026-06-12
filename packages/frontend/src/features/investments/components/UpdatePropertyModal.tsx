@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { Modal, ModalFooter, FormField, TextInput } from '@/components/ui';
+import { JointToggleField } from '@/features/partner';
 import { formatFixedInputValue } from '@/lib/utils';
 import type { Property } from '@quro/shared';
 
@@ -8,7 +9,7 @@ type UpdatePropertyModalProps = {
   property: Property;
   mortgageBalance: number;
   onClose: () => void;
-  onSave: (id: number, value: number, rent: number) => void;
+  onSave: (id: number, value: number, rent: number, isJoint: boolean) => void;
 };
 
 type PropertyStatsPreviewProps = {
@@ -51,6 +52,7 @@ function PropertyStatsPreview({
 function useUpdatePropertyForm(property: Property) {
   const [value, setValue] = useState(formatFixedInputValue(property.currentValue));
   const [rent, setRent] = useState(formatFixedInputValue(property.monthlyRent));
+  const [isJoint, setIsJoint] = useState(property.isJoint);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const numericValue = parseFloat(value) || 0;
@@ -67,12 +69,14 @@ function useUpdatePropertyForm(property: Property) {
   return {
     value,
     rent,
+    isJoint,
     errors,
     numericValue,
     equity,
     appreciation,
     appreciationPct,
     setRent,
+    setIsJoint,
     setErrors,
     handleValueChange,
   };
@@ -100,7 +104,7 @@ function MortgageBalanceField({ mortgageBalance, currency, fmtNative }: Mortgage
 function buildUpdateSaveHandler(
   form: ReturnType<typeof useUpdatePropertyForm>,
   property: Property,
-  onSave: (id: number, value: number, rent: number) => void,
+  onSave: (id: number, value: number, rent: number, isJoint: boolean) => void,
   onClose: () => void,
 ) {
   return () => {
@@ -108,7 +112,7 @@ function buildUpdateSaveHandler(
       form.setErrors({ value: 'Required' });
       return;
     }
-    onSave(property.id, form.numericValue, parseFloat(form.rent) || 0);
+    onSave(property.id, form.numericValue, parseFloat(form.rent) || 0, form.isJoint);
     onClose();
   };
 }
@@ -159,6 +163,11 @@ export function UpdatePropertyModal({
           onChange={form.setRent}
         />
       </FormField>
+      <JointToggleField
+        checked={form.isJoint}
+        onChange={form.setIsJoint}
+        hint="Also applies to a linked mortgage. Counts 50/50 in both dashboards."
+      />
       <PropertyStatsPreview
         equity={equity}
         appreciation={form.appreciation}

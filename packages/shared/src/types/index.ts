@@ -83,6 +83,28 @@ export type UpdateUserPasswordInput = {
   nextPassword: string;
 };
 
+export type PartnerLinkStatus = 'pending' | 'accepted';
+export type PartnerLinkRole = 'requester' | 'addressee';
+
+export type PartnerProfile = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+export type PartnerLink = {
+  id: number;
+  status: PartnerLinkStatus;
+  role: PartnerLinkRole;
+  createdAt: string;
+  partner: PartnerProfile;
+};
+
+export type InvitePartnerInput = {
+  email: string;
+};
+
 export const SAVINGS_ACCOUNT_TYPES = ['Easy Access', 'Term Deposit'] as const;
 export type SavingsAccountType = (typeof SAVINGS_ACCOUNT_TYPES)[number];
 
@@ -97,6 +119,8 @@ export type SavingsAccount = {
   color: string;
   emoji: string;
   bunqAccountId?: string | null;
+  isJoint: boolean;
+  userId?: number;
   archivedAt?: string | null;
 };
 
@@ -254,6 +278,8 @@ export type Property = {
   monthlyRent: number;
   currency: CurrencyCode;
   emoji: string;
+  isJoint: boolean;
+  userId?: number;
 };
 
 export const PROPERTY_TRANSACTION_TYPES = [
@@ -449,6 +475,8 @@ export type Mortgage = {
   startDate: string;
   endDate: string;
   overpaymentLimit: number;
+  isJoint: boolean;
+  userId?: number;
   archivedAt?: string | null;
 };
 
@@ -634,6 +662,7 @@ export type DashboardTransaction = {
   date: string;
   category: string;
   currency: CurrencyCode;
+  isJoint: boolean;
 };
 
 export type BunqConnection = {

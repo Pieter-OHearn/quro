@@ -1,5 +1,6 @@
 import { Edit3, Home } from 'lucide-react';
 import type { Mortgage as MortgageType } from '@quro/shared';
+import { JointBadge } from '@/features/partner';
 import type { MortgageFormatFn } from '../types';
 
 type MortgageHeroCardProps = {
@@ -49,7 +50,10 @@ export function MortgageHeroCard({
             <Home size={22} />
           </div>
           <div>
-            <h2 className="font-bold text-lg">{mortgage.propertyAddress}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-bold text-lg">{mortgage.propertyAddress}</h2>
+              <JointBadge isJoint={mortgage.isJoint} ownerUserId={mortgage.userId} />
+            </div>
             <p className="text-slate-400 text-sm">
               {mortgage.lender} · {mortgage.rateType} Rate · Fixed until {mortgage.fixedUntil}
             </p>

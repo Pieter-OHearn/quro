@@ -1,6 +1,7 @@
 import { Modal, ModalFooter } from '@/components/ui';
 import { CURRENCY_CODES, useCurrency, type CurrencyCode } from '@/lib/CurrencyContext';
 import { formatNumber, type Mortgage as MortgageType, type Property } from '@quro/shared';
+import { JointToggleField } from '@/features/partner';
 import { useAddMortgageForm } from '../hooks';
 import type { MortgageFormPayload, MortgageFormState } from '../types';
 
@@ -144,8 +145,14 @@ function PropertyLinkSection({
 
 type LoanFinancialsSectionProps = { form: FormState; errors: Errors; setField: SetFieldFn };
 
+type LoanFinancialField =
+  | 'originalAmount'
+  | 'outstandingBalance'
+  | 'propertyValue'
+  | 'monthlyPayment';
+
 function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSectionProps) {
-  const fields = [
+  const fields: Array<{ field: LoanFinancialField; label: string; placeholder: string }> = [
     { field: 'originalAmount', label: 'Original Loan Amount', placeholder: '240000' },
     { field: 'outstandingBalance', label: 'Outstanding Balance', placeholder: '218600' },
     { field: 'propertyValue', label: 'Current Property Value', placeholder: '362000' },
@@ -172,8 +179,8 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
                 step="0.01"
                 className={`w-full rounded-xl border pl-12 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors[field] ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
                 placeholder={placeholder}
-                value={form[field as keyof MortgageFormState]}
-                onChange={(e) => setField(field as keyof MortgageFormState, e.target.value)}
+                value={form[field]}
+                onChange={(e) => setField(field, e.target.value)}
               />
             </div>
             {errors[field] && <p className="text-xs text-rose-500 mt-1">{errors[field]}</p>}
@@ -394,6 +401,11 @@ function MortgageFormBody({
       <LoanFinancialsSection form={form} errors={errors} setField={setField} />
       <RateTermSection form={form} errors={errors} setField={setField} />
       <DatesSection form={form} setField={setField} />
+      <JointToggleField
+        checked={form.isJoint}
+        onChange={(checked) => setField('isJoint', checked)}
+        hint="Also applies to the linked property. Counts 50/50 in both dashboards."
+      />
       {ltvPreview && <LtvPreview ltvPreview={ltvPreview} form={form} />}
     </div>
   );

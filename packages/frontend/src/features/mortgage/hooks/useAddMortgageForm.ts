@@ -69,6 +69,7 @@ function buildPayload(form: MortgageFormState, existing?: MortgageType): Mortgag
     startDate: form.startDate.trim() || 'N/A',
     endDate: form.endDate.trim() || 'N/A',
     overpaymentLimit: n(form.overpaymentLimit) || DEFAULT_OVERPAYMENT_LIMIT_PERCENT,
+    isJoint: form.isJoint,
     ...(existing ? { id: existing.id } : {}),
   };
 }
@@ -113,6 +114,7 @@ function buildInitialMortgageState(
       startDate: '',
       endDate: '',
       overpaymentLimit: '10',
+      isJoint: false,
     };
   }
 
@@ -132,6 +134,7 @@ function buildInitialMortgageState(
     startDate: existing.startDate,
     endDate: existing.endDate,
     overpaymentLimit: String(existing.overpaymentLimit ?? '10'),
+    isJoint: existing.isJoint,
   };
 }
 

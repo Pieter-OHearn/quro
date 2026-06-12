@@ -120,6 +120,13 @@
       "when": 1778768294138,
       "tag": "0016_cloudy_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1781269781667,
+      "tag": "0017_fancy_riptide",
+      "breakpoints": true
     }
   ]
 }

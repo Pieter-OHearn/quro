@@ -156,6 +156,7 @@ export function normalizeDashboardTransactions(
     date: transaction.date,
     type: transaction.type,
     amount: convertToBase(transaction.amount, transaction.currency),
+    isJoint: transaction.isJoint ?? false,
   }));
 }
 
@@ -266,6 +267,14 @@ export const buildMonthlySummaryItems = (
   },
 ];
 
+const JOINT_TXN_WEIGHT = 0.5;
+
+// Joint-account transactions count half in the monthly summary so the two
+// partners' summaries add up to the real totals. Display rows keep the full
+// amount; only these aggregates are weighted.
+const weightedTxnAmount = (tx: DashboardTransaction): number =>
+  tx.isJoint ? tx.amount * JOINT_TXN_WEIGHT : tx.amount;
+
 export function computeDashboardTxnStats(
   transactions: readonly DashboardTransaction[],
   payslips: readonly Payslip[],
@@ -276,17 +285,21 @@ export function computeDashboardTxnStats(
   const monthlyCategoryChange = (category: string) =>
     monthTxns
       .filter((tx) => tx.category === category)
-      .reduce((sum, tx) => sum + (tx.type === 'transfer' ? -tx.amount : tx.amount), 0);
+      .reduce(
+        (sum, tx) =>
+          sum + (tx.type === 'transfer' ? -weightedTxnAmount(tx) : weightedTxnAmount(tx)),
+        0,
+      );
   const { monthlySalaryValue, salaryTrendChange } = computeSalaryMetrics(payslips, convertToBase);
   const totalIncome = monthTxns
     .filter((tx) => tx.type === 'income')
-    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+    .reduce((s, tx) => s + Math.abs(weightedTxnAmount(tx)), 0);
   const totalExpenses = monthTxns
     .filter((tx) => tx.type === 'expense')
-    .reduce((s, tx) => s + Math.abs(tx.amount), 0);
+    .reduce((s, tx) => s + Math.abs(weightedTxnAmount(tx)), 0);
   const totalSavingsDeposited = monthTxns
     .filter((tx) => tx.type === 'transfer' && tx.category === 'Savings')
-    .reduce((s, tx) => s - tx.amount, 0);
+    .reduce((s, tx) => s - weightedTxnAmount(tx), 0);
   return {
     monthlyCategoryChange,
     monthlySalaryValue,

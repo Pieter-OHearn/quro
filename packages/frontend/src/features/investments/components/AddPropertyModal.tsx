@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CURRENCY_CODES, type CurrencyCode, useCurrency } from '@/lib/CurrencyContext';
 import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
+import { JointToggleField } from '@/features/partner';
 import type { Property } from '@quro/shared';
 
 const PROPERTY_TYPES = [
@@ -62,12 +63,13 @@ type PropertyFormState = {
   purchasePrice: string;
   currentValue: string;
   monthlyRent: string;
+  isJoint: boolean;
 };
 
 type PropertyFormFieldsProps = {
   form: PropertyFormState;
   errors: Record<string, string>;
-  onSet: (field: string, value: string) => void;
+  onSet: (field: string, value: string | boolean) => void;
 };
 
 function PropertyIdentityFields({ form, errors, onSet }: PropertyFormFieldsProps) {
@@ -157,6 +159,11 @@ function PropertyFormFields({ form, errors, onSet }: PropertyFormFieldsProps) {
     <>
       <PropertyIdentityFields form={form} errors={errors} onSet={onSet} />
       <PropertyValueFields form={form} errors={errors} onSet={onSet} />
+      <JointToggleField
+        checked={form.isJoint}
+        onChange={(checked) => onSet('isJoint', checked)}
+        hint="Also applies to a linked mortgage. Counts 50/50 in both dashboards."
+      />
     </>
   );
 }
@@ -181,10 +188,11 @@ function useAddPropertyForm() {
     purchasePrice: '',
     currentValue: '',
     monthlyRent: '',
+    isJoint: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  function set(field: string, value: string): void {
+  function set(field: string, value: string | boolean): void {
     setForm((previous) => ({ ...previous, [field]: value }));
     if (errors[field]) {
       setErrors((previous) => {
@@ -224,6 +232,7 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
       mortgage: 0,
       mortgageId: null,
       monthlyRent: parsed.monthlyRent,
+      isJoint: form.isJoint,
     });
     onClose();
   }
