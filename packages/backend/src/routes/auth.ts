@@ -30,6 +30,11 @@ const HOURS_PER_DAY = 24;
 const MINUTES_PER_HOUR = 60;
 const SECONDS_PER_MINUTE = 60;
 const MILLISECONDS_PER_SECOND = 1000;
+const BCRYPT_COST = 10;
+const DUMMY_PASSWORD_HASH = await Bun.password.hash('quro-dummy-password', {
+  algorithm: 'bcrypt',
+  cost: BCRYPT_COST,
+});
 
 type SignUpPayload = {
   firstName: string;
@@ -201,7 +206,10 @@ app.post('/signup', signupRateLimit, async (c) => {
     return c.json({ error: 'An account with this email already exists' }, HTTP_STATUS.CONFLICT);
   }
 
-  const passwordHash = await Bun.password.hash(data.password, { algorithm: 'bcrypt', cost: 10 });
+  const passwordHash = await Bun.password.hash(data.password, {
+    algorithm: 'bcrypt',
+    cost: BCRYPT_COST,
+  });
 
   const [user] = await db
     .insert(users)
@@ -234,13 +242,15 @@ app.post('/signin', signinRateLimit, async (c) => {
     return c.json({ error: 'Email and password are required' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  const [user] = await db.select().from(users).where(eq(users.email, email));
-  if (!user) {
-    return c.json({ error: 'Invalid email or password' }, HTTP_STATUS.UNAUTHORIZED);
-  }
+  const [user] = await db
+    .select({ id: users.id, passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.email, email));
 
-  const valid = await Bun.password.verify(password, user.passwordHash);
-  if (!valid) {
+  const hashToVerify = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
+  const valid = await Bun.password.verify(password, hashToVerify);
+
+  if (!user || !valid) {
     return c.json({ error: 'Invalid email or password' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
