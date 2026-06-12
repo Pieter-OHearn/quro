@@ -199,7 +199,9 @@ export const savingsAccounts = pgTable(
   'savings_accounts',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     name: text('name').notNull(),
     bank: text('bank').notNull(),
     balance: numericAsNumber('balance', { precision: 19, scale: 2 }).notNull(),
@@ -225,7 +227,9 @@ export const savingsTransactions = pgTable(
   'savings_transactions',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     accountId: integer('account_id')
       .references(() => savingsAccounts.id, { onDelete: 'cascade' })
       .notNull(),
@@ -264,7 +268,9 @@ export const holdings = pgTable(
   'holdings',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     name: text('name').notNull(),
     ticker: text('ticker').notNull(),
     currentPrice: numericAsNumber('current_price', { precision: 19, scale: 2 }).notNull(),
@@ -287,7 +293,9 @@ export const holdingTransactions = pgTable(
   'holding_transactions',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     holdingId: integer('holding_id')
       .references(() => holdings.id, { onDelete: 'cascade' })
       .notNull(),
@@ -337,7 +345,9 @@ export const properties = pgTable(
   'properties',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     address: text('address').notNull(),
     propertyType: text('property_type').notNull(),
     purchasePrice: numericAsNumber('purchase_price', { precision: 19, scale: 2 }).notNull(),
@@ -359,7 +369,9 @@ export const propertyTransactions = pgTable(
   'property_transactions',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     propertyId: integer('property_id')
       .references(() => properties.id, { onDelete: 'cascade' })
       .notNull(),
@@ -382,7 +394,9 @@ export const pensionPots = pgTable(
   'pension_pots',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     name: text('name').notNull(),
     provider: text('provider').notNull(),
     type: text('type').notNull(),
@@ -406,7 +420,9 @@ export const pensionTransactions = pgTable(
   'pension_transactions',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     potId: integer('pot_id')
       .references(() => pensionPots.id, { onDelete: 'cascade' })
       .notNull(),
@@ -527,7 +543,9 @@ export const mortgages = pgTable(
   'mortgages',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     propertyAddress: text('property_address').notNull(),
     lender: text('lender').notNull(),
     currency: currencyCodeEnum('currency').notNull(),
@@ -557,7 +575,9 @@ export const mortgageTransactions = pgTable(
   'mortgage_transactions',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     mortgageId: integer('mortgage_id')
       .references(() => mortgages.id, { onDelete: 'cascade' })
       .notNull(),
@@ -633,7 +653,9 @@ export const payslips = pgTable(
   'payslips',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     month: text('month').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     gross: numericAsNumber('gross', { precision: 19, scale: 2 }).notNull(),
@@ -658,7 +680,9 @@ export const goals = pgTable(
   'goals',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     type: text('type'),
     sourceType: text('source_type').notNull().default('manual'),
     sourceId: integer('source_id'),
@@ -703,7 +727,9 @@ export const budgetCategories = pgTable(
   'budget_categories',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     name: text('name').notNull(),
     emoji: text('emoji'),
     budgeted: numericAsNumber('budgeted', { precision: 19, scale: 2 }).notNull(),
@@ -727,7 +753,9 @@ export const budgetTransactions = pgTable(
   'budget_transactions',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     categoryId: integer('category_id')
       .references(() => budgetCategories.id)
       .notNull(),
@@ -803,7 +831,9 @@ export const dashboardTransactions = pgTable(
   'dashboard_transactions',
   {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
     name: text('name').notNull(),
     type: text('type').notNull(),
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
