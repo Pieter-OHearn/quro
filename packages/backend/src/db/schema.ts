@@ -40,6 +40,7 @@ export const pensionImportConfidenceLabelEnum = pgEnum('pension_import_confidenc
   'low',
 ]);
 export const bunqSyncStatusEnum = pgEnum('bunq_sync_status', ['idle', 'syncing', 'error']);
+export const partnerLinkStatusEnum = pgEnum('partner_link_status', ['pending', 'accepted']);
 
 const inlinePdfDocumentColumns = () => ({
   documentStorageKey: text('document_storage_key'),
@@ -131,6 +132,32 @@ export const sessions = pgTable(
   }),
 );
 
+// ── Partner Links ────────────────────────────────────────────────────────────
+
+export const partnerLinks = pgTable(
+  'partner_links',
+  {
+    id: serial('id').primaryKey(),
+    requesterId: integer('requester_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    addresseeId: integer('addressee_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    status: partnerLinkStatusEnum('status').notNull().default('pending'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    respondedAt: timestamp('responded_at'),
+  },
+  (table) => ({
+    requesterUnique: uniqueIndex('partner_links_requester_id_unique').on(table.requesterId),
+    addresseeUnique: uniqueIndex('partner_links_addressee_id_unique').on(table.addresseeId),
+    noSelfLinkCheck: check(
+      'partner_links_no_self_link_check',
+      sql`${table.requesterId} <> ${table.addresseeId}`,
+    ),
+  }),
+);
+
 // ── Worker Heartbeats ───────────────────────────────────────────────────────
 
 export const workerHeartbeats = pgTable('worker_heartbeats', {
@@ -160,6 +187,7 @@ export const savingsAccounts = pgTable(
     color: text('color'),
     emoji: text('emoji'),
     bunqAccountId: text('bunq_account_id'),
+    isJoint: boolean('is_joint').notNull().default(false),
     archivedAt: timestamp('archived_at'),
   },
   (table) => ({
@@ -297,6 +325,7 @@ export const properties = pgTable(
     monthlyRent: numeric('monthly_rent', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     emoji: text('emoji'),
+    isJoint: boolean('is_joint').notNull().default(false),
   },
   (table) => ({
     userIdx: index('properties_user_id_idx').on(table.userId),
@@ -491,6 +520,7 @@ export const mortgages = pgTable(
     startDate: text('start_date').notNull(),
     endDate: text('end_date').notNull(),
     overpaymentLimit: numeric('overpayment_limit', { precision: 19, scale: 2 }),
+    isJoint: boolean('is_joint').notNull().default(false),
     archivedAt: timestamp('archived_at'),
   },
   (table) => ({

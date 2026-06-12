@@ -1,5 +1,6 @@
 import { ArrowRight, CreditCard } from 'lucide-react';
 import { Link } from 'react-router';
+import { JointBadge } from '@/features/partner';
 import type { DashboardFormatFn, DashboardTransaction } from '../types';
 
 const txIconClass = (type: string) => {
@@ -24,7 +25,10 @@ function TransactionItem({
           <CreditCard size={15} />
         </div>
         <div>
-          <p className="text-sm font-medium text-slate-800">{tx.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium text-slate-800">{tx.name}</p>
+            <JointBadge isJoint={tx.isJoint} size="xs" />
+          </div>
           <p className="text-xs text-slate-400">
             {tx.category} · {tx.date}
           </p>

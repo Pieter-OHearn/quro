@@ -6,13 +6,15 @@ import {
 } from '@quro/shared';
 import { db } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
+import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
   isRecord,
   ok,
+  parseBooleanField,
   parseCurrencyField,
   parseDateField,
   parseId,
@@ -44,6 +46,7 @@ const MORTGAGE_FIELDS = [
   'startDate',
   'endDate',
   'overpaymentLimit',
+  'isJoint',
 ] as const;
 const MORTGAGE_TRANSACTION_FIELDS = [
   'mortgageId',
@@ -73,6 +76,7 @@ type MortgagePayload = {
   startDate: string;
   endDate: string;
   overpaymentLimit: number | null;
+  isJoint: boolean;
 };
 
 type MortgageTransactionPayload = {
@@ -99,10 +103,12 @@ function pickPatchedValue<T, U>(patchValue: T | undefined, existingValue: U): T 
 
 type LinkedProperty = {
   id: number;
+  userId: number | null;
   address: string;
   currency: string;
   currentValue: unknown;
   mortgageId: number | null;
+  isJoint: boolean;
 };
 
 function toFiniteNumber(value: unknown): number | null {
@@ -178,6 +184,8 @@ const mortgageParsers: FieldParsers<MortgagePayload> = {
   endDate: (value) => parseTextField(value, 'End date is required'),
   overpaymentLimit: (value) =>
     parseOptionalNormalizedDecimalField(value, 'Overpayment limit must be zero or greater', 0),
+  isJoint: (value) =>
+    value === undefined ? ok(false) : parseBooleanField(value, 'isJoint must be a boolean'),
 };
 
 const mortgageTransactionParsers: FieldParsers<MortgageTransactionPayload> = {
@@ -216,6 +224,7 @@ function resolveNextPropertyId(
 
 async function fetchLinkedProperty(
   userId: number,
+  partnerId: number | null,
   propertyId: number,
   mortgageId: number,
 ): Promise<
@@ -224,13 +233,17 @@ async function fetchLinkedProperty(
   const [property] = await db
     .select({
       id: properties.id,
+      userId: properties.userId,
       address: properties.address,
       currency: properties.currency,
       currentValue: properties.currentValue,
       mortgageId: properties.mortgageId,
+      isJoint: properties.isJoint,
     })
     .from(properties)
-    .where(and(eq(properties.id, propertyId), eq(properties.userId, userId)));
+    .where(
+      and(eq(properties.id, propertyId), ownedOrJointPredicate(properties, userId, partnerId)),
+    );
   if (!property) return { ok: false, error: 'Property not found', status: 404 };
   if (property.mortgageId != null && property.mortgageId !== mortgageId) {
     return { ok: false, error: 'Property already has a linked mortgage', status: 409 };
@@ -242,6 +255,7 @@ async function resolveLinkedProperty(
   rawLinkedPropertyId: unknown,
   currentPropertyId: number | null,
   userId: number,
+  partnerId: number | null,
   mortgageId: number,
 ): Promise<
   | { ok: true; nextId: number | null; property: LinkedProperty | null }
@@ -252,16 +266,16 @@ async function resolveLinkedProperty(
     return { ok: false, error: nextIdResult.error, status: HTTP_STATUS.BAD_REQUEST };
   const nextId = nextIdResult.id;
   if (nextId == null) return { ok: true, nextId: null, property: null };
-  const result = await fetchLinkedProperty(userId, nextId, mortgageId);
+  const result = await fetchLinkedProperty(userId, partnerId, nextId, mortgageId);
   if (!result.ok) return { ok: false, error: result.error, status: result.status };
   return { ok: true, nextId, property: result.property };
 }
 
-async function getOwnedMortgage(userId: number, mortgageId: number) {
+async function getAccessibleMortgage(userId: number, partnerId: number | null, mortgageId: number) {
   const [mortgage] = await db
     .select()
     .from(mortgages)
-    .where(and(eq(mortgages.id, mortgageId), eq(mortgages.userId, userId)));
+    .where(and(eq(mortgages.id, mortgageId), ownedOrJointPredicate(mortgages, userId, partnerId)));
   return mortgage ?? null;
 }
 
@@ -290,19 +304,19 @@ async function readMortgagePatchPayload(
   return body;
 }
 
-async function getCurrentLinkedPropertyId(
-  userId: number,
-  mortgageId: number,
-): Promise<number | null> {
+// The mortgage has already been access-checked, so the linked-property lookup
+// is by mortgageId alone (the property may belong to the partner).
+async function getCurrentLinkedPropertyId(mortgageId: number): Promise<number | null> {
   const [linkedProperty] = await db
     .select({ id: properties.id })
     .from(properties)
-    .where(and(eq(properties.userId, userId), eq(properties.mortgageId, mortgageId)));
+    .where(eq(properties.mortgageId, mortgageId));
   return linkedProperty?.id ?? null;
 }
 
 async function prepareMortgagePatch(params: {
   userId: number;
+  partnerId: number | null;
   mortgageId: number;
   patch: Partial<MortgagePayload>;
 }): Promise<
@@ -312,11 +326,12 @@ async function prepareMortgagePatch(params: {
     }
   | { ok: false; error: string; status: 400 | 404 | 409 }
 > {
-  const currentPropertyId = await getCurrentLinkedPropertyId(params.userId, params.mortgageId);
+  const currentPropertyId = await getCurrentLinkedPropertyId(params.mortgageId);
   const resolved = await resolveLinkedProperty(
     params.patch.linkedPropertyId,
     currentPropertyId,
     params.userId,
+    params.partnerId,
     params.mortgageId,
   );
   if (!resolved.ok) return resolved;
@@ -338,24 +353,27 @@ async function prepareMortgagePatch(params: {
   };
 }
 
+// Property ids come from access-checked resolution, so updates are by id only.
+// Jointness propagates to the linked property to keep the pair's 50% dashboard
+// weighting consistent (equity = value - mortgage balance).
 async function syncLinkedProperty(
-  userId: number,
   prevId: number | null,
   nextId: number | null,
   mortgageId: number,
   balance: unknown,
+  isJoint: boolean,
 ) {
   if (prevId != null && prevId !== nextId) {
     await db
       .update(properties)
       .set({ mortgageId: null, mortgage: 0 } as any)
-      .where(and(eq(properties.id, prevId), eq(properties.userId, userId)));
+      .where(eq(properties.id, prevId));
   }
   if (nextId != null) {
     await db
       .update(properties)
-      .set({ mortgageId, mortgage: balance } as any)
-      .where(and(eq(properties.id, nextId), eq(properties.userId, userId)));
+      .set({ mortgageId, mortgage: balance, isJoint } as any)
+      .where(eq(properties.id, nextId));
   }
 }
 
@@ -502,6 +520,7 @@ function mergeMortgagePayload(
     startDate: pickPatchedValue(patch.startDate, existing.startDate),
     endDate: pickPatchedValue(patch.endDate, existing.endDate),
     overpaymentLimit: pickPatchedValue(patch.overpaymentLimit, existing.overpaymentLimit),
+    isJoint: pickPatchedValue(patch.isJoint, existing.isJoint),
   });
 }
 
@@ -541,6 +560,7 @@ function toMortgageValues(
     startDate: payload.startDate,
     endDate: payload.endDate,
     overpaymentLimit: payload.overpaymentLimit?.toString() ?? null,
+    isJoint: payload.isJoint,
   };
 }
 
@@ -563,15 +583,13 @@ function toMortgageTransactionValues(
 
 app.get('/', async (c) => {
   const user = getAuthUser(c);
+  const partnerId = await getAcceptedPartnerId(user.id);
   const includeArchived = c.req.query('includeArchived') === 'true';
+  const accessPredicate = ownedOrJointPredicate(mortgages, user.id, partnerId);
   const data = await db
     .select()
     .from(mortgages)
-    .where(
-      includeArchived
-        ? eq(mortgages.userId, user.id)
-        : and(eq(mortgages.userId, user.id), isNull(mortgages.archivedAt)),
-    );
+    .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(mortgages.archivedAt)));
   return c.json({ data });
 });
 
@@ -579,26 +597,25 @@ app.get('/', async (c) => {
 
 app.get('/transactions', async (c) => {
   const user = getAuthUser(c);
+  const partnerId = await getAcceptedPartnerId(user.id);
   const mortgageId = c.req.query('mortgageId');
   if (mortgageId) {
     const parsedMortgageId = parseId(mortgageId);
     if (parsedMortgageId === null)
       return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
+    const mortgage = await getAccessibleMortgage(user.id, partnerId, parsedMortgageId);
+    if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
     const data = await db
       .select()
       .from(mortgageTransactions)
-      .where(
-        and(
-          eq(mortgageTransactions.mortgageId, parsedMortgageId),
-          eq(mortgageTransactions.userId, user.id),
-        ),
-      );
+      .where(eq(mortgageTransactions.mortgageId, parsedMortgageId));
     return c.json({ data });
   }
   const data = await db
-    .select()
+    .select(getTableColumns(mortgageTransactions))
     .from(mortgageTransactions)
-    .where(eq(mortgageTransactions.userId, user.id));
+    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+    .where(ownedOrJointPredicate(mortgages, user.id, partnerId));
   return c.json({ data });
 });
 
@@ -606,10 +623,8 @@ app.get('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
-  const [data] = await db
-    .select()
-    .from(mortgages)
-    .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)));
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const data = await getAccessibleMortgage(user.id, partnerId, id);
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -631,7 +646,8 @@ app.post('/', async (c) => {
   if (!linkedPropertyId.ok)
     return c.json({ error: linkedPropertyId.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const propertyResult = await fetchLinkedProperty(user.id, linkedPropertyId.value, 0);
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const propertyResult = await fetchLinkedProperty(user.id, partnerId, linkedPropertyId.value, 0);
   if (!propertyResult.ok) return c.json({ error: propertyResult.error }, propertyResult.status);
   const property = propertyResult.property;
   const propertyValue = toFiniteNumber(property.currentValue);
@@ -647,10 +663,15 @@ app.post('/', async (c) => {
   });
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
+  // A mortgage linked to a joint property is joint too (and vice versa).
+  const isJoint = body.value.isJoint || property.isJoint;
+  const jointError = await assertJointAllowed(user.id, isJoint);
+  if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
+
   const [data] = await db
     .insert(mortgages)
     .values({
-      ...toMortgageValues(body.value, property),
+      ...toMortgageValues({ ...body.value, isJoint }, property),
       userId: user.id,
     })
     .returning();
@@ -660,8 +681,9 @@ app.post('/', async (c) => {
     .set({
       mortgageId: data.id,
       mortgage: body.value.outstandingBalance.toString(),
+      isJoint,
     })
-    .where(and(eq(properties.id, property.id), eq(properties.userId, user.id)));
+    .where(eq(properties.id, property.id));
 
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -671,13 +693,15 @@ app.patch('/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const existingMortgage = await getOwnedMortgage(user.id, id);
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const existingMortgage = await getAccessibleMortgage(user.id, partnerId, id);
   if (!existingMortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
   const body = await readMortgagePatchPayload(c.req);
   if (!body.ok) return c.json({ error: body.error }, body.status);
   const patchContext = await prepareMortgagePatch({
     userId: user.id,
+    partnerId,
     mortgageId: id,
     patch: body.value,
   });
@@ -690,18 +714,21 @@ app.patch('/:id', async (c) => {
   );
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
 
+  const jointError = await assertJointAllowed(user.id, merged.value.isJoint);
+  if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
+
   const [data] = await db
     .update(mortgages)
     .set(toMortgageValues(merged.value, patchContext.value.property))
-    .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
+    .where(eq(mortgages.id, id))
     .returning();
 
   await syncLinkedProperty(
-    user.id,
     patchContext.value.currentPropertyId,
     patchContext.value.nextPropertyId,
     id,
     merged.value.outstandingBalance.toString(),
+    merged.value.isJoint,
   );
   return c.json({ data });
 });
@@ -711,31 +738,34 @@ app.delete('/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const accessPredicate = and(
+    eq(mortgages.id, id),
+    ownedOrJointPredicate(mortgages, user.id, partnerId),
+  );
+
   if (c.req.query('cascade') === 'true') {
+    const [data] = await db.delete(mortgages).where(accessPredicate).returning();
+    if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+
     await db
       .update(properties)
       .set({ mortgageId: null, mortgage: 0 } as any)
-      .where(and(eq(properties.mortgageId, id), eq(properties.userId, user.id)));
-
-    const [data] = await db
-      .delete(mortgages)
-      .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
-      .returning();
-    if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+      .where(eq(properties.mortgageId, id));
     return c.json({ data });
   }
 
   const [data] = await db
     .update(mortgages)
     .set({ archivedAt: new Date() })
-    .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id), isNull(mortgages.archivedAt)))
+    .where(and(accessPredicate, isNull(mortgages.archivedAt)))
     .returning();
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
   await db
     .update(properties)
     .set({ mortgageId: null, mortgage: 0 } as any)
-    .where(and(eq(properties.mortgageId, id), eq(properties.userId, user.id)));
+    .where(eq(properties.mortgageId, id));
 
   return c.json({ data });
 });
@@ -745,10 +775,11 @@ app.post('/:id/unarchive', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
+  const partnerId = await getAcceptedPartnerId(user.id);
   const [data] = await db
     .update(mortgages)
     .set({ archivedAt: null })
-    .where(and(eq(mortgages.id, id), eq(mortgages.userId, user.id)))
+    .where(and(eq(mortgages.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)))
     .returning();
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
@@ -758,10 +789,14 @@ app.get('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
+  const partnerId = await getAcceptedPartnerId(user.id);
   const [data] = await db
-    .select()
+    .select(getTableColumns(mortgageTransactions))
     .from(mortgageTransactions)
-    .where(and(eq(mortgageTransactions.id, id), eq(mortgageTransactions.userId, user.id)));
+    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+    .where(
+      and(eq(mortgageTransactions.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)),
+    );
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -774,15 +809,13 @@ app.post('/transactions', async (c) => {
   const body = parseMortgageTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const [mortgage] = await db
-    .select({ id: mortgages.id })
-    .from(mortgages)
-    .where(and(eq(mortgages.id, body.value.mortgageId), eq(mortgages.userId, user.id)));
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const mortgage = await getAccessibleMortgage(user.id, partnerId, body.value.mortgageId);
   if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db
     .insert(mortgageTransactions)
-    .values({ ...toMortgageTransactionValues(body.value), userId: user.id })
+    .values({ ...toMortgageTransactionValues(body.value), userId: mortgage.userId ?? user.id })
     .returning();
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -792,10 +825,14 @@ app.patch('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
+  const partnerId = await getAcceptedPartnerId(user.id);
   const [existing] = await db
-    .select()
+    .select(getTableColumns(mortgageTransactions))
     .from(mortgageTransactions)
-    .where(and(eq(mortgageTransactions.id, id), eq(mortgageTransactions.userId, user.id)));
+    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+    .where(
+      and(eq(mortgageTransactions.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)),
+    );
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   const rawBody = await readJsonBody(c.req, 'Invalid mortgage transaction payload');
@@ -810,16 +847,13 @@ app.patch('/transactions/:id', async (c) => {
   const merged = mergeMortgageTransactionPayload(body.value, existing);
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const [mortgage] = await db
-    .select({ id: mortgages.id })
-    .from(mortgages)
-    .where(and(eq(mortgages.id, merged.value.mortgageId), eq(mortgages.userId, user.id)));
+  const mortgage = await getAccessibleMortgage(user.id, partnerId, merged.value.mortgageId);
   if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db
     .update(mortgageTransactions)
-    .set(toMortgageTransactionValues(merged.value))
-    .where(and(eq(mortgageTransactions.id, id), eq(mortgageTransactions.userId, user.id)))
+    .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
+    .where(eq(mortgageTransactions.id, id))
     .returning();
   return c.json({ data });
 });
@@ -828,9 +862,19 @@ app.delete('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const [existing] = await db
+    .select({ id: mortgageTransactions.id })
+    .from(mortgageTransactions)
+    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+    .where(
+      and(eq(mortgageTransactions.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)),
+    );
+  if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+
   const [data] = await db
     .delete(mortgageTransactions)
-    .where(and(eq(mortgageTransactions.id, id), eq(mortgageTransactions.userId, user.id)))
+    .where(eq(mortgageTransactions.id, id))
     .returning();
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });

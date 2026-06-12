@@ -21,6 +21,7 @@ const mortgageBase: Mortgage = {
   startDate: '2032-04-01',
   endDate: '2034-03-31',
   overpaymentLimit: 10,
+  isJoint: false,
 };
 
 test('derives mortgage projection years from the current mortgage schedule', () => {

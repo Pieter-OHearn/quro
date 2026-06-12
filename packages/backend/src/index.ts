@@ -17,6 +17,7 @@ import dashboard from './routes/dashboard';
 import currency from './routes/currency';
 import capabilities from './routes/capabilities';
 import settings from './routes/settings';
+import partner from './routes/partner';
 import bunq from './routes/bunq';
 import {
   getCoreReadinessReport,
@@ -62,6 +63,8 @@ app.use('/api/capabilities', requireAuth);
 app.use('/api/capabilities/*', requireAuth);
 app.use('/api/settings', requireAuth);
 app.use('/api/settings/*', requireAuth);
+app.use('/api/partner', requireAuth);
+app.use('/api/partner/*', requireAuth);
 app.use('/api/bunq/oauth/start', requireAuth);
 app.use('/api/bunq/oauth/callback', requireAuth);
 app.use('/api/bunq/connection', requireAuth);
@@ -81,6 +84,7 @@ app.route('/api/dashboard', dashboard);
 app.route('/api/currency', currency);
 app.route('/api/capabilities', capabilities);
 app.route('/api/settings', settings);
+app.route('/api/partner', partner);
 app.route('/api/bunq', bunq);
 
 startSessionCleanup();

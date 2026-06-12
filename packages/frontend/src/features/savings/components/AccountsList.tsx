@@ -1,6 +1,7 @@
 import { Calendar, ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { Badge, Button, Card, IconButton, PanelHeader } from '@/components/ui';
+import { JointBadge } from '@/features/partner';
 import { TxnHistory } from './TxnHistory';
 import type {
   ConvertToBaseFn,
@@ -77,6 +78,7 @@ function AccountRowMeta({
             Bunq
           </Badge>
         )}
+        <JointBadge isJoint={acc.isJoint} ownerUserId={acc.userId} />
         <Badge tone="neutral" size="sm">
           {acc.accountType}
         </Badge>

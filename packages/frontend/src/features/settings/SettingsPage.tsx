@@ -35,6 +35,7 @@ import {
   RefreshCw,
   Unlink,
   User as UserIcon,
+  Users,
 } from 'lucide-react';
 import {
   Badge,
@@ -52,6 +53,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { resolveApiErrorMessage } from '@/lib/pdfDocuments';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
+import { PartnerSection } from '@/features/partner';
 import {
   useBunqConnection,
   useCategoryMappings,
@@ -61,7 +63,7 @@ import {
   type CategoryMapping,
 } from './hooks';
 
-type TabKey = 'profile' | 'security' | 'preferences' | 'connections';
+type TabKey = 'profile' | 'security' | 'preferences' | 'partner' | 'connections';
 
 type StrengthState = {
   score: number;
@@ -122,6 +124,12 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string; icon: ElementType; subti
     label: 'Preferences',
     icon: SlidersHorizontal,
     subtitle: 'Currency and display defaults',
+  },
+  {
+    key: 'partner',
+    label: 'Partner',
+    icon: Users,
+    subtitle: 'Share joint assets with your partner',
   },
   {
     key: 'connections',
@@ -1212,6 +1220,7 @@ export function Settings() {
             {activeTab === 'preferences' ? (
               <PreferencesSection user={user} replaceUser={replaceUser} />
             ) : null}
+            {activeTab === 'partner' ? <PartnerSection /> : null}
             {activeTab === 'connections' ? <ConnectionsSection /> : null}
           </Card>
         </div>

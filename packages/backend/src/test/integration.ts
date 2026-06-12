@@ -1,4 +1,4 @@
-import { like, inArray } from 'drizzle-orm';
+import { like, inArray, or } from 'drizzle-orm';
 import { app } from '../index';
 import { db } from '../db/client';
 import {
@@ -11,6 +11,7 @@ import {
   holdings,
   mortgageTransactions,
   mortgages,
+  partnerLinks,
   payslips,
   pensionPots,
   pensionTransactions,
@@ -172,6 +173,11 @@ async function cleanupTestUsers(emailPattern: string) {
   await db.delete(budgetCategories).where(inArray(budgetCategories.userId, userIds));
   await db.delete(categoryMappings).where(inArray(categoryMappings.userId, userIds));
   await db.delete(goals).where(inArray(goals.userId, userIds));
+  await db
+    .delete(partnerLinks)
+    .where(
+      or(inArray(partnerLinks.requesterId, userIds), inArray(partnerLinks.addresseeId, userIds)),
+    );
   await db.delete(sessions).where(inArray(sessions.userId, userIds));
   await db.delete(users).where(inArray(users.id, userIds));
 }

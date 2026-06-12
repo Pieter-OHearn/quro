@@ -85,9 +85,11 @@ export function useInvestmentActions(
     handleAddHoldingTxn: (transaction) =>
       mutateTransaction(transaction, updateHoldingTxn.mutate, createHoldingTxn.mutate),
     handleDeleteHoldingTxn: (id: number) => deleteHoldingTxn.mutate(id),
-    handleUpdateProperty: (id: number, value: number, rent: number) => {
+    handleUpdateProperty: (id: number, value: number, rent: number, isJoint: boolean) => {
       const existing = properties.find((property) => property.id === id);
-      if (existing) updateProperty.mutate({ ...existing, currentValue: value, monthlyRent: rent });
+      if (existing) {
+        updateProperty.mutate({ ...existing, currentValue: value, monthlyRent: rent, isJoint });
+      }
     },
     handleSaveProperty: (property) => {
       createProperty.mutate(property);

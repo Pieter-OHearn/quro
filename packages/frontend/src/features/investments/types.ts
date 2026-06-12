@@ -91,7 +91,7 @@ export type InvestmentActions = {
   handleDeleteHolding: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   handleAddHoldingTxn: (transaction: SaveHoldingTxnInput) => void;
   handleDeleteHoldingTxn: (id: number) => void;
-  handleUpdateProperty: (id: number, value: number, rent: number) => void;
+  handleUpdateProperty: (id: number, value: number, rent: number, isJoint: boolean) => void;
   handleSaveProperty: (property: Omit<Property, 'id'>) => void;
   handleAddPropertyTxn: (transaction: SavePropertyTxnInput) => void;
   handleDeletePropertyTxn: (id: number) => void;
@@ -143,7 +143,7 @@ export type PropertyModalsProps = {
   properties: Property[];
   mortgageById: Map<number, Mortgage>;
   onCloseUpdateProperty: () => void;
-  onSaveUpdateProperty: (id: number, value: number, rent: number) => void;
+  onSaveUpdateProperty: (id: number, value: number, rent: number, isJoint: boolean) => void;
   onCloseAddProperty: () => void;
   onSaveAddProperty: (property: Omit<Property, 'id'>) => void;
   onCloseAddPropertyTxn: () => void;

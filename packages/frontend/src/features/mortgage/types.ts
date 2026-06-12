@@ -33,6 +33,7 @@ export type MortgageFormState = {
   startDate: string;
   endDate: string;
   overpaymentLimit: string;
+  isJoint: boolean;
 };
 
 export type AmortizationRow = {
