@@ -49,11 +49,11 @@ function toDebtInsertPayload(payload: DebtPayload, userId: number): typeof debts
     name: payload.name,
     type: payload.type,
     lender: payload.lender,
-    originalAmount: payload.originalAmount.toString(),
-    remainingBalance: payload.remainingBalance.toString(),
+    originalAmount: payload.originalAmount,
+    remainingBalance: payload.remainingBalance,
     currency: payload.currency,
-    interestRate: payload.interestRate.toString(),
-    monthlyPayment: payload.monthlyPayment.toString(),
+    interestRate: payload.interestRate,
+    monthlyPayment: payload.monthlyPayment,
     startDate: payload.startDate,
     endDate: payload.endDate,
     color: payload.color,
@@ -67,11 +67,11 @@ function toDebtUpdatePayload(payload: DebtPayload): Partial<typeof debts.$inferI
     name: payload.name,
     type: payload.type,
     lender: payload.lender,
-    originalAmount: payload.originalAmount.toString(),
-    remainingBalance: payload.remainingBalance.toString(),
+    originalAmount: payload.originalAmount,
+    remainingBalance: payload.remainingBalance,
     currency: payload.currency,
-    interestRate: payload.interestRate.toString(),
-    monthlyPayment: payload.monthlyPayment.toString(),
+    interestRate: payload.interestRate,
+    monthlyPayment: payload.monthlyPayment,
     startDate: payload.startDate,
     endDate: payload.endDate,
     color: payload.color,
@@ -88,9 +88,9 @@ function toDebtPaymentInsertPayload(
     userId,
     debtId: payload.debtId,
     date: payload.date,
-    amount: payload.amount.toString(),
-    interest: payload.interest.toString(),
-    principal: payload.principal.toString(),
+    amount: payload.amount,
+    interest: payload.interest,
+    principal: payload.principal,
     note: payload.note,
   };
 }
@@ -388,10 +388,7 @@ async function createDebtPayment(params: {
     await tx
       .update(debts)
       .set({
-        remainingBalance: applyDebtPrincipalPayment(
-          currentRemainingBalance,
-          parsed.data.principal,
-        ).toString(),
+        remainingBalance: applyDebtPrincipalPayment(currentRemainingBalance, parsed.data.principal),
       })
       .where(and(eq(debts.id, debt.id), eq(debts.userId, params.userId)));
 
@@ -419,7 +416,7 @@ function deleteDebtPayment(params: {
         remainingBalance: restoreDebtPrincipalPayment(
           parseDebtBalance(debt.remainingBalance),
           parseDebtBalance(existing.principal),
-        ).toString(),
+        ),
       })
       .where(and(eq(debts.id, debt.id), eq(debts.userId, params.userId)));
 

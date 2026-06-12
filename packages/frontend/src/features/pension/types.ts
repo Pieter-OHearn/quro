@@ -1,7 +1,6 @@
 import type {
   AppCapabilityStatus,
   PensionImportCollisionWarning,
-  PensionImportConfidenceLabel,
   PensionPot,
   PensionStatementDocument,
   PensionStatementImportFeedItem,
@@ -30,36 +29,18 @@ export type PensionFormatNativeFn = (n: number, currency: string, compact?: bool
 export type ConvertToBaseFn = (n: number, currency: string) => number;
 export type IsForeignFn = (currency: string) => boolean;
 
-export type NumericLike = number | string | null | undefined;
 export type IntegerLike = number | string | null | undefined;
 
-export type ApiPensionPot = Omit<
-  PensionPot,
-  'balance' | 'employeeMonthly' | 'employerMonthly' | 'metadata'
-> & {
-  balance: NumericLike;
-  employeeMonthly: NumericLike;
-  employerMonthly: NumericLike;
+export type ApiPensionPot = Omit<PensionPot, 'metadata'> & {
   metadata?: unknown;
 };
 
-export type ApiPensionTransaction = Omit<PensionTransaction, 'amount' | 'taxAmount'> & {
-  amount: NumericLike;
-  taxAmount: NumericLike;
-};
+export type ApiPensionTransaction = PensionTransaction;
 
 export type ApiPensionStatementDocument = Omit<PensionStatementDocument, 'sizeBytes' | 'mimeType'> &
   ApiPdfDocument;
 
-export type ApiPensionStatementImport = Omit<
-  PensionStatementImport,
-  'sizeBytes' | 'totalRows' | 'deletedRows' | 'activeRows'
-> & {
-  sizeBytes: NumericLike;
-  totalRows?: NumericLike;
-  deletedRows?: NumericLike;
-  activeRows?: NumericLike;
-};
+export type ApiPensionStatementImport = PensionStatementImport;
 
 export type ApiPensionStatementImportFeedItem = Omit<PensionStatementImportFeedItem, 'import'> & {
   import: ApiPensionStatementImport;
@@ -71,26 +52,10 @@ export type ApiPensionStatementImportFeedItem = Omit<PensionStatementImportFeedI
   };
 };
 
-export type ApiPensionStatementImportSummary = Omit<
-  PensionStatementImportSummary,
-  'totalRows' | 'deletedRows' | 'activeRows'
-> & {
-  totalRows?: NumericLike;
-  deletedRows?: NumericLike;
-  activeRows?: NumericLike;
-};
+export type ApiPensionStatementImportSummary = PensionStatementImportSummary;
 
-export type ApiPensionStatementImportRow = Omit<
-  PensionStatementImportRow,
-  'amount' | 'taxAmount' | 'confidence' | 'collisionWarning'
-> & {
-  amount: NumericLike;
-  taxAmount: NumericLike;
-  confidence: NumericLike;
+export type ApiPensionStatementImportRow = Omit<PensionStatementImportRow, 'collisionWarning'> & {
   collisionWarning?: PensionImportCollisionWarning | null;
-  confidenceLabel: PensionImportConfidenceLabel;
-  type: PensionTransaction['type'];
-  evidence: Array<{ page: number | null; snippet: string }>;
 };
 
 export type UpdatePensionImportRowPayload = Partial<

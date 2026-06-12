@@ -37,7 +37,7 @@ type PriceSnapshotInput = {
   userId: number;
   holdingId: number;
   eodDate: string;
-  closePrice: number | string;
+  closePrice: number;
   priceCurrency: string;
 };
 
@@ -184,7 +184,7 @@ async function applyQuoteToHolding(
   const [updatedHolding] = await db
     .update(holdings)
     .set({
-      currentPrice: String(quote.close),
+      currentPrice: quote.close,
       currency: resolvedHoldingCurrency,
       priceUpdatedAt: toTradeDate(quote.tradeLast),
     })
@@ -236,14 +236,14 @@ export async function upsertHoldingPriceSnapshot(input: PriceSnapshotInput): Pro
       userId: input.userId,
       holdingId: input.holdingId,
       eodDate: input.eodDate,
-      closePrice: String(input.closePrice),
+      closePrice: input.closePrice,
       priceCurrency: input.priceCurrency,
       syncedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: [holdingPriceHistory.holdingId, holdingPriceHistory.eodDate],
       set: {
-        closePrice: String(input.closePrice),
+        closePrice: input.closePrice,
         priceCurrency: input.priceCurrency,
         syncedAt: new Date(),
       },

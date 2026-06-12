@@ -166,9 +166,9 @@ function toSavingsAccountInsertValues(
     userId,
     name: payload.name,
     bank: payload.bank,
-    balance: payload.balance.toString(),
+    balance: payload.balance,
     currency: payload.currency,
-    interestRate: payload.interestRate.toString(),
+    interestRate: payload.interestRate,
     accountType: payload.accountType,
     color: payload.color,
     emoji: payload.emoji,
@@ -182,9 +182,9 @@ function toSavingsAccountUpdateValues(
   return {
     name: payload.name,
     bank: payload.bank,
-    balance: payload.balance?.toString(),
+    balance: payload.balance,
     currency: payload.currency,
-    interestRate: payload.interestRate?.toString(),
+    interestRate: payload.interestRate,
     accountType: payload.accountType,
     color: payload.color,
     emoji: payload.emoji,
@@ -200,7 +200,7 @@ function toSavingsTransactionInsertValues(
     userId,
     accountId: payload.accountId,
     type: payload.type,
-    amount: payload.amount.toString(),
+    amount: payload.amount,
     date: payload.date,
     note: payload.note,
   };
@@ -212,7 +212,7 @@ function toSavingsTransactionUpdateValues(
   return {
     accountId: payload.accountId,
     type: payload.type,
-    amount: payload.amount?.toString(),
+    amount: payload.amount,
     date: payload.date,
     note: payload.note,
   };

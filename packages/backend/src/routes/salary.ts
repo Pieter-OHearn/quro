@@ -41,11 +41,11 @@ type FieldParsers<T extends object> = {
 type PayslipInput = {
   month: string;
   date: string;
-  gross: string;
-  tax: string;
-  pension: string;
-  net: string;
-  bonus: string | null;
+  gross: number;
+  tax: number;
+  pension: number;
+  net: number;
+  bonus: number | null;
   currency: CurrencyCode;
 };
 
@@ -143,25 +143,25 @@ const parseDateField = (value: unknown, error: string): ParseResult<string> => {
   return parsed ? ok(parsed) : err(error);
 };
 
-const parseNumericStringField = (
+const parseNumericField = (
   value: unknown,
   error: string,
   min = Number.NEGATIVE_INFINITY,
-): ParseResult<string> => {
+): ParseResult<number> => {
   const parsed = parseNumber(value);
   if (parsed === null || parsed < min) return err(error);
-  return ok(parsed.toString());
+  return ok(parsed);
 };
 
-const parseNullableNumericStringField = (
+const parseNullableNumericField = (
   value: unknown,
   error: string,
   min = Number.NEGATIVE_INFINITY,
-): ParseResult<string | null> => {
+): ParseResult<number | null> => {
   if (value == null) return ok(null);
   const parsed = parseNumber(value);
   if (parsed === null || parsed < min) return err(error);
-  return ok(parsed.toString());
+  return ok(parsed);
 };
 
 const parseCurrencyField = (value: unknown): ParseResult<CurrencyCode> => {
@@ -172,11 +172,11 @@ const parseCurrencyField = (value: unknown): ParseResult<CurrencyCode> => {
 const payslipFieldParsers: FieldParsers<PayslipInput> = {
   month: (value) => parseTextField(value, 'Invalid month'),
   date: (value) => parseDateField(value, 'Invalid date (expected YYYY-MM-DD)'),
-  gross: (value) => parseNumericStringField(value, 'Invalid gross', 0),
-  tax: (value) => parseNumericStringField(value, 'Invalid tax', 0),
-  pension: (value) => parseNumericStringField(value, 'Invalid pension', 0),
-  net: (value) => parseNumericStringField(value, 'Invalid net', 0),
-  bonus: (value) => parseNullableNumericStringField(value, 'Invalid bonus', 0),
+  gross: (value) => parseNumericField(value, 'Invalid gross', 0),
+  tax: (value) => parseNumericField(value, 'Invalid tax', 0),
+  pension: (value) => parseNumericField(value, 'Invalid pension', 0),
+  net: (value) => parseNumericField(value, 'Invalid net', 0),
+  bonus: (value) => parseNullableNumericField(value, 'Invalid bonus', 0),
   currency: parseCurrencyField,
 };
 

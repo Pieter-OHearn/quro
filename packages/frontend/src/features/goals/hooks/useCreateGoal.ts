@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { ApiGoal, CreateGoalInput } from '../types';
+import type { Goal } from '@quro/shared';
+import type { CreateGoalInput } from '../types';
 import { normalizeGoal } from './goal-normalizer';
 
 export function useCreateGoal() {
@@ -9,7 +10,7 @@ export function useCreateGoal() {
   return useMutation({
     mutationFn: async (goal: CreateGoalInput) => {
       const { data } = await api.post('/api/goals', goal);
-      return normalizeGoal(data.data as ApiGoal);
+      return normalizeGoal(data.data as Goal);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['goals'] });

@@ -548,18 +548,17 @@ function toMortgageValues(
     propertyAddress: property.address,
     lender: payload.lender,
     currency: property.currency as CurrencyCode,
-    originalAmount: payload.originalAmount.toString(),
-    outstandingBalance: payload.outstandingBalance.toString(),
-    propertyValue:
-      toFiniteNumber(property.currentValue)?.toString() ?? payload.propertyValue.toString(),
-    monthlyPayment: payload.monthlyPayment.toString(),
-    interestRate: payload.interestRate.toString(),
+    originalAmount: payload.originalAmount,
+    outstandingBalance: payload.outstandingBalance,
+    propertyValue: toFiniteNumber(property.currentValue) ?? payload.propertyValue,
+    monthlyPayment: payload.monthlyPayment,
+    interestRate: payload.interestRate,
     rateType: payload.rateType,
     fixedUntil: payload.fixedUntil ?? 'N/A',
     termYears: payload.termYears,
     startDate: payload.startDate,
     endDate: payload.endDate,
-    overpaymentLimit: payload.overpaymentLimit?.toString() ?? null,
+    overpaymentLimit: payload.overpaymentLimit ?? null,
     isJoint: payload.isJoint,
   };
 }
@@ -570,12 +569,12 @@ function toMortgageTransactionValues(
   return {
     mortgageId: payload.mortgageId,
     type: payload.type,
-    amount: payload.amount.toString(),
-    interest: payload.interest?.toString() ?? null,
-    principal: payload.principal?.toString() ?? null,
+    amount: payload.amount,
+    interest: payload.interest ?? null,
+    principal: payload.principal ?? null,
     date: payload.date,
     note: payload.note,
-    fixedYears: payload.fixedYears?.toString() ?? null,
+    fixedYears: payload.fixedYears ?? null,
   };
 }
 
@@ -680,7 +679,7 @@ app.post('/', async (c) => {
     .update(properties)
     .set({
       mortgageId: data.id,
-      mortgage: body.value.outstandingBalance.toString(),
+      mortgage: body.value.outstandingBalance,
       isJoint,
     })
     .where(eq(properties.id, property.id));

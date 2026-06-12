@@ -17,7 +17,6 @@ import type {
   ApiPensionStatementDocument,
   ApiPensionTransaction,
   IntegerLike,
-  NumericLike,
 } from '../types';
 
 const DEFAULT_STATEMENT_FILE_NAME = 'statement.pdf';
@@ -45,15 +44,6 @@ const ROW_TYPES = new Set<PensionStatementImportRow['type']>([
   'fee',
   'annual_statement',
 ]);
-
-const toNumber = (value: NumericLike): number => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (typeof value === 'string') {
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-};
 
 const toPositiveInt = (value: IntegerLike): number => {
   if (typeof value === 'number') {
@@ -150,14 +140,12 @@ function normalizeEvidence(evidence: unknown): Array<{ page: number | null; snip
     .filter((entry): entry is { page: number | null; snippet: string } => entry !== null);
 }
 
-function toOptionalCount(value: unknown): number | undefined {
-  if (value === undefined) return undefined;
-  return toNumber(value as NumericLike);
+function toOptionalCount(value: number | undefined): number | undefined {
+  return value;
 }
 
-function toCount(value: unknown): number {
-  if (value === undefined) return 0;
-  return toNumber(value as NumericLike);
+function toCount(value: number | undefined): number {
+  return value ?? 0;
 }
 
 function normalizeImportRowType(value: unknown): PensionStatementImportRow['type'] {
@@ -180,9 +168,6 @@ export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
   ...pot,
   id: toPositiveInt((pot as { id?: IntegerLike }).id),
   type: normalizePensionPotType(pot.type),
-  balance: toNumber(pot.balance),
-  employeeMonthly: toNumber(pot.employeeMonthly),
-  employerMonthly: toNumber(pot.employerMonthly),
   investmentStrategy: toOptionalString(pot.investmentStrategy)?.trim() || null,
   metadata: normalizePensionMetadata(pot.metadata),
   notes: toStringOr(pot.notes),
@@ -192,8 +177,6 @@ export const normalizePensionTransaction = (txn: ApiPensionTransaction): Pension
   ...txn,
   id: toPositiveInt((txn as { id?: IntegerLike }).id),
   potId: toPositiveInt((txn as { potId?: IntegerLike }).potId),
-  amount: toNumber(txn.amount),
-  taxAmount: toNumber(txn.taxAmount),
   note: toStringOr(txn.note),
 });
 
@@ -220,7 +203,6 @@ export const normalizePensionStatementImport = (
   ...value,
   id: toPositiveInt((value as { id?: IntegerLike }).id),
   potId: toPositiveInt((value as { potId?: IntegerLike }).potId),
-  sizeBytes: toNumber(value.sizeBytes),
   status: toStatus(value.status),
   mimeType: 'application/pdf',
   fileName: toStringOr(value.fileName, DEFAULT_STATEMENT_FILE_NAME),
@@ -288,9 +270,6 @@ export const normalizePensionStatementImportRow = (
     importId: toPositiveInt((value as { importId?: IntegerLike }).importId),
     rowOrder: toPositiveInt((value as { rowOrder?: IntegerLike }).rowOrder),
     type: normalizeImportRowType(value.type),
-    amount: toNumber(value.amount),
-    taxAmount: toNumber(value.taxAmount),
-    confidence: toNumber(value.confidence),
     confidenceLabel: toConfidenceLabel(value.confidenceLabel),
     evidence: normalizeEvidence(value.evidence),
     isDeleted: Boolean(value.isDeleted),

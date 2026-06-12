@@ -1,6 +1,6 @@
 {
-  "id": "7eed5554-aa5b-439b-ab62-d7920bc52d0c",
-  "prevId": "aa7d7866-974f-4070-9241-84c7683254cc",
+  "id": "42c7edcd-d987-4345-ae3e-6d88919ec43b",
+  "prevId": "7eed5554-aa5b-439b-ab62-d7920bc52d0c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2372,7 +2372,7 @@
           "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'0'"
+          "default": 0
         },
         "date": {
           "name": "date",
@@ -2398,7 +2398,7 @@
           "type": "numeric(5, 4)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'0'"
+          "default": 0
         },
         "confidence_label": {
           "name": "confidence_label",
@@ -2811,7 +2811,7 @@
           "type": "numeric(19, 2)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'0'"
+          "default": 0
         },
         "date": {
           "name": "date",

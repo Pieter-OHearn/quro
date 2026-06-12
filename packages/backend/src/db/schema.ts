@@ -4,7 +4,7 @@ import {
   serial,
   text,
   date,
-  numeric,
+  customType,
   integer,
   boolean,
   jsonb,
@@ -24,6 +24,28 @@ import {
 } from '@quro/shared';
 
 export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
+
+const numericAsNumber = customType<{
+  data: number;
+  driverData: string;
+  config: { precision?: number; scale?: number };
+}>({
+  dataType(config) {
+    if (config?.precision !== undefined && config.scale !== undefined) {
+      return `numeric(${config.precision}, ${config.scale})`;
+    }
+
+    return 'numeric';
+  },
+  fromDriver(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  },
+  toDriver(value) {
+    return String(value);
+  },
+});
+
 export const pensionImportStatusEnum = pgEnum('pension_import_status', [
   'queued',
   'processing',
@@ -180,9 +202,9 @@ export const savingsAccounts = pgTable(
     userId: integer('user_id').references(() => users.id),
     name: text('name').notNull(),
     bank: text('bank').notNull(),
-    balance: numeric('balance', { precision: 19, scale: 2 }).notNull(),
+    balance: numericAsNumber('balance', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
-    interestRate: numeric('interest_rate', { precision: 7, scale: 4 }).notNull(),
+    interestRate: numericAsNumber('interest_rate', { precision: 7, scale: 4 }).notNull(),
     accountType: text('account_type').notNull(),
     color: text('color'),
     emoji: text('emoji'),
@@ -208,7 +230,7 @@ export const savingsTransactions = pgTable(
       .references(() => savingsAccounts.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // deposit | withdrawal | interest
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     bunqTransactionId: text('bunq_transaction_id'),
@@ -245,14 +267,14 @@ export const holdings = pgTable(
     userId: integer('user_id').references(() => users.id),
     name: text('name').notNull(),
     ticker: text('ticker').notNull(),
-    currentPrice: numeric('current_price', { precision: 19, scale: 2 }).notNull(),
+    currentPrice: numericAsNumber('current_price', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     sector: text('sector').notNull(),
     itemType: text('item_type'),
     exchangeMic: text('exchange_mic'),
     industry: text('industry'),
     priceUpdatedAt: timestamp('price_updated_at'),
-    manualPrice: numeric('manual_price', { precision: 19, scale: 2 }),
+    manualPrice: numericAsNumber('manual_price', { precision: 19, scale: 2 }),
     excludeFromSync: boolean('exclude_from_sync').default(false).notNull(),
     archivedAt: timestamp('archived_at'),
   },
@@ -270,8 +292,8 @@ export const holdingTransactions = pgTable(
       .references(() => holdings.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // buy | sell | dividend
-    shares: numeric('shares', { precision: 19, scale: 6 }),
-    price: numeric('price', { precision: 19, scale: 2 }).notNull(),
+    shares: numericAsNumber('shares', { precision: 19, scale: 6 }),
+    price: numericAsNumber('price', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
@@ -292,7 +314,7 @@ export const holdingPriceHistory = pgTable(
       .references(() => holdings.id, { onDelete: 'cascade' })
       .notNull(),
     eodDate: date('eod_date', { mode: 'string' }).notNull(),
-    closePrice: numeric('close_price', { precision: 19, scale: 2 }).notNull(),
+    closePrice: numericAsNumber('close_price', { precision: 19, scale: 2 }).notNull(),
     priceCurrency: text('price_currency').notNull(),
     syncedAt: timestamp('synced_at').defaultNow().notNull(),
   },
@@ -318,11 +340,11 @@ export const properties = pgTable(
     userId: integer('user_id').references(() => users.id),
     address: text('address').notNull(),
     propertyType: text('property_type').notNull(),
-    purchasePrice: numeric('purchase_price', { precision: 19, scale: 2 }).notNull(),
-    currentValue: numeric('current_value', { precision: 19, scale: 2 }).notNull(),
-    mortgage: numeric('mortgage', { precision: 19, scale: 2 }).notNull(),
+    purchasePrice: numericAsNumber('purchase_price', { precision: 19, scale: 2 }).notNull(),
+    currentValue: numericAsNumber('current_value', { precision: 19, scale: 2 }).notNull(),
+    mortgage: numericAsNumber('mortgage', { precision: 19, scale: 2 }).notNull(),
     mortgageId: integer('mortgage_id'),
-    monthlyRent: numeric('monthly_rent', { precision: 19, scale: 2 }).notNull(),
+    monthlyRent: numericAsNumber('monthly_rent', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     emoji: text('emoji'),
     isJoint: boolean('is_joint').notNull().default(false),
@@ -342,9 +364,9 @@ export const propertyTransactions = pgTable(
       .references(() => properties.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // repayment | valuation | rent_income | expense
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
-    interest: numeric('interest', { precision: 19, scale: 2 }),
-    principal: numeric('principal', { precision: 19, scale: 2 }),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
+    interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
+    principal: numericAsNumber('principal', { precision: 19, scale: 2 }),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
@@ -364,10 +386,10 @@ export const pensionPots = pgTable(
     name: text('name').notNull(),
     provider: text('provider').notNull(),
     type: text('type').notNull(),
-    balance: numeric('balance', { precision: 19, scale: 2 }).notNull(),
+    balance: numericAsNumber('balance', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
-    employeeMonthly: numeric('employee_monthly', { precision: 19, scale: 2 }).notNull(),
-    employerMonthly: numeric('employer_monthly', { precision: 19, scale: 2 }).notNull(),
+    employeeMonthly: numericAsNumber('employee_monthly', { precision: 19, scale: 2 }).notNull(),
+    employerMonthly: numericAsNumber('employer_monthly', { precision: 19, scale: 2 }).notNull(),
     investmentStrategy: text('investment_strategy'),
     metadata: jsonb('metadata').$type<Record<string, string>>().notNull().default({}),
     color: text('color'),
@@ -389,8 +411,8 @@ export const pensionTransactions = pgTable(
       .references(() => pensionPots.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // contribution | fee | annual_statement
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
-    taxAmount: numeric('tax_amount', { precision: 19, scale: 2 }).notNull().default('0'),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
+    taxAmount: numericAsNumber('tax_amount', { precision: 19, scale: 2 }).notNull().default(0),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     isEmployer: boolean('is_employer'),
@@ -457,12 +479,12 @@ export const pensionStatementImportRows = pgTable(
       .notNull(),
     rowOrder: integer('row_order').notNull(),
     type: text('type').notNull(),
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
-    taxAmount: numeric('tax_amount', { precision: 19, scale: 2 }).notNull().default('0'),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
+    taxAmount: numericAsNumber('tax_amount', { precision: 19, scale: 2 }).notNull().default(0),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note').notNull().default(''),
     isEmployer: boolean('is_employer'),
-    confidence: numeric('confidence', { precision: 5, scale: 4 }).notNull().default('0'),
+    confidence: numericAsNumber('confidence', { precision: 5, scale: 4 }).notNull().default(0),
     confidenceLabel: pensionImportConfidenceLabelEnum('confidence_label').notNull().default('low'),
     evidence: jsonb('evidence')
       .$type<Array<{ page: number | null; snippet: string }>>()
@@ -509,17 +531,20 @@ export const mortgages = pgTable(
     propertyAddress: text('property_address').notNull(),
     lender: text('lender').notNull(),
     currency: currencyCodeEnum('currency').notNull(),
-    originalAmount: numeric('original_amount', { precision: 19, scale: 2 }).notNull(),
-    outstandingBalance: numeric('outstanding_balance', { precision: 19, scale: 2 }).notNull(),
-    propertyValue: numeric('property_value', { precision: 19, scale: 2 }).notNull(),
-    monthlyPayment: numeric('monthly_payment', { precision: 19, scale: 2 }).notNull(),
-    interestRate: numeric('interest_rate', { precision: 7, scale: 4 }).notNull(),
+    originalAmount: numericAsNumber('original_amount', { precision: 19, scale: 2 }).notNull(),
+    outstandingBalance: numericAsNumber('outstanding_balance', {
+      precision: 19,
+      scale: 2,
+    }).notNull(),
+    propertyValue: numericAsNumber('property_value', { precision: 19, scale: 2 }).notNull(),
+    monthlyPayment: numericAsNumber('monthly_payment', { precision: 19, scale: 2 }).notNull(),
+    interestRate: numericAsNumber('interest_rate', { precision: 7, scale: 4 }).notNull(),
     rateType: text('rate_type').notNull(),
     fixedUntil: text('fixed_until'),
     termYears: integer('term_years').notNull(),
     startDate: text('start_date').notNull(),
     endDate: text('end_date').notNull(),
-    overpaymentLimit: numeric('overpayment_limit', { precision: 19, scale: 2 }),
+    overpaymentLimit: numericAsNumber('overpayment_limit', { precision: 19, scale: 2 }),
     isJoint: boolean('is_joint').notNull().default(false),
     archivedAt: timestamp('archived_at'),
   },
@@ -537,12 +562,12 @@ export const mortgageTransactions = pgTable(
       .references(() => mortgages.id, { onDelete: 'cascade' })
       .notNull(),
     type: text('type').notNull(), // repayment | valuation | rate_change
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
-    interest: numeric('interest', { precision: 19, scale: 2 }),
-    principal: numeric('principal', { precision: 19, scale: 2 }),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
+    interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
+    principal: numericAsNumber('principal', { precision: 19, scale: 2 }),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
-    fixedYears: numeric('fixed_years', { precision: 4, scale: 1 }),
+    fixedYears: numericAsNumber('fixed_years', { precision: 4, scale: 1 }),
   },
   (table) => ({
     userIdx: index('mortgage_transactions_user_id_idx').on(table.userId),
@@ -562,11 +587,11 @@ export const debts = pgTable(
     name: text('name').notNull(),
     type: text('type').notNull(),
     lender: text('lender').notNull(),
-    originalAmount: numeric('original_amount', { precision: 19, scale: 2 }).notNull(),
-    remainingBalance: numeric('remaining_balance', { precision: 19, scale: 2 }).notNull(),
+    originalAmount: numericAsNumber('original_amount', { precision: 19, scale: 2 }).notNull(),
+    remainingBalance: numericAsNumber('remaining_balance', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
-    interestRate: numeric('interest_rate', { precision: 7, scale: 4 }).notNull(),
-    monthlyPayment: numeric('monthly_payment', { precision: 19, scale: 2 }).notNull(),
+    interestRate: numericAsNumber('interest_rate', { precision: 7, scale: 4 }).notNull(),
+    monthlyPayment: numericAsNumber('monthly_payment', { precision: 19, scale: 2 }).notNull(),
     startDate: date('start_date', { mode: 'string' }).notNull(),
     endDate: date('end_date', { mode: 'string' }),
     color: text('color').notNull(),
@@ -590,9 +615,9 @@ export const debtPayments = pgTable(
       .references(() => debts.id, { onDelete: 'cascade' })
       .notNull(),
     date: date('date', { mode: 'string' }).notNull(),
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
-    principal: numeric('principal', { precision: 19, scale: 2 }).notNull(),
-    interest: numeric('interest', { precision: 19, scale: 2 }).notNull(),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
+    principal: numericAsNumber('principal', { precision: 19, scale: 2 }).notNull(),
+    interest: numericAsNumber('interest', { precision: 19, scale: 2 }).notNull(),
     note: text('note'),
   },
   (table) => ({
@@ -611,11 +636,11 @@ export const payslips = pgTable(
     userId: integer('user_id').references(() => users.id),
     month: text('month').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
-    gross: numeric('gross', { precision: 19, scale: 2 }).notNull(),
-    tax: numeric('tax', { precision: 19, scale: 2 }).notNull(),
-    pension: numeric('pension', { precision: 19, scale: 2 }).notNull(),
-    net: numeric('net', { precision: 19, scale: 2 }).notNull(),
-    bonus: numeric('bonus', { precision: 19, scale: 2 }),
+    gross: numericAsNumber('gross', { precision: 19, scale: 2 }).notNull(),
+    tax: numericAsNumber('tax', { precision: 19, scale: 2 }).notNull(),
+    pension: numericAsNumber('pension', { precision: 19, scale: 2 }).notNull(),
+    net: numericAsNumber('net', { precision: 19, scale: 2 }).notNull(),
+    bonus: numericAsNumber('bonus', { precision: 19, scale: 2 }),
     currency: currencyCodeEnum('currency').default('EUR').notNull(),
     ...inlinePdfDocumentColumns(),
   },
@@ -639,13 +664,16 @@ export const goals = pgTable(
     sourceId: integer('source_id'),
     name: text('name').notNull(),
     emoji: text('emoji'),
-    currentAmount: numeric('current_amount', { precision: 19, scale: 2 }).notNull(),
-    targetAmount: numeric('target_amount', { precision: 19, scale: 2 }).notNull(),
+    currentAmount: numericAsNumber('current_amount', { precision: 19, scale: 2 }).notNull(),
+    targetAmount: numericAsNumber('target_amount', { precision: 19, scale: 2 }).notNull(),
     deadline: text('deadline').notNull(),
     year: integer('year'),
     category: text('category').notNull(),
-    monthlyContribution: numeric('monthly_contribution', { precision: 19, scale: 2 }).notNull(),
-    monthlyTarget: numeric('monthly_target', { precision: 19, scale: 2 }),
+    monthlyContribution: numericAsNumber('monthly_contribution', {
+      precision: 19,
+      scale: 2,
+    }).notNull(),
+    monthlyTarget: numericAsNumber('monthly_target', { precision: 19, scale: 2 }),
     monthsCompleted: integer('months_completed'),
     totalMonths: integer('total_months'),
     unit: text('unit'),
@@ -678,8 +706,8 @@ export const budgetCategories = pgTable(
     userId: integer('user_id').references(() => users.id),
     name: text('name').notNull(),
     emoji: text('emoji'),
-    budgeted: numeric('budgeted', { precision: 19, scale: 2 }).notNull(),
-    spent: numeric('spent', { precision: 19, scale: 2 }).notNull(),
+    budgeted: numericAsNumber('budgeted', { precision: 19, scale: 2 }).notNull(),
+    spent: numericAsNumber('spent', { precision: 19, scale: 2 }).notNull(),
     color: text('color'),
     month: text('month').notNull(),
     year: integer('year').notNull(),
@@ -704,7 +732,7 @@ export const budgetTransactions = pgTable(
       .references(() => budgetCategories.id)
       .notNull(),
     description: text('description').notNull(),
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     merchant: text('merchant').notNull(),
     bunqTransactionId: text('bunq_transaction_id'),
@@ -756,7 +784,7 @@ export const currencyRates = pgTable(
     id: serial('id').primaryKey(),
     fromCurrency: currencyCodeEnum('from_currency').notNull(),
     toCurrency: currencyCodeEnum('to_currency').notNull(),
-    rate: numeric('rate', { precision: 12, scale: 6 }).notNull(),
+    rate: numericAsNumber('rate', { precision: 12, scale: 6 }).notNull(),
     provider: text('provider').notNull(),
     sourceDate: date('source_date', { mode: 'string' }).notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -778,7 +806,7 @@ export const dashboardTransactions = pgTable(
     userId: integer('user_id').references(() => users.id),
     name: text('name').notNull(),
     type: text('type').notNull(),
-    amount: numeric('amount', { precision: 19, scale: 2 }).notNull(),
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     category: text('category').notNull(),
   },

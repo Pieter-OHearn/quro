@@ -48,12 +48,12 @@ function existing(overrides: Partial<ExistingGoal> = {}): ExistingGoal {
     sourceId: 1,
     name: 'Emergency fund',
     emoji: null,
-    currentAmount: '0',
-    targetAmount: '5000',
+    currentAmount: 0,
+    targetAmount: 5000,
     deadline: '2027-12-31',
     year: null,
     category: 'savings',
-    monthlyContribution: '100',
+    monthlyContribution: 100,
     monthlyTarget: null,
     monthsCompleted: null,
     totalMonths: null,
@@ -404,7 +404,7 @@ describe('mergeGoalPayload', () => {
   });
 
   test('merges name and targetAmount fields', () => {
-    const ex = existing({ name: 'Old name', targetAmount: '5000' });
+    const ex = existing({ name: 'Old name', targetAmount: 5000 });
     const result = mergeGoalPayload({ name: 'New name', targetAmount: 8000 }, ex);
     expect(result.ok).toBe(true);
     if (result.ok) {
