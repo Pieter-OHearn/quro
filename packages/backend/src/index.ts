@@ -87,10 +87,12 @@ app.route('/api/settings', settings);
 app.route('/api/partner', partner);
 app.route('/api/bunq', bunq);
 
-startSessionCleanup();
-startBunqSyncScheduler();
-startHoldingPriceSyncScheduler();
-startCurrencyRateSyncScheduler();
+if (process.env.NODE_ENV !== 'test') {
+  startSessionCleanup();
+  startBunqSyncScheduler();
+  startHoldingPriceSyncScheduler();
+  startCurrencyRateSyncScheduler();
+}
 
 export default {
   port: parseInt(process.env.PORT || '3000'),

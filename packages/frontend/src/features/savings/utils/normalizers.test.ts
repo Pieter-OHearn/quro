@@ -3,14 +3,14 @@
 import { expect, test } from 'bun:test';
 import { normalizeSavingsAccount, normalizeSavingsTransaction } from './normalizers';
 
-test('normalizes numeric-string savings account fields from the API', () => {
+test('passes through numeric savings account fields from the API', () => {
   const account = normalizeSavingsAccount({
     id: 1,
     name: 'HECS',
     bank: 'Up Bank',
-    balance: '20307.00' as unknown as number,
+    balance: 20307,
     currency: 'AUD',
-    interestRate: '4.85' as unknown as number,
+    interestRate: 4.85,
     accountType: 'Easy Access',
     color: '#4338ca',
     emoji: '🧑‍🎓',
@@ -20,12 +20,12 @@ test('normalizes numeric-string savings account fields from the API', () => {
   expect(account.interestRate).toBe(4.85);
 });
 
-test('normalizes numeric-string savings transaction amounts from the API', () => {
+test('defaults a missing savings transaction note to an empty string', () => {
   const transaction = normalizeSavingsTransaction({
     id: 7,
     accountId: 1,
     type: 'interest',
-    amount: '123,15' as unknown as number,
+    amount: 123.15,
     date: '2026-03-01',
     note: null as unknown as string,
   });

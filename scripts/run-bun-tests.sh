@@ -9,8 +9,8 @@ bun test packages/shared/test
 
 echo "==> Backend tests"
 cd "$REPO_ROOT/packages/backend"
-bun test src
+NODE_ENV=test bun test src
 
 echo "==> Frontend tests"
 cd "$REPO_ROOT"
-bun run --filter '@quro/frontend' test
+NODE_ENV=test bun run --filter '@quro/frontend' test

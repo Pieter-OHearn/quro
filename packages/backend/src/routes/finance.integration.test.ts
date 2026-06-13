@@ -921,13 +921,13 @@ describe('finance integration', () => {
     const patchMortgageTxnBody = await parseJson<
       ApiDataResponse<{
         type: string;
-        fixedYears: string | null;
+        fixedYears: number | null;
         note: string | null;
       }>
     >(patchMortgageTxnResponse, 200);
     expect(patchMortgageTxnBody.data).toMatchObject({
       type: 'rate_change',
-      fixedYears: '5.0',
+      fixedYears: 5,
       note: 'Refixed term',
     });
 

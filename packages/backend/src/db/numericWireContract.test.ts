@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const REPO_ROOT = join(import.meta.dir, '../../../../..');
+const REPO_ROOT = join(import.meta.dir, '../../../..');
 const schemaSource = readFileSync(join(import.meta.dir, 'schema.ts'), 'utf8');
 
 const FRONTEND_NORMALIZERS = [
