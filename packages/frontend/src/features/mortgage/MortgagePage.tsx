@@ -80,12 +80,13 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
     <div className="p-6 space-y-6">
       <MortgageModals
         showTxnModal={state.showTxnModal}
+        editingTxn={state.editingTxn}
         showMortgageModal={state.showMortgageModal}
         mortgage={mortgage}
         editingMortgage={state.editingMortgage}
         properties={state.properties}
         editingLinkedPropertyId={state.editingLinkedPropertyId}
-        onCloseTxnModal={() => state.setShowTxnModal(false)}
+        onCloseTxnModal={state.closeTxnModal}
         onCloseMortgageModal={state.closeMortgageModal}
         onSaveTxn={state.handleAddTxn}
         onSaveMortgage={state.handleSaveMortgage}
@@ -133,6 +134,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
         mortgage={mortgage}
         transactions={state.txns}
         onAdd={() => state.setShowTxnModal(true)}
+        onEdit={state.setEditingTxn}
         onDelete={state.handleDeleteTxn}
       />
       <MortgageTips mortgage={mortgage} fmt={state.fmt} overpaymentImpact={overpaymentImpact} />
