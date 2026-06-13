@@ -196,8 +196,8 @@ function toBudgetCategoryInsertValues(
     userId,
     name: payload.name,
     emoji: payload.emoji,
-    budgeted: payload.budgeted.toString(),
-    spent: payload.spent.toString(),
+    budgeted: payload.budgeted,
+    spent: payload.spent,
     color: payload.color,
     month: payload.month,
     year: payload.year,
@@ -210,8 +210,8 @@ function toBudgetCategoryUpdateValues(
   return {
     name: payload.name,
     emoji: payload.emoji,
-    budgeted: payload.budgeted?.toString(),
-    spent: payload.spent?.toString(),
+    budgeted: payload.budgeted,
+    spent: payload.spent,
     color: payload.color,
     month: payload.month,
     year: payload.year,
@@ -226,7 +226,7 @@ function toBudgetTransactionInsertValues(
     userId,
     categoryId: payload.categoryId,
     description: payload.description,
-    amount: payload.amount.toString(),
+    amount: payload.amount,
     date: payload.date,
     merchant: payload.merchant,
   };
@@ -238,7 +238,7 @@ function toBudgetTransactionUpdateValues(
   return {
     categoryId: payload.categoryId,
     description: payload.description,
-    amount: payload.amount?.toString(),
+    amount: payload.amount,
     date: payload.date,
     merchant: payload.merchant,
   };

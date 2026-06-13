@@ -31,7 +31,7 @@ const MCC_SOURCE = 'mcc';
 type BunqConnectionRow = typeof bunqConnections.$inferSelect;
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type BudgetCategoryTemplate = {
-  budgeted: string;
+  budgeted: number;
   emoji: string | null;
   color: string | null;
 };
@@ -177,7 +177,7 @@ async function findLatestCategoryTemplate(
       and(
         eq(budgetCategories.userId, userId),
         eq(budgetCategories.name, name),
-        gt(budgetCategories.budgeted, '0'),
+        gt(budgetCategories.budgeted, 0),
       ),
     )
     .orderBy(desc(budgetCategories.year), desc(budgetCategoryMonthIndex), desc(budgetCategories.id))
@@ -215,8 +215,8 @@ export async function findOrCreateCategoryByName(
       userId,
       name,
       emoji: template?.emoji ?? preset.emoji,
-      budgeted: template?.budgeted ?? '0',
-      spent: '0',
+      budgeted: template?.budgeted ?? 0,
+      spent: 0,
       color: template?.color ?? preset.color,
       month,
       year,
@@ -288,7 +288,7 @@ async function claimMatchingManualBudgetTransaction(
       and(
         eq(budgetTransactions.userId, userId),
         isNull(budgetTransactions.bunqTransactionId),
-        eq(budgetTransactions.amount, amount.toString()),
+        eq(budgetTransactions.amount, amount),
         eq(budgetTransactions.date, dateStr),
         eq(budgetTransactions.merchant, payment.counterpartyAlias.displayName || ''),
         eq(budgetTransactions.description, payment.description || ''),
@@ -360,7 +360,7 @@ async function importBudgetPayment(
         userId,
         categoryId,
         description: payment.description || '',
-        amount: amount.toString(),
+        amount,
         date: dateStr,
         merchant: payment.counterpartyAlias.displayName || '',
         bunqTransactionId,
@@ -382,7 +382,7 @@ async function importBudgetPayment(
     await tx
       .update(budgetCategories)
       .set({
-        spent: sql`${budgetCategories.spent} + ${amount.toString()}`,
+        spent: sql`${budgetCategories.spent} + ${amount}`,
       })
       .where(eq(budgetCategories.id, categoryId));
   });

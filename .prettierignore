@@ -20,3 +20,6 @@ package-lock.json
 pnpm-lock.yaml
 yarn.lock
 LICENSE.html
+
+# Drizzle-generated migration metadata (owned by drizzle-kit, not Prettier)
+packages/backend/src/db/migrations/meta

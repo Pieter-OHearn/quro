@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import type { Goal, GoalSourceType, GoalType, SavingsAccount } from '@quro/shared';
+import type { Goal, SavingsAccount } from '@quro/shared';
 import type { LucideIcon } from 'lucide-react';
 
 export type GoalStatus = 'complete' | 'on_track' | 'at_risk' | 'pending';
@@ -42,33 +42,6 @@ export type AddGoalModalProps = {
 
 export type CreateGoalInput = Omit<Goal, 'id'>;
 export type UpdateGoalInput = { id: number } & Partial<Omit<Goal, 'id'>>;
-
-export type ApiGoal = Omit<
-  Goal,
-  | 'type'
-  | 'sourceType'
-  | 'sourceId'
-  | 'currentAmount'
-  | 'targetAmount'
-  | 'year'
-  | 'monthlyContribution'
-  | 'monthlyTarget'
-  | 'monthsCompleted'
-  | 'totalMonths'
-> & {
-  type?: GoalType | string | null;
-  sourceType?: GoalSourceType | string | null;
-  sourceId?: number | string | null;
-  currentAmount: number | string;
-  targetAmount: number | string;
-  year?: number | string | null;
-  monthlyContribution: number | string;
-  monthlyTarget?: number | string | null;
-  monthsCompleted?: number | string | null;
-  totalMonths?: number | string | null;
-  startMonth?: string | null;
-  missedMonths?: string[] | null;
-};
 
 export type GoalStatsData = {
   total: number;

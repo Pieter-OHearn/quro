@@ -127,6 +127,13 @@
       "when": 1781269781667,
       "tag": "0017_fancy_riptide",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781300474175,
+      "tag": "0018_slow_carlie_cooper",
+      "breakpoints": true
     }
   ]
 }

@@ -10,13 +10,13 @@ const DEFAULT_DEMO_PASSWORD = 'password123';
 // the frontend's currency-rates gate doesn't block CI smoke tests.
 const SEED_RATE_PROVIDER = 'seed';
 const SEED_RATES = [
-  { fromCurrency: 'GBP' as const, toCurrency: 'EUR' as const, rate: '1.18' },
-  { fromCurrency: 'USD' as const, toCurrency: 'EUR' as const, rate: '0.92' },
-  { fromCurrency: 'AUD' as const, toCurrency: 'EUR' as const, rate: '0.58' },
-  { fromCurrency: 'NZD' as const, toCurrency: 'EUR' as const, rate: '0.53' },
-  { fromCurrency: 'CAD' as const, toCurrency: 'EUR' as const, rate: '0.67' },
-  { fromCurrency: 'CHF' as const, toCurrency: 'EUR' as const, rate: '1.04' },
-  { fromCurrency: 'SGD' as const, toCurrency: 'EUR' as const, rate: '0.68' },
+  { fromCurrency: 'GBP' as const, toCurrency: 'EUR' as const, rate: 1.18 },
+  { fromCurrency: 'USD' as const, toCurrency: 'EUR' as const, rate: 0.92 },
+  { fromCurrency: 'AUD' as const, toCurrency: 'EUR' as const, rate: 0.58 },
+  { fromCurrency: 'NZD' as const, toCurrency: 'EUR' as const, rate: 0.53 },
+  { fromCurrency: 'CAD' as const, toCurrency: 'EUR' as const, rate: 0.67 },
+  { fromCurrency: 'CHF' as const, toCurrency: 'EUR' as const, rate: 1.04 },
+  { fromCurrency: 'SGD' as const, toCurrency: 'EUR' as const, rate: 0.68 },
 ];
 
 async function ensureCurrencyRates(db: ReturnType<typeof createDb>['db']): Promise<void> {

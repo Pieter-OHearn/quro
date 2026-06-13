@@ -43,7 +43,7 @@ export type CurrentCurrencyRateRow = {
   id: number;
   fromCurrency: CurrencyCode;
   toCurrency: CurrencyCode;
-  rate: string;
+  rate: number;
   provider: string;
   sourceDate: string;
   updatedAt: Date;
@@ -183,7 +183,7 @@ export async function syncCurrencyRates(
         result.rates.map((rate) => ({
           fromCurrency: rate.fromCurrency,
           toCurrency: rate.toCurrency,
-          rate: String(rate.rate),
+          rate: rate.rate,
           provider: rate.provider,
           sourceDate: rate.sourceDate,
           updatedAt: syncedAt,

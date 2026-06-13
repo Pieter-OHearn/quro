@@ -125,9 +125,9 @@ async function createLocalSavingsAccount(
       userId,
       name: account.description || 'Bunq Savings',
       bank: 'Bunq',
-      balance: account.balance.value,
+      balance: Number(account.balance.value),
       currency,
-      interestRate: '0',
+      interestRate: 0,
       accountType: 'Easy Access',
       color: DEFAULT_BUNQ_COLOR,
       emoji: DEFAULT_BUNQ_EMOJI,
@@ -145,7 +145,7 @@ async function updateLocalSavingsAccount(
   await db
     .update(savingsAccounts)
     .set({
-      balance: account.balance.value,
+      balance: Number(account.balance.value),
     })
     .where(and(eq(savingsAccounts.id, localId), eq(savingsAccounts.userId, userId)));
 }
@@ -190,7 +190,7 @@ async function importPayment(
       userId,
       accountId: localAccountId,
       type,
-      amount: absoluteAmount.toString(),
+      amount: absoluteAmount,
       date: toTransactionDate(payment.created),
       note: payment.description || null,
       bunqTransactionId,

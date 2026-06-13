@@ -921,13 +921,13 @@ describe('finance integration', () => {
     const patchMortgageTxnBody = await parseJson<
       ApiDataResponse<{
         type: string;
-        fixedYears: string | null;
+        fixedYears: number | null;
         note: string | null;
       }>
     >(patchMortgageTxnResponse, 200);
     expect(patchMortgageTxnBody.data).toMatchObject({
       type: 'rate_change',
-      fixedYears: '5.0',
+      fixedYears: 5,
       note: 'Refixed term',
     });
 
@@ -1529,12 +1529,12 @@ describe('finance integration', () => {
         importId: importRecord.id,
         rowOrder: 0,
         type: 'fee',
-        amount: '15',
-        taxAmount: '0',
+        amount: 15,
+        taxAmount: 0,
         date: '2026-03-10',
         note: '',
         isEmployer: null,
-        confidence: '0.9',
+        confidence: 0.9,
         confidenceLabel: 'high',
         evidence: [],
         isDerived: false,

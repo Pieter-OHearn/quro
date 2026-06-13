@@ -32,20 +32,10 @@ export type PayslipFormState = {
 
 export type PayslipFieldErrorMap = Record<string, string>;
 
-export type ApiPayslip = Omit<
-  Payslip,
-  'gross' | 'tax' | 'pension' | 'net' | 'bonus' | 'document'
-> & {
-  gross: number | string;
-  tax: number | string;
-  pension: number | string;
-  net: number | string;
-  bonus: number | string | null;
+export type ApiPayslip = Omit<Payslip, 'document'> & {
   document?: ApiPdfDocument | null;
 };
 
-export type ApiSalaryHistory = Omit<SalaryHistory, 'annualSalary'> & {
-  annualSalary: number | string;
-};
+export type ApiSalaryHistory = SalaryHistory;
 
 export type SavePayslipInput = Omit<Payslip, 'id' | 'document'>;
