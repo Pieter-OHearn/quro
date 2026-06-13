@@ -358,6 +358,7 @@ export const properties = pgTable(
     currency: currencyCodeEnum('currency').notNull(),
     emoji: text('emoji'),
     isJoint: boolean('is_joint').notNull().default(false),
+    archivedAt: timestamp('archived_at'),
   },
   (table) => ({
     userIdx: index('properties_user_id_idx').on(table.userId),

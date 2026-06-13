@@ -68,7 +68,12 @@ function buildPayload(form: MortgageFormState, existing?: MortgageType): Mortgag
     termYears: n(form.termYears),
     startDate: form.startDate.trim() || 'N/A',
     endDate: form.endDate.trim() || 'N/A',
-    overpaymentLimit: n(form.overpaymentLimit) || DEFAULT_OVERPAYMENT_LIMIT_PERCENT,
+    // An explicit 0 means "no overpayment allowance"; only a blank field falls
+    // back to the default.
+    overpaymentLimit:
+      form.overpaymentLimit.trim() === ''
+        ? DEFAULT_OVERPAYMENT_LIMIT_PERCENT
+        : n(form.overpaymentLimit),
     isJoint: form.isJoint,
     ...(existing ? { id: existing.id } : {}),
   };

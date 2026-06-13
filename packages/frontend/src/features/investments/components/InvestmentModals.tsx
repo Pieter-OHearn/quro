@@ -95,6 +95,7 @@ function PropertyModals({
   mortgageById,
   onCloseUpdateProperty,
   onSaveUpdateProperty,
+  onDeleteProperty,
   onCloseAddProperty,
   onSaveAddProperty,
   onCloseAddPropertyTxn,
@@ -114,6 +115,7 @@ function PropertyModals({
           mortgageBalance={getPropertyMortgageBalance(updatingProperty, mortgageById)}
           onClose={onCloseUpdateProperty}
           onSave={onSaveUpdateProperty}
+          onDelete={onDeleteProperty}
         />
       )}
       {showAddProperty && (

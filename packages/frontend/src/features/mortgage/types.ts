@@ -73,6 +73,7 @@ export type MortgagePageState = {
   handleAddTxn: (transaction: Omit<MortgageTransaction, 'id'>) => void;
   handleSaveMortgage: (payload: MortgageFormPayload) => Promise<void>;
   handleDeleteTxn: (id: number) => void;
+  handleDeleteMortgage: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   closeMortgageModal: () => void;
   isLoading: boolean;
 };

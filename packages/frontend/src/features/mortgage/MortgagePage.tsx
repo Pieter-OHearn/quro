@@ -1,4 +1,5 @@
 import { Home } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import type { Mortgage as MortgageType } from '@quro/shared';
 import { EmptyState, LoadingState } from '@/components/ui';
 import {
@@ -22,6 +23,9 @@ type MortgageEmptyStateProps = {
 };
 
 function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
+  const navigate = useNavigate();
+  const hasProperties = state.properties.length > 0;
+
   return (
     <div className="p-6">
       {state.showMortgageModal && (
@@ -36,10 +40,16 @@ function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
         <EmptyState
           icon={Home}
           title="No mortgages yet"
-          description="Add a property first, then create a mortgage linked to that property."
+          description={
+            hasProperties
+              ? 'Create a mortgage linked to one of your properties.'
+              : 'Add a property first, then create a mortgage linked to that property.'
+          }
           action={{
-            label: state.properties.length === 0 ? 'Add Property First' : 'Set Up Mortgage',
-            onClick: () => state.setShowMortgageModal(true),
+            label: hasProperties ? 'Set Up Mortgage' : 'Add Property First',
+            onClick: hasProperties
+              ? () => state.setShowMortgageModal(true)
+              : () => navigate('/investments'),
           }}
         />
       </div>
@@ -79,6 +89,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
         onCloseMortgageModal={state.closeMortgageModal}
         onSaveTxn={state.handleAddTxn}
         onSaveMortgage={state.handleSaveMortgage}
+        onDeleteMortgage={state.handleDeleteMortgage}
       />
       <MortgageTabSelector
         mortgages={state.mortgages}

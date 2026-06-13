@@ -11,6 +11,11 @@ import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
+  applyPrincipalToBalance,
+  restorePrincipalToBalance,
+  validatePrincipalAgainstBalance,
+} from '../lib/balance';
+import {
   err,
   isRecord,
   ok,
@@ -246,7 +251,15 @@ async function fetchLinkedProperty(
     );
   if (!property) return { ok: false, error: 'Property not found', status: 404 };
   if (property.mortgageId != null && property.mortgageId !== mortgageId) {
-    return { ok: false, error: 'Property already has a linked mortgage', status: 409 };
+    // An archived mortgage no longer "occupies" the property — allow
+    // re-linking (e.g. remortgaging) by repointing the property.
+    const [linked] = await db
+      .select({ archivedAt: mortgages.archivedAt })
+      .from(mortgages)
+      .where(eq(mortgages.id, property.mortgageId));
+    if (linked && linked.archivedAt == null) {
+      return { ok: false, error: 'Property already has a linked mortgage', status: 409 };
+    }
   }
   return { ok: true, property };
 }
@@ -271,12 +284,93 @@ async function resolveLinkedProperty(
   return { ok: true, nextId, property: result.property };
 }
 
-async function getAccessibleMortgage(userId: number, partnerId: number | null, mortgageId: number) {
-  const [mortgage] = await db
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbExecutor = typeof db | DbTransaction;
+
+const ISO_DATE_PART_LENGTH = 10;
+
+async function getAccessibleMortgage(
+  userId: number,
+  partnerId: number | null,
+  mortgageId: number,
+  executor: DbExecutor = db,
+) {
+  const [mortgage] = await executor
     .select()
     .from(mortgages)
     .where(and(eq(mortgages.id, mortgageId), ownedOrJointPredicate(mortgages, userId, partnerId)));
   return mortgage ?? null;
+}
+
+// The mortgage is the source of truth for its balance; keep the linked
+// property's denormalized snapshot in step so the dashboard and property
+// cards stay consistent.
+async function syncPropertyMortgageSnapshot(
+  executor: DbExecutor,
+  mortgageId: number,
+  outstandingBalance: number,
+): Promise<void> {
+  await executor
+    .update(properties)
+    .set({ mortgage: outstandingBalance })
+    .where(eq(properties.mortgageId, mortgageId));
+}
+
+function addYearsToIsoDate(isoDate: string, years: number): string {
+  const base = new Date(`${isoDate}T00:00:00Z`);
+  if (Number.isNaN(base.getTime())) return 'N/A';
+  base.setUTCFullYear(base.getUTCFullYear() + Math.round(years));
+  return base.toISOString().slice(0, ISO_DATE_PART_LENGTH);
+}
+
+// Apply a transaction's effect to the mortgage: a repayment reduces the
+// outstanding balance by its principal; a rate change updates the rate (and
+// re-derives the fixed-until date). Returns an error string for invalid input.
+async function applyMortgageTxnEffect(
+  tx: DbTransaction,
+  mortgage: typeof mortgages.$inferSelect,
+  payload: MortgageTransactionPayload,
+): Promise<string | null> {
+  if (payload.type === 'repayment') {
+    const principal = payload.principal ?? 0;
+    const validationError = validatePrincipalAgainstBalance(principal, mortgage.outstandingBalance);
+    if (validationError) return validationError;
+    const nextBalance = applyPrincipalToBalance(mortgage.outstandingBalance, principal);
+    await tx
+      .update(mortgages)
+      .set({ outstandingBalance: nextBalance })
+      .where(eq(mortgages.id, mortgage.id));
+    await syncPropertyMortgageSnapshot(tx, mortgage.id, nextBalance);
+    return null;
+  }
+  if (payload.type === 'rate_change') {
+    const fixedUntil =
+      payload.fixedYears != null
+        ? addYearsToIsoDate(payload.date, payload.fixedYears)
+        : mortgage.fixedUntil;
+    await tx
+      .update(mortgages)
+      .set({ interestRate: payload.amount, rateType: 'Fixed', fixedUntil })
+      .where(eq(mortgages.id, mortgage.id));
+    return null;
+  }
+  return null;
+}
+
+// Reverse a repayment's balance effect. Rate changes are not reversible (the
+// previous rate is not recorded), so they are intentionally left untouched.
+async function reverseMortgageTxnEffect(
+  tx: DbTransaction,
+  mortgage: typeof mortgages.$inferSelect,
+  txn: { type: string; principal: number | null },
+): Promise<void> {
+  if (txn.type !== 'repayment') return;
+  const nextBalance = restorePrincipalToBalance(mortgage.outstandingBalance, txn.principal ?? 0);
+  await tx
+    .update(mortgages)
+    .set({ outstandingBalance: nextBalance })
+    .where(eq(mortgages.id, mortgage.id));
+  await syncPropertyMortgageSnapshot(tx, mortgage.id, nextBalance);
 }
 
 async function readMortgagePatchPayload(
@@ -357,22 +451,23 @@ async function prepareMortgagePatch(params: {
 // Jointness propagates to the linked property to keep the pair's 50% dashboard
 // weighting consistent (equity = value - mortgage balance).
 async function syncLinkedProperty(
+  executor: DbExecutor,
   prevId: number | null,
   nextId: number | null,
   mortgageId: number,
-  balance: unknown,
+  balance: number,
   isJoint: boolean,
 ) {
   if (prevId != null && prevId !== nextId) {
-    await db
+    await executor
       .update(properties)
-      .set({ mortgageId: null, mortgage: 0 } as any)
+      .set({ mortgageId: null, mortgage: 0 })
       .where(eq(properties.id, prevId));
   }
   if (nextId != null) {
-    await db
+    await executor
       .update(properties)
-      .set({ mortgageId, mortgage: balance, isJoint } as any)
+      .set({ mortgageId, mortgage: balance, isJoint })
       .where(eq(properties.id, nextId));
   }
 }
@@ -667,22 +762,26 @@ app.post('/', async (c) => {
   const jointError = await assertJointAllowed(user.id, isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .insert(mortgages)
-    .values({
-      ...toMortgageValues({ ...body.value, isJoint }, property),
-      userId: user.id,
-    })
-    .returning();
+  const data = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(mortgages)
+      .values({
+        ...toMortgageValues({ ...body.value, isJoint }, property),
+        userId: user.id,
+      })
+      .returning();
 
-  await db
-    .update(properties)
-    .set({
-      mortgageId: data.id,
-      mortgage: body.value.outstandingBalance,
-      isJoint,
-    })
-    .where(eq(properties.id, property.id));
+    await tx
+      .update(properties)
+      .set({
+        mortgageId: created.id,
+        mortgage: body.value.outstandingBalance,
+        isJoint,
+      })
+      .where(eq(properties.id, property.id));
+
+    return created;
+  });
 
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -716,19 +815,23 @@ app.patch('/:id', async (c) => {
   const jointError = await assertJointAllowed(user.id, merged.value.isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .update(mortgages)
-    .set(toMortgageValues(merged.value, patchContext.value.property))
-    .where(eq(mortgages.id, id))
-    .returning();
+  const data = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(mortgages)
+      .set(toMortgageValues(merged.value, patchContext.value.property))
+      .where(eq(mortgages.id, id))
+      .returning();
 
-  await syncLinkedProperty(
-    patchContext.value.currentPropertyId,
-    patchContext.value.nextPropertyId,
-    id,
-    merged.value.outstandingBalance.toString(),
-    merged.value.isJoint,
-  );
+    await syncLinkedProperty(
+      tx,
+      patchContext.value.currentPropertyId,
+      patchContext.value.nextPropertyId,
+      id,
+      merged.value.outstandingBalance,
+      merged.value.isJoint,
+    );
+    return updated;
+  });
   return c.json({ data });
 });
 
@@ -743,28 +846,30 @@ app.delete('/:id', async (c) => {
     ownedOrJointPredicate(mortgages, user.id, partnerId),
   );
 
+  // Hard delete removes the mortgage and its repayment history, so the linked
+  // property is unlinked and becomes unencumbered.
   if (c.req.query('cascade') === 'true') {
-    const [data] = await db.delete(mortgages).where(accessPredicate).returning();
+    const data = await db.transaction(async (tx) => {
+      const [deleted] = await tx.delete(mortgages).where(accessPredicate).returning();
+      if (!deleted) return null;
+      await tx
+        .update(properties)
+        .set({ mortgageId: null, mortgage: 0 })
+        .where(eq(properties.mortgageId, id));
+      return deleted;
+    });
     if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-
-    await db
-      .update(properties)
-      .set({ mortgageId: null, mortgage: 0 } as any)
-      .where(eq(properties.mortgageId, id));
     return c.json({ data });
   }
 
+  // Archiving keeps the property link intact so unarchiving restores the
+  // balance; the dashboard treats an archived mortgage as a zero balance.
   const [data] = await db
     .update(mortgages)
     .set({ archivedAt: new Date() })
     .where(and(accessPredicate, isNull(mortgages.archivedAt)))
     .returning();
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-
-  await db
-    .update(properties)
-    .set({ mortgageId: null, mortgage: 0 } as any)
-    .where(eq(properties.mortgageId, id));
 
   return c.json({ data });
 });
@@ -775,6 +880,20 @@ app.post('/:id/unarchive', async (c) => {
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
   const partnerId = await getAcceptedPartnerId(user.id);
+  const mortgage = await getAccessibleMortgage(user.id, partnerId, id);
+  if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+
+  // While archived, the property may have been re-linked to another mortgage.
+  // Restoring this one would orphan it (a mortgage must stay linked to remain
+  // editable), so block and explain.
+  const stillLinked = await getCurrentLinkedPropertyId(id);
+  if (stillLinked == null) {
+    return c.json(
+      { error: 'The linked property now belongs to another mortgage; re-link it first' },
+      HTTP_STATUS.CONFLICT,
+    );
+  }
+
   const [data] = await db
     .update(mortgages)
     .set({ archivedAt: null })
@@ -809,14 +928,21 @@ app.post('/transactions', async (c) => {
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
   const partnerId = await getAcceptedPartnerId(user.id);
-  const mortgage = await getAccessibleMortgage(user.id, partnerId, body.value.mortgageId);
-  if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+  const result = await db.transaction(async (tx) => {
+    const mortgage = await getAccessibleMortgage(user.id, partnerId, body.value.mortgageId, tx);
+    if (!mortgage) return { error: 'Mortgage not found', status: HTTP_STATUS.NOT_FOUND } as const;
 
-  const [data] = await db
-    .insert(mortgageTransactions)
-    .values({ ...toMortgageTransactionValues(body.value), userId: mortgage.userId ?? user.id })
-    .returning();
-  return c.json({ data }, HTTP_STATUS.CREATED);
+    const effectError = await applyMortgageTxnEffect(tx, mortgage, body.value);
+    if (effectError) return { error: effectError, status: HTTP_STATUS.BAD_REQUEST } as const;
+
+    const [created] = await tx
+      .insert(mortgageTransactions)
+      .values({ ...toMortgageTransactionValues(body.value), userId: mortgage.userId ?? user.id })
+      .returning();
+    return { data: created } as const;
+  });
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/transactions/:id', async (c) => {
@@ -846,15 +972,27 @@ app.patch('/transactions/:id', async (c) => {
   const merged = mergeMortgageTransactionPayload(body.value, existing);
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const mortgage = await getAccessibleMortgage(user.id, partnerId, merged.value.mortgageId);
-  if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+  const result = await db.transaction(async (tx) => {
+    // Undo the old transaction's balance effect, then apply the edited one
+    // against the freshly-restored balance.
+    const oldMortgage = await getAccessibleMortgage(user.id, partnerId, existing.mortgageId, tx);
+    if (oldMortgage) await reverseMortgageTxnEffect(tx, oldMortgage, existing);
 
-  const [data] = await db
-    .update(mortgageTransactions)
-    .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
-    .where(eq(mortgageTransactions.id, id))
-    .returning();
-  return c.json({ data });
+    const mortgage = await getAccessibleMortgage(user.id, partnerId, merged.value.mortgageId, tx);
+    if (!mortgage) return { error: 'Mortgage not found', status: HTTP_STATUS.NOT_FOUND } as const;
+
+    const effectError = await applyMortgageTxnEffect(tx, mortgage, merged.value);
+    if (effectError) return { error: effectError, status: HTTP_STATUS.BAD_REQUEST } as const;
+
+    const [updated] = await tx
+      .update(mortgageTransactions)
+      .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
+      .where(eq(mortgageTransactions.id, id))
+      .returning();
+    return { data: updated } as const;
+  });
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data });
 });
 
 app.delete('/transactions/:id', async (c) => {
@@ -863,7 +1001,7 @@ app.delete('/transactions/:id', async (c) => {
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const partnerId = await getAcceptedPartnerId(user.id);
   const [existing] = await db
-    .select({ id: mortgageTransactions.id })
+    .select(getTableColumns(mortgageTransactions))
     .from(mortgageTransactions)
     .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
     .where(
@@ -871,10 +1009,17 @@ app.delete('/transactions/:id', async (c) => {
     );
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db
-    .delete(mortgageTransactions)
-    .where(eq(mortgageTransactions.id, id))
-    .returning();
+  const data = await db.transaction(async (tx) => {
+    // Restore the balance this repayment had reduced before removing it.
+    const mortgage = await getAccessibleMortgage(user.id, partnerId, existing.mortgageId, tx);
+    if (mortgage) await reverseMortgageTxnEffect(tx, mortgage, existing);
+
+    const [deleted] = await tx
+      .delete(mortgageTransactions)
+      .where(eq(mortgageTransactions.id, id))
+      .returning();
+    return deleted ?? null;
+  });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });

@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import { useCreateMortgage } from './useCreateMortgage';
 import { useCreateMortgageTransaction } from './useCreateMortgageTransaction';
+import { useDeleteMortgage, type DeleteMortgageMode } from './useDeleteMortgage';
 import { useDeleteMortgageTransaction } from './useDeleteMortgageTransaction';
 import { useMortgageModals } from './useMortgageModals';
 import { useMortgages } from './useMortgages';
@@ -37,6 +38,7 @@ export function useMortgagePageState(): MortgagePageState {
   const updateMortgageMut = useUpdateMortgage();
   const createTxn = useCreateMortgageTransaction();
   const deleteTxnMut = useDeleteMortgageTransaction();
+  const deleteMortgageMut = useDeleteMortgage();
 
   const modals = useMortgageModals();
   const linkedPropertyByMortgageId = useMemo(
@@ -51,6 +53,12 @@ export function useMortgagePageState(): MortgagePageState {
   const handleAddTxn = (transaction: Omit<MortgageTransaction, 'id'>) =>
     createTxn.mutate(transaction);
   const handleDeleteTxn = (id: number) => deleteTxnMut.mutate(id);
+  const handleDeleteMortgage = (id: number, mode: DeleteMortgageMode = 'preserveTransactions') => {
+    deleteMortgageMut.mutate({ id, mode });
+    modals.setEditingMortgage(null);
+    modals.setShowMortgageModal(false);
+    setActiveMortgageId(null);
+  };
 
   async function handleSaveMortgage(payload: MortgageFormPayload) {
     const { id, ...body } = payload;
@@ -77,6 +85,7 @@ export function useMortgagePageState(): MortgagePageState {
     handleAddTxn,
     handleSaveMortgage,
     handleDeleteTxn,
+    handleDeleteMortgage,
     isLoading: [loadingMortgages, loadingProperties, loadingTxns].some(Boolean),
   };
 }

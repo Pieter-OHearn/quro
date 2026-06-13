@@ -280,6 +280,7 @@ export type Property = {
   emoji: string;
   isJoint: boolean;
   userId?: number;
+  archivedAt?: string | null;
 };
 
 export const PROPERTY_TRANSACTION_TYPES = [

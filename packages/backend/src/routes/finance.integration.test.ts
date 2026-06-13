@@ -978,6 +978,217 @@ describe('finance integration', () => {
     expect(Number(propertyTwoAfterDeleteBody.data.mortgage)).toBe(0);
   });
 
+  test('covers property archive, mortgage link lifecycle, and balance reconciliation', async () => {
+    const owner = await integration.signUp('property-lifecycle');
+
+    const propertyResponse = await integration.request('/api/investments/properties', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        address: '5 Lifecycle Lane',
+        propertyType: 'primary_home',
+        purchasePrice: 350000,
+        currentValue: 400000,
+        monthlyRent: 0,
+        currency: 'EUR',
+        emoji: 'L',
+      },
+    });
+    const property = (await parseJson<ApiDataResponse<{ id: number }>>(propertyResponse, 201)).data;
+
+    const mortgageResponse = await integration.request('/api/mortgages', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        linkedPropertyId: property.id,
+        lender: 'ABN',
+        originalAmount: 320000,
+        outstandingBalance: 300000,
+        propertyValue: 400000,
+        monthlyPayment: 1400,
+        interestRate: 2.1,
+        rateType: 'fixed',
+        fixedUntil: '2030-01-01',
+        termYears: 25,
+        startDate: '2022-01-01',
+        endDate: '2047-01-01',
+        overpaymentLimit: 10,
+      },
+    });
+    const mortgage = (await parseJson<ApiDataResponse<{ id: number }>>(mortgageResponse, 201)).data;
+
+    const readProperty = async () =>
+      (
+        await parseJson<ApiDataResponse<{ mortgageId: number | null; mortgage: string }>>(
+          await integration.request(`/api/investments/properties/${property.id}`, {
+            cookie: owner.cookie,
+          }),
+          200,
+        )
+      ).data;
+    const readMortgage = async () =>
+      (
+        await parseJson<ApiDataResponse<{ outstandingBalance: string; archivedAt: string | null }>>(
+          await integration.request(`/api/mortgages/${mortgage.id}`, { cookie: owner.cookie }),
+          200,
+        )
+      ).data;
+
+    // Hard-deleting a property with an active linked mortgage is refused.
+    const blockedDeleteResponse = await integration.request(
+      `/api/investments/properties/${property.id}?cascade=true`,
+      { method: 'DELETE', cookie: owner.cookie },
+    );
+    expect(blockedDeleteResponse.status).toBe(409);
+
+    // A repayment reduces the mortgage balance and the property's snapshot.
+    const repaymentResponse = await integration.request('/api/mortgages/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        mortgageId: mortgage.id,
+        type: 'repayment',
+        amount: 1400,
+        interest: 400,
+        principal: 1000,
+        date: '2026-02-01',
+      },
+    });
+    const repayment = (await parseJson<ApiDataResponse<{ id: number }>>(repaymentResponse, 201))
+      .data;
+    expect(Number((await readMortgage()).outstandingBalance)).toBe(299000);
+    expect(Number((await readProperty()).mortgage)).toBe(299000);
+
+    // Removing the repayment restores both balances.
+    await integration.request(`/api/mortgages/transactions/${repayment.id}`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect(Number((await readMortgage()).outstandingBalance)).toBe(300000);
+    expect(Number((await readProperty()).mortgage)).toBe(300000);
+
+    // A repayment whose principal exceeds the balance is rejected.
+    const overpayResponse = await integration.request('/api/mortgages/transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        mortgageId: mortgage.id,
+        type: 'repayment',
+        amount: 400000,
+        interest: 0,
+        principal: 400000,
+        date: '2026-02-02',
+      },
+    });
+    expect(overpayResponse.status).toBe(400);
+
+    // Archiving the mortgage keeps the property link intact (the regression
+    // that previously orphaned the mortgage), and unarchive restores it.
+    await integration.request(`/api/mortgages/${mortgage.id}`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect((await readProperty()).mortgageId).toBe(mortgage.id);
+    const activeMortgages = (
+      await parseJson<ApiDataResponse<Array<{ id: number }>>>(
+        await integration.request('/api/mortgages', { cookie: owner.cookie }),
+        200,
+      )
+    ).data;
+    expect(activeMortgages.map((m) => m.id)).not.toContain(mortgage.id);
+
+    const unarchiveResponse = await integration.request(`/api/mortgages/${mortgage.id}/unarchive`, {
+      method: 'POST',
+      cookie: owner.cookie,
+    });
+    await parseJson<ApiDataResponse<{ id: number }>>(unarchiveResponse, 200);
+    expect((await readMortgage()).archivedAt).toBeNull();
+    expect(Number((await readMortgage()).outstandingBalance)).toBe(300000);
+
+    // Archiving a property hides it from the default list but keeps it under
+    // includeArchived, and unarchive brings it back.
+    await integration.request(`/api/investments/properties/${property.id}`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    const defaultList = (
+      await parseJson<ApiDataResponse<Array<{ id: number }>>>(
+        await integration.request('/api/investments/properties', { cookie: owner.cookie }),
+        200,
+      )
+    ).data;
+    expect(defaultList.map((p) => p.id)).not.toContain(property.id);
+    const archivedList = (
+      await parseJson<ApiDataResponse<Array<{ id: number }>>>(
+        await integration.request('/api/investments/properties?includeArchived=true', {
+          cookie: owner.cookie,
+        }),
+        200,
+      )
+    ).data;
+    expect(archivedList.map((p) => p.id)).toContain(property.id);
+
+    const unarchivePropertyResponse = await integration.request(
+      `/api/investments/properties/${property.id}/unarchive`,
+      { method: 'POST', cookie: owner.cookie },
+    );
+    await parseJson<ApiDataResponse<{ id: number }>>(unarchivePropertyResponse, 200);
+  });
+
+  test('covers property repayment balance reconciliation without a linked mortgage', async () => {
+    const owner = await integration.signUp('property-repayment');
+
+    const propertyResponse = await integration.request('/api/investments/properties', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        address: '8 Manual Mortgage Way',
+        propertyType: 'Buy-to-Let',
+        purchasePrice: 200000,
+        currentValue: 240000,
+        mortgage: 50000,
+        monthlyRent: 1200,
+        currency: 'EUR',
+        emoji: 'M',
+      },
+    });
+    const property = (await parseJson<ApiDataResponse<{ id: number }>>(propertyResponse, 201)).data;
+
+    const repaymentResponse = await integration.request('/api/investments/property-transactions', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        propertyId: property.id,
+        type: 'repayment',
+        amount: 12000,
+        interest: 2000,
+        principal: 10000,
+        date: '2026-03-01',
+      },
+    });
+    const repayment = (await parseJson<ApiDataResponse<{ id: number }>>(repaymentResponse, 201))
+      .data;
+
+    const readMortgageBalance = async () =>
+      Number(
+        (
+          await parseJson<ApiDataResponse<{ mortgage: string }>>(
+            await integration.request(`/api/investments/properties/${property.id}`, {
+              cookie: owner.cookie,
+            }),
+            200,
+          )
+        ).data.mortgage,
+      );
+    expect(await readMortgageBalance()).toBe(40000);
+
+    await integration.request(`/api/investments/property-transactions/${repayment.id}`, {
+      method: 'DELETE',
+      cookie: owner.cookie,
+    });
+    expect(await readMortgageBalance()).toBe(50000);
+  });
+
   test('covers pension pot and transaction CRUD with balance reconciliation and ownership checks', async () => {
     const owner = await integration.signUp('pension-owner');
     const stranger = await integration.signUp('pension-stranger');

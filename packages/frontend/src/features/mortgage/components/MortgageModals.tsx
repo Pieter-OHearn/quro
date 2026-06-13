@@ -1,5 +1,6 @@
 import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
 import type { MortgageFormPayload } from '../types';
+import type { DeleteMortgageMode } from '../hooks/useDeleteMortgage';
 import { AddMortgageModal } from './AddMortgageModal';
 import { AddMortgageTxnModal } from './AddMortgageTxnModal';
 
@@ -14,6 +15,7 @@ type MortgageModalsProps = {
   onCloseMortgageModal: () => void;
   onSaveTxn: (t: Omit<MortgageTransaction, 'id'>) => void;
   onSaveMortgage: (payload: MortgageFormPayload) => Promise<void>;
+  onDeleteMortgage: (id: number, mode?: DeleteMortgageMode) => void;
 };
 
 export function MortgageModals({
@@ -27,6 +29,7 @@ export function MortgageModals({
   onCloseMortgageModal,
   onSaveTxn,
   onSaveMortgage,
+  onDeleteMortgage,
 }: Readonly<MortgageModalsProps>) {
   return (
     <>
@@ -40,6 +43,7 @@ export function MortgageModals({
           linkedPropertyId={editingLinkedPropertyId}
           onClose={onCloseMortgageModal}
           onSave={onSaveMortgage}
+          onDelete={onDeleteMortgage}
         />
       )}
     </>

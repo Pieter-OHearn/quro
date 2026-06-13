@@ -1,8 +1,11 @@
-import { Modal, ModalFooter } from '@/components/ui';
-import { CURRENCY_CODES, useCurrency, type CurrencyCode } from '@/lib/CurrencyContext';
+import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { ArchiveOrDeleteDialog, Modal, ModalFooter } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { formatNumber, type Mortgage as MortgageType, type Property } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
 import { useAddMortgageForm } from '../hooks';
+import type { DeleteMortgageMode } from '../hooks/useDeleteMortgage';
 import type { MortgageFormPayload, MortgageFormState } from '../types';
 
 export type { MortgageFormPayload } from '../types';
@@ -13,6 +16,7 @@ type AddMortgageModalProps = {
   linkedPropertyId: number | null;
   onClose: () => void;
   onSave: (mortgage: MortgageFormPayload) => Promise<void> | void;
+  onDelete?: (id: number, mode?: DeleteMortgageMode) => void;
 };
 
 const RATE_TYPES = ['Fixed', 'Variable', 'Tracker', 'Offset'];
@@ -46,17 +50,12 @@ function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
       </div>
       <div>
         <label className="block text-xs font-semibold text-slate-600 mb-1.5">Currency</label>
-        <select
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        <input
+          disabled
+          readOnly
+          className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
           value={form.currency}
-          onChange={(e) => setField('currency', e.target.value as CurrencyCode)}
-        >
-          {CURRENCY_CODES.map((currency) => (
-            <option key={currency} value={currency}>
-              {currency}
-            </option>
-          ))}
-        </select>
+        />
       </div>
     </div>
   );
@@ -71,17 +70,16 @@ function PropertySection({ form, errors, setField }: PropertySectionProps) {
       <div className="space-y-3">
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Property Address <span className="text-rose-500">*</span>
+            Property Address
           </label>
           <input
-            className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.propertyAddress ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-            placeholder="e.g. Prinsengracht 42, Amsterdam"
+            disabled
+            readOnly
+            className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+            placeholder="Select a property below"
             value={form.propertyAddress}
-            onChange={(e) => setField('propertyAddress', e.target.value)}
           />
-          {errors.propertyAddress && (
-            <p className="text-xs text-rose-500 mt-1">{errors.propertyAddress}</p>
-          )}
+          <p className="text-[10px] text-slate-400 mt-1">Taken from the linked property.</p>
         </div>
         <LenderCurrencyGrid form={form} errors={errors} setField={setField} />
       </div>
@@ -152,10 +150,22 @@ type LoanFinancialField =
   | 'monthlyPayment';
 
 function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSectionProps) {
-  const fields: Array<{ field: LoanFinancialField; label: string; placeholder: string }> = [
+  // Property value is derived from the linked property, so it is shown
+  // read-only here — editing it would be discarded on save.
+  const fields: Array<{
+    field: LoanFinancialField;
+    label: string;
+    placeholder: string;
+    readOnly?: boolean;
+  }> = [
     { field: 'originalAmount', label: 'Original Loan Amount', placeholder: '240000' },
     { field: 'outstandingBalance', label: 'Outstanding Balance', placeholder: '218600' },
-    { field: 'propertyValue', label: 'Current Property Value', placeholder: '362000' },
+    {
+      field: 'propertyValue',
+      label: 'Current Property Value',
+      placeholder: 'From linked property',
+      readOnly: true,
+    },
     { field: 'monthlyPayment', label: 'Monthly Payment', placeholder: '1280' },
   ];
   return (
@@ -164,10 +174,10 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
         Loan Financials
       </p>
       <div className="grid grid-cols-2 gap-3">
-        {fields.map(({ field, label, placeholder }) => (
+        {fields.map(({ field, label, placeholder, readOnly }) => (
           <div key={field}>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              {label} <span className="text-rose-500">*</span>
+              {label} {!readOnly && <span className="text-rose-500">*</span>}
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
@@ -177,13 +187,23 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
                 type="number"
                 inputMode="decimal"
                 step="0.01"
-                className={`w-full rounded-xl border pl-12 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors[field] ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+                disabled={readOnly}
+                readOnly={readOnly}
+                className={`w-full rounded-xl border pl-12 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                  readOnly
+                    ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
+                    : errors[field]
+                      ? 'border-rose-300 bg-rose-50'
+                      : 'border-slate-200 bg-slate-50'
+                }`}
                 placeholder={placeholder}
                 value={form[field]}
-                onChange={(e) => setField(field, e.target.value)}
+                onChange={readOnly ? undefined : (e) => setField(field, e.target.value)}
               />
             </div>
-            {errors[field] && <p className="text-xs text-rose-500 mt-1">{errors[field]}</p>}
+            {!readOnly && errors[field] && (
+              <p className="text-xs text-rose-500 mt-1">{errors[field]}</p>
+            )}
           </div>
         ))}
       </div>
@@ -411,15 +431,54 @@ function MortgageFormBody({
   );
 }
 
-export function AddMortgageModal(props: AddMortgageModalProps) {
-  const { existing, properties, linkedPropertyId, onClose, onSave } = props;
-  const { form, errors, saving, setField, handleSave } = useAddMortgageForm({
-    existing,
-    properties,
-    linkedPropertyId,
-    onClose,
-    onSave,
-  });
+function buildMortgageDeleteButton(
+  existing: MortgageType | undefined,
+  onDelete: AddMortgageModalProps['onDelete'],
+  onRequestConfirm: () => void,
+): React.ReactNode {
+  if (!existing || !onDelete) return undefined;
+  return (
+    <button
+      onClick={onRequestConfirm}
+      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
+      title="Remove mortgage"
+    >
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
+function MortgageDeleteDialog({
+  existing,
+  onDelete,
+  onCancel,
+}: Readonly<{
+  existing: MortgageType;
+  onDelete: NonNullable<AddMortgageModalProps['onDelete']>;
+  onCancel: () => void;
+}>) {
+  return (
+    <ArchiveOrDeleteDialog
+      entityLabel="Mortgage"
+      entityName={existing.propertyAddress}
+      balance={existing.outstandingBalance}
+      balanceCurrency={existing.currency}
+      balanceLabel="outstanding balance"
+      childrenLabel="repayment history"
+      onArchive={() => onDelete(existing.id, 'preserveTransactions')}
+      onDelete={() => onDelete(existing.id, 'deleteTransactions')}
+      onCancel={onCancel}
+    />
+  );
+}
+
+function deriveMortgageModalState(
+  form: MortgageFormState,
+  properties: Property[],
+  linkedPropertyId: number | null,
+  existing: MortgageType | undefined,
+  saving: boolean,
+) {
   const linkedPropertyIdNum = form.linkedPropertyId
     ? Number.parseInt(form.linkedPropertyId, 10)
     : NaN;
@@ -434,6 +493,31 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
       ? ((n(form.outstandingBalance) / n(form.propertyValue)) * 100).toFixed(1)
       : null;
   const disableSave = saving || (!existing && availableProperties.length === 0);
+  return { selectedProperty, availableProperties, ltvPreview, disableSave };
+}
+
+export function AddMortgageModal(props: AddMortgageModalProps) {
+  const { existing, properties, linkedPropertyId, onClose, onSave, onDelete } = props;
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const { form, errors, saving, setField, handleSave } = useAddMortgageForm({
+    existing,
+    properties,
+    linkedPropertyId,
+    onClose,
+    onSave,
+  });
+  const { selectedProperty, availableProperties, ltvPreview, disableSave } =
+    deriveMortgageModalState(form, properties, linkedPropertyId, existing, saving);
+
+  if (confirmingDelete && existing && onDelete) {
+    return (
+      <MortgageDeleteDialog
+        existing={existing}
+        onDelete={onDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+    );
+  }
 
   return (
     <Modal
@@ -453,6 +537,7 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
           confirmLabel={existing ? 'Save Changes' : 'Add Mortgage'}
           disabled={disableSave}
           loading={saving}
+          danger={buildMortgageDeleteButton(existing, onDelete, () => setConfirmingDelete(true))}
         />
       }
     >

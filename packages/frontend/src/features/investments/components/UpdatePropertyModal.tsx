@@ -1,15 +1,18 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { Modal, ModalFooter, FormField, TextInput } from '@/components/ui';
+import { ArchiveOrDeleteDialog, Modal, ModalFooter, FormField, TextInput } from '@/components/ui';
 import { JointToggleField } from '@/features/partner';
 import { formatFixedInputValue } from '@/lib/utils';
 import type { Property } from '@quro/shared';
+import type { DeletePropertyMode } from '../hooks/useDeleteProperty';
 
 type UpdatePropertyModalProps = {
   property: Property;
   mortgageBalance: number;
   onClose: () => void;
   onSave: (id: number, value: number, rent: number, isJoint: boolean) => void;
+  onDelete?: (id: number, mode?: DeletePropertyMode) => void;
 };
 
 type PropertyStatsPreviewProps = {
@@ -117,16 +120,68 @@ function buildUpdateSaveHandler(
   };
 }
 
+function buildDeleteButton(
+  onDelete: UpdatePropertyModalProps['onDelete'],
+  onRequestConfirm: () => void,
+): React.ReactNode {
+  if (!onDelete) return undefined;
+  return (
+    <button
+      onClick={onRequestConfirm}
+      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
+      title="Remove property"
+    >
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
+function PropertyDeleteDialog({
+  property,
+  onDelete,
+  onCancel,
+}: Readonly<{
+  property: Property;
+  onDelete: NonNullable<UpdatePropertyModalProps['onDelete']>;
+  onCancel: () => void;
+}>) {
+  return (
+    <ArchiveOrDeleteDialog
+      entityLabel="Property"
+      entityName={property.address}
+      balance={property.currentValue}
+      balanceCurrency={property.currency}
+      balanceLabel="current value"
+      childrenLabel="transaction history"
+      onArchive={() => onDelete(property.id, 'preserveTransactions')}
+      onDelete={() => onDelete(property.id, 'deleteTransactions')}
+      onCancel={onCancel}
+    />
+  );
+}
+
 export function UpdatePropertyModal({
   property,
   mortgageBalance,
   onClose,
   onSave,
+  onDelete,
 }: UpdatePropertyModalProps) {
   const { fmtNative } = useCurrency();
   const form = useUpdatePropertyForm(property);
   const equity = form.numericValue - mortgageBalance;
   const handleSave = buildUpdateSaveHandler(form, property, onSave, onClose);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  if (confirmingDelete && onDelete) {
+    return (
+      <PropertyDeleteDialog
+        property={property}
+        onDelete={onDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+    );
+  }
 
   return (
     <Modal
@@ -134,7 +189,14 @@ export function UpdatePropertyModal({
       subtitle={property.address}
       onClose={onClose}
       maxWidth="sm"
-      footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Update" />}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={handleSave}
+          confirmLabel="Update"
+          danger={buildDeleteButton(onDelete, () => setConfirmingDelete(true))}
+        />
+      }
     >
       <FormField label={`Current Value (${property.currency})`} required error={form.errors.value}>
         <TextInput
