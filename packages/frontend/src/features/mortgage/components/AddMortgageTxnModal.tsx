@@ -2,14 +2,28 @@ import { Modal, ModalFooter, ModalHeader } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import { useMortgageTxnModal } from '../hooks';
-import type { MortgageTxnType } from '../types';
+import type { MortgageTxnType, SaveMortgageTxnInput } from '../types';
 import { MORTGAGE_TXN_TYPES, TXN_META } from '../utils/mortgage-meta';
 
 type AddMortgageTxnModalProps = {
   mortgage: MortgageType;
+  existing?: MortgageTransaction;
   onClose: () => void;
-  onSave: (t: Omit<MortgageTransaction, 'id'>) => void;
+  onSave: (t: SaveMortgageTxnInput) => void;
 };
+
+// When editing a repayment, the mortgage balance already reflects the old
+// transaction's principal. Add it back so the live preview reflects the balance
+// before the edited repayment is applied.
+function buildEffectiveMortgage(
+  mortgage: MortgageType,
+  existing?: MortgageTransaction,
+): MortgageType {
+  if (existing?.type !== 'repayment') return mortgage;
+  const existingPrincipal =
+    existing.principal ?? Math.max(0, existing.amount - (existing.interest ?? 0));
+  return { ...mortgage, outstandingBalance: mortgage.outstandingBalance + existingPrincipal };
+}
 
 // ─── Type Selector ────────────────────────────────────────────────────────────
 
@@ -483,14 +497,22 @@ function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function AddMortgageTxnModal({ mortgage, onClose, onSave }: AddMortgageTxnModalProps) {
+export function AddMortgageTxnModal({
+  mortgage,
+  existing,
+  onClose,
+  onSave,
+}: AddMortgageTxnModalProps) {
   const { fmtBase } = useCurrency();
   const fmt = (v: number) => fmtBase(v);
-  const state = useMortgageTxnModal({ mortgage, onSave, onClose });
+  const effectiveMortgage = buildEffectiveMortgage(mortgage, existing);
+  const state = useMortgageTxnModal({ mortgage: effectiveMortgage, existing, onSave, onClose });
+  const isEditing = Boolean(existing);
+  const title = isEditing ? 'Edit Transaction' : 'Record Transaction';
 
   return (
     <Modal
-      title="Record Transaction"
+      title={title}
       subtitle={`🏠 ${mortgage.propertyAddress}`}
       onClose={onClose}
       maxWidth="md"
@@ -498,15 +520,21 @@ export function AddMortgageTxnModal({ mortgage, onClose, onSave }: AddMortgageTx
       header={
         <ModalHeader
           onClose={onClose}
-          title="Record Transaction"
+          title={title}
           subtitle={`🏠 ${mortgage.propertyAddress}`}
           contentClassName="min-w-0"
           subtitleClassName="truncate max-w-[240px]"
         />
       }
-      footer={<ModalFooter onCancel={onClose} onConfirm={state.handleSave} confirmLabel="Record" />}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={state.handleSave}
+          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+        />
+      }
     >
-      <TxnModalFormBody state={state} mortgage={mortgage} fmt={fmt} />
+      <TxnModalFormBody state={state} mortgage={effectiveMortgage} fmt={fmt} />
     </Modal>
   );
 }

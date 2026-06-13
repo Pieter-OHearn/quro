@@ -8,3 +8,4 @@ export { useArchivedMortgages, useMortgages } from './useMortgages';
 export { useMortgageTransactions } from './useMortgageTransactions';
 export { useMortgageTxnModal } from './useMortgageTxnModal';
 export { useUpdateMortgage } from './useUpdateMortgage';
+export { useUpdateMortgageTransaction } from './useUpdateMortgageTransaction';

@@ -6,6 +6,7 @@ import type {
   CreateMortgagePayload,
   MortgageFormPayload,
   MortgagePageState,
+  SaveMortgageTxnInput,
   UpdateMortgagePayload,
 } from '../types';
 import { useCreateMortgage } from './useCreateMortgage';
@@ -16,6 +17,7 @@ import { useMortgageModals } from './useMortgageModals';
 import { useMortgages } from './useMortgages';
 import { useMortgageTransactions } from './useMortgageTransactions';
 import { useUpdateMortgage } from './useUpdateMortgage';
+import { useUpdateMortgageTransaction } from './useUpdateMortgageTransaction';
 
 function buildLinkedPropertyMap(properties: Property[]): Map<number, Property> {
   const map = new Map<number, Property>();
@@ -37,6 +39,7 @@ export function useMortgagePageState(): MortgagePageState {
   const createMortgageMut = useCreateMortgage();
   const updateMortgageMut = useUpdateMortgage();
   const createTxn = useCreateMortgageTransaction();
+  const updateTxn = useUpdateMortgageTransaction();
   const deleteTxnMut = useDeleteMortgageTransaction();
   const deleteMortgageMut = useDeleteMortgage();
 
@@ -50,8 +53,14 @@ export function useMortgagePageState(): MortgagePageState {
     ? (linkedPropertyByMortgageId.get(modals.editingMortgage.id)?.id ?? null)
     : null;
 
-  const handleAddTxn = (transaction: Omit<MortgageTransaction, 'id'>) =>
-    createTxn.mutate(transaction);
+  const handleAddTxn = (transaction: SaveMortgageTxnInput) => {
+    const { id, ...payload } = transaction;
+    if (typeof id === 'number') {
+      updateTxn.mutate({ id, ...payload } as MortgageTransaction);
+      return;
+    }
+    createTxn.mutate(payload);
+  };
   const handleDeleteTxn = (id: number) => deleteTxnMut.mutate(id);
   const handleDeleteMortgage = (id: number, mode: DeleteMortgageMode = 'preserveTransactions') => {
     deleteMortgageMut.mutate({ id, mode });

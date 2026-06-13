@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
-import type { MortgageTxnType } from '../types';
+import { formatFixedInputValue } from '@/lib/utils';
+import type { MortgageTxnType, SaveMortgageTxnInput } from '../types';
 
 type UseMortgageTxnModalParams = {
   mortgage: MortgageType;
-  onSave: (t: Omit<MortgageTransaction, 'id'>) => void;
+  existing?: MortgageTransaction;
+  onSave: (t: SaveMortgageTxnInput) => void;
   onClose: () => void;
 };
 
@@ -37,13 +39,37 @@ function computeFixedUntil(date: string, parsedFixedYears: number): string | nul
   return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 
-function useMortgageTxnFormState() {
-  const [type, setType] = useState<MortgageTxnType>('repayment');
-  const [amount, setAmount] = useState('');
-  const [interest, setInterest] = useState('');
-  const [fixedYears, setFixedYears] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, ISO_DATE_LENGTH));
-  const [note, setNote] = useState('');
+function emptyTxnFormValues() {
+  return {
+    type: 'repayment' as MortgageTxnType,
+    amount: '',
+    interest: '',
+    fixedYears: '',
+    date: new Date().toISOString().slice(0, ISO_DATE_LENGTH),
+    note: '',
+  };
+}
+
+function getInitialTxnFormValues(existing?: MortgageTransaction) {
+  if (!existing) return emptyTxnFormValues();
+  return {
+    type: existing.type,
+    amount: formatFixedInputValue(existing.amount),
+    interest: existing.interest != null ? formatFixedInputValue(existing.interest) : '',
+    fixedYears: existing.fixedYears != null ? String(existing.fixedYears) : '',
+    date: existing.date,
+    note: existing.note,
+  };
+}
+
+function useMortgageTxnFormState(existing?: MortgageTransaction) {
+  const initial = getInitialTxnFormValues(existing);
+  const [type, setType] = useState<MortgageTxnType>(initial.type);
+  const [amount, setAmount] = useState(initial.amount);
+  const [interest, setInterest] = useState(initial.interest);
+  const [fixedYears, setFixedYears] = useState(initial.fixedYears);
+  const [date, setDate] = useState(initial.date);
+  const [note, setNote] = useState(initial.note);
   const [error, setError] = useState('');
 
   return {
@@ -64,8 +90,13 @@ function useMortgageTxnFormState() {
   };
 }
 
-export function useMortgageTxnModal({ mortgage, onSave, onClose }: UseMortgageTxnModalParams) {
-  const formState = useMortgageTxnFormState();
+export function useMortgageTxnModal({
+  mortgage,
+  existing,
+  onSave,
+  onClose,
+}: UseMortgageTxnModalParams) {
+  const formState = useMortgageTxnFormState(existing);
   const { type, amount, interest, fixedYears, date, note } = formState;
   const { setType, setError, setAmount, setInterest, setFixedYears } = formState;
 
@@ -90,7 +121,7 @@ export function useMortgageTxnModal({ mortgage, onSave, onClose }: UseMortgageTx
       return;
     }
 
-    onSave({
+    const payload = {
       mortgageId: mortgage.id,
       type,
       amount: parsedAmount,
@@ -99,7 +130,8 @@ export function useMortgageTxnModal({ mortgage, onSave, onClose }: UseMortgageTx
       fixedYears: type === 'rate_change' ? parsedFixedYears : null,
       date,
       note,
-    });
+    };
+    onSave(existing ? { id: existing.id, ...payload } : payload);
     onClose();
   };
 

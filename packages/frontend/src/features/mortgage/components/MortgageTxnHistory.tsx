@@ -10,12 +10,14 @@ type MortgageTxnHistoryProps = {
   currency?: string;
   transactions: MortgageTransaction[];
   onAdd: () => void;
+  onEdit: (transaction: MortgageTransaction) => void;
   onDelete: (id: number) => void;
 };
 
 type MortgageTxnRowProps = {
   t: MortgageTransaction;
   fmt: (n: number) => string;
+  onEdit: (transaction: MortgageTransaction) => void;
   onDelete: (id: number) => void;
 };
 function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
@@ -51,7 +53,7 @@ function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
   );
 }
 
-function MortgageTxnRow({ t, fmt, onDelete }: MortgageTxnRowProps) {
+function MortgageTxnRow({ t, fmt, onEdit, onDelete }: MortgageTxnRowProps) {
   const m = TXN_META[t.type];
   return (
     <TxnRow
@@ -65,6 +67,7 @@ function MortgageTxnRow({ t, fmt, onDelete }: MortgageTxnRowProps) {
       date={t.date}
       dateClassName="text-xs text-slate-400"
       amount={<MortgageTxnAmount t={t} fmt={fmt} />}
+      onEdit={() => onEdit(t)}
       onDelete={() => onDelete(t.id)}
       className="rounded-none border-0 bg-transparent px-5 py-3 hover:bg-slate-50/60"
     />
@@ -94,6 +97,7 @@ export function MortgageTxnHistory({
   currency,
   transactions,
   onAdd,
+  onEdit,
   onDelete,
 }: MortgageTxnHistoryProps) {
   const { fmtBase } = useCurrency();
@@ -122,7 +126,7 @@ export function MortgageTxnHistory({
       isEmpty={sorted.length === 0}
     >
       {sorted.map((t) => (
-        <MortgageTxnRow key={t.id} t={t} fmt={fmt} onDelete={onDelete} />
+        <MortgageTxnRow key={t.id} t={t} fmt={fmt} onEdit={onEdit} onDelete={onDelete} />
       ))}
     </TxnHistoryPanel>
   );
