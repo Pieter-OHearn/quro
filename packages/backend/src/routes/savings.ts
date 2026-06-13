@@ -73,6 +73,7 @@ type SavingsTransactionPayload = {
 
 type SavingsAccountInsert = typeof savingsAccounts.$inferInsert;
 type SavingsTransactionInsert = typeof savingsTransactions.$inferInsert;
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function parseSavingsAccountTypeField(value: unknown): ParseResult<SavingsAccountType> {
   return typeof value === 'string' && SAVINGS_ACCOUNT_TYPES.includes(value as SavingsAccountType)
@@ -264,27 +265,31 @@ async function getAccessibleSavingsTransaction(
   return transaction ?? null;
 }
 
-async function syncSavingsBalancesForEditedTransaction(params: {
-  previousAccountId: number;
-  nextAccountId: number;
-  previousType: unknown;
-  nextType: unknown;
-  previousAmount: unknown;
-  nextAmount: unknown;
-}): Promise<void> {
+async function syncSavingsBalancesForEditedTransaction(
+  tx: DbTransaction,
+  params: {
+    previousAccountId: number;
+    nextAccountId: number;
+    previousType: unknown;
+    nextType: unknown;
+    previousAmount: unknown;
+    nextAmount: unknown;
+  },
+): Promise<void> {
   const oldSignedAmount = toSignedSavingsAmount(params.previousType, params.previousAmount);
   const newSignedAmount = toSignedSavingsAmount(params.nextType, params.nextAmount);
 
   if (params.nextAccountId === params.previousAccountId) {
     await updateSavingsAccountBalanceByDelta(
+      tx,
       params.previousAccountId,
       newSignedAmount - oldSignedAmount,
     );
     return;
   }
 
-  await updateSavingsAccountBalanceByDelta(params.previousAccountId, -oldSignedAmount);
-  await updateSavingsAccountBalanceByDelta(params.nextAccountId, newSignedAmount);
+  await updateSavingsAccountBalanceByDelta(tx, params.previousAccountId, -oldSignedAmount);
+  await updateSavingsAccountBalanceByDelta(tx, params.nextAccountId, newSignedAmount);
 }
 
 function resolveNextSavingsTransactionState(
@@ -516,15 +521,20 @@ app.post('/transactions', async (c) => {
     );
   }
 
-  const [data] = await db
-    .insert(savingsTransactions)
-    .values(toSavingsTransactionInsertValues(body.value, account.userId ?? user.id))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(savingsTransactions)
+      .values(toSavingsTransactionInsertValues(body.value, account.userId ?? user.id))
+      .returning();
 
-  await updateSavingsAccountBalanceByDelta(
-    body.value.accountId,
-    toSignedSavingsAmount(body.value.type, body.value.amount),
-  );
+    await updateSavingsAccountBalanceByDelta(
+      tx,
+      body.value.accountId,
+      toSignedSavingsAmount(body.value.type, body.value.amount),
+    );
+
+    return [inserted];
+  });
 
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -565,21 +575,27 @@ app.patch('/transactions/:id', async (c) => {
     updateValues.userId = nextAccount.nextAccountUserId;
   }
 
-  const [data] = await db
-    .update(savingsTransactions)
-    .set(updateValues)
-    .where(eq(savingsTransactions.id, id))
-    .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  const [data] = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(savingsTransactions)
+      .set(updateValues)
+      .where(eq(savingsTransactions.id, id))
+      .returning();
 
-  await syncSavingsBalancesForEditedTransaction({
-    previousAccountId: existing.accountId,
-    nextAccountId: nextState.accountId,
-    previousType: existing.type,
-    nextType: nextState.type,
-    previousAmount: existing.amount,
-    nextAmount: nextState.amount,
+    if (!updated) return [updated];
+
+    await syncSavingsBalancesForEditedTransaction(tx, {
+      previousAccountId: existing.accountId,
+      nextAccountId: nextState.accountId,
+      previousType: existing.type,
+      nextType: nextState.type,
+      previousAmount: existing.amount,
+      nextAmount: nextState.amount,
+    });
+
+    return [updated];
   });
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   return c.json({ data });
 });
@@ -593,16 +609,23 @@ app.delete('/transactions/:id', async (c) => {
   const editable = await getEditableSavingsTransaction(id, user.id, partnerId, 'delete');
   if (!editable.ok) return c.json({ error: editable.error }, editable.status);
 
-  const [data] = await db
-    .delete(savingsTransactions)
-    .where(eq(savingsTransactions.id, id))
-    .returning();
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  const [data] = await db.transaction(async (tx) => {
+    const [deleted] = await tx
+      .delete(savingsTransactions)
+      .where(eq(savingsTransactions.id, id))
+      .returning();
 
-  await updateSavingsAccountBalanceByDelta(
-    data.accountId,
-    -toSignedSavingsAmount(data.type, data.amount),
-  );
+    if (!deleted) return [deleted];
+
+    await updateSavingsAccountBalanceByDelta(
+      tx,
+      deleted.accountId,
+      -toSignedSavingsAmount(deleted.type, deleted.amount),
+    );
+
+    return [deleted];
+  });
+  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   return c.json({ data });
 });
