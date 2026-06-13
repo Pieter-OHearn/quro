@@ -27,6 +27,11 @@ import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
+  applyPrincipalToBalance,
+  restorePrincipalToBalance,
+  validatePrincipalAgainstBalance,
+} from '../lib/balance';
+import {
   err,
   isRecord,
   ok,
@@ -806,14 +811,93 @@ async function getOwnedHoldingTransaction(userId: number, transactionId: number)
   return transaction ?? null;
 }
 
-async function getAccessibleProperty(userId: number, partnerId: number | null, propertyId: number) {
-  const [property] = await db
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbExecutor = typeof db | DbTransaction;
+
+async function getAccessibleProperty(
+  userId: number,
+  partnerId: number | null,
+  propertyId: number,
+  executor: DbExecutor = db,
+) {
+  const [property] = await executor
     .select()
     .from(properties)
     .where(
       and(eq(properties.id, propertyId), ownedOrJointPredicate(properties, userId, partnerId)),
     );
   return property ?? null;
+}
+
+// A property repayment reduces the linked mortgage's outstanding balance (the
+// source of truth, with the property's snapshot kept in step). For properties
+// with no linked mortgage it reduces the property's own mortgage balance.
+async function applyPropertyRepaymentEffect(
+  tx: DbTransaction,
+  property: typeof properties.$inferSelect,
+  principal: number,
+): Promise<string | null> {
+  if (property.mortgageId != null) {
+    const [mortgage] = await tx
+      .select()
+      .from(mortgages)
+      .where(eq(mortgages.id, property.mortgageId));
+    if (mortgage) {
+      const validationError = validatePrincipalAgainstBalance(
+        principal,
+        mortgage.outstandingBalance,
+      );
+      if (validationError) return validationError;
+      const nextBalance = applyPrincipalToBalance(mortgage.outstandingBalance, principal);
+      await tx
+        .update(mortgages)
+        .set({ outstandingBalance: nextBalance })
+        .where(eq(mortgages.id, mortgage.id));
+      await tx
+        .update(properties)
+        .set({ mortgage: nextBalance })
+        .where(eq(properties.mortgageId, mortgage.id));
+      return null;
+    }
+  }
+  const validationError = validatePrincipalAgainstBalance(principal, property.mortgage);
+  if (validationError) return validationError;
+  await tx
+    .update(properties)
+    .set({ mortgage: applyPrincipalToBalance(property.mortgage, principal) })
+    .where(eq(properties.id, property.id));
+  return null;
+}
+
+// Inverse of applyPropertyRepaymentEffect, used when a repayment is removed
+// or edited.
+async function reversePropertyRepaymentEffect(
+  tx: DbTransaction,
+  property: typeof properties.$inferSelect,
+  principal: number,
+): Promise<void> {
+  if (property.mortgageId != null) {
+    const [mortgage] = await tx
+      .select()
+      .from(mortgages)
+      .where(eq(mortgages.id, property.mortgageId));
+    if (mortgage) {
+      const nextBalance = restorePrincipalToBalance(mortgage.outstandingBalance, principal);
+      await tx
+        .update(mortgages)
+        .set({ outstandingBalance: nextBalance })
+        .where(eq(mortgages.id, mortgage.id));
+      await tx
+        .update(properties)
+        .set({ mortgage: nextBalance })
+        .where(eq(properties.mortgageId, mortgage.id));
+      return;
+    }
+  }
+  await tx
+    .update(properties)
+    .set({ mortgage: restorePrincipalToBalance(property.mortgage, principal) })
+    .where(eq(properties.id, property.id));
 }
 
 async function getAccessiblePropertyTransaction(
@@ -895,10 +979,11 @@ async function getPropertyLinkedToMortgage(params: {
 async function syncMortgageSnapshotFromProperty(params: {
   mortgageId: number | null;
   property: typeof properties.$inferSelect;
+  executor?: DbExecutor;
 }): Promise<void> {
   if (params.mortgageId == null) return;
 
-  await db
+  await (params.executor ?? db)
     .update(mortgages)
     .set({
       propertyAddress: params.property.address,
@@ -1293,10 +1378,12 @@ app.delete('/holding-transactions/:id', async (c) => {
 app.get('/properties', async (c) => {
   const user = getAuthUser(c);
   const partnerId = await getAcceptedPartnerId(user.id);
+  const includeArchived = c.req.query('includeArchived') === 'true';
+  const accessPredicate = ownedOrJointPredicate(properties, user.id, partnerId);
   const data = await db
     .select()
     .from(properties)
-    .where(ownedOrJointPredicate(properties, user.id, partnerId));
+    .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(properties.archivedAt)));
   return c.json({ data });
 });
 
@@ -1350,14 +1437,18 @@ app.post('/properties', async (c) => {
     isJoint,
   };
 
-  const [data] = await db
-    .insert(properties)
-    .values(toPropertyInsertValues(propertyPayload, user.id))
-    .returning();
+  const data = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(properties)
+      .values(toPropertyInsertValues(propertyPayload, user.id))
+      .returning();
 
-  await syncMortgageSnapshotFromProperty({
-    mortgageId: data.mortgageId,
-    property: data,
+    await syncMortgageSnapshotFromProperty({
+      mortgageId: created.mortgageId,
+      property: created,
+      executor: tx,
+    });
+    return created;
   });
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -1391,26 +1482,76 @@ app.patch('/properties/:id', async (c) => {
     ...mortgagePatch.value,
   };
 
-  const [data] = await db
-    .update(properties)
-    .set(toPropertyUpdateValues(updates))
-    .where(eq(properties.id, id))
-    .returning();
+  const data = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(properties)
+      .set(toPropertyUpdateValues(updates))
+      .where(eq(properties.id, id))
+      .returning();
 
-  await syncMortgageSnapshotFromProperty({
-    mortgageId: data.mortgageId,
-    property: data,
+    await syncMortgageSnapshotFromProperty({
+      mortgageId: updated.mortgageId,
+      property: updated,
+      executor: tx,
+    });
+    return updated;
   });
   return c.json({ data });
 });
+
+async function hasActiveLinkedMortgage(mortgageId: number | null): Promise<boolean> {
+  if (mortgageId == null) return false;
+  const [mortgage] = await db
+    .select({ archivedAt: mortgages.archivedAt })
+    .from(mortgages)
+    .where(eq(mortgages.id, mortgageId));
+  return mortgage != null && mortgage.archivedAt == null;
+}
 
 app.delete('/properties/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid property id' }, HTTP_STATUS.BAD_REQUEST);
   const partnerId = await getAcceptedPartnerId(user.id);
+  const accessPredicate = and(
+    eq(properties.id, id),
+    ownedOrJointPredicate(properties, user.id, partnerId),
+  );
+
+  // Hard delete removes the property and its transaction history. Refuse if an
+  // active mortgage is linked — deleting would orphan it (uneditable, missing
+  // from net worth). The user must remove or unlink the mortgage first.
+  if (c.req.query('cascade') === 'true') {
+    const property = await getAccessibleProperty(user.id, partnerId, id);
+    if (!property) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
+    if (await hasActiveLinkedMortgage(property.mortgageId)) {
+      return c.json(
+        { error: 'Remove or unlink the linked mortgage before deleting this property' },
+        HTTP_STATUS.CONFLICT,
+      );
+    }
+    const [data] = await db.delete(properties).where(accessPredicate).returning();
+    if (!data) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
+    return c.json({ data });
+  }
+
   const [data] = await db
-    .delete(properties)
+    .update(properties)
+    .set({ archivedAt: new Date() })
+    .where(and(accessPredicate, isNull(properties.archivedAt)))
+    .returning();
+  if (!data) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
+  return c.json({ data });
+});
+
+app.post('/properties/:id/unarchive', async (c) => {
+  const user = getAuthUser(c);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'Invalid property id' }, HTTP_STATUS.BAD_REQUEST);
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const [data] = await db
+    .update(properties)
+    .set({ archivedAt: null })
     .where(and(eq(properties.id, id), ownedOrJointPredicate(properties, user.id, partnerId)))
     .returning();
   if (!data) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
@@ -1462,17 +1603,31 @@ app.post('/property-transactions', async (c) => {
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
   const partnerId = await getAcceptedPartnerId(user.id);
-  const property = await getAccessibleProperty(user.id, partnerId, body.value.propertyId);
-  if (!property) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
+  const result = await db.transaction(async (tx) => {
+    const property = await getAccessibleProperty(user.id, partnerId, body.value.propertyId, tx);
+    if (!property) return { error: 'Property not found', status: HTTP_STATUS.NOT_FOUND } as const;
 
-  const validationError = validatePropertyTransactionPayload(body.value, property);
-  if (validationError) return c.json({ error: validationError }, HTTP_STATUS.BAD_REQUEST);
+    const validationError = validatePropertyTransactionPayload(body.value, property);
+    if (validationError)
+      return { error: validationError, status: HTTP_STATUS.BAD_REQUEST } as const;
 
-  const [data] = await db
-    .insert(propertyTransactions)
-    .values(toPropertyTransactionInsertValues(body.value, property.userId ?? user.id))
-    .returning();
-  return c.json({ data }, HTTP_STATUS.CREATED);
+    if (body.value.type === 'repayment') {
+      const effectError = await applyPropertyRepaymentEffect(
+        tx,
+        property,
+        body.value.principal ?? 0,
+      );
+      if (effectError) return { error: effectError, status: HTTP_STATUS.BAD_REQUEST } as const;
+    }
+
+    const [created] = await tx
+      .insert(propertyTransactions)
+      .values(toPropertyTransactionInsertValues(body.value, property.userId ?? user.id))
+      .returning();
+    return { data: created } as const;
+  });
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/property-transactions/:id', async (c) => {
@@ -1496,21 +1651,42 @@ app.patch('/property-transactions/:id', async (c) => {
   const merged = mergePropertyTransactionPayload(body.value, existing);
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const property = await getAccessibleProperty(user.id, partnerId, merged.value.propertyId);
-  if (!property) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
+  const result = await db.transaction(async (tx) => {
+    // Undo the old repayment's balance effect, then apply the edited one.
+    if (existing.type === 'repayment') {
+      const oldProperty = await getAccessibleProperty(user.id, partnerId, existing.propertyId, tx);
+      if (oldProperty)
+        await reversePropertyRepaymentEffect(tx, oldProperty, existing.principal ?? 0);
+    }
 
-  const validationError = validatePropertyTransactionPayload(merged.value, property);
-  if (validationError) return c.json({ error: validationError }, HTTP_STATUS.BAD_REQUEST);
+    const property = await getAccessibleProperty(user.id, partnerId, merged.value.propertyId, tx);
+    if (!property) return { error: 'Property not found', status: HTTP_STATUS.NOT_FOUND } as const;
 
-  const [data] = await db
-    .update(propertyTransactions)
-    .set({
-      ...toPropertyTransactionUpdateValues(merged.value),
-      userId: property.userId ?? user.id,
-    })
-    .where(eq(propertyTransactions.id, id))
-    .returning();
-  return c.json({ data });
+    const validationError = validatePropertyTransactionPayload(merged.value, property);
+    if (validationError)
+      return { error: validationError, status: HTTP_STATUS.BAD_REQUEST } as const;
+
+    if (merged.value.type === 'repayment') {
+      const effectError = await applyPropertyRepaymentEffect(
+        tx,
+        property,
+        merged.value.principal ?? 0,
+      );
+      if (effectError) return { error: effectError, status: HTTP_STATUS.BAD_REQUEST } as const;
+    }
+
+    const [updated] = await tx
+      .update(propertyTransactions)
+      .set({
+        ...toPropertyTransactionUpdateValues(merged.value),
+        userId: property.userId ?? user.id,
+      })
+      .where(eq(propertyTransactions.id, id))
+      .returning();
+    return { data: updated } as const;
+  });
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data });
 });
 
 app.delete('/property-transactions/:id', async (c) => {
@@ -1521,10 +1697,19 @@ app.delete('/property-transactions/:id', async (c) => {
   const existing = await getAccessiblePropertyTransaction(user.id, partnerId, id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db
-    .delete(propertyTransactions)
-    .where(eq(propertyTransactions.id, id))
-    .returning();
+  const data = await db.transaction(async (tx) => {
+    // Restore the balance this repayment had reduced before removing it.
+    if (existing.type === 'repayment') {
+      const property = await getAccessibleProperty(user.id, partnerId, existing.propertyId, tx);
+      if (property) await reversePropertyRepaymentEffect(tx, property, existing.principal ?? 0);
+    }
+
+    const [deleted] = await tx
+      .delete(propertyTransactions)
+      .where(eq(propertyTransactions.id, id))
+      .returning();
+    return deleted ?? null;
+  });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });

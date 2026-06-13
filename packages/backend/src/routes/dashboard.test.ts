@@ -34,6 +34,53 @@ describe('dashboard debt integration helpers', () => {
     ).toThrow('Missing FX rate for GBP -> EUR');
   });
 
+  test('values property equity from active mortgages, treating archived links as unencumbered', () => {
+    const summary = computeDerivedAllocations(
+      new Map([['EUR', 1]]),
+      [] as any,
+      [] as any,
+      [] as any,
+      [
+        // Linked to an active mortgage → its balance is subtracted.
+        {
+          id: 1,
+          currentValue: '400000',
+          purchasePrice: '350000',
+          mortgage: '0',
+          mortgageId: 10,
+          currency: 'EUR',
+        },
+        // Linked to an archived mortgage (absent from the active set) →
+        // treated as unencumbered rather than using the stale snapshot.
+        {
+          id: 2,
+          currentValue: '300000',
+          purchasePrice: '280000',
+          mortgage: '120000',
+          mortgageId: 99,
+          currency: 'EUR',
+        },
+        // No linked mortgage → falls back to its own manual balance.
+        {
+          id: 3,
+          currentValue: '250000',
+          purchasePrice: '250000',
+          mortgage: '80000',
+          mortgageId: null,
+          currency: 'EUR',
+        },
+      ] as any,
+      [] as any,
+      [{ id: 10, outstandingBalance: '250000' }] as any,
+      [] as any,
+    );
+
+    const propertyEquity = summary.allocations.find(
+      (item) => item.name === 'Property Equity',
+    )?.value;
+    expect(propertyEquity).toBe(150000 + 300000 + 170000);
+  });
+
   test('subtracts non-mortgage debts from historical and current net worth', () => {
     const today = new Date();
     const todayIso = today.toISOString().slice(0, 10);

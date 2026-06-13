@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
 import type { Mortgage, Property, PropertyTransaction } from '@quro/shared';
 import { getPropertyMortgageBalance } from '../utils/position';
+import { PropertiesArchivedSection } from './PropertiesArchivedSection';
 import { PropertyTxnHistory } from './PropertyTxnHistory';
 
 type PropertyTabProps = {
@@ -228,25 +229,17 @@ function PropertyPLGrid({ property, stats, fmtNative }: PropertyPLGridProps) {
           </p>
         </div>
       </div>
-      {grossYield > 0 && (
-        <PropertyYieldBadges property={property} grossYield={grossYield} netYield={netYield} />
-      )}
+      {grossYield > 0 && <PropertyYieldBadges grossYield={grossYield} netYield={netYield} />}
     </>
   );
 }
 
 type PropertyYieldBadgesProps = {
-  property: Property;
   grossYield: number;
   netYield: number;
 };
 
-function PropertyYieldBadges({
-  property: _property,
-  grossYield,
-  netYield,
-}: PropertyYieldBadgesProps) {
-  const linkedMortgage = undefined as Mortgage | undefined;
+function PropertyYieldBadges({ grossYield, netYield }: PropertyYieldBadgesProps) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">
@@ -257,11 +250,6 @@ function PropertyYieldBadges({
       >
         Net yield {netYield.toFixed(2)}%
       </span>
-      {linkedMortgage && (
-        <span className="text-[10px] bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-semibold">
-          {(linkedMortgage as Mortgage).interestRate.toFixed(2)}% mortgage rate
-        </span>
-      )}
     </div>
   );
 }
@@ -372,11 +360,7 @@ function PropertyCard(props: PropertyCardProps) {
         />
         {stats.hasPL && <PropertyPLGrid property={property} stats={stats} fmtNative={fmtNative} />}
         {stats.grossYield > 0 && !stats.hasPL && (
-          <PropertyYieldBadges
-            property={property}
-            grossYield={stats.grossYield}
-            netYield={stats.netYield}
-          />
+          <PropertyYieldBadges grossYield={stats.grossYield} netYield={stats.netYield} />
         )}
       </div>
       {isExpanded && (
@@ -477,6 +461,9 @@ export function PropertyTab({
           onDeleteTxn={onDeleteTxn}
         />
       )}
+      <div className="px-6 pb-6">
+        <PropertiesArchivedSection />
+      </div>
     </div>
   );
 }

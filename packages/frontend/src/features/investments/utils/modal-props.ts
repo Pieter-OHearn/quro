@@ -51,6 +51,7 @@ export function buildPropertyModalsProps(
     mortgageById,
     onCloseUpdateProperty: () => ui.setUpdatingProperty(null),
     onSaveUpdateProperty: actions.handleUpdateProperty,
+    onDeleteProperty: actions.handleDeleteProperty,
     onCloseAddProperty: () => ui.setShowAddProperty(false),
     onSaveAddProperty: actions.handleSaveProperty,
     onCloseAddPropertyTxn: () => {

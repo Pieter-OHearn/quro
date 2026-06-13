@@ -141,6 +141,13 @@
       "when": 1781339672978,
       "tag": "0019_flashy_psynapse",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1781340914675,
+      "tag": "0020_normal_solo",
+      "breakpoints": true
     }
   ]
 }

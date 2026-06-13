@@ -115,7 +115,7 @@ type PropertyRow = {
   mortgage: unknown;
   mortgageId: number | null;
   currency: string;
-};
+} & Archivable;
 type PropertyTransactionRow = {
   propertyId: number;
   type: string;
@@ -487,10 +487,14 @@ export function computeDerivedAllocations(
 
   const mortgageBalanceById = buildMortgageBalanceById(userMortgages);
   const propertyEquityTotal = userProperties.reduce((sum, property) => {
-    const linkedBalance = property.mortgageId
-      ? mortgageBalanceById.get(property.mortgageId)
-      : undefined;
-    const equity = toNumber(property.currentValue) - (linkedBalance ?? toNumber(property.mortgage));
+    // A linked mortgage is the source of truth; if it is archived (absent from
+    // the active set) the property is treated as unencumbered. Only properties
+    // with no linked mortgage fall back to their own snapshot balance.
+    const mortgageBalance =
+      property.mortgageId != null
+        ? (mortgageBalanceById.get(property.mortgageId) ?? 0)
+        : toNumber(property.mortgage);
+    const equity = toNumber(property.currentValue) - mortgageBalance;
     return sum + convertToBase(equity, property.currency, rates);
   }, 0);
 
@@ -547,7 +551,7 @@ async function buildDerivedAllocations(userId: number): Promise<DerivedAllocatio
     weighJointSavingsAccounts(jointScoped.savings.filter((row) => !row.archivedAt)),
     userHoldings,
     userHoldingTxns,
-    weighJointProperties(jointScoped.properties),
+    weighJointProperties(jointScoped.properties.filter((row) => !row.archivedAt)),
     userPensions,
     weighJointMortgages(jointScoped.mortgages.filter((row) => !row.archivedAt)),
     userDebts,
@@ -673,8 +677,10 @@ function computePropertyEquityAtCutoff(
   }
 
   function resolveBaseMortgageBalance(property: PropertyRow): number {
+    // Linked mortgages are the source of truth; an archived one (absent from
+    // the active set at this cutoff) leaves the property unencumbered.
     if (property.mortgageId == null) return toNumber(property.mortgage);
-    return mortgageBalanceById.get(property.mortgageId) ?? toNumber(property.mortgage);
+    return mortgageBalanceById.get(property.mortgageId) ?? 0;
   }
 
   function resolveMortgageBalanceAtCutoff(
@@ -692,6 +698,7 @@ function computePropertyEquityAtCutoff(
   }
 
   return userProperties.reduce((sum, property) => {
+    if (isArchivedAtCutoff(property, cutoff)) return sum;
     const transactions = txnsByPropertyId.get(property.id) ?? [];
     const propertyValue = resolvePropertyValueAtCutoff(property, transactions);
     const mortgageBalance = resolveMortgageBalanceAtCutoff(property, transactions);

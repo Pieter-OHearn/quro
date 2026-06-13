@@ -40,7 +40,7 @@ export function useInvestmentActions(
   const deleteHoldingTxn = useDeleteHoldingTransaction();
   const createProperty = useCreateProperty();
   const updateProperty = useUpdateProperty();
-  useDeleteProperty();
+  const deleteProperty = useDeleteProperty();
   const createPropertyTxn = useCreatePropertyTransaction();
   const updatePropertyTxn = useUpdatePropertyTransaction();
   const deletePropertyTxn = useDeletePropertyTransaction();
@@ -94,6 +94,11 @@ export function useInvestmentActions(
     handleSaveProperty: (property) => {
       createProperty.mutate(property);
       ui.setShowAddProperty(false);
+    },
+    handleDeleteProperty: (id, mode = 'preserveTransactions') => {
+      deleteProperty.mutate({ id, mode });
+      if (ui.expandedPropertyId === id) ui.setExpandedPropertyId(null);
+      ui.setUpdatingProperty(null);
     },
     handleAddPropertyTxn: (transaction) =>
       mutateTransaction(transaction, updatePropertyTxn.mutate, createPropertyTxn.mutate),

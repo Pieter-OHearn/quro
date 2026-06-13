@@ -8,6 +8,7 @@ export { InvestmentModals } from './InvestmentModals';
 export { InvestmentStatCards } from './InvestmentStatCards';
 export { InvestmentTabPanel } from './InvestmentTabPanel';
 export { PortfolioChart } from './PortfolioChart';
+export { PropertiesArchivedSection } from './PropertiesArchivedSection';
 export { PropertyTab } from './PropertyTab';
 export { PropertyTxnHistory } from './PropertyTxnHistory';
 export { TabSwitcher } from './TabSwitcher';
