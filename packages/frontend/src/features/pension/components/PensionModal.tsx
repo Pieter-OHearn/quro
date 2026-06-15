@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createClientId } from '@/lib/clientId';
 import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
 import { formatFixedInputValue } from '@/lib/utils';
@@ -61,7 +62,7 @@ function buildMetadataRecord(entries: MetadataEntry[]): Record<string, string> {
 
 function createMetadataEntry(key = '', value = ''): MetadataEntry {
   return {
-    id: crypto.randomUUID(),
+    id: createClientId('pension-metadata'),
     key,
     value,
   };
