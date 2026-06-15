@@ -66,7 +66,9 @@ app.use('/api/settings/*', requireAuth);
 app.use('/api/partner', requireAuth);
 app.use('/api/partner/*', requireAuth);
 app.use('/api/bunq/oauth/start', requireAuth);
-app.use('/api/bunq/oauth/callback', requireAuth);
+// /api/bunq/oauth/callback is intentionally public: bunq may redirect back in a
+// different browser/in-app webview that lacks the Quro session cookie. The user
+// is identified by the HMAC-signed `state` param instead (see routes/bunq.ts).
 app.use('/api/bunq/connection', requireAuth);
 app.use('/api/bunq/sync', requireAuth);
 app.use('/api/bunq/sync/*', requireAuth);

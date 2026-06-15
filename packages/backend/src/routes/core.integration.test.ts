@@ -105,13 +105,14 @@ describe('auth integration', () => {
       error: 'Authentication required',
     });
 
+    // The bunq callback is public but authenticates the user via the HMAC-signed
+    // `state` param. An unsigned/forged state is rejected with a redirect to the
+    // settings error page rather than processed.
     const bunqCallbackResponse = await integration.request(
       '/api/bunq/oauth/callback?state=state&code=code',
     );
-    expect(bunqCallbackResponse.status).toBe(401);
-    expect(await bunqCallbackResponse.json()).toEqual({
-      error: 'Authentication required',
-    });
+    expect(bunqCallbackResponse.status).toBe(302);
+    expect(bunqCallbackResponse.headers.get('location')).toContain('bunq=error');
   });
 });
 

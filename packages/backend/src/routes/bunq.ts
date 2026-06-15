@@ -27,23 +27,27 @@ function buildOAuthState(userId: number, nonce: string): string {
   return `${payload}.${sig}`;
 }
 
-function verifyOAuthState(state: string, userId: number): boolean {
+// Verifies the HMAC signature on an OAuth `state` value and returns the user id
+// it was issued for, or null if the signature is invalid or malformed. This is
+// what authenticates the callback when it lands without a Quro session cookie.
+function parseSignedState(state: string): number | null {
   const dotIdx = state.lastIndexOf('.');
-  if (dotIdx === -1) return false;
+  if (dotIdx === -1) return null;
   const payload = state.slice(0, dotIdx);
   const sig = state.slice(dotIdx + 1);
   const expectedSig = createHmac('sha256', BUNQ_STATE_KEY).update(payload).digest('hex');
   try {
     const expectedBuf = Buffer.from(expectedSig, 'hex');
     const actualBuf = Buffer.from(sig, 'hex');
-    if (expectedBuf.length !== actualBuf.length) return false;
-    if (!timingSafeEqual(expectedBuf, actualBuf)) return false;
+    if (expectedBuf.length !== actualBuf.length) return null;
+    if (!timingSafeEqual(expectedBuf, actualBuf)) return null;
   } catch {
-    return false;
+    return null;
   }
   const colonIdx = payload.indexOf(':');
-  if (colonIdx === -1) return false;
-  return parseInt(payload.slice(0, colonIdx), 10) === userId;
+  if (colonIdx === -1) return null;
+  const userId = parseInt(payload.slice(0, colonIdx), 10);
+  return Number.isInteger(userId) ? userId : null;
 }
 
 function logBunqError(label: string, error: unknown): void {
@@ -86,17 +90,20 @@ app.get('/oauth/callback', async (c) => {
 
   deleteCookie(c, STATE_COOKIE, { path: '/' });
 
-  if (!storedState || !queryState || storedState !== queryState) {
+  if (!queryState || !code) {
     return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
   }
 
-  if (!code) {
+  // When the callback returns to the same browser that started the flow, enforce
+  // the double-submit cookie. Mobile/in-app browsers won't carry it, so we fall
+  // back to the signed state below, which cryptographically binds the request to
+  // a user without needing any cookie.
+  if (storedState && storedState !== queryState) {
     return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
   }
 
-  const user = getAuthUser(c);
-
-  if (!verifyOAuthState(storedState, user.id)) {
+  const userId = parseSignedState(queryState);
+  if (userId === null) {
     return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
   }
 
@@ -106,7 +113,7 @@ app.get('/oauth/callback', async (c) => {
     await db
       .insert(bunqConnections)
       .values({
-        userId: user.id,
+        userId,
         accessToken: tokens.accessToken,
       })
       .onConflictDoUpdate({
