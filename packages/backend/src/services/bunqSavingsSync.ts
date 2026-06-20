@@ -169,19 +169,15 @@ export type SavingsPaymentClassificationInput = Pick<
   'amount' | 'description' | 'type' | 'subType'
 >;
 
-function hasInterestMetadata(payment: SavingsPaymentClassificationInput): boolean {
-  const metadata = [payment.description, payment.type, payment.subType]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-  return /(interest|rente|payday)/.test(metadata);
+function isPaydayPayment(payment: SavingsPaymentClassificationInput): boolean {
+  return payment.type.trim().toUpperCase() === 'PAYDAY';
 }
 
 export function classifySavingsPayment(
   payment: SavingsPaymentClassificationInput,
 ): 'deposit' | 'withdrawal' | 'interest' {
   if (payment.amount.value.trim().startsWith('-')) return 'withdrawal';
-  return hasInterestMetadata(payment) ? 'interest' : 'deposit';
+  return isPaydayPayment(payment) ? 'interest' : 'deposit';
 }
 
 function toTransactionDate(created: string): string {

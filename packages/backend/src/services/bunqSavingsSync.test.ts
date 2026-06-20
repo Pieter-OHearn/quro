@@ -14,22 +14,28 @@ function payment(
 }
 
 describe('Bunq savings payment classification', () => {
-  test('classifies bunq Payday credits as savings interest', () => {
+  test('classifies bunq PAYDAY credits as savings interest', () => {
     expect(
       classifySavingsPayment(
         payment({
           amount: { value: '4.20', currency: 'EUR' },
           description: 'bunq Payday 2026-06-09 EUR',
+          type: 'PAYDAY',
         }),
       ),
     ).toBe('interest');
   });
 
-  test('classifies interest metadata as savings interest', () => {
-    expect(classifySavingsPayment(payment({ subType: 'SAVINGS_INTEREST' }))).toBe('interest');
-    expect(classifySavingsPayment(payment({ description: 'Monthly interest payout' }))).toBe(
-      'interest',
-    );
+  test('uses the bunq payment type instead of loose description matching', () => {
+    expect(
+      classifySavingsPayment(
+        payment({
+          description: 'bunq Payday 2026-06-09 EUR',
+          type: 'BUNQ',
+        }),
+      ),
+    ).toBe('deposit');
+    expect(classifySavingsPayment(payment({ subType: 'SAVINGS_INTEREST' }))).toBe('deposit');
   });
 
   test('keeps ordinary savings money movements as deposits or withdrawals', () => {
