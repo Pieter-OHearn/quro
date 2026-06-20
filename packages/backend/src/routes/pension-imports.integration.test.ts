@@ -141,7 +141,7 @@ async function createPensionPot(cookie: string, name = 'Imported Pension') {
 }
 
 async function uploadImport(cookie: string, potId: number, suffix = '') {
-  const response = await integration.request('/api/pension-imports', {
+  const response = await integration.request('/api/pensions/imports', {
     method: 'POST',
     cookie,
     body: buildUploadForm(potId, `statement-${suffix || 'base'}.pdf`, suffix),
@@ -178,7 +178,7 @@ async function markReady(importId: number, rows: Array<{ type: string; amount: n
 }
 
 async function getImportRows(cookie: string, importId: number) {
-  const response = await integration.request(`/api/pension-imports/${importId}/rows`, { cookie });
+  const response = await integration.request(`/api/pensions/imports/${importId}/rows`, { cookie });
   const body = await parseJson<ApiDataResponse<ImportRowResponse[]>>(response, 200);
   return body.data;
 }
@@ -203,9 +203,12 @@ describe('pension imports integration', () => {
     expect(uploadBody.data.status).toBe('queued');
     await runPensionImportWorkerTick();
 
-    const detailResponse = await integration.request(`/api/pension-imports/${uploadBody.data.id}`, {
-      cookie: owner.cookie,
-    });
+    const detailResponse = await integration.request(
+      `/api/pensions/imports/${uploadBody.data.id}`,
+      {
+        cookie: owner.cookie,
+      },
+    );
     const detailBody = await parseJson<ApiDataResponse<ImportResponse>>(detailResponse, 200);
     expect(detailBody.data.status).toBe('ready_for_review');
     expect(detailBody.data.statementPeriodStart).toBe('2025-01-01');
@@ -215,7 +218,7 @@ describe('pension imports integration', () => {
     expect(contributionRow).toBeDefined();
 
     const patchResponse = await integration.request(
-      `/api/pension-imports/${uploadBody.data.id}/rows/${contributionRow!.id}`,
+      `/api/pensions/imports/${uploadBody.data.id}/rows/${contributionRow!.id}`,
       {
         method: 'PATCH',
         cookie: owner.cookie,
@@ -226,7 +229,7 @@ describe('pension imports integration', () => {
     expect(patchBody.data.amount).toBe(1200);
 
     const commitResponse = await integration.request(
-      `/api/pension-imports/${uploadBody.data.id}/commit`,
+      `/api/pensions/imports/${uploadBody.data.id}/commit`,
       {
         method: 'POST',
         cookie: owner.cookie,
@@ -247,10 +250,13 @@ describe('pension imports integration', () => {
       .where(inArray(pensionTransactions.id, commitBody.data.transactionIds));
     expect(transactions).toHaveLength(2);
 
-    const cancelResponse = await integration.request(`/api/pension-imports/${uploadBody.data.id}`, {
-      method: 'DELETE',
-      cookie: owner.cookie,
-    });
+    const cancelResponse = await integration.request(
+      `/api/pensions/imports/${uploadBody.data.id}`,
+      {
+        method: 'DELETE',
+        cookie: owner.cookie,
+      },
+    );
     expect(cancelResponse.status).toBe(400);
     expect(await cancelResponse.json()).toEqual({ error: 'Committed imports cannot be cancelled' });
   });
@@ -260,7 +266,7 @@ describe('pension imports integration', () => {
     const potId = await createPensionPot(owner.cookie, 'Duplicate Pension');
     await uploadImport(owner.cookie, potId, 'same-bytes');
 
-    const duplicateResponse = await integration.request('/api/pension-imports', {
+    const duplicateResponse = await integration.request('/api/pensions/imports', {
       method: 'POST',
       cookie: owner.cookie,
       body: buildUploadForm(potId, 'same-again.pdf', 'same-bytes'),
@@ -277,7 +283,7 @@ describe('pension imports integration', () => {
     const potId = await createPensionPot(owner.cookie, 'Disabled Pension');
     pensionImportCapabilityEnabled = false;
 
-    const response = await integration.request('/api/pension-imports', {
+    const response = await integration.request('/api/pensions/imports', {
       method: 'POST',
       cookie: owner.cookie,
       body: buildUploadForm(potId, 'disabled.pdf', 'disabled'),
@@ -300,19 +306,19 @@ describe('pension imports integration', () => {
     const [row] = await getImportRows(owner.cookie, uploadBody.data.id);
 
     const requests = await Promise.all([
-      integration.request(`/api/pension-imports/${uploadBody.data.id}`, {
+      integration.request(`/api/pensions/imports/${uploadBody.data.id}`, {
         cookie: stranger.cookie,
       }),
-      integration.request(`/api/pension-imports/${uploadBody.data.id}/rows/${row.id}`, {
+      integration.request(`/api/pensions/imports/${uploadBody.data.id}/rows/${row.id}`, {
         method: 'PATCH',
         cookie: stranger.cookie,
         json: { amount: 900 },
       }),
-      integration.request(`/api/pension-imports/${uploadBody.data.id}/commit`, {
+      integration.request(`/api/pensions/imports/${uploadBody.data.id}/commit`, {
         method: 'POST',
         cookie: stranger.cookie,
       }),
-      integration.request(`/api/pension-imports/${uploadBody.data.id}`, {
+      integration.request(`/api/pensions/imports/${uploadBody.data.id}`, {
         method: 'DELETE',
         cookie: stranger.cookie,
       }),
@@ -328,7 +334,7 @@ describe('pension imports integration', () => {
 
     await markReady(uploadBody.data.id, [{ type: 'contribution', amount: 100 }]);
     const noAnnualResponse = await integration.request(
-      `/api/pension-imports/${uploadBody.data.id}/commit`,
+      `/api/pensions/imports/${uploadBody.data.id}/commit`,
       { method: 'POST', cookie: owner.cookie },
     );
     expect(noAnnualResponse.status).toBe(400);
@@ -341,7 +347,7 @@ describe('pension imports integration', () => {
       { type: 'annual_statement', amount: 1100 },
     ]);
     const twoAnnualResponse = await integration.request(
-      `/api/pension-imports/${uploadBody.data.id}/commit`,
+      `/api/pensions/imports/${uploadBody.data.id}/commit`,
       { method: 'POST', cookie: owner.cookie },
     );
     expect(twoAnnualResponse.status).toBe(400);
