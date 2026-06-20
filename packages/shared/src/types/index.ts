@@ -459,6 +459,9 @@ export type PensionStatementImportRow = {
   updatedAt: string;
 };
 
+export const MORTGAGE_RATE_TYPES = ['Fixed', 'Variable'] as const;
+export type MortgageRateType = (typeof MORTGAGE_RATE_TYPES)[number];
+
 export type Mortgage = {
   id: number;
   linkedPropertyId?: number | null;
@@ -470,7 +473,7 @@ export type Mortgage = {
   propertyValue: number;
   monthlyPayment: number;
   interestRate: number;
-  rateType: string;
+  rateType: MortgageRateType;
   fixedUntil: string;
   termYears: number;
   startDate: string;
