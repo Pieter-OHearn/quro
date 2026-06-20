@@ -1,5 +1,10 @@
 import type { CurrencyCode } from '@/lib/CurrencyContext';
-import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
+import type {
+  Mortgage as MortgageType,
+  MortgageRateType,
+  MortgageTransaction,
+  Property,
+} from '@quro/shared';
 
 export type MortgageFormatFn = (n: number) => string;
 
@@ -29,7 +34,7 @@ export type MortgageFormState = {
   propertyValue: string;
   monthlyPayment: string;
   interestRate: string;
-  rateType: string;
+  rateType: MortgageRateType;
   fixedUntil: string;
   termYears: string;
   startDate: string;

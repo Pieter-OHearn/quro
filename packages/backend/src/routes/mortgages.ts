@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import {
+  MORTGAGE_RATE_TYPES,
   MORTGAGE_TRANSACTION_TYPES,
   type CurrencyCode,
+  type MortgageRateType,
   type MortgageTransactionType,
 } from '@quro/shared';
 import { db } from '../db/client';
@@ -63,7 +65,6 @@ const MORTGAGE_TRANSACTION_FIELDS = [
   'note',
   'fixedYears',
 ] as const;
-type MortgageRateType = 'Fixed' | 'Variable';
 
 type MortgagePayload = {
   linkedPropertyId: number;
@@ -143,9 +144,8 @@ function parseOptionalNormalizedDecimalField(
 function parseMortgageRateTypeField(value: unknown): ParseResult<MortgageRateType> {
   if (typeof value !== 'string') return err('Invalid mortgage rate type');
   const normalized = value.trim().toLowerCase();
-  if (normalized === 'fixed') return ok('Fixed');
-  if (normalized === 'variable') return ok('Variable');
-  return err('Invalid mortgage rate type');
+  const rateType = MORTGAGE_RATE_TYPES.find((type) => type.toLowerCase() === normalized);
+  return rateType ? ok(rateType) : err('Invalid mortgage rate type');
 }
 
 function parseMortgageTransactionTypeField(value: unknown): ParseResult<MortgageTransactionType> {

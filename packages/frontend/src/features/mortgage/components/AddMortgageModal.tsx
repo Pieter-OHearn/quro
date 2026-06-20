@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { ArchiveOrDeleteDialog, Modal, ModalFooter } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { formatNumber, type Mortgage as MortgageType, type Property } from '@quro/shared';
+import {
+  formatNumber,
+  MORTGAGE_RATE_TYPES,
+  type Mortgage as MortgageType,
+  type MortgageRateType,
+  type Property,
+} from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
 import { useAddMortgageForm } from '../hooks';
 import type { DeleteMortgageMode } from '../hooks/useDeleteMortgage';
@@ -19,9 +25,15 @@ type AddMortgageModalProps = {
   onDelete?: (id: number, mode?: DeleteMortgageMode) => void;
 };
 
-const RATE_TYPES = ['Fixed', 'Variable', 'Tracker', 'Offset'];
+export const RATE_TYPES = [...MORTGAGE_RATE_TYPES];
 const LOW_LTV_THRESHOLD = 70;
 const MEDIUM_LTV_THRESHOLD = 85;
+
+function toMortgageRateType(value: string): MortgageRateType {
+  return MORTGAGE_RATE_TYPES.includes(value as MortgageRateType)
+    ? (value as MortgageRateType)
+    : 'Fixed';
+}
 
 const n = (value: string) => parseFloat(value) || 0;
 
@@ -295,7 +307,7 @@ function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
           <select
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
             value={form.rateType}
-            onChange={(e) => setField('rateType', e.target.value)}
+            onChange={(e) => setField('rateType', toMortgageRateType(e.target.value))}
           >
             {RATE_TYPES.map((type) => (
               <option key={type}>{type}</option>
