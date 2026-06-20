@@ -23,7 +23,7 @@ jobs:
       version: ${{ steps.version.outputs.value }}
       sha: ${{ steps.commit.outputs.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_REF }}
           fetch-depth: 0
@@ -57,7 +57,7 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
       REGISTRY_OWNER: ${{ github.repository_owner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.sha }}
       - name: Normalize registry owner
@@ -109,7 +109,7 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
       REGISTRY_OWNER: ${{ github.repository_owner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.sha }}
       - name: Normalize registry owner
