@@ -164,8 +164,20 @@ async function upsertSavingsAccount(
   return createLocalSavingsAccount(userId, account, account.balance.currency);
 }
 
-function classifyPayment(amountValue: string): 'deposit' | 'withdrawal' {
-  return amountValue.trim().startsWith('-') ? 'withdrawal' : 'deposit';
+export type SavingsPaymentClassificationInput = Pick<
+  BunqPayment,
+  'amount' | 'description' | 'type' | 'subType'
+>;
+
+function isPaydayPayment(payment: SavingsPaymentClassificationInput): boolean {
+  return payment.type.trim().toUpperCase() === 'PAYDAY';
+}
+
+export function classifySavingsPayment(
+  payment: SavingsPaymentClassificationInput,
+): 'deposit' | 'withdrawal' | 'interest' {
+  if (payment.amount.value.trim().startsWith('-')) return 'withdrawal';
+  return isPaydayPayment(payment) ? 'interest' : 'deposit';
 }
 
 function toTransactionDate(created: string): string {
@@ -180,7 +192,7 @@ async function importPayment(
   payment: BunqPayment,
 ): Promise<void> {
   const bunqTransactionId = String(payment.id);
-  const type = classifyPayment(payment.amount.value);
+  const type = classifySavingsPayment(payment);
   const absoluteAmount = Math.abs(Number(payment.amount.value) || 0);
   if (absoluteAmount <= 0) return;
 

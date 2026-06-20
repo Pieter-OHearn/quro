@@ -127,7 +127,23 @@ type RowProps = {
   onEdit: () => void;
 };
 
+function isReadOnlyBunqTransaction(transaction: RecentBudgetTx): boolean {
+  return transaction.sourceProvider === 'bunq' || Boolean(transaction.bunqTransactionId);
+}
+
+function getBunqMetadataTitle(transaction: RecentBudgetTx): string {
+  return [
+    'Bunq synced transaction',
+    transaction.sourceAccountName ? `Account: ${transaction.sourceAccountName}` : null,
+    transaction.sourceAccountType ? `Type: ${transaction.sourceAccountType}` : null,
+    transaction.sourceAccountId ? `ID: ${transaction.sourceAccountId}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
+  const isReadOnly = isReadOnlyBunqTransaction(transaction);
   return (
     <DataTableRow interactive>
       <DataTableCell columnKey="transaction">
@@ -136,8 +152,13 @@ function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="truncate text-sm font-medium text-slate-800">{transaction.name}</p>
-              {transaction.bunqTransactionId && (
-                <Badge tone="info" size="sm" className="bg-blue-500 text-white">
+              {isReadOnly && (
+                <Badge
+                  tone="info"
+                  size="sm"
+                  className="bg-blue-500 text-white"
+                  title={getBunqMetadataTitle(transaction)}
+                >
                   Bunq
                 </Badge>
               )}
@@ -167,17 +188,19 @@ function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
       </DataTableCell>
       <DataTableCell columnKey="amount">-{fmtDec(transaction.amount)}</DataTableCell>
       <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
-        <RowActions>
-          <IconButton
-            type="button"
-            onClick={onEdit}
-            icon={Pencil}
-            label="Edit transaction"
-            title="Edit transaction"
-            variant="ghost"
-            size="sm"
-          />
-        </RowActions>
+        {!isReadOnly && (
+          <RowActions>
+            <IconButton
+              type="button"
+              onClick={onEdit}
+              icon={Pencil}
+              label="Edit transaction"
+              title="Edit transaction"
+              variant="ghost"
+              size="sm"
+            />
+          </RowActions>
+        )}
       </DataTableCell>
     </DataTableRow>
   );
@@ -295,7 +318,10 @@ export function RecentTransactionsList({
             key={tx.id}
             transaction={tx}
             fmtDec={fmtDec}
-            onEdit={() => setEditing(tx)}
+            onEdit={() => {
+              if (isReadOnlyBunqTransaction(tx)) return;
+              setEditing(tx);
+            }}
           />
         ))}
       </DataTable>

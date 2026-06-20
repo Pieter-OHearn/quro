@@ -87,7 +87,10 @@ test('RecentTransactionsList renders shared table rows with mobile-critical tran
   expect(markup).toContain('Groceries');
   expect(markup).toContain('Bunq');
   expect(markup).toContain('Joint');
-  expect(markup).toContain('aria-label="Edit transaction"');
+  expect(markup).toContain(
+    'title="Bunq synced transaction · Account: Joint checking · Type: JOINT · ID: account-1"',
+  );
+  expect(markup.match(/aria-label="Edit transaction"/g)?.length).toBe(1);
 });
 
 test('RecentTransactionsList defaults to newest transactions first', () => {
