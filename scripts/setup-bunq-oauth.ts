@@ -53,9 +53,13 @@ const signingKey = await webcrypto.subtle.importKey(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function pemToArrayBuffer(pem: string): Uint8Array {
-  const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
-  return new Uint8Array(Buffer.from(base64, 'base64'));
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const base64 = pem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s/g, '');
+  const bytes = Buffer.from(base64, 'base64');
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 async function signRequestBody(body: string): Promise<string> {

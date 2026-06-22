@@ -83,6 +83,7 @@ export default [
             'packages/frontend/tsconfig.json',
             'packages/backend/tsconfig.json',
             'packages/shared/tsconfig.json',
+            'tsconfig.scripts.json',
           ],
         },
         node: {
@@ -126,7 +127,12 @@ export default [
             'packages/backend/drizzle.config.ts',
             'packages/frontend/vite.config.ts',
             'packages/shared/test/*.ts',
+            'playwright.config.ts',
+            'scripts/*.ts',
+            'scripts/lib/*.ts',
+            'scripts/auto-update/*.ts',
           ],
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
         },
         tsconfigRootDir: __dirname,
       },
@@ -193,6 +199,12 @@ export default [
     rules: {
       'require-await': 'error',
       'unicorn/prefer-node-protocol': 'error',
+    },
+  },
+  {
+    files: ['scripts/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}', 'playwright.config.ts'],
+    rules: {
+      complexity: 'off',
     },
   },
   {

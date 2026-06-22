@@ -400,8 +400,11 @@ async function readMortgagePatchPayload(
 
 // The mortgage has already been access-checked, so the linked-property lookup
 // is by mortgageId alone (the property may belong to the partner).
-async function getCurrentLinkedPropertyId(mortgageId: number): Promise<number | null> {
-  const [linkedProperty] = await db
+async function getCurrentLinkedPropertyId(
+  mortgageId: number,
+  executor: DbExecutor = db,
+): Promise<number | null> {
+  const [linkedProperty] = await executor
     .select({ id: properties.id })
     .from(properties)
     .where(eq(properties.mortgageId, mortgageId));
@@ -850,12 +853,18 @@ app.delete('/:id', async (c) => {
   // property is unlinked and becomes unencumbered.
   if (c.req.query('cascade') === 'true') {
     const data = await db.transaction(async (tx) => {
+      // Captured before the delete: the FK's ON DELETE SET NULL already nulls
+      // properties.mortgage_id once the mortgage row is gone, so matching on
+      // mortgageId afterwards would find nothing.
+      const linkedPropertyId = await getCurrentLinkedPropertyId(id, tx);
       const [deleted] = await tx.delete(mortgages).where(accessPredicate).returning();
       if (!deleted) return null;
-      await tx
-        .update(properties)
-        .set({ mortgageId: null, mortgage: 0 })
-        .where(eq(properties.mortgageId, id));
+      if (linkedPropertyId != null) {
+        await tx
+          .update(properties)
+          .set({ mortgageId: null, mortgage: 0 })
+          .where(eq(properties.id, linkedPropertyId));
+      }
       return deleted;
     });
     if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
