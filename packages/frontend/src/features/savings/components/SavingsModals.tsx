@@ -13,7 +13,7 @@ type SavingsModalsProps = {
   onSaveAccount: (account: SaveAccountInput) => Promise<void>;
   onDeleteAccount: (id: number, mode: DeleteSavingsAccountMode) => Promise<void>;
   onCloseTxnModal: () => void;
-  onSaveTxn: (transaction: SaveTransactionInput) => void;
+  onSaveTxn: (transaction: SaveTransactionInput) => Promise<void>;
 };
 
 export function SavingsModals({

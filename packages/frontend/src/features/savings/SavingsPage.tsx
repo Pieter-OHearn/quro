@@ -31,7 +31,7 @@ type SavingsPageBodyProps = {
   editingTxn: SavingsTransaction | null;
   onSaveAccount: (account: SaveAccountInput) => Promise<void>;
   onDeleteAccount: (id: number, mode: DeleteSavingsAccountMode) => Promise<void>;
-  onSaveTxn: (transaction: SaveTransactionInput) => void;
+  onSaveTxn: (transaction: SaveTransactionInput) => Promise<void>;
   onDeleteTxn: (id: number) => void;
   contribChartData: ReturnType<typeof useContribChartData>;
   growthChartData: ReturnType<typeof useGrowthChartData>;
@@ -181,13 +181,13 @@ export function Savings() {
       addTxnFor={addTxnFor}
       onSaveAccount={onSaveAccount}
       onDeleteAccount={(id, mode) => deleteAccount.mutateAsync({ id, mode })}
-      onSaveTxn={(transaction) => {
+      onSaveTxn={async (transaction) => {
         if (transaction.id) {
           const { id, ...payload } = transaction;
-          updateTxn.mutate({ id, ...payload });
+          await updateTxn.mutateAsync({ id, ...payload });
           return;
         }
-        createTxn.mutate(transaction);
+        await createTxn.mutateAsync(transaction);
       }}
       onDeleteTxn={(id) => deleteTxn.mutate(id)}
       setEditingTxn={setEditingTxn}

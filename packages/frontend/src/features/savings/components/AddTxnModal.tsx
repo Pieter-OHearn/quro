@@ -12,6 +12,7 @@ import {
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { TXN_META, TXN_TYPE_LIST } from '../constants';
 import type { SaveTransactionInput, TxnType } from '../types';
+import { saveSavingsTransaction } from '../utils/save-transaction';
 
 function toFiniteNumber(value: number): number {
   const normalized = Number(value);
@@ -22,7 +23,7 @@ type AddTxnModalProps = {
   account: SavingsAccount;
   existing?: SavingsTransaction;
   onClose: () => void;
-  onSave: (transaction: SaveTransactionInput) => void;
+  onSave: (transaction: SaveTransactionInput) => Promise<void>;
 };
 
 function signedAmount(type: TxnType, amount: number): number {
@@ -71,7 +72,7 @@ function BalancePreview({
 function useAddTxnForm(
   account: SavingsAccount,
   existing: SavingsTransaction | undefined,
-  onSave: (transaction: SaveTransactionInput) => void,
+  onSave: (transaction: SaveTransactionInput) => Promise<void>,
   onClose: () => void,
 ) {
   const [type, setType] = useState<TxnType>(existing?.type ?? 'deposit');
@@ -87,7 +88,7 @@ function useAddTxnForm(
     : 0;
   const balanceBeforeTxn = accountBalance - existingSignedAmount;
 
-  function handleSave(): void {
+  async function handleSave(): Promise<void> {
     if (!amount || isNaN(parsed) || parsed <= 0) {
       setError('Enter a valid amount');
       return;
@@ -97,8 +98,12 @@ function useAddTxnForm(
       return;
     }
     const payload = { accountId: account.id, type, amount: parsed, date, note };
-    onSave(existing ? { id: existing.id, ...payload } : payload);
-    onClose();
+    await saveSavingsTransaction({
+      transaction: existing ? { id: existing.id, ...payload } : payload,
+      onSave,
+      onClose,
+      setError,
+    });
   }
 
   return {
@@ -130,7 +135,9 @@ export function AddTxnModal({ account, existing, onClose, onSave }: AddTxnModalP
       footer={
         <ModalFooter
           onCancel={onClose}
-          onConfirm={form.handleSave}
+          onConfirm={() => {
+            void form.handleSave();
+          }}
           confirmLabel={isEditing ? 'Save Changes' : 'Record Transaction'}
         />
       }
