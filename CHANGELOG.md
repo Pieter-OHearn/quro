@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.3.2] - 2026-06-22
+
+- Fix Bunq savings sync misclassifying payday interest payments as deposits by detecting the `PAYDAY` payment type.
+- Fix mortgage rate type validation to read from the shared `MORTGAGE_RATE_TYPES` enum instead of a duplicated local type.
+- Fix savings transaction modals closing before the save request resolved, which could drop failed saves silently.
+- Fix property records allowing a `mortgageId` that no longer pointed at an existing mortgage by adding a foreign key constraint with `ON DELETE SET NULL`.
+- Fix holding price sync skipping valid price updates whenever a snapshot also produced an issue for the same ticker.
+
 ## [v0.3.1] - 2026-06-15
 
 - Fix Bunq OAuth callbacks so redirects that return without a Quro session cookie are authenticated via the HMAC-signed `state` parameter, while forged or malformed states redirect back to settings with an error.
