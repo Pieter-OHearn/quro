@@ -1,0 +1,1 @@
+ALTER TABLE "properties" ADD CONSTRAINT "properties_mortgage_id_mortgages_id_fk" FOREIGN KEY ("mortgage_id") REFERENCES "public"."mortgages"("id") ON DELETE set null ON UPDATE no action;

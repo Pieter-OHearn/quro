@@ -148,6 +148,13 @@
       "when": 1781340914675,
       "tag": "0020_normal_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1782121341796,
+      "tag": "0021_careful_micromax",
+      "breakpoints": true
     }
   ]
 }
