@@ -282,16 +282,11 @@ export async function syncHoldingPricesForUser(
       quoteCheck.ticker,
       quoteCheck.quote,
     );
-    if ('issue' in updateResult && updateResult.issue !== undefined) {
-      issues.push(updateResult.issue);
-      continue;
-    }
-
-    if ('issue' in updateResult && updateResult.issue !== undefined) {
-      issues.push(updateResult.issue);
-    }
     if ('updated' in updateResult) {
       updates.push(updateResult.updated);
+    }
+    if ('issue' in updateResult && updateResult.issue !== undefined) {
+      issues.push(updateResult.issue);
     }
   }
 
