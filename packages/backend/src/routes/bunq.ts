@@ -21,7 +21,7 @@ const FRONTEND_SETTINGS_PATH = FRONTEND_ORIGIN
 
 const BUNQ_STATE_KEY = process.env.BUNQ_CLIENT_SECRET ?? '';
 
-function buildOAuthState(userId: number, nonce: string): string {
+export function buildOAuthState(userId: number, nonce: string): string {
   const payload = `${userId}:${nonce}`;
   const sig = createHmac('sha256', BUNQ_STATE_KEY).update(payload).digest('hex');
   return `${payload}.${sig}`;
@@ -30,7 +30,7 @@ function buildOAuthState(userId: number, nonce: string): string {
 // Verifies the HMAC signature on an OAuth `state` value and returns the user id
 // it was issued for, or null if the signature is invalid or malformed. This is
 // what authenticates the callback when it lands without a Quro session cookie.
-function parseSignedState(state: string): number | null {
+export function parseSignedState(state: string): number | null {
   const dotIdx = state.lastIndexOf('.');
   if (dotIdx === -1) return null;
   const payload = state.slice(0, dotIdx);
