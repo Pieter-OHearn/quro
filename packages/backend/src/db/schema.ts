@@ -353,7 +353,7 @@ export const properties = pgTable(
     purchasePrice: numericAsNumber('purchase_price', { precision: 19, scale: 2 }).notNull(),
     currentValue: numericAsNumber('current_value', { precision: 19, scale: 2 }).notNull(),
     mortgage: numericAsNumber('mortgage', { precision: 19, scale: 2 }).notNull(),
-    mortgageId: integer('mortgage_id'),
+    mortgageId: integer('mortgage_id').references(() => mortgages.id, { onDelete: 'set null' }),
     monthlyRent: numericAsNumber('monthly_rent', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     emoji: text('emoji'),
