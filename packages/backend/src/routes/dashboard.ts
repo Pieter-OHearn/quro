@@ -19,6 +19,11 @@ import {
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { convertToBaseCurrency, FX_BASE_CURRENCY } from '../lib/currencyRateCache';
+import {
+  buildHistoricalCurrencyRateResolver,
+  loadHistoricalCurrencyRateRows,
+  type HistoricalCurrencyRateResolver,
+} from '../lib/currencyRateHistory';
 import { getCurrentRatesToBaseCurrency } from '../lib/currencyRateSync';
 import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 
@@ -73,6 +78,13 @@ function getRatesToBaseCurrency(): Promise<Map<string, number>> {
 const convertToBase = (amount: number, currency: string, rates: Map<string, number>) => {
   return convertToBaseCurrency(amount, currency, rates);
 };
+
+const convertHistoricalToBase = (
+  amount: number,
+  currency: string,
+  cutoff: number,
+  resolver: HistoricalCurrencyRateResolver,
+) => resolver.convertToBase(amount, currency, new Date(cutoff)).value;
 
 type DerivedAllocation = {
   id: number;
@@ -451,7 +463,7 @@ function computeDebtLiabilitiesAtCutoff(
   debts: readonly DebtRow[],
   paymentsByDebtId: ReadonlyMap<number, readonly DatedDebtPayment[]>,
   cutoff: number,
-  rates: Map<string, number>,
+  resolver: HistoricalCurrencyRateResolver,
 ): number {
   return debts.reduce((sum, debt) => {
     if (isArchivedAtCutoff(debt, cutoff)) return sum;
@@ -460,7 +472,7 @@ function computeDebtLiabilitiesAtCutoff(
       if (payment.timestamp <= cutoff) continue;
       balance += payment.principal;
     }
-    return sum + convertToBase(Math.max(0, balance), debt.currency, rates);
+    return sum + convertHistoricalToBase(Math.max(0, balance), debt.currency, cutoff, resolver);
   }, 0);
 }
 
@@ -583,7 +595,7 @@ function computeSavingsAtCutoff(
   accounts: readonly HistoricalSavingsAccountRow[],
   txnsByAccountId: ReadonlyMap<number, readonly DatedSavingsTransaction[]>,
   cutoff: number,
-  rates: Map<string, number>,
+  resolver: HistoricalCurrencyRateResolver,
 ): number {
   return accounts.reduce((sum, account) => {
     if (isArchivedAtCutoff(account, cutoff)) return sum;
@@ -594,7 +606,7 @@ function computeSavingsAtCutoff(
       if (transaction.type === 'withdrawal') balance += transaction.amount;
       else balance -= transaction.amount;
     }
-    return sum + convertToBase(Math.max(0, balance), account.currency, rates);
+    return sum + convertHistoricalToBase(Math.max(0, balance), account.currency, cutoff, resolver);
   }, 0);
 }
 
@@ -607,7 +619,7 @@ function computePensionAtCutoff(
   pots: readonly PensionPotRow[],
   txnsByPotId: ReadonlyMap<number, readonly DatedPensionTransaction[]>,
   cutoff: number,
-  rates: Map<string, number>,
+  resolver: HistoricalCurrencyRateResolver,
 ): number {
   return pots.reduce((sum, pot) => {
     if (isArchivedAtCutoff(pot, cutoff)) return sum;
@@ -616,7 +628,7 @@ function computePensionAtCutoff(
       if (transaction.timestamp <= cutoff) continue;
       balance -= computePensionTxnDelta(transaction);
     }
-    return sum + convertToBase(Math.max(0, balance), pot.currency, rates);
+    return sum + convertHistoricalToBase(Math.max(0, balance), pot.currency, cutoff, resolver);
   }, 0);
 }
 
@@ -624,7 +636,7 @@ function computeBrokerageAtCutoff(
   portfolioHoldings: readonly HoldingRow[],
   txnsByHoldingId: ReadonlyMap<number, readonly DatedHoldingTransaction[]>,
   cutoff: number,
-  rates: Map<string, number>,
+  resolver: HistoricalCurrencyRateResolver,
 ): number {
   return portfolioHoldings.reduce((sum, holding) => {
     if (isArchivedAtCutoff(holding, cutoff)) return sum;
@@ -635,7 +647,7 @@ function computeBrokerageAtCutoff(
       else shares -= transaction.shares;
     }
     const value = Math.max(0, shares) * toNumber(holding.currentPrice);
-    return sum + convertToBase(value, holding.currency, rates);
+    return sum + convertHistoricalToBase(value, holding.currency, cutoff, resolver);
   }, 0);
 }
 
@@ -656,7 +668,7 @@ function computePropertyEquityAtCutoff(
   txnsByPropertyId: ReadonlyMap<number, readonly DatedPropertyTransaction[]>,
   mortgageBalanceById: ReadonlyMap<number, number>,
   cutoff: number,
-  rates: Map<string, number>,
+  resolver: HistoricalCurrencyRateResolver,
 ): number {
   function resolvePropertyValueAtCutoff(
     property: PropertyRow,
@@ -703,12 +715,13 @@ function computePropertyEquityAtCutoff(
     const propertyValue = resolvePropertyValueAtCutoff(property, transactions);
     const mortgageBalance = resolveMortgageBalanceAtCutoff(property, transactions);
     const equity = propertyValue - mortgageBalance;
-    return sum + convertToBase(equity, property.currency, rates);
+    return sum + convertHistoricalToBase(equity, property.currency, cutoff, resolver);
   }, 0);
 }
 
 type NetWorthSourceData = {
   rates: Map<string, number>;
+  historicalRateResolver: HistoricalCurrencyRateResolver;
   savings: HistoricalSavingsAccountRow[];
   savingsTransactions: SavingsTransactionRow[];
   holdings: HoldingRow[];
@@ -728,6 +741,7 @@ type NetWorthHistoryPoint = {
   year: number;
   totalValue: number;
   currency: string;
+  fxEstimated: boolean;
 };
 
 async function safeLoad<T>(label: string, query: Promise<T>, fallback: T): Promise<T> {
@@ -777,6 +791,11 @@ async function loadNetWorthSourceData(userId: number): Promise<NetWorthSourceDat
 
   return {
     rates,
+    historicalRateResolver: buildHistoricalCurrencyRateResolver(
+      await loadHistoricalCurrencyRateRows(),
+      rates,
+      BASE_CURRENCY,
+    ),
     savings: weighJointSavingsAccounts(jointScoped.savings),
     savingsTransactions: weighJointSavingsTransactions(
       jointScoped.savingsTransactions,
@@ -822,8 +841,72 @@ function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthH
       year: new Date(currentMonth).getUTCFullYear(),
       totalValue,
       currency: BASE_CURRENCY,
+      fxEstimated: false,
     },
   ];
+}
+
+type NetWorthHistoryGroups = {
+  savingsByAccount: ReadonlyMap<number, readonly DatedSavingsTransaction[]>;
+  holdingsById: ReadonlyMap<number, readonly DatedHoldingTransaction[]>;
+  propertiesById: ReadonlyMap<number, readonly DatedPropertyTransaction[]>;
+  pensionsByPotId: ReadonlyMap<number, readonly DatedPensionTransaction[]>;
+  debtPaymentsByDebtId: ReadonlyMap<number, readonly DatedDebtPayment[]>;
+};
+
+type NetWorthHistoryMonth = ReturnType<typeof buildRollingMonths>[number];
+
+function computeNetWorthHistoryPoint(
+  sourceData: NetWorthSourceData,
+  groups: NetWorthHistoryGroups,
+  month: NetWorthHistoryMonth,
+  index: number,
+): NetWorthHistoryPoint {
+  const estimatedDateCountBefore =
+    sourceData.historicalRateResolver.getCoverage().estimatedDates.length;
+  const savings = computeSavingsAtCutoff(
+    sourceData.savings,
+    groups.savingsByAccount,
+    month.cutoff,
+    sourceData.historicalRateResolver,
+  );
+  const brokerage = computeBrokerageAtCutoff(
+    sourceData.holdings,
+    groups.holdingsById,
+    month.cutoff,
+    sourceData.historicalRateResolver,
+  );
+  const propertyEquity = computePropertyEquityAtCutoff(
+    sourceData.properties,
+    groups.propertiesById,
+    buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, month.cutoff),
+    month.cutoff,
+    sourceData.historicalRateResolver,
+  );
+  const pension = computePensionAtCutoff(
+    sourceData.pensions,
+    groups.pensionsByPotId,
+    month.cutoff,
+    sourceData.historicalRateResolver,
+  );
+  const liabilities = computeDebtLiabilitiesAtCutoff(
+    sourceData.debts,
+    groups.debtPaymentsByDebtId,
+    month.cutoff,
+    sourceData.historicalRateResolver,
+  );
+  const fxEstimated =
+    sourceData.historicalRateResolver.getCoverage().estimatedDates.length >
+    estimatedDateCountBefore;
+
+  return {
+    id: index + 1,
+    month: month.label,
+    year: month.year,
+    totalValue: savings + brokerage + propertyEquity + pension - liabilities,
+    currency: BASE_CURRENCY,
+    fxEstimated,
+  };
 }
 
 export function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
@@ -842,68 +925,26 @@ export function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHi
   if (!hasQualifyingTransactions) return buildFallbackNetWorthHistory(sourceData);
 
   const months = buildRollingMonths();
-  const savingsByAccount = groupByNumericId(
-    datedSavingsTransactions,
-    (transaction) => transaction.accountId,
-  );
-  const holdingsById = groupByNumericId(
-    datedHoldingTransactions,
-    (transaction) => transaction.holdingId,
-  );
-  const propertiesById = groupByNumericId(
-    datedPropertyTransactions,
-    (transaction) => transaction.propertyId,
-  );
-  const pensionsByPotId = groupByNumericId(
-    datedPensionTransactions,
-    (transaction) => transaction.potId,
-  );
-  const debtPaymentsByDebtId = groupByNumericId(
-    datedDebtPayments,
-    (transaction) => transaction.debtId,
-  );
+  const groups: NetWorthHistoryGroups = {
+    savingsByAccount: groupByNumericId(
+      datedSavingsTransactions,
+      (transaction) => transaction.accountId,
+    ),
+    holdingsById: groupByNumericId(
+      datedHoldingTransactions,
+      (transaction) => transaction.holdingId,
+    ),
+    propertiesById: groupByNumericId(
+      datedPropertyTransactions,
+      (transaction) => transaction.propertyId,
+    ),
+    pensionsByPotId: groupByNumericId(datedPensionTransactions, (transaction) => transaction.potId),
+    debtPaymentsByDebtId: groupByNumericId(datedDebtPayments, (transaction) => transaction.debtId),
+  };
 
-  return months.map((month, index) => {
-    const savings = computeSavingsAtCutoff(
-      sourceData.savings,
-      savingsByAccount,
-      month.cutoff,
-      sourceData.rates,
-    );
-    const brokerage = computeBrokerageAtCutoff(
-      sourceData.holdings,
-      holdingsById,
-      month.cutoff,
-      sourceData.rates,
-    );
-    const propertyEquity = computePropertyEquityAtCutoff(
-      sourceData.properties,
-      propertiesById,
-      buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, month.cutoff),
-      month.cutoff,
-      sourceData.rates,
-    );
-    const pension = computePensionAtCutoff(
-      sourceData.pensions,
-      pensionsByPotId,
-      month.cutoff,
-      sourceData.rates,
-    );
-    const liabilities = computeDebtLiabilitiesAtCutoff(
-      sourceData.debts,
-      debtPaymentsByDebtId,
-      month.cutoff,
-      sourceData.rates,
-    );
-
-    return {
-      id: index + 1,
-      month: month.label,
-      year: month.year,
-      totalValue: savings + brokerage + propertyEquity + pension - liabilities,
-      currency: BASE_CURRENCY,
-    };
-  });
+  return months.map((month, index) =>
+    computeNetWorthHistoryPoint(sourceData, groups, month, index),
+  );
 }
 
 app.get('/net-worth', async (c) => {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { buildHistoricalCurrencyRateResolver } from '../lib/currencyRateHistory';
 import { buildActivityList, buildNetWorthHistory, computeDerivedAllocations } from './dashboard';
 
 describe('dashboard debt integration helpers', () => {
@@ -86,6 +87,7 @@ describe('dashboard debt integration helpers', () => {
     const todayIso = today.toISOString().slice(0, 10);
     const history = buildNetWorthHistory({
       rates: new Map([['EUR', 1]]),
+      historicalRateResolver: buildHistoricalCurrencyRateResolver([], new Map([['EUR', 1]])),
       savings: [{ id: 1, balance: '1500', currency: 'EUR' }] as any,
       savingsTransactions: [] as any,
       holdings: [] as any,

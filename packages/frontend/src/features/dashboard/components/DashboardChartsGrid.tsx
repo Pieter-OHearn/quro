@@ -25,7 +25,11 @@ export function DashboardChartsGrid({
         <AreaChartCard
           className="h-full"
           title="Net Worth Growth"
-          subtitle={`Last 7 months in ${baseCurrency}`}
+          subtitle={
+            chartData.some((point) => point.fxEstimated)
+              ? `Last 7 months in ${baseCurrency}; some FX values estimated from nearest available rates`
+              : `Last 7 months in ${baseCurrency}`
+          }
           data={chartData}
           dataKey="value"
           xKey="month"

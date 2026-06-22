@@ -120,6 +120,7 @@ export function normalizeNetWorthSnapshots(
     month: snapshot.month,
     year: snapshot.year,
     value: convertToBase(snapshot.totalValue, snapshot.currency),
+    fxEstimated: snapshot.fxEstimated,
   }));
 }
 

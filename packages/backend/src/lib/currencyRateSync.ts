@@ -1,7 +1,7 @@
 import { CURRENCY_CODES, type CurrencyCode } from '@quro/shared';
 import { asc, sql } from 'drizzle-orm';
 import { db } from '../db/client';
-import { currencyRates } from '../db/schema';
+import { currencyRateHistory, currencyRates } from '../db/schema';
 import {
   buildRatesToBaseCurrency,
   CurrencyRatesUnavailableError,
@@ -177,27 +177,54 @@ export async function syncCurrencyRates(
   const result = await fetchRates(baseCurrency, fromCurrencies);
 
   if (result.rates.length > 0) {
-    await db
-      .insert(currencyRates)
-      .values(
-        result.rates.map((rate) => ({
-          fromCurrency: rate.fromCurrency,
-          toCurrency: rate.toCurrency,
-          rate: rate.rate,
-          provider: rate.provider,
-          sourceDate: rate.sourceDate,
-          updatedAt: syncedAt,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [currencyRates.fromCurrency, currencyRates.toCurrency],
-        set: {
-          rate: sql`excluded.rate`,
-          provider: sql`excluded.provider`,
-          sourceDate: sql`excluded.source_date`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-      });
+    await db.transaction(async (tx) => {
+      const rateRows = result.rates.map((rate) => ({
+        fromCurrency: rate.fromCurrency,
+        toCurrency: rate.toCurrency,
+        rate: rate.rate,
+        provider: rate.provider,
+        sourceDate: rate.sourceDate,
+        updatedAt: syncedAt,
+      }));
+
+      await tx
+        .insert(currencyRates)
+        .values(rateRows)
+        .onConflictDoUpdate({
+          target: [currencyRates.fromCurrency, currencyRates.toCurrency],
+          set: {
+            rate: sql`excluded.rate`,
+            provider: sql`excluded.provider`,
+            sourceDate: sql`excluded.source_date`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+        });
+
+      await tx
+        .insert(currencyRateHistory)
+        .values(
+          rateRows.map((rate) => ({
+            fromCurrency: rate.fromCurrency,
+            toCurrency: rate.toCurrency,
+            rate: rate.rate,
+            rateDate: rate.sourceDate,
+            provider: rate.provider,
+            syncedAt,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [
+            currencyRateHistory.fromCurrency,
+            currencyRateHistory.toCurrency,
+            currencyRateHistory.rateDate,
+          ],
+          set: {
+            rate: sql`excluded.rate`,
+            provider: sql`excluded.provider`,
+            syncedAt: sql`excluded.synced_at`,
+          },
+        });
+    });
   }
 
   return {

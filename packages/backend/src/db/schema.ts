@@ -826,6 +826,31 @@ export const currencyRates = pgTable(
   }),
 );
 
+export const currencyRateHistory = pgTable(
+  'currency_rate_history',
+  {
+    id: serial('id').primaryKey(),
+    fromCurrency: currencyCodeEnum('from_currency').notNull(),
+    toCurrency: currencyCodeEnum('to_currency').notNull(),
+    rate: numericAsNumber('rate', { precision: 12, scale: 6 }).notNull(),
+    rateDate: date('rate_date', { mode: 'string' }).notNull(),
+    provider: text('provider').notNull(),
+    syncedAt: timestamp('synced_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    fromToDateUnique: uniqueIndex('currency_rate_history_from_to_date_unique').on(
+      table.fromCurrency,
+      table.toCurrency,
+      table.rateDate,
+    ),
+    fromToDateIdx: index('currency_rate_history_from_to_date_idx').on(
+      table.fromCurrency,
+      table.toCurrency,
+      table.rateDate,
+    ),
+  }),
+);
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 export const dashboardTransactions = pgTable(

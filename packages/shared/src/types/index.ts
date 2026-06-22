@@ -635,6 +635,7 @@ export type NetWorthSnapshot = {
   year: number;
   totalValue: number;
   currency: CurrencyCode;
+  fxEstimated?: boolean;
 };
 
 export type AssetAllocation = {
