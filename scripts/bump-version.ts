@@ -3,16 +3,22 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { incrementVersion, formatVersion, ReleaseType } from './lib/version';
 
-const releaseType = process.argv[2]?.toLowerCase() as ReleaseType | undefined;
+const rawReleaseType = process.argv[2]?.toLowerCase();
 const validTypes: ReleaseType[] = ['major', 'minor', 'patch', 'prerelease'];
 
-if (!releaseType || !validTypes.includes(releaseType)) {
+function isReleaseType(value: string | undefined): value is ReleaseType {
+  return validTypes.includes(value as ReleaseType);
+}
+
+if (!isReleaseType(rawReleaseType)) {
   console.error(
     `Usage: bun scripts/bump-version.ts <${validTypes.join('|')}>\n` +
       'Example: bun scripts/bump-version.ts minor',
   );
   process.exit(1);
 }
+
+const releaseType = rawReleaseType;
 
 const VERSION_FILE = 'VERSION';
 

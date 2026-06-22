@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "types": ["bun", "node"],
+    "skipLibCheck": true,
+    "paths": {
+      "@quro/shared": ["./packages/shared/src"]
+    }
+  },
+  "include": ["playwright.config.ts", "scripts/**/*.ts"]
+}
