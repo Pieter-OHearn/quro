@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { afterAll, describe, expect, mock, test } from 'bun:test';
 
 const holding = {
   id: 42,
@@ -24,6 +24,8 @@ const updatedHolding = {
 };
 
 let snapshotWriteShouldFail = false;
+
+const { db: realDb } = await import('../db/client');
 
 await mock.module('../db/client', () => ({
   db: {
@@ -67,6 +69,11 @@ await mock.module('./marketDataClient', () => ({
 }));
 
 const { syncHoldingPricesForUser } = await import('./holdingPriceSync');
+
+afterAll(async () => {
+  await mock.module('../db/client', () => ({ db: realDb }));
+  mock.restore();
+});
 
 describe('holding price sync', () => {
   test('reports a holding update even when the history snapshot write fails', async () => {
