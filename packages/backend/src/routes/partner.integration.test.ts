@@ -1,5 +1,42 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { createIntegrationHelpers, type AuthSession } from '../test/integration';
+import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
+import type { AuthSession } from '../test/integration';
+
+// The dashboard's currency conversion lazily syncs FX rates from the real
+// market data client when the cache is empty/stale. Mock it so this suite
+// doesn't depend on a live network call to Yahoo Finance.
+const FX_RATES_TO_EUR: Record<string, number> = {
+  GBP: 1.18,
+  USD: 0.92,
+  AUD: 0.58,
+  NZD: 0.53,
+  CAD: 0.67,
+  CHF: 1.04,
+  SGD: 0.68,
+};
+
+await mock.module('../lib/marketDataClient', () => ({
+  getMarketDataClient: () => ({
+    lookupSymbol() {
+      throw new Error('lookupSymbol is not used by this suite');
+    },
+    getLatestEod(symbols: string[]) {
+      const now = new Date().toISOString();
+      const entries = symbols.flatMap((symbol) => {
+        const close = FX_RATES_TO_EUR[symbol.slice(0, 3)];
+        if (close === undefined) return [];
+        return [
+          [
+            symbol,
+            { symbol, close, priceCurrency: 'EUR', eodDate: now.slice(0, 10), tradeLast: now },
+          ],
+        ];
+      });
+      return Object.fromEntries(entries);
+    },
+  }),
+}));
+
+const { createIntegrationHelpers } = await import('../test/integration');
 
 const integration = createIntegrationHelpers('partner-it.quro.test');
 
@@ -640,4 +677,8 @@ describe('dashboard joint weighting', () => {
       amount: -200,
     });
   });
+});
+
+afterAll(() => {
+  mock.restore();
 });
