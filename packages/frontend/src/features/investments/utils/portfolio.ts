@@ -10,6 +10,7 @@ import {
   addMonthsUtc,
   formatMonthLabel,
   getPropertyMortgageBalance,
+  getPropertyOwnershipShare,
   monthEndUtc,
   monthStartUtc,
   toUtcTimestamp,
@@ -204,7 +205,7 @@ function getPropertyEquity(
     const principal = t.principal ?? Math.max(0, t.amount - (t.interest ?? 0));
     mortgage += principal;
   }
-  return convertToBase(value - mortgage, property.currency);
+  return convertToBase((value - mortgage) * getPropertyOwnershipShare(property), property.currency);
 }
 
 function computePropertyEquityForMonth(
@@ -306,7 +307,12 @@ export function computeTotalRental(
 
   if (rentalTxns.length === 0) {
     return properties.reduce(
-      (sum, property) => sum + convertToBase(property.monthlyRent, property.currency),
+      (sum, property) =>
+        sum +
+        convertToBase(
+          property.monthlyRent * getPropertyOwnershipShare(property),
+          property.currency,
+        ),
       0,
     );
   }
@@ -314,6 +320,7 @@ export function computeTotalRental(
   const propertyById = new Map(properties.map((property) => [property.id, property]));
   return rentalTxns.reduce((sum, transaction) => {
     const property = propertyById.get(transaction.propertyId);
-    return sum + convertToBase(transaction.amount, property?.currency ?? 'EUR');
+    const ownershipShare = property ? getPropertyOwnershipShare(property) : 1;
+    return sum + convertToBase(transaction.amount * ownershipShare, property?.currency ?? 'EUR');
   }, 0);
 }

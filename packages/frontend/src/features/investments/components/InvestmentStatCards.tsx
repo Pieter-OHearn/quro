@@ -65,9 +65,9 @@ export function InvestmentStatCards({
         change={trends.dividendsReceived}
       />
       <StatCard
-        label="Property Equity"
+        label="Your Property Equity"
         value={fmtBase(totalPropertyEquityBase)}
-        subtitle={`${fmtBase(totalRentalBase)}/mo rental`}
+        subtitle={`Your share after mortgages · ${fmtBase(totalRentalBase)}/mo rental`}
         icon={Building2}
         color="amber"
         change={trends.propertyEquity}

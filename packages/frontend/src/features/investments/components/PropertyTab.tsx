@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { EmptyState } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
 import type { Mortgage, Property, PropertyTransaction } from '@quro/shared';
-import { getPropertyMortgageBalance } from '../utils/position';
+import { getPropertyMortgageBalance, getPropertyOwnershipShare } from '../utils/position';
 import { PropertiesArchivedSection } from './PropertiesArchivedSection';
 import { PropertyTxnHistory } from './PropertyTxnHistory';
 
@@ -23,6 +23,7 @@ type PropertyTabProps = {
 
 type PropertyCardStats = {
   equity: number;
+  totalEquity: number;
   appreciation: number;
   appreciationPct: number;
   ltv: number;
@@ -44,7 +45,8 @@ function computePropertyCardStats(
   mortgageById: Map<number, Mortgage>,
 ): PropertyCardStats {
   const mortgageBalance = getPropertyMortgageBalance(property, mortgageById);
-  const equity = property.currentValue - mortgageBalance;
+  const totalEquity = property.currentValue - mortgageBalance;
+  const equity = totalEquity * getPropertyOwnershipShare(property);
   const appreciation = property.currentValue - property.purchasePrice;
   const appreciationPct = (property.currentValue / property.purchasePrice - 1) * 100;
   const ltv =
@@ -70,6 +72,7 @@ function computePropertyCardStats(
 
   return {
     equity,
+    totalEquity,
     appreciation,
     appreciationPct,
     ltv,
@@ -91,11 +94,22 @@ type PropertyValueGridProps = {
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
+function getEquityLabel(isJoint: boolean, hasMortgage: boolean): string {
+  if (isJoint) return hasMortgage ? 'Your Equity (50%)' : 'Your Asset Value (50%)';
+  return hasMortgage ? 'Equity' : 'Asset Value (no mortgage)';
+}
+
 function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: PropertyValueGridProps) {
+  const ownershipShare = getPropertyOwnershipShare(property);
+  const isJoint = ownershipShare < 1;
+  const equityLabel = getEquityLabel(isJoint, linkedMortgage !== undefined);
+
   return (
     <div className="grid grid-cols-2 gap-3 mb-3">
       <div className="bg-slate-50 rounded-xl p-3">
-        <p className="text-[10px] text-slate-400 mb-0.5">Current Value</p>
+        <p className="text-[10px] text-slate-400 mb-0.5">
+          {isJoint ? 'Property Value (total)' : 'Current Value'}
+        </p>
         <p className="font-bold text-slate-900 text-sm">
           {fmtNative(property.currentValue, property.currency, true)}
         </p>
@@ -109,12 +123,15 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
         </p>
       </div>
       <div className="bg-slate-50 rounded-xl p-3">
-        <p className="text-[10px] text-slate-400 mb-0.5">
-          {linkedMortgage ? 'Equity' : 'Asset Value (no mortgage)'}
-        </p>
+        <p className="text-[10px] text-slate-400 mb-0.5">{equityLabel}</p>
         <p className="font-bold text-emerald-600 text-sm">
           {fmtNative(stats.equity, property.currency, true)}
         </p>
+        {isJoint && (
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {fmtNative(stats.totalEquity, property.currency, true)} total equity
+          </p>
+        )}
         {linkedMortgage && (
           <p className="text-[10px] text-slate-400 mt-0.5">
             LTV{' '}
@@ -140,7 +157,7 @@ type MortgageLinkRowProps = {
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
-function MortgageLinkRow({ property: _property, linkedMortgage, fmtNative }: MortgageLinkRowProps) {
+function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRowProps) {
   if (linkedMortgage) {
     return (
       <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 mb-3">
@@ -149,10 +166,13 @@ function MortgageLinkRow({ property: _property, linkedMortgage, fmtNative }: Mor
             <Building2 size={11} className="text-indigo-600" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] text-slate-400">Linked mortgage · {linkedMortgage.lender}</p>
+            <p className="text-[10px] text-slate-400">
+              {property.isJoint ? 'Joint mortgage' : 'Linked mortgage'} · {linkedMortgage.lender}
+            </p>
             <p className="text-xs font-semibold text-slate-800 truncate">
               {fmtNative(linkedMortgage.outstandingBalance, linkedMortgage.currency, true)}{' '}
-              outstanding · {linkedMortgage.interestRate.toFixed(2)}%
+              {property.isJoint ? 'total outstanding' : 'outstanding'} ·{' '}
+              {linkedMortgage.interestRate.toFixed(2)}%
             </p>
           </div>
         </div>

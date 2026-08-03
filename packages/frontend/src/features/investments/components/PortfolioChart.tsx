@@ -45,7 +45,7 @@ function PortfolioChartLegend() {
       </div>
       <div className="flex items-center gap-2">
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-        Property Equity
+        Your Property Equity
       </div>
       <div className="text-xs text-slate-500">
         Estimated where historical market prices are unavailable.
@@ -87,7 +87,7 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
                 fmtBase(Number(value) || 0),
                 name === 'brokerage'
                   ? `Brokerage${isEstimated ? ' (estimated)' : ''}`
-                  : 'Property Equity',
+                  : 'Your Property Equity',
               ];
             }}
             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
@@ -121,7 +121,7 @@ export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartPr
   return (
     <ChartCard
       title="Portfolio Performance"
-      subtitle={`Brokerage + Property equity in ${baseCurrency}`}
+      subtitle={`Brokerage + your property equity in ${baseCurrency}`}
       hasData={data.length > 0}
       emptyMessage="Add transactions to generate portfolio history."
     >

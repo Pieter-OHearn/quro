@@ -9,6 +9,7 @@ const INVESTMENT_PROPERTY_TYPES = new Set([
   'Holiday Home',
   'Commercial',
 ]);
+const JOINT_PROPERTY_SHARE = 0.5;
 
 export type Position = {
   shares: number;
@@ -106,4 +107,9 @@ export function getPropertyMortgageBalance(
     if (linked) return linked.outstandingBalance;
   }
   return property.mortgage;
+}
+
+/** The portfolio is personal, so a joint property contributes an equal share. */
+export function getPropertyOwnershipShare(property: Property): number {
+  return property.isJoint ? JOINT_PROPERTY_SHARE : 1;
 }

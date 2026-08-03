@@ -2,7 +2,11 @@ import { useMemo } from 'react';
 import type { Holding, Mortgage, Property, PropertyTransaction } from '@quro/shared';
 import type { ConvertToBaseFn, InvestmentPortfolioStats } from '../types';
 import { computeTotalRental } from '../utils/portfolio';
-import { getPropertyMortgageBalance, type Position } from '../utils/position';
+import {
+  getPropertyMortgageBalance,
+  getPropertyOwnershipShare,
+  type Position,
+} from '../utils/position';
 
 export function useInvestmentPortfolioStats(
   holdings: Holding[],
@@ -39,7 +43,8 @@ export function useInvestmentPortfolioStats(
       (sum, property) =>
         sum +
         convertToBase(
-          property.currentValue - getPropertyMortgageBalance(property, mortgageById),
+          (property.currentValue - getPropertyMortgageBalance(property, mortgageById)) *
+            getPropertyOwnershipShare(property),
           property.currency,
         ),
       0,

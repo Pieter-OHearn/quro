@@ -12,7 +12,12 @@ import type {
   InvestmentPortfolioStats,
   InvestmentStatTrends,
 } from '../types';
-import { getPropertyMortgageBalance, monthStartUtc, toUtcTimestamp } from '../utils/position';
+import {
+  getPropertyMortgageBalance,
+  getPropertyOwnershipShare,
+  monthStartUtc,
+  toUtcTimestamp,
+} from '../utils/position';
 
 type DatedHoldingTransaction = HoldingTransaction & { timestamp: number };
 type DatedPropertyTransaction = PropertyTransaction & { timestamp: number };
@@ -187,7 +192,7 @@ function computePropertyEquityAtMonthStart(
     mortgage += principal;
   }
 
-  return convertToBase(value - mortgage, property.currency);
+  return convertToBase((value - mortgage) * getPropertyOwnershipShare(property), property.currency);
 }
 
 function computePropertyEquityAtMonthStartBase(
