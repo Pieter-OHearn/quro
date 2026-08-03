@@ -20,7 +20,7 @@
     "@aws-sdk/client-s3": "^3.1045.0",
     "@quro/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.25",
+    "hono": "^4.12.34",
     "postgres": "^3.4.0",
     "yahoo-finance2": "^3.14.0"
   },
