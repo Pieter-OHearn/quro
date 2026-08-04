@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
+import { and, eq, getTableColumns, gte, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   budgetTransactions,
@@ -25,6 +25,8 @@ import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 const app = new Hono();
 const BASE_CURRENCY = FX_BASE_CURRENCY;
 const NET_WORTH_HISTORY_MONTHS = 7;
+const ACTIVITY_LOOKBACK_MONTHS = 1;
+const ISO_DATE_LENGTH = 10;
 // Joint assets count half for each partner so the two dashboards sum to reality.
 const JOINT_WEIGHT = 0.5;
 
@@ -60,6 +62,13 @@ function monthEndUtc(monthStart: number): number {
 function addMonthsUtc(monthStart: number, delta: number): number {
   const date = new Date(monthStart);
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1);
+}
+
+export function getActivityCutoff(now = new Date()): string {
+  const currentMonthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  return new Date(addMonthsUtc(currentMonthStart, -ACTIVITY_LOOKBACK_MONTHS))
+    .toISOString()
+    .slice(0, ISO_DATE_LENGTH);
 }
 
 function formatMonthShort(monthStart: number): string {
@@ -1191,7 +1200,10 @@ type JointScopedActivityRows = {
   propertyParents: Array<{ id: number; currency: string; isJoint: boolean }>;
 };
 
-async function loadJointScopedActivityRows(userId: number): Promise<JointScopedActivityRows> {
+async function loadJointScopedActivityRows(
+  userId: number,
+  cutoff: string,
+): Promise<JointScopedActivityRows> {
   const partnerId = await getAcceptedPartnerId(userId);
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
@@ -1209,7 +1221,7 @@ async function loadJointScopedActivityRows(userId: number): Promise<JointScopedA
       .select(getTableColumns(savingsTransactions))
       .from(savingsTransactions)
       .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
-      .where(savingsAccess),
+      .where(and(savingsAccess, gte(savingsTransactions.date, cutoff))),
     db
       .select({
         id: savingsAccounts.id,
@@ -1222,7 +1234,7 @@ async function loadJointScopedActivityRows(userId: number): Promise<JointScopedA
       .select(getTableColumns(mortgageTransactions))
       .from(mortgageTransactions)
       .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
-      .where(mortgageAccess),
+      .where(and(mortgageAccess, gte(mortgageTransactions.date, cutoff))),
     db
       .select({ id: mortgages.id, currency: mortgages.currency, isJoint: mortgages.isJoint })
       .from(mortgages)
@@ -1231,7 +1243,7 @@ async function loadJointScopedActivityRows(userId: number): Promise<JointScopedA
       .select(getTableColumns(propertyTransactions))
       .from(propertyTransactions)
       .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
-      .where(propertyAccess),
+      .where(and(propertyAccess, gte(propertyTransactions.date, cutoff))),
     db
       .select({ id: properties.id, currency: properties.currency, isJoint: properties.isJoint })
       .from(properties)
@@ -1250,21 +1262,37 @@ async function loadJointScopedActivityRows(userId: number): Promise<JointScopedA
 
 app.get('/transactions', async (c) => {
   const user = getAuthUser(c);
+  const cutoff = getActivityCutoff();
   const [jointScoped, p, b, h, ho, d, doRows, pe, po] = await Promise.all([
-    loadJointScopedActivityRows(user.id),
-    db.select().from(payslips).where(eq(payslips.userId, user.id)),
-    db.select().from(budgetTransactions).where(eq(budgetTransactions.userId, user.id)),
-    db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, user.id)),
+    loadJointScopedActivityRows(user.id, cutoff),
+    db
+      .select()
+      .from(payslips)
+      .where(and(eq(payslips.userId, user.id), gte(payslips.date, cutoff))),
+    db
+      .select()
+      .from(budgetTransactions)
+      .where(and(eq(budgetTransactions.userId, user.id), gte(budgetTransactions.date, cutoff))),
+    db
+      .select()
+      .from(holdingTransactions)
+      .where(and(eq(holdingTransactions.userId, user.id), gte(holdingTransactions.date, cutoff))),
     db
       .select({ id: holdings.id, currency: holdings.currency })
       .from(holdings)
       .where(eq(holdings.userId, user.id)),
-    db.select().from(debtPayments).where(eq(debtPayments.userId, user.id)),
+    db
+      .select()
+      .from(debtPayments)
+      .where(and(eq(debtPayments.userId, user.id), gte(debtPayments.date, cutoff))),
     db
       .select({ id: debts.id, currency: debts.currency })
       .from(debts)
       .where(eq(debts.userId, user.id)),
-    db.select().from(pensionTransactions).where(eq(pensionTransactions.userId, user.id)),
+    db
+      .select()
+      .from(pensionTransactions)
+      .where(and(eq(pensionTransactions.userId, user.id), gte(pensionTransactions.date, cutoff))),
     db
       .select({ id: pensionPots.id, currency: pensionPots.currency })
       .from(pensionPots)

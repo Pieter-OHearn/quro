@@ -1,7 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-import { buildActivityList, buildNetWorthHistory, computeDerivedAllocations } from './dashboard';
+import {
+  buildActivityList,
+  buildNetWorthHistory,
+  computeDerivedAllocations,
+  getActivityCutoff,
+} from './dashboard';
 
 describe('dashboard debt integration helpers', () => {
+  test('bounds activity queries from the start of the previous UTC month', () => {
+    expect(getActivityCutoff(new Date('2026-08-04T12:00:00Z'))).toBe('2026-07-01');
+    expect(getActivityCutoff(new Date('2026-01-15T12:00:00Z'))).toBe('2025-12-01');
+  });
+
   test('includes liabilities metadata alongside asset allocations', () => {
     const summary = computeDerivedAllocations(
       new Map([['EUR', 1]]),
