@@ -123,12 +123,10 @@ type PensionStatementDocumentRecord = {
 };
 
 type ValidationResult =
-  | { ok: true; data: NormalizedPensionTransactionPayload }
-  | { ok: false; error: string };
+  { ok: true; data: NormalizedPensionTransactionPayload } | { ok: false; error: string };
 
 type RouteMutationResult =
-  | { data: unknown }
-  | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
+  { data: unknown } | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 

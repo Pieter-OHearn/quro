@@ -357,13 +357,7 @@ export type PensionStatementDocument = PdfDocument & {
 export type PayslipDocument = PdfDocument;
 
 export type PensionImportStatus =
-  | 'queued'
-  | 'processing'
-  | 'ready_for_review'
-  | 'failed'
-  | 'committed'
-  | 'expired'
-  | 'cancelled';
+  'queued' | 'processing' | 'ready_for_review' | 'failed' | 'committed' | 'expired' | 'cancelled';
 
 export type PensionImportConfidenceLabel = 'high' | 'medium' | 'low';
 

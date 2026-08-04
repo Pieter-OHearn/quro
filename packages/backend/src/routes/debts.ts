@@ -40,8 +40,7 @@ type DebtPaymentPayload = {
 };
 
 type RouteMutationResult =
-  | { data: unknown }
-  | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
+  { data: unknown } | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
 
 function toDebtInsertPayload(payload: DebtPayload, userId: number): typeof debts.$inferInsert {
   return {
