@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
+import { budgetCategories, budgetTransactions, categoryMappings, sessions } from '../db/schema';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
@@ -24,6 +25,81 @@ afterAll(async () => {
 });
 
 describe('auth integration', () => {
+  test('rejects an expired session', async () => {
+    const owner = await integration.signUp('expired-session');
+    await db
+      .update(sessions)
+      .set({ expiresAt: new Date(Date.now() - 60_000) })
+      .where(eq(sessions.userId, owner.user.id));
+
+    const response = await integration.request('/api/goals', { cookie: owner.cookie });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Session expired' });
+  });
+
+  test('rejects missing and mismatched CSRF tokens on unsafe requests', async () => {
+    const owner = await integration.signUp('csrf-rejections');
+    const sessionCookie = owner.cookie.split(';')[0];
+    const requestOptions = {
+      method: 'POST',
+      json: { name: 'Blocked goal' },
+    };
+
+    const missingCookie = await integration.request('/api/goals', {
+      ...requestOptions,
+      cookie: sessionCookie,
+      headers: { 'X-CSRF-Token': owner.csrfToken },
+    });
+    const missingHeader = await integration.request('/api/goals', {
+      ...requestOptions,
+      headers: { Cookie: owner.cookie },
+    });
+    const mismatchedToken = await integration.request('/api/goals', {
+      ...requestOptions,
+      headers: { Cookie: owner.cookie, 'X-CSRF-Token': 'not-the-cookie-token' },
+    });
+
+    for (const response of [missingCookie, missingHeader, mismatchedToken]) {
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'Invalid CSRF token' });
+    }
+  });
+
+  test('allows safe methods and auth exemptions without a CSRF token', async () => {
+    const owner = await integration.signUp('csrf-exemptions');
+    const sessionCookie = owner.cookie.split(';')[0];
+
+    const safeResponse = await integration.request('/api/goals', {
+      headers: { Cookie: sessionCookie },
+    });
+    expect(safeResponse.status).toBe(200);
+
+    const signinResponse = await integration.request('/api/auth/signin', {
+      method: 'POST',
+      json: { email: owner.user.email, password: integrationPassword },
+    });
+    expect(signinResponse.status).toBe(200);
+
+    const signupResponse = await integration.request('/api/auth/signup', {
+      method: 'POST',
+      json: {
+        firstName: 'CSRF',
+        lastName: 'Exemption',
+        email: integration.buildEmail('csrf-signup-exemption'),
+        password: integrationPassword,
+        age: 31,
+        retirementAge: 67,
+      },
+    });
+    expect(signupResponse.status).toBe(201);
+
+    const signoutResponse = await integration.request('/api/auth/signout', {
+      method: 'POST',
+      headers: { Cookie: sessionCookie },
+    });
+    expect(signoutResponse.status).toBe(200);
+  });
+
   test('rate limits repeated signin attempts', async () => {
     const owner = await integration.signUp('signin-rate-limit');
     const previousNodeEnv = process.env.NODE_ENV;
