@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
@@ -30,13 +31,24 @@ function buildLinkedPropertyMap(properties: Property[]): Map<number, Property> {
 
 const EMPTY_PROPERTIES: Property[] = [];
 
+function parseRequestedMortgageId(raw: string | null): number | null {
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 export function useMortgagePageState(): MortgagePageState {
+  const [searchParams] = useSearchParams();
   const { fmtBase: fmt } = useCurrency();
   const mortgagesQuery = useMortgages();
   const propertiesQuery = useProperties();
   const mortgages = mortgagesQuery.data ?? [];
   const properties = propertiesQuery.data ?? EMPTY_PROPERTIES;
-  const [activeMortgageId, setActiveMortgageId] = useState<number | null>(null);
+  const requestedMortgageId = parseRequestedMortgageId(searchParams.get('mortgageId'));
+  const [activeMortgageId, setActiveMortgageId] = useState<number | null>(requestedMortgageId);
+
+  useEffect(() => {
+    if (requestedMortgageId !== null) setActiveMortgageId(requestedMortgageId);
+  }, [requestedMortgageId]);
 
   const mortgage = mortgages.find((entry) => entry.id === activeMortgageId) ?? mortgages[0];
   const transactionsQuery = useMortgageTransactions(mortgage?.id);

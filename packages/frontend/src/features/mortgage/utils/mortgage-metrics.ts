@@ -1,5 +1,5 @@
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
-import type { AmortizationRow, OverpaymentImpact, PaymentBreakdownRow } from '../types';
+import type { AmortizationRow, PaymentBreakdownRow } from '../types';
 
 const SCHEDULE_YEAR_STEP = 2;
 const MONTHS_PER_YEAR = 12;
@@ -160,43 +160,6 @@ export function computePaymentBreakdownRows(txns: MortgageTransaction[]): Paymen
     }));
 }
 
-export function computeOverpaymentImpact(
-  mortgage: MortgageType,
-  monthlyRate: number,
-  monthsRemainingRaw: number | null,
-): OverpaymentImpact | null {
-  if (monthsRemainingRaw == null) return null;
-  const annualAllowance = (mortgage.outstandingBalance * mortgage.overpaymentLimit) / 100;
-  if (!Number.isFinite(annualAllowance) || annualAllowance <= 0) return null;
-
-  const extraMonthly = annualAllowance / MONTHS_PER_YEAR;
-  const acceleratedPayment = mortgage.monthlyPayment + extraMonthly;
-  const acceleratedMonthsRaw = calculateRemainingMonths(
-    mortgage.outstandingBalance,
-    monthlyRate,
-    acceleratedPayment,
-  );
-  if (acceleratedMonthsRaw == null) return null;
-
-  const baselineInterest =
-    mortgage.monthlyPayment * monthsRemainingRaw - mortgage.outstandingBalance;
-  const acceleratedInterest =
-    acceleratedPayment * acceleratedMonthsRaw - mortgage.outstandingBalance;
-  return {
-    annualAllowance,
-    extraMonthly,
-    interestSaved: Math.max(0, baselineInterest - acceleratedInterest),
-    monthsReduced: Math.max(0, Math.round(monthsRemainingRaw - acceleratedMonthsRaw)),
-  };
-}
-
-export function formatTermReduction(monthsReduced: number): string {
-  if (monthsReduced < MONTHS_PER_YEAR) {
-    return `${monthsReduced} month${monthsReduced === 1 ? '' : 's'}`;
-  }
-  return `${(monthsReduced / MONTHS_PER_YEAR).toFixed(1)} years`;
-}
-
 export function computeMortgageMetrics(mortgage: MortgageType, txns: MortgageTransaction[]) {
   const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
   const monthsRemainingRaw = calculateRemainingMonths(
@@ -207,7 +170,6 @@ export function computeMortgageMetrics(mortgage: MortgageType, txns: MortgageTra
   const monthsRemaining = Math.round(monthsRemainingRaw ?? 0);
   const paid = mortgage.originalAmount - mortgage.outstandingBalance;
   const paymentBreakdown = computePaymentBreakdownRows(txns);
-  const overpaymentImpact = computeOverpaymentImpact(mortgage, monthlyRate, monthsRemainingRaw);
 
   return {
     ltv: (mortgage.outstandingBalance / mortgage.propertyValue) * 100,
@@ -218,6 +180,5 @@ export function computeMortgageMetrics(mortgage: MortgageType, txns: MortgageTra
     yearsRemaining: Math.floor(monthsRemaining / 12),
     amortization: generateSchedule(mortgage, monthsRemainingRaw),
     paymentBreakdown,
-    overpaymentImpact,
   };
 }

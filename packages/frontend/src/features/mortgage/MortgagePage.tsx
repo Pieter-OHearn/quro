@@ -12,7 +12,6 @@ import {
   MortgageRepaymentProgress,
   MortgageStatCards,
   MortgageTabSelector,
-  MortgageTips,
   MortgageTxnHistory,
 } from './components';
 import { useMortgagePageState } from './hooks/useMortgagePageState';
@@ -74,7 +73,6 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
     yearsRemaining,
     amortization,
     paymentBreakdown,
-    overpaymentImpact,
   } = computeMortgageMetrics(mortgage, state.txns);
 
   return (
@@ -138,7 +136,6 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
         onEdit={state.setEditingTxn}
         onDelete={state.handleDeleteTxn}
       />
-      <MortgageTips mortgage={mortgage} fmt={state.fmt} overpaymentImpact={overpaymentImpact} />
       <MortgageArchivedSection />
     </div>
   );

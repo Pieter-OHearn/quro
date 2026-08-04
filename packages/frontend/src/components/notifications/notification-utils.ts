@@ -1,5 +1,10 @@
 import type { PensionStatementImportFeedItem } from '@quro/shared';
-import type { ImportNotificationItem, NotificationStatus, NotificationStatusCounts } from './types';
+import type {
+  ImportNotificationItem,
+  NotificationItem,
+  NotificationStatus,
+  NotificationStatusCounts,
+} from './types';
 
 const FALLBACK_POT_EMOJI = '🏦';
 
@@ -42,6 +47,7 @@ export function mapImportFeedToNotifications(
 
       return {
         id: `import-${item.import.id}`,
+        kind: 'import',
         importId: item.import.id,
         potId: item.pot.id,
         potName: item.pot.name,
@@ -58,19 +64,21 @@ export function mapImportFeedToNotifications(
         body: toNotificationBody(item, status),
         unread,
         actionable,
+        dismissible: false,
         source: item,
       };
     });
 }
 
 export function buildNotificationStatusCounts(
-  notifications: ImportNotificationItem[],
+  notifications: NotificationItem[],
 ): NotificationStatusCounts {
   const counts: NotificationStatusCounts = {
     queuing: 0,
     processing: 0,
     ready: 0,
     failed: 0,
+    reminder: 0,
   };
 
   for (const notification of notifications) {

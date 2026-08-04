@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react';
-import { AlertCircle, ArrowRight, Clock, Loader2, Sparkles } from 'lucide-react';
+import { AlertCircle, ArrowRight, Clock, Home, Loader2, Sparkles, X } from 'lucide-react';
 import { toRelativeTime } from './notification-utils';
-import type { ImportNotificationItem } from './types';
+import type { NotificationItem as NotificationItemType } from './types';
 
 const STATUS_META = {
   queuing: {
@@ -36,15 +36,25 @@ const STATUS_META = {
     label: 'Failed',
     labelCls: 'bg-rose-50 text-rose-600 border border-rose-100',
   },
+  reminder: {
+    bar: 'bg-amber-400',
+    bgTint: 'bg-amber-50/20',
+    iconBg: 'bg-amber-50',
+    iconColor: 'text-amber-600',
+    label: 'Reminder',
+    labelCls: 'bg-amber-50 text-amber-700 border border-amber-100',
+  },
 } as const;
 
 type NotificationItemProps = {
-  item: ImportNotificationItem;
-  onAction: (item: ImportNotificationItem) => void;
+  item: NotificationItemType;
+  onAction: (item: NotificationItemType) => void;
+  onDismiss: (item: NotificationItemType) => void;
 };
 
-function renderStatusIcon(item: ImportNotificationItem) {
+function renderStatusIcon(item: NotificationItemType) {
   const meta = STATUS_META[item.status];
+  if (item.kind === 'mortgage_expiry') return <Home size={16} className={meta.iconColor} />;
   if (item.status === 'queuing') return <Clock size={16} className={meta.iconColor} />;
   if (item.status === 'processing')
     return <Loader2 size={16} className={`${meta.iconColor} animate-spin`} />;
@@ -52,7 +62,7 @@ function renderStatusIcon(item: ImportNotificationItem) {
   return <span className="text-sm leading-none">{item.potEmoji}</span>;
 }
 
-function renderFooter(item: ImportNotificationItem) {
+function renderFooter(item: NotificationItemType) {
   const meta = STATUS_META[item.status];
 
   if (item.status === 'queuing') {
@@ -106,6 +116,15 @@ function renderFooter(item: ImportNotificationItem) {
     );
   }
 
+  if (item.status === 'reminder') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[10px] bg-amber-600 text-white px-2.5 py-1 rounded-full font-medium">
+        Review mortgage
+        <ArrowRight size={9} />
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] bg-indigo-600 text-white px-2.5 py-1 rounded-full font-medium">
       <Sparkles size={9} />
@@ -115,7 +134,7 @@ function renderFooter(item: ImportNotificationItem) {
   );
 }
 
-export function NotificationItem({ item, onAction }: Readonly<NotificationItemProps>) {
+export function NotificationItem({ item, onAction, onDismiss }: Readonly<NotificationItemProps>) {
   const meta = STATUS_META[item.status];
 
   const handleClick = (event: MouseEvent<HTMLLIElement>): void => {
@@ -146,9 +165,24 @@ export function NotificationItem({ item, onAction }: Readonly<NotificationItemPr
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-0.5">
           <p className="text-xs leading-snug font-semibold text-slate-800">{item.title}</p>
-          <span className="text-[10px] text-slate-400 flex-shrink-0 mt-px tabular-nums whitespace-nowrap">
-            {toRelativeTime(item.updatedAt)}
-          </span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <span className="text-[10px] text-slate-400 mt-px tabular-nums whitespace-nowrap">
+              {item.timeLabel ?? toRelativeTime(item.updatedAt)}
+            </span>
+            {item.dismissible && (
+              <button
+                type="button"
+                aria-label="Dismiss notification"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDismiss(item);
+                }}
+                className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
         </div>
 
         <p className="text-[11px] text-slate-500 leading-relaxed truncate mb-2">{item.body}</p>

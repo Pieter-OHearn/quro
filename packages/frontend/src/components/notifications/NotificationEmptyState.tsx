@@ -6,7 +6,7 @@ export function NotificationEmptyState() {
     <EmptyState
       icon={Bell}
       title="All caught up!"
-      description="Background jobs will appear here."
+      description="Background jobs and timely reminders will appear here."
       compact
       tone="neutral"
     />

@@ -17,6 +17,8 @@ function buildMortgageMetrics(
   yearsRemaining: number,
   monthsRemaining: number,
 ) {
+  const annualAllowance = (mortgage.outstandingBalance * mortgage.overpaymentLimit) / 100;
+  const hasAllowance = Number.isFinite(annualAllowance) && annualAllowance > 0;
   return [
     {
       label: 'Outstanding Balance',
@@ -30,6 +32,11 @@ function buildMortgageMetrics(
       sub: `${mortgage.rateType} (until ${mortgage.fixedUntil})`,
     },
     { label: 'Years Remaining', value: `${yearsRemaining} yrs`, sub: `~${monthsRemaining} months` },
+    {
+      label: 'Penalty-free allowance',
+      value: hasAllowance ? `${mortgage.overpaymentLimit}% per year` : 'Not recorded',
+      sub: hasAllowance ? `Contract maximum: ${fmt(annualAllowance)}` : 'Check your mortgage terms',
+    },
   ];
 }
 
@@ -66,7 +73,7 @@ export function MortgageHeroCard({
           <Edit3 size={12} /> Edit
         </button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {metrics.map(({ label, value, sub }) => (
           <div key={label} className="bg-white/10 rounded-xl p-4">
             <p className="text-xs text-slate-400 mb-1">{label}</p>

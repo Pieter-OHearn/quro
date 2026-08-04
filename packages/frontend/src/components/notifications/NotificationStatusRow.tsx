@@ -14,6 +14,7 @@ const STATUS_META: Array<{
   { key: 'processing', label: 'Processing', dotClass: 'bg-indigo-400', pulse: true },
   { key: 'ready', label: 'Ready', dotClass: 'bg-amber-400' },
   { key: 'failed', label: 'Failed', dotClass: 'bg-rose-400' },
+  { key: 'reminder', label: 'Reminders', dotClass: 'bg-amber-400' },
 ];
 
 export function NotificationStatusRow({ counts }: Readonly<NotificationStatusRowProps>) {

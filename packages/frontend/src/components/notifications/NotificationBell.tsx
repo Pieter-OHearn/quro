@@ -2,15 +2,55 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { usePensionImportNotifications } from '@/features/pension/hooks';
+import { useMortgages } from '@/features/mortgage/hooks';
+import { useAuth } from '@/lib/AuthContext';
 import { buildNotificationStatusCounts, mapImportFeedToNotifications } from './notification-utils';
 import { NotificationEmptyState } from './NotificationEmptyState';
 import { NotificationList } from './NotificationList';
 import { NotificationPanelHeader } from './NotificationPanelHeader';
 import { NotificationStatusRow } from './NotificationStatusRow';
-import type { ImportNotificationItem, NotificationStatusCounts } from './types';
+import {
+  buildMortgageExpiryNotifications,
+  mortgageDismissalStorageKey,
+  parseDismissedNotificationKeys,
+} from './mortgage-notifications';
+import type { NotificationItem, NotificationStatusCounts } from './types';
 
 const RING_DURATION_MS = 700;
 const BADGE_OVERFLOW_LIMIT = 9;
+
+function useMortgageReminders(
+  userId: number | undefined,
+  mortgages: Parameters<typeof buildMortgageExpiryNotifications>[0],
+) {
+  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (userId === undefined) {
+      setDismissedKeys(new Set());
+      return;
+    }
+    setDismissedKeys(
+      parseDismissedNotificationKeys(localStorage.getItem(mortgageDismissalStorageKey(userId))),
+    );
+  }, [userId]);
+
+  const notifications = useMemo(
+    () => buildMortgageExpiryNotifications(mortgages, dismissedKeys),
+    [dismissedKeys, mortgages],
+  );
+
+  const dismiss = (notification: NotificationItem): void => {
+    if (userId === undefined || notification.kind !== 'mortgage_expiry') return;
+    setDismissedKeys((current) => {
+      const next = new Set(current).add(notification.dismissalKey);
+      localStorage.setItem(mortgageDismissalStorageKey(userId), JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  return { notifications, dismiss };
+}
 
 type BellButtonProps = {
   open: boolean;
@@ -54,12 +94,13 @@ function BellButton({
 }
 
 type DropdownProps = {
-  notifications: ImportNotificationItem[];
+  notifications: NotificationItem[];
   counts: NotificationStatusCounts;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
-  onAction: (notification: ImportNotificationItem) => void;
+  onAction: (notification: NotificationItem) => void;
+  onDismiss: (notification: NotificationItem) => void;
   onRetry: () => void;
 };
 
@@ -70,6 +111,7 @@ function Dropdown({
   isFetching,
   isError,
   onAction,
+  onDismiss,
   onRetry,
 }: Readonly<DropdownProps>) {
   return (
@@ -84,7 +126,7 @@ function Dropdown({
       ) : notifications.length === 0 ? (
         <NotificationEmptyState />
       ) : (
-        <NotificationList notifications={notifications} onAction={onAction} />
+        <NotificationList notifications={notifications} onAction={onAction} onDismiss={onDismiss} />
       )}
 
       {isError && (
@@ -105,18 +147,21 @@ function Dropdown({
 
 export function NotificationBell() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [ring, setRing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const previousUnreadCountRef = useRef(0);
   const notificationsQuery = usePensionImportNotifications();
+  const mortgagesQuery = useMortgages();
+  const mortgageReminders = useMortgageReminders(user?.id, mortgagesQuery.data ?? []);
 
-  const notifications = useMemo(
-    () => mapImportFeedToNotifications(notificationsQuery.data ?? []),
-    [notificationsQuery.data],
-  );
+  const notifications = useMemo(() => {
+    const imports = mapImportFeedToNotifications(notificationsQuery.data ?? []);
+    return [...mortgageReminders.notifications, ...imports];
+  }, [mortgageReminders.notifications, notificationsQuery.data]);
   const counts = useMemo(() => buildNotificationStatusCounts(notifications), [notifications]);
-  const unreadCount = counts.ready + counts.failed;
+  const unreadCount = counts.ready + counts.failed + counts.reminder;
   const hasActiveJobs = counts.queuing > 0 || counts.processing > 0;
 
   useEffect(() => {
@@ -143,9 +188,13 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', onOutsideClick);
   }, [open]);
 
-  const handleAction = (notification: ImportNotificationItem): void => {
+  const handleAction = (notification: NotificationItem): void => {
     if (!notification.actionable) return;
     setOpen(false);
+    if (notification.kind === 'mortgage_expiry') {
+      void navigate(`/mortgage?mortgageId=${notification.mortgageId}`);
+      return;
+    }
     void navigate('/pension', {
       state: {
         openImportId: notification.importId,
@@ -167,12 +216,14 @@ export function NotificationBell() {
         <Dropdown
           notifications={notifications}
           counts={counts}
-          isLoading={notificationsQuery.isLoading}
-          isFetching={notificationsQuery.isFetching}
-          isError={notificationsQuery.isError}
+          isLoading={notificationsQuery.isLoading || mortgagesQuery.isLoading}
+          isFetching={notificationsQuery.isFetching || mortgagesQuery.isFetching}
+          isError={notificationsQuery.isError || mortgagesQuery.isError}
           onAction={handleAction}
+          onDismiss={mortgageReminders.dismiss}
           onRetry={() => {
             void notificationsQuery.refetch();
+            void mortgagesQuery.refetch();
           }}
         />
       )}

@@ -57,13 +57,6 @@ export type PaymentBreakdownRow = {
   interest: number;
 };
 
-export type OverpaymentImpact = {
-  annualAllowance: number;
-  extraMonthly: number;
-  interestSaved: number;
-  monthsReduced: number;
-};
-
 export type MortgagePageState = {
   fmt: MortgageFormatFn;
   mortgages: MortgageType[];

@@ -7,5 +7,4 @@ export { MortgageModals } from './MortgageModals';
 export { MortgageRepaymentProgress } from './MortgageRepaymentProgress';
 export { MortgageStatCards } from './MortgageStatCards';
 export { MortgageTabSelector } from './MortgageTabSelector';
-export { MortgageTips } from './MortgageTips';
 export { MortgageTxnHistory } from './MortgageTxnHistory';
