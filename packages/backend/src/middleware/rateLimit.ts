@@ -53,6 +53,7 @@ const SIGNIN_MAX_ATTEMPTS = 5;
 const SIGNUP_MAX_ATTEMPTS = 3;
 const CHANGE_PASSWORD_MAX_ATTEMPTS = 5;
 const SIGNIN_EMAIL_MAX_ATTEMPTS = 5;
+const PARTNER_INVITE_MAX_ATTEMPTS = 10;
 
 export const signinRateLimit = createRateLimiter(ONE_MINUTE_MS, SIGNIN_MAX_ATTEMPTS);
 export const signupRateLimit = createRateLimiter(FIFTEEN_MINUTES_MS, SIGNUP_MAX_ATTEMPTS);
@@ -61,6 +62,10 @@ export const signupRateLimit = createRateLimiter(FIFTEEN_MINUTES_MS, SIGNUP_MAX_
 export const signinEmailRateLimit = createRateLimitChecker(
   FIFTEEN_MINUTES_MS,
   SIGNIN_EMAIL_MAX_ATTEMPTS,
+);
+export const partnerInviteRateLimit = createRateLimitChecker(
+  FIFTEEN_MINUTES_MS,
+  PARTNER_INVITE_MAX_ATTEMPTS,
 );
 export const changePasswordRateLimit = createRateLimiter(
   FIFTEEN_MINUTES_MS,

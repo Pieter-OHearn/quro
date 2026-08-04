@@ -5,6 +5,7 @@ import { db } from '../db/client';
 import { mortgages, partnerLinks, properties, savingsAccounts, users } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
+import { partnerInviteRateLimit } from '../middleware/rateLimit';
 
 const app = new Hono();
 
@@ -72,6 +73,14 @@ app.get('/', async (c) => {
 
 app.post('/invite', async (c) => {
   const user = getAuthUser(c);
+
+  if (partnerInviteRateLimit(String(user.id))) {
+    return c.json(
+      { error: 'Too many requests, please try again later' },
+      HTTP_STATUS.TOO_MANY_REQUESTS,
+    );
+  }
+
   const payload = (await c.req.json()) as { email?: unknown };
   const email = typeof payload.email === 'string' ? payload.email.toLowerCase().trim() : '';
 

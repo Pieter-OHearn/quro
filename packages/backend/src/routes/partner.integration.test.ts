@@ -39,6 +39,7 @@ await mock.module('../lib/marketDataClient', () => ({
 const { createIntegrationHelpers } = await import('../test/integration');
 
 const integration = createIntegrationHelpers('partner-it.quro.test');
+const PARTNER_INVITE_ALLOWED_ATTEMPTS = 10;
 
 type ApiDataResponse<T> = { data: T };
 type ApiErrorResponse = { error: string };
@@ -189,6 +190,30 @@ describe('partner link lifecycle', () => {
 
   afterAll(async () => {
     await integration.cleanup();
+  });
+
+  test('rate limits repeated invite attempts by authenticated user', async () => {
+    const requester = await integration.signUp('invite-rate-limit');
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    try {
+      process.env.NODE_ENV = 'development';
+      for (let attempt = 0; attempt < PARTNER_INVITE_ALLOWED_ATTEMPTS; attempt += 1) {
+        const response = await invitePartner(requester, integration.buildEmail('unknown-target'));
+        expect(response.status).toBe(404);
+      }
+
+      const limitedResponse = await invitePartner(
+        requester,
+        integration.buildEmail('unknown-target'),
+      );
+      expect(limitedResponse.status).toBe(429);
+      expect(await limitedResponse.json()).toEqual({
+        error: 'Too many requests, please try again later',
+      });
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
   });
 
   test('invite, accept, and unlink round trip with correct roles', async () => {
