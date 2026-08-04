@@ -95,9 +95,13 @@ export async function checkDatabaseReadiness(now = new Date()): Promise<Readines
   }
 }
 
-export async function checkDocumentStorageReadiness(now = new Date()): Promise<ReadinessCheck> {
+export async function checkDocumentStorageReadiness(
+  now = new Date(),
+  checkStorage = checkS3Readiness,
+  timeoutMs = READINESS_TIMEOUT_MS,
+): Promise<ReadinessCheck> {
   try {
-    await withTimeout(checkS3Readiness(), READINESS_TIMEOUT_MS, 'Document storage readiness check');
+    await withTimeout(checkStorage(), timeoutMs, 'Document storage readiness check');
     return createReadinessCheck(now, true, true, 'Document storage is reachable.');
   } catch (error) {
     if (error instanceof S3ConfigurationError) {
