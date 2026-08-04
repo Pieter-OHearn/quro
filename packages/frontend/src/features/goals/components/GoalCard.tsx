@@ -579,7 +579,7 @@ function GoalNameAndBadges({
 
   return (
     <div className="flex items-start gap-3 min-w-0">
-      <span className="text-2xl flex-shrink-0 leading-none mt-0.5">{goal.emoji}</span>
+      <span className="text-2xl flex-shrink-0 leading-none mt-0.5">{goal.emoji ?? '🎯'}</span>
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-semibold text-slate-800 leading-tight">{goal.name}</p>

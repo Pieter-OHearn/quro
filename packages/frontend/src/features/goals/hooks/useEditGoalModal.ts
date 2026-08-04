@@ -50,7 +50,7 @@ function goalAmountFields(goal: Goal) {
 function goalToFormState(goal: Goal, baseCurrency: string): GoalFormState {
   return {
     name: goal.name,
-    emoji: goal.emoji,
+    emoji: goal.emoji ?? '🎯',
     color: goal.color ?? COLORS[0],
     notes: goal.notes ?? '',
     deadline: goal.deadline,

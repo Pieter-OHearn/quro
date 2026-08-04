@@ -586,7 +586,7 @@ export type Goal = {
   sourceType: GoalSourceType;
   sourceId?: number | null;
   name: string;
-  emoji: string;
+  emoji: string | null;
   currentAmount: number;
   targetAmount: number;
   deadline: string;

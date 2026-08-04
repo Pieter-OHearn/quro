@@ -1224,6 +1224,36 @@ describe('bunq integration', () => {
 });
 
 describe('goals integration', () => {
+  test('returns a null emoji when a goal is created without one', async () => {
+    const owner = await integration.signUp('goals-null-emoji');
+
+    const createResponse = await integration.request('/api/goals', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        type: 'annual',
+        name: 'Read more books',
+        currentAmount: 0,
+        targetAmount: 12,
+        deadline: '2026-12-31',
+        year: 2026,
+        category: 'Personal',
+        monthlyContribution: 0,
+        currency: 'EUR',
+      },
+    });
+    const created = (await createResponse.json()) as { data: { id: number; emoji: null } };
+    expect(createResponse.status).toBe(201);
+    expect(created.data.emoji).toBeNull();
+
+    const listResponse = await integration.request('/api/goals', { cookie: owner.cookie });
+    const listed = (await listResponse.json()) as { data: Array<{ id: number; emoji: null }> };
+    expect(listResponse.status).toBe(200);
+    expect(listed.data).toContainEqual(
+      expect.objectContaining({ id: created.data.id, emoji: null }),
+    );
+  });
+
   test('covers goal CRUD', async () => {
     const owner = await integration.signUp('goals-owner');
 

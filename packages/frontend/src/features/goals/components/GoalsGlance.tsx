@@ -21,7 +21,7 @@ function GlanceItem({ goal, goalProgressContext, currentYear }: Readonly<GlanceI
 
   return (
     <div className="group flex items-center gap-3">
-      <span className="text-base w-7 text-center flex-shrink-0">{goal.emoji}</span>
+      <span className="text-base w-7 text-center flex-shrink-0">{goal.emoji ?? '🎯'}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-medium text-slate-700 truncate">{goal.name}</span>
