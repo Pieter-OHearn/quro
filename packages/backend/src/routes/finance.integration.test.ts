@@ -347,6 +347,38 @@ describe('finance integration', () => {
     expect(await strangerDeleteResponse.json()).toEqual({ error: 'Payslip not found' });
   });
 
+  test('returns a null emoji for a property created without one', async () => {
+    const owner = await integration.signUp('property-null-emoji');
+    const createResponse = await integration.request('/api/investments/properties', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        address: '1 Plain Street',
+        propertyType: 'primary_home',
+        purchasePrice: 250000,
+        currentValue: 275000,
+        monthlyRent: 0,
+        currency: 'EUR',
+      },
+    });
+    const created = await parseJson<ApiDataResponse<{ id: number; emoji: null }>>(
+      createResponse,
+      201,
+    );
+    expect(created.data.emoji).toBeNull();
+
+    const listResponse = await integration.request('/api/investments/properties', {
+      cookie: owner.cookie,
+    });
+    const listed = await parseJson<ApiDataResponse<Array<{ id: number; emoji: string | null }>>>(
+      listResponse,
+      200,
+    );
+    expect(listed.data).toContainEqual(
+      expect.objectContaining({ id: created.data.id, emoji: null }),
+    );
+  });
+
   test('covers investments holdings, price sync boundaries, transactions, and property CRUD', async () => {
     const owner = await integration.signUp('investments-owner');
     const stranger = await integration.signUp('investments-stranger');

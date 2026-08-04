@@ -41,6 +41,7 @@ export function normalizeProperty(raw: Property): Property {
   return {
     ...raw,
     mortgageId: toNullableId(raw.mortgageId),
+    emoji: raw.emoji?.trim() || '🏠',
   };
 }
 

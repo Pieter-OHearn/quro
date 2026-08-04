@@ -277,7 +277,7 @@ export type Property = {
   mortgageId: number | null;
   monthlyRent: number;
   currency: CurrencyCode;
-  emoji: string;
+  emoji: string | null;
   isJoint: boolean;
   userId?: number;
   archivedAt?: string | null;

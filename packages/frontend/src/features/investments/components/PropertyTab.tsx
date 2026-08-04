@@ -307,7 +307,7 @@ function PropertyCardHeader({
   return (
     <div className="flex items-start justify-between gap-3 mb-4">
       <div className="flex items-center gap-3 min-w-0">
-        <span className="text-2xl leading-none flex-shrink-0">{property.emoji}</span>
+        <span className="text-2xl leading-none flex-shrink-0">{property.emoji ?? '🏠'}</span>
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 truncate">{property.address}</p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">

@@ -591,7 +591,7 @@ export function AddPropertyTxnModal({
   return (
     <Modal
       title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
-      subtitle={`${property.emoji} ${property.address}`}
+      subtitle={`${property.emoji ?? '🏠'} ${property.address}`}
       onClose={onClose}
       footer={
         <ModalFooter
