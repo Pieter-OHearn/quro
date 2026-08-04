@@ -156,7 +156,10 @@ function PropertyLinkSection({
 type LoanFinancialsSectionProps = { form: FormState; errors: Errors; setField: SetFieldFn };
 
 type LoanFinancialField =
-  'originalAmount' | 'outstandingBalance' | 'propertyValue' | 'monthlyPayment';
+  | 'originalAmount'
+  | 'outstandingBalance'
+  | 'propertyValue'
+  | 'monthlyPayment';
 
 function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSectionProps) {
   // Property value is derived from the linked property, so it is shown

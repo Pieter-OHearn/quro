@@ -16,10 +16,14 @@ import {
 import { usePensionPageState } from './hooks';
 
 type DeepLinkResolution =
-  { type: 'none' } | { type: 'clear' } | { type: 'open'; importId: number; pot: PensionPot };
+  | { type: 'none' }
+  | { type: 'clear' }
+  | { type: 'open'; importId: number; pot: PensionPot };
 
 type ParsedDeepLinkIds =
-  { type: 'none' } | { type: 'clear' } | { type: 'open'; importId: number; potId: number };
+  | { type: 'none' }
+  | { type: 'clear' }
+  | { type: 'open'; importId: number; potId: number };
 
 function parsePositiveInt(value: unknown): number | null {
   const parsed = Number.parseInt(String(value ?? ''), 10);

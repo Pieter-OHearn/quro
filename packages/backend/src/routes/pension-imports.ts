@@ -91,10 +91,17 @@ type NormalizedPensionTransactionPayload = {
 };
 
 type ValidationResult =
-  { ok: true; data: NormalizedPensionTransactionPayload } | { ok: false; error: string };
+  | { ok: true; data: NormalizedPensionTransactionPayload }
+  | { ok: false; error: string };
 
 type ImportStatus =
-  'queued' | 'processing' | 'ready_for_review' | 'failed' | 'committed' | 'expired' | 'cancelled';
+  | 'queued'
+  | 'processing'
+  | 'ready_for_review'
+  | 'failed'
+  | 'committed'
+  | 'expired'
+  | 'cancelled';
 
 const IMPORT_STATUSES: ImportStatus[] = [
   'queued',
