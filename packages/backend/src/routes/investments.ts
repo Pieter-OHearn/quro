@@ -20,17 +20,12 @@ import {
   propertyTransactions,
   stockExchanges,
 } from '../db/schema';
-import { and, asc, eq, getTableColumns, gte, inArray, isNull, lte } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
-import {
-  applyPrincipalToBalance,
-  restorePrincipalToBalance,
-  validatePrincipalAgainstBalance,
-} from '../lib/balance';
 import {
   err,
   isRecord,
@@ -838,35 +833,40 @@ async function applyPropertyRepaymentEffect(
   principal: number,
 ): Promise<string | null> {
   if (property.mortgageId != null) {
-    const [mortgage] = await tx
-      .select()
-      .from(mortgages)
-      .where(eq(mortgages.id, property.mortgageId));
-    if (mortgage) {
-      const validationError = validatePrincipalAgainstBalance(
-        principal,
-        mortgage.outstandingBalance,
-      );
-      if (validationError) return validationError;
-      const nextBalance = applyPrincipalToBalance(mortgage.outstandingBalance, principal);
-      await tx
-        .update(mortgages)
-        .set({ outstandingBalance: nextBalance })
-        .where(eq(mortgages.id, mortgage.id));
+    const [updatedMortgage] = await tx
+      .update(mortgages)
+      .set({
+        outstandingBalance: sql`GREATEST(0, CAST(${mortgages.outstandingBalance} AS numeric) - ${principal})`,
+      })
+      .where(
+        and(
+          eq(mortgages.id, property.mortgageId),
+          sql`CAST(${mortgages.outstandingBalance} AS numeric) + 0.01 >= ${principal}`,
+        ),
+      )
+      .returning({ id: mortgages.id, outstandingBalance: mortgages.outstandingBalance });
+    if (updatedMortgage) {
       await tx
         .update(properties)
-        .set({ mortgage: nextBalance })
-        .where(eq(properties.mortgageId, mortgage.id));
+        .set({ mortgage: updatedMortgage.outstandingBalance })
+        .where(eq(properties.mortgageId, updatedMortgage.id));
       return null;
     }
+    return 'Principal portion cannot exceed the current outstanding balance';
   }
-  const validationError = validatePrincipalAgainstBalance(principal, property.mortgage);
-  if (validationError) return validationError;
-  await tx
+  const [updatedProperty] = await tx
     .update(properties)
-    .set({ mortgage: applyPrincipalToBalance(property.mortgage, principal) })
-    .where(eq(properties.id, property.id));
-  return null;
+    .set({
+      mortgage: sql`GREATEST(0, CAST(${properties.mortgage} AS numeric) - ${principal})`,
+    })
+    .where(
+      and(
+        eq(properties.id, property.id),
+        sql`CAST(${properties.mortgage} AS numeric) + 0.01 >= ${principal}`,
+      ),
+    )
+    .returning({ id: properties.id });
+  return updatedProperty ? null : 'Principal portion cannot exceed the current outstanding balance';
 }
 
 // Inverse of applyPropertyRepaymentEffect, used when a repayment is removed
@@ -877,26 +877,24 @@ async function reversePropertyRepaymentEffect(
   principal: number,
 ): Promise<void> {
   if (property.mortgageId != null) {
-    const [mortgage] = await tx
-      .select()
-      .from(mortgages)
-      .where(eq(mortgages.id, property.mortgageId));
-    if (mortgage) {
-      const nextBalance = restorePrincipalToBalance(mortgage.outstandingBalance, principal);
-      await tx
-        .update(mortgages)
-        .set({ outstandingBalance: nextBalance })
-        .where(eq(mortgages.id, mortgage.id));
+    const [updatedMortgage] = await tx
+      .update(mortgages)
+      .set({
+        outstandingBalance: sql`CAST(${mortgages.outstandingBalance} AS numeric) + ${principal}`,
+      })
+      .where(eq(mortgages.id, property.mortgageId))
+      .returning({ id: mortgages.id, outstandingBalance: mortgages.outstandingBalance });
+    if (updatedMortgage) {
       await tx
         .update(properties)
-        .set({ mortgage: nextBalance })
-        .where(eq(properties.mortgageId, mortgage.id));
+        .set({ mortgage: updatedMortgage.outstandingBalance })
+        .where(eq(properties.mortgageId, updatedMortgage.id));
       return;
     }
   }
   await tx
     .update(properties)
-    .set({ mortgage: restorePrincipalToBalance(property.mortgage, principal) })
+    .set({ mortgage: sql`CAST(${properties.mortgage} AS numeric) + ${principal}` })
     .where(eq(properties.id, property.id));
 }
 

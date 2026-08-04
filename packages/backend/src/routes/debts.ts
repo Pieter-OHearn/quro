@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { DEBT_TYPES, isCurrencyCode, type CurrencyCode, type DebtType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
@@ -368,14 +368,22 @@ async function createDebtPayment(params: {
     const debt = await getDebtById(tx, params.userId, parsed.data.debtId);
     if (!debt) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
-    const currentRemainingBalance = parseDebtBalance(debt.remainingBalance);
-    const principalValidationError = validateDebtPrincipalAgainstBalance(
-      parsed.data.principal,
-      currentRemainingBalance,
-    );
-    if (principalValidationError) {
+    const [updatedDebt] = await tx
+      .update(debts)
+      .set({
+        remainingBalance: sql`GREATEST(0, CAST(${debts.remainingBalance} AS numeric) - ${parsed.data.principal})`,
+      })
+      .where(
+        and(
+          eq(debts.id, debt.id),
+          eq(debts.userId, params.userId),
+          sql`CAST(${debts.remainingBalance} AS numeric) + 0.01 >= ${parsed.data.principal}`,
+        ),
+      )
+      .returning({ id: debts.id });
+    if (!updatedDebt) {
       return {
-        error: principalValidationError,
+        error: 'Principal portion cannot exceed the current remaining balance',
         status: HTTP_STATUS.BAD_REQUEST,
       };
     }
@@ -384,13 +392,6 @@ async function createDebtPayment(params: {
       .insert(debtPayments)
       .values(toDebtPaymentInsertPayload(parsed.data, params.userId))
       .returning();
-
-    await tx
-      .update(debts)
-      .set({
-        remainingBalance: applyDebtPrincipalPayment(currentRemainingBalance, parsed.data.principal),
-      })
-      .where(and(eq(debts.id, debt.id), eq(debts.userId, params.userId)));
 
     return { data };
   });
@@ -407,18 +408,12 @@ function deleteDebtPayment(params: {
       .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)));
     if (!existing) return { error: 'Payment not found', status: HTTP_STATUS.NOT_FOUND };
 
-    const debt = await getDebtById(tx, params.userId, existing.debtId);
-    if (!debt) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
-
     await tx
       .update(debts)
       .set({
-        remainingBalance: restoreDebtPrincipalPayment(
-          parseDebtBalance(debt.remainingBalance),
-          parseDebtBalance(existing.principal),
-        ),
+        remainingBalance: sql`CAST(${debts.remainingBalance} AS numeric) + ${parseDebtBalance(existing.principal)}`,
       })
-      .where(and(eq(debts.id, debt.id), eq(debts.userId, params.userId)));
+      .where(and(eq(debts.id, existing.debtId), eq(debts.userId, params.userId)));
 
     const [data] = await tx
       .delete(debtPayments)

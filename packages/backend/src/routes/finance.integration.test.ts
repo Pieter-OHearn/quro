@@ -1221,6 +1221,164 @@ describe('finance integration', () => {
     expect(await readMortgageBalance()).toBe(50000);
   });
 
+  test('preserves concurrent debt, mortgage, and property balance updates', async () => {
+    const owner = await integration.signUp('concurrent-balances');
+
+    const debt = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await integration.request('/api/debts', {
+          method: 'POST',
+          cookie: owner.cookie,
+          json: {
+            name: 'Concurrent loan',
+            type: 'credit_card',
+            lender: 'Test Bank',
+            originalAmount: 1000,
+            remainingBalance: 1000,
+            currency: 'EUR',
+            interestRate: 5,
+            monthlyPayment: 100,
+            startDate: '2026-01-01',
+            color: '#ef4444',
+            emoji: 'D',
+          },
+        }),
+        201,
+      )
+    ).data;
+    const createDebtPayment = () =>
+      integration.request('/api/debts/payments', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: { debtId: debt.id, amount: 100, interest: 0, date: '2026-03-01' },
+      });
+    const debtPayments = await Promise.all([createDebtPayment(), createDebtPayment()]);
+    expect(debtPayments.map((response) => response.status)).toEqual([201, 201]);
+    const debtAfter = await parseJson<ApiDataResponse<{ remainingBalance: string }>>(
+      await integration.request(`/api/debts/${debt.id}`, { cookie: owner.cookie }),
+      200,
+    );
+    expect(Number(debtAfter.data.remainingBalance)).toBe(800);
+
+    const unlinkedProperty = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await integration.request('/api/investments/properties', {
+          method: 'POST',
+          cookie: owner.cookie,
+          json: {
+            address: '1 Concurrent Property Lane',
+            propertyType: 'primary_home',
+            purchasePrice: 2000,
+            currentValue: 2000,
+            mortgage: 1000,
+            monthlyRent: 0,
+            currency: 'EUR',
+            emoji: 'P',
+          },
+        }),
+        201,
+      )
+    ).data;
+    const createPropertyRepayment = () =>
+      integration.request('/api/investments/property-transactions', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          propertyId: unlinkedProperty.id,
+          type: 'repayment',
+          amount: 100,
+          interest: 0,
+          principal: 100,
+          date: '2026-03-01',
+        },
+      });
+    const propertyRepayments = await Promise.all([
+      createPropertyRepayment(),
+      createPropertyRepayment(),
+    ]);
+    expect(propertyRepayments.map((response) => response.status)).toEqual([201, 201]);
+    const propertyAfter = await parseJson<ApiDataResponse<{ mortgage: string }>>(
+      await integration.request(`/api/investments/properties/${unlinkedProperty.id}`, {
+        cookie: owner.cookie,
+      }),
+      200,
+    );
+    expect(Number(propertyAfter.data.mortgage)).toBe(800);
+
+    const linkedProperty = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await integration.request('/api/investments/properties', {
+          method: 'POST',
+          cookie: owner.cookie,
+          json: {
+            address: '2 Concurrent Mortgage Lane',
+            propertyType: 'primary_home',
+            purchasePrice: 2000,
+            currentValue: 2000,
+            monthlyRent: 0,
+            currency: 'EUR',
+            emoji: 'M',
+          },
+        }),
+        201,
+      )
+    ).data;
+    const mortgage = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await integration.request('/api/mortgages', {
+          method: 'POST',
+          cookie: owner.cookie,
+          json: {
+            linkedPropertyId: linkedProperty.id,
+            lender: 'Concurrent Bank',
+            originalAmount: 1000,
+            outstandingBalance: 1000,
+            propertyValue: 2000,
+            monthlyPayment: 100,
+            interestRate: 2,
+            rateType: 'fixed',
+            fixedUntil: '2030-01-01',
+            termYears: 25,
+            startDate: '2026-01-01',
+            endDate: '2051-01-01',
+            overpaymentLimit: 10,
+          },
+        }),
+        201,
+      )
+    ).data;
+    const createMortgageRepayment = () =>
+      integration.request('/api/mortgages/transactions', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          mortgageId: mortgage.id,
+          type: 'repayment',
+          amount: 100,
+          interest: 0,
+          principal: 100,
+          date: '2026-03-01',
+        },
+      });
+    const mortgageRepayments = await Promise.all([
+      createMortgageRepayment(),
+      createMortgageRepayment(),
+    ]);
+    expect(mortgageRepayments.map((response) => response.status)).toEqual([201, 201]);
+    const mortgageAfter = await parseJson<ApiDataResponse<{ outstandingBalance: string }>>(
+      await integration.request(`/api/mortgages/${mortgage.id}`, { cookie: owner.cookie }),
+      200,
+    );
+    const linkedPropertyAfter = await parseJson<ApiDataResponse<{ mortgage: string }>>(
+      await integration.request(`/api/investments/properties/${linkedProperty.id}`, {
+        cookie: owner.cookie,
+      }),
+      200,
+    );
+    expect(Number(mortgageAfter.data.outstandingBalance)).toBe(800);
+    expect(Number(linkedPropertyAfter.data.mortgage)).toBe(800);
+  });
+
   test('returns nullable presentation fields for a pension pot created without them', async () => {
     const owner = await integration.signUp('pension-null-presentation');
     const createResponse = await integration.request('/api/pensions/pots', {

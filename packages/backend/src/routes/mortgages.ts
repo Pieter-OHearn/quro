@@ -8,15 +8,10 @@ import {
 } from '@quro/shared';
 import { db } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
-import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
+import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
-import {
-  applyPrincipalToBalance,
-  restorePrincipalToBalance,
-  validatePrincipalAgainstBalance,
-} from '../lib/balance';
 import {
   err,
   isRecord,
@@ -333,14 +328,20 @@ async function applyMortgageTxnEffect(
 ): Promise<string | null> {
   if (payload.type === 'repayment') {
     const principal = payload.principal ?? 0;
-    const validationError = validatePrincipalAgainstBalance(principal, mortgage.outstandingBalance);
-    if (validationError) return validationError;
-    const nextBalance = applyPrincipalToBalance(mortgage.outstandingBalance, principal);
-    await tx
+    const [updated] = await tx
       .update(mortgages)
-      .set({ outstandingBalance: nextBalance })
-      .where(eq(mortgages.id, mortgage.id));
-    await syncPropertyMortgageSnapshot(tx, mortgage.id, nextBalance);
+      .set({
+        outstandingBalance: sql`GREATEST(0, CAST(${mortgages.outstandingBalance} AS numeric) - ${principal})`,
+      })
+      .where(
+        and(
+          eq(mortgages.id, mortgage.id),
+          sql`CAST(${mortgages.outstandingBalance} AS numeric) + 0.01 >= ${principal}`,
+        ),
+      )
+      .returning({ outstandingBalance: mortgages.outstandingBalance });
+    if (!updated) return 'Principal portion cannot exceed the current outstanding balance';
+    await syncPropertyMortgageSnapshot(tx, mortgage.id, updated.outstandingBalance);
     return null;
   }
   if (payload.type === 'rate_change') {
@@ -365,12 +366,16 @@ async function reverseMortgageTxnEffect(
   txn: { type: string; principal: number | null },
 ): Promise<void> {
   if (txn.type !== 'repayment') return;
-  const nextBalance = restorePrincipalToBalance(mortgage.outstandingBalance, txn.principal ?? 0);
-  await tx
+  const [updated] = await tx
     .update(mortgages)
-    .set({ outstandingBalance: nextBalance })
-    .where(eq(mortgages.id, mortgage.id));
-  await syncPropertyMortgageSnapshot(tx, mortgage.id, nextBalance);
+    .set({
+      outstandingBalance: sql`CAST(${mortgages.outstandingBalance} AS numeric) + ${txn.principal ?? 0}`,
+    })
+    .where(eq(mortgages.id, mortgage.id))
+    .returning({ outstandingBalance: mortgages.outstandingBalance });
+  if (updated) {
+    await syncPropertyMortgageSnapshot(tx, mortgage.id, updated.outstandingBalance);
+  }
 }
 
 async function readMortgagePatchPayload(
