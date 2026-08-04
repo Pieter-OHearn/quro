@@ -30,3 +30,12 @@ updates:
       github-actions:
         patterns:
           - '*'
+
+  - package-ecosystem: 'pip'
+    directory: '/services/pension-parser'
+    schedule:
+      interval: 'weekly'
+    groups:
+      python-dependencies:
+        patterns:
+          - '*'
