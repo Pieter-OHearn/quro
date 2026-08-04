@@ -11,7 +11,7 @@ import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { HTTP_STATUS } from '../constants/http';
-import { signinRateLimit, signupRateLimit } from '../middleware/rateLimit';
+import { signinEmailRateLimit, signinRateLimit, signupRateLimit } from '../middleware/rateLimit';
 import {
   DEFAULT_BASE_CURRENCY,
   DEFAULT_USER_NUMBER_FORMAT,
@@ -258,6 +258,13 @@ app.post('/signin', signinRateLimit, async (c) => {
 
   if (!email || !password) {
     return c.json({ error: 'Email and password are required' }, HTTP_STATUS.BAD_REQUEST);
+  }
+
+  if (signinEmailRateLimit(email)) {
+    return c.json(
+      { error: 'Too many requests, please try again later' },
+      HTTP_STATUS.TOO_MANY_REQUESTS,
+    );
   }
 
   const [user] = await db
