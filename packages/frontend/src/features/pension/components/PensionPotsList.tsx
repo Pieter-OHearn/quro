@@ -283,7 +283,7 @@ function PensionPotCardLeft({
 }: Readonly<PensionPotCardLeftProps>) {
   return (
     <>
-      <span className="text-2xl flex-shrink-0">{pot.emoji}</span>
+      <span className="text-2xl flex-shrink-0">{pot.emoji ?? '🏦'}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
           <p className="font-semibold text-slate-800 text-sm">{pot.name}</p>

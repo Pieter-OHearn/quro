@@ -297,7 +297,7 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
     employerMonthly: formatFixedInputValue(existing.employerMonthly),
     investmentStrategy: existing.investmentStrategy ?? '',
     notes: existing.notes,
-    emoji: existing.emoji,
+    emoji: existing.emoji ?? '🏦',
   };
 }
 

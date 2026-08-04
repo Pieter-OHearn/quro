@@ -321,8 +321,8 @@ export type PensionPot = {
   employerMonthly: number;
   investmentStrategy: string | null;
   metadata: Record<string, string>;
-  color: string;
-  emoji: string;
+  color: string | null;
+  emoji: string | null;
   notes: string;
   archivedAt?: string | null;
 };

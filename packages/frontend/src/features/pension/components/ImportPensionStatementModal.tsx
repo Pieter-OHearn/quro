@@ -111,7 +111,7 @@ function Header({ pot, step, jobPhase, onClose }: Readonly<HeaderProps>) {
       <div>
         <h2 className="font-bold text-white">Import Annual Statement</h2>
         <p className="text-xs text-amber-400 mt-0.5">
-          {pot.emoji} {pot.name}
+          {pot.emoji ?? '🏦'} {pot.name}
         </p>
       </div>
       <div className="flex items-center gap-2">

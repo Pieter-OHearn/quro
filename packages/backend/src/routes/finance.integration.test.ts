@@ -1189,6 +1189,39 @@ describe('finance integration', () => {
     expect(await readMortgageBalance()).toBe(50000);
   });
 
+  test('returns nullable presentation fields for a pension pot created without them', async () => {
+    const owner = await integration.signUp('pension-null-presentation');
+    const createResponse = await integration.request('/api/pensions/pots', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: {
+        name: 'Unstyled Pension',
+        provider: 'Provider',
+        type: 'Personal Pension',
+        balance: 2500,
+        currency: 'EUR',
+        employeeMonthly: 0,
+        employerMonthly: 0,
+      },
+    });
+    const created = await parseJson<ApiDataResponse<{ id: number; color: null; emoji: null }>>(
+      createResponse,
+      201,
+    );
+    expect(created.data.color).toBeNull();
+    expect(created.data.emoji).toBeNull();
+
+    const listResponse = await integration.request('/api/pensions/pots', {
+      cookie: owner.cookie,
+    });
+    const listed = await parseJson<
+      ApiDataResponse<Array<{ id: number; color: string | null; emoji: string | null }>>
+    >(listResponse, 200);
+    expect(listed.data).toContainEqual(
+      expect.objectContaining({ id: created.data.id, color: null, emoji: null }),
+    );
+  });
+
   test('covers pension pot and transaction CRUD with balance reconciliation and ownership checks', async () => {
     const owner = await integration.signUp('pension-owner');
     const stranger = await integration.signUp('pension-stranger');

@@ -170,6 +170,8 @@ export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
   type: normalizePensionPotType(pot.type),
   investmentStrategy: toOptionalString(pot.investmentStrategy)?.trim() || null,
   metadata: normalizePensionMetadata(pot.metadata),
+  color: toOptionalString(pot.color)?.trim() || '#475569',
+  emoji: toOptionalString(pot.emoji)?.trim() || '🏦',
   notes: toStringOr(pot.notes),
 });
 

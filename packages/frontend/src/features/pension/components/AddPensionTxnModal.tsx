@@ -435,7 +435,7 @@ export function AddPensionTxnModal({
   return (
     <Modal
       title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
-      subtitle={`${pot.emoji} ${pot.name}`}
+      subtitle={`${pot.emoji ?? '🏦'} ${pot.name}`}
       onClose={onClose}
       footer={
         <ModalFooter

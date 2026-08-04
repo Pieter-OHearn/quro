@@ -31,7 +31,9 @@ export type IsForeignFn = (currency: string) => boolean;
 
 export type IntegerLike = number | string | null | undefined;
 
-export type ApiPensionPot = Omit<PensionPot, 'metadata'> & {
+export type ApiPensionPot = Omit<PensionPot, 'metadata' | 'color' | 'emoji'> & {
+  color: string | null;
+  emoji: string | null;
   metadata?: unknown;
 };
 
