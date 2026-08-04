@@ -5,6 +5,8 @@ import {
   budgetCategories,
   budgetTransactions,
   categoryMappings,
+  debtPayments,
+  debts,
   goals,
   holdingPriceHistory,
   holdingTransactions,
@@ -173,6 +175,8 @@ async function cleanupTestUsers(emailPattern: string) {
   await db.delete(budgetCategories).where(inArray(budgetCategories.userId, userIds));
   await db.delete(categoryMappings).where(inArray(categoryMappings.userId, userIds));
   await db.delete(goals).where(inArray(goals.userId, userIds));
+  await db.delete(debtPayments).where(inArray(debtPayments.userId, userIds));
+  await db.delete(debts).where(inArray(debts.userId, userIds));
   await db
     .delete(partnerLinks)
     .where(
