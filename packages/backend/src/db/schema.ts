@@ -241,6 +241,7 @@ export const savingsTransactions = pgTable(
   },
   (table) => ({
     userIdx: index('savings_transactions_user_id_idx').on(table.userId),
+    accountIdx: index('savings_transactions_account_id_idx').on(table.accountId),
     userDateIdx: index('savings_transactions_user_date_idx').on(table.userId, table.date),
     bunqTransactionUnique: uniqueIndex('savings_transactions_user_bunq_transaction_id_unique').on(
       table.userId,
@@ -385,6 +386,7 @@ export const propertyTransactions = pgTable(
   },
   (table) => ({
     userIdx: index('property_transactions_user_id_idx').on(table.userId),
+    propertyIdx: index('property_transactions_property_id_idx').on(table.propertyId),
     userDateIdx: index('property_transactions_user_date_idx').on(table.userId, table.date),
   }),
 );
@@ -592,6 +594,7 @@ export const mortgageTransactions = pgTable(
   },
   (table) => ({
     userIdx: index('mortgage_transactions_user_id_idx').on(table.userId),
+    mortgageIdx: index('mortgage_transactions_mortgage_id_idx').on(table.mortgageId),
     userDateIdx: index('mortgage_transactions_user_date_idx').on(table.userId, table.date),
   }),
 );

@@ -155,6 +155,13 @@
       "when": 1782121341796,
       "tag": "0021_careful_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785850859245,
+      "tag": "0022_magenta_amphibian",
+      "breakpoints": true
     }
   ]
 }
