@@ -10,6 +10,7 @@ export function useUpdateCategoryMapping() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['budget', 'category-mappings'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

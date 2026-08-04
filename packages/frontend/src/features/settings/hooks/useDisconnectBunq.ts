@@ -10,6 +10,7 @@ export function useDisconnectBunq() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['bunq', 'connection'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

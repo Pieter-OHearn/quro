@@ -11,6 +11,7 @@ export function useSyncBunqBudget() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['bunq', 'connection'] });
       void queryClient.invalidateQueries({ queryKey: ['budget'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

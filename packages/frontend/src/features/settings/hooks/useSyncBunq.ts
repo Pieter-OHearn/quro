@@ -12,6 +12,7 @@ export function useSyncBunq() {
       void queryClient.invalidateQueries({ queryKey: ['bunq', 'connection'] });
       void queryClient.invalidateQueries({ queryKey: ['savings'] });
       void queryClient.invalidateQueries({ queryKey: ['budget'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
