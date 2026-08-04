@@ -5,6 +5,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { hasPostgresErrorCode } from '../lib/postgresErrors';
 import {
   err,
   ok,
@@ -30,12 +31,7 @@ const DEFAULT_TRANSACTION_LIMIT = 100;
 const PG_FOREIGN_KEY_VIOLATION = '23503';
 
 function isForeignKeyViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: unknown }).code === PG_FOREIGN_KEY_VIOLATION
-  );
+  return hasPostgresErrorCode(error, PG_FOREIGN_KEY_VIOLATION);
 }
 
 const BUDGET_CATEGORY_FIELDS = [

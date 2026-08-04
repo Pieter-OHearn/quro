@@ -19,6 +19,7 @@ import {
   DEFAULT_USER_AGE,
   publicUserColumns,
 } from '../lib/users';
+import { hasPostgresErrorCode } from '../lib/postgresErrors';
 
 const app = new Hono();
 
@@ -38,12 +39,7 @@ const DUMMY_PASSWORD_HASH = await Bun.password.hash('quro-dummy-password', {
 });
 
 export function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: unknown }).code === PG_UNIQUE_VIOLATION
-  );
+  return hasPostgresErrorCode(error, PG_UNIQUE_VIOLATION);
 }
 
 type SignUpPayload = {

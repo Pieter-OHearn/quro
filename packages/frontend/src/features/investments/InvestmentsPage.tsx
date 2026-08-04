@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { LoadingSpinner } from '@/components/ui';
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type {
   Holding,
@@ -31,6 +32,7 @@ import type {
   ConvertToBaseFn,
   InvestmentActions,
   InvestmentFormatFn,
+  InvestmentData,
   InvestmentNativeFormatFn,
   InvestmentPortfolioStats,
   InvestmentStatTrends,
@@ -128,10 +130,9 @@ function InvestmentPageBody({
   );
 }
 
-export function Investments() {
+function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
   const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
-  const { holdings, holdingTxns, properties, propertyTxns, mortgages, isLoading } =
-    useInvestmentData();
+  const { holdings, holdingTxns, properties, propertyTxns, mortgages } = data;
   const syncHoldingPrices = useSyncHoldingPrices();
   const ui = useInvestmentUIState();
 
@@ -184,8 +185,6 @@ export function Investments() {
     convertToBase,
   );
 
-  if (isLoading) return <LoadingSpinner />;
-
   return (
     <InvestmentPageBody
       activeHoldings={activeHoldings}
@@ -212,4 +211,15 @@ export function Investments() {
       syncSummary={syncHoldingPrices.data ?? null}
     />
   );
+}
+
+export function Investments() {
+  const data = useInvestmentData();
+
+  if (data.isLoading) return <LoadingSpinner />;
+  if (data.queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Investments" failedQueries={data.queryFailures} />;
+  }
+
+  return <LoadedInvestments data={data} />;
 }

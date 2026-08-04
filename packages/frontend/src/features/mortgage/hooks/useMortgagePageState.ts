@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import { useProperties } from '../../investments/hooks';
 import type {
   CreateMortgagePayload,
@@ -27,14 +28,19 @@ function buildLinkedPropertyMap(properties: Property[]): Map<number, Property> {
   return map;
 }
 
+const EMPTY_PROPERTIES: Property[] = [];
+
 export function useMortgagePageState(): MortgagePageState {
   const { fmtBase: fmt } = useCurrency();
-  const { data: mortgages = [], isLoading: loadingMortgages } = useMortgages();
-  const { data: properties = [], isLoading: loadingProperties } = useProperties();
+  const mortgagesQuery = useMortgages();
+  const propertiesQuery = useProperties();
+  const mortgages = mortgagesQuery.data ?? [];
+  const properties = propertiesQuery.data ?? EMPTY_PROPERTIES;
   const [activeMortgageId, setActiveMortgageId] = useState<number | null>(null);
 
   const mortgage = mortgages.find((entry) => entry.id === activeMortgageId) ?? mortgages[0];
-  const { data: txns = [], isLoading: loadingTxns } = useMortgageTransactions(mortgage?.id);
+  const transactionsQuery = useMortgageTransactions(mortgage?.id);
+  const txns = transactionsQuery.data ?? [];
 
   const createMortgageMut = useCreateMortgage();
   const updateMortgageMut = useUpdateMortgage();
@@ -95,6 +101,13 @@ export function useMortgagePageState(): MortgagePageState {
     handleSaveMortgage,
     handleDeleteTxn,
     handleDeleteMortgage,
-    isLoading: [loadingMortgages, loadingProperties, loadingTxns].some(Boolean),
+    isLoading: [mortgagesQuery, propertiesQuery, transactionsQuery].some(
+      (query) => query.isLoading,
+    ),
+    queryFailures: getFailedRouteQueries([
+      { label: 'mortgages', ...mortgagesQuery },
+      { label: 'properties', ...propertiesQuery },
+      { label: 'mortgage transactions', ...transactionsQuery },
+    ]),
   };
 }

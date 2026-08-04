@@ -7,6 +7,7 @@ import type {
   PropertyTransaction,
 } from '@quro/shared';
 import type { Position } from './utils/position';
+import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 
 export type Tab = 'brokerage' | 'property';
 
@@ -105,6 +106,7 @@ export type InvestmentData = {
   propertyTxns: PropertyTransaction[];
   mortgages: Mortgage[];
   isLoading: boolean;
+  queryFailures: FailedRouteQuery[];
 };
 
 export type HoldingModalsProps = {

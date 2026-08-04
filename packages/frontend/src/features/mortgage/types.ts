@@ -1,4 +1,5 @@
 import type { CurrencyCode } from '@/lib/CurrencyContext';
+import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 import type {
   Mortgage as MortgageType,
   MortgageRateType,
@@ -86,4 +87,5 @@ export type MortgagePageState = {
   handleDeleteMortgage: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   closeMortgageModal: () => void;
   isLoading: boolean;
+  queryFailures: FailedRouteQuery[];
 };

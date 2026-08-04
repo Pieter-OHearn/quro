@@ -656,6 +656,7 @@ describe('dashboard joint weighting', () => {
 
     const jointAccount = await createSavingsAccount(alice, { isJoint: true, balance: 0 });
     const personalAccount = await createSavingsAccount(alice, { name: 'Solo', balance: 0 });
+    const activityDate = new Date().toISOString().slice(0, 10);
 
     await parseJson(
       await integration.request('/api/savings/transactions', {
@@ -665,7 +666,7 @@ describe('dashboard joint weighting', () => {
           accountId: jointAccount.id,
           type: 'deposit',
           amount: 500,
-          date: '2026-06-05',
+          date: activityDate,
           note: 'Joint deposit',
         },
       }),
@@ -679,7 +680,7 @@ describe('dashboard joint weighting', () => {
           accountId: personalAccount.id,
           type: 'deposit',
           amount: 200,
-          date: '2026-06-05',
+          date: activityDate,
           note: 'Personal deposit',
         },
       }),

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Goal } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useHoldingTransactions } from '@/features/investments/hooks';
 import { usePayslips } from '@/features/salary/hooks';
@@ -12,11 +13,30 @@ import { useGoals } from './useGoals';
 import { useGoalsComputations } from './useGoalsComputations';
 import { useUpdateGoal } from './useUpdateGoal';
 
+function useGoalsQueries() {
+  const goalsQuery = useGoals();
+  const payslipsQuery = usePayslips();
+  const savingsAccountsQuery = useSavingsAccounts();
+
+  return {
+    goals: goalsQuery.data ?? [],
+    payslips: payslipsQuery.data ?? [],
+    savingsAccounts: savingsAccountsQuery.data ?? [],
+    loadingGoals: goalsQuery.isLoading,
+    loadingPayslips: payslipsQuery.isLoading,
+    loadingSavingsAccounts: savingsAccountsQuery.isLoading,
+    queryFailures: getFailedRouteQueries([
+      { label: 'goals', ...goalsQuery },
+      { label: 'payslips', ...payslipsQuery },
+      { label: 'savings accounts', ...savingsAccountsQuery },
+    ]),
+  };
+}
+
 export function useGoalsPage(): GoalsPageState {
   const { fmtBase, convertToBase } = useCurrency();
-  const { data: goals = [], isLoading: loadingGoals } = useGoals();
-  const { data: payslips = [], isLoading: loadingPayslips } = usePayslips();
-  const { data: savingsAccounts = [], isLoading: loadingSavingsAccounts } = useSavingsAccounts();
+  const queries = useGoalsQueries();
+  const { goals, payslips, savingsAccounts } = queries;
   const { data: allocations = null } = useAssetAllocations();
   const { data: holdingTxns = [] } = useHoldingTransactions();
   const createGoal = useCreateGoal();
@@ -73,9 +93,10 @@ export function useGoalsPage(): GoalsPageState {
   return {
     fmtBase,
     goals,
-    loadingGoals,
-    loadingPayslips,
-    loadingSavingsAccounts,
+    loadingGoals: queries.loadingGoals,
+    loadingPayslips: queries.loadingPayslips,
+    loadingSavingsAccounts: queries.loadingSavingsAccounts,
+    queryFailures: queries.queryFailures,
     currentYear,
     activeYear,
     setActiveYear,

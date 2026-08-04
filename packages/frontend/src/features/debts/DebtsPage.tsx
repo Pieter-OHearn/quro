@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { Debt, DebtPayment } from '@quro/shared';
 import { ArchiveOrDeleteDialog, LoadingState, PageStack } from '@/components/ui';
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
+import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import { DebtFormModal } from './components/DebtFormModal';
 import { DebtPaymentModal } from './components/DebtPaymentModal';
 import { DebtsArchivedSection } from './components/DebtsArchivedSection';
@@ -116,6 +118,10 @@ function useDebtsPageState() {
     setPaymentDebt,
     debtPendingDelete,
     setDebtPendingDelete,
+    queryFailures: getFailedRouteQueries([
+      { label: 'debts', ...debtsQuery },
+      { label: 'debt payments', ...paymentsQuery },
+    ]),
   };
 }
 
@@ -138,6 +144,9 @@ export function Debts() {
   };
 
   if (state.debtsQuery.isLoading || state.paymentsQuery.isLoading) return <LoadingState compact />;
+  if (state.queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Debts" failedQueries={state.queryFailures} />;
+  }
 
   return (
     <PageStack>

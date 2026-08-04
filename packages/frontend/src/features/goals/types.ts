@@ -1,6 +1,7 @@
 import type { ElementType } from 'react';
 import type { Goal, SavingsAccount } from '@quro/shared';
 import type { LucideIcon } from 'lucide-react';
+import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 
 export type GoalStatus = 'complete' | 'on_track' | 'at_risk' | 'pending';
 export type FilterKey = 'all' | 'savings' | 'career' | 'investing' | 'annual';
@@ -76,6 +77,7 @@ export type GoalsPageState = {
   loadingGoals: boolean;
   loadingPayslips: boolean;
   loadingSavingsAccounts: boolean;
+  queryFailures: FailedRouteQuery[];
   currentYear: number;
   activeYear: number;
   setActiveYear: (year: number) => void;

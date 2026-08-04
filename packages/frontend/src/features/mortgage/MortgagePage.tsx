@@ -2,6 +2,7 @@ import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { Mortgage as MortgageType } from '@quro/shared';
 import { EmptyState, LoadingState } from '@/components/ui';
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import {
   AddMortgageModal,
   MortgageArchivedSection,
@@ -147,6 +148,9 @@ export function Mortgage() {
   const state = useMortgagePageState();
 
   if (state.isLoading) return <LoadingState compact />;
+  if (state.queryFailures.length > 0) {
+    return <RouteQueryErrorState routeName="Mortgage" failedQueries={state.queryFailures} />;
+  }
   if (!state.mortgage) return <MortgageEmptyState state={state} />;
 
   return <MortgageContent state={state} mortgage={state.mortgage} />;
