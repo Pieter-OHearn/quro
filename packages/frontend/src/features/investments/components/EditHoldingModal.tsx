@@ -192,7 +192,7 @@ function TickerSearch({
           value={searchTicker}
           onChange={(e) => onSearchTickerChange(e.target.value.toUpperCase())}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !isLoading) {
               e.preventDefault();
               onFind();
             }
