@@ -4,6 +4,16 @@ import { budgetCategories, budgetTransactions, categoryMappings } from '../db/sc
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
+const SIGNIN_ALLOWED_ATTEMPTS = 5;
+const SIGNUP_ALLOWED_ATTEMPTS = 3;
+
+function restoreNodeEnv(previousNodeEnv: string | undefined) {
+  if (previousNodeEnv === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = previousNodeEnv;
+  }
+}
 
 beforeAll(async () => {
   await integration.cleanup();
@@ -14,6 +24,79 @@ afterAll(async () => {
 });
 
 describe('auth integration', () => {
+  test('rate limits repeated signin attempts', async () => {
+    const owner = await integration.signUp('signin-rate-limit');
+    const previousNodeEnv = process.env.NODE_ENV;
+    const isolatedIp = `signin-rate-limit-${crypto.randomUUID()}`;
+
+    try {
+      process.env.NODE_ENV = 'development';
+      for (let attempt = 0; attempt < SIGNIN_ALLOWED_ATTEMPTS; attempt += 1) {
+        const response = await integration.request('/api/auth/signin', {
+          method: 'POST',
+          headers: { 'x-real-ip': isolatedIp },
+          json: { email: owner.user.email, password: 'wrong-password' },
+        });
+        expect(response.status).toBe(401);
+      }
+
+      const limitedResponse = await integration.request('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'x-real-ip': isolatedIp },
+        json: { email: owner.user.email, password: 'wrong-password' },
+      });
+      expect(limitedResponse.status).toBe(429);
+      expect(await limitedResponse.json()).toEqual({
+        error: 'Too many requests, please try again later',
+      });
+    } finally {
+      restoreNodeEnv(previousNodeEnv);
+    }
+  });
+
+  test('rate limits repeated signup attempts', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const isolatedIp = `signup-rate-limit-${crypto.randomUUID()}`;
+
+    try {
+      process.env.NODE_ENV = 'development';
+      for (let attempt = 0; attempt < SIGNUP_ALLOWED_ATTEMPTS; attempt += 1) {
+        const response = await integration.request('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'x-real-ip': isolatedIp },
+          json: {
+            firstName: 'Signup',
+            lastName: 'Limiter',
+            email: integration.buildEmail(`signup-rate-limit-${attempt}`),
+            password: integrationPassword,
+            age: 31,
+            retirementAge: 67,
+          },
+        });
+        expect(response.status).toBe(201);
+      }
+
+      const limitedResponse = await integration.request('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'x-real-ip': isolatedIp },
+        json: {
+          firstName: 'Signup',
+          lastName: 'Limiter',
+          email: integration.buildEmail('signup-rate-limit-blocked'),
+          password: integrationPassword,
+          age: 31,
+          retirementAge: 67,
+        },
+      });
+      expect(limitedResponse.status).toBe(429);
+      expect(await limitedResponse.json()).toEqual({
+        error: 'Too many requests, please try again later',
+      });
+    } finally {
+      restoreNodeEnv(previousNodeEnv);
+    }
+  });
+
   test('supports signup, session reuse, signout, and signin', async () => {
     const signupEmail = integration.buildEmail('auth-session');
     const signupResponse = await integration.request('/api/auth/signup', {
