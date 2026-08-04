@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import type { ReactNode } from 'react';
 import type { User } from '@quro/shared';
 import { api } from './api';
+import { clearAuthQueryCache } from './authCache';
 
 type SignUpInput = {
   firstName: string;
@@ -35,13 +36,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .get('/api/auth/me')
       .then((res) => replaceUser(res.data.data ?? null))
-      .catch(() => replaceUser(null))
+      .catch(() => {
+        clearAuthQueryCache();
+        replaceUser(null);
+      })
       .finally(() => setLoading(false));
   }, [replaceUser]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
       const res = await api.post('/api/auth/signin', { email, password });
+      clearAuthQueryCache();
       replaceUser(res.data.data);
     },
     [replaceUser],
@@ -50,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(
     async (input: SignUpInput) => {
       const res = await api.post('/api/auth/signup', input);
+      clearAuthQueryCache();
       replaceUser(res.data.data);
     },
     [replaceUser],
@@ -57,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await api.post('/api/auth/signout');
+    clearAuthQueryCache();
     replaceUser(null);
   }, [replaceUser]);
 
