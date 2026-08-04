@@ -22,7 +22,7 @@
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.34",
     "postgres": "^3.4.0",
-    "yahoo-finance2": "^3.14.0"
+    "yahoo-finance2": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
