@@ -81,6 +81,30 @@ describe('auth integration', () => {
     expect(await protectedResponse.json()).toEqual({ data: [] });
   });
 
+  test('returns conflict instead of an unhandled error for concurrent duplicate signup', async () => {
+    const email = integration.buildEmail('concurrent-signup');
+    const signup = () =>
+      integration.request('/api/auth/signup', {
+        method: 'POST',
+        json: {
+          firstName: 'Concurrent',
+          lastName: 'Signup',
+          email,
+          password: integrationPassword,
+          age: 31,
+          retirementAge: 67,
+        },
+      });
+
+    const responses = await Promise.all([signup(), signup()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+
+    const conflict = responses.find((response) => response.status === 409);
+    expect(await conflict?.json()).toEqual({
+      error: 'An account with this email already exists',
+    });
+  });
+
   test('rejects invalid auth payloads and unauthenticated protected requests', async () => {
     const weakPasswordResponse = await integration.request('/api/auth/signup', {
       method: 'POST',

@@ -31,10 +31,20 @@ const MINUTES_PER_HOUR = 60;
 const SECONDS_PER_MINUTE = 60;
 const MILLISECONDS_PER_SECOND = 1000;
 const BCRYPT_COST = 10;
+const PG_UNIQUE_VIOLATION = '23505';
 const DUMMY_PASSWORD_HASH = await Bun.password.hash('quro-dummy-password', {
   algorithm: 'bcrypt',
   cost: BCRYPT_COST,
 });
+
+export function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === PG_UNIQUE_VIOLATION
+  );
+}
 
 type SignUpPayload = {
   firstName: string;
@@ -211,20 +221,28 @@ app.post('/signup', signupRateLimit, async (c) => {
     cost: BCRYPT_COST,
   });
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      location: '',
-      age: data.age,
-      retirementAge: data.retirementAge,
-      baseCurrency: DEFAULT_BASE_CURRENCY,
-      numberFormat: DEFAULT_USER_NUMBER_FORMAT,
-      passwordHash,
-    })
-    .returning(publicUserColumns);
+  let user;
+  try {
+    [user] = await db
+      .insert(users)
+      .values({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        location: '',
+        age: data.age,
+        retirementAge: data.retirementAge,
+        baseCurrency: DEFAULT_BASE_CURRENCY,
+        numberFormat: DEFAULT_USER_NUMBER_FORMAT,
+        passwordHash,
+      })
+      .returning(publicUserColumns);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return c.json({ error: 'An account with this email already exists' }, HTTP_STATUS.CONFLICT);
+    }
+    throw error;
+  }
 
   await createSession(c, user.id);
 
