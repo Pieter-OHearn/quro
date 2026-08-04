@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { db } from '../db/client';
-import { categoryMappings } from '../db/schema';
+import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
@@ -690,6 +690,50 @@ describe('savings integration', () => {
 });
 
 describe('budget integration', () => {
+  test('bounds unfiltered transaction history while preserving newest-first order', async () => {
+    const owner = await integration.signUp('budget-bounded-history');
+    const [category] = await db
+      .insert(budgetCategories)
+      .values({
+        userId: owner.user.id,
+        name: 'History',
+        emoji: 'H',
+        budgeted: 1000,
+        spent: 0,
+        color: '#475569',
+        month: 'Jan',
+        year: 2026,
+      })
+      .returning({ id: budgetCategories.id });
+    const inserted = await db
+      .insert(budgetTransactions)
+      .values(
+        Array.from({ length: 105 }, (_, index) => ({
+          userId: owner.user.id,
+          categoryId: category.id,
+          description: `Transaction ${index}`,
+          amount: 1,
+          date: '2026-01-01',
+          merchant: 'History Test',
+        })),
+      )
+      .returning({ id: budgetTransactions.id });
+
+    const response = await integration.request('/api/budget/transactions', {
+      cookie: owner.cookie,
+    });
+    const body = (await response.json()) as { data: Array<{ id: number }> };
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(100);
+    expect(body.data.map((transaction) => transaction.id)).toEqual(
+      inserted
+        .map((transaction) => transaction.id)
+        .reverse()
+        .slice(0, 100),
+    );
+  });
+
   test('covers category and transaction CRUD', async () => {
     const owner = await integration.signUp('budget-owner');
 
