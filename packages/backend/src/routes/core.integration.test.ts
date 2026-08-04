@@ -844,6 +844,24 @@ describe('budget integration', () => {
     };
     expect(Number(categoryAfterCreate.data.spent)).toBe(239.5);
 
+    const deleteInUseCategoryResponse = await integration.request(
+      `/api/budget/categories/${createdCategory.data.id}`,
+      {
+        method: 'DELETE',
+        cookie: owner.cookie,
+      },
+    );
+    expect(deleteInUseCategoryResponse.status).toBe(409);
+    expect(await deleteInUseCategoryResponse.json()).toEqual({
+      error: 'Cannot delete a category with existing transactions',
+    });
+
+    const inUseCategoryLookupResponse = await integration.request(
+      `/api/budget/categories/${createdCategory.data.id}`,
+      { cookie: owner.cookie },
+    );
+    expect(inUseCategoryLookupResponse.status).toBe(200);
+
     const renameTransactionResponse = await integration.request(
       `/api/budget/transactions/${createdTransaction.data.id}`,
       {

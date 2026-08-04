@@ -27,6 +27,16 @@ const app = new Hono();
 const MIN_BUDGET_YEAR = 2000;
 const MAX_BUDGET_YEAR = 9999;
 const DEFAULT_TRANSACTION_LIMIT = 100;
+const PG_FOREIGN_KEY_VIOLATION = '23503';
+
+function isForeignKeyViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code: unknown }).code === PG_FOREIGN_KEY_VIOLATION
+  );
+}
 
 const BUDGET_CATEGORY_FIELDS = [
   'name',
@@ -330,10 +340,21 @@ app.delete('/categories/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid category id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .delete(budgetCategories)
-    .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)))
-    .returning();
+  let data;
+  try {
+    [data] = await db
+      .delete(budgetCategories)
+      .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)))
+      .returning();
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      return c.json(
+        { error: 'Cannot delete a category with existing transactions' },
+        HTTP_STATUS.CONFLICT,
+      );
+    }
+    throw error;
+  }
   if (!data) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
