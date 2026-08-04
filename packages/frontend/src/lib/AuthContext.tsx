@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '@quro/shared';
-import { api } from './api';
-import { clearAuthQueryCache } from './authCache';
+import { api, registerUnauthorizedHandler } from './api';
+import { clearAuthQueryCache, invalidateAuthSession } from './authCache';
 
 type SignUpInput = {
   firstName: string;
@@ -42,6 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setLoading(false));
   }, [replaceUser]);
+
+  useEffect(
+    () => registerUnauthorizedHandler(() => invalidateAuthSession(replaceUser)),
+    [replaceUser],
+  );
 
   const signIn = useCallback(
     async (email: string, password: string) => {
