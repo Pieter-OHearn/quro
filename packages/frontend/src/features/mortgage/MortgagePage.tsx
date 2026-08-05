@@ -128,6 +128,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
         fmt={state.fmt}
         amortization={amortization}
         paymentBreakdown={paymentBreakdown}
+        repaymentType={mortgage.repaymentType}
       />
       <MortgageTxnHistory
         mortgage={mortgage}

@@ -16,6 +16,7 @@ const mortgageBase: Mortgage = {
   monthlyPayment: 100,
   interestRate: 0,
   rateType: 'Fixed',
+  repaymentType: 'Annuity',
   fixedUntil: '2034-04',
   termYears: 2,
   startDate: '2032-04-01',
@@ -67,4 +68,39 @@ test('shows contractual time remaining instead of the estimated payoff time', ()
   expect(metrics.monthsRemaining).toBe(360);
   expect(metrics.yearsRemaining).toBe(30);
   expect(metrics.amortization.at(-1)?.year).toBe('2046');
+});
+
+test('projects a linear mortgage with fixed principal through the contractual end date', () => {
+  const mortgage: Mortgage = {
+    ...mortgageBase,
+    originalAmount: 705000,
+    outstandingBalance: 705000,
+    monthlyPayment: 4220.21,
+    interestRate: 3.85,
+    repaymentType: 'Linear',
+    termYears: 30,
+    startDate: '24 July 2026',
+    endDate: '1 August 2056',
+  };
+
+  const metrics = computeMortgageMetrics(mortgage, [], new Date(2026, 7, 5, 12));
+
+  expect(metrics.amortization.at(-1)?.year).toBe('2056');
+  expect(metrics.amortization.at(-1)?.balance).toBe(0);
+  expect(metrics.amortization.slice(1).reduce((sum, row) => sum + row.principal, 0)).toBe(705000);
+});
+
+test('recorded overpayments shorten a linear mortgage projection', () => {
+  const mortgage: Mortgage = {
+    ...mortgageBase,
+    outstandingBalance: 2200,
+    monthlyPayment: 10,
+    repaymentType: 'Linear',
+  };
+
+  const schedule = generateSchedule(mortgage, 22, new Date('2032-04-15T12:00:00Z'));
+
+  expect(schedule.at(-1)?.year).toBe('2034');
+  expect(schedule.at(-1)?.balance).toBe(0);
+  expect(schedule.at(-1)?.principal).toBe(2200);
 });

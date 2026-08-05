@@ -10,19 +10,27 @@ import {
   YAxis,
 } from 'recharts';
 import type { AmortizationRow, MortgageFormatFn, PaymentBreakdownRow } from '../types';
+import type { MortgageRepaymentType } from '@quro/shared';
 
 const ROUNDED_BAR_RADIUS = 4;
 
 type MortgageBalanceChartProps = {
   amortization: AmortizationRow[];
   fmt: MortgageFormatFn;
+  repaymentType: MortgageRepaymentType;
 };
 
-function MortgageBalanceChart({ amortization, fmt }: Readonly<MortgageBalanceChartProps>) {
+function MortgageBalanceChart({
+  amortization,
+  fmt,
+  repaymentType,
+}: Readonly<MortgageBalanceChartProps>) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
       <h3 className="font-semibold text-slate-900 mb-1">Balance Projection</h3>
-      <p className="text-xs text-slate-400 mb-5">Remaining balance over loan term</p>
+      <p className="text-xs text-slate-400 mb-5">
+        Remaining balance using the {repaymentType.toLowerCase()} repayment method
+      </p>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={amortization}>
           <defs>
@@ -146,16 +154,18 @@ type MortgageChartsProps = {
   fmt: MortgageFormatFn;
   amortization: AmortizationRow[];
   paymentBreakdown: PaymentBreakdownRow[];
+  repaymentType: MortgageRepaymentType;
 };
 
 export function MortgageCharts({
   fmt,
   amortization,
   paymentBreakdown,
+  repaymentType,
 }: Readonly<MortgageChartsProps>) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <MortgageBalanceChart amortization={amortization} fmt={fmt} />
+      <MortgageBalanceChart amortization={amortization} fmt={fmt} repaymentType={repaymentType} />
       <MortgagePaymentChart paymentBreakdown={paymentBreakdown} fmt={fmt} />
     </div>
   );

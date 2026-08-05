@@ -101,6 +101,30 @@ function buildScheduleRow(
   };
 }
 
+function calculateLinearMonthlyPrincipal(mortgage: MortgageType): number | null {
+  const contractMonths = mortgage.termYears * MONTHS_PER_YEAR;
+  if (!(mortgage.originalAmount > 0 && contractMonths > 0)) return null;
+  const principal = mortgage.originalAmount / contractMonths;
+  return Number.isFinite(principal) && principal > 0 ? principal : null;
+}
+
+function calculateProjectedRemainingMonths(
+  mortgage: MortgageType,
+  monthlyRate: number,
+): number | null {
+  if (mortgage.repaymentType === 'Linear') {
+    const monthlyPrincipal = calculateLinearMonthlyPrincipal(mortgage);
+    if (monthlyPrincipal == null || mortgage.outstandingBalance <= 0) return null;
+    return mortgage.outstandingBalance / monthlyPrincipal;
+  }
+
+  return calculateRemainingMonths(
+    mortgage.outstandingBalance,
+    monthlyRate,
+    mortgage.monthlyPayment,
+  );
+}
+
 export function generateSchedule(
   mortgage: MortgageType,
   monthsRemainingRaw: number | null,
@@ -111,6 +135,7 @@ export function generateSchedule(
   const start = getCurrentYearMonth(today);
   const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
   const projectionMonths = calculateProjectionMonths(mortgage, monthsRemainingRaw, today);
+  const linearMonthlyPrincipal = calculateLinearMonthlyPrincipal(mortgage);
   let principalSinceLastPoint = 0;
   let interestSinceLastPoint = 0;
 
@@ -118,7 +143,12 @@ export function generateSchedule(
 
   for (let monthNumber = 1; monthNumber <= projectionMonths && balance > 0; monthNumber += 1) {
     const interest = Math.max(0, balance * monthlyRate);
-    const principal = Math.min(balance, Math.max(0, mortgage.monthlyPayment - interest));
+    const principal = Math.min(
+      balance,
+      mortgage.repaymentType === 'Linear'
+        ? (linearMonthlyPrincipal ?? 0)
+        : Math.max(0, mortgage.monthlyPayment - interest),
+    );
     balance = Math.max(0, balance - principal);
     principalSinceLastPoint += principal;
     interestSinceLastPoint += interest;
@@ -193,11 +223,7 @@ export function computeMortgageMetrics(
   today = new Date(),
 ) {
   const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
-  const monthsRemainingRaw = calculateRemainingMonths(
-    mortgage.outstandingBalance,
-    monthlyRate,
-    mortgage.monthlyPayment,
-  );
+  const monthsRemainingRaw = calculateProjectedRemainingMonths(mortgage, monthlyRate);
   const contractMonthsRemaining = calculateContractRemainingMonths(mortgage, today);
   const monthsRemaining = contractMonthsRemaining ?? Math.round(monthsRemainingRaw ?? 0);
   const paid = mortgage.originalAmount - mortgage.outstandingBalance;

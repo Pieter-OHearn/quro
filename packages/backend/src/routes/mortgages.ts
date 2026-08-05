@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import {
   MORTGAGE_RATE_TYPES,
+  MORTGAGE_REPAYMENT_TYPES,
   MORTGAGE_TRANSACTION_TYPES,
   type CurrencyCode,
   type MortgageRateType,
+  type MortgageRepaymentType,
   type MortgageTransactionType,
 } from '@quro/shared';
 import { db } from '../db/client';
@@ -43,6 +45,7 @@ const MORTGAGE_FIELDS = [
   'monthlyPayment',
   'interestRate',
   'rateType',
+  'repaymentType',
   'fixedUntil',
   'termYears',
   'startDate',
@@ -72,6 +75,7 @@ type MortgagePayload = {
   monthlyPayment: number;
   interestRate: number;
   rateType: MortgageRateType;
+  repaymentType: MortgageRepaymentType;
   fixedUntil: string | null;
   termYears: number;
   startDate: string;
@@ -143,6 +147,16 @@ function parseMortgageRateTypeField(value: unknown): ParseResult<MortgageRateTyp
   return rateType ? ok(rateType) : err('Invalid mortgage rate type');
 }
 
+function parseMortgageRepaymentTypeField(value: unknown): ParseResult<MortgageRepaymentType> {
+  // Keep older API clients compatible while the migration safely classifies
+  // every existing mortgage as annuity.
+  if (value === undefined) return ok('Annuity');
+  if (typeof value !== 'string') return err('Invalid mortgage repayment type');
+  const normalized = value.trim().toLowerCase();
+  const repaymentType = MORTGAGE_REPAYMENT_TYPES.find((type) => type.toLowerCase() === normalized);
+  return repaymentType ? ok(repaymentType) : err('Invalid mortgage repayment type');
+}
+
 function parseMortgageTransactionTypeField(value: unknown): ParseResult<MortgageTransactionType> {
   return typeof value === 'string' &&
     MORTGAGE_TRANSACTION_TYPES.includes(value as MortgageTransactionType)
@@ -178,6 +192,7 @@ const mortgageParsers: FieldParsers<MortgagePayload> = {
   interestRate: (value) =>
     parseNormalizedDecimalField(value, 'Interest rate must be zero or greater', 0),
   rateType: parseMortgageRateTypeField,
+  repaymentType: parseMortgageRepaymentTypeField,
   fixedUntil: (value) => parseOptionalTextField(value, 'Fixed-until value must be a string'),
   termYears: (value) => parseIntegerField(value, 'Term years must be greater than zero', 1),
   startDate: (value) => parseTextField(value, 'Start date is required'),
@@ -618,6 +633,7 @@ function mergeMortgagePayload(
     monthlyPayment: pickPatchedValue(patch.monthlyPayment, existing.monthlyPayment),
     interestRate: pickPatchedValue(patch.interestRate, existing.interestRate),
     rateType: pickPatchedValue(patch.rateType, existing.rateType),
+    repaymentType: pickPatchedValue(patch.repaymentType, existing.repaymentType),
     fixedUntil: pickPatchedValue(patch.fixedUntil, existing.fixedUntil),
     termYears: pickPatchedValue(patch.termYears, existing.termYears),
     startDate: pickPatchedValue(patch.startDate, existing.startDate),
@@ -657,6 +673,7 @@ function toMortgageValues(
     monthlyPayment: payload.monthlyPayment,
     interestRate: payload.interestRate,
     rateType: payload.rateType,
+    repaymentType: payload.repaymentType,
     fixedUntil: payload.fixedUntil ?? 'N/A',
     termYears: payload.termYears,
     startDate: payload.startDate,

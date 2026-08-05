@@ -561,6 +561,7 @@ export const mortgages = pgTable(
     monthlyPayment: numericAsNumber('monthly_payment', { precision: 19, scale: 2 }).notNull(),
     interestRate: numericAsNumber('interest_rate', { precision: 7, scale: 4 }).notNull(),
     rateType: text('rate_type').notNull(),
+    repaymentType: text('repayment_type').notNull().default('Annuity'),
     fixedUntil: text('fixed_until'),
     termYears: integer('term_years').notNull(),
     startDate: text('start_date').notNull(),

@@ -357,13 +357,7 @@ export type PensionStatementDocument = PdfDocument & {
 export type PayslipDocument = PdfDocument;
 
 export type PensionImportStatus =
-  | 'queued'
-  | 'processing'
-  | 'ready_for_review'
-  | 'failed'
-  | 'committed'
-  | 'expired'
-  | 'cancelled';
+  'queued' | 'processing' | 'ready_for_review' | 'failed' | 'committed' | 'expired' | 'cancelled';
 
 export type PensionImportConfidenceLabel = 'high' | 'medium' | 'low';
 
@@ -462,6 +456,9 @@ export type PensionStatementImportRow = {
 export const MORTGAGE_RATE_TYPES = ['Fixed', 'Variable'] as const;
 export type MortgageRateType = (typeof MORTGAGE_RATE_TYPES)[number];
 
+export const MORTGAGE_REPAYMENT_TYPES = ['Annuity', 'Linear'] as const;
+export type MortgageRepaymentType = (typeof MORTGAGE_REPAYMENT_TYPES)[number];
+
 export type Mortgage = {
   id: number;
   linkedPropertyId?: number | null;
@@ -474,6 +471,7 @@ export type Mortgage = {
   monthlyPayment: number;
   interestRate: number;
   rateType: MortgageRateType;
+  repaymentType: MortgageRepaymentType;
   fixedUntil: string;
   termYears: number;
   startDate: string;

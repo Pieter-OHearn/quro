@@ -5,8 +5,10 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import {
   formatNumber,
   MORTGAGE_RATE_TYPES,
+  MORTGAGE_REPAYMENT_TYPES,
   type Mortgage as MortgageType,
   type MortgageRateType,
+  type MortgageRepaymentType,
   type Property,
 } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
@@ -26,6 +28,7 @@ type AddMortgageModalProps = {
 };
 
 export const RATE_TYPES = [...MORTGAGE_RATE_TYPES];
+export const REPAYMENT_TYPES = [...MORTGAGE_REPAYMENT_TYPES];
 const LOW_LTV_THRESHOLD = 70;
 const MEDIUM_LTV_THRESHOLD = 85;
 
@@ -33,6 +36,12 @@ function toMortgageRateType(value: string): MortgageRateType {
   return MORTGAGE_RATE_TYPES.includes(value as MortgageRateType)
     ? (value as MortgageRateType)
     : 'Fixed';
+}
+
+function toMortgageRepaymentType(value: string): MortgageRepaymentType {
+  return MORTGAGE_REPAYMENT_TYPES.includes(value as MortgageRepaymentType)
+    ? (value as MortgageRepaymentType)
+    : 'Annuity';
 }
 
 const n = (value: string) => parseFloat(value) || 0;
@@ -156,10 +165,7 @@ function PropertyLinkSection({
 type LoanFinancialsSectionProps = { form: FormState; errors: Errors; setField: SetFieldFn };
 
 type LoanFinancialField =
-  | 'originalAmount'
-  | 'outstandingBalance'
-  | 'propertyValue'
-  | 'monthlyPayment';
+  'originalAmount' | 'outstandingBalance' | 'propertyValue' | 'monthlyPayment';
 
 function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSectionProps) {
   // Property value is derived from the linked property, so it is shown
@@ -301,6 +307,25 @@ function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
         Rate & Term
       </p>
       <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+            Repayment Method
+          </label>
+          <select
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            value={form.repaymentType}
+            onChange={(e) => setField('repaymentType', toMortgageRepaymentType(e.target.value))}
+          >
+            {REPAYMENT_TYPES.map((type) => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+          <p className="text-[10px] text-slate-400 mt-1">
+            {form.repaymentType === 'Linear'
+              ? 'Fixed principal; the monthly payment declines over time.'
+              : 'Fixed payment; the principal share increases over time.'}
+          </p>
+        </div>
         <InterestRateField form={form} errors={errors} setField={setField} />
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1.5">Rate Type</label>
