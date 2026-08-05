@@ -2,7 +2,7 @@
 
 import { expect, test } from 'bun:test';
 import type { Mortgage } from '@quro/shared';
-import { generateSchedule } from './mortgage-metrics';
+import { computeMortgageMetrics, generateSchedule } from './mortgage-metrics';
 
 const mortgageBase: Mortgage = {
   id: 1,
@@ -49,4 +49,22 @@ test('accumulates non-zero interest across schedule periods', () => {
   // total repaid = original balance
   const totalPrincipal = schedule.slice(1).reduce((sum, row) => sum + row.principal, 0);
   expect(totalPrincipal).toBe(1200);
+});
+
+test('shows contractual time remaining instead of the estimated payoff time', () => {
+  const mortgage: Mortgage = {
+    ...mortgageBase,
+    originalAmount: 2400,
+    outstandingBalance: 2400,
+    monthlyPayment: 10,
+    termYears: 30,
+    startDate: '24 July 2026',
+    endDate: '1 August 2056',
+  };
+
+  const metrics = computeMortgageMetrics(mortgage, [], new Date(2026, 7, 5, 12));
+
+  expect(metrics.monthsRemaining).toBe(360);
+  expect(metrics.yearsRemaining).toBe(30);
+  expect(metrics.amortization.at(-1)?.year).toBe('2046');
 });

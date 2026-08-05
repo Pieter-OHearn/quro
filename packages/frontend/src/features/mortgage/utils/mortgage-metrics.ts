@@ -8,13 +8,33 @@ const PAYMENT_BREAKDOWN_LIMIT = 6;
 const ISO_YEAR_MONTH_LENGTH = 7;
 
 type YearMonth = { year: number; monthIndex: number };
+type CalendarDate = YearMonth & { day: number };
 
-function parseYearMonth(value: string): YearMonth | null {
-  const [yearPart, monthPart] = value.slice(0, ISO_YEAR_MONTH_LENGTH).split('-');
-  const year = Number.parseInt(yearPart ?? '', 10);
-  const month = Number.parseInt(monthPart ?? '', 10);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return null;
-  return { year, monthIndex: month - 1 };
+function parseCalendarDate(value: string): CalendarDate | null {
+  const isoMatch = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/.exec(value.trim());
+  if (isoMatch) {
+    const [, yearPart, monthPart, dayPart] = isoMatch;
+    const year = Number.parseInt(yearPart ?? '', 10);
+    const month = Number.parseInt(monthPart ?? '', 10);
+    const day = Number.parseInt(dayPart ?? '1', 10);
+    const candidate = new Date(year, month - 1, day);
+    if (
+      candidate.getFullYear() === year &&
+      candidate.getMonth() === month - 1 &&
+      candidate.getDate() === day
+    ) {
+      return { year, monthIndex: month - 1, day };
+    }
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return {
+    year: parsed.getFullYear(),
+    monthIndex: parsed.getMonth(),
+    day: parsed.getDate(),
+  };
 }
 
 function getCurrentYearMonth(today: Date): YearMonth {
@@ -33,15 +53,22 @@ function addMonths(start: YearMonth, monthOffset: number): YearMonth {
   };
 }
 
-function calculateContractRemainingMonths(mortgage: MortgageType, today: Date): number | null {
-  const current = getCurrentYearMonth(today);
-  const explicitEnd = parseYearMonth(mortgage.endDate);
-  if (explicitEnd) return Math.max(0, monthsBetween(current, explicitEnd) + 1);
+export function calculateContractRemainingMonths(
+  mortgage: MortgageType,
+  today = new Date(),
+): number | null {
+  const current: CalendarDate = { ...getCurrentYearMonth(today), day: today.getDate() };
+  const explicitEnd = parseCalendarDate(mortgage.endDate);
+  if (explicitEnd) {
+    const partialMonth = explicitEnd.day > current.day ? 1 : 0;
+    return Math.max(0, monthsBetween(current, explicitEnd) + partialMonth);
+  }
 
-  const start = parseYearMonth(mortgage.startDate);
+  const start = parseCalendarDate(mortgage.startDate);
   if (!start || mortgage.termYears <= 0) return null;
 
-  const elapsedMonths = Math.max(0, monthsBetween(start, current));
+  const partialMonth = current.day < start.day ? 1 : 0;
+  const elapsedMonths = Math.max(0, monthsBetween(start, current) - partialMonth);
   return Math.max(0, mortgage.termYears * MONTHS_PER_YEAR - elapsedMonths);
 }
 
@@ -160,14 +187,19 @@ export function computePaymentBreakdownRows(txns: MortgageTransaction[]): Paymen
     }));
 }
 
-export function computeMortgageMetrics(mortgage: MortgageType, txns: MortgageTransaction[]) {
+export function computeMortgageMetrics(
+  mortgage: MortgageType,
+  txns: MortgageTransaction[],
+  today = new Date(),
+) {
   const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
   const monthsRemainingRaw = calculateRemainingMonths(
     mortgage.outstandingBalance,
     monthlyRate,
     mortgage.monthlyPayment,
   );
-  const monthsRemaining = Math.round(monthsRemainingRaw ?? 0);
+  const contractMonthsRemaining = calculateContractRemainingMonths(mortgage, today);
+  const monthsRemaining = contractMonthsRemaining ?? Math.round(monthsRemainingRaw ?? 0);
   const paid = mortgage.originalAmount - mortgage.outstandingBalance;
   const paymentBreakdown = computePaymentBreakdownRows(txns);
 
@@ -178,7 +210,7 @@ export function computeMortgageMetrics(mortgage: MortgageType, txns: MortgageTra
     paidPct: (paid / mortgage.originalAmount) * 100,
     monthsRemaining,
     yearsRemaining: Math.floor(monthsRemaining / 12),
-    amortization: generateSchedule(mortgage, monthsRemainingRaw),
+    amortization: generateSchedule(mortgage, monthsRemainingRaw, today),
     paymentBreakdown,
   };
 }
