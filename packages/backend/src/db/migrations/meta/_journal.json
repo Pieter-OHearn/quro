@@ -162,6 +162,13 @@
       "when": 1785850859245,
       "tag": "0022_magenta_amphibian",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785936114419,
+      "tag": "0023_bored_juggernaut",
+      "breakpoints": true
     }
   ]
 }

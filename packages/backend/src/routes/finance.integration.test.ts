@@ -773,6 +773,7 @@ describe('finance integration', () => {
         monthlyPayment: 1550,
         interestRate: 2.4,
         rateType: 'fixed',
+        repaymentType: 'linear',
         fixedUntil: '2031-06-30',
         termYears: 30,
         startDate: '2021-07-01',
@@ -786,11 +787,13 @@ describe('finance integration', () => {
         propertyAddress: string;
         currency: string;
         propertyValue: string;
+        repaymentType: string;
       }>
     >(createMortgageResponse, 201);
     expect(createMortgageBody.data).toMatchObject({
       propertyAddress: '1 River Lane',
       currency: 'EUR',
+      repaymentType: 'Linear',
     });
     expect(Number(createMortgageBody.data.propertyValue)).toBe(500000);
 
@@ -858,6 +861,7 @@ describe('finance integration', () => {
           linkedPropertyId: ownerPropertyTwoBody.data.id,
           outstandingBalance: 295000,
           monthlyPayment: 1600,
+          repaymentType: 'annuity',
           userId: stranger.user.id,
         },
       },
@@ -867,11 +871,13 @@ describe('finance integration', () => {
         propertyAddress: string;
         propertyValue: string;
         outstandingBalance: string;
+        repaymentType: string;
       }>
     >(patchMortgageResponse, 200);
     expect(patchMortgageBody.data.propertyAddress).toBe('99 Harbor Road');
     expect(Number(patchMortgageBody.data.propertyValue)).toBe(540000);
     expect(Number(patchMortgageBody.data.outstandingBalance)).toBe(295000);
+    expect(patchMortgageBody.data.repaymentType).toBe('Annuity');
 
     const propertyOneAfterMoveResponse = await integration.request(
       `/api/investments/properties/${ownerPropertyOneBody.data.id}`,

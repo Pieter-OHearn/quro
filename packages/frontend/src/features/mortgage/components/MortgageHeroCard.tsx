@@ -25,7 +25,12 @@ function buildMortgageMetrics(
       value: fmt(mortgage.outstandingBalance),
       sub: `of ${fmt(mortgage.originalAmount)} original`,
     },
-    { label: 'Monthly Payment', value: fmt(mortgage.monthlyPayment), sub: 'Capital + Interest' },
+    {
+      label: mortgage.repaymentType === 'Linear' ? 'Current Payment' : 'Monthly Payment',
+      value: fmt(mortgage.monthlyPayment),
+      sub:
+        mortgage.repaymentType === 'Linear' ? 'Declines as interest falls' : 'Fixed total payment',
+    },
     {
       label: 'Interest Rate',
       value: `${mortgage.interestRate}%`,
@@ -62,7 +67,8 @@ export function MortgageHeroCard({
               <JointBadge isJoint={mortgage.isJoint} ownerUserId={mortgage.userId} />
             </div>
             <p className="text-slate-400 text-sm">
-              {mortgage.lender} · {mortgage.rateType} Rate · Fixed until {mortgage.fixedUntil}
+              {mortgage.lender} · {mortgage.repaymentType} · {mortgage.rateType} Rate · Fixed until{' '}
+              {mortgage.fixedUntil}
             </p>
           </div>
         </div>

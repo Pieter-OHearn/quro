@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.4.1] - 2026-08-05
+
+- Add annuity and linear mortgage repayment methods, including method-aware balance projections, form controls, and clear mortgage summary labels.
+- Fix mortgage time remaining calculations to use the contractual end date and support human-readable stored dates.
+
 ## [v0.4.0] - 2026-08-04
 
 - Add dismissible fixed-rate expiry reminders to the notification centre during the six months before a mortgage's fixed term ends, with direct links to the relevant mortgage.

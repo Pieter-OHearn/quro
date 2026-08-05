@@ -1,0 +1,1 @@
+ALTER TABLE "mortgages" ADD COLUMN "repayment_type" text DEFAULT 'Annuity' NOT NULL;

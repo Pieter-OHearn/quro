@@ -18,6 +18,7 @@ const mortgage: Mortgage = {
   monthlyPayment: 3000,
   interestRate: 2.5,
   rateType: 'Fixed',
+  repaymentType: 'Annuity',
   fixedUntil: '2030-08-15',
   termYears: 30,
   startDate: '2025-01-01',

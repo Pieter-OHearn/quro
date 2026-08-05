@@ -3,6 +3,7 @@ import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 import type {
   Mortgage as MortgageType,
   MortgageRateType,
+  MortgageRepaymentType,
   MortgageTransaction,
   Property,
 } from '@quro/shared';
@@ -36,6 +37,7 @@ export type MortgageFormState = {
   monthlyPayment: string;
   interestRate: string;
   rateType: MortgageRateType;
+  repaymentType: MortgageRepaymentType;
   fixedUntil: string;
   termYears: string;
   startDate: string;
