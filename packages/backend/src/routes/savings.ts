@@ -10,6 +10,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
   toFiniteNumber,
@@ -532,6 +533,7 @@ app.post('/transactions', async (c) => {
       body.value.accountId,
       toSignedSavingsAmount(body.value.type, body.value.amount),
     );
+    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
 
     return [inserted];
   });
@@ -592,6 +594,11 @@ app.patch('/transactions/:id', async (c) => {
       previousAmount: existing.amount,
       nextAmount: nextState.amount,
     });
+    await invalidateSnapshotsFrom(
+      tx,
+      user.id,
+      earliestDate(existing.date, body.value.date ?? existing.date),
+    );
 
     return [updated];
   });
@@ -622,6 +629,7 @@ app.delete('/transactions/:id', async (c) => {
       deleted.accountId,
       -toSignedSavingsAmount(deleted.type, deleted.amount),
     );
+    await invalidateSnapshotsFrom(tx, user.id, deleted.date);
 
     return [deleted];
   });

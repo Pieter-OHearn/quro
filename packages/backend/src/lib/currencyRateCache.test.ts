@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   buildRatesToBaseCurrency,
+  buildRatesToBaseCurrencyAt,
   convertToBaseCurrency,
   CurrencyRatesUnavailableError,
 } from './currencyRateCache';
@@ -17,6 +18,11 @@ const completeRows = [
   { fromCurrency: 'CHF', toCurrency: 'EUR', rate: '1.04', updatedAt: freshUpdatedAt },
   { fromCurrency: 'SGD', toCurrency: 'EUR', rate: '0.68', updatedAt: freshUpdatedAt },
 ] as const;
+
+const historicalRows = completeRows.flatMap((row) => [
+  { ...row, rate: String(Number(row.rate) - 0.1), sourceDate: '2026-04-30' },
+  { ...row, sourceDate: '2026-05-08' },
+]);
 
 describe('currency rate cache', () => {
   test('builds a complete fresh rate map and converts strictly', () => {
@@ -55,5 +61,29 @@ describe('currency rate cache', () => {
     );
 
     expect(rates.get('EUR')).toBe(1);
+  });
+
+  test('selects the last historical rate at or before the cutoff', () => {
+    const result = buildRatesToBaseCurrencyAt(historicalRows, '2026-05-01');
+
+    expect(result.rates.get('GBP')).toBeCloseTo(1.08);
+    expect(result.isEstimated).toBe(false);
+  });
+
+  test('falls back to the latest rate and marks pre-history values as estimated', () => {
+    const result = buildRatesToBaseCurrencyAt(historicalRows, '2026-01-31');
+
+    expect(result.rates.get('GBP')).toBe(1.18);
+    expect(result.isEstimated).toBe(true);
+  });
+
+  test('marks the result estimated when any currency lacks an applicable historical rate', () => {
+    const rows = historicalRows.map((row) =>
+      row.fromCurrency === 'GBP' && row.sourceDate === '2026-04-30'
+        ? { ...row, sourceDate: '2026-05-02' }
+        : row,
+    );
+
+    expect(buildRatesToBaseCurrencyAt(rows, '2026-05-01').isEstimated).toBe(true);
   });
 });

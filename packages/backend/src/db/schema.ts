@@ -109,6 +109,7 @@ export const users = pgTable(
     age: integer('age').notNull().default(35),
     retirementAge: integer('retirement_age').notNull().default(67),
     baseCurrency: currencyCodeEnum('base_currency').notNull().default('EUR'),
+    jurisdiction: text('jurisdiction').notNull().default('GENERIC'),
     numberFormat: text('number_format').notNull().default('en-US'),
     passwordHash: text('password_hash').notNull(),
     passwordUpdatedAt: timestamp('password_updated_at'),
@@ -132,6 +133,10 @@ export const users = pgTable(
     numberFormatCheck: check(
       'users_number_format_check',
       sql`${table.numberFormat} in ('en-US', 'de-DE')`,
+    ),
+    jurisdictionCheck: check(
+      'users_jurisdiction_check',
+      sql`${table.jurisdiction} in ('NL', 'AU', 'GENERIC')`,
     ),
   }),
 );
@@ -176,6 +181,80 @@ export const partnerLinks = pgTable(
     noSelfLinkCheck: check(
       'partner_links_no_self_link_check',
       sql`${table.requesterId} <> ${table.addresseeId}`,
+    ),
+  }),
+);
+
+// ── Wealth planning ─────────────────────────────────────────────────────────
+
+export const employmentProfiles = pgTable(
+  'employment_profiles',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    employmentType: text('employment_type'),
+    tenureMonths: integer('tenure_months'),
+    noticePeriodMonths: integer('notice_period_months'),
+    hasDependents: boolean('has_dependents'),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userUnique: uniqueIndex('employment_profiles_user_id_unique').on(table.userId),
+    employmentTypeCheck: check(
+      'employment_profiles_type_check',
+      sql`${table.employmentType} is null or ${table.employmentType} in ('employed', 'self_employed', 'other')`,
+    ),
+    tenureMonthsCheck: check(
+      'employment_profiles_tenure_months_check',
+      sql`${table.tenureMonths} is null or ${table.tenureMonths} between 0 and 720`,
+    ),
+    noticePeriodCheck: check(
+      'employment_profiles_notice_period_months_check',
+      sql`${table.noticePeriodMonths} is null or ${table.noticePeriodMonths} between 0 and 24`,
+    ),
+  }),
+);
+
+export const planAssumptions = pgTable(
+  'plan_assumptions',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    leanBurnOverride: numericAsNumber('lean_burn_override', { precision: 19, scale: 2 }),
+    emergencyLifestylePct: numericAsNumber('emergency_lifestyle_pct', {
+      precision: 5,
+      scale: 4,
+    }),
+    excludedTiers: jsonb('excluded_tiers').$type<number[]>(),
+    countFullJointBalances: boolean('count_full_joint_balances'),
+    benefitMonthlyOverride: numericAsNumber('benefit_monthly_override', {
+      precision: 19,
+      scale: 2,
+    }),
+    benefitMaxMonthsOverride: integer('benefit_max_months_override'),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userUnique: uniqueIndex('plan_assumptions_user_id_unique').on(table.userId),
+    leanBurnCheck: check(
+      'plan_assumptions_lean_burn_check',
+      sql`${table.leanBurnOverride} is null or ${table.leanBurnOverride} >= 0`,
+    ),
+    lifestyleCheck: check(
+      'plan_assumptions_lifestyle_check',
+      sql`${table.emergencyLifestylePct} is null or ${table.emergencyLifestylePct} between 0 and 1`,
+    ),
+    benefitMonthlyCheck: check(
+      'plan_assumptions_benefit_monthly_check',
+      sql`${table.benefitMonthlyOverride} is null or ${table.benefitMonthlyOverride} >= 0`,
+    ),
+    benefitMonthsCheck: check(
+      'plan_assumptions_benefit_months_check',
+      sql`${table.benefitMaxMonthsOverride} is null or ${table.benefitMaxMonthsOverride} between 0 and 120`,
     ),
   }),
 );
@@ -742,6 +821,7 @@ export const budgetCategories = pgTable(
     color: text('color'),
     month: text('month').notNull(),
     year: integer('year').notNull(),
+    expenseClass: text('expense_class').notNull().default('essential'),
   },
   (table) => ({
     userIdx: index('budget_categories_user_id_idx').on(table.userId),
@@ -750,6 +830,10 @@ export const budgetCategories = pgTable(
       table.month,
       table.year,
       table.name,
+    ),
+    expenseClassCheck: check(
+      'budget_categories_expense_class_check',
+      sql`${table.expenseClass} in ('essential', 'discretionary', 'employment_linked')`,
     ),
   }),
 );
@@ -830,7 +914,55 @@ export const currencyRates = pgTable(
   }),
 );
 
+export const currencyRateHistory = pgTable(
+  'currency_rate_history',
+  {
+    id: serial('id').primaryKey(),
+    fromCurrency: currencyCodeEnum('from_currency').notNull(),
+    toCurrency: currencyCodeEnum('to_currency').notNull(),
+    rate: numericAsNumber('rate', { precision: 12, scale: 6 }).notNull(),
+    provider: text('provider').notNull(),
+    sourceDate: date('source_date', { mode: 'string' }).notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    fromToDateUnique: uniqueIndex('currency_rate_history_from_to_date_unique').on(
+      table.fromCurrency,
+      table.toCurrency,
+      table.sourceDate,
+    ),
+    sourceDateIdx: index('currency_rate_history_source_date_idx').on(table.sourceDate),
+  }),
+);
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
+
+export const netWorthSnapshots = pgTable(
+  'net_worth_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    snapshotDate: date('snapshot_date', { mode: 'string' }).notNull(),
+    baseCurrency: currencyCodeEnum('base_currency').notNull(),
+    savings: numericAsNumber('savings', { precision: 19, scale: 2 }).notNull(),
+    brokerage: numericAsNumber('brokerage', { precision: 19, scale: 2 }).notNull(),
+    propertyEquity: numericAsNumber('property_equity', { precision: 19, scale: 2 }).notNull(),
+    pension: numericAsNumber('pension', { precision: 19, scale: 2 }).notNull(),
+    liabilities: numericAsNumber('liabilities', { precision: 19, scale: 2 }).notNull(),
+    totalValue: numericAsNumber('total_value', { precision: 19, scale: 2 }).notNull(),
+    isEstimated: boolean('is_estimated').notNull().default(false),
+    computedAt: timestamp('computed_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index('net_worth_snapshots_user_id_idx').on(table.userId),
+    userDateUnique: uniqueIndex('net_worth_snapshots_user_date_unique').on(
+      table.userId,
+      table.snapshotDate,
+    ),
+  }),
+);
 
 export const dashboardTransactions = pgTable(
   'dashboard_transactions',

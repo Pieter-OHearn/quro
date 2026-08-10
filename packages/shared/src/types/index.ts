@@ -1,3 +1,7 @@
+import type { JurisdictionCode, UnemploymentEligibility } from './jurisdiction.js';
+
+export * from './jurisdiction.js';
+
 export const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
 
 export type CurrencyCode = (typeof CURRENCY_CODES)[number];
@@ -59,6 +63,7 @@ export type User = {
   age: number;
   retirementAge: number;
   baseCurrency: CurrencyCode;
+  jurisdiction: import('./jurisdiction.js').JurisdictionCode;
   numberFormat: NumberFormatPreference;
   passwordUpdatedAt: string | null;
   createdAt: string;
@@ -76,6 +81,7 @@ export type UpdateUserProfileInput = {
 export type UpdateUserPreferencesInput = {
   baseCurrency?: CurrencyCode;
   numberFormat?: NumberFormatPreference;
+  jurisdiction?: import('./jurisdiction.js').JurisdictionCode;
 };
 
 export type UpdateUserPasswordInput = {
@@ -611,6 +617,7 @@ export type BudgetCategory = {
   color: string;
   month: BudgetMonth;
   year: number;
+  expenseClass: ExpenseClass;
 };
 
 export type BudgetTransaction = {
@@ -633,6 +640,111 @@ export type NetWorthSnapshot = {
   year: number;
   totalValue: number;
   currency: CurrencyCode;
+  isEstimated: boolean;
+};
+
+export const EXPENSE_CLASSES = ['essential', 'discretionary', 'employment_linked'] as const;
+export type ExpenseClass = (typeof EXPENSE_CLASSES)[number];
+
+export const EMPLOYMENT_TYPES = ['employed', 'self_employed', 'other'] as const;
+export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
+
+export type EmploymentProfile = {
+  id: number;
+  userId: number;
+  employmentType: EmploymentType | null;
+  tenureMonths: number | null;
+  noticePeriodMonths: number | null;
+  hasDependents: boolean | null;
+  updatedAt: string;
+};
+
+export type EmploymentProfileInput = Partial<{
+  employmentType: EmploymentType | null;
+  tenureMonths: number | null;
+  noticePeriodMonths: number | null;
+  hasDependents: boolean | null;
+}>;
+
+export type PlanAssumptions = {
+  id: number;
+  userId: number;
+  leanBurnOverride: number | null;
+  emergencyLifestylePct: number | null;
+  excludedTiers: number[] | null;
+  countFullJointBalances: boolean | null;
+  benefitMonthlyOverride: number | null;
+  benefitMaxMonthsOverride: number | null;
+  updatedAt: string;
+};
+
+export type PlanAssumptionsInput = Partial<Omit<PlanAssumptions, 'id' | 'userId' | 'updatedAt'>>;
+
+export type RunwayBurnSource = 'envelopes' | 'envelopes_partial' | 'derived_cashflow';
+export type RunwayBand = 'critical' | 'building' | 'resilient';
+
+export type RunwayResponse = {
+  baseCurrency: CurrencyCode;
+  asOf: string;
+  jurisdiction: {
+    code: JurisdictionCode;
+    rulesEffectiveFrom: string;
+    isExtrapolated: boolean;
+  };
+  burn: {
+    lean: number;
+    current: number;
+    burnSource: RunwayBurnSource;
+    isPartialHistory: boolean;
+    unclassifiedCategoryCount: number;
+    components: Array<{
+      label: string;
+      amount: number;
+      source: 'budget_category' | 'mortgage' | 'debt';
+      expenseClass: ExpenseClass;
+    }>;
+  };
+  tiers: Array<{
+    tier: number;
+    label: string;
+    amount: number;
+    haircutPct: number;
+    note: string;
+    included: boolean;
+  }>;
+  incomeSupport: {
+    noticeMonths: number;
+    noticeMonthlyNet: number;
+    severanceNet: number;
+    benefit: { monthlyNetByMonth: number[]; maxMonths: number } | null;
+    effectiveTaxRate: number;
+    taxRateSource: 'payslips' | 'jurisdiction_default';
+    eligibility: UnemploymentEligibility;
+  } | null;
+  runway: {
+    monthsCashOnly: number;
+    monthsAllLiquid: number;
+    monthsWithIncomeSupport: number | null;
+    band: RunwayBand;
+    ledger: Array<{
+      month: number;
+      income: number;
+      burn: number;
+      drawdown: number;
+      liquidRemaining: number;
+    }>;
+  };
+  depositGuarantee: Array<{
+    entityId: string | null;
+    entityName: string;
+    scheme: string;
+    total: number;
+    cap: number;
+    excess: number;
+    confidence: 'verified' | 'unverified';
+  }>;
+  setupComplete: boolean;
+  isEstimated: boolean;
 };
 
 export type AssetAllocation = {

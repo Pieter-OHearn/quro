@@ -4,6 +4,7 @@ import type { ComponentProps, ElementType } from 'react';
 import { useSearchParams } from 'react-router';
 import type {
   CurrencyCode,
+  JurisdictionCode,
   NumberFormatPreference,
   UpdateUserPasswordInput,
   UpdateUserPreferencesInput,
@@ -18,6 +19,7 @@ import {
   MIN_RETIREMENT_AGE,
   MIN_USER_AGE,
   NUMBER_FORMATS,
+  JURISDICTION_CODES,
 } from '@quro/shared';
 import {
   AlertTriangle,
@@ -733,6 +735,9 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
 
 function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionProps>) {
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(user.baseCurrency);
+  const [selectedJurisdiction, setSelectedJurisdiction] = useState<JurisdictionCode>(
+    user.jurisdiction,
+  );
   const [selectedNumberFormat, setSelectedNumberFormat] = useState<NumberFormatPreference>(
     user.numberFormat,
   );
@@ -740,17 +745,21 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
   const [isSaving, setIsSaving] = useState(false);
   const { saved, showSaved } = useSavedState();
   const hasChanges =
-    selectedCurrency !== user.baseCurrency || selectedNumberFormat !== user.numberFormat;
+    selectedCurrency !== user.baseCurrency ||
+    selectedNumberFormat !== user.numberFormat ||
+    selectedJurisdiction !== user.jurisdiction;
 
   useEffect(() => {
     setSelectedCurrency(user.baseCurrency);
     setSelectedNumberFormat(user.numberFormat);
-  }, [user.baseCurrency, user.numberFormat]);
+    setSelectedJurisdiction(user.jurisdiction);
+  }, [user.baseCurrency, user.jurisdiction, user.numberFormat]);
 
   const handleSave = async () => {
     const payload: UpdateUserPreferencesInput = {
       baseCurrency: selectedCurrency,
       numberFormat: selectedNumberFormat,
+      jurisdiction: selectedJurisdiction,
     };
 
     setIsSaving(true);
@@ -807,6 +816,47 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
         </div>
         <p className="mt-3 text-sm text-slate-500">
           Cross-currency balances and charts convert into this currency across the app.
+        </p>
+      </div>
+
+      <div className="mb-8 border-t border-slate-100 pt-6">
+        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          <MapPin size={14} className="text-indigo-500" />
+          Planning jurisdiction
+        </p>
+        <div className="grid gap-3 md:grid-cols-3">
+          {JURISDICTION_CODES.map((code) => {
+            const isSelected = code === selectedJurisdiction;
+            const labels: Record<JurisdictionCode, { name: string; note: string }> = {
+              NL: { name: 'Netherlands', note: 'Dutch benefit and severance rules' },
+              AU: { name: 'Australia', note: 'Conservative rules until the AU profile ships' },
+              GENERIC: { name: 'Generic', note: 'Conservative international defaults' },
+            };
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => setSelectedJurisdiction(code)}
+                className={cn(
+                  'rounded-2xl border px-4 py-4 text-left transition-all',
+                  isSelected
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50',
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{labels[code].name}</p>
+                    <p className="mt-1 text-xs text-slate-400">{labels[code].note}</p>
+                  </div>
+                  {isSelected ? <Check size={16} className="ml-auto text-indigo-600" /> : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          Planning rules are independent from the currency used to display balances.
         </p>
       </div>
 

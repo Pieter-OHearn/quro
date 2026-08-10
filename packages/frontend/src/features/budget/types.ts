@@ -5,7 +5,7 @@ import type {
 
 export type BudgetCategory = Pick<
   SharedBudgetCategory,
-  'id' | 'name' | 'budgeted' | 'spent' | 'color' | 'emoji' | 'month' | 'year'
+  'id' | 'name' | 'budgeted' | 'spent' | 'color' | 'emoji' | 'month' | 'year' | 'expenseClass'
 >;
 
 export type BudgetTx = Pick<
@@ -58,7 +58,7 @@ export type BudgetStats = {
   pieData: PieEntry[];
 };
 
-export type CreateBudgetCategoryInput = Omit<SharedBudgetCategory, 'id'>;
+export type CreateBudgetCategoryInput = Omit<SharedBudgetCategory, 'id' | 'expenseClass'>;
 export type UpdateBudgetCategoryInput = { id: number } & Partial<Omit<SharedBudgetCategory, 'id'>>;
 
 export type EditCategoryForm = {

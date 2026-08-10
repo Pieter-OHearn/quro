@@ -169,6 +169,20 @@
       "when": 1785936114419,
       "tag": "0023_bored_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785939498876,
+      "tag": "0024_reflective_vapor",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786391941529,
+      "tag": "0025_jazzy_bloodaxe",
+      "breakpoints": true
     }
   ]
 }

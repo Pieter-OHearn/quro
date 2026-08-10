@@ -19,6 +19,7 @@ export const publicUserColumns = {
   age: users.age,
   retirementAge: users.retirementAge,
   baseCurrency: users.baseCurrency,
+  jurisdiction: users.jurisdiction,
   numberFormat: users.numberFormat,
   passwordUpdatedAt: users.passwordUpdatedAt,
   createdAt: users.createdAt,

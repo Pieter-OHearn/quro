@@ -1,7 +1,7 @@
 import { CURRENCY_CODES, type CurrencyCode } from '@quro/shared';
 import { asc, sql } from 'drizzle-orm';
 import { db } from '../db/client';
-import { currencyRates } from '../db/schema';
+import { currencyRateHistory, currencyRates } from '../db/schema';
 import {
   buildRatesToBaseCurrency,
   CurrencyRatesUnavailableError,
@@ -48,6 +48,8 @@ export type CurrentCurrencyRateRow = {
   sourceDate: string;
   updatedAt: Date;
 };
+
+export type HistoricalCurrencyRateDbRow = Omit<CurrentCurrencyRateRow, 'id'>;
 
 type CurrencyRateFetcher = (
   baseCurrency: CurrencyCode,
@@ -127,6 +129,32 @@ export function loadCurrencyRateCacheRows(): Promise<CurrentCurrencyRateRow[]> {
     .orderBy(asc(currencyRates.fromCurrency), asc(currencyRates.toCurrency));
 }
 
+export function loadCurrencyRateHistoryRows(): Promise<HistoricalCurrencyRateDbRow[]> {
+  return db
+    .select({
+      fromCurrency: currencyRateHistory.fromCurrency,
+      toCurrency: currencyRateHistory.toCurrency,
+      rate: currencyRateHistory.rate,
+      provider: currencyRateHistory.provider,
+      sourceDate: currencyRateHistory.sourceDate,
+      updatedAt: currencyRateHistory.updatedAt,
+    })
+    .from(currencyRateHistory)
+    .orderBy(
+      asc(currencyRateHistory.fromCurrency),
+      asc(currencyRateHistory.toCurrency),
+      asc(currencyRateHistory.sourceDate),
+    );
+}
+
+export async function getHistoricalCurrencyRateRows(): Promise<HistoricalCurrencyRateDbRow[]> {
+  const [history, current] = await Promise.all([
+    loadCurrencyRateHistoryRows(),
+    getCurrentCurrencyRateRows(),
+  ]);
+  return [...history, ...current.map(({ id: _id, ...row }) => row)];
+}
+
 function shouldRefreshCurrencyRateCache(
   rows: readonly CurrentCurrencyRateRow[],
   baseCurrency: CurrencyCode,
@@ -177,27 +205,39 @@ export async function syncCurrencyRates(
   const result = await fetchRates(baseCurrency, fromCurrencies);
 
   if (result.rates.length > 0) {
-    await db
-      .insert(currencyRates)
-      .values(
-        result.rates.map((rate) => ({
-          fromCurrency: rate.fromCurrency,
-          toCurrency: rate.toCurrency,
-          rate: rate.rate,
-          provider: rate.provider,
-          sourceDate: rate.sourceDate,
-          updatedAt: syncedAt,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [currencyRates.fromCurrency, currencyRates.toCurrency],
-        set: {
-          rate: sql`excluded.rate`,
-          provider: sql`excluded.provider`,
-          sourceDate: sql`excluded.source_date`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-      });
+    const values = result.rates.map((rate) => ({
+      fromCurrency: rate.fromCurrency,
+      toCurrency: rate.toCurrency,
+      rate: rate.rate,
+      provider: rate.provider,
+      sourceDate: rate.sourceDate,
+      updatedAt: syncedAt,
+    }));
+
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(currencyRates)
+        .values(values)
+        .onConflictDoUpdate({
+          target: [currencyRates.fromCurrency, currencyRates.toCurrency],
+          set: {
+            rate: sql`excluded.rate`,
+            provider: sql`excluded.provider`,
+            sourceDate: sql`excluded.source_date`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+        });
+      await tx
+        .insert(currencyRateHistory)
+        .values(values)
+        .onConflictDoNothing({
+          target: [
+            currencyRateHistory.fromCurrency,
+            currencyRateHistory.toCurrency,
+            currencyRateHistory.sourceDate,
+          ],
+        });
+    });
   }
 
   return {

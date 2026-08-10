@@ -13,6 +13,7 @@ import { mortgages, mortgageTransactions, properties } from '../db/schema';
 import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
+import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
@@ -970,6 +971,7 @@ app.post('/transactions', async (c) => {
       .insert(mortgageTransactions)
       .values({ ...toMortgageTransactionValues(body.value), userId: mortgage.userId ?? user.id })
       .returning();
+    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
     return { data: created } as const;
   });
   if ('error' in result) return c.json({ error: result.error }, result.status);
@@ -1020,6 +1022,7 @@ app.patch('/transactions/:id', async (c) => {
       .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
       .where(eq(mortgageTransactions.id, id))
       .returning();
+    await invalidateSnapshotsFrom(tx, user.id, earliestDate(existing.date, merged.value.date));
     return { data: updated } as const;
   });
   if ('error' in result) return c.json({ error: result.error }, result.status);
@@ -1049,6 +1052,7 @@ app.delete('/transactions/:id', async (c) => {
       .delete(mortgageTransactions)
       .where(eq(mortgageTransactions.id, id))
       .returning();
+    await invalidateSnapshotsFrom(tx, user.id, existing.date);
     return deleted ?? null;
   });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);

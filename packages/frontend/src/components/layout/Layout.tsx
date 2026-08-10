@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ChevronDown,
   Check,
+  Compass,
 } from 'lucide-react';
 import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
@@ -29,6 +30,7 @@ import { NotificationBell } from '@/components/notifications';
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { label: 'Plan', path: '/plan', icon: Compass },
   { label: 'Savings', path: '/savings', icon: PiggyBank },
   { label: 'Investments', path: '/investments', icon: TrendingUp },
   { label: 'Pension', path: '/pension', icon: ShieldCheck },

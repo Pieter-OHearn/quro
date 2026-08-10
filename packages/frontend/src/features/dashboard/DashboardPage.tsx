@@ -157,7 +157,10 @@ function useDashboardData(
     convertToBase,
   };
 
-  const { netWorth, monthChange, ytdPct } = computeNWMetrics(chartData, allocationSummary.netWorth);
+  const { netWorth, monthChange, ytdPct, isEstimated } = computeNWMetrics(
+    chartData,
+    allocationSummary.netWorth,
+  );
   const {
     monthlyCategoryChange,
     monthlySalaryValue,
@@ -184,6 +187,7 @@ function useDashboardData(
     netWorth,
     monthChange,
     ytdPct,
+    isEstimated,
     annualGross,
     goalProgressContext,
     currentYear,
@@ -259,6 +263,7 @@ function DashboardPageBody({
     netWorth,
     monthChange,
     ytdPct,
+    isEstimated,
   } = data;
 
   const hour = new Date().getHours();
@@ -281,6 +286,7 @@ function DashboardPageBody({
           liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
           fmtBase={fmtBase}
+          isEstimated={isEstimated}
         />
       </ContentSection>
       <ContentSection>

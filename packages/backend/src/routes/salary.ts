@@ -4,6 +4,7 @@ import { db } from '../db/client';
 import { payslips } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
+import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import {
   asFile,
   buildPdfStorageKey,
@@ -340,10 +341,14 @@ app.post('/payslips', async (c) => {
   const body = parsePayslipCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .insert(payslips)
-    .values({ ...body.value, userId: user.id })
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(payslips)
+      .values({ ...body.value, userId: user.id })
+      .returning();
+    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
+    return [created];
+  });
 
   return c.json({ data: formatPayslipResponse(data) }, HTTP_STATUS.CREATED);
 });
@@ -361,12 +366,22 @@ app.patch('/payslips/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No payslip fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const existing = await getOwnedPayslip(user.id, id);
+  if (!existing) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db
-    .update(payslips)
-    .set(body.value)
-    .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(payslips)
+      .set(body.value)
+      .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
+      .returning();
+    await invalidateSnapshotsFrom(
+      tx,
+      user.id,
+      earliestDate(existing.date, body.value.date ?? existing.date),
+    );
+    return [updated];
+  });
 
   if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data: formatPayslipResponse(data) });
@@ -377,10 +392,14 @@ app.delete('/payslips/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .delete(payslips)
-    .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [deleted] = await tx
+      .delete(payslips)
+      .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
+      .returning();
+    if (deleted) await invalidateSnapshotsFrom(tx, user.id, deleted.date);
+    return [deleted];
+  });
 
   if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
 

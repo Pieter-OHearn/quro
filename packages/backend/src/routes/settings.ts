@@ -7,6 +7,7 @@ import {
   MIN_USER_AGE,
   isNumberFormatPreference,
   isCurrencyCode,
+  isJurisdictionCode,
   type UpdateUserPasswordInput,
   type UpdateUserPreferencesInput,
   type UpdateUserProfileInput,
@@ -83,38 +84,49 @@ function parseProfilePayload(payload: unknown): ParseResult<UpdateUserProfileInp
   };
 }
 
+function parseOptionalPreference<T>(
+  value: unknown,
+  isValid: (candidate: unknown) => candidate is T,
+  error: string,
+): ParseResult<T | undefined> {
+  if (value === undefined) return { ok: true, data: undefined };
+  return isValid(value) ? { ok: true, data: value } : { ok: false, error };
+}
+
 function parsePreferencesPayload(payload: unknown): ParseResult<UpdateUserPreferencesInput> {
   if (typeof payload !== 'object' || payload === null) {
     return { ok: false, error: 'Invalid preferences payload' };
   }
 
   const raw = payload as Partial<Record<keyof UpdateUserPreferencesInput, unknown>>;
-  const nextPreferences: UpdateUserPreferencesInput = {};
+  const currency = parseOptionalPreference(
+    raw.baseCurrency,
+    isCurrencyCode,
+    'Choose a valid base currency',
+  );
+  if (!currency.ok) return currency;
+  const numberFormat = parseOptionalPreference(
+    raw.numberFormat,
+    isNumberFormatPreference,
+    'Choose a valid number format',
+  );
+  if (!numberFormat.ok) return numberFormat;
+  const jurisdiction = parseOptionalPreference(
+    raw.jurisdiction,
+    isJurisdictionCode,
+    'Choose a valid jurisdiction',
+  );
+  if (!jurisdiction.ok) return jurisdiction;
 
-  if (raw.baseCurrency !== undefined) {
-    if (!isCurrencyCode(raw.baseCurrency)) {
-      return { ok: false, error: 'Choose a valid base currency' };
-    }
-
-    nextPreferences.baseCurrency = raw.baseCurrency;
-  }
-
-  if (raw.numberFormat !== undefined) {
-    if (!isNumberFormatPreference(raw.numberFormat)) {
-      return { ok: false, error: 'Choose a valid number format' };
-    }
-
-    nextPreferences.numberFormat = raw.numberFormat;
-  }
-
-  if (!nextPreferences.baseCurrency && !nextPreferences.numberFormat) {
+  const data: UpdateUserPreferencesInput = {
+    ...(currency.data ? { baseCurrency: currency.data } : {}),
+    ...(numberFormat.data ? { numberFormat: numberFormat.data } : {}),
+    ...(jurisdiction.data ? { jurisdiction: jurisdiction.data } : {}),
+  };
+  if (Object.keys(data).length === 0) {
     return { ok: false, error: 'Choose at least one preference to update' };
   }
-
-  return {
-    ok: true,
-    data: nextPreferences,
-  };
+  return { ok: true, data };
 }
 
 function parsePasswordPayload(payload: unknown): ParseResult<UpdateUserPasswordInput> {
@@ -205,6 +217,7 @@ app.put('/preferences', async (c) => {
   const updatePayload: Partial<typeof users.$inferInsert> = {};
   if (parsed.data.baseCurrency) updatePayload.baseCurrency = parsed.data.baseCurrency;
   if (parsed.data.numberFormat) updatePayload.numberFormat = parsed.data.numberFormat;
+  if (parsed.data.jurisdiction) updatePayload.jurisdiction = parsed.data.jurisdiction;
 
   const [data] = await db
     .update(users)

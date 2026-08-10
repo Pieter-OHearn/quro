@@ -11,6 +11,7 @@ import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
+import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { getS3ObjectBytes } from '../lib/s3';
 import {
   asFile,
@@ -744,6 +745,7 @@ function createPensionTransaction(params: {
       params.payload.potId,
       computePensionTransactionDelta(params.payload),
     );
+    await invalidateSnapshotsFrom(tx, params.userId, params.payload.date);
 
     return { data };
   });
@@ -808,6 +810,11 @@ async function updatePensionTransaction(params: {
       nextType: nextPayload.type,
       existingRow: existing,
     });
+    await invalidateSnapshotsFrom(
+      tx,
+      params.userId,
+      earliestDate(normalizedExisting.date, nextPayload.date),
+    );
 
     return { data };
   });
@@ -854,6 +861,7 @@ async function deletePensionTransaction(params: {
       normalizedExisting.potId,
       -computePensionTransactionDelta(normalizedExisting),
     );
+    await invalidateSnapshotsFrom(tx, params.userId, normalizedExisting.date);
 
     return { data };
   });
