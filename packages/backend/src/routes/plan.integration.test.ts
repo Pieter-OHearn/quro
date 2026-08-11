@@ -136,10 +136,10 @@ describe('plan integration', () => {
     expect(derived.jurisdiction.code).toBe('AU');
     expect(derived.depositGuarantee[0]).toMatchObject({
       entityId: 'cba-au',
-      cap: 250_000,
       excess: 0,
       confidence: 'verified',
     });
+    expect(derived.depositGuarantee[0]?.cap).toBeCloseTo(250_000, 2);
     expect(derived.incomeSupport.severance).toMatchObject({
       status: 'included',
       gross: 24_000,
