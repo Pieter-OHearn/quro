@@ -92,9 +92,17 @@ export type IncomeSupportInput = {
 };
 
 export type SavingsGuaranteeInput = {
+  id?: number;
   bank: string;
   amount: number;
   isJoint: boolean;
+  confirmedEntity?: {
+    entityId: string | null;
+    entityName: string | null;
+    scheme: string | null;
+    cap: number | null;
+    currency: CurrencyCode | null;
+  } | null;
 };
 
 function average(values: readonly number[]): number {
@@ -755,20 +763,36 @@ export function aggregateDepositGuarantees(
   cap: number;
   excess: number;
   confidence: 'verified' | 'unverified';
+  accountIds: number[];
 }> {
-  const groups = new Map<string, ReturnType<typeof resolveBankingEntity> & { total: number }>();
+  const groups = new Map<
+    string,
+    ReturnType<typeof resolveBankingEntity> & {
+      total: number;
+      modelledCap: number;
+      accountIds: number[];
+    }
+  >();
   for (const account of accounts) {
-    const entity = resolveBankingEntity(account.bank);
+    const entity = resolveBankingEntity(account.bank, account.confirmedEntity);
     const key = entity.entityId ?? `unverified:${entity.entityName.toLowerCase()}`;
-    const group = groups.get(key) ?? { ...entity, total: 0 };
-    // Deposit protection is per depositor, so joint accounts count in full here despite 50% display weighting.
-    group.total += Math.max(0, account.amount);
+    const entityCap = entity.cap ?? cap;
+    const group = groups.get(key) ?? {
+      ...entity,
+      total: 0,
+      modelledCap: entityCap,
+      accountIds: [],
+    };
+    // Without explicit ownership shares, the plan attributes half of a joint balance to this depositor.
+    group.total += Math.max(0, account.amount) * (account.isJoint ? JOINT_WEIGHT : 1);
+    group.modelledCap = Math.min(group.modelledCap, entityCap);
+    if (account.id !== undefined) group.accountIds.push(account.id);
     groups.set(key, group);
   }
-  return [...groups.values()].map((group) => ({
+  return [...groups.values()].map(({ modelledCap, ...group }) => ({
     ...group,
     scheme: group.confidence === 'verified' ? group.scheme : scheme,
-    cap,
-    excess: Math.max(0, group.total - cap),
+    cap: modelledCap,
+    excess: Math.max(0, group.total - modelledCap),
   }));
 }

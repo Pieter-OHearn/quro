@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import {
   SAVINGS_ACCOUNT_TYPES,
   SAVINGS_TRANSACTION_TYPES,
+  type BankingEntityConfirmationInput,
   type SavingsAccountType,
   type SavingsTransactionType,
 } from '@quro/shared';
@@ -10,6 +11,12 @@ import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import {
+  BANKING_ENTITIES,
+  buildManualBankingEntityId,
+  getBankingEntity,
+  normalizeBankName,
+} from '../lib/jurisdictions/bankingEntities';
 import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
@@ -25,6 +32,7 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  isRecord,
   parseNumber,
   parseNumberField,
   parseOptionalTextField,
@@ -71,6 +79,49 @@ type SavingsTransactionPayload = {
   date: string;
   note: string | null;
 };
+
+const BANKING_ENTITY_CONFIRMATION_FIELDS = [
+  'mode',
+  'entityId',
+  'entityName',
+  'scheme',
+  'cap',
+  'currency',
+] as const;
+
+function parseKnownBankingEntity(
+  body: Record<string, unknown>,
+): ParseResult<BankingEntityConfirmationInput> {
+  const entityId = typeof body.entityId === 'string' ? body.entityId.trim() : '';
+  return entityId ? ok({ mode: 'known', entityId }) : err('Banking entity is required');
+}
+
+function parseManualBankingEntity(
+  body: Record<string, unknown>,
+): ParseResult<BankingEntityConfirmationInput> {
+  const entityName = typeof body.entityName === 'string' ? body.entityName.trim() : '';
+  const scheme = typeof body.scheme === 'string' ? body.scheme.trim() : '';
+  if (!entityName) return err('Licensed entity name is required');
+  if (!normalizeBankName(entityName)) return err('Licensed entity name is invalid');
+  if (!scheme) return err('Deposit guarantee scheme is required');
+  const cap = parsePositiveNumberField(body.cap, 'Deposit guarantee cap must be positive');
+  if (!cap.ok) return cap;
+  const currency = parseCurrencyField(body.currency);
+  if (!currency.ok) return currency;
+  return ok({ mode: 'manual', entityName, scheme, cap: cap.value, currency: currency.value });
+}
+
+function parseBankingEntityConfirmation(
+  body: unknown,
+): ParseResult<BankingEntityConfirmationInput> {
+  if (!isRecord(body)) return err('Invalid banking entity payload');
+  const strict = rejectUnknownFields(body, BANKING_ENTITY_CONFIRMATION_FIELDS);
+  if (!strict.ok) return strict;
+  if (body.mode === 'clear') return ok({ mode: 'clear' });
+  if (body.mode === 'known') return parseKnownBankingEntity(body);
+  if (body.mode === 'manual') return parseManualBankingEntity(body);
+  return err('Confirmation mode must be known, manual, or clear');
+}
 
 type SavingsAccountInsert = typeof savingsAccounts.$inferInsert;
 type SavingsTransactionInsert = typeof savingsTransactions.$inferInsert;
@@ -368,6 +419,18 @@ app.get('/accounts', async (c) => {
   return c.json({ data });
 });
 
+app.get('/banking-entities', (c) =>
+  c.json({
+    data: BANKING_ENTITIES.map(({ id, name, scheme, cap, currency }) => ({
+      id,
+      name,
+      scheme,
+      cap,
+      currency,
+    })),
+  }),
+);
+
 app.get('/accounts/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
@@ -415,13 +478,84 @@ app.patch('/accounts/:id', async (c) => {
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
   const partnerId = await getAcceptedPartnerId(user.id);
+  const current = await getAccessibleSavingsAccount(id, user.id, partnerId);
+  if (!current) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
+  const updateValues = toSavingsAccountUpdateValues(body.value);
+  if (body.value.bank !== undefined && body.value.bank !== current.bank) {
+    Object.assign(updateValues, {
+      bankingEntityId: null,
+      bankingEntityName: null,
+      depositGuaranteeScheme: null,
+      depositGuaranteeCap: null,
+      depositGuaranteeCurrency: null,
+      bankingEntityConfirmedAt: null,
+    });
+  }
   const [data] = await db
     .update(savingsAccounts)
-    .set(toSavingsAccountUpdateValues(body.value))
+    .set(updateValues)
     .where(getSavingsAccountPredicate(id, user.id, partnerId))
     .returning();
   if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
+});
+
+app.patch('/accounts/:id/banking-entity', async (c) => {
+  const user = getAuthUser(c);
+  const id = parseId(c.req.param('id'));
+  if (id === null) return c.json({ error: 'Invalid account id' }, HTTP_STATUS.BAD_REQUEST);
+  const rawBody = await readJsonBody(c.req, 'Invalid banking entity payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+  const parsed = parseBankingEntityConfirmation(rawBody.value);
+  if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
+
+  let confirmation: Pick<
+    SavingsAccountInsert,
+    | 'bankingEntityId'
+    | 'bankingEntityName'
+    | 'depositGuaranteeScheme'
+    | 'depositGuaranteeCap'
+    | 'depositGuaranteeCurrency'
+    | 'bankingEntityConfirmedAt'
+  >;
+  if (parsed.value.mode === 'clear') {
+    confirmation = {
+      bankingEntityId: null,
+      bankingEntityName: null,
+      depositGuaranteeScheme: null,
+      depositGuaranteeCap: null,
+      depositGuaranteeCurrency: null,
+      bankingEntityConfirmedAt: null,
+    };
+  } else if (parsed.value.mode === 'known') {
+    const entity = getBankingEntity(parsed.value.entityId);
+    if (!entity) return c.json({ error: 'Unknown banking entity' }, HTTP_STATUS.BAD_REQUEST);
+    confirmation = {
+      bankingEntityId: entity.id,
+      bankingEntityName: entity.name,
+      depositGuaranteeScheme: entity.scheme,
+      depositGuaranteeCap: entity.cap,
+      depositGuaranteeCurrency: entity.currency,
+      bankingEntityConfirmedAt: new Date(),
+    };
+  } else {
+    confirmation = {
+      bankingEntityId: buildManualBankingEntityId(parsed.value.entityName),
+      bankingEntityName: parsed.value.entityName,
+      depositGuaranteeScheme: parsed.value.scheme,
+      depositGuaranteeCap: parsed.value.cap,
+      depositGuaranteeCurrency: parsed.value.currency,
+      bankingEntityConfirmedAt: new Date(),
+    };
+  }
+
+  const partnerId = await getAcceptedPartnerId(user.id);
+  const [data] = await db
+    .update(savingsAccounts)
+    .set(confirmation)
+    .where(getSavingsAccountPredicate(id, user.id, partnerId))
+    .returning();
+  return data ? c.json({ data }) : c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
 });
 
 app.delete('/accounts/:id', async (c) => {

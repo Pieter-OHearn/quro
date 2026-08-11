@@ -1,41 +1,63 @@
 import type { RunwayResponse } from '@quro/shared';
-import { AlertTriangle } from 'lucide-react';
-import { Card } from '@/components/ui';
+import { AlertTriangle, Landmark } from 'lucide-react';
+import { Button, Card } from '@/components/ui';
 
 export function DepositGuaranteeNotice({
   guarantees,
   fmtBase,
+  onReview,
 }: Readonly<{
   guarantees: RunwayResponse['depositGuarantee'];
   fmtBase: (value: number) => string;
+  onReview: () => void;
 }>) {
   const atRisk = guarantees.filter((entry) => entry.excess > 0);
-  const unverified = guarantees.filter(
-    (entry) => entry.confidence === 'unverified' && entry.excess === 0,
-  );
-  const entries = [...atRisk, ...unverified];
-  if (entries.length === 0) return null;
+  const unverified = guarantees.filter((entry) => entry.confidence === 'unverified');
+  const unverifiedAccountCount = new Set(unverified.flatMap((entry) => entry.accountIds)).size;
+  if (guarantees.length === 0) return null;
   const hasExcess = atRisk.length > 0;
-  return (
-    <Card className={hasExcess ? 'border-amber-200 bg-amber-50/70' : 'border-slate-200'}>
-      <div className="flex gap-3">
-        <AlertTriangle
-          className={`mt-0.5 shrink-0 ${hasExcess ? 'text-amber-600' : 'text-slate-400'}`}
-          size={20}
-        />
+  const showCompactStatus = unverifiedAccountCount > 0 || !hasExcess;
+
+  const compactStatus = showCompactStatus ? (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <Landmark className="shrink-0 text-fg-faint" size={18} />
         <div>
-          <h2 className={`font-semibold ${hasExcess ? 'text-amber-950' : 'text-slate-900'}`}>
-            {hasExcess ? 'Deposit guarantee review' : 'Unverified banking entities'}
-          </h2>
+          <p className="text-sm font-medium text-fg">
+            {unverifiedAccountCount > 0
+              ? `${unverifiedAccountCount} bank account${unverifiedAccountCount === 1 ? '' : 's'} need entity review`
+              : 'Banking entities identified'}
+          </p>
+          <p className="text-xs text-fg-muted">
+            {unverifiedAccountCount > 0
+              ? 'Confirm the licensed entity used for deposit protection.'
+              : 'Manage how account brands are grouped for deposit protection.'}
+          </p>
+        </div>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onReview}>
+        {unverifiedAccountCount > 0 ? 'Review banks' : 'Manage'}
+      </Button>
+    </div>
+  ) : null;
+
+  const exposureNotice = hasExcess ? (
+    <Card className="border-amber-200 bg-amber-50/70">
+      <div className="flex gap-3">
+        <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={20} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h2 className="font-semibold text-amber-950">Deposit guarantee review</h2>
+            <Button variant="ghost" size="sm" onClick={onReview}>
+              Review banks
+            </Button>
+          </div>
           <div className="mt-3 space-y-2">
-            {entries.map((entry) => (
-              <p
-                key={`${entry.entityId ?? entry.entityName}`}
-                className={`text-sm ${hasExcess ? 'text-amber-900' : 'text-slate-600'}`}
-              >
+            {atRisk.map((entry) => (
+              <p key={`${entry.entityId ?? entry.entityName}`} className="text-sm text-amber-900">
                 <span className="font-semibold">{entry.entityName}:</span>{' '}
                 {entry.confidence === 'unverified'
-                  ? 'the licensed banking entity could not be confirmed.'
+                  ? `${fmtBase(entry.excess)} may be above the modelled ${fmtBase(entry.cap)} cap, but the licensed entity still needs confirmation.`
                   : `${fmtBase(entry.excess)} is above the modelled ${fmtBase(entry.cap)} cap.`}
               </p>
             ))}
@@ -43,5 +65,12 @@ export function DepositGuaranteeNotice({
         </div>
       </div>
     </Card>
+  ) : null;
+
+  return (
+    <div className="space-y-3">
+      {exposureNotice}
+      {compactStatus}
+    </div>
   );
 }

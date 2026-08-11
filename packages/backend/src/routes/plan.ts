@@ -580,9 +580,25 @@ function buildEurRunwayResponse(
     runway: simulateRunway(burn.lean, tiers, incomeSupport),
     depositGuarantee: aggregateDepositGuarantees(
       data.savings.map((account) => ({
+        id: account.id,
         bank: account.bank,
         amount: convertToEur(toNumber(account.balance), account.currency),
         isJoint: account.isJoint,
+        confirmedEntity: account.bankingEntityConfirmedAt
+          ? {
+              entityId: account.bankingEntityId,
+              entityName: account.bankingEntityName,
+              scheme: account.depositGuaranteeScheme,
+              cap:
+                account.depositGuaranteeCap && account.depositGuaranteeCurrency
+                  ? convertToEur(
+                      toNumber(account.depositGuaranteeCap),
+                      account.depositGuaranteeCurrency,
+                    )
+                  : null,
+              currency: account.depositGuaranteeCurrency ? 'EUR' : null,
+            }
+          : null,
       })),
       guaranteeRule.value.amount,
       guaranteeRule.value.scheme,

@@ -118,6 +118,12 @@ export type SavingsAccount = {
   id: number;
   name: string;
   bank: string;
+  bankingEntityId?: string | null;
+  bankingEntityName?: string | null;
+  depositGuaranteeScheme?: string | null;
+  depositGuaranteeCap?: number | null;
+  depositGuaranteeCurrency?: CurrencyCode | null;
+  bankingEntityConfirmedAt?: string | null;
   balance: number;
   currency: CurrencyCode;
   interestRate: number;
@@ -129,6 +135,25 @@ export type SavingsAccount = {
   userId?: number;
   archivedAt?: string | null;
 };
+
+export type BankingEntityOption = {
+  id: string;
+  name: string;
+  scheme: string;
+  cap: number;
+  currency: CurrencyCode;
+};
+
+export type BankingEntityConfirmationInput =
+  | { mode: 'known'; entityId: string }
+  | {
+      mode: 'manual';
+      entityName: string;
+      scheme: string;
+      cap: number;
+      currency: CurrencyCode;
+    }
+  | { mode: 'clear' };
 
 export const SAVINGS_TRANSACTION_TYPES = ['deposit', 'withdrawal', 'interest'] as const;
 export type SavingsTransactionType = (typeof SAVINGS_TRANSACTION_TYPES)[number];
@@ -814,6 +839,7 @@ export type RunwayResponse = {
     cap: number;
     excess: number;
     confidence: 'verified' | 'unverified';
+    accountIds: number[];
   }>;
   setupComplete: boolean;
   isEstimated: boolean;

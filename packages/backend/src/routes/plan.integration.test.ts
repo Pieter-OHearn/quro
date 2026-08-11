@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import type { BudgetCategory, Employment, PlanAssumptions, RunwayResponse } from '@quro/shared';
+import type {
+  BudgetCategory,
+  Employment,
+  PlanAssumptions,
+  RunwayResponse,
+  SavingsAccount,
+} from '@quro/shared';
 import { createIntegrationHelpers } from '../test/integration';
 
 const integration = createIntegrationHelpers('plan.integration.quro.test');
@@ -246,5 +252,140 @@ describe('plan integration', () => {
     expect(classified.every((category) => category.expenseClass === 'employment_linked')).toBe(
       true,
     );
+  });
+
+  test('lets users resolve banking entities and clears stale confirmations after a rename', async () => {
+    const owner = await integration.signUp('banking-entity-review');
+    const account = await readData<SavingsAccount>(
+      await integration.request('/api/savings/accounts', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          name: 'Emergency reserve',
+          bank: 'Mystery Brand',
+          balance: 25_000,
+          currency: 'EUR',
+          interestRate: 2,
+          accountType: 'Easy Access',
+          color: '#334155',
+          emoji: '🏦',
+          isJoint: false,
+        },
+      }),
+      201,
+    );
+    const unresolved = await readData<RunwayResponse>(
+      await integration.request('/api/plan/runway', { cookie: owner.cookie }),
+    );
+    expect(unresolved.depositGuarantee[0]).toMatchObject({
+      confidence: 'unverified',
+      accountIds: [account.id],
+    });
+
+    const entities = await readData<Array<{ id: string }>>(
+      await integration.request('/api/savings/banking-entities', { cookie: owner.cookie }),
+    );
+    expect(entities.some((entity) => entity.id === 'bunq')).toBe(true);
+
+    const invalidEntity = await integration.request(
+      `/api/savings/accounts/${account.id}/banking-entity`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: { mode: 'known', entityId: 'not-a-real-entity' },
+      },
+    );
+    expect(invalidEntity.status).toBe(400);
+
+    const knownConfirmation = await readData<SavingsAccount>(
+      await integration.request(`/api/savings/accounts/${account.id}/banking-entity`, {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: { mode: 'known', entityId: 'bunq' },
+      }),
+    );
+    expect(knownConfirmation).toMatchObject({
+      bankingEntityId: 'bunq',
+      bankingEntityName: 'bunq B.V.',
+      depositGuaranteeScheme: 'Nederlandse Depositogarantie',
+      depositGuaranteeCap: 100_000,
+      depositGuaranteeCurrency: 'EUR',
+    });
+    const cleared = await readData<SavingsAccount>(
+      await integration.request(`/api/savings/accounts/${account.id}/banking-entity`, {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: { mode: 'clear' },
+      }),
+    );
+    expect(cleared.bankingEntityConfirmedAt).toBeNull();
+
+    const invalidManual = await integration.request(
+      `/api/savings/accounts/${account.id}/banking-entity`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          mode: 'manual',
+          entityName: 'Mystery Bank Europe N.V.',
+          scheme: 'Example national deposit guarantee',
+          cap: 0,
+          currency: 'AUD',
+        },
+      },
+    );
+    expect(invalidManual.status).toBe(400);
+
+    const manuallyConfirmed = await readData<SavingsAccount>(
+      await integration.request(`/api/savings/accounts/${account.id}/banking-entity`, {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: {
+          mode: 'manual',
+          entityName: 'Mystery Bank Europe N.V.',
+          scheme: 'Example national deposit guarantee',
+          cap: 250_000,
+          currency: 'AUD',
+        },
+      }),
+    );
+    expect(manuallyConfirmed).toMatchObject({
+      bankingEntityId: 'manual:mysteryeurope',
+      bankingEntityName: 'Mystery Bank Europe N.V.',
+      depositGuaranteeScheme: 'Example national deposit guarantee',
+      depositGuaranteeCap: 250_000,
+      depositGuaranteeCurrency: 'AUD',
+    });
+    expect(manuallyConfirmed.bankingEntityConfirmedAt).toBeTruthy();
+    const resolved = await readData<RunwayResponse>(
+      await integration.request('/api/plan/runway', { cookie: owner.cookie }),
+    );
+    expect(resolved.depositGuarantee[0]).toMatchObject({
+      entityId: 'manual:mysteryeurope',
+      confidence: 'verified',
+      accountIds: [account.id],
+    });
+    expect(resolved.depositGuarantee[0]?.cap).not.toBe(100_000);
+
+    const renamed = await readData<SavingsAccount>(
+      await integration.request(`/api/savings/accounts/${account.id}`, {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: { bank: 'A Different Brand' },
+      }),
+    );
+    expect(renamed.bankingEntityConfirmedAt).toBeNull();
+    expect(renamed.bankingEntityId).toBeNull();
+
+    const stranger = await integration.signUp('banking-entity-stranger');
+    expect(
+      (
+        await integration.request(`/api/savings/accounts/${account.id}/banking-entity`, {
+          method: 'PATCH',
+          cookie: stranger.cookie,
+          json: { mode: 'known', entityId: 'bunq' },
+        })
+      ).status,
+    ).toBe(404);
   });
 });

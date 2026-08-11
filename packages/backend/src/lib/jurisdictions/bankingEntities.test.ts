@@ -27,17 +27,70 @@ describe('banking entity resolution', () => {
     });
   });
 
-  test('keeps unresolved banks explicit and counts a joint balance in full', () => {
+  test('attributes half of a joint balance to the current depositor', () => {
     const [result] = aggregateDepositGuarantees(
-      [{ bank: 'Local Mystery Bank', amount: 120_000, isJoint: true }],
+      [{ bank: 'Local Mystery Bank', amount: 200_000, isJoint: true }],
       100_000,
       'EU deposit guarantee',
     );
     expect(result).toMatchObject({
       entityId: null,
-      total: 120_000,
-      excess: 20_000,
+      total: 100_000,
+      excess: 0,
       confidence: 'unverified',
+    });
+  });
+
+  test('reports only the depositor share above the joint-account boundary', () => {
+    const [result] = aggregateDepositGuarantees(
+      [{ bank: 'Local Mystery Bank', amount: 200_002, isJoint: true }],
+      100_000,
+      'EU deposit guarantee',
+    );
+    expect(result).toMatchObject({ total: 100_001, excess: 1 });
+  });
+
+  test('groups user-confirmed manual entities and exposes their account ids', () => {
+    const result = aggregateDepositGuarantees(
+      [
+        {
+          id: 11,
+          bank: 'Brand One',
+          amount: 60_000,
+          isJoint: false,
+          confirmedEntity: {
+            entityId: 'manual:examplegroup',
+            entityName: 'Example Banking Group Ltd',
+            scheme: 'Example protection scheme',
+            cap: 140_000,
+            currency: 'EUR',
+          },
+        },
+        {
+          id: 12,
+          bank: 'Brand Two',
+          amount: 50_000,
+          isJoint: false,
+          confirmedEntity: {
+            entityId: 'manual:examplegroup',
+            entityName: 'Example Banking Group Ltd',
+            scheme: 'Example protection scheme',
+            cap: 140_000,
+            currency: 'EUR',
+          },
+        },
+      ],
+      100_000,
+      'Fallback scheme',
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      entityId: 'manual:examplegroup',
+      total: 110_000,
+      cap: 140_000,
+      excess: 0,
+      confidence: 'verified',
+      accountIds: [11, 12],
     });
   });
 });

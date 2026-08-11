@@ -1,4 +1,5 @@
 export { AssumptionsDrawer } from './AssumptionsDrawer';
+export { BankingEntityReviewModal } from './BankingEntityReviewModal';
 export { BurnRateCards } from './BurnRateCards';
 export { CalculationReviewModal } from './CalculationReviewModal';
 export { CategoryClassificationCard } from './CategoryClassificationCard';

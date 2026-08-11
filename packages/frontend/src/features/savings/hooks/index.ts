@@ -1,4 +1,5 @@
 export { useContribChartData } from './useContribChartData';
+export { useBankingEntities, useConfirmBankingEntity } from './useBankingEntities';
 export { useCreateSavingsAccount } from './useCreateSavingsAccount';
 export { useCreateSavingsTransaction } from './useCreateSavingsTransaction';
 export { useDeleteSavingsAccount, useUnarchiveSavingsAccount } from './useDeleteSavingsAccount';

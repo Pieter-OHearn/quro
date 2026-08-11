@@ -1,7 +1,11 @@
+import type { CurrencyCode } from '@quro/shared';
+
 export type BankingEntity = {
   id: string;
   name: string;
   scheme: string;
+  cap: number;
+  currency: CurrencyCode;
   aliases: string[];
 };
 
@@ -9,7 +13,17 @@ export type BankingEntityResolution = {
   entityId: string | null;
   entityName: string;
   scheme: string;
+  cap: number | null;
+  currency: CurrencyCode | null;
   confidence: 'verified' | 'unverified';
+};
+
+export type ConfirmedBankingEntity = {
+  entityId: string | null;
+  entityName: string | null;
+  scheme: string | null;
+  cap: number | null;
+  currency: CurrencyCode | null;
 };
 
 const LEGAL_SUFFIXES =
@@ -20,7 +34,9 @@ export function normalizeBankName(value: string): string {
   return value.toLowerCase().replace(LEGAL_SUFFIXES, ' ').replace(NON_ALPHANUMERIC, '').trim();
 }
 
-export const BANKING_ENTITIES: BankingEntity[] = [
+const EU_DEPOSIT_GUARANTEE = { cap: 100_000, currency: 'EUR' as const };
+
+const BANKING_ENTITY_PROFILES: Array<Omit<BankingEntity, 'cap' | 'currency'>> = [
   {
     id: 'bunq',
     name: 'bunq B.V.',
@@ -143,13 +159,54 @@ export const BANKING_ENTITIES: BankingEntity[] = [
   },
 ];
 
+export const BANKING_ENTITIES: BankingEntity[] = BANKING_ENTITY_PROFILES.map((entity) => ({
+  ...entity,
+  ...EU_DEPOSIT_GUARANTEE,
+}));
+
 const ENTITY_BY_ALIAS = new Map(
   BANKING_ENTITIES.flatMap((entity) =>
     entity.aliases.map((alias) => [normalizeBankName(alias), entity] as const),
   ),
 );
 
-export function resolveBankingEntity(bankName: string): BankingEntityResolution {
+const ENTITY_BY_ID = new Map(BANKING_ENTITIES.map((entity) => [entity.id, entity] as const));
+
+export function getBankingEntity(entityId: string): BankingEntity | null {
+  return ENTITY_BY_ID.get(entityId) ?? null;
+}
+
+export function buildManualBankingEntityId(entityName: string): string {
+  return `manual:${normalizeBankName(entityName)}`;
+}
+
+export function resolveBankingEntity(
+  bankName: string,
+  confirmed?: ConfirmedBankingEntity | null,
+): BankingEntityResolution {
+  if (confirmed?.entityId) {
+    const known = getBankingEntity(confirmed.entityId);
+    if (known) {
+      return {
+        entityId: known.id,
+        entityName: known.name,
+        scheme: known.scheme,
+        cap: known.cap,
+        currency: known.currency,
+        confidence: 'verified',
+      };
+    }
+    if (confirmed.entityName && confirmed.scheme && confirmed.cap && confirmed.currency) {
+      return {
+        entityId: confirmed.entityId,
+        entityName: confirmed.entityName,
+        scheme: confirmed.scheme,
+        cap: confirmed.cap,
+        currency: confirmed.currency,
+        confidence: 'verified',
+      };
+    }
+  }
   const normalized = normalizeBankName(bankName);
   const entity = ENTITY_BY_ALIAS.get(normalized);
   if (entity) {
@@ -157,6 +214,8 @@ export function resolveBankingEntity(bankName: string): BankingEntityResolution 
       entityId: entity.id,
       entityName: entity.name,
       scheme: entity.scheme,
+      cap: entity.cap,
+      currency: entity.currency,
       confidence: 'verified',
     };
   }
@@ -164,6 +223,8 @@ export function resolveBankingEntity(bankName: string): BankingEntityResolution 
     entityId: null,
     entityName: bankName.trim() || 'Unknown bank',
     scheme: 'Unverified deposit guarantee',
+    cap: null,
+    currency: null,
     confidence: 'unverified',
   };
 }

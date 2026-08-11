@@ -9,6 +9,14 @@ const employmentMigration = readFileSync(
   new URL('./migrations/0026_aberrant_beast.sql', import.meta.url),
   'utf8',
 );
+const bankingEntityMigration = readFileSync(
+  new URL('./migrations/0027_spooky_jean_grey.sql', import.meta.url),
+  'utf8',
+);
+const bankingEntityCapMigration = readFileSync(
+  new URL('./migrations/0028_sudden_living_lightning.sql', import.meta.url),
+  'utf8',
+);
 
 describe('wealth planning migration', () => {
   test('creates the planning and snapshot schema', () => {
@@ -24,6 +32,15 @@ describe('wealth planning migration', () => {
     expect(employmentMigration).toContain('INSERT INTO "employments"');
     expect(employmentMigration).toContain('ADD COLUMN "employment_id"');
     expect(employmentMigration).not.toContain('"tenure_months" integer');
+  });
+
+  test('stores user-confirmed banking entities separately from display names', () => {
+    expect(bankingEntityMigration).toContain('ADD COLUMN "banking_entity_id"');
+    expect(bankingEntityMigration).toContain('ADD COLUMN "banking_entity_name"');
+    expect(bankingEntityMigration).toContain('ADD COLUMN "deposit_guarantee_scheme"');
+    expect(bankingEntityMigration).toContain('ADD COLUMN "banking_entity_confirmed_at"');
+    expect(bankingEntityCapMigration).toContain('ADD COLUMN "deposit_guarantee_cap"');
+    expect(bankingEntityCapMigration).toContain('ADD COLUMN "deposit_guarantee_currency"');
   });
 
   test('classifies existing preset categories conservatively', () => {

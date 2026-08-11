@@ -13,6 +13,7 @@ export function useCreateSavingsAccount() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['savings'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['plan'] });
     },
   });
 }

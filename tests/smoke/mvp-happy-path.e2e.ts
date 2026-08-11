@@ -14,6 +14,7 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   const today = new Date();
   const payDate = today.toISOString().slice(0, 10);
   const savingsName = `Smoke Reserve ${runId}`;
+  const secondSavingsName = `Smoke Buffer ${runId}`;
   const budgetName = `Smoke Budget ${runId}`;
   const payslipMonth = `Smoke ${payDate} ${runId}`;
 
@@ -68,6 +69,47 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await savingsDialog.getByRole('button', { name: 'Add Account' }).click();
 
   await expect(page.getByText(savingsName)).toBeVisible();
+
+  await page.getByTestId('savings-add-account-button').click();
+  await savingsDialog.getByTestId('savings-account-name-input').fill(secondSavingsName);
+  await savingsDialog.getByTestId('savings-account-bank-input').fill('Another Smoke Bank');
+  await savingsDialog.getByTestId('savings-account-balance-input').fill('2100');
+  await savingsDialog.getByTestId('savings-account-rate-input').fill('2.5');
+  await savingsDialog.getByRole('button', { name: 'Add Account' }).click();
+  await expect(page.getByText(secondSavingsName)).toBeVisible();
+
+  await page.getByRole('link', { name: 'Plan', exact: true }).click();
+  await page.getByRole('button', { name: 'Review banks' }).click();
+  const bankingDialog = page.getByRole('dialog', { name: 'Review banking entities' });
+  const firstBankRow = bankingDialog.getByRole('region', { name: savingsName });
+  const secondBankRow = bankingDialog.getByRole('region', { name: secondSavingsName });
+
+  await secondBankRow.locator('select').first().selectOption('__manual__');
+  await secondBankRow.locator('input').nth(0).fill('Draft Banking Group Ltd');
+  await secondBankRow.locator('input').nth(1).fill('Draft protection scheme');
+  await secondBankRow.locator('input').nth(2).fill('250000');
+  await secondBankRow.locator('select').nth(1).selectOption('AUD');
+
+  await firstBankRow.locator('select').first().selectOption('bunq');
+  await page.route('**/api/savings/accounts/*/banking-entity', (route) => route.abort());
+  await firstBankRow.getByRole('button', { name: 'Confirm entity' }).click();
+  await expect(firstBankRow.getByText('The banking entity could not be saved.')).toBeVisible();
+  await page.unroute('**/api/savings/accounts/*/banking-entity');
+  await firstBankRow.getByRole('button', { name: 'Confirm entity' }).click();
+  await expect(firstBankRow.getByText('Confirmed by you')).toBeVisible();
+
+  // A refetch after saving another row must not discard this unsaved manual draft.
+  await expect(secondBankRow.locator('input').nth(0)).toHaveValue('Draft Banking Group Ltd');
+  await expect(secondBankRow.locator('input').nth(2)).toHaveValue('250000');
+  await expect(secondBankRow.locator('select').nth(1)).toHaveValue('AUD');
+
+  await page.route('**/api/savings/accounts/*/banking-entity', (route) => route.abort());
+  await firstBankRow.getByRole('button', { name: 'Use automatic matching' }).click();
+  await expect(firstBankRow.getByText('The banking entity could not be saved.')).toBeVisible();
+  await page.unroute('**/api/savings/accounts/*/banking-entity');
+  await firstBankRow.getByRole('button', { name: 'Use automatic matching' }).click();
+  await expect(firstBankRow.getByText('Needs review')).toBeVisible();
+  await bankingDialog.getByRole('button', { name: 'Close dialog' }).click();
 
   await page.getByRole('link', { name: 'Budget', exact: true }).click();
   await page.getByTestId('budget-add-category-button').click();

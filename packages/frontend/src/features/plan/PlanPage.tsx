@@ -12,6 +12,7 @@ import { EmploymentCard } from '@/features/employment';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   AssumptionsDrawer,
+  BankingEntityReviewModal,
   BurnRateCards,
   CalculationReviewModal,
   CategoryClassificationCard,
@@ -39,12 +40,15 @@ const PLAN_SECTIONS = [
   },
 ] as const;
 
+// The page intentionally keeps its section order and modal state together for readability.
+// eslint-disable-next-line max-lines-per-function
 export function Plan() {
   const runwayQuery = useRunway();
   const assumptionsQuery = usePlanAssumptions();
   const { fmtBase } = useCurrency();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [bankingReviewOpen, setBankingReviewOpen] = useState(false);
 
   if (runwayQuery.isPending || assumptionsQuery.isPending) {
     return <LoadingSpinner className="min-h-[60vh]" label="Building runway plan" />;
@@ -94,6 +98,7 @@ export function Plan() {
       <DepositGuaranteeNotice
         guarantees={data.depositGuarantee}
         fmtBase={(value) => fmtBase(value)}
+        onReview={() => setBankingReviewOpen(true)}
       />
       {data.incomeSupport.unemployment.status === 'unknown' ? (
         <p className="text-xs leading-5 text-slate-500">
@@ -111,6 +116,12 @@ export function Plan() {
           data={data}
           fmtBase={(value) => fmtBase(value)}
           onClose={() => setReviewOpen(false)}
+        />
+      ) : null}
+      {bankingReviewOpen ? (
+        <BankingEntityReviewModal
+          guarantees={data.depositGuarantee}
+          onClose={() => setBankingReviewOpen(false)}
         />
       ) : null}
     </PageStack>
