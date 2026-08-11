@@ -166,7 +166,7 @@ export function CalculationReviewModal({
               </a>
               <span className="ml-2 text-xs text-slate-500">
                 effective {source.effectiveFrom}
-                {source.effectiveTo ? `–${source.effectiveTo}` : ''}; reviewed {source.reviewedAt}
+                {source.effectiveTo ? `–${source.effectiveTo}` : ''}
               </span>
             </li>
           ))}
