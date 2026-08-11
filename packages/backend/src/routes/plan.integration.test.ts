@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type {
   BudgetCategory,
   Employment,
@@ -6,42 +6,19 @@ import type {
   RunwayResponse,
   SavingsAccount,
 } from '@quro/shared';
+import { db } from '../db/client';
+import { currencyRates } from '../db/schema';
+import { createIntegrationHelpers } from '../test/integration';
 
-// The runway converts monetary inputs through the shared FX cache. Mock the
-// provider so this suite remains deterministic when CI starts with an empty cache.
-const FX_RATES_TO_EUR: Record<string, number> = {
-  GBP: 1.18,
-  USD: 0.92,
-  AUD: 0.58,
-  NZD: 0.53,
-  CAD: 0.67,
-  CHF: 1.04,
-  SGD: 0.68,
-};
-
-await mock.module('../lib/marketDataClient', () => ({
-  getMarketDataClient: () => ({
-    lookupSymbol() {
-      throw new Error('lookupSymbol is not used by this suite');
-    },
-    getLatestEod(symbols: string[]) {
-      const now = new Date().toISOString();
-      const entries = symbols.flatMap((symbol) => {
-        const close = FX_RATES_TO_EUR[symbol.slice(0, 3)];
-        if (close === undefined) return [];
-        return [
-          [
-            symbol,
-            { symbol, close, priceCurrency: 'EUR', eodDate: now.slice(0, 10), tradeLast: now },
-          ],
-        ];
-      });
-      return Object.fromEntries(entries);
-    },
-  }),
-}));
-
-const { createIntegrationHelpers } = await import('../test/integration');
+const FX_RATES_TO_EUR = [
+  { fromCurrency: 'GBP', rate: 1.18 },
+  { fromCurrency: 'USD', rate: 0.92 },
+  { fromCurrency: 'AUD', rate: 0.58 },
+  { fromCurrency: 'NZD', rate: 0.53 },
+  { fromCurrency: 'CAD', rate: 0.67 },
+  { fromCurrency: 'CHF', rate: 1.04 },
+  { fromCurrency: 'SGD', rate: 0.68 },
+] as const;
 
 const integration = createIntegrationHelpers('plan.integration.quro.test');
 
@@ -51,7 +28,22 @@ async function readData<T>(response: Response, status = 200): Promise<T> {
   return body.data;
 }
 
-beforeAll(() => integration.cleanup());
+beforeAll(async () => {
+  await integration.cleanup();
+  const updatedAt = new Date();
+  await db
+    .insert(currencyRates)
+    .values(
+      FX_RATES_TO_EUR.map((rate) => ({
+        ...rate,
+        toCurrency: 'EUR' as const,
+        provider: 'plan-integration-fixture',
+        sourceDate: updatedAt.toISOString().slice(0, 10),
+        updatedAt,
+      })),
+    )
+    .onConflictDoNothing();
+});
 afterAll(() => integration.cleanup());
 
 describe('plan integration', () => {
