@@ -838,6 +838,7 @@ export type RunwayResponse = {
     total: number;
     cap: number;
     excess: number;
+    ineligibleCurrencyTotal: number;
     confidence: 'verified' | 'unverified';
     accountIds: number[];
   }>;

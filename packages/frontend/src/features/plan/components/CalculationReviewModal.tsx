@@ -17,13 +17,17 @@ function Status({ value }: Readonly<{ value: keyof typeof STATUS_LABELS }>) {
 }
 
 // The sections deliberately follow the backend component order for auditability.
-// eslint-disable-next-line max-lines-per-function
+// eslint-disable-next-line max-lines-per-function, complexity, sonarjs/cognitive-complexity
 export function CalculationReviewModal({
   data,
   fmtBase,
   onClose,
 }: Readonly<{ data: RunwayResponse; fmtBase: (value: number) => string; onClose: () => void }>) {
   const support = data.incomeSupport;
+  const isNl = data.jurisdiction.code === 'NL';
+  const isAu = data.jurisdiction.code === 'AU';
+  const severanceLabel = isAu ? 'Redundancy pay' : 'Transition compensation';
+  const benefitLabel = isNl ? 'WW benefit' : isAu ? 'JobSeeker Payment' : 'Unemployment benefit';
   return (
     <Modal
       title="Review calculation"
@@ -52,7 +56,7 @@ export function CalculationReviewModal({
           </div>
           <div className="rounded-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-medium text-slate-900">Transition compensation</p>
+              <p className="font-medium text-slate-900">{severanceLabel}</p>
               <Status value={support.severance.status} />
             </div>
             <p className="mt-2 text-sm text-slate-600">{support.severance.reason}</p>
@@ -65,7 +69,7 @@ export function CalculationReviewModal({
           </div>
           <div className="rounded-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-medium text-slate-900">WW benefit</p>
+              <p className="font-medium text-slate-900">{benefitLabel}</p>
               <Status value={support.unemployment.status} />
             </div>
             <p className="mt-2 text-sm text-slate-600">{support.unemployment.reason}</p>
@@ -115,25 +119,31 @@ export function CalculationReviewModal({
               {support.taxRateSource.replace('_', ' ')}
             </dd>
           </div>
-          <div>
-            <dt className="text-slate-500">WW 26-of-36 condition</dt>
-            <dd className="font-medium text-slate-900">
-              {support.unemployment.weeklyRequirement.replace('_', ' ')}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">WW duration source</dt>
-            <dd className="font-medium text-slate-900">
-              {support.unemployment.durationSource}
-              {support.unemployment.durationConfirmedAt
-                ? ` · confirmed ${support.unemployment.durationConfirmedAt}`
-                : ''}
-            </dd>
-          </div>
+          {isNl ? (
+            <div>
+              <dt className="text-slate-500">WW 26-of-36 condition</dt>
+              <dd className="font-medium text-slate-900">
+                {support.unemployment.weeklyRequirement.replace('_', ' ')}
+              </dd>
+            </div>
+          ) : null}
+          {isNl ? (
+            <div>
+              <dt className="text-slate-500">WW duration source</dt>
+              <dd className="font-medium text-slate-900">
+                {support.unemployment.durationSource}
+                {support.unemployment.durationConfirmedAt
+                  ? ` · confirmed ${support.unemployment.durationConfirmedAt}`
+                  : ''}
+              </dd>
+            </div>
+          ) : null}
         </dl>
         {support.unemployment.unverifiedConditions.length > 0 ? (
           <div className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-            <p className="font-medium">Still to verify with UWV</p>
+            <p className="font-medium">
+              Still to verify with {isNl ? 'UWV' : isAu ? 'Services Australia' : 'the provider'}
+            </p>
             <ul className="mt-1 list-disc pl-5">
               {support.unemployment.unverifiedConditions.map((condition) => (
                 <li key={condition}>{condition}</li>

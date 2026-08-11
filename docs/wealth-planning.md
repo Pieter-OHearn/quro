@@ -15,9 +15,16 @@ The resilience bands use the Financial Health Network's published six-month emer
 anchor. They describe the model output; they are not recommendations. Benefit eligibility that Quro
 cannot verify is listed alongside the result instead of being presented as confirmed.
 
-Dutch rules are effective-dated in `packages/backend/src/lib/jurisdictions/nl.ts`. Source links and
-the verification date live beside each value so moving statutory figures are updated in one place.
-Rules past their published period are carried forward explicitly and labelled as extrapolated.
+Dutch and Australian rules are effective-dated in
+`packages/backend/src/lib/jurisdictions/`. Source links live beside each value so moving statutory
+figures are updated in one place. Rules past their published period are carried forward explicitly
+and labelled as extrapolated.
+
+For Australia, Quro applies the Fair Work continuous-service redundancy weeks table to estimated
+weekly base pay. It does not derive JobSeeker Payment from salary because Services Australia applies
+personal, household-income, and assets tests; users can instead enter their own monthly estimate and
+planning duration. Australian deposit protection uses APRA's Financial Claims Scheme limit of
+A$250,000 per account holder per Australian-incorporated ADI and treats only AUD deposits as covered.
 
 ## Derived spending
 
@@ -40,7 +47,7 @@ renders as a dashed segment. Estimated headline values carry a `~` prefix.
 
 Joint balances use a 50% display share by default so linked partner views add to the real total. The
 advanced runway assumptions can count a full joint balance for accessibility modelling. Deposit
-guarantee checks are different by law: a joint balance counts in full for each depositor's check.
+guarantee checks use the same 50% attributed share until explicit ownership shares are available.
 
 Deposit balances are grouped by licensed entity rather than free-text brand. Unresolved institutions
 are shown as unverified; the app does not imply coverage it could not confirm.

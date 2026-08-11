@@ -95,6 +95,7 @@ export type SavingsGuaranteeInput = {
   id?: number;
   bank: string;
   amount: number;
+  currency: CurrencyCode;
   isJoint: boolean;
   confirmedEntity?: {
     entityId: string | null;
@@ -360,17 +361,27 @@ function buildBenefitSchedule(params: {
 
 function calculateSeverance(
   monthlyGross: number,
-  serviceYears: number,
+  service: NonNullable<ReturnType<typeof calculateServiceDuration>>,
   taxRate: number,
   rule: SeveranceRule,
-): { gross: number; net: number; cap: number } {
+): { gross: number; net: number; cap: number | null } {
+  if (rule.model === 'service_weeks') {
+    const completedYears = Math.min(
+      Math.floor(service.completedMonths / MONTHS_PER_YEAR),
+      rule.weeksByCompletedServiceYear.length - 1,
+    );
+    const weeks = rule.weeksByCompletedServiceYear[completedYears] ?? 0;
+    const weeklyGross = (monthlyGross * MONTHS_PER_YEAR) / rule.weeksPerYear;
+    const gross = weeklyGross * weeks;
+    return { gross, net: gross * (1 - taxRate), cap: null };
+  }
   const annualGross = monthlyGross * MONTHS_PER_YEAR;
   const cap = rule.annualSalaryIfHigher
     ? Math.max(rule.maximumAmount, annualGross)
     : rule.maximumAmount;
   const gross = Math.min(
     cap,
-    monthlyGross * rule.monthlySalaryFractionPerServiceYear * serviceYears,
+    monthlyGross * rule.monthlySalaryFractionPerServiceYear * service.serviceYears,
   );
   return { gross, net: gross * (1 - taxRate), cap };
 }
@@ -436,6 +447,33 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
     );
     if (source) sources.push(source);
   }
+  const depositSource = sourceFromResolution(
+    resolveRule(input.jurisdiction.depositGuarantee, input.asOf),
+  );
+  if (depositSource) sources.push(depositSource);
+  if (input.jurisdiction.code === 'AU') {
+    const common = {
+      publisher: 'Services Australia',
+      reviewedAt: '2026-08-11',
+      effectiveFrom: input.asOf,
+      effectiveTo: null,
+      isExtrapolated: false,
+    };
+    sources.push(
+      {
+        ...common,
+        id: 'services-australia-jobseeker-eligibility',
+        title: 'Who can get JobSeeker Payment',
+        url: 'https://www.servicesaustralia.gov.au/who-can-get-jobseeker-payment?context=51411',
+      },
+      {
+        ...common,
+        id: 'services-australia-jobseeker-means-tests',
+        title: 'Income and assets tests for JobSeeker Payment',
+        url: 'https://www.servicesaustralia.gov.au/income-and-assets-tests-for-jobseeker-payment?context=51411',
+      },
+    );
+  }
   if (input.jurisdiction.severance) {
     const source = sourceFromResolution(resolveRule(input.jurisdiction.severance, input.asOf));
     if (source) sources.push(source);
@@ -446,6 +484,11 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
   if (input.jurisdiction.code === 'NL') {
     warnings.push(
       'Dutch transition-pay salary can include holiday allowance and fixed pay components; use the salary override if the payslip gross does not include them.',
+    );
+  } else if (input.jurisdiction.code === 'AU') {
+    warnings.push(
+      'Australian redundancy pay uses base pay for ordinary hours and can be unavailable or reduced under Fair Work exceptions.',
+      'JobSeeker is household means- and assets-tested, so it is excluded until you enter an estimate and planning duration.',
     );
   }
 
@@ -510,12 +553,11 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
     };
   } else {
     const resolution = resolveRule(input.jurisdiction.severance, input.asOf);
-    const amount = calculateSeverance(
-      severanceMonthlyGross,
-      service.serviceYears,
-      tax.rate,
-      resolution.value,
-    );
+    const amount = calculateSeverance(severanceMonthlyGross, service, tax.rate, resolution.value);
+    const reason =
+      resolution.value.model === 'service_weeks'
+        ? 'Fair Work redundancy weeks for completed continuous service, multiplied by estimated weekly base pay.'
+        : 'One third of monthly salary per exact year of service, subject to the statutory cap.';
     severance = {
       status: 'included',
       serviceStartDate: input.serviceStartDate,
@@ -523,14 +565,21 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
       serviceYears: service.serviceYears,
       monthlyGross: severanceMonthlyGross,
       ...amount,
-      reason:
-        'One third of monthly salary per exact year of service, subject to the statutory cap.',
+      reason,
     };
   }
 
   let unemployment: IncomeSupportCalculation['unemployment'];
   const weeklyRequirement = input.assumptions?.wwWeeklyRequirement ?? 'unknown';
-  if (!employed || !input.jurisdiction.unemploymentBenefit) {
+  const benefitOverride = input.assumptions?.benefitMonthlyOverride;
+  const benefitDurationOverride = input.assumptions?.benefitMaxMonthsOverride;
+  const hasAustralianBenefitOverride =
+    input.jurisdiction.code === 'AU' &&
+    benefitOverride !== null &&
+    benefitOverride !== undefined &&
+    benefitDurationOverride !== null &&
+    benefitDurationOverride !== undefined;
+  if (!employed) {
     unemployment = {
       status: 'not_applicable',
       weeklyRequirement,
@@ -539,9 +588,52 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
       durationSource: 'unknown',
       monthlyNetByMonth: [],
       unverifiedConditions: [],
-      reason: employed
-        ? 'No unemployment rule is available for this jurisdiction.'
-        : 'WW is only modelled for employees.',
+      reason: 'Unemployment support is only modelled for employees.',
+    };
+  } else if (hasAustralianBenefitOverride) {
+    unemployment = {
+      status: 'included',
+      weeklyRequirement: 'unknown',
+      durationMonths: benefitDurationOverride,
+      durationConfirmedAt: null,
+      durationSource: 'override',
+      monthlyNetByMonth: Array.from({ length: benefitDurationOverride }, () => benefitOverride),
+      unverifiedConditions: [
+        'age and Australian residence rules',
+        'household income test',
+        'household assets test',
+        'mutual-obligation or temporary incapacity requirements',
+      ],
+      reason:
+        'Uses your JobSeeker estimate and planning duration; Services Australia determines actual eligibility and payment.',
+    };
+  } else if (input.jurisdiction.code === 'AU') {
+    unemployment = {
+      status: 'unknown',
+      weeklyRequirement: 'unknown',
+      durationMonths: null,
+      durationConfirmedAt: null,
+      durationSource: 'unknown',
+      monthlyNetByMonth: [],
+      unverifiedConditions: [
+        'age and Australian residence rules',
+        'household income test',
+        'household assets test',
+        'unemployed, looking for work, or temporarily unable to work',
+      ],
+      reason:
+        'JobSeeker is not derived from salary. Enter the monthly estimate from Services Australia and a planning duration to include it.',
+    };
+  } else if (!input.jurisdiction.unemploymentBenefit) {
+    unemployment = {
+      status: 'not_applicable',
+      weeklyRequirement,
+      durationMonths: null,
+      durationConfirmedAt: null,
+      durationSource: 'unknown',
+      monthlyNetByMonth: [],
+      unverifiedConditions: [],
+      reason: 'No unemployment rule is available for this jurisdiction.',
     };
   } else if (weeklyRequirement === 'unknown') {
     unemployment = {
@@ -751,10 +843,15 @@ export function simulateRunway(
   };
 }
 
+// Aggregation branches mirror ownership, eligibility, and verification states in the API result.
+// eslint-disable-next-line complexity
 export function aggregateDepositGuarantees(
   accounts: readonly SavingsGuaranteeInput[],
   cap: number,
   scheme: string,
+  jurisdiction: JurisdictionProfile['code'] = 'GENERIC',
+  fallbackEligibleCurrencies?: readonly CurrencyCode[],
+  convertCap: (amount: number, currency: CurrencyCode) => number = (amount) => amount,
 ): Array<{
   entityId: string | null;
   entityName: string;
@@ -762,6 +859,7 @@ export function aggregateDepositGuarantees(
   total: number;
   cap: number;
   excess: number;
+  ineligibleCurrencyTotal: number;
   confidence: 'verified' | 'unverified';
   accountIds: number[];
 }> {
@@ -769,30 +867,47 @@ export function aggregateDepositGuarantees(
     string,
     ReturnType<typeof resolveBankingEntity> & {
       total: number;
+      eligibleTotal: number;
+      ineligibleTotal: number;
       modelledCap: number;
       accountIds: number[];
     }
   >();
   for (const account of accounts) {
-    const entity = resolveBankingEntity(account.bank, account.confirmedEntity);
+    const entity = resolveBankingEntity(account.bank, account.confirmedEntity, jurisdiction);
     const key = entity.entityId ?? `unverified:${entity.entityName.toLowerCase()}`;
-    const entityCap = entity.cap ?? cap;
+    const entityCap =
+      entity.cap !== null && entity.currency !== null
+        ? convertCap(entity.cap, entity.currency)
+        : cap;
     const group = groups.get(key) ?? {
       ...entity,
       total: 0,
+      eligibleTotal: 0,
+      ineligibleTotal: 0,
       modelledCap: entityCap,
       accountIds: [],
     };
     // Without explicit ownership shares, the plan attributes half of a joint balance to this depositor.
-    group.total += Math.max(0, account.amount) * (account.isJoint ? JOINT_WEIGHT : 1);
+    const attributedAmount = Math.max(0, account.amount) * (account.isJoint ? JOINT_WEIGHT : 1);
+    const eligibleCurrencies =
+      entity.eligibleCurrencies ??
+      (entity.entityId === null ? fallbackEligibleCurrencies : undefined);
+    group.total += attributedAmount;
+    if (eligibleCurrencies && !eligibleCurrencies.includes(account.currency)) {
+      group.ineligibleTotal += attributedAmount;
+    } else {
+      group.eligibleTotal += attributedAmount;
+    }
     group.modelledCap = Math.min(group.modelledCap, entityCap);
     if (account.id !== undefined) group.accountIds.push(account.id);
     groups.set(key, group);
   }
-  return [...groups.values()].map(({ modelledCap, ...group }) => ({
+  return [...groups.values()].map(({ modelledCap, eligibleTotal, ineligibleTotal, ...group }) => ({
     ...group,
     scheme: group.confidence === 'verified' ? group.scheme : scheme,
     cap: modelledCap,
-    excess: Math.max(0, group.total - modelledCap),
+    excess: ineligibleTotal + Math.max(0, eligibleTotal - modelledCap),
+    ineligibleCurrencyTotal: ineligibleTotal,
   }));
 }

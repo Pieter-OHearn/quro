@@ -35,6 +35,100 @@ describe('plan integration', () => {
     expect(runway.tiers.map((tier) => tier.amount)).toEqual([0, 0, 0]);
   });
 
+  test('uses Australian FCS, Fair Work redundancy, and user-supplied JobSeeker estimates', async () => {
+    const owner = await integration.signUp('runway-australia');
+    await readData(
+      await integration.request('/api/settings/preferences', {
+        method: 'PUT',
+        cookie: owner.cookie,
+        json: { baseCurrency: 'AUD', numberFormat: 'en-US', jurisdiction: 'AU' },
+      }),
+    );
+    await readData(
+      await integration.request('/api/employments', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          employerName: 'Quro Australia Pty Ltd',
+          employmentType: 'employed',
+          serviceStartDate: '2017-01-01',
+          endDate: null,
+          noticePeriodMonths: 1,
+          isPrimary: true,
+        },
+      }),
+      201,
+    );
+    await readData(
+      await integration.request('/api/salary/payslips', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          month: 'Jul 2026',
+          date: '2026-07-31',
+          gross: 6_500,
+          tax: 1_950,
+          pension: 0,
+          net: 4_550,
+          bonus: null,
+          currency: 'AUD',
+        },
+      }),
+      201,
+    );
+    await readData(
+      await integration.request('/api/savings/accounts', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          name: 'Emergency reserve',
+          bank: 'CommBank',
+          balance: 250_000,
+          currency: 'AUD',
+          interestRate: 4,
+          accountType: 'Easy Access',
+          color: '#334155',
+          emoji: '🏦',
+          isJoint: false,
+        },
+      }),
+      201,
+    );
+
+    const derived = await readData<RunwayResponse>(
+      await integration.request('/api/plan/runway', { cookie: owner.cookie }),
+    );
+    expect(derived.jurisdiction.code).toBe('AU');
+    expect(derived.depositGuarantee[0]).toMatchObject({
+      entityId: 'cba-au',
+      cap: 250_000,
+      excess: 0,
+      confidence: 'verified',
+    });
+    expect(derived.incomeSupport.severance).toMatchObject({
+      status: 'included',
+      gross: 24_000,
+      net: 16_800,
+    });
+    expect(derived.incomeSupport.unemployment.status).toBe('unknown');
+
+    await readData(
+      await integration.request('/api/plan/assumptions', {
+        method: 'PUT',
+        cookie: owner.cookie,
+        json: { benefitMonthlyOverride: 1_250, benefitMaxMonthsOverride: 6 },
+      }),
+    );
+    const confirmed = await readData<RunwayResponse>(
+      await integration.request('/api/plan/runway', { cookie: owner.cookie }),
+    );
+    expect(confirmed.incomeSupport.unemployment).toMatchObject({
+      status: 'included',
+      durationMonths: 6,
+      durationSource: 'override',
+    });
+  });
+
   test('creates and updates shared employment while preserving explicit zeroes', async () => {
     const owner = await integration.signUp('runway-upserts');
     const employment = await readData<Employment>(

@@ -16,6 +16,7 @@ function guarantee(
     total: 25_000,
     cap: 100_000,
     excess: 0,
+    ineligibleCurrencyTotal: 0,
     confidence: 'unverified',
     accountIds: [7],
     ...overrides,
@@ -72,5 +73,30 @@ describe('deposit guarantee notice', () => {
     );
     expect(markup).toContain('Deposit guarantee review');
     expect(markup).toContain('2 bank accounts need entity review');
+  });
+
+  test('explains when a deposit currency is outside scheme coverage', () => {
+    const markup = renderToStaticMarkup(
+      <DepositGuaranteeNotice
+        guarantees={[
+          guarantee({
+            entityId: 'cba-au',
+            entityName: 'Commonwealth Bank of Australia',
+            scheme: 'Australian Financial Claims Scheme (AUD deposits only)',
+            confidence: 'verified',
+            total: 10_000,
+            cap: 250_000,
+            excess: 10_000,
+            ineligibleCurrencyTotal: 10_000,
+          }),
+        ]}
+        fmtBase={fmt}
+        onReview={noop}
+      />,
+    );
+    expect(markup).toContain(
+      '€10,000 is outside the currencies covered by Australian Financial Claims Scheme (AUD deposits only)',
+    );
+    expect(markup).not.toContain('is above the modelled');
   });
 });

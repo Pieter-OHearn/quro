@@ -279,6 +279,7 @@ function convertEurResponse(response: RunwayResponse, factor: number): RunwayRes
       total: money(entry.total),
       cap: money(entry.cap),
       excess: money(entry.excess),
+      ineligibleCurrencyTotal: money(entry.ineligibleCurrencyTotal),
     })),
   };
 }
@@ -583,6 +584,7 @@ function buildEurRunwayResponse(
         id: account.id,
         bank: account.bank,
         amount: convertToEur(toNumber(account.balance), account.currency),
+        currency: account.currency,
         isJoint: account.isJoint,
         confirmedEntity: account.bankingEntityConfirmedAt
           ? {
@@ -600,8 +602,11 @@ function buildEurRunwayResponse(
             }
           : null,
       })),
-      guaranteeRule.value.amount,
+      convertToEur(guaranteeRule.value.amount, guaranteeRule.value.currency),
       guaranteeRule.value.scheme,
+      jurisdiction.code,
+      guaranteeRule.value.eligibleCurrencies,
+      convertToEur,
     ),
     setupComplete: missingFields.length === 0,
     isEstimated:

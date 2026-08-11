@@ -2,6 +2,24 @@ import type { RunwayResponse } from '@quro/shared';
 import { AlertTriangle, Landmark } from 'lucide-react';
 import { Button, Card } from '@/components/ui';
 
+function exposureMessage(
+  entry: RunwayResponse['depositGuarantee'][number],
+  fmtBase: (value: number) => string,
+): string {
+  if (entry.ineligibleCurrencyTotal > 0) {
+    const capExcess = entry.excess - entry.ineligibleCurrencyTotal;
+    const currencyMessage = `${fmtBase(entry.ineligibleCurrencyTotal)} is outside the currencies covered by ${entry.scheme}`;
+    if (capExcess > 0) {
+      return `${currencyMessage}; another ${fmtBase(capExcess)} is above the modelled ${fmtBase(entry.cap)} cap.`;
+    }
+    return `${currencyMessage}.`;
+  }
+  if (entry.confidence === 'unverified') {
+    return `${fmtBase(entry.excess)} may be above the modelled ${fmtBase(entry.cap)} cap, but the licensed entity still needs confirmation.`;
+  }
+  return `${fmtBase(entry.excess)} is above the modelled ${fmtBase(entry.cap)} cap.`;
+}
+
 export function DepositGuaranteeNotice({
   guarantees,
   fmtBase,
@@ -56,9 +74,7 @@ export function DepositGuaranteeNotice({
             {atRisk.map((entry) => (
               <p key={`${entry.entityId ?? entry.entityName}`} className="text-sm text-amber-900">
                 <span className="font-semibold">{entry.entityName}:</span>{' '}
-                {entry.confidence === 'unverified'
-                  ? `${fmtBase(entry.excess)} may be above the modelled ${fmtBase(entry.cap)} cap, but the licensed entity still needs confirmation.`
-                  : `${fmtBase(entry.excess)} is above the modelled ${fmtBase(entry.cap)} cap.`}
+                {exposureMessage(entry, fmtBase)}
               </p>
             ))}
           </div>

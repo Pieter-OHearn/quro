@@ -33,13 +33,21 @@ export type UnemploymentRule = {
   monthsPerYearAfterThreshold: number;
 };
 
-export type SeveranceRule = {
-  currency: CurrencyCode;
-  monthlySalaryFractionPerServiceYear: number;
-  maximumAmount: number;
-  annualSalaryIfHigher: boolean;
-  includesHolidayAllowance: boolean;
-};
+export type SeveranceRule =
+  | {
+      model: 'salary_fraction';
+      currency: CurrencyCode;
+      monthlySalaryFractionPerServiceYear: number;
+      maximumAmount: number;
+      annualSalaryIfHigher: boolean;
+      includesHolidayAllowance: boolean;
+    }
+  | {
+      model: 'service_weeks';
+      currency: CurrencyCode;
+      weeksByCompletedServiceYear: readonly number[];
+      weeksPerYear: number;
+    };
 
 export type WealthTaxRule = {
   currency: CurrencyCode;
@@ -60,6 +68,7 @@ export type JurisdictionProfile = {
     amount: number;
     currency: CurrencyCode;
     scheme: string;
+    eligibleCurrencies?: readonly CurrencyCode[];
   }>;
   defaultEffectiveTaxRate: NonEmptyDatedRules<number>;
   unemploymentBenefit: NonEmptyDatedRules<UnemploymentRule> | null;

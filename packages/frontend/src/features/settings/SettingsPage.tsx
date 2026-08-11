@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ElementType } from 'react';
 import { useSearchParams } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   CurrencyCode,
   JurisdictionCode,
@@ -734,6 +735,7 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
 }
 
 function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionProps>) {
+  const queryClient = useQueryClient();
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(user.baseCurrency);
   const [selectedJurisdiction, setSelectedJurisdiction] = useState<JurisdictionCode>(
     user.jurisdiction,
@@ -767,6 +769,10 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
     try {
       const response = await api.put('/api/settings/preferences', payload);
       replaceUser(response.data.data);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['plan'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
       showSaved();
     } catch (error) {
       setFormError(resolveApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
@@ -829,7 +835,7 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
             const isSelected = code === selectedJurisdiction;
             const labels: Record<JurisdictionCode, { name: string; note: string }> = {
               NL: { name: 'Netherlands', note: 'Dutch benefit and severance rules' },
-              AU: { name: 'Australia', note: 'Conservative rules until the AU profile ships' },
+              AU: { name: 'Australia', note: 'Australian FCS and Fair Work redundancy rules' },
               GENERIC: { name: 'Generic', note: 'Conservative international defaults' },
             };
             return (

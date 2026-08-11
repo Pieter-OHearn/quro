@@ -40,6 +40,12 @@ const PLAN_SECTIONS = [
   },
 ] as const;
 
+function unemploymentSupportLabel(jurisdiction: 'NL' | 'AU' | 'GENERIC'): string {
+  if (jurisdiction === 'NL') return 'WW';
+  if (jurisdiction === 'AU') return 'JobSeeker';
+  return 'Unemployment support';
+}
+
 // The page intentionally keeps its section order and modal state together for readability.
 // eslint-disable-next-line max-lines-per-function
 export function Plan() {
@@ -102,13 +108,15 @@ export function Plan() {
       />
       {data.incomeSupport.unemployment.status === 'unknown' ? (
         <p className="text-xs leading-5 text-slate-500">
-          WW is not included yet: {data.incomeSupport.unemployment.reason}
+          {unemploymentSupportLabel(data.jurisdiction.code)} is not included yet:{' '}
+          {data.incomeSupport.unemployment.reason}
         </p>
       ) : null}
       <p className="text-xs leading-5 text-slate-400">{RUNWAY_CITATIONS.advice}</p>
       <AssumptionsDrawer
         open={drawerOpen}
         assumptions={assumptionsQuery.data ?? null}
+        jurisdiction={data.jurisdiction.code}
         onClose={() => setDrawerOpen(false)}
       />
       {reviewOpen ? (

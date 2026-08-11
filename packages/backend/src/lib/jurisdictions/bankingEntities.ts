@@ -1,4 +1,4 @@
-import type { CurrencyCode } from '@quro/shared';
+import type { CurrencyCode, JurisdictionCode } from '@quro/shared';
 
 export type BankingEntity = {
   id: string;
@@ -6,6 +6,8 @@ export type BankingEntity = {
   scheme: string;
   cap: number;
   currency: CurrencyCode;
+  eligibleCurrencies: CurrencyCode[] | null;
+  jurisdictions: JurisdictionCode[];
   aliases: string[];
 };
 
@@ -15,6 +17,7 @@ export type BankingEntityResolution = {
   scheme: string;
   cap: number | null;
   currency: CurrencyCode | null;
+  eligibleCurrencies: CurrencyCode[] | null;
   confidence: 'verified' | 'unverified';
 };
 
@@ -36,7 +39,9 @@ export function normalizeBankName(value: string): string {
 
 const EU_DEPOSIT_GUARANTEE = { cap: 100_000, currency: 'EUR' as const };
 
-const BANKING_ENTITY_PROFILES: Array<Omit<BankingEntity, 'cap' | 'currency'>> = [
+const BANKING_ENTITY_PROFILES: Array<
+  Omit<BankingEntity, 'cap' | 'currency' | 'eligibleCurrencies' | 'jurisdictions'>
+> = [
   {
     id: 'bunq',
     name: 'bunq B.V.',
@@ -159,16 +164,97 @@ const BANKING_ENTITY_PROFILES: Array<Omit<BankingEntity, 'cap' | 'currency'>> = 
   },
 ];
 
-export const BANKING_ENTITIES: BankingEntity[] = BANKING_ENTITY_PROFILES.map((entity) => ({
-  ...entity,
-  ...EU_DEPOSIT_GUARANTEE,
-}));
+const AU_FINANCIAL_CLAIMS_SCHEME = {
+  cap: 250_000,
+  currency: 'AUD' as const,
+  scheme: 'Australian Financial Claims Scheme (AUD deposits only)',
+};
 
-const ENTITY_BY_ALIAS = new Map(
-  BANKING_ENTITIES.flatMap((entity) =>
-    entity.aliases.map((alias) => [normalizeBankName(alias), entity] as const),
-  ),
-);
+const AU_BANKING_ENTITY_PROFILES: Array<
+  Omit<BankingEntity, 'cap' | 'currency' | 'scheme' | 'eligibleCurrencies' | 'jurisdictions'>
+> = [
+  {
+    id: 'cba-au',
+    name: 'Commonwealth Bank of Australia',
+    aliases: ['commonwealth bank', 'commonwealth bank of australia', 'commbank', 'cba', 'bankwest'],
+  },
+  {
+    id: 'westpac-au',
+    name: 'Westpac Banking Corporation',
+    aliases: [
+      'westpac',
+      'westpac bank',
+      'st george',
+      'st.george',
+      'banksa',
+      'bank of melbourne',
+      'rams',
+    ],
+  },
+  {
+    id: 'nab-au',
+    name: 'National Australia Bank Limited',
+    aliases: ['national australia bank', 'nab', 'ubank', 'citi australia', 'citibank australia'],
+  },
+  {
+    id: 'anz-au',
+    name: 'Australia and New Zealand Banking Group Limited',
+    aliases: ['anz', 'anz bank', 'australia and new zealand banking group'],
+  },
+  {
+    id: 'ing-au',
+    name: 'ING Bank (Australia) Limited',
+    aliases: ['ing', 'ing australia', 'ing bank australia'],
+  },
+  {
+    id: 'macquarie-au',
+    name: 'Macquarie Bank Limited',
+    aliases: ['macquarie', 'macquarie bank'],
+  },
+  {
+    id: 'boq-au',
+    name: 'Bank of Queensland Limited',
+    aliases: ['bank of queensland', 'boq', 'me bank', 'virgin money australia'],
+  },
+  {
+    id: 'bendigo-adelaide-au',
+    name: 'Bendigo and Adelaide Bank Limited',
+    aliases: ['bendigo bank', 'adelaide bank', 'bendigo and adelaide bank', 'up', 'up bank'],
+  },
+  {
+    id: 'amp-au',
+    name: 'AMP Bank Limited',
+    aliases: ['amp', 'amp bank'],
+  },
+  {
+    id: 'great-southern-au',
+    name: 'Great Southern Bank',
+    aliases: ['great southern bank', 'credit union australia', 'cua'],
+  },
+];
+
+export const BANKING_ENTITIES: BankingEntity[] = [
+  ...BANKING_ENTITY_PROFILES.map((entity) => ({
+    ...entity,
+    ...EU_DEPOSIT_GUARANTEE,
+    eligibleCurrencies: null,
+    jurisdictions: ['NL', 'GENERIC'] as JurisdictionCode[],
+  })),
+  ...AU_BANKING_ENTITY_PROFILES.map((entity) => ({
+    ...entity,
+    ...AU_FINANCIAL_CLAIMS_SCHEME,
+    eligibleCurrencies: ['AUD'] as CurrencyCode[],
+    jurisdictions: ['AU'] as JurisdictionCode[],
+  })),
+];
+
+const ENTITY_BY_ALIAS = new Map<string, BankingEntity[]>();
+for (const entity of BANKING_ENTITIES) {
+  for (const alias of entity.aliases) {
+    const normalized = normalizeBankName(alias);
+    ENTITY_BY_ALIAS.set(normalized, [...(ENTITY_BY_ALIAS.get(normalized) ?? []), entity]);
+  }
+}
 
 const ENTITY_BY_ID = new Map(BANKING_ENTITIES.map((entity) => [entity.id, entity] as const));
 
@@ -180,9 +266,12 @@ export function buildManualBankingEntityId(entityName: string): string {
   return `manual:${normalizeBankName(entityName)}`;
 }
 
+// Resolution keeps persisted overrides, jurisdiction aliases, and the unverified fallback together.
+// eslint-disable-next-line complexity
 export function resolveBankingEntity(
   bankName: string,
   confirmed?: ConfirmedBankingEntity | null,
+  jurisdiction: JurisdictionCode = 'GENERIC',
 ): BankingEntityResolution {
   if (confirmed?.entityId) {
     const known = getBankingEntity(confirmed.entityId);
@@ -193,6 +282,7 @@ export function resolveBankingEntity(
         scheme: known.scheme,
         cap: known.cap,
         currency: known.currency,
+        eligibleCurrencies: known.eligibleCurrencies,
         confidence: 'verified',
       };
     }
@@ -203,12 +293,15 @@ export function resolveBankingEntity(
         scheme: confirmed.scheme,
         cap: confirmed.cap,
         currency: confirmed.currency,
+        eligibleCurrencies: null,
         confidence: 'verified',
       };
     }
   }
   const normalized = normalizeBankName(bankName);
-  const entity = ENTITY_BY_ALIAS.get(normalized);
+  const entity = ENTITY_BY_ALIAS.get(normalized)?.find((candidate) =>
+    candidate.jurisdictions.includes(jurisdiction),
+  );
   if (entity) {
     return {
       entityId: entity.id,
@@ -216,6 +309,7 @@ export function resolveBankingEntity(
       scheme: entity.scheme,
       cap: entity.cap,
       currency: entity.currency,
+      eligibleCurrencies: entity.eligibleCurrencies,
       confidence: 'verified',
     };
   }
@@ -225,6 +319,7 @@ export function resolveBankingEntity(
     scheme: 'Unverified deposit guarantee',
     cap: null,
     currency: null,
+    eligibleCurrencies: null,
     confidence: 'unverified',
   };
 }

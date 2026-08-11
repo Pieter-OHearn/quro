@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type {
   PlanAssumptions,
   PlanAssumptionsInput,
+  JurisdictionCode,
   WwWeeklyRequirementStatus,
 } from '@quro/shared';
 import { X } from 'lucide-react';
@@ -82,6 +83,7 @@ function toInput(form: AssumptionForm): PlanAssumptionsInput {
 type AssumptionsDrawerProps = {
   open: boolean;
   assumptions: PlanAssumptions | null;
+  jurisdiction: JurisdictionCode;
   onClose: () => void;
 };
 
@@ -120,10 +122,12 @@ function LiquidityTierFields({
 // eslint-disable-next-line max-lines-per-function
 function AssumptionFields({
   form,
+  jurisdiction,
   setField,
   toggleTier,
 }: Readonly<{
   form: AssumptionForm;
+  jurisdiction: JurisdictionCode;
   setField: SetAssumptionField;
   toggleTier: (tier: number) => void;
 }>) {
@@ -165,44 +169,56 @@ function AssumptionFields({
         </span>
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
+        {jurisdiction === 'NL' ? (
+          <>
+            <FormField
+              label="UWV 26-of-36 weeks condition"
+              hint="Employment at this employer alone does not determine WW eligibility"
+            >
+              <SelectInput
+                value={form.wwWeeklyRequirement}
+                onChange={(value) =>
+                  setField('wwWeeklyRequirement', value as WwWeeklyRequirementStatus)
+                }
+                options={[
+                  { value: 'unknown', label: 'Not confirmed' },
+                  { value: 'met', label: 'Yes, I meet it' },
+                  { value: 'not_met', label: 'No, I do not meet it' },
+                ]}
+              />
+            </FormField>
+            <FormField
+              label="Confirmed WW duration (months)"
+              hint="Use the duration shown by UWV; blank uses the statutory minimum"
+            >
+              <TextInput
+                type="number"
+                min={0}
+                max={24}
+                value={form.wwDurationMonths}
+                onChange={(value) => setField('wwDurationMonths', value)}
+              />
+            </FormField>
+            <FormField label="WW duration confirmed on">
+              <TextInput
+                type="date"
+                value={form.wwDurationConfirmedAt}
+                onChange={(value) => setField('wwDurationConfirmedAt', value)}
+              />
+            </FormField>
+          </>
+        ) : null}
         <FormField
-          label="UWV 26-of-36 weeks condition"
-          hint="Employment at this employer alone does not determine WW eligibility"
-        >
-          <SelectInput
-            value={form.wwWeeklyRequirement}
-            onChange={(value) =>
-              setField('wwWeeklyRequirement', value as WwWeeklyRequirementStatus)
-            }
-            options={[
-              { value: 'unknown', label: 'Not confirmed' },
-              { value: 'met', label: 'Yes, I meet it' },
-              { value: 'not_met', label: 'No, I do not meet it' },
-            ]}
-          />
-        </FormField>
-        <FormField
-          label="Confirmed WW duration (months)"
-          hint="Use the duration shown by UWV; blank uses the statutory minimum"
-        >
-          <TextInput
-            type="number"
-            min={0}
-            max={24}
-            value={form.wwDurationMonths}
-            onChange={(value) => setField('wwDurationMonths', value)}
-          />
-        </FormField>
-        <FormField label="WW duration confirmed on">
-          <TextInput
-            type="date"
-            value={form.wwDurationConfirmedAt}
-            onChange={(value) => setField('wwDurationConfirmedAt', value)}
-          />
-        </FormField>
-        <FormField
-          label="Severance monthly salary override"
-          hint="Optional; include fixed allowances used by the statutory calculation"
+          label={
+            jurisdiction === 'AU'
+              ? 'Redundancy monthly base-pay override'
+              : 'Severance monthly salary override'
+          }
+          hint={
+            jurisdiction === 'AU'
+              ? 'Optional; use base pay for ordinary hours, excluding bonuses and separate allowances'
+              : 'Optional; include fixed allowances used by the statutory calculation'
+          }
         >
           <TextInput
             type="number"
@@ -211,7 +227,14 @@ function AssumptionFields({
             onChange={(value) => setField('severanceMonthlySalaryOverride', value)}
           />
         </FormField>
-        <FormField label="Monthly benefit override">
+        <FormField
+          label={jurisdiction === 'AU' ? 'Monthly JobSeeker estimate' : 'Monthly benefit override'}
+          hint={
+            jurisdiction === 'AU'
+              ? 'Use an estimate based on your Services Australia circumstances'
+              : undefined
+          }
+        >
           <TextInput
             type="number"
             min={0}
@@ -219,7 +242,13 @@ function AssumptionFields({
             onChange={(value) => setField('benefitMonthlyOverride', value)}
           />
         </FormField>
-        <FormField label="Benefit duration (months)">
+        <FormField
+          label={
+            jurisdiction === 'AU'
+              ? 'JobSeeker planning duration (months)'
+              : 'Benefit duration (months)'
+          }
+        >
           <TextInput
             type="number"
             min={0}
@@ -254,9 +283,12 @@ function AssumptionActions({
   );
 }
 
+// The drawer keeps form state and its accessible overlay lifecycle in one component.
+// eslint-disable-next-line max-lines-per-function
 export function AssumptionsDrawer({
   open,
   assumptions,
+  jurisdiction,
   onClose,
 }: Readonly<AssumptionsDrawerProps>) {
   const updateAssumptions = useUpdateAssumptions();
@@ -324,7 +356,12 @@ export function AssumptionsDrawer({
           are therefore not counted twice. Severance tax uses the effective payslip rate as a
           planning simplification.
         </p>
-        <AssumptionFields form={form} setField={setField} toggleTier={toggleTier} />
+        <AssumptionFields
+          form={form}
+          jurisdiction={jurisdiction}
+          setField={setField}
+          toggleTier={toggleTier}
+        />
         {updateAssumptions.isError ? (
           <p className="mt-4 text-sm text-rose-600">Assumptions could not be saved.</p>
         ) : null}

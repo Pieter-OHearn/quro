@@ -8,6 +8,7 @@ import {
   simulateRunway,
 } from './runway';
 import { baselineIncomeSupport, baselineLiquidAssets } from './__fixtures__/runway';
+import { auJurisdiction } from './jurisdictions/au';
 
 describe('runway burn', () => {
   test('amortises annual spending and excludes employment-linked costs from lean burn', () => {
@@ -148,6 +149,44 @@ describe('runway liquidity and income support', () => {
     );
     expect(sourceIds).toContain('uwv-maximum-daily-wage');
     expect(sourceIds).toContain('uwv-daily-wage-calculation');
+  });
+
+  test('uses Fair Work redundancy weeks and requires a JobSeeker estimate for Australia', () => {
+    const australianInput = {
+      ...baselineIncomeSupport,
+      jurisdiction: auJurisdiction,
+      payslips: baselineIncomeSupport.payslips.map((payslip) => ({
+        ...payslip,
+        currency: 'AUD' as const,
+      })),
+      assumptions: null,
+    };
+    const withoutJobSeeker = calculateIncomeSupport(australianInput);
+    expect(withoutJobSeeker.severance).toMatchObject({
+      status: 'included',
+      gross: 24_000,
+      net: 16_800,
+      cap: null,
+    });
+    expect(withoutJobSeeker.unemployment.status).toBe('unknown');
+    expect(withoutJobSeeker.sources.map((source) => source.id)).toEqual(
+      expect.arrayContaining([
+        'fair-work-redundancy-pay',
+        'apra-financial-claims-scheme',
+        'services-australia-jobseeker-eligibility',
+      ]),
+    );
+
+    const withJobSeeker = calculateIncomeSupport({
+      ...australianInput,
+      assumptions: { benefitMonthlyOverride: 1_250, benefitMaxMonthsOverride: 6 },
+    });
+    expect(withJobSeeker.unemployment).toMatchObject({
+      status: 'included',
+      durationMonths: 6,
+      durationSource: 'override',
+      monthlyNetByMonth: [1_250, 1_250, 1_250, 1_250, 1_250, 1_250],
+    });
   });
 
   test('uses jurisdiction tax fallback when no payslips exist', () => {

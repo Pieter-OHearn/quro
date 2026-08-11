@@ -82,6 +82,7 @@ export const nlJurisdiction: JurisdictionProfile = {
       effectiveTo: '2026-12-31',
       source: severanceSource,
       value: {
+        model: 'salary_fraction',
         currency: 'EUR',
         monthlySalaryFractionPerServiceYear: 1 / 3,
         maximumAmount: 102_000,
