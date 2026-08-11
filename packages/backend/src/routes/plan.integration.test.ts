@@ -142,9 +142,9 @@ describe('plan integration', () => {
     expect(derived.depositGuarantee[0]?.cap).toBeCloseTo(250_000, 2);
     expect(derived.incomeSupport.severance).toMatchObject({
       status: 'included',
-      gross: 24_000,
-      net: 16_800,
     });
+    expect(derived.incomeSupport.severance.gross).toBeCloseTo(24_000, 2);
+    expect(derived.incomeSupport.severance.net).toBeCloseTo(16_800, 2);
     expect(derived.incomeSupport.unemployment.status).toBe('unknown');
 
     await readData(
