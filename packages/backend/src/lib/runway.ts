@@ -1,19 +1,20 @@
 import {
   resolveRule,
+  type CalculationRuleSource,
+  type CurrencyCode,
   type ExpenseClass,
+  type IncomeSupportCalculation,
   type JurisdictionProfile,
   type PlanAssumptionsInput,
   type RunwayBand,
   type RunwayBurnSource,
   type SeveranceRule,
-  type UnemploymentEligibility,
   type UnemploymentRule,
 } from '@quro/shared';
 import { resolveBankingEntity } from './jurisdictions/bankingEntities';
 
 const JOINT_WEIGHT = 0.5;
 const MONTHS_PER_YEAR = 12;
-const WW_MINIMUM_TENURE_MONTHS = 6;
 const TIER_TWO_HAIRCUT = 0.02;
 const TIER_THREE_HAIRCUT = 0.15;
 const MAX_LEDGER_MONTHS = 1_200;
@@ -69,26 +70,25 @@ export type LiquidityTier = {
   included: boolean;
 };
 
-export type PayslipInput = { gross: number; tax: number; net: number };
+export type PayslipInput = {
+  id: number;
+  date: string;
+  gross: number;
+  tax: number;
+  net: number;
+  currency: CurrencyCode;
+};
 
 export type IncomeSupportInput = {
   jurisdiction: JurisdictionProfile;
   asOf: string;
   employmentType: 'employed' | 'self_employed' | 'other' | null;
-  tenureMonths: number | null;
+  serviceStartDate: string | null;
+  employmentEndDate: string | null;
   noticePeriodMonths: number | null;
   payslips: PayslipInput[];
+  salaryBasisStatus: IncomeSupportCalculation['salaryBasis']['status'];
   assumptions?: PlanAssumptionsInput | null;
-};
-
-export type IncomeSupport = {
-  noticeMonths: number;
-  noticeMonthlyNet: number;
-  severanceNet: number;
-  benefit: { monthlyNetByMonth: number[]; maxMonths: number } | null;
-  effectiveTaxRate: number;
-  taxRateSource: 'payslips' | 'jurisdiction_default';
-  eligibility: UnemploymentEligibility;
 };
 
 export type SavingsGuaranteeInput = {
@@ -234,7 +234,7 @@ function getEffectiveTaxRate(
   payslips: readonly PayslipInput[],
   jurisdiction: JurisdictionProfile,
   asOf: string,
-): { rate: number; source: IncomeSupport['taxRateSource'] } {
+): { rate: number; source: IncomeSupportCalculation['taxRateSource'] } {
   const gross = payslips.reduce((sum, payslip) => sum + Math.max(0, payslip.gross), 0);
   if (gross > 0) {
     const tax = payslips.reduce((sum, payslip) => sum + Math.max(0, payslip.tax), 0);
@@ -246,57 +246,98 @@ function getEffectiveTaxRate(
   };
 }
 
-function getEligibility(
-  employmentType: IncomeSupportInput['employmentType'],
-  tenureMonths: number | null,
-): UnemploymentEligibility {
-  if (employmentType !== 'employed') {
-    return { eligible: false, confidence: 'derived', unverifiedConditions: [] };
-  }
-  if (tenureMonths !== null && tenureMonths < WW_MINIMUM_TENURE_MONTHS) {
-    return {
-      eligible: false,
-      confidence: 'derived',
-      unverifiedConditions: ['other employment in the last 36 weeks'],
-    };
-  }
+const DATE_MS = 86_400_000;
+
+function parseDateOnly(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value
+    ? null
+    : parsed;
+}
+
+export function calculateServiceDuration(
+  startDate: string,
+  asOf: string,
+): {
+  completedMonths: number;
+  serviceDays: number;
+  serviceYears: number;
+} | null {
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(asOf);
+  if (!start || !end || start > end) return null;
+  const serviceDays = Math.max(0, Math.floor((end.getTime() - start.getTime()) / DATE_MS));
+  let completedMonths =
+    (end.getUTCFullYear() - start.getUTCFullYear()) * MONTHS_PER_YEAR +
+    end.getUTCMonth() -
+    start.getUTCMonth();
+  if (end.getUTCDate() < start.getUTCDate()) completedMonths -= 1;
   return {
-    eligible: true,
-    confidence: 'assumed',
-    unverifiedConditions: [
-      'worked in at least 26 of the last 36 weeks',
-      'lost at least five working hours per week',
-      'available for paid work',
-      'not dismissed for cause',
-    ],
+    completedMonths: Math.max(0, completedMonths),
+    serviceDays,
+    serviceYears: serviceDays / 365.2425,
   };
 }
 
-function calculateBenefitDuration(tenureMonths: number, rule: UnemploymentRule): number {
-  const serviceYears = Math.max(0, tenureMonths) / MONTHS_PER_YEAR;
-  const initialYears = Math.min(rule.fullMonthPerYearYears, serviceYears);
-  const laterYears = Math.max(0, serviceYears - rule.fullMonthPerYearYears);
-  const calculated = initialYears + laterYears * rule.monthsPerYearAfterThreshold;
-  return Math.min(
-    rule.maximumDurationMonths,
-    Math.max(rule.minimumDurationMonths, Math.floor(calculated)),
-  );
+function sourceFromResolution<T>(resolution: {
+  value: T;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isExtrapolated: boolean;
+  source: { id: string; title: string; publisher: string; url: string; reviewedAt: string } | null;
+}): CalculationRuleSource | null {
+  return resolution.source
+    ? {
+        ...resolution.source,
+        effectiveFrom: resolution.effectiveFrom,
+        effectiveTo: resolution.effectiveTo,
+        isExtrapolated: resolution.isExtrapolated,
+      }
+    : null;
 }
 
-function averagePayslip(payslips: readonly PayslipInput[], field: keyof PayslipInput): number {
-  return average(payslips.map((payslip) => payslip[field]));
+function emptySalaryBasis(
+  status: IncomeSupportCalculation['salaryBasis']['status'],
+): IncomeSupportCalculation['salaryBasis'] {
+  return {
+    status,
+    payslipId: null,
+    payslipDate: null,
+    monthlyGross: 0,
+    monthlyNet: 0,
+    currency: 'EUR',
+    note: 'Add or link a payslip to calculate salary-based support.',
+  };
+}
+
+function buildSalaryBasis(input: IncomeSupportInput, taxRate: number) {
+  const latest = input.payslips[0];
+  if (!latest) return emptySalaryBasis('missing');
+  return {
+    status: input.salaryBasisStatus,
+    payslipId: latest.id,
+    payslipDate: latest.date,
+    monthlyGross: latest.gross,
+    monthlyNet: latest.net || latest.gross * (1 - taxRate),
+    currency: latest.currency,
+    note:
+      input.salaryBasisStatus === 'linked_payslips'
+        ? 'Using the latest payslip linked to this employment.'
+        : 'Using your latest unlinked payslip as a fallback. Link it in Salary for greater confidence.',
+  } satisfies IncomeSupportCalculation['salaryBasis'];
 }
 
 function buildBenefitSchedule(params: {
   input: IncomeSupportInput;
   rule: UnemploymentRule;
-  tenureMonths: number;
   monthlyGross: number;
   taxRate: number;
 }): { monthlyNetByMonth: number[]; maxMonths: number } {
   const maxMonths =
     params.input.assumptions?.benefitMaxMonthsOverride ??
-    calculateBenefitDuration(params.tenureMonths, params.rule);
+    params.input.assumptions?.wwDurationMonths ??
+    params.rule.minimumDurationMonths;
   const maximumMonthlyWage =
     (params.rule.maximumDailyWage * params.rule.workingDaysPerYear) / MONTHS_PER_YEAR;
   const cappedGross = Math.min(params.monthlyGross, maximumMonthlyWage);
@@ -309,13 +350,12 @@ function buildBenefitSchedule(params: {
   return { monthlyNetByMonth, maxMonths };
 }
 
-function calculateSeveranceNet(
+function calculateSeverance(
   monthlyGross: number,
-  tenureMonths: number,
+  serviceYears: number,
   taxRate: number,
   rule: SeveranceRule,
-): number {
-  const serviceYears = tenureMonths / MONTHS_PER_YEAR;
+): { gross: number; net: number; cap: number } {
   const annualGross = monthlyGross * MONTHS_PER_YEAR;
   const cap = rule.annualSalaryIfHigher
     ? Math.max(rule.maximumAmount, annualGross)
@@ -324,40 +364,276 @@ function calculateSeveranceNet(
     cap,
     monthlyGross * rule.monthlySalaryFractionPerServiceYear * serviceYears,
   );
-  return gross * (1 - taxRate);
+  return { gross, net: gross * (1 - taxRate), cap };
 }
 
-export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport | null {
-  const eligibility = getEligibility(input.employmentType, input.tenureMonths);
-  if (
-    !eligibility.eligible ||
-    !input.jurisdiction.unemploymentBenefit ||
-    !input.jurisdiction.severance
-  )
-    return null;
-
-  const benefitRule = resolveRule(input.jurisdiction.unemploymentBenefit, input.asOf).value;
-  const severanceRule = resolveRule(input.jurisdiction.severance, input.asOf).value;
+// The component branches intentionally mirror the user-visible calculation review.
+// eslint-disable-next-line complexity, sonarjs/cognitive-complexity, max-lines-per-function
+export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupportCalculation {
   const tax = getEffectiveTaxRate(input.payslips, input.jurisdiction, input.asOf);
-  const monthlyGross = averagePayslip(input.payslips, 'gross');
-  const monthlyNet = averagePayslip(input.payslips, 'net') || monthlyGross * (1 - tax.rate);
-  const tenureMonths = input.tenureMonths ?? 0;
-  const benefit = buildBenefitSchedule({
-    input,
-    rule: benefitRule,
-    tenureMonths,
-    monthlyGross,
-    taxRate: tax.rate,
-  });
+  const salaryBasis = buildSalaryBasis(input, tax.rate);
+  const severanceMonthlyGross =
+    input.assumptions?.severanceMonthlySalaryOverride ?? salaryBasis.monthlyGross;
+  const latestPayslip = input.payslips[0];
+  const monthlyGrossForBenefits = latestPayslip?.gross ?? 0;
+  const monthlyNetForNotice = latestPayslip?.net || monthlyGrossForBenefits * (1 - tax.rate);
+  const employed = input.employmentType === 'employed';
+  const serviceAsOf =
+    input.employmentEndDate && input.employmentEndDate < input.asOf
+      ? input.employmentEndDate
+      : input.asOf;
+  const service = input.serviceStartDate
+    ? calculateServiceDuration(input.serviceStartDate, serviceAsOf)
+    : null;
+  const sources: CalculationRuleSource[] = [];
+  if (input.jurisdiction.code === 'NL' && input.jurisdiction.unemploymentBenefit) {
+    const wwResolution = resolveRule(input.jurisdiction.unemploymentBenefit, input.asOf);
+    const common = {
+      publisher: 'UWV',
+      reviewedAt: '2026-08-05',
+      effectiveFrom: wwResolution.effectiveFrom,
+      effectiveTo: wwResolution.effectiveTo,
+      isExtrapolated: wwResolution.isExtrapolated,
+    };
+    sources.push(
+      {
+        ...common,
+        id: 'uwv-ww-eligibility',
+        title: 'When am I entitled to WW benefit?',
+        url: 'https://www.uwv.nl/nl/ww/wanneer-recht-op-ww',
+      },
+      {
+        ...common,
+        id: 'uwv-ww-duration',
+        title: 'How long will I receive WW benefit?',
+        url: 'https://www.uwv.nl/nl/ww/hoelang-ww',
+      },
+      {
+        ...common,
+        id: 'uwv-maximum-daily-wage',
+        title: 'Maximum daily wage',
+        url: 'https://www.uwv.nl/nl/premies-bedragen/maximum-dagloon',
+      },
+      {
+        ...common,
+        id: 'uwv-daily-wage-calculation',
+        title: 'Calculating daily wage',
+        url: 'https://www.uwv.nl/nl/premies-bedragen/dagloon-berekenen',
+      },
+    );
+  }
+  if (input.jurisdiction.unemploymentBenefit) {
+    const source = sourceFromResolution(
+      resolveRule(input.jurisdiction.unemploymentBenefit, input.asOf),
+    );
+    if (source) sources.push(source);
+  }
+  if (input.jurisdiction.severance) {
+    const source = sourceFromResolution(resolveRule(input.jurisdiction.severance, input.asOf));
+    if (source) sources.push(source);
+  }
+  const warnings = [
+    'Net amounts use the effective tax rate from your payslips and are planning estimates, not tax advice.',
+  ];
+  if (input.jurisdiction.code === 'NL') {
+    warnings.push(
+      'Dutch transition-pay salary can include holiday allowance and fixed pay components; use the salary override if the payslip gross does not include them.',
+    );
+  }
+
+  const notice: IncomeSupportCalculation['notice'] = !employed
+    ? {
+        status: 'not_applicable',
+        months: null,
+        monthlyNet: 0,
+        totalNet: 0,
+        reason: 'Notice pay is only modelled for employees.',
+      }
+    : input.noticePeriodMonths === null
+      ? {
+          status: 'unknown',
+          months: null,
+          monthlyNet: 0,
+          totalNet: 0,
+          reason: 'Add your contractual notice period.',
+        }
+      : !latestPayslip
+        ? {
+            status: 'unknown',
+            months: input.noticePeriodMonths,
+            monthlyNet: 0,
+            totalNet: 0,
+            reason: 'Add or link a payslip to estimate notice pay.',
+          }
+        : {
+            status: 'included',
+            months: input.noticePeriodMonths,
+            monthlyNet: monthlyNetForNotice,
+            totalNet: input.noticePeriodMonths * monthlyNetForNotice,
+            reason: 'Contractual notice months multiplied by latest monthly net pay.',
+          };
+
+  let severance: IncomeSupportCalculation['severance'];
+  if (!employed || !input.jurisdiction.severance) {
+    severance = {
+      status: 'not_applicable',
+      serviceStartDate: input.serviceStartDate,
+      serviceDays: service?.serviceDays ?? null,
+      serviceYears: service?.serviceYears ?? null,
+      monthlyGross: severanceMonthlyGross,
+      gross: 0,
+      net: 0,
+      cap: null,
+      reason: employed
+        ? 'No severance rule is available for this jurisdiction.'
+        : 'Only modelled for employees.',
+    };
+  } else if (!service || severanceMonthlyGross <= 0) {
+    severance = {
+      status: 'unknown',
+      serviceStartDate: input.serviceStartDate,
+      serviceDays: service?.serviceDays ?? null,
+      serviceYears: service?.serviceYears ?? null,
+      monthlyGross: severanceMonthlyGross,
+      gross: 0,
+      net: 0,
+      cap: null,
+      reason: !service ? 'Add a valid continuous-service start date.' : 'Add a salary source.',
+    };
+  } else {
+    const resolution = resolveRule(input.jurisdiction.severance, input.asOf);
+    const amount = calculateSeverance(
+      severanceMonthlyGross,
+      service.serviceYears,
+      tax.rate,
+      resolution.value,
+    );
+    severance = {
+      status: 'included',
+      serviceStartDate: input.serviceStartDate,
+      serviceDays: service.serviceDays,
+      serviceYears: service.serviceYears,
+      monthlyGross: severanceMonthlyGross,
+      ...amount,
+      reason:
+        'One third of monthly salary per exact year of service, subject to the statutory cap.',
+    };
+  }
+
+  let unemployment: IncomeSupportCalculation['unemployment'];
+  const weeklyRequirement = input.assumptions?.wwWeeklyRequirement ?? 'unknown';
+  if (!employed || !input.jurisdiction.unemploymentBenefit) {
+    unemployment = {
+      status: 'not_applicable',
+      weeklyRequirement,
+      durationMonths: null,
+      durationConfirmedAt: null,
+      durationSource: 'unknown',
+      monthlyNetByMonth: [],
+      unverifiedConditions: [],
+      reason: employed
+        ? 'No unemployment rule is available for this jurisdiction.'
+        : 'WW is only modelled for employees.',
+    };
+  } else if (weeklyRequirement === 'unknown') {
+    unemployment = {
+      status: 'unknown',
+      weeklyRequirement,
+      durationMonths: null,
+      durationConfirmedAt: null,
+      durationSource: 'unknown',
+      monthlyNetByMonth: [],
+      unverifiedConditions: [
+        'worked in at least 26 of the last 36 weeks',
+        'lost at least five working hours per week',
+        'available for paid work',
+        'not dismissed for cause',
+      ],
+      reason: 'Confirm the UWV 26-of-36-weeks condition before WW is included.',
+    };
+  } else if (weeklyRequirement === 'not_met') {
+    unemployment = {
+      status: 'excluded',
+      weeklyRequirement,
+      durationMonths: 0,
+      durationConfirmedAt: null,
+      durationSource: 'unknown',
+      monthlyNetByMonth: [],
+      unverifiedConditions: [],
+      reason: 'Excluded because you indicated the 26-of-36-weeks condition is not met.',
+    };
+  } else if (!latestPayslip) {
+    unemployment = {
+      status: 'unknown',
+      weeklyRequirement,
+      durationMonths: null,
+      durationConfirmedAt: null,
+      durationSource: 'unknown',
+      monthlyNetByMonth: [],
+      unverifiedConditions: [
+        'lost at least five working hours per week',
+        'available for paid work',
+        'not dismissed for cause',
+      ],
+      reason: 'Add or link a payslip to estimate WW.',
+    };
+  } else {
+    const resolution = resolveRule(input.jurisdiction.unemploymentBenefit, input.asOf);
+    const benefit = buildBenefitSchedule({
+      input,
+      rule: resolution.value,
+      monthlyGross: monthlyGrossForBenefits,
+      taxRate: tax.rate,
+    });
+    const durationSource =
+      input.assumptions?.benefitMaxMonthsOverride !== null &&
+      input.assumptions?.benefitMaxMonthsOverride !== undefined
+        ? 'override'
+        : input.assumptions?.wwDurationMonths !== null &&
+            input.assumptions?.wwDurationMonths !== undefined
+          ? 'confirmed'
+          : 'minimum';
+    unemployment = {
+      status: 'included',
+      weeklyRequirement,
+      durationMonths: benefit.maxMonths,
+      durationConfirmedAt:
+        durationSource === 'confirmed' ? (input.assumptions?.wwDurationConfirmedAt ?? null) : null,
+      durationSource,
+      monthlyNetByMonth: benefit.monthlyNetByMonth,
+      unverifiedConditions: [
+        'lost at least five working hours per week',
+        'available for paid work',
+        'not dismissed for cause',
+      ],
+      reason:
+        durationSource === 'minimum'
+          ? `Uses ${resolution.value.initialRate * 100}% for the first ${resolution.value.initialRateMonths} months, then ${resolution.value.ongoingRate * 100}%, capped at the statutory maximum wage, and the minimum duration until you confirm it.`
+          : `Uses ${resolution.value.initialRate * 100}% for the first ${resolution.value.initialRateMonths} months, then ${resolution.value.ongoingRate * 100}%, capped at the statutory maximum wage, for the duration you provided.`,
+    };
+  }
+
+  if (input.salaryBasisStatus === 'unlinked_fallback') {
+    warnings.push('The salary source is not linked to this employment.');
+  }
+  if (
+    input.assumptions?.severanceMonthlySalaryOverride !== null &&
+    input.assumptions?.severanceMonthlySalaryOverride !== undefined
+  ) {
+    warnings.push(
+      'Transition compensation uses your severance salary override; notice and WW use the latest payslip.',
+    );
+  }
 
   return {
-    noticeMonths: input.noticePeriodMonths ?? 0,
-    noticeMonthlyNet: monthlyNet,
-    severanceNet: calculateSeveranceNet(monthlyGross, tenureMonths, tax.rate, severanceRule),
-    benefit,
     effectiveTaxRate: tax.rate,
     taxRateSource: tax.source,
-    eligibility,
+    salaryBasis,
+    notice,
+    severance,
+    unemployment,
+    sources,
+    warnings,
   };
 }
 
@@ -371,11 +647,14 @@ function classifyBand(months: number | null): RunwayBand {
   return 'critical';
 }
 
-function buildIncomeByMonth(support: IncomeSupport | null): number[] {
+function buildIncomeByMonth(support: IncomeSupportCalculation | null): number[] {
   if (!support) return [];
   return [
-    ...Array.from({ length: support.noticeMonths }, () => support.noticeMonthlyNet),
-    ...(support.benefit?.monthlyNetByMonth ?? []),
+    ...Array.from(
+      { length: support.notice.status === 'included' ? (support.notice.months ?? 0) : 0 },
+      () => support.notice.monthlyNet,
+    ),
+    ...(support.unemployment.status === 'included' ? support.unemployment.monthlyNetByMonth : []),
   ];
 }
 
@@ -433,7 +712,7 @@ function simulateLedger(
 export function simulateRunway(
   leanBurn: number,
   tiers: readonly LiquidityTier[],
-  support: IncomeSupport | null,
+  support: IncomeSupportCalculation | null,
 ): {
   monthsCashOnly: number;
   monthsAllLiquid: number;
@@ -442,7 +721,7 @@ export function simulateRunway(
   ledger: RunwayLedgerEntry[];
 } {
   const burn = Math.max(0, leanBurn);
-  const severance = support?.severanceNet ?? 0;
+  const severance = support?.severance.status === 'included' ? support.severance.net : 0;
   if (burn === 0) {
     return {
       monthsCashOnly: 0,

@@ -1,16 +1,15 @@
 import {
-  EMPLOYMENT_TYPES,
+  WW_WEEKLY_REQUIREMENT_STATUSES,
   isJurisdictionCode,
   resolveRule,
   toBudgetMonthIndex,
   type BudgetMonth,
-  type EmploymentProfileInput,
-  type EmploymentType,
   type ExpenseClass,
   type PlanAssumptionsInput,
   type RunwayResponse,
+  type WwWeeklyRequirementStatus,
 } from '@quro/shared';
-import { and, desc, eq, getTableColumns, gte, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, isNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
@@ -18,7 +17,7 @@ import {
   budgetCategories,
   budgetTransactions,
   debts,
-  employmentProfiles,
+  employments,
   holdingTransactions,
   holdings,
   mortgages,
@@ -38,6 +37,7 @@ import {
   calculateBurn,
   calculateIncomeSupport,
   calculateLiquidityTiers,
+  calculateServiceDuration,
   simulateRunway,
   type BudgetCategoryBurnInput,
   type LiquidAssetInput,
@@ -49,6 +49,7 @@ import {
   parseOptionalBooleanField,
   parseOptionalIntegerField,
   parseOptionalNumberField,
+  parseDateString,
   parsePatchFields,
   readJsonBody,
   rejectUnknownFields,
@@ -62,12 +63,6 @@ const ISO_DATE_LENGTH = 10;
 const HISTORY_MONTHS = 12;
 const MONTHS_PER_YEAR = 12;
 const JOINT_WEIGHT = 0.5;
-const EMPLOYMENT_FIELDS = [
-  'employmentType',
-  'tenureMonths',
-  'noticePeriodMonths',
-  'hasDependents',
-] as const;
 const ASSUMPTION_FIELDS = [
   'leanBurnOverride',
   'emergencyLifestylePct',
@@ -75,6 +70,10 @@ const ASSUMPTION_FIELDS = [
   'countFullJointBalances',
   'benefitMonthlyOverride',
   'benefitMaxMonthsOverride',
+  'wwWeeklyRequirement',
+  'wwDurationMonths',
+  'wwDurationConfirmedAt',
+  'severanceMonthlySalaryOverride',
 ] as const;
 
 function toNumber(value: unknown): number {
@@ -88,13 +87,6 @@ function toDateMonthsAgo(now: Date, months: number): string {
     .slice(0, ISO_DATE_LENGTH);
 }
 
-function parseEmploymentType(value: unknown): ParseResult<EmploymentType | null> {
-  if (value === null) return ok(null);
-  return typeof value === 'string' && EMPLOYMENT_TYPES.includes(value as EmploymentType)
-    ? ok(value as EmploymentType)
-    : err('Invalid employment type');
-}
-
 function parseExcludedTiers(value: unknown): ParseResult<number[] | null> {
   if (value === null) return ok(null);
   if (!Array.isArray(value)) return err('Excluded tiers must be an array');
@@ -104,16 +96,11 @@ function parseExcludedTiers(value: unknown): ParseResult<number[] | null> {
     : err('Excluded tiers must contain only 1, 2, or 3');
 }
 
-const employmentParsers: FieldParsers<Required<EmploymentProfileInput>> = {
-  employmentType: parseEmploymentType,
-  tenureMonths: (value) =>
-    parseOptionalIntegerField(value, 'Tenure must be 0 to 720 months', 0, 720),
-  noticePeriodMonths: (value) =>
-    parseOptionalIntegerField(value, 'Notice period must be 0 to 24 months', 0, 24),
-  hasDependents: (value) => parseOptionalBooleanField(value, 'Dependants must be true or false'),
+type AssumptionFields = Omit<Required<PlanAssumptionsInput>, 'wwWeeklyRequirement'> & {
+  wwWeeklyRequirement: WwWeeklyRequirementStatus;
 };
 
-const assumptionParsers: FieldParsers<Required<PlanAssumptionsInput>> = {
+const assumptionParsers: FieldParsers<AssumptionFields> = {
   leanBurnOverride: (value) =>
     parseOptionalNumberField(value, 'Lean burn must be zero or greater', 0),
   emergencyLifestylePct: (value) => {
@@ -133,6 +120,20 @@ const assumptionParsers: FieldParsers<Required<PlanAssumptionsInput>> = {
     parseOptionalNumberField(value, 'Benefit amount must be zero or greater', 0),
   benefitMaxMonthsOverride: (value) =>
     parseOptionalIntegerField(value, 'Benefit duration must be 0 to 120 months', 0, 120),
+  wwWeeklyRequirement: (value) =>
+    typeof value === 'string' &&
+    WW_WEEKLY_REQUIREMENT_STATUSES.includes(value as WwWeeklyRequirementStatus)
+      ? ok(value as WwWeeklyRequirementStatus)
+      : err('WW weekly requirement must be unknown, met, or not_met'),
+  wwDurationMonths: (value) =>
+    parseOptionalIntegerField(value, 'WW duration must be 0 to 24 months', 0, 24),
+  wwDurationConfirmedAt: (value) => {
+    if (value === null) return ok(null);
+    const parsed = parseDateString(value);
+    return parsed ? ok(parsed) : err('WW confirmation date must be a valid ISO date');
+  },
+  severanceMonthlySalaryOverride: (value) =>
+    parseOptionalNumberField(value, 'Severance salary must be zero or greater', 0),
 };
 
 async function parsePatch<T extends object>(
@@ -235,19 +236,34 @@ function convertEurResponse(response: RunwayResponse, factor: number): RunwayRes
       })),
     },
     tiers: response.tiers.map((tier) => ({ ...tier, amount: money(tier.amount) })),
-    incomeSupport: response.incomeSupport
-      ? {
-          ...response.incomeSupport,
-          noticeMonthlyNet: money(response.incomeSupport.noticeMonthlyNet),
-          severanceNet: money(response.incomeSupport.severanceNet),
-          benefit: response.incomeSupport.benefit
-            ? {
-                ...response.incomeSupport.benefit,
-                monthlyNetByMonth: response.incomeSupport.benefit.monthlyNetByMonth.map(money),
-              }
-            : null,
-        }
-      : null,
+    incomeSupport: {
+      ...response.incomeSupport,
+      salaryBasis: {
+        ...response.incomeSupport.salaryBasis,
+        monthlyGross: money(response.incomeSupport.salaryBasis.monthlyGross),
+        monthlyNet: money(response.incomeSupport.salaryBasis.monthlyNet),
+        currency: response.baseCurrency,
+      },
+      notice: {
+        ...response.incomeSupport.notice,
+        monthlyNet: money(response.incomeSupport.notice.monthlyNet),
+        totalNet: money(response.incomeSupport.notice.totalNet),
+      },
+      severance: {
+        ...response.incomeSupport.severance,
+        monthlyGross: money(response.incomeSupport.severance.monthlyGross),
+        gross: money(response.incomeSupport.severance.gross),
+        net: money(response.incomeSupport.severance.net),
+        cap:
+          response.incomeSupport.severance.cap === null
+            ? null
+            : money(response.incomeSupport.severance.cap),
+      },
+      unemployment: {
+        ...response.incomeSupport.unemployment,
+        monthlyNetByMonth: response.incomeSupport.unemployment.monthlyNetByMonth.map(money),
+      },
+    },
     runway: {
       ...response.runway,
       ledger: response.runway.ledger.map((entry) => ({
@@ -289,14 +305,26 @@ function resolveJurisdictionMetadata(
   };
 }
 
+// eslint-disable-next-line max-lines-per-function
 async function loadRunwayData(userId: number, now: Date) {
   const partnerId = await getAcceptedPartnerId(userId);
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
   const historyStart = toDateMonthsAgo(now, HISTORY_MONTHS);
+  const asOf = now.toISOString().slice(0, ISO_DATE_LENGTH);
+  const [primaryEmployment] = await db
+    .select()
+    .from(employments)
+    .where(
+      and(
+        eq(employments.userId, userId),
+        or(isNull(employments.endDate), gte(employments.endDate, asOf)),
+      ),
+    )
+    .orderBy(desc(employments.isPrimary), asc(employments.id))
+    .limit(1);
   const [
     userRows,
-    profileRows,
     assumptionRows,
     savings,
     savingsTxns,
@@ -305,12 +333,13 @@ async function loadRunwayData(userId: number, now: Date) {
     mortgageRows,
     debtRows,
     payslipRows,
+    linkedPayslipRows,
+    unlinkedPayslipRows,
     categories,
     budgetTxns,
     rates,
   ] = await Promise.all([
     db.select().from(users).where(eq(users.id, userId)),
-    db.select().from(employmentProfiles).where(eq(employmentProfiles.userId, userId)),
     db.select().from(planAssumptions).where(eq(planAssumptions.userId, userId)),
     db
       .select()
@@ -340,6 +369,20 @@ async function loadRunwayData(userId: number, now: Date) {
       .where(eq(payslips.userId, userId))
       .orderBy(desc(payslips.date))
       .limit(HISTORY_MONTHS),
+    primaryEmployment
+      ? db
+          .select()
+          .from(payslips)
+          .where(and(eq(payslips.userId, userId), eq(payslips.employmentId, primaryEmployment.id)))
+          .orderBy(desc(payslips.date))
+          .limit(HISTORY_MONTHS)
+      : Promise.resolve([]),
+    db
+      .select()
+      .from(payslips)
+      .where(and(eq(payslips.userId, userId), isNull(payslips.employmentId)))
+      .orderBy(desc(payslips.date))
+      .limit(HISTORY_MONTHS),
     db.select().from(budgetCategories).where(eq(budgetCategories.userId, userId)),
     db
       .select({
@@ -355,7 +398,7 @@ async function loadRunwayData(userId: number, now: Date) {
   ]);
   return {
     user: userRows[0],
-    profile: profileRows[0] ?? null,
+    primaryEmployment: primaryEmployment ?? null,
     assumptions: assumptionRows[0] ?? null,
     savings,
     savingsTxns,
@@ -364,6 +407,8 @@ async function loadRunwayData(userId: number, now: Date) {
     mortgageRows,
     debtRows,
     payslipRows,
+    linkedPayslipRows,
+    unlinkedPayslipRows,
     categories,
     budgetTxns,
     rates,
@@ -422,34 +467,79 @@ function buildContractualInputs(data: RunwayData, convertToEur: MoneyConverter) 
   ];
 }
 
-function isEmploymentSetupComplete(profile: RunwayData['profile']): boolean {
-  return Boolean(
-    profile?.employmentType &&
-    profile.tenureMonths !== null &&
-    profile.noticePeriodMonths !== null &&
-    profile.hasDependents !== null,
-  );
+function getMissingEmploymentFields(employment: RunwayData['primaryEmployment']): string[] {
+  if (!employment) return ['employment'];
+  if (employment.employmentType !== 'employed') return [];
+  return [
+    ...(employment.employerName?.trim() ? [] : ['employerName']),
+    ...(employment.serviceStartDate ? [] : ['serviceStartDate']),
+    ...(employment.noticePeriodMonths === null ? ['noticePeriodMonths'] : []),
+  ];
 }
 
+function toEmploymentDto(employment: NonNullable<RunwayData['primaryEmployment']>) {
+  return {
+    id: employment.id,
+    employerName: employment.employerName,
+    employmentType: employment.employmentType,
+    serviceStartDate: employment.serviceStartDate,
+    endDate: employment.endDate,
+    noticePeriodMonths: employment.noticePeriodMonths,
+    isPrimary: employment.isPrimary,
+    createdAt: employment.createdAt.toISOString(),
+    updatedAt: employment.updatedAt.toISOString(),
+  };
+}
+
+// eslint-disable-next-line complexity
 function buildIncomeSupport(
   data: RunwayData,
   jurisdiction: ReturnType<typeof getJurisdictionProfile>,
   asOf: string,
   convertToEur: MoneyConverter,
+  assumptions: PlanAssumptionsInput | null,
 ) {
+  const selectedPayslips =
+    data.linkedPayslipRows.length > 0 ? data.linkedPayslipRows : data.unlinkedPayslipRows;
   return calculateIncomeSupport({
     jurisdiction,
     asOf,
-    employmentType: data.profile?.employmentType as EmploymentType | null,
-    tenureMonths: data.profile?.tenureMonths ?? null,
-    noticePeriodMonths: data.profile?.noticePeriodMonths ?? null,
-    payslips: data.payslipRows.map((payslip) => ({
+    employmentType: data.primaryEmployment?.employmentType ?? null,
+    serviceStartDate: data.primaryEmployment?.serviceStartDate ?? null,
+    employmentEndDate: data.primaryEmployment?.endDate ?? null,
+    noticePeriodMonths: data.primaryEmployment?.noticePeriodMonths ?? null,
+    salaryBasisStatus:
+      data.linkedPayslipRows.length > 0
+        ? 'linked_payslips'
+        : selectedPayslips.length > 0
+          ? 'unlinked_fallback'
+          : 'missing',
+    payslips: selectedPayslips.map((payslip) => ({
+      id: payslip.id,
+      date: payslip.date,
       gross: convertToEur(toNumber(payslip.gross), payslip.currency),
       tax: convertToEur(toNumber(payslip.tax), payslip.currency),
       net: convertToEur(toNumber(payslip.net), payslip.currency),
+      currency: 'EUR',
     })),
-    assumptions: data.assumptions,
+    assumptions,
   });
+}
+
+function convertAssumptionsToEur(
+  assumptions: RunwayData['assumptions'],
+  baseCurrency: string,
+  convertToEur: MoneyConverter,
+): PlanAssumptionsInput | null {
+  if (!assumptions) return null;
+  const money = (value: number | null) =>
+    value === null ? null : convertToEur(value, baseCurrency);
+  return {
+    ...assumptions,
+    leanBurnOverride: money(assumptions.leanBurnOverride),
+    benefitMonthlyOverride: money(assumptions.benefitMonthlyOverride),
+    severanceMonthlySalaryOverride: money(assumptions.severanceMonthlySalaryOverride),
+  };
 }
 
 function buildEurRunwayResponse(
@@ -459,20 +549,31 @@ function buildEurRunwayResponse(
   asOf: string,
   convertToEur: MoneyConverter,
 ): RunwayResponse {
-  const jointWeight = data.assumptions?.countFullJointBalances ? 1 : JOINT_WEIGHT;
+  const assumptions = convertAssumptionsToEur(data.assumptions, user.baseCurrency, convertToEur);
+  const jointWeight = assumptions?.countFullJointBalances ? 1 : JOINT_WEIGHT;
   const burn = calculateBurn({
     categories: buildBudgetInputs(data.categories, data.budgetTxns),
     contractual: buildContractualInputs(data, convertToEur),
     derivedCashflowMonthly: calculateDerivedCashflow(data, convertToEur, jointWeight),
-    assumptions: data.assumptions,
+    assumptions,
   });
-  const incomeSupport = buildIncomeSupport(data, jurisdiction, asOf, convertToEur);
-  const tiers = calculateLiquidityTiers(buildLiquidAssets(data, convertToEur), data.assumptions);
+  const incomeSupport = buildIncomeSupport(data, jurisdiction, asOf, convertToEur, assumptions);
+  const tiers = calculateLiquidityTiers(buildLiquidAssets(data, convertToEur), assumptions);
   const guaranteeRule = resolveRule(jurisdiction.depositGuarantee, asOf);
+  const primaryEmployment = data.primaryEmployment ? toEmploymentDto(data.primaryEmployment) : null;
+  const service = primaryEmployment?.serviceStartDate
+    ? calculateServiceDuration(primaryEmployment.serviceStartDate, asOf)
+    : null;
+  const missingFields = getMissingEmploymentFields(data.primaryEmployment);
   return {
     baseCurrency: user.baseCurrency,
     asOf,
     jurisdiction: resolveJurisdictionMetadata(jurisdiction, asOf),
+    employment: {
+      primary: primaryEmployment,
+      derived: service ? { asOf, ...service } : null,
+      missingFields,
+    },
     burn,
     tiers,
     incomeSupport,
@@ -486,8 +587,10 @@ function buildEurRunwayResponse(
       guaranteeRule.value.amount,
       guaranteeRule.value.scheme,
     ),
-    setupComplete: isEmploymentSetupComplete(data.profile),
-    isEstimated: false,
+    setupComplete: missingFields.length === 0,
+    isEstimated:
+      incomeSupport.salaryBasis.status === 'unlinked_fallback' ||
+      incomeSupport.unemployment.status === 'unknown',
   };
 }
 
@@ -511,26 +614,6 @@ app.get('/runway', async (c) => {
   const user = getAuthUser(c);
   const data = await buildRunwayResponse(user.id);
   return data ? c.json({ data }) : c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
-});
-
-app.put('/employment', async (c) => {
-  const user = getAuthUser(c);
-  const parsed = await parsePatch(
-    c.req,
-    EMPLOYMENT_FIELDS,
-    employmentParsers,
-    'Invalid employment profile',
-  );
-  if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
-  const [data] = await db
-    .insert(employmentProfiles)
-    .values({ userId: user.id, ...parsed.value, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: employmentProfiles.userId,
-      set: { ...parsed.value, updatedAt: new Date() },
-    })
-    .returning();
-  return c.json({ data });
 });
 
 app.get('/assumptions', async (c) => {

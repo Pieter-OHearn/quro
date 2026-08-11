@@ -1,5 +1,21 @@
 import type { JurisdictionProfile } from '@quro/shared';
 
+const reviewedAt = '2026-08-05';
+const uwvAmountSource = {
+  id: 'uwv-ww-amount',
+  title: 'How much WW benefit will I receive?',
+  publisher: 'UWV',
+  url: 'https://www.uwv.nl/nl/ww/hoogte-ww',
+  reviewedAt,
+};
+const severanceSource = {
+  id: 'rijksoverheid-transitievergoeding',
+  title: 'How much transition compensation will I receive on dismissal?',
+  publisher: 'Rijksoverheid',
+  url: 'https://www.rijksoverheid.nl/vraag-en-antwoord/ontslag/hoe-hoog-is-de-transitievergoeding-als-ik-word-ontslagen',
+  reviewedAt,
+};
+
 // Primary sources (verified 2026-08-05):
 // - UWV maximum daily wage: https://www.uwv.nl/nl/premies-bedragen/maximum-dagloon
 // - UWV duration: https://www.uwv.nl/nl/ww/hoelang-ww
@@ -28,6 +44,7 @@ export const nlJurisdiction: JurisdictionProfile = {
     {
       effectiveFrom: '2026-01-01',
       effectiveTo: '2026-06-30',
+      source: uwvAmountSource,
       value: {
         currency: 'EUR',
         workingDaysPerYear: 261,
@@ -44,6 +61,7 @@ export const nlJurisdiction: JurisdictionProfile = {
     {
       effectiveFrom: '2026-07-01',
       effectiveTo: '2026-12-31',
+      source: uwvAmountSource,
       value: {
         currency: 'EUR',
         workingDaysPerYear: 261,
@@ -62,6 +80,7 @@ export const nlJurisdiction: JurisdictionProfile = {
     {
       effectiveFrom: '2026-01-01',
       effectiveTo: '2026-12-31',
+      source: severanceSource,
       value: {
         currency: 'EUR',
         monthlySalaryFractionPerServiceYear: 1 / 3,

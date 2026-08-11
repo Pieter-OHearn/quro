@@ -8,16 +8,17 @@ import {
   SegmentedControl,
 } from '@/components/ui';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
+import { EmploymentCard } from '@/features/employment';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   AssumptionsDrawer,
   BurnRateCards,
+  CalculationReviewModal,
   CategoryClassificationCard,
   DepositGuaranteeNotice,
   LiquidityTierBar,
   RunwayHeroCard,
   RunwayLedgerChart,
-  RunwaySetupCard,
 } from './components';
 import { usePlanAssumptions, useRunway } from './hooks';
 import { RUNWAY_CITATIONS } from './utils/runway-display';
@@ -43,6 +44,7 @@ export function Plan() {
   const assumptionsQuery = usePlanAssumptions();
   const { fmtBase } = useCurrency();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   if (runwayQuery.isPending || assumptionsQuery.isPending) {
     return <LoadingSpinner className="min-h-[60vh]" label="Building runway plan" />;
@@ -79,10 +81,10 @@ export function Plan() {
         onChange={() => undefined}
         variant="contained"
       />
-      {!data.setupComplete ? <RunwaySetupCard /> : null}
+      <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
       <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
       <ContentSection spacing="lg">
-        <RunwayHeroCard data={data} />
+        <RunwayHeroCard data={data} onReview={() => setReviewOpen(true)} />
         <BurnRateCards burn={data.burn} fmtBase={(value) => fmtBase(value)} />
       </ContentSection>
       <ContentSection spacing="lg" className="grid gap-6 xl:grid-cols-2">
@@ -93,10 +95,9 @@ export function Plan() {
         guarantees={data.depositGuarantee}
         fmtBase={(value) => fmtBase(value)}
       />
-      {data.incomeSupport?.eligibility.confidence === 'assumed' ? (
+      {data.incomeSupport.unemployment.status === 'unknown' ? (
         <p className="text-xs leading-5 text-slate-500">
-          Benefit eligibility assumes:{' '}
-          {data.incomeSupport.eligibility.unverifiedConditions.join('; ')}.
+          WW is not included yet: {data.incomeSupport.unemployment.reason}
         </p>
       ) : null}
       <p className="text-xs leading-5 text-slate-400">{RUNWAY_CITATIONS.advice}</p>
@@ -105,6 +106,13 @@ export function Plan() {
         assumptions={assumptionsQuery.data ?? null}
         onClose={() => setDrawerOpen(false)}
       />
+      {reviewOpen ? (
+        <CalculationReviewModal
+          data={data}
+          fmtBase={(value) => fmtBase(value)}
+          onClose={() => setReviewOpen(false)}
+        />
+      ) : null}
     </PageStack>
   );
 }

@@ -21,6 +21,8 @@ import {
   MAX_USER_AGE,
   MIN_RETIREMENT_AGE,
   MIN_USER_AGE,
+  type WwWeeklyRequirementStatus,
+  type EmploymentType,
 } from '@quro/shared';
 
 export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
@@ -187,32 +189,38 @@ export const partnerLinks = pgTable(
 
 // ── Wealth planning ─────────────────────────────────────────────────────────
 
-export const employmentProfiles = pgTable(
-  'employment_profiles',
+export const employments = pgTable(
+  'employments',
   {
     id: serial('id').primaryKey(),
     userId: integer('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
-    employmentType: text('employment_type'),
-    tenureMonths: integer('tenure_months'),
+    employerName: text('employer_name'),
+    employmentType: text('employment_type').$type<EmploymentType>().notNull(),
+    serviceStartDate: date('service_start_date', { mode: 'string' }),
+    endDate: date('end_date', { mode: 'string' }),
     noticePeriodMonths: integer('notice_period_months'),
-    hasDependents: boolean('has_dependents'),
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (table) => ({
-    userUnique: uniqueIndex('employment_profiles_user_id_unique').on(table.userId),
+    userIdx: index('employments_user_id_idx').on(table.userId),
+    primaryUnique: uniqueIndex('employments_primary_user_unique')
+      .on(table.userId)
+      .where(sql`${table.isPrimary} = true`),
     employmentTypeCheck: check(
-      'employment_profiles_type_check',
-      sql`${table.employmentType} is null or ${table.employmentType} in ('employed', 'self_employed', 'other')`,
-    ),
-    tenureMonthsCheck: check(
-      'employment_profiles_tenure_months_check',
-      sql`${table.tenureMonths} is null or ${table.tenureMonths} between 0 and 720`,
+      'employments_type_check',
+      sql`${table.employmentType} in ('employed', 'self_employed', 'other')`,
     ),
     noticePeriodCheck: check(
-      'employment_profiles_notice_period_months_check',
+      'employments_notice_period_months_check',
       sql`${table.noticePeriodMonths} is null or ${table.noticePeriodMonths} between 0 and 24`,
+    ),
+    dateOrderCheck: check(
+      'employments_date_order_check',
+      sql`${table.endDate} is null or ${table.serviceStartDate} is null or ${table.endDate} >= ${table.serviceStartDate}`,
     ),
   }),
 );
@@ -236,6 +244,16 @@ export const planAssumptions = pgTable(
       scale: 2,
     }),
     benefitMaxMonthsOverride: integer('benefit_max_months_override'),
+    wwWeeklyRequirement: text('ww_weekly_requirement')
+      .$type<WwWeeklyRequirementStatus>()
+      .default('unknown')
+      .notNull(),
+    wwDurationMonths: integer('ww_duration_months'),
+    wwDurationConfirmedAt: date('ww_duration_confirmed_at', { mode: 'string' }),
+    severanceMonthlySalaryOverride: numericAsNumber('severance_monthly_salary_override', {
+      precision: 19,
+      scale: 2,
+    }),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (table) => ({
@@ -255,6 +273,18 @@ export const planAssumptions = pgTable(
     benefitMonthsCheck: check(
       'plan_assumptions_benefit_months_check',
       sql`${table.benefitMaxMonthsOverride} is null or ${table.benefitMaxMonthsOverride} between 0 and 120`,
+    ),
+    wwWeeklyRequirementCheck: check(
+      'plan_assumptions_ww_weekly_requirement_check',
+      sql`${table.wwWeeklyRequirement} in ('unknown', 'met', 'not_met')`,
+    ),
+    wwDurationMonthsCheck: check(
+      'plan_assumptions_ww_duration_months_check',
+      sql`${table.wwDurationMonths} is null or ${table.wwDurationMonths} between 0 and 24`,
+    ),
+    severanceSalaryCheck: check(
+      'plan_assumptions_severance_salary_check',
+      sql`${table.severanceMonthlySalaryOverride} is null or ${table.severanceMonthlySalaryOverride} >= 0`,
     ),
   }),
 );
@@ -740,6 +770,9 @@ export const payslips = pgTable(
     userId: integer('user_id')
       .references(() => users.id)
       .notNull(),
+    employmentId: integer('employment_id').references(() => employments.id, {
+      onDelete: 'set null',
+    }),
     month: text('month').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     gross: numericAsNumber('gross', { precision: 19, scale: 2 }).notNull(),
@@ -752,6 +785,7 @@ export const payslips = pgTable(
   },
   (table) => ({
     userIdx: index('payslips_user_id_idx').on(table.userId),
+    employmentIdx: index('payslips_employment_id_idx').on(table.employmentId),
     userDateIdx: index('payslips_user_date_idx').on(table.userId, table.date),
     documentStateChk: inlinePdfDocumentStateCheck('payslips_document_fields_chk', table),
     documentSizeChk: inlinePdfDocumentSizeCheck('payslips_document_size_bytes_chk', table),

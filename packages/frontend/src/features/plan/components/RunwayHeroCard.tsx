@@ -1,8 +1,11 @@
 import type { RunwayResponse } from '@quro/shared';
-import { Badge, Card } from '@/components/ui';
+import { Badge, Button, Card } from '@/components/ui';
 import { formatMonths, RUNWAY_BAND_META, RUNWAY_CITATIONS } from '../utils/runway-display';
 
-export function RunwayHeroCard({ data }: Readonly<{ data: RunwayResponse }>) {
+export function RunwayHeroCard({
+  data,
+  onReview,
+}: Readonly<{ data: RunwayResponse; onReview: () => void }>) {
   const band = RUNWAY_BAND_META[data.runway.band];
   return (
     <Card className="overflow-hidden border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-0">
@@ -23,6 +26,15 @@ export function RunwayHeroCard({ data }: Readonly<{ data: RunwayResponse }>) {
             severance, and applicable income support.
           </p>
           <p className="mt-4 text-xs text-slate-500">{RUNWAY_CITATIONS.band}</p>
+          <Button
+            className="mt-5"
+            variant="secondary"
+            size="sm"
+            onClick={onReview}
+            aria-label="Review runway calculation"
+          >
+            Review calculation
+          </Button>
         </div>
         <div className="grid grid-cols-2 gap-3 self-stretch">
           <div className="rounded-2xl border border-white bg-white/85 p-4 shadow-sm">

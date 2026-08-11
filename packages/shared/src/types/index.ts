@@ -1,4 +1,4 @@
-import type { JurisdictionCode, UnemploymentEligibility } from './jurisdiction.js';
+import type { JurisdictionCode } from './jurisdiction.js';
 
 export * from './jurisdiction.js';
 
@@ -544,6 +544,7 @@ export type DebtPayment = {
 
 export type Payslip = {
   id: number;
+  employmentId: number | null;
   month: string;
   date: string;
   gross: number;
@@ -649,22 +650,31 @@ export type ExpenseClass = (typeof EXPENSE_CLASSES)[number];
 export const EMPLOYMENT_TYPES = ['employed', 'self_employed', 'other'] as const;
 export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
 
-export type EmploymentProfile = {
+export type Employment = {
   id: number;
-  userId: number;
-  employmentType: EmploymentType | null;
-  tenureMonths: number | null;
+  employerName: string | null;
+  employmentType: EmploymentType;
+  serviceStartDate: string | null;
+  endDate: string | null;
   noticePeriodMonths: number | null;
-  hasDependents: boolean | null;
+  isPrimary: boolean;
+  createdAt: string;
   updatedAt: string;
 };
 
-export type EmploymentProfileInput = Partial<{
-  employmentType: EmploymentType | null;
-  tenureMonths: number | null;
+export type EmploymentInput = {
+  employerName: string;
+  employmentType: EmploymentType;
+  serviceStartDate: string | null;
+  endDate: string | null;
   noticePeriodMonths: number | null;
-  hasDependents: boolean | null;
-}>;
+  isPrimary: boolean;
+};
+
+export type EmploymentPatch = Partial<EmploymentInput>;
+
+export const WW_WEEKLY_REQUIREMENT_STATUSES = ['unknown', 'met', 'not_met'] as const;
+export type WwWeeklyRequirementStatus = (typeof WW_WEEKLY_REQUIREMENT_STATUSES)[number];
 
 export type PlanAssumptions = {
   id: number;
@@ -675,6 +685,10 @@ export type PlanAssumptions = {
   countFullJointBalances: boolean | null;
   benefitMonthlyOverride: number | null;
   benefitMaxMonthsOverride: number | null;
+  wwWeeklyRequirement: WwWeeklyRequirementStatus | null;
+  wwDurationMonths: number | null;
+  wwDurationConfirmedAt: string | null;
+  severanceMonthlySalaryOverride: number | null;
   updatedAt: string;
 };
 
@@ -682,6 +696,62 @@ export type PlanAssumptionsInput = Partial<Omit<PlanAssumptions, 'id' | 'userId'
 
 export type RunwayBurnSource = 'envelopes' | 'envelopes_partial' | 'derived_cashflow';
 export type RunwayBand = 'critical' | 'building' | 'resilient';
+export type CalculationComponentStatus = 'included' | 'unknown' | 'not_applicable' | 'excluded';
+
+export type CalculationRuleSource = {
+  id: string;
+  title: string;
+  publisher: string;
+  url: string;
+  reviewedAt: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isExtrapolated: boolean;
+};
+
+export type IncomeSupportCalculation = {
+  effectiveTaxRate: number;
+  taxRateSource: 'payslips' | 'jurisdiction_default';
+  salaryBasis: {
+    status: 'linked_payslips' | 'unlinked_fallback' | 'missing';
+    payslipId: number | null;
+    payslipDate: string | null;
+    monthlyGross: number;
+    monthlyNet: number;
+    currency: CurrencyCode;
+    note: string;
+  };
+  notice: {
+    status: CalculationComponentStatus;
+    months: number | null;
+    monthlyNet: number;
+    totalNet: number;
+    reason: string;
+  };
+  severance: {
+    status: CalculationComponentStatus;
+    serviceStartDate: string | null;
+    serviceDays: number | null;
+    serviceYears: number | null;
+    monthlyGross: number;
+    gross: number;
+    net: number;
+    cap: number | null;
+    reason: string;
+  };
+  unemployment: {
+    status: CalculationComponentStatus;
+    weeklyRequirement: WwWeeklyRequirementStatus;
+    durationMonths: number | null;
+    durationConfirmedAt: string | null;
+    durationSource: 'confirmed' | 'minimum' | 'override' | 'unknown';
+    monthlyNetByMonth: number[];
+    unverifiedConditions: string[];
+    reason: string;
+  };
+  sources: CalculationRuleSource[];
+  warnings: string[];
+};
 
 export type RunwayResponse = {
   baseCurrency: CurrencyCode;
@@ -690,6 +760,16 @@ export type RunwayResponse = {
     code: JurisdictionCode;
     rulesEffectiveFrom: string;
     isExtrapolated: boolean;
+  };
+  employment: {
+    primary: Employment | null;
+    derived: {
+      asOf: string;
+      completedMonths: number;
+      serviceDays: number;
+      serviceYears: number;
+    } | null;
+    missingFields: string[];
   };
   burn: {
     lean: number;
@@ -712,15 +792,7 @@ export type RunwayResponse = {
     note: string;
     included: boolean;
   }>;
-  incomeSupport: {
-    noticeMonths: number;
-    noticeMonthlyNet: number;
-    severanceNet: number;
-    benefit: { monthlyNetByMonth: number[]; maxMonths: number } | null;
-    effectiveTaxRate: number;
-    taxRateSource: 'payslips' | 'jurisdiction_default';
-    eligibility: UnemploymentEligibility;
-  } | null;
+  incomeSupport: IncomeSupportCalculation;
   runway: {
     monthsCashOnly: number;
     monthsAllLiquid: number;

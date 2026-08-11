@@ -3,10 +3,19 @@ import type { CurrencyCode } from './index.js';
 export const JURISDICTION_CODES = ['NL', 'AU', 'GENERIC'] as const;
 export type JurisdictionCode = (typeof JURISDICTION_CODES)[number];
 
+export type RuleSource = {
+  id: string;
+  title: string;
+  publisher: string;
+  url: string;
+  reviewedAt: string;
+};
+
 export type DatedRule<T> = {
   effectiveFrom: string;
   effectiveTo: string | null;
   value: T;
+  source?: RuleSource;
 };
 
 export type NonEmptyDatedRules<T> = readonly [DatedRule<T>, ...DatedRule<T>[]];
@@ -62,7 +71,9 @@ export type JurisdictionProfile = {
 export type RuleResolution<T> = {
   value: T;
   effectiveFrom: string;
+  effectiveTo: string | null;
   isExtrapolated: boolean;
+  source: RuleSource | null;
 };
 
 export type UnemploymentEligibility = {
@@ -86,7 +97,9 @@ export function resolveRule<T>(rules: NonEmptyDatedRules<T>, asOf: string): Rule
     return {
       value: matchingRule.value,
       effectiveFrom: matchingRule.effectiveFrom,
+      effectiveTo: matchingRule.effectiveTo,
       isExtrapolated: false,
+      source: matchingRule.source ?? null,
     };
   }
 
@@ -96,6 +109,8 @@ export function resolveRule<T>(rules: NonEmptyDatedRules<T>, asOf: string): Rule
   return {
     value: fallbackRule.value,
     effectiveFrom: fallbackRule.effectiveFrom,
+    effectiveTo: fallbackRule.effectiveTo,
     isExtrapolated: true,
+    source: fallbackRule.source ?? null,
   };
 }

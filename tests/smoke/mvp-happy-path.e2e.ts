@@ -34,12 +34,16 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await page.request.post(`${BACKEND_ORIGIN}/api/auth/signout`);
 
   await page.goto('/welcome');
-  await page
-    .getByRole('button', { name: /sign in/i })
-    .first()
-    .click();
+  const openSignIn = page.getByRole('button', { name: /sign in/i }).first();
+  await openSignIn.focus();
+  await openSignIn.click();
 
   const signInDialog = page.getByRole('dialog');
+  await expect(signInDialog.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(signInDialog).toBeHidden();
+  await expect(openSignIn).toBeFocused();
+  await openSignIn.click();
   await signInDialog.getByTestId('signin-email-input').fill(smokeEmail);
   await signInDialog.getByTestId('signin-password-input').fill(smokePassword);
   await signInDialog.getByRole('button', { name: 'Sign In' }).click();

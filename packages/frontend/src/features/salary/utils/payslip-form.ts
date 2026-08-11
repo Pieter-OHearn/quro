@@ -5,6 +5,7 @@ import type { PayslipFieldErrorMap, PayslipFormState } from '../types';
 const isInvalidRequiredNumber = (raw: string, parsed: number) => !raw || Number.isNaN(parsed);
 
 export const createEmptyPayslipForm = (currency: CurrencyCode): PayslipFormState => ({
+  employmentId: '',
   month: '',
   date: '',
   gross: '',
@@ -15,6 +16,7 @@ export const createEmptyPayslipForm = (currency: CurrencyCode): PayslipFormState
 });
 
 export const createPayslipFormFromExisting = (payslip: Payslip): PayslipFormState => ({
+  employmentId: payslip.employmentId === null ? '' : String(payslip.employmentId),
   month: payslip.month,
   date: payslip.date,
   gross: formatFixedInputValue(payslip.gross),

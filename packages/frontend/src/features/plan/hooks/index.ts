@@ -1,10 +1,4 @@
-import type {
-  EmploymentProfile,
-  EmploymentProfileInput,
-  PlanAssumptions,
-  PlanAssumptionsInput,
-  RunwayResponse,
-} from '@quro/shared';
+import type { PlanAssumptions, PlanAssumptionsInput, RunwayResponse } from '@quro/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -37,17 +31,6 @@ function usePlanInvalidation() {
       queryClient.invalidateQueries({ queryKey: PLAN_QUERY_KEY }),
       queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
     ]);
-}
-
-export function useUpdateEmployment() {
-  const invalidate = usePlanInvalidation();
-  return useMutation({
-    mutationFn: async (input: EmploymentProfileInput) => {
-      const response = await api.put('/api/plan/employment', input);
-      return response.data.data as EmploymentProfile;
-    },
-    onSuccess: invalidate,
-  });
 }
 
 export function useUpdateAssumptions() {

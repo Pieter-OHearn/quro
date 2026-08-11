@@ -453,6 +453,8 @@ const smokeCases: readonly SmokeCase[] = [
       'Modal body',
       'Submit',
       'max-w-md',
+      'aria-label="Close dialog"',
+      'aria-labelledby=',
     ],
   },
   {

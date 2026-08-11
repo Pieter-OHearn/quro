@@ -12,6 +12,7 @@ export function useDeletePayslip() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: salaryQueryKeys.all });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['plan'] });
     },
   });
 }

@@ -183,6 +183,13 @@
       "when": 1786391941529,
       "tag": "0025_jazzy_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786465979873,
+      "tag": "0026_aberrant_beast",
+      "breakpoints": true
     }
   ]
 }

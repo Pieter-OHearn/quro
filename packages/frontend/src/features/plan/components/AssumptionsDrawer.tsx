@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { PlanAssumptions, PlanAssumptionsInput } from '@quro/shared';
+import type {
+  PlanAssumptions,
+  PlanAssumptionsInput,
+  WwWeeklyRequirementStatus,
+} from '@quro/shared';
 import { X } from 'lucide-react';
-import { Button, FormField, TextInput } from '@/components/ui';
+import { Button, FormField, SelectInput, TextInput } from '@/components/ui';
 import { useUpdateAssumptions } from '../hooks';
 
 type AssumptionForm = {
@@ -9,6 +13,10 @@ type AssumptionForm = {
   emergencyLifestylePct: string;
   benefitMonthlyOverride: string;
   benefitMaxMonthsOverride: string;
+  wwWeeklyRequirement: WwWeeklyRequirementStatus;
+  wwDurationMonths: string;
+  wwDurationConfirmedAt: string;
+  severanceMonthlySalaryOverride: string;
   excludedTiers: number[];
   countFullJointBalances: boolean;
 };
@@ -18,6 +26,10 @@ const EMPTY_FORM: AssumptionForm = {
   emergencyLifestylePct: '',
   benefitMonthlyOverride: '',
   benefitMaxMonthsOverride: '',
+  wwWeeklyRequirement: 'unknown',
+  wwDurationMonths: '',
+  wwDurationConfirmedAt: '',
+  severanceMonthlySalaryOverride: '',
   excludedTiers: [],
   countFullJointBalances: false,
 };
@@ -29,6 +41,10 @@ function toForm(value: PlanAssumptions | null): AssumptionForm {
     emergencyLifestylePct: displayPercentage(value.emergencyLifestylePct),
     benefitMonthlyOverride: displayNumber(value.benefitMonthlyOverride),
     benefitMaxMonthsOverride: displayNumber(value.benefitMaxMonthsOverride),
+    wwWeeklyRequirement: value.wwWeeklyRequirement ?? 'unknown',
+    wwDurationMonths: displayNumber(value.wwDurationMonths),
+    wwDurationConfirmedAt: value.wwDurationConfirmedAt ?? '',
+    severanceMonthlySalaryOverride: displayNumber(value.severanceMonthlySalaryOverride),
     excludedTiers: value.excludedTiers ?? [],
     countFullJointBalances: Boolean(value.countFullJointBalances),
   };
@@ -54,6 +70,10 @@ function toInput(form: AssumptionForm): PlanAssumptionsInput {
     emergencyLifestylePct: lifestylePct === null ? null : lifestylePct / 100,
     benefitMonthlyOverride: nullableNumber(form.benefitMonthlyOverride),
     benefitMaxMonthsOverride: nullableNumber(form.benefitMaxMonthsOverride),
+    wwWeeklyRequirement: form.wwWeeklyRequirement,
+    wwDurationMonths: nullableNumber(form.wwDurationMonths),
+    wwDurationConfirmedAt: form.wwDurationConfirmedAt || null,
+    severanceMonthlySalaryOverride: nullableNumber(form.severanceMonthlySalaryOverride),
     excludedTiers: form.excludedTiers.length > 0 ? form.excludedTiers : null,
     countFullJointBalances: form.countFullJointBalances,
   };
@@ -96,6 +116,8 @@ function LiquidityTierFields({
   );
 }
 
+// The groups stay together to preserve the drawer's keyboard and reading order.
+// eslint-disable-next-line max-lines-per-function
 function AssumptionFields({
   form,
   setField,
@@ -143,6 +165,52 @@ function AssumptionFields({
         </span>
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
+        <FormField
+          label="UWV 26-of-36 weeks condition"
+          hint="Employment at this employer alone does not determine WW eligibility"
+        >
+          <SelectInput
+            value={form.wwWeeklyRequirement}
+            onChange={(value) =>
+              setField('wwWeeklyRequirement', value as WwWeeklyRequirementStatus)
+            }
+            options={[
+              { value: 'unknown', label: 'Not confirmed' },
+              { value: 'met', label: 'Yes, I meet it' },
+              { value: 'not_met', label: 'No, I do not meet it' },
+            ]}
+          />
+        </FormField>
+        <FormField
+          label="Confirmed WW duration (months)"
+          hint="Use the duration shown by UWV; blank uses the statutory minimum"
+        >
+          <TextInput
+            type="number"
+            min={0}
+            max={24}
+            value={form.wwDurationMonths}
+            onChange={(value) => setField('wwDurationMonths', value)}
+          />
+        </FormField>
+        <FormField label="WW duration confirmed on">
+          <TextInput
+            type="date"
+            value={form.wwDurationConfirmedAt}
+            onChange={(value) => setField('wwDurationConfirmedAt', value)}
+          />
+        </FormField>
+        <FormField
+          label="Severance monthly salary override"
+          hint="Optional; include fixed allowances used by the statutory calculation"
+        >
+          <TextInput
+            type="number"
+            min={0}
+            value={form.severanceMonthlySalaryOverride}
+            onChange={(value) => setField('severanceMonthlySalaryOverride', value)}
+          />
+        </FormField>
         <FormField label="Monthly benefit override">
           <TextInput
             type="number"
@@ -221,6 +289,10 @@ export function AssumptionsDrawer({
       countFullJointBalances: null,
       benefitMonthlyOverride: null,
       benefitMaxMonthsOverride: null,
+      wwWeeklyRequirement: 'unknown',
+      wwDurationMonths: null,
+      wwDurationConfirmedAt: null,
+      severanceMonthlySalaryOverride: null,
     };
     updateAssumptions.mutate(cleared, { onSuccess: () => setForm(EMPTY_FORM) });
   };

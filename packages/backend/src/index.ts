@@ -20,6 +20,7 @@ import settings from './routes/settings';
 import partner from './routes/partner';
 import bunq from './routes/bunq';
 import plan from './routes/plan';
+import employments from './routes/employments';
 import {
   getCoreReadinessReport,
   getHealthReport,
@@ -75,6 +76,8 @@ app.use('/api/bunq/connection', requireAuth);
 app.use('/api/bunq/sync', requireAuth);
 app.use('/api/bunq/sync/*', requireAuth);
 app.use('/api/plan/*', requireAuth);
+app.use('/api/employments', requireAuth);
+app.use('/api/employments/*', requireAuth);
 
 app.route('/api/savings', savings);
 app.route('/api/investments', investments);
@@ -92,6 +95,7 @@ app.route('/api/settings', settings);
 app.route('/api/partner', partner);
 app.route('/api/bunq', bunq);
 app.route('/api/plan', plan);
+app.route('/api/employments', employments);
 
 if (process.env.NODE_ENV !== 'test') {
   startSessionCleanup();

@@ -34,6 +34,7 @@ export function useAddPayslipForm(baseCurrency: CurrencyCode, existing?: Payslip
     }
 
     return {
+      employmentId: form.employmentId ? Number(form.employmentId) : null,
       month: form.month.trim(),
       date: form.date.trim(),
       gross,

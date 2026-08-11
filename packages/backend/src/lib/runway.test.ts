@@ -4,6 +4,7 @@ import {
   calculateBurn,
   calculateIncomeSupport,
   calculateLiquidityTiers,
+  calculateServiceDuration,
   simulateRunway,
 } from './runway';
 import { baselineIncomeSupport, baselineLiquidAssets } from './__fixtures__/runway';
@@ -101,18 +102,52 @@ describe('runway liquidity and income support', () => {
     expect(support).not.toBeNull();
     expect(support?.taxRateSource).toBe('payslips');
     expect(support?.effectiveTaxRate).toBeCloseTo(0.3);
-    expect(support?.noticeMonthlyNet).toBe(4_550);
-    expect(support?.severanceNet).toBeCloseTo(13_650);
-    expect(support?.benefit?.maxMonths).toBe(9);
-    expect(support?.benefit?.monthlyNetByMonth[0]).toBeCloseTo(3_412.5);
-    expect(support?.benefit?.monthlyNetByMonth[2]).toBeCloseTo(3_185);
+    expect(support.notice.monthlyNet).toBe(4_550);
+    expect(support.severance.net).toBeCloseTo(13_649.24);
+    expect(support.unemployment.durationMonths).toBe(9);
+    expect(support.unemployment.monthlyNetByMonth[0]).toBeCloseTo(3_412.5);
+    expect(support.unemployment.monthlyNetByMonth[2]).toBeCloseTo(3_185);
   });
 
-  test('does not claim support for self-employment or insufficient known tenure', () => {
-    expect(
-      calculateIncomeSupport({ ...baselineIncomeSupport, employmentType: 'self_employed' }),
-    ).toBeNull();
-    expect(calculateIncomeSupport({ ...baselineIncomeSupport, tenureMonths: 5 })).toBeNull();
+  test('keeps components independent when WW is unknown or employment is not eligible', () => {
+    const unknownWw = calculateIncomeSupport({
+      ...baselineIncomeSupport,
+      assumptions: { wwWeeklyRequirement: 'unknown' },
+    });
+    expect(unknownWw.notice.status).toBe('included');
+    expect(unknownWw.severance.status).toBe('included');
+    expect(unknownWw.unemployment.status).toBe('unknown');
+    const selfEmployed = calculateIncomeSupport({
+      ...baselineIncomeSupport,
+      employmentType: 'self_employed',
+    });
+    expect(selfEmployed.notice.status).toBe('not_applicable');
+    expect(selfEmployed.severance.status).toBe('not_applicable');
+  });
+
+  test('derives completed months for display and exact service days for severance', () => {
+    expect(calculateServiceDuration('2024-01-31', '2024-02-29')).toMatchObject({
+      completedMonths: 0,
+      serviceDays: 29,
+    });
+    expect(calculateServiceDuration('2024-01-31', '2024-03-31')).toMatchObject({
+      completedMonths: 2,
+      serviceDays: 60,
+    });
+    const ended = calculateIncomeSupport({
+      ...baselineIncomeSupport,
+      serviceStartDate: '2020-01-01',
+      employmentEndDate: '2022-01-01',
+    });
+    expect(ended.severance.serviceDays).toBe(731);
+  });
+
+  test('attributes Dutch WW caps and daily-wage conversion to official sources', () => {
+    const sourceIds = calculateIncomeSupport(baselineIncomeSupport).sources.map(
+      (source) => source.id,
+    );
+    expect(sourceIds).toContain('uwv-maximum-daily-wage');
+    expect(sourceIds).toContain('uwv-daily-wage-calculation');
   });
 
   test('uses jurisdiction tax fallback when no payslips exist', () => {
@@ -127,9 +162,11 @@ describe('runway ledger', () => {
     const tiers = calculateLiquidityTiers(baselineLiquidAssets);
     const support = calculateIncomeSupport(baselineIncomeSupport);
     const result = simulateRunway(3_600, tiers, support);
-    expect(result.monthsCashOnly).toBeCloseTo((19_700 + 13_650) / 3_600);
+    expect(result.monthsCashOnly).toBeCloseTo((19_700 + support.severance.net) / 3_600);
     expect(result.ledger[0]).toMatchObject({ income: 4_550, drawdown: 0 });
-    expect(result.ledger[0].liquidRemaining).toBeCloseTo(59_106);
+    expect(result.ledger[0].liquidRemaining).toBeCloseTo(
+      19_700 + 9_700 * 0.98 + 18_000 * 0.85 + support.severance.net + 950,
+    );
     expect(result.monthsWithIncomeSupport).toBeGreaterThan(result.monthsAllLiquid);
   });
 
@@ -156,7 +193,11 @@ describe('runway ledger', () => {
     const support = calculateIncomeSupport({
       ...baselineIncomeSupport,
       noticePeriodMonths: 0,
-      assumptions: { benefitMonthlyOverride: 500, benefitMaxMonthsOverride: 2 },
+      assumptions: {
+        ...baselineIncomeSupport.assumptions,
+        benefitMonthlyOverride: 500,
+        benefitMaxMonthsOverride: 2,
+      },
     });
     const result = simulateRunway(
       1_000,

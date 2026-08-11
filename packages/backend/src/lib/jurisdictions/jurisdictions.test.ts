@@ -7,7 +7,9 @@ describe('effective-dated jurisdiction rules', () => {
     expect(resolveRule(nlJurisdiction.safeWithdrawalRate, '2025-06-01')).toEqual({
       value: 0.0282,
       effectiveFrom: '2025-01-01',
+      effectiveTo: '2025-12-31',
       isExtrapolated: false,
+      source: null,
     });
     expect(
       resolveRule(nlJurisdiction.unemploymentBenefit!, '2026-06-30').value.maximumDailyWage,
