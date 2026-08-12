@@ -15,7 +15,7 @@ export function RunwayLedgerChart({
       data={ledger}
       dataKey="liquidRemaining"
       xKey="month"
-      color="#4f46e5"
+      color="var(--brand)"
       formatValue={fmtBase}
       formatYAxis={(value) => fmtBase(value)}
       emptyMessage="Complete employment setup to add the benefit-adjusted ledger."

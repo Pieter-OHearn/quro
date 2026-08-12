@@ -825,9 +825,9 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
         </p>
       </div>
 
-      <div className="mb-8 border-t border-slate-100 pt-6">
-        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          <MapPin size={14} className="text-indigo-500" />
+      <div className="mb-8 border-t border-border-subtle pt-6">
+        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+          <MapPin size={14} className="text-brand" />
           Planning jurisdiction
         </p>
         <div className="grid gap-3 md:grid-cols-3">
@@ -844,24 +844,24 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
                 type="button"
                 onClick={() => setSelectedJurisdiction(code)}
                 className={cn(
-                  'rounded-2xl border px-4 py-4 text-left transition-all',
+                  'rounded-2xl border px-4 py-4 text-left transition-all duration-base ease-standard',
                   isSelected
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50',
+                    ? 'border-brand-border bg-brand-soft text-brand-fg shadow-brand'
+                    : 'border-border-default bg-surface text-fg-muted hover:border-brand-border hover:bg-surface-sunken',
                 )}
               >
                 <div className="flex items-start gap-3">
                   <div>
                     <p className="text-sm font-semibold">{labels[code].name}</p>
-                    <p className="mt-1 text-xs text-slate-400">{labels[code].note}</p>
+                    <p className="mt-1 text-xs text-fg-faint">{labels[code].note}</p>
                   </div>
-                  {isSelected ? <Check size={16} className="ml-auto text-indigo-600" /> : null}
+                  {isSelected ? <Check size={16} className="ml-auto text-brand" /> : null}
                 </div>
               </button>
             );
           })}
         </div>
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-fg-subtle">
           Planning rules are independent from the currency used to display balances.
         </p>
       </div>

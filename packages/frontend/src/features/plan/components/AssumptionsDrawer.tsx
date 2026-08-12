@@ -98,12 +98,12 @@ function LiquidityTierFields({
 }: Readonly<{ excludedTiers: readonly number[]; toggleTier: (tier: number) => void }>) {
   return (
     <fieldset>
-      <legend className="text-sm font-medium text-slate-700">Liquidity included</legend>
+      <legend className="text-sm font-medium text-fg-strong">Liquidity included</legend>
       <div className="mt-2 space-y-2">
         {[1, 2, 3].map((tier) => (
           <label
             key={tier}
-            className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="flex items-center gap-3 rounded-xl border border-border-default px-3 py-2 text-sm"
           >
             <input
               type="checkbox"
@@ -154,7 +154,7 @@ function AssumptionFields({
         />
       </FormField>
       <LiquidityTierFields excludedTiers={form.excludedTiers} toggleTier={toggleTier} />
-      <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm">
+      <label className="flex items-start gap-3 rounded-xl border border-border-default p-3 text-sm">
         <input
           type="checkbox"
           className="mt-0.5"
@@ -162,8 +162,8 @@ function AssumptionFields({
           onChange={(event) => setField('countFullJointBalances', event.target.checked)}
         />
         <span>
-          <span className="font-medium text-slate-800">Count full joint balances</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">
+          <span className="font-medium text-fg-strong">Count full joint balances</span>
+          <span className="mt-1 block text-xs leading-5 text-fg-subtle">
             The default model counts the user's 50% share.
           </span>
         </span>
@@ -272,7 +272,7 @@ function AssumptionActions({
   onApply: () => void;
 }>) {
   return (
-    <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-5">
+    <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-border-subtle pt-5">
       <Button variant="ghost" onClick={onReset} loading={pending}>
         Reset to derived
       </Button>
@@ -330,28 +330,28 @@ export function AssumptionsDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/25" role="presentation">
+    <div className="fixed inset-0 z-50 flex justify-end bg-surface-inverse/25" role="presentation">
       <button
         className="absolute inset-0 cursor-default"
         aria-label="Close assumptions"
         onClick={onClose}
       />
       <aside
-        className="relative h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-2xl"
+        className="relative h-full w-full max-w-lg overflow-y-auto bg-surface p-6 shadow-overlay"
         aria-label="Advanced runway assumptions"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
               Advanced planner
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">Runway assumptions</h2>
+            <h2 className="mt-2 text-xl font-semibold text-fg">Runway assumptions</h2>
           </div>
           <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose}>
             <X size={18} />
           </Button>
         </div>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
+        <p className="mt-3 text-sm leading-6 text-fg-muted">
           Blank values stay derived. Spending uses net cash flow; income tax and pension deductions
           are therefore not counted twice. Severance tax uses the effective payslip rate as a
           planning simplification.
@@ -363,7 +363,7 @@ export function AssumptionsDrawer({
           toggleTier={toggleTier}
         />
         {updateAssumptions.isError ? (
-          <p className="mt-4 text-sm text-rose-600">Assumptions could not be saved.</p>
+          <p className="mt-4 text-sm text-danger-fg">Assumptions could not be saved.</p>
         ) : null}
         <AssumptionActions
           pending={updateAssumptions.isPending}

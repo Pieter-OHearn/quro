@@ -44,21 +44,21 @@ export function EmploymentCard({
   const [editing, setEditing] = useState(false);
   return (
     <>
-      <Card className="border-indigo-100 bg-indigo-50/40">
+      <Card className="border-brand-border bg-brand-soft/40">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-white p-2 text-indigo-600 shadow-sm">
+            <div className="rounded-xl bg-surface p-2 text-brand shadow-card">
               <BriefcaseBusiness size={20} />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-fg">
                 Employment
               </p>
-              <h2 className="mt-1 font-semibold text-slate-900">
+              <h2 className="mt-1 font-semibold text-fg">
                 {employment?.employerName || 'Add your current employment'}
               </h2>
               {employment ? (
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fg-muted">
                   <span className="capitalize">{employment.employmentType.replace('_', '-')}</span>
                   <span className="inline-flex items-center gap-1">
                     <CalendarDays size={14} /> {tenureLabel(employment, asOf)} tenure
@@ -73,7 +73,7 @@ export function EmploymentCard({
                   </span>
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-fg-muted">
                   One record powers Salary, notice pay, and severance calculations.
                 </p>
               )}

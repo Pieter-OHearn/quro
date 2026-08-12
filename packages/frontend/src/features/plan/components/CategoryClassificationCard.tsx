@@ -33,10 +33,10 @@ function ClassificationRows({
   setClasses: Dispatch<SetStateAction<Record<number, ExpenseClass>>>;
 }>) {
   return (
-    <div className="mt-5 divide-y divide-slate-100 border-t border-slate-100">
+    <div className="mt-5 divide-y divide-border-subtle border-t border-border-subtle">
       {categories.map((category) => (
         <div key={category.id} className="flex items-center justify-between gap-4 py-3">
-          <span className="text-sm font-medium text-slate-700">
+          <span className="text-sm font-medium text-fg-strong">
             {category.emoji} {category.name}
           </span>
           <SelectInput
@@ -94,27 +94,27 @@ export function CategoryClassificationCard({
 
   if (categoriesQuery.isPending || categories.length === 0) return null;
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border-default">
       <details>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
           <span className="flex items-center gap-3">
-            <span className="rounded-xl bg-slate-100 p-2 text-slate-600">
+            <span className="rounded-xl bg-surface-muted p-2 text-fg-muted">
               <Tags size={18} />
             </span>
             <span>
-              <span className="block font-semibold text-slate-900">Review spending classes</span>
-              <span className="mt-0.5 block text-xs text-slate-500">
+              <span className="block font-semibold text-fg">Review spending classes</span>
+              <span className="mt-0.5 block text-xs text-fg-subtle">
                 {defaultedCount > 0
                   ? `${defaultedCount} custom categories currently use the conservative essential default.`
                   : 'Mark work-linked spending so it drops out of job-loss burn.'}
               </span>
             </span>
           </span>
-          <span className="text-xs font-semibold text-indigo-600">Review all</span>
+          <span className="text-xs font-semibold text-brand">Review all</span>
         </summary>
         <ClassificationRows categories={categories} classes={classes} setClasses={setClasses} />
         {classify.isError ? (
-          <p className="mt-3 text-sm text-rose-600">Spending classes could not be saved.</p>
+          <p className="mt-3 text-sm text-danger-fg">Spending classes could not be saved.</p>
         ) : null}
         <div className="mt-4 flex justify-end">
           <Button onClick={() => classify.mutate()} loading={classify.isPending}>

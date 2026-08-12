@@ -46,7 +46,7 @@ function NetWorthBadge({
         </span>
       </div>
       {isEstimated ? (
-        <p className="mt-2 text-[10px] text-indigo-200">
+        <p className="mt-2 text-[10px] text-fg-inverted/80">
           Includes estimated historical rates or prices
         </p>
       ) : null}

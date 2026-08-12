@@ -73,11 +73,9 @@ export function Plan() {
     <PageStack as="main">
       <ContentSection className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-600">Plan</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-            Financial resilience
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand">Plan</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-fg">Financial resilience</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-muted">
             A derived planning view built from the balances, spending, and income already in Quro.
           </p>
         </div>
@@ -107,12 +105,12 @@ export function Plan() {
         onReview={() => setBankingReviewOpen(true)}
       />
       {data.incomeSupport.unemployment.status === 'unknown' ? (
-        <p className="text-xs leading-5 text-slate-500">
+        <p className="text-xs leading-5 text-fg-subtle">
           {unemploymentSupportLabel(data.jurisdiction.code)} is not included yet:{' '}
           {data.incomeSupport.unemployment.reason}
         </p>
       ) : null}
-      <p className="text-xs leading-5 text-slate-400">{RUNWAY_CITATIONS.advice}</p>
+      <p className="text-xs leading-5 text-fg-faint">{RUNWAY_CITATIONS.advice}</p>
       <AssumptionsDrawer
         open={drawerOpen}
         assumptions={assumptionsQuery.data ?? null}

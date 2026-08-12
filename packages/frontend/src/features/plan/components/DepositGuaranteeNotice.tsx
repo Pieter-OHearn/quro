@@ -60,19 +60,19 @@ export function DepositGuaranteeNotice({
   ) : null;
 
   const exposureNotice = hasExcess ? (
-    <Card className="border-amber-200 bg-amber-50/70">
+    <Card className="border-warning-border bg-warning-soft/70">
       <div className="flex gap-3">
-        <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={20} />
+        <AlertTriangle className="mt-0.5 shrink-0 text-warning" size={20} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="font-semibold text-amber-950">Deposit guarantee review</h2>
+            <h2 className="font-semibold text-fg">Deposit guarantee review</h2>
             <Button variant="ghost" size="sm" onClick={onReview}>
               Review banks
             </Button>
           </div>
           <div className="mt-3 space-y-2">
             {atRisk.map((entry) => (
-              <p key={`${entry.entityId ?? entry.entityName}`} className="text-sm text-amber-900">
+              <p key={`${entry.entityId ?? entry.entityName}`} className="text-sm text-fg-strong">
                 <span className="font-semibold">{entry.entityName}:</span>{' '}
                 {exposureMessage(entry, fmtBase)}
               </p>
