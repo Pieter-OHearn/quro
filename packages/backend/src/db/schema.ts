@@ -865,6 +865,7 @@ export const budgetCategories = pgTable(
     month: text('month').notNull(),
     year: integer('year').notNull(),
     expenseClass: text('expense_class').notNull().default('essential'),
+    expenseClassConfirmed: boolean('expense_class_confirmed').notNull().default(false),
   },
   (table) => ({
     userIdx: index('budget_categories_user_id_idx').on(table.userId),

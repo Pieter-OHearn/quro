@@ -12,6 +12,7 @@ import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { hasPostgresErrorCode } from '../lib/postgresErrors';
+import { CATEGORY_PRESETS } from '../services/bunqCategoryRules';
 import {
   err,
   ok,
@@ -205,6 +206,9 @@ function toBudgetCategoryInsertValues(
   payload: BudgetCategoryPayload,
   userId: number,
 ): BudgetCategoryInsert {
+  const preset = Object.hasOwn(CATEGORY_PRESETS, payload.name)
+    ? CATEGORY_PRESETS[payload.name]
+    : undefined;
   return {
     userId,
     name: payload.name,
@@ -214,6 +218,8 @@ function toBudgetCategoryInsertValues(
     color: payload.color,
     month: payload.month,
     year: payload.year,
+    expenseClass: preset?.expenseClass ?? 'essential',
+    expenseClassConfirmed: Boolean(preset),
   };
 }
 
@@ -315,7 +321,7 @@ function classifyBudgetCategories(
       if (!category) return null;
       const rows = await tx
         .update(budgetCategories)
-        .set({ expenseClass: update.expenseClass })
+        .set({ expenseClass: update.expenseClass, expenseClassConfirmed: true })
         .where(and(eq(budgetCategories.userId, userId), eq(budgetCategories.name, category.name)))
         .returning();
       updatedRows.push(...rows);

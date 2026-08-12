@@ -3,13 +3,14 @@ import { Hono } from 'hono';
 import {
   SAVINGS_ACCOUNT_TYPES,
   SAVINGS_TRANSACTION_TYPES,
+  isJurisdictionCode,
   type BankingEntityConfirmationInput,
   type SavingsAccountType,
   type SavingsTransactionType,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
-import { savingsAccounts, savingsTransactions } from '../db/schema';
+import { savingsAccounts, savingsTransactions, users } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import {
   BANKING_ENTITIES,
@@ -46,6 +47,14 @@ import {
 } from '../lib/requestValidation';
 
 const app = new Hono();
+
+async function getUserJurisdiction(userId: number) {
+  const [user] = await db
+    .select({ jurisdiction: users.jurisdiction })
+    .from(users)
+    .where(eq(users.id, userId));
+  return isJurisdictionCode(user?.jurisdiction) ? user.jurisdiction : 'GENERIC';
+}
 
 const SAVINGS_ACCOUNT_FIELDS = [
   'name',
@@ -419,17 +428,21 @@ app.get('/accounts', async (c) => {
   return c.json({ data });
 });
 
-app.get('/banking-entities', (c) =>
-  c.json({
-    data: BANKING_ENTITIES.map(({ id, name, scheme, cap, currency }) => ({
-      id,
-      name,
-      scheme,
-      cap,
-      currency,
-    })),
-  }),
-);
+app.get('/banking-entities', async (c) => {
+  const user = getAuthUser(c);
+  const jurisdiction = await getUserJurisdiction(user.id);
+  return c.json({
+    data: BANKING_ENTITIES.filter((entity) => entity.jurisdictions.includes(jurisdiction)).map(
+      ({ id, name, scheme, cap, currency }) => ({
+        id,
+        name,
+        scheme,
+        cap,
+        currency,
+      }),
+    ),
+  });
+});
 
 app.get('/accounts/:id', async (c) => {
   const user = getAuthUser(c);
@@ -530,6 +543,13 @@ app.patch('/accounts/:id/banking-entity', async (c) => {
   } else if (parsed.value.mode === 'known') {
     const entity = getBankingEntity(parsed.value.entityId);
     if (!entity) return c.json({ error: 'Unknown banking entity' }, HTTP_STATUS.BAD_REQUEST);
+    const jurisdiction = await getUserJurisdiction(user.id);
+    if (!entity.jurisdictions.includes(jurisdiction)) {
+      return c.json(
+        { error: 'Banking entity is unavailable in your jurisdiction' },
+        HTTP_STATUS.BAD_REQUEST,
+      );
+    }
     confirmation = {
       bankingEntityId: entity.id,
       bankingEntityName: entity.name,

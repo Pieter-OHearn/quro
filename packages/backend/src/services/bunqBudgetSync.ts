@@ -207,7 +207,8 @@ export async function findOrCreateCategoryByName(
 
   if (existing) return existing.id;
 
-  const preset = CATEGORY_PRESETS[name] ?? DEFAULT_CATEGORY_PRESET;
+  const categoryPreset = Object.hasOwn(CATEGORY_PRESETS, name) ? CATEGORY_PRESETS[name] : undefined;
+  const preset = categoryPreset ?? DEFAULT_CATEGORY_PRESET;
   const template = await findLatestCategoryTemplate(tx, userId, name);
   const [inserted] = await tx
     .insert(budgetCategories)
@@ -220,6 +221,8 @@ export async function findOrCreateCategoryByName(
       color: template?.color ?? preset.color,
       month,
       year,
+      expenseClass: preset.expenseClass,
+      expenseClassConfirmed: categoryPreset !== undefined,
     })
     .onConflictDoUpdate({
       target: [

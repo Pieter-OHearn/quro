@@ -56,7 +56,6 @@ import {
   type FieldParsers,
   type ParseResult,
 } from '../lib/requestValidation';
-import { CATEGORY_PRESETS } from '../services/bunqCategoryRules';
 
 const app = new Hono();
 const ISO_DATE_LENGTH = 10;
@@ -218,7 +217,7 @@ function buildBudgetInputs(
       (month) => spendByNameMonth.get(category.name)?.get(month) ?? 0,
     ),
     currentBudgeted: toNumber(category.budgeted),
-    wasDefaultClassified: !(category.name in CATEGORY_PRESETS),
+    wasDefaultClassified: !category.expenseClassConfirmed,
   }));
 }
 

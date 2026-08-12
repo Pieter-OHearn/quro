@@ -326,6 +326,24 @@ describe('plan integration', () => {
 
   test('validates plan inputs and classifies a category name across months', async () => {
     const owner = await integration.signUp('runway-validation');
+    const preset = await readData<BudgetCategory>(
+      await integration.request('/api/budget/categories', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          name: 'Restaurants & Bars',
+          emoji: '🍽️',
+          budgeted: 150,
+          spent: 0,
+          color: '#f97316',
+          month: 'Jun',
+          year: 2026,
+        },
+      }),
+      201,
+    );
+    expect(preset).toMatchObject({ expenseClass: 'discretionary', expenseClassConfirmed: true });
+
     const invalid = await integration.request('/api/employments', {
       method: 'POST',
       cookie: owner.cookie,
@@ -360,6 +378,7 @@ describe('plan integration', () => {
         }),
         201,
       );
+      expect(category.expenseClassConfirmed).toBe(false);
       ids.push(category.id);
     }
     const classified = await readData<BudgetCategory[]>(
@@ -373,6 +392,67 @@ describe('plan integration', () => {
     expect(classified.every((category) => category.expenseClass === 'employment_linked')).toBe(
       true,
     );
+    expect(classified.every((category) => category.expenseClassConfirmed)).toBe(true);
+  });
+
+  test('scopes known banking entities to the current jurisdiction and invalidates old confirmations', async () => {
+    const owner = await integration.signUp('banking-entity-jurisdiction');
+    const account = await readData<SavingsAccount>(
+      await integration.request('/api/savings/accounts', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          name: 'International reserve',
+          bank: 'bunq',
+          balance: 25_000,
+          currency: 'EUR',
+          interestRate: 2,
+          accountType: 'Easy Access',
+          color: '#334155',
+          emoji: '🏦',
+          isJoint: false,
+        },
+      }),
+      201,
+    );
+    await readData<SavingsAccount>(
+      await integration.request(`/api/savings/accounts/${account.id}/banking-entity`, {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: { mode: 'known', entityId: 'bunq' },
+      }),
+    );
+    await readData(
+      await integration.request('/api/settings/preferences', {
+        method: 'PUT',
+        cookie: owner.cookie,
+        json: { baseCurrency: 'AUD', numberFormat: 'en-US', jurisdiction: 'AU' },
+      }),
+    );
+
+    const entities = await readData<Array<{ id: string }>>(
+      await integration.request('/api/savings/banking-entities', { cookie: owner.cookie }),
+    );
+    expect(entities.some((entity) => entity.id === 'bunq')).toBe(false);
+    expect(entities.some((entity) => entity.id === 'cba-au')).toBe(true);
+    const rejected = await integration.request(
+      `/api/savings/accounts/${account.id}/banking-entity`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: { mode: 'known', entityId: 'bunq' },
+      },
+    );
+    expect(rejected.status).toBe(400);
+
+    const runway = await readData<RunwayResponse>(
+      await integration.request('/api/plan/runway', { cookie: owner.cookie }),
+    );
+    expect(runway.depositGuarantee[0]).toMatchObject({
+      entityId: null,
+      confidence: 'unverified',
+      accountIds: [account.id],
+    });
   });
 
   test('lets users resolve banking entities and clears stale confirmations after a rename', async () => {

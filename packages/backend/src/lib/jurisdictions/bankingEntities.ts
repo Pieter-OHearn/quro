@@ -275,7 +275,7 @@ export function resolveBankingEntity(
 ): BankingEntityResolution {
   if (confirmed?.entityId) {
     const known = getBankingEntity(confirmed.entityId);
-    if (known) {
+    if (known?.jurisdictions.includes(jurisdiction)) {
       return {
         entityId: known.id,
         entityName: known.name,
@@ -286,7 +286,7 @@ export function resolveBankingEntity(
         confidence: 'verified',
       };
     }
-    if (confirmed.entityName && confirmed.scheme && confirmed.cap && confirmed.currency) {
+    if (!known && confirmed.entityName && confirmed.scheme && confirmed.cap && confirmed.currency) {
       return {
         entityId: confirmed.entityId,
         entityName: confirmed.entityName,

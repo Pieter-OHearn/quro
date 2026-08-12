@@ -58,8 +58,13 @@ export type BudgetStats = {
   pieData: PieEntry[];
 };
 
-export type CreateBudgetCategoryInput = Omit<SharedBudgetCategory, 'id' | 'expenseClass'>;
-export type UpdateBudgetCategoryInput = { id: number } & Partial<Omit<SharedBudgetCategory, 'id'>>;
+export type CreateBudgetCategoryInput = Omit<
+  SharedBudgetCategory,
+  'id' | 'expenseClass' | 'expenseClassConfirmed'
+>;
+export type UpdateBudgetCategoryInput = { id: number } & Partial<
+  Omit<SharedBudgetCategory, 'id' | 'expenseClassConfirmed'>
+>;
 
 export type EditCategoryForm = {
   name: string;

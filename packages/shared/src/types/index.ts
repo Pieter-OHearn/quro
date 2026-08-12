@@ -644,6 +644,7 @@ export type BudgetCategory = {
   month: BudgetMonth;
   year: number;
   expenseClass: ExpenseClass;
+  expenseClassConfirmed: boolean;
 };
 
 export type BudgetTransaction = {

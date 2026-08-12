@@ -17,6 +17,10 @@ const bankingEntityCapMigration = readFileSync(
   new URL('./migrations/0028_sudden_living_lightning.sql', import.meta.url),
   'utf8',
 );
+const classificationConfirmationMigration = readFileSync(
+  new URL('./migrations/0029_track_expense_class_confirmation.sql', import.meta.url),
+  'utf8',
+);
 
 describe('wealth planning migration', () => {
   test('creates the planning and snapshot schema', () => {
@@ -57,5 +61,12 @@ describe('wealth planning migration', () => {
     }
     expect(migration).toContain('SET "expense_class" = \'essential\'');
     expect(migration).not.toContain('SET "expense_class" = \'employment_linked\'');
+  });
+
+  test('preserves which existing categories have an explicit preset classification', () => {
+    expect(classificationConfirmationMigration).toContain('ADD COLUMN "expense_class_confirmed"');
+    expect(classificationConfirmationMigration).toContain('"expense_class_confirmed" = true');
+    expect(classificationConfirmationMigration).toContain("'Restaurants & Bars'");
+    expect(classificationConfirmationMigration).toContain("'Uncategorised'");
   });
 });

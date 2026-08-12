@@ -119,6 +119,37 @@ describe('banking entity resolution', () => {
     expect(notCovered).toMatchObject({ total: 10_000, excess: 10_000 });
   });
 
+  test('does not trust a saved known entity outside the user jurisdiction', () => {
+    const [result] = aggregateDepositGuarantees(
+      [
+        {
+          id: 44,
+          bank: 'bunq',
+          amount: 50_000,
+          currency: 'EUR',
+          isJoint: false,
+          confirmedEntity: {
+            entityId: 'bunq',
+            entityName: 'bunq B.V.',
+            scheme: 'Nederlandse Depositogarantie',
+            cap: 100_000,
+            currency: 'EUR',
+          },
+        },
+      ],
+      250_000,
+      'Australian Financial Claims Scheme (AUD deposits only)',
+      'AU',
+      ['AUD'],
+    );
+
+    expect(result).toMatchObject({
+      entityId: null,
+      confidence: 'unverified',
+      accountIds: [44],
+    });
+  });
+
   test('converts an Australian entity cap into the calculation currency', () => {
     const [result] = aggregateDepositGuarantees(
       [{ bank: 'CommBank', amount: 160_000, currency: 'AUD', isJoint: false }],

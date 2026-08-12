@@ -498,6 +498,7 @@ function buildRollingMonths() {
     cutoff: number;
     asOfDate: string;
     snapshotDate: string;
+    isCurrent: boolean;
     label: string;
     year: number;
   }> = [];
@@ -508,6 +509,7 @@ function buildRollingMonths() {
       cutoff,
       asOfDate: new Date(cutoff).toISOString().slice(0, ISO_DATE_LENGTH),
       snapshotDate: new Date(monthEndUtc(month)).toISOString().slice(0, ISO_DATE_LENGTH),
+      isCurrent: month === currentMonth,
       label: formatMonthShort(month),
       year: new Date(month).getUTCFullYear(),
     });
@@ -874,7 +876,9 @@ function buildNetWorthHistoryPoint(
   month: ReturnType<typeof buildRollingMonths>[number],
   index: number,
 ): NetWorthHistoryPoint {
-  const snapshot = context.snapshotByDate.get(month.snapshotDate);
+  // Current-month snapshots can predate a price sync or direct holding edit.
+  // Rebuild that point from source data; completed months remain immutable snapshots.
+  const snapshot = month.isCurrent ? undefined : context.snapshotByDate.get(month.snapshotDate);
   if (snapshot) {
     return {
       id: index + 1,

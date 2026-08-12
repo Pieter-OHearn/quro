@@ -125,6 +125,47 @@ describe('dashboard debt integration helpers', () => {
     expect(previousPoint?.totalValue).toBe(500);
   });
 
+  test('rebuilds the current month while retaining completed-month snapshots', () => {
+    const now = new Date();
+    const currentSnapshotDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0))
+      .toISOString()
+      .slice(0, 10);
+    const previousSnapshotDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0))
+      .toISOString()
+      .slice(0, 10);
+    const history = buildNetWorthHistory({
+      rates: new Map([['EUR', 1]]),
+      savings: [{ id: 1, balance: '500', currency: 'EUR' }] as any,
+      savingsTransactions: [] as any,
+      holdings: [] as any,
+      holdingTransactions: [] as any,
+      properties: [] as any,
+      propertyTransactions: [] as any,
+      pensions: [] as any,
+      pensionTransactions: [] as any,
+      mortgages: [] as any,
+      debts: [] as any,
+      debtPayments: [] as any,
+      snapshots: [
+        {
+          snapshotDate: previousSnapshotDate,
+          totalValue: '125',
+          baseCurrency: 'EUR',
+          isEstimated: false,
+        },
+        {
+          snapshotDate: currentSnapshotDate,
+          totalValue: '1',
+          baseCurrency: 'EUR',
+          isEstimated: false,
+        },
+      ],
+    } as any);
+
+    expect(history.at(-2)?.totalValue).toBe(125);
+    expect(history.at(-1)?.totalValue).toBe(500);
+  });
+
   test('maps debt payments into dashboard activity as debt expenses', () => {
     const activity = buildActivityList(
       [],
