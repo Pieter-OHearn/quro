@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useEffect, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '../../atoms';
 
@@ -15,6 +16,7 @@ export type ModalHeaderProps = {
   subtitleClassName?: string;
   closeButtonClassName?: string;
   closeIconSize?: number;
+  titleId?: string;
 };
 
 export type ModalProps = {
@@ -40,6 +42,71 @@ const MAX_WIDTH_MAP = {
 } as const;
 
 const DEFAULT_CLOSE_ICON_SIZE = 18;
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function getActiveElement(): HTMLElement | null {
+  return typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
+}
+
+function useModalFocusTrap(
+  dialogRef: React.RefObject<HTMLDivElement | null>,
+  returnFocusRef: React.RefObject<HTMLElement | null>,
+  onClose: () => void,
+) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const previouslyFocused = returnFocusRef.current;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusableElements = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (element) => !element.hasAttribute('hidden'),
+      );
+
+    (focusableElements()[0] ?? dialog).focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const elements = focusableElements();
+      if (elements.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      queueMicrotask(() => {
+        if (previouslyFocused && document.body.contains(previouslyFocused)) {
+          previouslyFocused.focus();
+        }
+      });
+    };
+  }, [dialogRef, returnFocusRef]);
+}
 
 export function ModalHeader({
   title,
@@ -54,6 +121,7 @@ export function ModalHeader({
   subtitleClassName,
   closeButtonClassName,
   closeIconSize = DEFAULT_CLOSE_ICON_SIZE,
+  titleId,
 }: ModalHeaderProps) {
   const isCentered = align === 'center';
 
@@ -70,6 +138,7 @@ export function ModalHeader({
         <>
           <button
             type="button"
+            aria-label="Close dialog"
             onClick={onClose}
             className={cn(
               'absolute top-4 right-4 p-2 rounded-xl hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
@@ -80,7 +149,9 @@ export function ModalHeader({
           </button>
           <div className={cn('min-w-0 flex flex-col items-center', contentClassName)}>
             {visual}
-            <h2 className={cn('font-bold text-fg-inverted', titleClassName)}>{title}</h2>
+            <h2 id={titleId} className={cn('font-bold text-fg-inverted', titleClassName)}>
+              {title}
+            </h2>
             {subtitle && (
               <p className={cn('text-xs text-brand-border mt-0.5', subtitleClassName)}>
                 {subtitle}
@@ -92,7 +163,9 @@ export function ModalHeader({
         <>
           <div className={cn('min-w-0 pr-4', contentClassName)}>
             {visual}
-            <h2 className={cn('font-bold text-fg-inverted', titleClassName)}>{title}</h2>
+            <h2 id={titleId} className={cn('font-bold text-fg-inverted', titleClassName)}>
+              {title}
+            </h2>
             {subtitle && (
               <p className={cn('text-xs text-brand-border mt-0.5', subtitleClassName)}>
                 {subtitle}
@@ -101,6 +174,7 @@ export function ModalHeader({
           </div>
           <button
             type="button"
+            aria-label="Close dialog"
             onClick={onClose}
             className={cn(
               'p-2 rounded-xl hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
@@ -129,6 +203,11 @@ export function Modal({
   contentClassName,
   bodyClassName,
 }: ModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(getActiveElement());
+  useModalFocusTrap(dialogRef, returnFocusRef, onClose);
+
   return (
     <div className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4">
       <div
@@ -139,6 +218,7 @@ export function Modal({
         onClick={onClose}
       />
       <div
+        ref={dialogRef}
         className={cn(
           'relative bg-surface rounded-2xl shadow-overlay w-full overflow-hidden',
           MAX_WIDTH_MAP[maxWidth],
@@ -147,6 +227,9 @@ export function Modal({
         )}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={header ? undefined : titleId}
+        aria-label={header ? (typeof title === 'string' ? title : 'Dialog') : undefined}
+        tabIndex={-1}
       >
         {header ?? (
           <ModalHeader
@@ -154,6 +237,7 @@ export function Modal({
             subtitle={subtitle}
             onClose={onClose}
             scrollable={scrollable}
+            titleId={titleId}
             {...headerProps}
           />
         )}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Payslip } from '@quro/shared';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
+import { EmploymentCard, selectCurrentEmployment, useEmployments } from '@/features/employment';
 import { LoadingState, SegmentedControl } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
@@ -30,6 +31,7 @@ import type { SavePayslipInput } from './types';
 function useSalaryData() {
   const payslipsQuery = usePayslips();
   const salaryHistoryQuery = useSalaryHistory();
+  const employmentsQuery = useEmployments();
   const createPayslip = useCreatePayslip();
   const updatePayslip = useUpdatePayslip();
   const deletePayslip = useDeletePayslip();
@@ -37,13 +39,16 @@ function useSalaryData() {
   return {
     payslips: payslipsQuery.data ?? [],
     salaryHistory: salaryHistoryQuery.data ?? [],
+    employments: employmentsQuery.data ?? [],
     createPayslip,
     updatePayslip,
     deletePayslip,
-    isLoading: payslipsQuery.isLoading || salaryHistoryQuery.isLoading,
+    isLoading:
+      payslipsQuery.isLoading || salaryHistoryQuery.isLoading || employmentsQuery.isLoading,
     queryFailures: getFailedRouteQueries([
       { label: 'payslips', ...payslipsQuery },
       { label: 'salary history', ...salaryHistoryQuery },
+      { label: 'employment details', ...employmentsQuery },
     ]),
   };
 }
@@ -59,6 +64,7 @@ function useSalaryPageState() {
   const {
     payslips,
     salaryHistory,
+    employments,
     createPayslip,
     updatePayslip,
     deletePayslip,
@@ -127,6 +133,7 @@ function useSalaryPageState() {
     salaryChartData,
     salaryGrowthPct,
     yearPayslips,
+    employments,
   };
 }
 
@@ -154,6 +161,7 @@ function SalaryPageContent({
           onSave={onSave}
           onDelete={onDelete}
           baseCurrency={state.baseCurrency}
+          employments={state.employments}
         />
       )}
 
@@ -174,6 +182,8 @@ function SalaryPageContent({
           buttonClassName="px-5 font-semibold"
         />
       </div>
+
+      <EmploymentCard employment={selectCurrentEmployment(state.employments)} />
 
       <SalaryStatsCards cards={state.statCards} />
 

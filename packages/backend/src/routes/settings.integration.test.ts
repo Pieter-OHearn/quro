@@ -24,6 +24,7 @@ type PublicUser = {
   age: number;
   retirementAge: number;
   baseCurrency: string;
+  jurisdiction: string;
   numberFormat: string;
   passwordUpdatedAt: string | null;
 };
@@ -70,6 +71,7 @@ describe('settings integration', () => {
       age: 42,
       retirementAge: 68,
       baseCurrency: 'EUR',
+      jurisdiction: 'GENERIC',
       numberFormat: 'en-US',
     });
     expect(body.data.passwordUpdatedAt).toBeNull();
@@ -197,6 +199,7 @@ describe('settings integration', () => {
     const currencyBody = await parseJson<ApiDataResponse<PublicUser>>(currencyResponse, 200);
     expect(currencyBody.data).toMatchObject({
       baseCurrency: 'GBP',
+      jurisdiction: 'GENERIC',
       numberFormat: 'en-US',
     });
 
@@ -221,12 +224,14 @@ describe('settings integration', () => {
       cookie: owner.cookie,
       json: {
         baseCurrency: 'USD',
+        jurisdiction: 'NL',
         numberFormat: 'en-US',
       },
     });
     const bothBody = await parseJson<ApiDataResponse<PublicUser>>(bothResponse, 200);
     expect(bothBody.data).toMatchObject({
       baseCurrency: 'USD',
+      jurisdiction: 'NL',
       numberFormat: 'en-US',
     });
   });
@@ -249,6 +254,10 @@ describe('settings integration', () => {
       {
         payload: { numberFormat: 'fr-FR' },
         expectedError: 'Choose a valid number format',
+      },
+      {
+        payload: { jurisdiction: 'BE' },
+        expectedError: 'Choose a valid jurisdiction',
       },
     ];
 

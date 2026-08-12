@@ -11,6 +11,7 @@ import { Budget } from '@/features/budget';
 import { Pension } from '@/features/pension';
 import { LandingPage } from '@/features/landing';
 import { Settings } from '@/features/settings';
+import { Plan } from '@/features/plan';
 import { useAuth } from '@/lib/AuthContext';
 import { RouteErrorScreen } from '@/router/RouteErrorScreen';
 
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
     ErrorBoundary: RouteErrorScreen,
     children: [
       { index: true, Component: Dashboard },
+      { path: 'plan', Component: Plan },
       { path: 'savings', Component: Savings },
       { path: 'investments', Component: Investments },
       { path: 'mortgage', Component: Mortgage },

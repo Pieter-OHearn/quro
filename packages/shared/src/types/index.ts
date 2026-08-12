@@ -1,3 +1,7 @@
+import type { JurisdictionCode } from './jurisdiction.js';
+
+export * from './jurisdiction.js';
+
 export const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
 
 export type CurrencyCode = (typeof CURRENCY_CODES)[number];
@@ -59,6 +63,7 @@ export type User = {
   age: number;
   retirementAge: number;
   baseCurrency: CurrencyCode;
+  jurisdiction: import('./jurisdiction.js').JurisdictionCode;
   numberFormat: NumberFormatPreference;
   passwordUpdatedAt: string | null;
   createdAt: string;
@@ -76,6 +81,7 @@ export type UpdateUserProfileInput = {
 export type UpdateUserPreferencesInput = {
   baseCurrency?: CurrencyCode;
   numberFormat?: NumberFormatPreference;
+  jurisdiction?: import('./jurisdiction.js').JurisdictionCode;
 };
 
 export type UpdateUserPasswordInput = {
@@ -112,6 +118,12 @@ export type SavingsAccount = {
   id: number;
   name: string;
   bank: string;
+  bankingEntityId?: string | null;
+  bankingEntityName?: string | null;
+  depositGuaranteeScheme?: string | null;
+  depositGuaranteeCap?: number | null;
+  depositGuaranteeCurrency?: CurrencyCode | null;
+  bankingEntityConfirmedAt?: string | null;
   balance: number;
   currency: CurrencyCode;
   interestRate: number;
@@ -123,6 +135,25 @@ export type SavingsAccount = {
   userId?: number;
   archivedAt?: string | null;
 };
+
+export type BankingEntityOption = {
+  id: string;
+  name: string;
+  scheme: string;
+  cap: number;
+  currency: CurrencyCode;
+};
+
+export type BankingEntityConfirmationInput =
+  | { mode: 'known'; entityId: string }
+  | {
+      mode: 'manual';
+      entityName: string;
+      scheme: string;
+      cap: number;
+      currency: CurrencyCode;
+    }
+  | { mode: 'clear' };
 
 export const SAVINGS_TRANSACTION_TYPES = ['deposit', 'withdrawal', 'interest'] as const;
 export type SavingsTransactionType = (typeof SAVINGS_TRANSACTION_TYPES)[number];
@@ -538,6 +569,7 @@ export type DebtPayment = {
 
 export type Payslip = {
   id: number;
+  employmentId: number | null;
   month: string;
   date: string;
   gross: number;
@@ -611,6 +643,8 @@ export type BudgetCategory = {
   color: string;
   month: BudgetMonth;
   year: number;
+  expenseClass: ExpenseClass;
+  expenseClassConfirmed: boolean;
 };
 
 export type BudgetTransaction = {
@@ -633,6 +667,184 @@ export type NetWorthSnapshot = {
   year: number;
   totalValue: number;
   currency: CurrencyCode;
+  isEstimated: boolean;
+};
+
+export const EXPENSE_CLASSES = ['essential', 'discretionary', 'employment_linked'] as const;
+export type ExpenseClass = (typeof EXPENSE_CLASSES)[number];
+
+export const EMPLOYMENT_TYPES = ['employed', 'self_employed', 'other'] as const;
+export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
+
+export type Employment = {
+  id: number;
+  employerName: string | null;
+  employmentType: EmploymentType;
+  serviceStartDate: string | null;
+  endDate: string | null;
+  noticePeriodMonths: number | null;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EmploymentInput = {
+  employerName: string;
+  employmentType: EmploymentType;
+  serviceStartDate: string | null;
+  endDate: string | null;
+  noticePeriodMonths: number | null;
+  isPrimary: boolean;
+};
+
+export type EmploymentPatch = Partial<EmploymentInput>;
+
+export const WW_WEEKLY_REQUIREMENT_STATUSES = ['unknown', 'met', 'not_met'] as const;
+export type WwWeeklyRequirementStatus = (typeof WW_WEEKLY_REQUIREMENT_STATUSES)[number];
+
+export type PlanAssumptions = {
+  id: number;
+  userId: number;
+  leanBurnOverride: number | null;
+  emergencyLifestylePct: number | null;
+  excludedTiers: number[] | null;
+  countFullJointBalances: boolean | null;
+  benefitMonthlyOverride: number | null;
+  benefitMaxMonthsOverride: number | null;
+  wwWeeklyRequirement: WwWeeklyRequirementStatus | null;
+  wwDurationMonths: number | null;
+  wwDurationConfirmedAt: string | null;
+  severanceMonthlySalaryOverride: number | null;
+  updatedAt: string;
+};
+
+export type PlanAssumptionsInput = Partial<Omit<PlanAssumptions, 'id' | 'userId' | 'updatedAt'>>;
+
+export type RunwayBurnSource = 'envelopes' | 'envelopes_partial' | 'derived_cashflow';
+export type RunwayBand = 'critical' | 'building' | 'resilient';
+export type CalculationComponentStatus = 'included' | 'unknown' | 'not_applicable' | 'excluded';
+
+export type CalculationRuleSource = {
+  id: string;
+  title: string;
+  publisher: string;
+  url: string;
+  reviewedAt: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isExtrapolated: boolean;
+};
+
+export type IncomeSupportCalculation = {
+  effectiveTaxRate: number;
+  taxRateSource: 'payslips' | 'jurisdiction_default';
+  salaryBasis: {
+    status: 'linked_payslips' | 'unlinked_fallback' | 'missing';
+    payslipId: number | null;
+    payslipDate: string | null;
+    monthlyGross: number;
+    monthlyNet: number;
+    currency: CurrencyCode;
+    note: string;
+  };
+  notice: {
+    status: CalculationComponentStatus;
+    months: number | null;
+    monthlyNet: number;
+    totalNet: number;
+    reason: string;
+  };
+  severance: {
+    status: CalculationComponentStatus;
+    serviceStartDate: string | null;
+    serviceDays: number | null;
+    serviceYears: number | null;
+    monthlyGross: number;
+    gross: number;
+    net: number;
+    cap: number | null;
+    reason: string;
+  };
+  unemployment: {
+    status: CalculationComponentStatus;
+    weeklyRequirement: WwWeeklyRequirementStatus;
+    durationMonths: number | null;
+    durationConfirmedAt: string | null;
+    durationSource: 'confirmed' | 'minimum' | 'override' | 'unknown';
+    monthlyNetByMonth: number[];
+    unverifiedConditions: string[];
+    reason: string;
+  };
+  sources: CalculationRuleSource[];
+  warnings: string[];
+};
+
+export type RunwayResponse = {
+  baseCurrency: CurrencyCode;
+  asOf: string;
+  jurisdiction: {
+    code: JurisdictionCode;
+    rulesEffectiveFrom: string;
+    isExtrapolated: boolean;
+  };
+  employment: {
+    primary: Employment | null;
+    derived: {
+      asOf: string;
+      completedMonths: number;
+      serviceDays: number;
+      serviceYears: number;
+    } | null;
+    missingFields: string[];
+  };
+  burn: {
+    lean: number;
+    current: number;
+    burnSource: RunwayBurnSource;
+    isPartialHistory: boolean;
+    unclassifiedCategoryCount: number;
+    components: Array<{
+      label: string;
+      amount: number;
+      source: 'budget_category' | 'mortgage' | 'debt';
+      expenseClass: ExpenseClass;
+    }>;
+  };
+  tiers: Array<{
+    tier: number;
+    label: string;
+    amount: number;
+    haircutPct: number;
+    note: string;
+    included: boolean;
+  }>;
+  incomeSupport: IncomeSupportCalculation;
+  runway: {
+    monthsCashOnly: number;
+    monthsAllLiquid: number;
+    monthsWithIncomeSupport: number | null;
+    band: RunwayBand;
+    ledger: Array<{
+      month: number;
+      income: number;
+      burn: number;
+      drawdown: number;
+      liquidRemaining: number;
+    }>;
+  };
+  depositGuarantee: Array<{
+    entityId: string | null;
+    entityName: string;
+    scheme: string;
+    total: number;
+    cap: number;
+    excess: number;
+    ineligibleCurrencyTotal: number;
+    confidence: 'verified' | 'unverified';
+    accountIds: number[];
+  }>;
+  setupComplete: boolean;
+  isEstimated: boolean;
 };
 
 export type AssetAllocation = {

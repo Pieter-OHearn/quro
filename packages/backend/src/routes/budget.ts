@@ -1,11 +1,18 @@
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { isBudgetMonth, toBudgetMonthIndex, type BudgetMonth } from '@quro/shared';
+import {
+  EXPENSE_CLASSES,
+  isBudgetMonth,
+  toBudgetMonthIndex,
+  type BudgetMonth,
+  type ExpenseClass,
+} from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { hasPostgresErrorCode } from '../lib/postgresErrors';
+import { CATEGORY_PRESETS } from '../services/bunqCategoryRules';
 import {
   err,
   ok,
@@ -199,6 +206,9 @@ function toBudgetCategoryInsertValues(
   payload: BudgetCategoryPayload,
   userId: number,
 ): BudgetCategoryInsert {
+  const preset = Object.hasOwn(CATEGORY_PRESETS, payload.name)
+    ? CATEGORY_PRESETS[payload.name]
+    : undefined;
   return {
     userId,
     name: payload.name,
@@ -208,6 +218,8 @@ function toBudgetCategoryInsertValues(
     color: payload.color,
     month: payload.month,
     year: payload.year,
+    expenseClass: preset?.expenseClass ?? 'essential',
+    expenseClassConfirmed: Boolean(preset),
   };
 }
 
@@ -264,6 +276,60 @@ async function adjustCategorySpent(
 
 // ── Categories ───────────────────────────────────────────────────────────────
 
+type CategoryClassificationUpdate = { id: number; expenseClass: ExpenseClass };
+
+function parseCategoryClassification(value: unknown): ParseResult<CategoryClassificationUpdate> {
+  if (!isRecord(value)) return err('Invalid category classification');
+  const id = typeof value.id === 'number' ? value.id : Number(value.id);
+  const expenseClass = value.expenseClass;
+  if (!Number.isInteger(id) || id <= 0) return err('Invalid category classification');
+  if (typeof expenseClass !== 'string' || !EXPENSE_CLASSES.includes(expenseClass as ExpenseClass)) {
+    return err('Invalid category classification');
+  }
+  return ok({ id, expenseClass: expenseClass as ExpenseClass });
+}
+
+function parseCategoryClassifications(
+  payload: unknown,
+): ParseResult<CategoryClassificationUpdate[]> {
+  if (!isRecord(payload) || !Array.isArray(payload.updates)) {
+    return err('Invalid category classification payload');
+  }
+  const rejected = rejectUnknownFields(payload, ['updates']);
+  if (!rejected.ok) return rejected;
+  if (payload.updates.length === 0) return err('At least one category update is required');
+  const updates: CategoryClassificationUpdate[] = [];
+  for (const value of payload.updates) {
+    const parsed = parseCategoryClassification(value);
+    if (!parsed.ok) return parsed;
+    updates.push(parsed.value);
+  }
+  return ok(updates);
+}
+
+function classifyBudgetCategories(
+  userId: number,
+  updates: readonly CategoryClassificationUpdate[],
+) {
+  return db.transaction(async (tx) => {
+    const updatedRows: Array<typeof budgetCategories.$inferSelect> = [];
+    for (const update of updates) {
+      const [category] = await tx
+        .select()
+        .from(budgetCategories)
+        .where(and(eq(budgetCategories.id, update.id), eq(budgetCategories.userId, userId)));
+      if (!category) return null;
+      const rows = await tx
+        .update(budgetCategories)
+        .set({ expenseClass: update.expenseClass, expenseClassConfirmed: true })
+        .where(and(eq(budgetCategories.userId, userId), eq(budgetCategories.name, category.name)))
+        .returning();
+      updatedRows.push(...rows);
+    }
+    return updatedRows;
+  });
+}
+
 app.get('/categories', async (c) => {
   const user = getAuthUser(c);
   const filter = parseMonthYearFilter(c.req.query('month'), c.req.query('year'));
@@ -281,6 +347,16 @@ app.get('/categories', async (c) => {
     .from(budgetCategories)
     .where(and(...conditions));
   return c.json({ data });
+});
+
+app.patch('/categories/classify', async (c) => {
+  const user = getAuthUser(c);
+  const rawBody = await readJsonBody(c.req, 'Invalid category classification payload');
+  if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
+  const parsed = parseCategoryClassifications(rawBody.value);
+  if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
+  const data = await classifyBudgetCategories(user.id, parsed.value);
+  return data ? c.json({ data }) : c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
 });
 
 app.get('/categories/:id', async (c) => {

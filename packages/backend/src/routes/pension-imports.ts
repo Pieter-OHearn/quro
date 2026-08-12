@@ -10,6 +10,7 @@ import {
   pensionTransactions,
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { invalidateSnapshotsFrom } from '../lib/netWorth';
 import { getPensionStatementImportCapability } from '../lib/capabilities';
 import {
   parsePensionStatement,
@@ -625,6 +626,10 @@ function validateRowsForCommit(rows: ImportRowRecord[], potId: number): string |
   return null;
 }
 
+function earliestRowDate(rows: readonly ImportRowRecord[]): string | undefined {
+  return [...rows].sort((left, right) => left.date.localeCompare(right.date)).at(0)?.date;
+}
+
 async function commitRowsToLedger(params: {
   userId: number;
   importRecord: ImportRecord;
@@ -705,6 +710,11 @@ async function commitRowsToLedger(params: {
         errorMessage: null,
       })
       .where(eq(pensionStatementImports.id, params.importId));
+
+    const earliestCommittedDate = earliestRowDate(params.rows);
+    if (earliestCommittedDate) {
+      await invalidateSnapshotsFrom(tx, params.userId, earliestCommittedDate);
+    }
   });
 
   return committedTransactionIds;

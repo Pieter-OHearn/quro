@@ -8,6 +8,7 @@ const MINUTES_PER_HOUR = 60;
 const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;
 const MS_PER_HOUR = MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const BINARY_SEARCH_DIVISOR = 2;
 
 export type CurrencyRateCacheRow = {
   fromCurrency: string;
@@ -15,6 +16,15 @@ export type CurrencyRateCacheRow = {
   rate: unknown;
   provider?: string | null;
   updatedAt: Date | string | null;
+};
+
+export type HistoricalCurrencyRateRow = CurrencyRateCacheRow & {
+  sourceDate: string;
+};
+
+export type HistoricalRatesToBaseCurrency = {
+  rates: Map<string, number>;
+  isEstimated: boolean;
 };
 
 export class CurrencyRatesUnavailableError extends Error {
@@ -87,6 +97,77 @@ export function buildRatesToBaseCurrency(
   }
 
   return rates;
+}
+
+function findRateAtOrBefore(
+  rows: readonly HistoricalCurrencyRateRow[],
+  asOfDate: string,
+): HistoricalCurrencyRateRow | null {
+  let low = 0;
+  let high = rows.length - 1;
+  let candidate = -1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / BINARY_SEARCH_DIVISOR);
+    if (rows[mid].sourceDate <= asOfDate) {
+      candidate = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return candidate < 0 ? null : rows[candidate];
+}
+
+function groupHistoricalRows(
+  rows: readonly HistoricalCurrencyRateRow[],
+  baseCurrency: CurrencyCode,
+): Map<string, HistoricalCurrencyRateRow[]> {
+  const rowsByCurrency = new Map<string, HistoricalCurrencyRateRow[]>();
+
+  for (const row of rows) {
+    if (row.toCurrency !== baseCurrency || row.fromCurrency === baseCurrency) continue;
+    const currencyRows = rowsByCurrency.get(row.fromCurrency) ?? [];
+    currencyRows.push(row);
+    rowsByCurrency.set(row.fromCurrency, currencyRows);
+  }
+
+  return rowsByCurrency;
+}
+
+function selectHistoricalRate(
+  currency: CurrencyCode,
+  rows: HistoricalCurrencyRateRow[],
+  asOfDate: string,
+): { row: HistoricalCurrencyRateRow; isEstimated: boolean } {
+  rows.sort((left, right) => left.sourceDate.localeCompare(right.sourceDate));
+  const historicalRow = findRateAtOrBefore(rows, asOfDate);
+  const selectedRow = historicalRow ?? rows[rows.length - 1];
+  if (!selectedRow) {
+    throw new CurrencyRatesUnavailableError(`Missing FX rates for: ${currency}`);
+  }
+  return { row: selectedRow, isEstimated: historicalRow === null };
+}
+
+export function buildRatesToBaseCurrencyAt(
+  rows: readonly HistoricalCurrencyRateRow[],
+  asOfDate: string,
+  baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
+): HistoricalRatesToBaseCurrency {
+  const rowsByCurrency = groupHistoricalRows(rows, baseCurrency);
+  const selectedRates = CURRENCY_CODES.filter((currency) => currency !== baseCurrency).map(
+    (currency) => selectHistoricalRate(currency, rowsByCurrency.get(currency) ?? [], asOfDate),
+  );
+
+  return {
+    rates: buildRatesToBaseCurrency(
+      selectedRates.map(({ row }) => row),
+      new Date(),
+      baseCurrency,
+    ),
+    isEstimated: selectedRates.some(({ isEstimated }) => isEstimated),
+  };
 }
 
 export function convertToBaseCurrency(

@@ -2,8 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ElementType } from 'react';
 import { useSearchParams } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   CurrencyCode,
+  JurisdictionCode,
   NumberFormatPreference,
   UpdateUserPasswordInput,
   UpdateUserPreferencesInput,
@@ -18,6 +20,7 @@ import {
   MIN_RETIREMENT_AGE,
   MIN_USER_AGE,
   NUMBER_FORMATS,
+  JURISDICTION_CODES,
 } from '@quro/shared';
 import {
   AlertTriangle,
@@ -732,7 +735,11 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
 }
 
 function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionProps>) {
+  const queryClient = useQueryClient();
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(user.baseCurrency);
+  const [selectedJurisdiction, setSelectedJurisdiction] = useState<JurisdictionCode>(
+    user.jurisdiction,
+  );
   const [selectedNumberFormat, setSelectedNumberFormat] = useState<NumberFormatPreference>(
     user.numberFormat,
   );
@@ -740,17 +747,21 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
   const [isSaving, setIsSaving] = useState(false);
   const { saved, showSaved } = useSavedState();
   const hasChanges =
-    selectedCurrency !== user.baseCurrency || selectedNumberFormat !== user.numberFormat;
+    selectedCurrency !== user.baseCurrency ||
+    selectedNumberFormat !== user.numberFormat ||
+    selectedJurisdiction !== user.jurisdiction;
 
   useEffect(() => {
     setSelectedCurrency(user.baseCurrency);
     setSelectedNumberFormat(user.numberFormat);
-  }, [user.baseCurrency, user.numberFormat]);
+    setSelectedJurisdiction(user.jurisdiction);
+  }, [user.baseCurrency, user.jurisdiction, user.numberFormat]);
 
   const handleSave = async () => {
     const payload: UpdateUserPreferencesInput = {
       baseCurrency: selectedCurrency,
       numberFormat: selectedNumberFormat,
+      jurisdiction: selectedJurisdiction,
     };
 
     setIsSaving(true);
@@ -758,6 +769,10 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
     try {
       const response = await api.put('/api/settings/preferences', payload);
       replaceUser(response.data.data);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['plan'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
       showSaved();
     } catch (error) {
       setFormError(resolveApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
@@ -807,6 +822,47 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
         </div>
         <p className="mt-3 text-sm text-slate-500">
           Cross-currency balances and charts convert into this currency across the app.
+        </p>
+      </div>
+
+      <div className="mb-8 border-t border-border-subtle pt-6">
+        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+          <MapPin size={14} className="text-brand" />
+          Planning jurisdiction
+        </p>
+        <div className="grid gap-3 md:grid-cols-3">
+          {JURISDICTION_CODES.map((code) => {
+            const isSelected = code === selectedJurisdiction;
+            const labels: Record<JurisdictionCode, { name: string; note: string }> = {
+              NL: { name: 'Netherlands', note: 'Dutch benefit and severance rules' },
+              AU: { name: 'Australia', note: 'Australian FCS and Fair Work redundancy rules' },
+              GENERIC: { name: 'Generic', note: 'Conservative international defaults' },
+            };
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => setSelectedJurisdiction(code)}
+                className={cn(
+                  'rounded-2xl border px-4 py-4 text-left transition-all duration-base ease-standard',
+                  isSelected
+                    ? 'border-brand-border bg-brand-soft text-brand-fg shadow-brand'
+                    : 'border-border-default bg-surface text-fg-muted hover:border-brand-border hover:bg-surface-sunken',
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{labels[code].name}</p>
+                    <p className="mt-1 text-xs text-fg-faint">{labels[code].note}</p>
+                  </div>
+                  {isSelected ? <Check size={16} className="ml-auto text-brand" /> : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-sm text-fg-subtle">
+          Planning rules are independent from the currency used to display balances.
         </p>
       </div>
 

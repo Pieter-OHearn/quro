@@ -28,6 +28,7 @@ export function DashboardChartsGrid({
           subtitle={`Last 7 months in ${baseCurrency}`}
           data={chartData}
           dataKey="value"
+          estimatedKey="isEstimated"
           xKey="month"
           color="#6366f1"
           height={220}

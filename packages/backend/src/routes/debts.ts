@@ -5,6 +5,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { invalidateSnapshotsFrom } from '../lib/netWorth';
 
 const app = new Hono();
 const MAX_INT32 = 2_147_483_647;
@@ -391,6 +392,7 @@ async function createDebtPayment(params: {
       .insert(debtPayments)
       .values(toDebtPaymentInsertPayload(parsed.data, params.userId))
       .returning();
+    await invalidateSnapshotsFrom(tx, params.userId, parsed.data.date);
 
     return { data };
   });
@@ -418,6 +420,7 @@ function deleteDebtPayment(params: {
       .delete(debtPayments)
       .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)))
       .returning();
+    await invalidateSnapshotsFrom(tx, params.userId, existing.date);
 
     return { data };
   });

@@ -120,6 +120,7 @@ export function normalizeNetWorthSnapshots(
     month: snapshot.month,
     year: snapshot.year,
     value: convertToBase(snapshot.totalValue, snapshot.currency),
+    isEstimated: snapshot.isEstimated,
   }));
 }
 
@@ -232,6 +233,7 @@ export const computeNWMetrics = (
     netWorth: currentNW,
     monthChange: currentNW - prevNW,
     ytdPct: firstNW > 0 ? ((currentNW - firstNW) / firstNW) * 100 : 0,
+    isEstimated: chartData.at(-1)?.isEstimated ?? false,
   };
 };
 

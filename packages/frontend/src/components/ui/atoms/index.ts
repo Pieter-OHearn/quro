@@ -7,6 +7,7 @@ export * from './MonthInput';
 export * from './IconButton';
 export * from './LoadingSpinner';
 export * from './PasswordInput';
+export * from './ProgressMeter';
 export * from './QuroLogo';
 export * from './SelectInput';
 export * from './Spinner';

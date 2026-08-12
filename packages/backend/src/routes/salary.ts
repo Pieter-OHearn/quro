@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, isNull, or } from 'drizzle-orm';
 import { db } from '../db/client';
-import { payslips } from '../db/schema';
+import { employments, payslips } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
+import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import {
   asFile,
   buildPdfStorageKey,
@@ -39,6 +40,7 @@ type FieldParsers<T extends object> = {
 };
 
 type PayslipInput = {
+  employmentId: number | null;
   month: string;
   date: string;
   gross: number;
@@ -52,6 +54,7 @@ type PayslipInput = {
 type PayslipRow = typeof payslips.$inferSelect;
 
 const PAYSLIP_FIELDS = [
+  'employmentId',
   'month',
   'date',
   'gross',
@@ -169,7 +172,16 @@ const parseCurrencyField = (value: unknown): ParseResult<CurrencyCode> => {
   return currency ? ok(currency) : err('Invalid currency');
 };
 
+const parseEmploymentIdField = (value: unknown): ParseResult<number | null> => {
+  if (value == null || value === '') return ok(null);
+  const parsed = parseNumber(value);
+  return parsed !== null && Number.isInteger(parsed) && parsed > 0
+    ? ok(parsed)
+    : err('Invalid employment');
+};
+
 const payslipFieldParsers: FieldParsers<PayslipInput> = {
+  employmentId: parseEmploymentIdField,
   month: (value) => parseTextField(value, 'Invalid month'),
   date: (value) => parseDateField(value, 'Invalid date (expected YYYY-MM-DD)'),
   gross: (value) => parseNumericField(value, 'Invalid gross', 0),
@@ -197,6 +209,7 @@ function parsePayslipPatch(body: unknown): ParseResult<Partial<PayslipInput>> {
 function formatPayslipResponse(row: PayslipRow) {
   return {
     id: row.id,
+    employmentId: row.employmentId,
     month: row.month,
     date: row.date,
     gross: row.gross,
@@ -207,6 +220,32 @@ function formatPayslipResponse(row: PayslipRow) {
     currency: row.currency,
     document: formatInlinePdfDocument(row),
   };
+}
+
+async function resolveEmploymentId(
+  userId: number,
+  requestedId: number | null | undefined,
+  autoLink: boolean,
+): Promise<{ ok: true; value: number | null } | { ok: false }> {
+  if (requestedId !== null && requestedId !== undefined) {
+    const [owned] = await db
+      .select({ id: employments.id })
+      .from(employments)
+      .where(and(eq(employments.id, requestedId), eq(employments.userId, userId)));
+    return owned ? { ok: true, value: owned.id } : { ok: false };
+  }
+  if (!autoLink) return { ok: true, value: null };
+  const today = new Date().toISOString().slice(0, ISO_DATE_LENGTH);
+  const active = await db
+    .select({ id: employments.id })
+    .from(employments)
+    .where(
+      and(
+        eq(employments.userId, userId),
+        or(isNull(employments.endDate), gte(employments.endDate, today)),
+      ),
+    );
+  return { ok: true, value: active.length === 1 ? active[0].id : null };
 }
 
 async function getOwnedPayslip(userId: number, payslipId: number): Promise<PayslipRow | null> {
@@ -339,11 +378,17 @@ app.post('/payslips', async (c) => {
 
   const body = parsePayslipCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const employment = await resolveEmploymentId(user.id, body.value.employmentId, true);
+  if (!employment.ok) return c.json({ error: 'Employment not found' }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .insert(payslips)
-    .values({ ...body.value, userId: user.id })
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(payslips)
+      .values({ ...body.value, employmentId: employment.value, userId: user.id })
+      .returning();
+    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
+    return [created];
+  });
 
   return c.json({ data: formatPayslipResponse(data) }, HTTP_STATUS.CREATED);
 });
@@ -361,12 +406,27 @@ app.patch('/payslips/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No payslip fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const existing = await getOwnedPayslip(user.id, id);
+  if (!existing) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
+  if ('employmentId' in body.value) {
+    const employment = await resolveEmploymentId(user.id, body.value.employmentId, false);
+    if (!employment.ok) return c.json({ error: 'Employment not found' }, HTTP_STATUS.BAD_REQUEST);
+    body.value.employmentId = employment.value;
+  }
 
-  const [data] = await db
-    .update(payslips)
-    .set(body.value)
-    .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(payslips)
+      .set(body.value)
+      .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
+      .returning();
+    await invalidateSnapshotsFrom(
+      tx,
+      user.id,
+      earliestDate(existing.date, body.value.date ?? existing.date),
+    );
+    return [updated];
+  });
 
   if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data: formatPayslipResponse(data) });
@@ -377,10 +437,14 @@ app.delete('/payslips/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .delete(payslips)
-    .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [deleted] = await tx
+      .delete(payslips)
+      .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
+      .returning();
+    if (deleted) await invalidateSnapshotsFrom(tx, user.id, deleted.date);
+    return [deleted];
+  });
 
   if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
 

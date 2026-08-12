@@ -1,20 +1,22 @@
+import type { ExpenseClass } from '@quro/shared';
+
 export const UNCATEGORISED_NAME = 'Uncategorised';
 
-type CategoryPreset = { emoji: string; color: string };
+type CategoryPreset = { emoji: string; color: string; expenseClass: ExpenseClass };
 
 export const CATEGORY_PRESETS: Record<string, CategoryPreset> = {
-  Groceries: { emoji: '🛒', color: '#22c55e' },
-  'Restaurants & Bars': { emoji: '🍽️', color: '#f97316' },
-  Transport: { emoji: '🚌', color: '#3b82f6' },
-  Fuel: { emoji: '⛽', color: '#ef4444' },
-  Shopping: { emoji: '🛍️', color: '#a855f7' },
-  Subscriptions: { emoji: '📱', color: '#6366f1' },
-  Entertainment: { emoji: '🎬', color: '#ec4899' },
-  Health: { emoji: '💊', color: '#14b8a6' },
-  Utilities: { emoji: '💡', color: '#eab308' },
-  'Personal Care': { emoji: '✂️', color: '#f43f5e' },
-  Travel: { emoji: '✈️', color: '#0ea5e9' },
-  [UNCATEGORISED_NAME]: { emoji: '📦', color: '#94a3b8' },
+  Groceries: { emoji: '🛒', color: '#22c55e', expenseClass: 'essential' },
+  'Restaurants & Bars': { emoji: '🍽️', color: '#f97316', expenseClass: 'discretionary' },
+  Transport: { emoji: '🚌', color: '#3b82f6', expenseClass: 'essential' },
+  Fuel: { emoji: '⛽', color: '#ef4444', expenseClass: 'essential' },
+  Shopping: { emoji: '🛍️', color: '#a855f7', expenseClass: 'discretionary' },
+  Subscriptions: { emoji: '📱', color: '#6366f1', expenseClass: 'discretionary' },
+  Entertainment: { emoji: '🎬', color: '#ec4899', expenseClass: 'discretionary' },
+  Health: { emoji: '💊', color: '#14b8a6', expenseClass: 'essential' },
+  Utilities: { emoji: '💡', color: '#eab308', expenseClass: 'essential' },
+  'Personal Care': { emoji: '✂️', color: '#f43f5e', expenseClass: 'discretionary' },
+  Travel: { emoji: '✈️', color: '#0ea5e9', expenseClass: 'discretionary' },
+  [UNCATEGORISED_NAME]: { emoji: '📦', color: '#94a3b8', expenseClass: 'essential' },
 };
 
 export const DEFAULT_CATEGORY_PRESET: CategoryPreset = CATEGORY_PRESETS[UNCATEGORISED_NAME];

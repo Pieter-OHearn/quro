@@ -7,17 +7,20 @@ function NetWorthBadge({
   totalAssets,
   liabilitiesTotal,
   fmtBase,
+  isEstimated,
 }: Readonly<{
   netWorth: number;
   monthChange: number;
   totalAssets: number;
   liabilitiesTotal: number;
   fmtBase: CompactFormatFn;
+  isEstimated: boolean;
 }>) {
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-4 text-center flex-shrink-0 min-w-[220px]">
       <p className="text-indigo-300 text-xs uppercase tracking-widest mb-1">Net Worth</p>
       <p className="text-3xl font-bold" data-testid="dashboard-net-worth-value">
+        {isEstimated ? '~' : ''}
         {fmtBase(netWorth)}
       </p>
       {monthChange !== 0 && (
@@ -42,6 +45,11 @@ function NetWorthBadge({
           Debts <span className="font-medium text-rose-300">-{fmtBase(liabilitiesTotal)}</span>
         </span>
       </div>
+      {isEstimated ? (
+        <p className="mt-2 text-[10px] text-fg-inverted/80">
+          Includes estimated historical rates or prices
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -55,6 +63,7 @@ export function WelcomeBanner({
   liabilitiesTotal,
   baseCurrency,
   fmtBase,
+  isEstimated,
 }: Readonly<{
   greeting: string;
   greetingName: string;
@@ -64,6 +73,7 @@ export function WelcomeBanner({
   liabilitiesTotal: number;
   baseCurrency: string;
   fmtBase: CompactFormatFn;
+  isEstimated: boolean;
 }>) {
   return (
     <div className="rounded-2xl bg-gradient-to-r from-[#0a0f1e] via-[#1a1f3e] to-[#1e1448] p-6 text-white overflow-hidden relative">
@@ -83,6 +93,7 @@ export function WelcomeBanner({
           totalAssets={totalAssets}
           liabilitiesTotal={liabilitiesTotal}
           fmtBase={fmtBase}
+          isEstimated={isEstimated}
         />
       </div>
     </div>

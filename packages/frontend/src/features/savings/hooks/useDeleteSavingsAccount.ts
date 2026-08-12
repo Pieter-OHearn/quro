@@ -10,6 +10,7 @@ type DeleteSavingsAccountInput = {
 function invalidateSavings(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: ['savings'] });
   void qc.invalidateQueries({ queryKey: ['dashboard'] });
+  void qc.invalidateQueries({ queryKey: ['plan'] });
 }
 
 export function useDeleteSavingsAccount() {

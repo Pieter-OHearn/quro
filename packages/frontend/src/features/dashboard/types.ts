@@ -77,4 +77,9 @@ export type DashboardTxnStats = {
   totalSavingsDeposited: number;
 };
 
-export type NetWorthMetricData = { month: string; year: number; value: number };
+export type NetWorthMetricData = {
+  month: string;
+  year: number;
+  value: number;
+  isEstimated: boolean;
+};

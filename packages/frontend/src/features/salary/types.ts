@@ -21,6 +21,7 @@ export type SalaryChartEntry = {
 export type SalaryHistoryEntry = Pick<SalaryHistory, 'year' | 'annualSalary' | 'currency'>;
 
 export type PayslipFormState = {
+  employmentId: string;
   month: string;
   date: string;
   gross: string;

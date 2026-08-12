@@ -169,6 +169,48 @@
       "when": 1785936114419,
       "tag": "0023_bored_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785939498876,
+      "tag": "0024_reflective_vapor",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786391941529,
+      "tag": "0025_jazzy_bloodaxe",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786465979873,
+      "tag": "0026_aberrant_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1786472669501,
+      "tag": "0027_spooky_jean_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1786474185102,
+      "tag": "0028_sudden_living_lightning",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1786531731552,
+      "tag": "0029_track_expense_class_confirmation",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,7 @@ import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
+import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
@@ -1321,10 +1322,14 @@ app.post('/holding-transactions', async (c) => {
   const holding = await getOwnedHolding(user.id, body.value.holdingId);
   if (!holding) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db
-    .insert(holdingTransactions)
-    .values(toHoldingTransactionInsertValues(body.value, user.id))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(holdingTransactions)
+      .values(toHoldingTransactionInsertValues(body.value, user.id))
+      .returning();
+    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
+    return [created];
+  });
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
@@ -1351,11 +1356,15 @@ app.patch('/holding-transactions/:id', async (c) => {
   const holding = await getOwnedHolding(user.id, merged.value.holdingId);
   if (!holding) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db
-    .update(holdingTransactions)
-    .set(toHoldingTransactionUpdateValues(merged.value))
-    .where(and(eq(holdingTransactions.id, id), eq(holdingTransactions.userId, user.id)))
-    .returning();
+  const [data] = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(holdingTransactions)
+      .set(toHoldingTransactionUpdateValues(merged.value))
+      .where(and(eq(holdingTransactions.id, id), eq(holdingTransactions.userId, user.id)))
+      .returning();
+    await invalidateSnapshotsFrom(tx, user.id, earliestDate(existing.date, merged.value.date));
+    return [updated];
+  });
   return c.json({ data });
 });
 
@@ -1363,10 +1372,16 @@ app.delete('/holding-transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
-  const [data] = await db
-    .delete(holdingTransactions)
-    .where(and(eq(holdingTransactions.id, id), eq(holdingTransactions.userId, user.id)))
-    .returning();
+  const existing = await getOwnedHoldingTransaction(user.id, id);
+  if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  const [data] = await db.transaction(async (tx) => {
+    const [deleted] = await tx
+      .delete(holdingTransactions)
+      .where(and(eq(holdingTransactions.id, id), eq(holdingTransactions.userId, user.id)))
+      .returning();
+    await invalidateSnapshotsFrom(tx, user.id, existing.date);
+    return [deleted];
+  });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -1622,6 +1637,7 @@ app.post('/property-transactions', async (c) => {
       .insert(propertyTransactions)
       .values(toPropertyTransactionInsertValues(body.value, property.userId ?? user.id))
       .returning();
+    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
     return { data: created } as const;
   });
   if ('error' in result) return c.json({ error: result.error }, result.status);
@@ -1681,6 +1697,7 @@ app.patch('/property-transactions/:id', async (c) => {
       })
       .where(eq(propertyTransactions.id, id))
       .returning();
+    await invalidateSnapshotsFrom(tx, user.id, earliestDate(existing.date, merged.value.date));
     return { data: updated } as const;
   });
   if ('error' in result) return c.json({ error: result.error }, result.status);
@@ -1706,6 +1723,7 @@ app.delete('/property-transactions/:id', async (c) => {
       .delete(propertyTransactions)
       .where(eq(propertyTransactions.id, id))
       .returning();
+    await invalidateSnapshotsFrom(tx, user.id, existing.date);
     return deleted ?? null;
   });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);

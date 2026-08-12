@@ -71,6 +71,7 @@ function createAddCategoryDraft(month: BudgetMonth, year: number): BudgetCategor
     color: '#94a3b8',
     month,
     year,
+    expenseClass: 'essential',
   };
 }
 

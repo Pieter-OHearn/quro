@@ -4,6 +4,7 @@ import {
   CURRENCY_META,
   formatCurrency as formatCurrencyValue,
   type CurrencyCode,
+  type Employment,
   type Payslip,
   type PayslipDocument,
 } from '@quro/shared';
@@ -33,6 +34,7 @@ type AddPayslipModalProps = {
   onSave: (payslip: SavePayslipInput) => Promise<Payslip>;
   onDelete?: (id: number) => void;
   baseCurrency: CurrencyCode;
+  employments: Employment[];
 };
 
 type NetPreviewProps = {
@@ -78,6 +80,7 @@ type PayslipModalBodyProps = {
   documentDownloadUrl: string | null;
   selectedFileHint: string;
   documentState: PayslipDocumentState;
+  employments: Employment[];
 };
 
 function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps>) {
@@ -397,6 +400,7 @@ function PayslipModalBody({
   documentDownloadUrl,
   selectedFileHint,
   documentState,
+  employments,
 }: Readonly<PayslipModalBodyProps>) {
   return (
     <>
@@ -410,6 +414,25 @@ function PayslipModalBody({
           {formError}
         </div>
       )}
+      {employments.length > 0 ? (
+        <FormField label="Employment" hint="Links this payslip to the employment used by Plan">
+          <SelectInput
+            value={form.form.employmentId}
+            onChange={(value) => form.set('employmentId', value)}
+            disabled={busy || formLocked}
+            options={[
+              {
+                value: '',
+                label: employments.length === 1 ? 'Auto-link current employment' : 'Not linked',
+              },
+              ...employments.map((employment) => ({
+                value: String(employment.id),
+                label: `${employment.employerName ?? 'Unnamed employment'}${employment.isPrimary ? ' · primary' : ''}`,
+              })),
+            ]}
+          />
+        </FormField>
+      ) : null}
       <PayslipFormFields form={form} busy={busy} formLocked={formLocked} />
       <PdfAttachmentField
         label="Payslip PDF"
@@ -443,6 +466,7 @@ export function AddPayslipModal({
   onSave,
   onDelete,
   baseCurrency,
+  employments,
 }: Readonly<AddPayslipModalProps>) {
   const form = useAddPayslipForm(baseCurrency, existing);
   const documentState = usePayslipDocumentState(existing);
@@ -511,6 +535,7 @@ export function AddPayslipModal({
         documentDownloadUrl={documentDownloadUrl}
         selectedFileHint={selectedFileHint}
         documentState={documentState}
+        employments={employments}
       />
     </Modal>
   );
