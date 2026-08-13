@@ -6,6 +6,9 @@ function exposureMessage(
   entry: RunwayResponse['depositGuarantee'][number],
   fmtBase: (value: number) => string,
 ): string {
+  if (entry.cap === null || entry.excess === null) {
+    return 'Protection cannot be modelled until the licensed entity and scheme are confirmed.';
+  }
   if (entry.ineligibleCurrencyTotal > 0) {
     const capExcess = entry.excess - entry.ineligibleCurrencyTotal;
     const currencyMessage = `${fmtBase(entry.ineligibleCurrencyTotal)} is outside the currencies covered by ${entry.scheme}`;
@@ -29,7 +32,7 @@ export function DepositGuaranteeNotice({
   fmtBase: (value: number) => string;
   onReview: () => void;
 }>) {
-  const atRisk = guarantees.filter((entry) => entry.excess > 0);
+  const atRisk = guarantees.filter((entry) => (entry.excess ?? 0) > 0);
   const unverified = guarantees.filter((entry) => entry.confidence === 'unverified');
   const unverifiedAccountCount = new Set(unverified.flatMap((entry) => entry.accountIds)).size;
   if (guarantees.length === 0) return null;

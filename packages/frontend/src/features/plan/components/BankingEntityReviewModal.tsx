@@ -135,7 +135,7 @@ function BankingEntityAccountRow({
               { value: '', label: 'Choose an entity' },
               ...entities.map((entity) => ({
                 value: entity.id,
-                label: `${entity.name} · ${entity.scheme}`,
+                label: `${entity.name} · ${entity.country} · ${entity.scheme}`,
               })),
               { value: MANUAL_VALUE, label: 'Enter another licensed entity…' },
             ]}

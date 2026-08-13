@@ -1,4 +1,4 @@
-import type { JurisdictionProfile } from '@quro/shared';
+import type { PlanningJurisdictionProfile } from '@quro/shared';
 
 const reviewedAt = '2026-08-05';
 const uwvAmountSource = {
@@ -23,18 +23,11 @@ const severanceSource = {
 // - Rijksoverheid severance: https://www.rijksoverheid.nl/vraag-en-antwoord/ontslag/hoe-hoog-is-de-transitievergoeding-als-ik-word-ontslagen
 // - Belastingdienst Box 3: https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/content/berekening-box-3-inkomen-2026
 // - DNB deposit guarantee: https://www.dnb.nl/betrouwbare-financiele-sector/nederlandse-depositogarantie/vragen-nederlandse-depositogarantie/
-export const nlJurisdiction: JurisdictionProfile = {
+export const nlJurisdiction: PlanningJurisdictionProfile = {
   code: 'NL',
   safeWithdrawalRate: [
     { effectiveFrom: '2025-01-01', effectiveTo: '2025-12-31', value: 0.0282 },
     { effectiveFrom: '2026-01-01', effectiveTo: '2026-12-31', value: 0.0282 },
-  ],
-  depositGuarantee: [
-    {
-      effectiveFrom: '2025-01-01',
-      effectiveTo: '2026-12-31',
-      value: { amount: 100_000, currency: 'EUR', scheme: 'Nederlandse Depositogarantie' },
-    },
   ],
   defaultEffectiveTaxRate: [
     { effectiveFrom: '2025-01-01', effectiveTo: '2025-12-31', value: 0.3 },

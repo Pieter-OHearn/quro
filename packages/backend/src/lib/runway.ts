@@ -4,7 +4,7 @@ import {
   type CurrencyCode,
   type ExpenseClass,
   type IncomeSupportCalculation,
-  type JurisdictionProfile,
+  type PlanningJurisdictionProfile,
   type PlanAssumptionsInput,
   type RunwayBand,
   type RunwayBurnSource,
@@ -80,7 +80,7 @@ export type PayslipInput = {
 };
 
 export type IncomeSupportInput = {
-  jurisdiction: JurisdictionProfile;
+  jurisdiction: PlanningJurisdictionProfile;
   asOf: string;
   employmentType: 'employed' | 'self_employed' | 'other' | null;
   serviceStartDate: string | null;
@@ -241,7 +241,7 @@ export function calculateLiquidityTiers(
 
 function getEffectiveTaxRate(
   payslips: readonly PayslipInput[],
-  jurisdiction: JurisdictionProfile,
+  jurisdiction: PlanningJurisdictionProfile,
   asOf: string,
 ): { rate: number; source: IncomeSupportCalculation['taxRateSource'] } {
   const gross = payslips.reduce((sum, payslip) => sum + Math.max(0, payslip.gross), 0);
@@ -447,10 +447,6 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
     );
     if (source) sources.push(source);
   }
-  const depositSource = sourceFromResolution(
-    resolveRule(input.jurisdiction.depositGuarantee, input.asOf),
-  );
-  if (depositSource) sources.push(depositSource);
   if (input.jurisdiction.code === 'AU') {
     const common = {
       publisher: 'Services Australia',
@@ -847,18 +843,14 @@ export function simulateRunway(
 // eslint-disable-next-line complexity
 export function aggregateDepositGuarantees(
   accounts: readonly SavingsGuaranteeInput[],
-  cap: number,
-  scheme: string,
-  jurisdiction: JurisdictionProfile['code'] = 'GENERIC',
-  fallbackEligibleCurrencies?: readonly CurrencyCode[],
-  convertCap: (amount: number, currency: CurrencyCode) => number = (amount) => amount,
+  convertMoney: (amount: number, currency: CurrencyCode) => number = (amount) => amount,
 ): Array<{
   entityId: string | null;
   entityName: string;
   scheme: string;
   total: number;
-  cap: number;
-  excess: number;
+  cap: number | null;
+  excess: number | null;
   ineligibleCurrencyTotal: number;
   confidence: 'verified' | 'unverified';
   accountIds: number[];
@@ -869,17 +861,17 @@ export function aggregateDepositGuarantees(
       total: number;
       eligibleTotal: number;
       ineligibleTotal: number;
-      modelledCap: number;
+      modelledCap: number | null;
       accountIds: number[];
     }
   >();
   for (const account of accounts) {
-    const entity = resolveBankingEntity(account.bank, account.confirmedEntity, jurisdiction);
-    const key = entity.entityId ?? `unverified:${entity.entityName.toLowerCase()}`;
+    const entity = resolveBankingEntity(account.bank, account.confirmedEntity);
+    const key = entity.entityId ?? `unverified-account:${account.id ?? groups.size}`;
     const entityCap =
       entity.cap !== null && entity.currency !== null
-        ? convertCap(entity.cap, entity.currency)
-        : cap;
+        ? convertMoney(entity.cap, entity.currency)
+        : null;
     const group = groups.get(key) ?? {
       ...entity,
       total: 0,
@@ -889,25 +881,30 @@ export function aggregateDepositGuarantees(
       accountIds: [],
     };
     // Without explicit ownership shares, the plan attributes half of a joint balance to this depositor.
-    const attributedAmount = Math.max(0, account.amount) * (account.isJoint ? JOINT_WEIGHT : 1);
-    const eligibleCurrencies =
-      entity.eligibleCurrencies ??
-      (entity.entityId === null ? fallbackEligibleCurrencies : undefined);
+    const attributedNative = Math.max(0, account.amount) * (account.isJoint ? JOINT_WEIGHT : 1);
+    const attributedAmount = convertMoney(attributedNative, account.currency);
+    const eligibleCurrencies = entity.eligibleCurrencies ?? undefined;
     group.total += attributedAmount;
     if (eligibleCurrencies && !eligibleCurrencies.includes(account.currency)) {
       group.ineligibleTotal += attributedAmount;
     } else {
       group.eligibleTotal += attributedAmount;
     }
-    group.modelledCap = Math.min(group.modelledCap, entityCap);
+    group.modelledCap =
+      group.modelledCap === null || entityCap === null
+        ? null
+        : Math.min(group.modelledCap, entityCap);
     if (account.id !== undefined) group.accountIds.push(account.id);
     groups.set(key, group);
   }
-  return [...groups.values()].map(({ modelledCap, eligibleTotal, ineligibleTotal, ...group }) => ({
-    ...group,
-    scheme: group.confidence === 'verified' ? group.scheme : scheme,
-    cap: modelledCap,
-    excess: ineligibleTotal + Math.max(0, eligibleTotal - modelledCap),
-    ineligibleCurrencyTotal: ineligibleTotal,
-  }));
+  return [...groups.values()].map(({ modelledCap, eligibleTotal, ineligibleTotal, ...group }) => {
+    const excess =
+      modelledCap === null ? null : ineligibleTotal + Math.max(0, eligibleTotal - modelledCap);
+    return {
+      ...group,
+      cap: modelledCap,
+      excess,
+      ineligibleCurrencyTotal: ineligibleTotal,
+    };
+  });
 }

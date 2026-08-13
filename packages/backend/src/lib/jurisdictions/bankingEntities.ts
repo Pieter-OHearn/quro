@@ -1,4 +1,4 @@
-import type { CurrencyCode, JurisdictionCode } from '@quro/shared';
+import type { CurrencyCode } from '@quro/shared';
 
 export type BankingEntity = {
   id: string;
@@ -7,7 +7,7 @@ export type BankingEntity = {
   cap: number;
   currency: CurrencyCode;
   eligibleCurrencies: CurrencyCode[] | null;
-  jurisdictions: JurisdictionCode[];
+  country: string;
   aliases: string[];
 };
 
@@ -33,6 +33,10 @@ const LEGAL_SUFFIXES =
   /\b(bank|banking|n\.v\.?|nv|b\.v\.?|bv|plc|se|ag|s\.a\.?|sa|uab|gmbh|limited|ltd)\b/g;
 const NON_ALPHANUMERIC = /[^a-z0-9]+/g;
 
+function normalizeLegalName(value: string): string {
+  return value.toLowerCase().replace(NON_ALPHANUMERIC, '').trim();
+}
+
 export function normalizeBankName(value: string): string {
   return value.toLowerCase().replace(LEGAL_SUFFIXES, ' ').replace(NON_ALPHANUMERIC, '').trim();
 }
@@ -40,7 +44,7 @@ export function normalizeBankName(value: string): string {
 const EU_DEPOSIT_GUARANTEE = { cap: 100_000, currency: 'EUR' as const };
 
 const BANKING_ENTITY_PROFILES: Array<
-  Omit<BankingEntity, 'cap' | 'currency' | 'eligibleCurrencies' | 'jurisdictions'>
+  Omit<BankingEntity, 'cap' | 'currency' | 'eligibleCurrencies' | 'country'>
 > = [
   {
     id: 'bunq',
@@ -171,7 +175,7 @@ const AU_FINANCIAL_CLAIMS_SCHEME = {
 };
 
 const AU_BANKING_ENTITY_PROFILES: Array<
-  Omit<BankingEntity, 'cap' | 'currency' | 'scheme' | 'eligibleCurrencies' | 'jurisdictions'>
+  Omit<BankingEntity, 'cap' | 'currency' | 'scheme' | 'eligibleCurrencies' | 'country'>
 > = [
   {
     id: 'cba-au',
@@ -238,13 +242,22 @@ export const BANKING_ENTITIES: BankingEntity[] = [
     ...entity,
     ...EU_DEPOSIT_GUARANTEE,
     eligibleCurrencies: null,
-    jurisdictions: ['NL', 'GENERIC'] as JurisdictionCode[],
+    country:
+      entity.scheme === 'Lithuanian deposit guarantee'
+        ? 'LT'
+        : entity.scheme === 'German deposit guarantee'
+          ? 'DE'
+          : entity.scheme === 'Irish Deposit Guarantee Scheme'
+            ? 'IE'
+            : entity.scheme === 'French deposit guarantee'
+              ? 'FR'
+              : 'NL',
   })),
   ...AU_BANKING_ENTITY_PROFILES.map((entity) => ({
     ...entity,
     ...AU_FINANCIAL_CLAIMS_SCHEME,
     eligibleCurrencies: ['AUD'] as CurrencyCode[],
-    jurisdictions: ['AU'] as JurisdictionCode[],
+    country: 'AU',
   })),
 ];
 
@@ -252,11 +265,17 @@ const ENTITY_BY_ALIAS = new Map<string, BankingEntity[]>();
 for (const entity of BANKING_ENTITIES) {
   for (const alias of entity.aliases) {
     const normalized = normalizeBankName(alias);
-    ENTITY_BY_ALIAS.set(normalized, [...(ENTITY_BY_ALIAS.get(normalized) ?? []), entity]);
+    const candidates = ENTITY_BY_ALIAS.get(normalized) ?? [];
+    if (!candidates.some((candidate) => candidate.id === entity.id)) {
+      ENTITY_BY_ALIAS.set(normalized, [...candidates, entity]);
+    }
   }
 }
 
 const ENTITY_BY_ID = new Map(BANKING_ENTITIES.map((entity) => [entity.id, entity] as const));
+const ENTITY_BY_LEGAL_NAME = new Map(
+  BANKING_ENTITIES.map((entity) => [normalizeLegalName(entity.name), entity] as const),
+);
 
 export function getBankingEntity(entityId: string): BankingEntity | null {
   return ENTITY_BY_ID.get(entityId) ?? null;
@@ -266,16 +285,16 @@ export function buildManualBankingEntityId(entityName: string): string {
   return `manual:${normalizeBankName(entityName)}`;
 }
 
-// Resolution keeps persisted overrides, jurisdiction aliases, and the unverified fallback together.
+// Persisted catalog selections are global. Automatic aliases resolve only when the catalog has
+// exactly one candidate; generic brands such as ING require explicit user confirmation.
 // eslint-disable-next-line complexity
 export function resolveBankingEntity(
   bankName: string,
   confirmed?: ConfirmedBankingEntity | null,
-  jurisdiction: JurisdictionCode = 'GENERIC',
 ): BankingEntityResolution {
   if (confirmed?.entityId) {
     const known = getBankingEntity(confirmed.entityId);
-    if (known?.jurisdictions.includes(jurisdiction)) {
+    if (known) {
       return {
         entityId: known.id,
         entityName: known.name,
@@ -298,10 +317,21 @@ export function resolveBankingEntity(
       };
     }
   }
+  const exactLegalEntity = ENTITY_BY_LEGAL_NAME.get(normalizeLegalName(bankName));
+  if (exactLegalEntity) {
+    return {
+      entityId: exactLegalEntity.id,
+      entityName: exactLegalEntity.name,
+      scheme: exactLegalEntity.scheme,
+      cap: exactLegalEntity.cap,
+      currency: exactLegalEntity.currency,
+      eligibleCurrencies: exactLegalEntity.eligibleCurrencies,
+      confidence: 'verified',
+    };
+  }
   const normalized = normalizeBankName(bankName);
-  const entity = ENTITY_BY_ALIAS.get(normalized)?.find((candidate) =>
-    candidate.jurisdictions.includes(jurisdiction),
-  );
+  const candidates = ENTITY_BY_ALIAS.get(normalized) ?? [];
+  const entity = candidates.length === 1 ? candidates[0] : null;
   if (entity) {
     return {
       entityId: entity.id,

@@ -172,7 +172,6 @@ describe('runway liquidity and income support', () => {
     expect(withoutJobSeeker.sources.map((source) => source.id)).toEqual(
       expect.arrayContaining([
         'fair-work-redundancy-pay',
-        'apra-financial-claims-scheme',
         'services-australia-jobseeker-eligibility',
       ]),
     );
