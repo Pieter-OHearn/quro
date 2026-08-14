@@ -175,6 +175,19 @@ function BankingEntityAccountRow({
             </FormField>
           </div>
         ) : null}
+        {guarantee?.source ? (
+          <p className="text-xs text-fg-subtle">
+            Official source:{' '}
+            <a
+              className="font-medium text-brand-fg underline decoration-brand-border underline-offset-2"
+              href={guarantee.source.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {guarantee.source.publisher}: {guarantee.source.title}
+            </a>
+          </p>
+        ) : null}
         {error ? <p className="text-sm text-danger-fg">{error}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           {confirmed ? (

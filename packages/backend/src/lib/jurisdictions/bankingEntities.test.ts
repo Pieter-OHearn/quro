@@ -20,7 +20,18 @@ describe('banking entity resolution', () => {
       total: 115_000,
       excess: 15_000,
       confidence: 'verified',
+      source: { id: 'dnb-deposit-guarantee' },
     });
+  });
+
+  test('keeps anonymous unverified accounts separate from accounts with numeric ids', () => {
+    const result = aggregateDepositGuarantees([
+      { id: 1, bank: 'Mystery One', amount: 10_000, currency: 'EUR', isJoint: false },
+      { bank: 'Mystery Two', amount: 20_000, currency: 'EUR', isJoint: false },
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((entry) => entry.total)).toEqual([10_000, 20_000]);
   });
 
   test('attributes half of a joint balance to the current depositor', () => {
@@ -93,7 +104,12 @@ describe('banking entity resolution', () => {
     const [covered] = aggregateDepositGuarantees([
       { bank: 'CommBank', amount: 250_000, currency: 'AUD', isJoint: false },
     ]);
-    expect(covered).toMatchObject({ entityId: 'cba-au', cap: 250_000, excess: 0 });
+    expect(covered).toMatchObject({
+      entityId: 'cba-au',
+      cap: 250_000,
+      excess: 0,
+      source: { id: 'apra-financial-claims-scheme' },
+    });
 
     const [notCovered] = aggregateDepositGuarantees([
       { bank: 'CommBank', amount: 10_000, currency: 'USD', isJoint: false },

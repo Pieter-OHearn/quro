@@ -6,6 +6,7 @@ import {
   type IncomeSupportCalculation,
   type PlanningJurisdictionProfile,
   type PlanAssumptionsInput,
+  type RuleSource,
   type RunwayBand,
   type RunwayBurnSource,
   type SeveranceRule,
@@ -839,6 +840,17 @@ export function simulateRunway(
   };
 }
 
+function getDepositGuaranteeGroupKey(
+  entityId: string | null,
+  accountId: number | undefined,
+  accountIndex: number,
+): string {
+  if (entityId !== null) return entityId;
+  return accountId === undefined
+    ? `unverified-anonymous-account:${accountIndex}`
+    : `unverified-account-id:${accountId}`;
+}
+
 // Aggregation branches mirror ownership, eligibility, and verification states in the API result.
 // eslint-disable-next-line complexity
 export function aggregateDepositGuarantees(
@@ -854,6 +866,7 @@ export function aggregateDepositGuarantees(
   ineligibleCurrencyTotal: number;
   confidence: 'verified' | 'unverified';
   accountIds: number[];
+  source: RuleSource | null;
 }> {
   const groups = new Map<
     string,
@@ -865,9 +878,9 @@ export function aggregateDepositGuarantees(
       accountIds: number[];
     }
   >();
-  for (const account of accounts) {
+  for (const [accountIndex, account] of accounts.entries()) {
     const entity = resolveBankingEntity(account.bank, account.confirmedEntity);
-    const key = entity.entityId ?? `unverified-account:${account.id ?? groups.size}`;
+    const key = getDepositGuaranteeGroupKey(entity.entityId, account.id, accountIndex);
     const entityCap =
       entity.cap !== null && entity.currency !== null
         ? convertMoney(entity.cap, entity.currency)

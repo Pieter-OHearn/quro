@@ -22,7 +22,6 @@ const severanceSource = {
 // - UWV daily/monthly conversion: https://www.uwv.nl/nl/premies-bedragen/dagloon-berekenen
 // - Rijksoverheid severance: https://www.rijksoverheid.nl/vraag-en-antwoord/ontslag/hoe-hoog-is-de-transitievergoeding-als-ik-word-ontslagen
 // - Belastingdienst Box 3: https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/content/berekening-box-3-inkomen-2026
-// - DNB deposit guarantee: https://www.dnb.nl/betrouwbare-financiele-sector/nederlandse-depositogarantie/vragen-nederlandse-depositogarantie/
 export const nlJurisdiction: PlanningJurisdictionProfile = {
   code: 'NL',
   safeWithdrawalRate: [

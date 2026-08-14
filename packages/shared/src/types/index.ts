@@ -1,4 +1,4 @@
-import type { JurisdictionCode } from './jurisdiction.js';
+import type { JurisdictionCode, RuleSource } from './jurisdiction.js';
 
 export * from './jurisdiction.js';
 
@@ -843,6 +843,7 @@ export type RunwayResponse = {
     ineligibleCurrencyTotal: number;
     confidence: 'verified' | 'unverified';
     accountIds: number[];
+    source: RuleSource | null;
   }>;
   setupComplete: boolean;
   isEstimated: boolean;

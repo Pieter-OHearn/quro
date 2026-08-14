@@ -10,7 +10,6 @@ const redundancySource = {
 };
 
 // Australian sources verified 2026-08-11:
-// - FCS: $250,000 per account holder per Australian-incorporated ADI, for AUD deposits.
 // - NES redundancy: base-rate weeks table, subject to eligibility and employer exceptions.
 // - JobSeeker is not derived because Services Australia applies household income and asset tests.
 export const auJurisdiction: PlanningJurisdictionProfile = {
