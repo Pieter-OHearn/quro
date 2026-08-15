@@ -395,7 +395,7 @@ describe('plan integration', () => {
     expect(classified.every((category) => category.expenseClassConfirmed)).toBe(true);
   });
 
-  test('scopes known banking entities to the current jurisdiction and invalidates old confirmations', async () => {
+  test('keeps banking entities independent of the planning jurisdiction', async () => {
     const owner = await integration.signUp('banking-entity-jurisdiction');
     const account = await readData<SavingsAccount>(
       await integration.request('/api/savings/accounts', {
@@ -433,24 +433,22 @@ describe('plan integration', () => {
     const entities = await readData<Array<{ id: string }>>(
       await integration.request('/api/savings/banking-entities', { cookie: owner.cookie }),
     );
-    expect(entities.some((entity) => entity.id === 'bunq')).toBe(false);
+    expect(entities.some((entity) => entity.id === 'bunq')).toBe(true);
     expect(entities.some((entity) => entity.id === 'cba-au')).toBe(true);
-    const rejected = await integration.request(
-      `/api/savings/accounts/${account.id}/banking-entity`,
-      {
+    await readData<SavingsAccount>(
+      await integration.request(`/api/savings/accounts/${account.id}/banking-entity`, {
         method: 'PATCH',
         cookie: owner.cookie,
         json: { mode: 'known', entityId: 'bunq' },
-      },
+      }),
     );
-    expect(rejected.status).toBe(400);
 
     const runway = await readData<RunwayResponse>(
       await integration.request('/api/plan/runway', { cookie: owner.cookie }),
     );
     expect(runway.depositGuarantee[0]).toMatchObject({
-      entityId: null,
-      confidence: 'unverified',
+      entityId: 'bunq',
+      confidence: 'verified',
       accountIds: [account.id],
     });
   });

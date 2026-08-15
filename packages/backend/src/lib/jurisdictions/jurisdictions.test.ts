@@ -33,12 +33,7 @@ describe('effective-dated jurisdiction rules', () => {
     );
   });
 
-  test('ships dedicated Australian FCS and Fair Work rules', () => {
-    expect(resolveRule(auJurisdiction.depositGuarantee, '2026-08-11').value).toMatchObject({
-      amount: 250_000,
-      currency: 'AUD',
-      eligibleCurrencies: ['AUD'],
-    });
+  test('ships dedicated Australian Fair Work rules', () => {
     expect(resolveRule(auJurisdiction.severance!, '2026-08-11').value.model).toBe('service_weeks');
     expect(auJurisdiction.unemploymentBenefit).toBeNull();
   });

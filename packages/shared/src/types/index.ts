@@ -1,4 +1,4 @@
-import type { JurisdictionCode } from './jurisdiction.js';
+import type { JurisdictionCode, RuleSource } from './jurisdiction.js';
 
 export * from './jurisdiction.js';
 
@@ -142,6 +142,7 @@ export type BankingEntityOption = {
   scheme: string;
   cap: number;
   currency: CurrencyCode;
+  country: string;
 };
 
 export type BankingEntityConfirmationInput =
@@ -837,11 +838,12 @@ export type RunwayResponse = {
     entityName: string;
     scheme: string;
     total: number;
-    cap: number;
-    excess: number;
+    cap: number | null;
+    excess: number | null;
     ineligibleCurrencyTotal: number;
     confidence: 'verified' | 'unverified';
     accountIds: number[];
+    source: RuleSource | null;
   }>;
   setupComplete: boolean;
   isEstimated: boolean;

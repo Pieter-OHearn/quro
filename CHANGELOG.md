@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.5.1] - 2026-08-14
+
+- Decouple licensed banking entities and deposit-protection calculations from the employment
+  planning jurisdiction, allowing mixed-country bank accounts without inventing coverage for
+  unresolved institutions.
+
 ## [v0.5.0] - 2026-08-12
 
 - Add a new Plan tab centred on financial resilience, with an income-stop runway that combines lean spending, accessible balances, notice pay, severance, and applicable income support into a month-by-month projection.

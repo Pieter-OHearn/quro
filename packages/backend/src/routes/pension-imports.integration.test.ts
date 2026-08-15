@@ -25,15 +25,22 @@ await mock.module('../lib/s3', () => ({
   },
 }));
 
-await mock.module('../lib/capabilities', () => ({
-  getPensionStatementImportCapability: () =>
+await mock.module('../lib/capabilities', () => {
+  const getPensionStatementImportCapability = () =>
     Promise.resolve({
       enabled: pensionImportCapabilityEnabled,
       reason: pensionImportCapabilityEnabled ? null : 'worker_unavailable',
       message: pensionImportCapabilityEnabled ? 'AI import is available.' : 'AI import disabled',
       checkedAt: new Date('2026-03-01T12:00:00.000Z').toISOString(),
-    }),
-}));
+    });
+  return {
+    getPensionStatementImportCapability,
+    getAppCapabilities: async () => {
+      const pensionStatementImport = await getPensionStatementImportCapability();
+      return { ai: pensionStatementImport, pensionStatementImport };
+    },
+  };
+});
 
 await mock.module('../lib/pensionParserClient', () => ({
   parsePensionStatement: () =>

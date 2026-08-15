@@ -835,7 +835,7 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
             const isSelected = code === selectedJurisdiction;
             const labels: Record<JurisdictionCode, { name: string; note: string }> = {
               NL: { name: 'Netherlands', note: 'Dutch benefit and severance rules' },
-              AU: { name: 'Australia', note: 'Australian FCS and Fair Work redundancy rules' },
+              AU: { name: 'Australia', note: 'Australian employment and redundancy rules' },
               GENERIC: { name: 'Generic', note: 'Conservative international defaults' },
             };
             return (

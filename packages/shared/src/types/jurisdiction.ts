@@ -61,15 +61,9 @@ export type WealthTaxRule = {
   };
 };
 
-export type JurisdictionProfile = {
+export type PlanningJurisdictionProfile = {
   code: JurisdictionCode;
   safeWithdrawalRate: NonEmptyDatedRules<number>;
-  depositGuarantee: NonEmptyDatedRules<{
-    amount: number;
-    currency: CurrencyCode;
-    scheme: string;
-    eligibleCurrencies?: readonly CurrencyCode[];
-  }>;
   defaultEffectiveTaxRate: NonEmptyDatedRules<number>;
   unemploymentBenefit: NonEmptyDatedRules<UnemploymentRule> | null;
   severance: NonEmptyDatedRules<SeveranceRule> | null;

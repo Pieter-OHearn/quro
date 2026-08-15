@@ -15,7 +15,7 @@ The resilience bands use the Financial Health Network's published six-month emer
 anchor. They describe the model output; they are not recommendations. Benefit eligibility that Quro
 cannot verify is listed alongside the result instead of being presented as confirmed.
 
-Dutch and Australian rules are effective-dated in
+Dutch and Australian employment and planning rules are effective-dated in
 `packages/backend/src/lib/jurisdictions/`. Source links live beside each value so moving statutory
 figures are updated in one place. Rules past their published period are carried forward explicitly
 and labelled as extrapolated.
@@ -51,3 +51,10 @@ guarantee checks use the same 50% attributed share until explicit ownership shar
 
 Deposit balances are grouped by licensed entity rather than free-text brand. Unresolved institutions
 are shown as unverified; the app does not imply coverage it could not confirm.
+
+Deposit protection follows the licensed banking entity rather than the user's planning
+jurisdiction. A portfolio can therefore contain accounts protected under different national
+schemes. Planning jurisdiction affects employment and planning rules only; changing it does not
+change a confirmed banking entity or the money available to the runway calculation. Automatic
+matching is used only for unambiguous brands. Ambiguous names require confirmation, and unresolved
+accounts are not assigned a fallback scheme or cap.

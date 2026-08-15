@@ -276,8 +276,8 @@ function convertEurResponse(response: RunwayResponse, factor: number): RunwayRes
     depositGuarantee: response.depositGuarantee.map((entry) => ({
       ...entry,
       total: money(entry.total),
-      cap: money(entry.cap),
-      excess: money(entry.excess),
+      cap: entry.cap === null ? null : money(entry.cap),
+      excess: entry.excess === null ? null : money(entry.excess),
       ineligibleCurrencyTotal: money(entry.ineligibleCurrencyTotal),
     })),
   };
@@ -288,7 +288,6 @@ function resolveJurisdictionMetadata(
   asOf: string,
 ): RunwayResponse['jurisdiction'] {
   const resolutions: Array<{ effectiveFrom: string; isExtrapolated: boolean }> = [
-    resolveRule(jurisdiction.depositGuarantee, asOf),
     resolveRule(jurisdiction.defaultEffectiveTaxRate, asOf),
   ];
   if (jurisdiction.unemploymentBenefit) {
@@ -559,7 +558,6 @@ function buildEurRunwayResponse(
   });
   const incomeSupport = buildIncomeSupport(data, jurisdiction, asOf, convertToEur, assumptions);
   const tiers = calculateLiquidityTiers(buildLiquidAssets(data, convertToEur), assumptions);
-  const guaranteeRule = resolveRule(jurisdiction.depositGuarantee, asOf);
   const primaryEmployment = data.primaryEmployment ? toEmploymentDto(data.primaryEmployment) : null;
   const service = primaryEmployment?.serviceStartDate
     ? calculateServiceDuration(primaryEmployment.serviceStartDate, asOf)
@@ -582,7 +580,7 @@ function buildEurRunwayResponse(
       data.savings.map((account) => ({
         id: account.id,
         bank: account.bank,
-        amount: convertToEur(toNumber(account.balance), account.currency),
+        amount: toNumber(account.balance),
         currency: account.currency,
         isJoint: account.isJoint,
         confirmedEntity: account.bankingEntityConfirmedAt
@@ -590,21 +588,11 @@ function buildEurRunwayResponse(
               entityId: account.bankingEntityId,
               entityName: account.bankingEntityName,
               scheme: account.depositGuaranteeScheme,
-              cap:
-                account.depositGuaranteeCap && account.depositGuaranteeCurrency
-                  ? convertToEur(
-                      toNumber(account.depositGuaranteeCap),
-                      account.depositGuaranteeCurrency,
-                    )
-                  : null,
-              currency: account.depositGuaranteeCurrency ? 'EUR' : null,
+              cap: account.depositGuaranteeCap ? toNumber(account.depositGuaranteeCap) : null,
+              currency: account.depositGuaranteeCurrency,
             }
           : null,
       })),
-      convertToEur(guaranteeRule.value.amount, guaranteeRule.value.currency),
-      guaranteeRule.value.scheme,
-      jurisdiction.code,
-      guaranteeRule.value.eligibleCurrencies,
       convertToEur,
     ),
     setupComplete: missingFields.length === 0,
