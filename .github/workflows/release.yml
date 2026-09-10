@@ -120,6 +120,8 @@ jobs:
             echo "REGISTRY=ghcr.io/$OWNER_LC"
           } >> "$GITHUB_ENV"
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - name: Extract release notes
         run: |
           bun scripts/read-changelog-section.ts "$VERSION" > release-notes.md
