@@ -3,7 +3,13 @@ import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { LoadingSpinner } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
-import { AccountsList, SavingsCharts, SavingsModals, SavingsStats } from './components';
+import {
+  AccountsList,
+  SavingsCharts,
+  SavingsConnectionPrompt,
+  SavingsModals,
+  SavingsStats,
+} from './components';
 import { SavingsArchivedSection } from './components/SavingsArchivedSection';
 import {
   useContribChartData,
@@ -80,6 +86,7 @@ function SavingsPageBodyContent(props: Readonly<SavingsPageBodyProps>) {
         onCloseTxnModal={handleCloseTxnModal}
         onSaveTxn={props.onSaveTxn}
       />
+      <SavingsConnectionPrompt />
       <SavingsStats
         totalInBase={props.totalInBase}
         totalInterest={props.totalInterest}

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings, sessions } from '../db/schema';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
+import { buildOAuthState } from './bunq';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
 const SIGNIN_ALLOWED_ATTEMPTS = 5;
@@ -296,6 +297,13 @@ describe('auth integration', () => {
     );
     expect(bunqCallbackResponse.status).toBe(302);
     expect(bunqCallbackResponse.headers.get('location')).toContain('bunq=error');
+
+    const savingsState = buildOAuthState(123, 'savings-return-test', 'savings');
+    const savingsCallbackResponse = await integration.request(
+      `/api/bunq/oauth/callback?state=${encodeURIComponent(savingsState)}`,
+    );
+    expect(savingsCallbackResponse.status).toBe(302);
+    expect(savingsCallbackResponse.headers.get('location')).toContain('/savings?bunq=error');
   });
 });
 

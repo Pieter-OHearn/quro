@@ -2,8 +2,11 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
-## [v0.5.1] - 2026-08-14
+## [v0.5.1] - 2026-09-10
 
+- Add a dismissible Savings prompt for users without a Bunq connection, including per-user
+  dismissal and OAuth success or error feedback that returns users to Savings.
+- Resolve Hono, qs, fast-uri, and pypdf dependency security advisories.
 - Decouple licensed banking entities and deposit-protection calculations from the employment
   planning jurisdiction, allowing mixed-country bank accounts without inventing coverage for
   unresolved institutions.

@@ -15,22 +15,40 @@ const app = new Hono();
 const STATE_COOKIE = 'bunq_oauth_state';
 const STATE_MAX_AGE_SECONDS = 600;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? '';
-const FRONTEND_SETTINGS_PATH = FRONTEND_ORIGIN
-  ? `${FRONTEND_ORIGIN}/settings`
-  : 'http://localhost:5173/settings';
+const FRONTEND_BASE_URL = FRONTEND_ORIGIN || 'http://localhost:5173';
 
 const BUNQ_STATE_KEY = process.env.BUNQ_CLIENT_SECRET ?? '';
 
-export function buildOAuthState(userId: number, nonce: string): string {
-  const payload = `${userId}:${nonce}`;
+type BunqOAuthDestination = 'savings' | 'settings';
+type BunqOAuthStatus = 'connected' | 'error';
+
+type ParsedOAuthState = {
+  userId: number;
+  destination: BunqOAuthDestination;
+};
+
+function resolveOAuthDestination(value: string | undefined): BunqOAuthDestination {
+  return value === 'savings' ? 'savings' : 'settings';
+}
+
+function buildFrontendRedirect(destination: BunqOAuthDestination, status: BunqOAuthStatus): string {
+  return `${FRONTEND_BASE_URL}/${destination}?bunq=${status}`;
+}
+
+export function buildOAuthState(
+  userId: number,
+  nonce: string,
+  destination: BunqOAuthDestination = 'settings',
+): string {
+  const payload = `${userId}:${destination}:${nonce}`;
   const sig = createHmac('sha256', BUNQ_STATE_KEY).update(payload).digest('hex');
   return `${payload}.${sig}`;
 }
 
-// Verifies the HMAC signature on an OAuth `state` value and returns the user id
-// it was issued for, or null if the signature is invalid or malformed. This is
-// what authenticates the callback when it lands without a Quro session cookie.
-export function parseSignedState(state: string): number | null {
+// Verifies the HMAC signature on an OAuth `state` value and returns the user and
+// allow-listed destination it was issued for. This authenticates the callback
+// when it lands without a Quro session cookie.
+export function parseSignedOAuthState(state: string): ParsedOAuthState | null {
   const dotIdx = state.lastIndexOf('.');
   if (dotIdx === -1) return null;
   const payload = state.slice(0, dotIdx);
@@ -47,7 +65,21 @@ export function parseSignedState(state: string): number | null {
   const colonIdx = payload.indexOf(':');
   if (colonIdx === -1) return null;
   const userId = parseInt(payload.slice(0, colonIdx), 10);
-  return Number.isInteger(userId) ? userId : null;
+  if (!Number.isInteger(userId)) return null;
+
+  const remainingPayload = payload.slice(colonIdx + 1);
+  const destinationEnd = remainingPayload.indexOf(':');
+  if (destinationEnd < 0) {
+    return { userId, destination: 'settings' };
+  }
+
+  const destination = remainingPayload.slice(0, destinationEnd);
+  if (destination !== 'savings' && destination !== 'settings') return null;
+  return { userId, destination };
+}
+
+export function parseSignedState(state: string): number | null {
+  return parseSignedOAuthState(state)?.userId ?? null;
 }
 
 function logBunqError(label: string, error: unknown): void {
@@ -70,7 +102,8 @@ function mergeSyncResults(
 app.get('/oauth/start', (c) => {
   const user = getAuthUser(c);
   const nonce = randomBytes(32).toString('hex');
-  const state = buildOAuthState(user.id, nonce);
+  const destination = resolveOAuthDestination(c.req.query('returnTo'));
+  const state = buildOAuthState(user.id, nonce, destination);
 
   setCookie(c, STATE_COOKIE, state, {
     httpOnly: true,
@@ -87,11 +120,13 @@ app.get('/oauth/callback', async (c) => {
   const storedState = getCookie(c, STATE_COOKIE);
   const queryState = c.req.query('state');
   const code = c.req.query('code');
+  const parsedState = queryState ? parseSignedOAuthState(queryState) : null;
+  const errorRedirect = buildFrontendRedirect(parsedState?.destination ?? 'settings', 'error');
 
   deleteCookie(c, STATE_COOKIE, { path: '/' });
 
   if (!queryState || !code) {
-    return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
+    return c.redirect(errorRedirect);
   }
 
   // When the callback returns to the same browser that started the flow, enforce
@@ -99,13 +134,13 @@ app.get('/oauth/callback', async (c) => {
   // back to the signed state below, which cryptographically binds the request to
   // a user without needing any cookie.
   if (storedState && storedState !== queryState) {
-    return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
+    return c.redirect(errorRedirect);
   }
 
-  const userId = parseSignedState(queryState);
-  if (userId === null) {
-    return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
+  if (parsedState === null) {
+    return c.redirect(errorRedirect);
   }
+  const { userId, destination } = parsedState;
 
   try {
     const tokens = await exchangeCodeForTokens(code);
@@ -132,10 +167,10 @@ app.get('/oauth/callback', async (c) => {
         },
       });
 
-    return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=connected`);
+    return c.redirect(buildFrontendRedirect(destination, 'connected'));
   } catch (e) {
     logBunqError('[bunq oauth callback error]', e);
-    return c.redirect(`${FRONTEND_SETTINGS_PATH}?bunq=error`);
+    return c.redirect(buildFrontendRedirect(destination, 'error'));
   }
 });
 

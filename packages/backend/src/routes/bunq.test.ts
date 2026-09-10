@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildOAuthState, parseSignedState } from './bunq';
+import { buildOAuthState, parseSignedOAuthState, parseSignedState } from './bunq';
 
 function replaceSignature(state: string, signature: string): string {
   const dotIdx = state.lastIndexOf('.');
@@ -11,6 +11,12 @@ describe('bunq OAuth signed state', () => {
     const state = buildOAuthState(123, 'nonce-value');
 
     expect(parseSignedState(state)).toBe(123);
+  });
+
+  test('round-trips the allow-listed return destination', () => {
+    const state = buildOAuthState(123, 'nonce-value', 'savings');
+
+    expect(parseSignedOAuthState(state)).toEqual({ userId: 123, destination: 'savings' });
   });
 
   test('rejects a tampered signature', () => {
