@@ -32,9 +32,11 @@ import { startBunqSyncScheduler } from './lib/bunqSyncScheduler';
 import { startHoldingPriceSyncScheduler } from './lib/holdingPriceSyncScheduler';
 import { startCurrencyRateSyncScheduler } from './lib/currencyRateSyncScheduler';
 import { startNetWorthSnapshotScheduler } from './lib/netWorthSnapshotScheduler';
+import { httpTracing } from './lib/tracing';
 
 export const app = new Hono();
 
+app.use('*', httpTracing);
 app.use('*', corsMiddleware);
 app.use('*', requireCsrf);
 app.onError(errorHandler);

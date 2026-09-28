@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.6.0] - 2026-09-28
+
+- Add optional OpenTelemetry tracing for the backend: a server span per API request that continues the caller's trace, and a client span per Postgres query. It's enabled by setting `OTEL_EXPORTER_OTLP_ENDPOINT` and exports over OTLP/HTTP; query strings and parameter values aren't recorded.
+
 ## [v0.5.1] - 2026-09-10
 
 - Add a dismissible Savings prompt for users without a Bunq connection, including per-user
