@@ -122,6 +122,14 @@ Public routes (`/api/auth/*`, `/api/health`, `/api/readiness`, `/api/readiness/p
 
 The global error handler (`src/middleware/errorHandler.ts`) catches any unhandled exception and returns `{ error: message }` JSON with an appropriate status code.
 
+### Tracing
+
+The backend can export OpenTelemetry traces over OTLP/HTTP (`src/lib/tracing.ts`). It's off unless `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) is set; `OTEL_SDK_DISABLED=true` turns it off again.
+
+- `httpTracing`, the first middleware, opens a server span per request. It continues the caller's W3C `traceparent` (Nginx passes it through), and records the method, path, matched route, and status. A 5xx or a handler error marks the span as failed. The query string isn't recorded.
+- Every Postgres query Drizzle runs, including inside transactions, gets a child client span with the parameterized query text. Parameter values aren't recorded.
+- The service name is `quro-backend` unless `OTEL_SERVICE_NAME` sets another. Every sampled parent is kept, so sampling belongs to the collector.
+
 ---
 
 ## 4. bunq Integration
