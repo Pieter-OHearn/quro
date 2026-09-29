@@ -8,13 +8,11 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "ignoreDeprecations": "6.0",
     "noEmit": true,
     "paths": {
       "@/*": ["./src/*"],
       "@quro/shared": ["../shared/src"]
-    },
-    "baseUrl": "."
+    }
   },
   "include": ["src"]
 }
