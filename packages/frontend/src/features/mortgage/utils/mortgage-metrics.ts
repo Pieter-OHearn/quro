@@ -7,6 +7,16 @@ const SCHEDULE_MONTH_STEP = SCHEDULE_YEAR_STEP * MONTHS_PER_YEAR;
 const PAYMENT_BREAKDOWN_LIMIT = 6;
 const ISO_YEAR_MONTH_LENGTH = 7;
 
+const CENTS_PER_UNIT = 100;
+
+function toCents(amount: number): number {
+  return Math.round(amount * CENTS_PER_UNIT);
+}
+
+function fromCents(cents: number): number {
+  return cents / CENTS_PER_UNIT;
+}
+
 type YearMonth = { year: number; monthIndex: number };
 type CalendarDate = YearMonth & { day: number };
 
@@ -95,9 +105,9 @@ function buildScheduleRow(
 ): AmortizationRow {
   return {
     year: String(date.year),
-    balance: Math.round(balance),
-    principal: Math.round(principal),
-    interest: Math.round(interest),
+    balance: fromCents(toCents(balance)),
+    principal: fromCents(toCents(principal)),
+    interest: fromCents(toCents(interest)),
   };
 }
 
@@ -199,8 +209,9 @@ export function computePaymentBreakdownRows(txns: MortgageTransaction[]): Paymen
     const monthTimestamp = Date.parse(`${monthKey}-01T00:00:00Z`);
     if (!Number.isFinite(monthTimestamp)) continue;
 
-    const interest = txn.interest ?? 0;
-    const principal = txn.principal ?? Math.max(0, txn.amount - interest);
+    const interest = toCents(txn.interest ?? 0);
+    const principal =
+      txn.principal == null ? Math.max(0, toCents(txn.amount) - interest) : toCents(txn.principal);
     const month = byMonth.get(monthKey) ?? { principal: 0, interest: 0, timestamp: monthTimestamp };
     month.principal += principal;
     month.interest += interest;
@@ -212,8 +223,8 @@ export function computePaymentBreakdownRows(txns: MortgageTransaction[]): Paymen
     .slice(-PAYMENT_BREAKDOWN_LIMIT)
     .map((month) => ({
       month: new Date(month.timestamp).toLocaleDateString('en-GB', { month: 'short' }),
-      principal: Math.round(month.principal),
-      interest: Math.round(month.interest),
+      principal: fromCents(month.principal),
+      interest: fromCents(month.interest),
     }));
 }
 

@@ -2,7 +2,11 @@
 
 import { expect, test } from 'bun:test';
 import type { Mortgage } from '@quro/shared';
-import { computeMortgageMetrics, generateSchedule } from './mortgage-metrics';
+import {
+  computeMortgageMetrics,
+  computePaymentBreakdownRows,
+  generateSchedule,
+} from './mortgage-metrics';
 
 const mortgageBase: Mortgage = {
   id: 1,
@@ -103,4 +107,28 @@ test('recorded overpayments shorten a linear mortgage projection', () => {
   expect(schedule.at(-1)?.year).toBe('2034');
   expect(schedule.at(-1)?.balance).toBe(0);
   expect(schedule.at(-1)?.principal).toBe(2200);
+});
+
+test('keeps payment breakdown amounts at cent precision', () => {
+  const rows = computePaymentBreakdownRows([
+    {
+      id: 1,
+      mortgageId: 1,
+      type: 'repayment',
+      date: '2026-08-28',
+      amount: 4220.21,
+      interest: 2262,
+      principal: 1958.21,
+    } as never,
+    {
+      id: 2,
+      mortgageId: 1,
+      type: 'repayment',
+      date: '2026-08-29',
+      amount: 0.1,
+      interest: 0.1,
+      principal: 0.2,
+    } as never,
+  ]);
+  expect(rows).toEqual([{ month: 'Aug', principal: 1958.41, interest: 2262.1 }]);
 });
