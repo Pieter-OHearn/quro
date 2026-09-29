@@ -11,28 +11,29 @@ import {
   parseInteger,
   parseIntegerField,
   parseNonEmptyString,
-  parseNumber,
   parseNormalizedDecimal,
   parseNormalizedDecimalField,
+  parseNumber,
   parseNumberField,
+  parseOptionalBooleanField,
   parseOptionalDateField,
   parseOptionalId,
-  parseOptionalBooleanField,
   parseOptionalIntegerField,
+  parseOptionalNormalizedDecimalField,
   parseOptionalNumberField,
   parseOptionalTextField,
   parsePatchFields,
   parsePositiveNumberField,
-  pickPatchedValue,
-  readJsonRecord,
-  toFiniteNumberOrNull,
-  toNumberOrZero,
   parseRequiredFields,
   parseString,
   parseTextField,
+  parseWholeNumber,
+  pickPatchedValue,
   readJsonBody,
+  readJsonRecord,
   rejectUnknownFields,
 } from './requestValidation';
+import { toNumberOrZero } from './numbers';
 
 describe('request validation primitives', () => {
   test('constructs success and error results', () => {
@@ -184,9 +185,29 @@ describe('shared helpers', () => {
     expect(parseNormalizedDecimalField('-1', 'bad', 0)).toEqual(err('bad'));
   });
 
+  test('handles grouped decimals and rejects ambiguous or malformed input', () => {
+    expect(parseNormalizedDecimal('1,250,000')).toBe(1_250_000);
+    expect(parseNormalizedDecimal('1.234.567')).toBe(1_234_567);
+    expect(parseNormalizedDecimal('0,125')).toBe(0.125);
+    expect(parseNormalizedDecimal('.5')).toBe(0.5);
+    expect(parseNormalizedDecimal('250,000')).toBeNull();
+    expect(parseNormalizedDecimal('1,5.3')).toBeNull();
+    expect(parseNormalizedDecimal('12abc')).toBeNull();
+    expect(parseOptionalNormalizedDecimalField('', 'bad')).toEqual(ok(null));
+    expect(parseOptionalNormalizedDecimalField('250,000', 'bad')).toEqual(err('bad'));
+  });
+
+  test('parses whole numbers from integral values', () => {
+    expect(parseWholeNumber('40.0')).toBe(40);
+    expect(parseWholeNumber('4e1')).toBe(40);
+    expect(parseWholeNumber(3)).toBe(3);
+    expect(parseWholeNumber('4.5')).toBeNull();
+    expect(parseWholeNumber('')).toBeNull();
+  });
+
   test('coerces numbers with null or zero fallbacks', () => {
-    expect(toFiniteNumberOrNull('3.5')).toBe(3.5);
-    expect(toFiniteNumberOrNull('abc')).toBeNull();
+    expect(parseNumber('3.5')).toBe(3.5);
+    expect(parseNumber('abc')).toBeNull();
     expect(toNumberOrZero(null)).toBe(0);
     expect(toNumberOrZero('4')).toBe(4);
   });

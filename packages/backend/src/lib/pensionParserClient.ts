@@ -1,4 +1,4 @@
-import { toNumberOrZero } from './requestValidation';
+import { toNumberOrZero } from './numbers';
 
 const DEFAULT_PARSER_TIMEOUT_MS = 300_000;
 const DEFAULT_PARSER_HEALTH_TIMEOUT_MS = 4_000;

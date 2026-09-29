@@ -22,21 +22,20 @@ import {
 import {
   err,
   type FieldParsers,
-  isRecord,
+  ok,
   parseCurrencyField,
   parseDateField,
   parseId,
-  parseNumber,
   parseNumberField,
-  parseOptionalIntegerField,
-  parseOptionalNumberField,
   parsePatchFields,
   parseRequiredFields,
   type ParseResult,
   parseTextField,
-  readJsonBody,
+  parseWholeNumber,
+  readJsonRecord,
   rejectUnknownFields,
 } from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
 import { getS3ObjectBytes } from '../lib/s3';
 
 const app = new Hono();
@@ -71,27 +70,31 @@ const PAYSLIP_FIELDS = [
   'currency',
 ] as const;
 
+function parseEmploymentIdField(value: unknown): ParseResult<number | null> {
+  if (value == null || value === '') return ok(null);
+  const parsed = parseWholeNumber(value);
+  return parsed !== null && parsed > 0 ? ok(parsed) : err('Invalid employment');
+}
+
 const payslipFieldParsers: FieldParsers<PayslipInput> = {
-  employmentId: (value) => parseOptionalIntegerField(value, 'Invalid employment', 1),
+  employmentId: parseEmploymentIdField,
   month: (value) => parseTextField(value, 'Invalid month'),
   date: (value) => parseDateField(value, 'Invalid date (expected YYYY-MM-DD)'),
   gross: (value) => parseNumberField(value, 'Invalid gross', 0),
   tax: (value) => parseNumberField(value, 'Invalid tax', 0),
   pension: (value) => parseNumberField(value, 'Invalid pension', 0),
   net: (value) => parseNumberField(value, 'Invalid net', 0),
-  bonus: (value) => parseOptionalNumberField(value, 'Invalid bonus', 0),
+  bonus: (value) => (value == null ? ok(null) : parseNumberField(value, 'Invalid bonus', 0)),
   currency: parseCurrencyField,
 };
 
-function parsePayslipCreate(body: unknown): ParseResult<PayslipInput> {
-  if (!isRecord(body)) return err('Invalid payslip payload');
+function parsePayslipCreate(body: Record<string, unknown>): ParseResult<PayslipInput> {
   const strictCheck = rejectUnknownFields(body, PAYSLIP_FIELDS);
   if (!strictCheck.ok) return strictCheck;
   return parseRequiredFields(body, payslipFieldParsers);
 }
 
-function parsePayslipPatch(body: unknown): ParseResult<Partial<PayslipInput>> {
-  if (!isRecord(body)) return err('Invalid payslip payload');
+function parsePayslipPatch(body: Record<string, unknown>): ParseResult<Partial<PayslipInput>> {
   const strictCheck = rejectUnknownFields(body, PAYSLIP_FIELDS);
   if (!strictCheck.ok) return strictCheck;
   return parsePatchFields(body, payslipFieldParsers);
@@ -264,7 +267,7 @@ app.get('/payslips/:id', async (c) => {
 
 app.post('/payslips', async (c) => {
   const user = getAuthUser(c);
-  const rawBody = await readJsonBody(c.req, 'Invalid payslip payload');
+  const rawBody = await readJsonRecord(c.req, 'Invalid payslip payload');
   if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
 
   const body = parsePayslipCreate(rawBody.value);
@@ -289,7 +292,7 @@ app.patch('/payslips/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const rawBody = await readJsonBody(c.req, 'Invalid payslip payload');
+  const rawBody = await readJsonRecord(c.req, 'Invalid payslip payload');
   if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
 
   const body = parsePayslipPatch(rawBody.value);
@@ -442,7 +445,7 @@ app.get('/history', async (c) => {
     const year = Number.parseInt(payslipRow.date.slice(0, DATE_YEAR_LENGTH), DECIMAL_RADIX);
     if (!Number.isInteger(year)) continue;
 
-    const gross = (parseNumber(payslipRow.gross) ?? 0) + (parseNumber(payslipRow.bonus) ?? 0);
+    const gross = toNumberOrZero(payslipRow.gross) + toNumberOrZero(payslipRow.bonus);
     const key = `${year}:${payslipRow.currency}`;
     const existing = annualSalaryByYearAndCurrency.get(key);
 

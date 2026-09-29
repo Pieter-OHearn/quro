@@ -1,11 +1,5 @@
 import { Hono } from 'hono';
-import {
-  PENSION_POT_TYPES,
-  PENSION_TRANSACTION_TYPES,
-  type CurrencyCode,
-  type PensionPotType,
-  type PensionTransactionType,
-} from '@quro/shared';
+import { PENSION_POT_TYPES, type CurrencyCode, type PensionPotType } from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
@@ -30,7 +24,6 @@ import {
   isRecord,
   ok,
   parseCurrencyField,
-  parseDateString,
   parseId,
   parseNumberField,
   parseOptionalTextField,
@@ -40,9 +33,12 @@ import {
   parseTextField,
   readJsonBody,
   rejectUnknownFields,
-  toFiniteNumberOrNull,
-  toNumberOrZero,
 } from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
+import {
+  type NormalizedPensionTransactionPayload,
+  validatePensionTransactionPayload,
+} from '../lib/pensionTransactionValidation';
 
 const app = new Hono();
 const PENSION_POT_FIELDS = [
@@ -84,36 +80,6 @@ type PensionPotPayload = {
   notes: string | null;
 };
 
-type NormalizedPensionTransactionPayload = {
-  potId: number;
-  type: PensionTransactionType;
-  amount: number;
-  taxAmount: number;
-  date: string;
-  note: string;
-  isEmployer: boolean | null;
-};
-
-type RawPensionTransactionPayload = {
-  potId: unknown;
-  type: unknown;
-  amount: unknown;
-  taxAmount: unknown;
-  date: unknown;
-  note: unknown;
-  isEmployer: unknown;
-};
-
-type ParsedPensionTransactionPayloadBase = {
-  potId: number;
-  type: PensionTransactionType;
-  amount: number;
-  taxAmount: number;
-  date: string;
-  note: string;
-  isEmployer: unknown;
-};
-
 type PensionStatementDocumentRecord = {
   id: number;
   transactionId: number;
@@ -124,9 +90,6 @@ type PensionStatementDocumentRecord = {
   sizeBytes: number;
   uploadedAt: Date;
 };
-
-type ValidationResult =
-  { ok: true; data: NormalizedPensionTransactionPayload } | { ok: false; error: string };
 
 type RouteMutationResult =
   { data: unknown } | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
@@ -248,13 +211,6 @@ function toPensionTransactionUpdatePayload(
   };
 }
 
-function parsePensionTransactionType(value: unknown): PensionTransactionType | null {
-  if (typeof value !== 'string') return null;
-  return PENSION_TRANSACTION_TYPES.includes(value as PensionTransactionType)
-    ? (value as PensionTransactionType)
-    : null;
-}
-
 function parsePensionPotCreate(body: unknown): ParseResult<PensionPotPayload> {
   if (!isRecord(body)) return err('Invalid pension pot payload');
   const strictCheck = rejectUnknownFields(body, PENSION_POT_FIELDS);
@@ -293,7 +249,7 @@ function parsePensionTransactionCreate(
     note: body.note,
     isEmployer: body.isEmployer,
   });
-  return validated.ok ? ok(validated.data) : err(validated.error);
+  return validated;
 }
 
 function parsePensionTransactionPatch(body: unknown): ParseResult<Record<string, unknown>> {
@@ -312,95 +268,6 @@ function buildPensionDocumentStorageKey(params: {
     userId: params.userId,
     pathSegments: ['pensions', params.potId, 'annual-statements', params.transactionId],
   });
-}
-
-function parsePensionTransactionPayloadBase(
-  rawPayload: RawPensionTransactionPayload,
-): { ok: true; data: ParsedPensionTransactionPayloadBase } | { ok: false; error: string } {
-  const potId = parseId(String(rawPayload.potId ?? ''));
-  if (potId === null) return { ok: false, error: 'Invalid pension pot id' };
-
-  const type = parsePensionTransactionType(rawPayload.type);
-  if (!type) return { ok: false, error: 'Invalid transaction type' };
-
-  const amount = toFiniteNumberOrNull(rawPayload.amount);
-  if (amount === null) return { ok: false, error: 'Invalid transaction amount' };
-
-  const taxAmount = toFiniteNumberOrNull(rawPayload.taxAmount ?? 0);
-  if (taxAmount === null) return { ok: false, error: 'Invalid tax amount' };
-
-  const date = parseDateString(rawPayload.date);
-  if (!date) return { ok: false, error: 'Invalid transaction date' };
-
-  return {
-    ok: true,
-    data: {
-      potId,
-      type,
-      amount,
-      taxAmount,
-      date,
-      note: typeof rawPayload.note === 'string' ? rawPayload.note : '',
-      isEmployer: rawPayload.isEmployer,
-    },
-  };
-}
-
-function validateContributionPayload(base: ParsedPensionTransactionPayloadBase): ValidationResult {
-  if (base.amount <= 0)
-    return { ok: false, error: 'Contribution amount must be greater than zero' };
-  if (base.taxAmount < 0) return { ok: false, error: 'Tax amount cannot be negative' };
-  if (base.taxAmount > base.amount)
-    return { ok: false, error: 'Tax amount cannot exceed contribution amount' };
-  if (typeof base.isEmployer !== 'boolean')
-    return { ok: false, error: 'Contribution requires employer/employee source' };
-
-  return {
-    ok: true,
-    data: {
-      potId: base.potId,
-      type: base.type,
-      amount: base.amount,
-      taxAmount: base.taxAmount,
-      date: base.date,
-      note: base.note,
-      isEmployer: base.isEmployer,
-    },
-  };
-}
-
-function validateFeePayload(base: ParsedPensionTransactionPayloadBase): ValidationResult {
-  if (base.amount <= 0) return { ok: false, error: 'Fee amount must be greater than zero' };
-  return {
-    ok: true,
-    data: {
-      potId: base.potId,
-      type: base.type,
-      amount: base.amount,
-      taxAmount: 0,
-      date: base.date,
-      note: base.note,
-      isEmployer: null,
-    },
-  };
-}
-
-function validateAnnualStatementPayload(
-  base: ParsedPensionTransactionPayloadBase,
-): ValidationResult {
-  if (base.amount === 0) return { ok: false, error: 'Annual statement amount cannot be zero' };
-  return {
-    ok: true,
-    data: {
-      potId: base.potId,
-      type: base.type,
-      amount: base.amount,
-      taxAmount: 0,
-      date: base.date,
-      note: base.note,
-      isEmployer: null,
-    },
-  };
 }
 
 function computePensionTransactionDelta(txn: {
@@ -440,17 +307,6 @@ function normalizeTransactionRow(row: {
     note: row.note ?? '',
     isEmployer: row.isEmployer ?? null,
   };
-}
-
-function validatePensionTransactionPayload(
-  rawPayload: RawPensionTransactionPayload,
-): ValidationResult {
-  const parsed = parsePensionTransactionPayloadBase(rawPayload);
-  if (!parsed.ok) return parsed;
-
-  if (parsed.data.type === 'contribution') return validateContributionPayload(parsed.data);
-  if (parsed.data.type === 'fee') return validateFeePayload(parsed.data);
-  return validateAnnualStatementPayload(parsed.data);
 }
 
 function formatStatementDocumentResponse(document: PensionStatementDocumentRecord) {
@@ -647,7 +503,7 @@ async function getStatementDocumentByTransaction(params: {
 function mergePensionTransactionPayload(
   raw: Record<string, unknown>,
   existing: ReturnType<typeof normalizeTransactionRow>,
-): ValidationResult {
+): ParseResult<NormalizedPensionTransactionPayload> {
   return validatePensionTransactionPayload({
     potId: raw.potId ?? existing.potId,
     type: raw.type ?? existing.type,
@@ -762,7 +618,7 @@ async function updatePensionTransaction(params: {
     const mergedPayload = mergePensionTransactionPayload(params.raw, normalizedExisting);
     if (!mergedPayload.ok) return { error: mergedPayload.error, status: HTTP_STATUS.BAD_REQUEST };
 
-    const nextPayload = mergedPayload.data;
+    const nextPayload = mergedPayload.value;
     const movingToAnotherPot = nextPayload.potId !== normalizedExisting.potId;
     if (
       movingToAnotherPot &&

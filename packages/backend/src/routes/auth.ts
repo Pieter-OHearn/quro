@@ -21,6 +21,7 @@ import {
   publicUserColumns,
 } from '../lib/users';
 import { isUniqueViolation } from '../lib/postgresErrors';
+import { parseWholeNumber } from '../lib/requestValidation';
 
 const app = new Hono();
 
@@ -76,14 +77,8 @@ function parseOptionalWholeNumber(rawValue: unknown, fallback: number) {
     return fallback;
   }
 
-  const normalized =
-    typeof rawValue === 'string'
-      ? Number(rawValue.trim())
-      : typeof rawValue === 'number'
-        ? rawValue
-        : Number.NaN;
-
-  return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+  const parsed = parseWholeNumber(rawValue);
+  return parsed !== null && parsed > 0 ? parsed : null;
 }
 
 const SESSION_MAX_AGE = SESSION_DURATION_DAYS * DAY_MS;

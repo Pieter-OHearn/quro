@@ -20,7 +20,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { publicUserColumns } from '../lib/users';
 import { changePasswordRateLimit } from '../middleware/rateLimit';
-import { err, ok, parseInteger, type ParseResult } from '../lib/requestValidation';
+import { err, ok, parseWholeNumber, type ParseResult } from '../lib/requestValidation';
 
 const app = new Hono();
 
@@ -37,8 +37,8 @@ function parseProfilePayload(payload: unknown): ParseResult<UpdateUserProfileInp
   const lastName = typeof raw.lastName === 'string' ? raw.lastName.trim() : '';
   const email = typeof raw.email === 'string' ? raw.email.toLowerCase().trim() : '';
   const location = typeof raw.location === 'string' ? raw.location.trim() : '';
-  const age = parseInteger(raw.age);
-  const retirementAge = parseInteger(raw.retirementAge);
+  const age = parseWholeNumber(raw.age);
+  const retirementAge = parseWholeNumber(raw.retirementAge);
 
   if (!firstName) return err('First name is required');
   if (!lastName) return err('Last name is required');

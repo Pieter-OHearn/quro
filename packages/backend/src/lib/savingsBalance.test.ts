@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { savingsAccounts } from '../db/schema';
-import { toNumberOrZero } from './requestValidation';
+import { toNumberOrZero } from './numbers';
 import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from './savingsBalance';
 
 type SavingsBalanceClient = Parameters<typeof updateSavingsAccountBalanceByDelta>[0];

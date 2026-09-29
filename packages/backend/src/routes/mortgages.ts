@@ -26,6 +26,7 @@ import {
   parseId,
   parseIntegerField,
   parseNormalizedDecimalField,
+  parseNumber,
   parseOptionalId,
   parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
@@ -36,7 +37,6 @@ import {
   pickPatchedValue,
   readJsonBody,
   rejectUnknownFields,
-  toFiniteNumberOrNull,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -637,7 +637,7 @@ function toMortgageValues(
     currency: property.currency as CurrencyCode,
     originalAmount: payload.originalAmount,
     outstandingBalance: payload.outstandingBalance,
-    propertyValue: toFiniteNumberOrNull(property.currentValue) ?? payload.propertyValue,
+    propertyValue: parseNumber(property.currentValue) ?? payload.propertyValue,
     monthlyPayment: payload.monthlyPayment,
     interestRate: payload.interestRate,
     rateType: payload.rateType,
@@ -737,7 +737,7 @@ app.post('/', async (c) => {
   const propertyResult = await fetchLinkedProperty(user.id, partnerId, linkedPropertyId.value, 0);
   if (!propertyResult.ok) return c.json({ error: propertyResult.error }, propertyResult.status);
   const property = propertyResult.property;
-  const propertyValue = toFiniteNumberOrNull(property.currentValue);
+  const propertyValue = parseNumber(property.currentValue);
   if (propertyValue === null || propertyValue <= 0) {
     return c.json({ error: 'Property value must be greater than zero' }, HTTP_STATUS.BAD_REQUEST);
   }

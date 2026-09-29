@@ -39,8 +39,8 @@ import {
   parseTextField,
   readJsonBody,
   rejectUnknownFields,
-  toNumberOrZero,
 } from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
 
 const app = new Hono();
 

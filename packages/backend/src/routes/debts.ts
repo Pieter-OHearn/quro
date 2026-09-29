@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { DEBT_TYPES, type CurrencyCode, type DebtType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
-import { db, type DbTransaction } from '../db/client';
+import { db, type DbExecutor } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { invalidateSnapshotsFrom } from '../lib/netWorth';
@@ -229,7 +229,7 @@ function mergeDebtPayload(
 }
 
 async function getDebtById(
-  tx: DbTransaction | typeof db,
+  tx: DbExecutor,
   userId: number,
   debtId: number,
 ): Promise<typeof debts.$inferSelect | null> {

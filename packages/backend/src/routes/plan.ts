@@ -55,8 +55,8 @@ import {
   type ParseResult,
   readJsonBody,
   rejectUnknownFields,
-  toNumberOrZero,
 } from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
 
 const app = new Hono();
 const ISO_DATE_LENGTH = 10;
@@ -584,7 +584,10 @@ function buildEurRunwayResponse(
               entityId: account.bankingEntityId,
               entityName: account.bankingEntityName,
               scheme: account.depositGuaranteeScheme,
-              cap: account.depositGuaranteeCap ? toNumberOrZero(account.depositGuaranteeCap) : null,
+              cap:
+                account.depositGuaranteeCap != null
+                  ? toNumberOrZero(account.depositGuaranteeCap)
+                  : null,
               currency: account.depositGuaranteeCurrency,
             }
           : null,

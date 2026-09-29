@@ -17,7 +17,6 @@ import {
   parseBooleanField,
   parseId,
   parseOptionalDateField,
-  parseOptionalIntegerField,
   parsePatchFields,
   parseRequiredFields,
   type ParseResult,
@@ -60,19 +59,29 @@ function parseEmploymentTypeField(value: unknown): ParseResult<EmploymentType> {
     : err('Invalid employment type');
 }
 
+// These keys must be sent on create; `null` or '' clears them.
+function parseNullableDateField(value: unknown, label: string): ParseResult<string | null> {
+  const error = `${label} must be a valid ISO date`;
+  return value === undefined ? err(error) : parseOptionalDateField(value, error);
+}
+
+function parseNoticePeriodField(value: unknown): ParseResult<number | null> {
+  if (value === null || value === '') return ok(null);
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= MAX_NOTICE_PERIOD_MONTHS
+    ? ok(value)
+    : err('Notice period must be 0 to 24 months');
+}
+
 // Keep create and patch validation in one strict field parser so both endpoints cannot drift.
 const employmentParsers: FieldParsers<EmploymentValues> = {
   employerName: (value) => parseTextField(value, 'Employer name is required'),
   employmentType: parseEmploymentTypeField,
-  serviceStartDate: (value) => parseOptionalDateField(value, 'Start date must be a valid ISO date'),
-  endDate: (value) => parseOptionalDateField(value, 'End date must be a valid ISO date'),
-  noticePeriodMonths: (value) =>
-    parseOptionalIntegerField(
-      value,
-      'Notice period must be 0 to 24 months',
-      0,
-      MAX_NOTICE_PERIOD_MONTHS,
-    ),
+  serviceStartDate: (value) => parseNullableDateField(value, 'Start date'),
+  endDate: (value) => parseNullableDateField(value, 'End date'),
+  noticePeriodMonths: parseNoticePeriodField,
   isPrimary: (value) =>
     value === undefined ? ok(undefined) : parseBooleanField(value, 'Primary must be true or false'),
 };

@@ -28,19 +28,20 @@ import {
   err,
   isRecord,
   ok,
-  parseDateString,
   parseId,
   type ParseResult,
   readJsonBody,
   rejectUnknownFields,
-  toFiniteNumberOrNull,
-  toNumberOrZero,
 } from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
 import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
+import {
+  type NormalizedPensionTransactionPayload,
+  validatePensionTransactionPayload,
+} from '../lib/pensionTransactionValidation';
 
 const app = new Hono();
 
-const TRANSACTION_TYPES = ['contribution', 'fee', 'annual_statement'] as const;
 const EDITABLE_IMPORT_ROW_FIELDS = [
   'type',
   'amount',
@@ -60,41 +61,6 @@ const DEFAULT_LANGUAGE_HINTS = ['en', 'nl'];
 const IMPORT_TTL_DAYS_DEFAULT = 7;
 const IMPORT_LIST_DEFAULT_LIMIT = 30;
 const IMPORT_LIST_MAX_LIMIT = 100;
-
-type PensionTransactionType = (typeof TRANSACTION_TYPES)[number];
-
-type RawPensionTransactionPayload = {
-  potId: unknown;
-  type: unknown;
-  amount: unknown;
-  taxAmount: unknown;
-  date: unknown;
-  note: unknown;
-  isEmployer: unknown;
-};
-
-type ParsedPensionTransactionPayloadBase = {
-  potId: number;
-  type: PensionTransactionType;
-  amount: number;
-  taxAmount: number;
-  date: string;
-  note: string;
-  isEmployer: unknown;
-};
-
-type NormalizedPensionTransactionPayload = {
-  potId: number;
-  type: PensionTransactionType;
-  amount: number;
-  taxAmount: number;
-  date: string;
-  note: string;
-  isEmployer: boolean | null;
-};
-
-type ValidationResult =
-  { ok: true; data: NormalizedPensionTransactionPayload } | { ok: false; error: string };
 
 type ImportStatus =
   'queued' | 'processing' | 'ready_for_review' | 'failed' | 'committed' | 'expired' | 'cancelled';
@@ -137,112 +103,6 @@ type ImportFeedRow = {
   potProvider: string;
   potEmoji: string | null;
 };
-
-function parsePensionTransactionType(value: unknown): PensionTransactionType | null {
-  if (typeof value !== 'string') return null;
-  return TRANSACTION_TYPES.includes(value as PensionTransactionType)
-    ? (value as PensionTransactionType)
-    : null;
-}
-
-function parsePensionTransactionPayloadBase(
-  rawPayload: RawPensionTransactionPayload,
-): { ok: true; data: ParsedPensionTransactionPayloadBase } | { ok: false; error: string } {
-  const potId = parseId(String(rawPayload.potId ?? ''));
-  if (potId === null) return { ok: false, error: 'Invalid pension pot id' };
-
-  const type = parsePensionTransactionType(rawPayload.type);
-  if (!type) return { ok: false, error: 'Invalid transaction type' };
-
-  const amount = toFiniteNumberOrNull(rawPayload.amount);
-  if (amount === null) return { ok: false, error: 'Invalid transaction amount' };
-
-  const taxAmount = toFiniteNumberOrNull(rawPayload.taxAmount ?? 0);
-  if (taxAmount === null) return { ok: false, error: 'Invalid tax amount' };
-
-  const date = parseDateString(rawPayload.date);
-  if (!date) return { ok: false, error: 'Invalid transaction date' };
-
-  return {
-    ok: true,
-    data: {
-      potId,
-      type,
-      amount,
-      taxAmount,
-      date,
-      note: typeof rawPayload.note === 'string' ? rawPayload.note : '',
-      isEmployer: rawPayload.isEmployer,
-    },
-  };
-}
-
-function validateContributionPayload(base: ParsedPensionTransactionPayloadBase): ValidationResult {
-  if (base.amount <= 0)
-    return { ok: false, error: 'Contribution amount must be greater than zero' };
-  if (base.taxAmount < 0) return { ok: false, error: 'Tax amount cannot be negative' };
-  if (base.taxAmount > base.amount)
-    return { ok: false, error: 'Tax amount cannot exceed contribution amount' };
-  if (typeof base.isEmployer !== 'boolean')
-    return { ok: false, error: 'Contribution requires employer/employee source' };
-
-  return {
-    ok: true,
-    data: {
-      potId: base.potId,
-      type: base.type,
-      amount: base.amount,
-      taxAmount: base.taxAmount,
-      date: base.date,
-      note: base.note,
-      isEmployer: base.isEmployer,
-    },
-  };
-}
-
-function validateFeePayload(base: ParsedPensionTransactionPayloadBase): ValidationResult {
-  if (base.amount <= 0) return { ok: false, error: 'Fee amount must be greater than zero' };
-  return {
-    ok: true,
-    data: {
-      potId: base.potId,
-      type: base.type,
-      amount: base.amount,
-      taxAmount: 0,
-      date: base.date,
-      note: base.note,
-      isEmployer: null,
-    },
-  };
-}
-
-function validateAnnualStatementPayload(
-  base: ParsedPensionTransactionPayloadBase,
-): ValidationResult {
-  if (base.amount === 0) return { ok: false, error: 'Annual statement amount cannot be zero' };
-  return {
-    ok: true,
-    data: {
-      potId: base.potId,
-      type: base.type,
-      amount: base.amount,
-      taxAmount: 0,
-      date: base.date,
-      note: base.note,
-      isEmployer: null,
-    },
-  };
-}
-
-function validatePensionTransactionPayload(
-  rawPayload: RawPensionTransactionPayload,
-): ValidationResult {
-  const parsed = parsePensionTransactionPayloadBase(rawPayload);
-  if (!parsed.ok) return parsed;
-  if (parsed.data.type === 'contribution') return validateContributionPayload(parsed.data);
-  if (parsed.data.type === 'fee') return validateFeePayload(parsed.data);
-  return validateAnnualStatementPayload(parsed.data);
-}
 
 function parseEditableImportRowPatch(body: unknown): ParseResult<Record<string, unknown>> {
   if (!isRecord(body)) return err('Invalid import row payload');
@@ -569,7 +429,7 @@ function validateEditableRowUpdate(params: {
   importRecord: ImportRecord;
   existingRow: ImportRowRecord;
   body: Record<string, unknown>;
-}): ValidationResult {
+}): ParseResult<NormalizedPensionTransactionPayload> {
   return validatePensionTransactionPayload({
     potId: params.importRecord.potId,
     type: params.body.type ?? params.existingRow.type,
@@ -651,13 +511,13 @@ async function commitRowsToLedger(params: {
         .values({
           userId: params.userId,
           potId: params.importRecord.potId,
-          type: validated.data.type,
-          amount: validated.data.amount,
-          taxAmount: validated.data.taxAmount,
-          date: validated.data.date,
-          note: validated.data.note,
-          isEmployer: validated.data.isEmployer,
-          ...(validated.data.type === 'annual_statement'
+          type: validated.value.type,
+          amount: validated.value.amount,
+          taxAmount: validated.value.taxAmount,
+          date: validated.value.date,
+          note: validated.value.note,
+          isEmployer: validated.value.isEmployer,
+          ...(validated.value.type === 'annual_statement'
             ? {
                 documentStorageKey: params.importRecord.storageKey,
                 documentFileName: params.importRecord.fileName,
@@ -669,12 +529,13 @@ async function commitRowsToLedger(params: {
         .returning();
 
       committedTransactionIds.push(transaction.id);
-      if (validated.data.type === 'annual_statement') annualStatementTransactionId = transaction.id;
+      if (validated.value.type === 'annual_statement')
+        annualStatementTransactionId = transaction.id;
 
       await tx
         .update(pensionPots)
         .set({
-          balance: sql`CAST(${pensionPots.balance} AS numeric) + ${computePensionTransactionDelta(validated.data)}`,
+          balance: sql`CAST(${pensionPots.balance} AS numeric) + ${computePensionTransactionDelta(validated.value)}`,
         })
         .where(
           and(eq(pensionPots.id, params.importRecord.potId), eq(pensionPots.userId, params.userId)),
@@ -1066,12 +927,12 @@ app.patch('/:id/rows/:rowId', async (c) => {
   const [updated] = await db
     .update(pensionStatementImportRows)
     .set({
-      type: validated.data.type,
-      amount: validated.data.amount,
-      taxAmount: validated.data.taxAmount,
-      date: validated.data.date,
-      note: validated.data.note,
-      isEmployer: validated.data.isEmployer,
+      type: validated.value.type,
+      amount: validated.value.amount,
+      taxAmount: validated.value.taxAmount,
+      date: validated.value.date,
+      note: validated.value.note,
+      isEmployer: validated.value.isEmployer,
       editedAt: now,
       updatedAt: now,
     })

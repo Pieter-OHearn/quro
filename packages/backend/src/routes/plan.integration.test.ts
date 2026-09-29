@@ -357,6 +357,16 @@ describe('plan integration', () => {
     });
     expect(invalid.status).toBe(400);
 
+    const missingNullableFields = await integration.request('/api/employments', {
+      method: 'POST',
+      cookie: owner.cookie,
+      json: { employerName: 'Freelance', employmentType: 'self_employed' },
+    });
+    expect(missingNullableFields.status).toBe(400);
+    expect(await missingNullableFields.json()).toEqual({
+      error: 'Start date must be a valid ISO date',
+    });
+
     const ids: number[] = [];
     for (const [month, year] of [
       ['Jul', 2026],

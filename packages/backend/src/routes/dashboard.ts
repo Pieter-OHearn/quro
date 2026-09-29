@@ -36,7 +36,7 @@ import {
   type DerivedAllocationSummary,
 } from '../lib/netWorth';
 import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
-import { toNumberOrZero } from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
 
 const app = new Hono();
 const BASE_CURRENCY = FX_BASE_CURRENCY;

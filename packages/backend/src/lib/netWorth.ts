@@ -14,7 +14,7 @@ import {
 import { convertToBaseCurrency, FX_BASE_CURRENCY } from './currencyRateCache';
 import { getCurrentRatesToBaseCurrency } from './currencyRateSync';
 import { getAcceptedPartnerId, ownedOrJointPredicate } from './partner';
-import { toNumberOrZero } from './requestValidation';
+import { toNumberOrZero } from './numbers';
 
 const JOINT_WEIGHT = 0.5;
 const ISO_MONTH_LENGTH = 7;

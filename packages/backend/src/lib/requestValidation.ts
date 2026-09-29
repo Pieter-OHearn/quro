@@ -1,4 +1,5 @@
 import { isCurrencyCode, type CurrencyCode } from '@quro/shared';
+import { parseNumber } from './numbers';
 
 const MAX_INT32 = 2_147_483_647;
 const ISO_DATE_LENGTH = 10;
@@ -96,14 +97,7 @@ export function parseInteger(value: unknown): number | null {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
-export function parseNumber(value: unknown): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+export { parseNumber };
 
 export function parseString(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() : null;
@@ -211,25 +205,50 @@ export function parseOptionalId(value: unknown): number | null | 'invalid' {
   return parsed === null ? 'invalid' : parsed;
 }
 
-// Accepts both `1,234.56` and `1.234,56` style decimals; the last separator is the decimal point.
+const DECIMAL_PATTERN = /^-?(\d+(\.\d+)?|\.\d+)$/;
+// `1,500` could be 1500 or 1.5, so a lone comma before exactly three digits is rejected.
+const AMBIGUOUS_COMMA_PATTERN = /^-?[1-9]\d{0,2},\d{3}$/;
+
+function stripGroupSeparators(value: string, separator: ',' | '.'): string | null {
+  if (!value.includes(separator)) return value;
+  const grouped = new RegExp(`^-?\\d{1,3}(\\${separator}\\d{3})+$`);
+  return grouped.test(value) ? value.replaceAll(separator, '') : null;
+}
+
+function normalizeSingleSeparator(value: string, separator: ',' | '.'): string | null {
+  if (value.indexOf(separator) !== value.lastIndexOf(separator)) {
+    return stripGroupSeparators(value, separator);
+  }
+  if (separator === ',' && AMBIGUOUS_COMMA_PATTERN.test(value)) return null;
+  return value.replace(separator, '.');
+}
+
+function normalizeDecimalString(value: string): string | null {
+  const lastComma = value.lastIndexOf(',');
+  const lastDot = value.lastIndexOf('.');
+  if (lastComma < 0 && lastDot < 0) return value;
+  if (lastComma < 0) return normalizeSingleSeparator(value, '.');
+  if (lastDot < 0) return normalizeSingleSeparator(value, ',');
+
+  const decimalIndex = Math.max(lastComma, lastDot);
+  const integerPart = stripGroupSeparators(
+    value.slice(0, decimalIndex),
+    decimalIndex === lastComma ? '.' : ',',
+  );
+  return integerPart === null ? null : `${integerPart}.${value.slice(decimalIndex + 1)}`;
+}
+
+// Accepts `1234.56`, `1,234.56`, `1.234,56` and `12,5`. Input where the grouping is malformed
+// or the meaning is unclear returns null rather than a silently wrong number.
 export function parseNormalizedDecimal(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value !== 'string') return null;
   const compact = value.replace(/\s+/g, '');
   if (!compact) return null;
 
-  const hasComma = compact.includes(',');
-  let normalized = compact;
-  if (hasComma && compact.includes('.')) {
-    normalized =
-      compact.lastIndexOf(',') > compact.lastIndexOf('.')
-        ? compact.replaceAll('.', '').replace(',', '.')
-        : compact.replaceAll(',', '');
-  } else if (hasComma) {
-    normalized = compact.replace(',', '.');
-  }
-
-  const parsed = Number.parseFloat(normalized);
+  const normalized = normalizeDecimalString(compact);
+  if (normalized === null || !DECIMAL_PATTERN.test(normalized)) return null;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -248,18 +267,15 @@ export function parseOptionalNormalizedDecimalField(
   min = Number.NEGATIVE_INFINITY,
 ): ParseResult<number | null> {
   if (value == null || value === '') return ok(null);
-  const parsed = parseNormalizedDecimal(value);
-  return parsed === null || parsed < min ? err(error) : ok(parsed);
+  return parseNormalizedDecimalField(value, error, min);
+}
+
+// Integers and integral numeric strings such as `"40"`, `"40.0"` or `"4e1"`.
+export function parseWholeNumber(value: unknown): number | null {
+  const parsed = parseNumber(value);
+  return parsed !== null && Number.isInteger(parsed) ? parsed : null;
 }
 
 export function pickPatchedValue<T, U>(patchValue: T | undefined, existingValue: U): T | U {
   return patchValue === undefined ? existingValue : patchValue;
-}
-
-export function toFiniteNumberOrNull(value: unknown): number | null {
-  return parseNumber(value);
-}
-
-export function toNumberOrZero(value: unknown): number {
-  return parseNumber(value) ?? 0;
 }
