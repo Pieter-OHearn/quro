@@ -135,7 +135,7 @@ export function formatInlinePdfDocument(
   };
 }
 
-export async function uploadPdfFile(params: {
+async function uploadPdfFile(params: {
   key: string;
   file: File;
   fallbackBaseName: string;
@@ -170,7 +170,7 @@ export async function deleteStoredPdfSafely(storageKey: string, context: string)
   }
 }
 
-export function isS3NotFoundError(error: unknown): boolean {
+function isS3NotFoundError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const maybeError = error as { name?: unknown; Code?: unknown; code?: unknown };
   const values = [maybeError.name, maybeError.Code, maybeError.code].map((value) =>
@@ -186,8 +186,7 @@ export type ReplaceStoredPdfResult<TDocument> =
 
 // Upload a PDF, point the owning row at it, then drop the document it
 // replaces. The freshly uploaded object is removed again if the row is
-// missing, the update throws, or the saved row cannot be read back as a
-// document, so storage never keeps an orphan.
+// missing or the update throws, so the row never points at a missing object.
 export async function replaceStoredPdfDocument<TRow, TDocument>(params: {
   storageKey: string;
   file: File;
@@ -223,33 +222,33 @@ export async function replaceStoredPdfDocument<TRow, TDocument>(params: {
   });
   if (!uploaded) return internalError(errors.uploadFailed);
 
+  let updated: TRow | undefined;
   try {
-    const updated = await params.persist({
+    updated = await params.persist({
       documentStorageKey: storageKey,
       documentFileName: uploaded.fileName,
       documentSizeBytes: uploaded.sizeBytes,
       documentUploadedAt: uploaded.uploadedAt,
     });
-    if (!updated) {
-      await deleteStoredPdfSafely(storageKey, context);
-      return { ok: false, error: errors.notFound, status: HTTP_STATUS.NOT_FOUND };
-    }
-
-    if (previousDocument && previousDocument.storageKey !== storageKey) {
-      await deleteStoredPdfSafely(previousDocument.storageKey, context);
-    }
-
-    const document = params.formatRow(updated);
-    if (!document) {
-      await deleteStoredPdfSafely(storageKey, context);
-      return internalError(errors.saveFailed);
-    }
-    return { ok: true, document };
   } catch (error) {
     await deleteStoredPdfSafely(storageKey, context);
     console.error(`Failed to save ${context} metadata`, error);
     return internalError(errors.saveFailed);
   }
+  if (!updated) {
+    await deleteStoredPdfSafely(storageKey, context);
+    return { ok: false, error: errors.notFound, status: HTTP_STATUS.NOT_FOUND };
+  }
+
+  // The row now points at the new object, so from here nothing may delete it.
+  // The previous object goes only once the new document reads back cleanly.
+  const document = params.formatRow(updated);
+  if (!document) return internalError(errors.saveFailed);
+
+  if (previousDocument && previousDocument.storageKey !== storageKey) {
+    await deleteStoredPdfSafely(previousDocument.storageKey, context);
+  }
+  return { ok: true, document };
 }
 
 // Stream a stored PDF inline, mapping a missing object to 404.

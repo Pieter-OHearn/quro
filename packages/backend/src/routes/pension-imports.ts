@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import { and, asc, desc, eq, inArray, lte, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -19,8 +19,9 @@ import {
 } from '../lib/pensionParserClient';
 import {
   asFile,
+  buildPdfStorageKey,
+  deleteStoredPdfSafely,
   normalizePdfFileName,
-  PDF_EXTENSION,
   PDF_MIME_TYPE,
   validateUploadedPdf,
 } from '../lib/pdfDocuments';
@@ -34,14 +35,18 @@ import {
   rejectUnknownFields,
 } from '../lib/requestValidation';
 import { toNumberOrZero } from '../lib/numbers';
-import { computePensionTransactionDelta } from '../lib/pensionTransactions';
-import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
+import {
+  applyPensionPotBalanceDelta,
+  computePensionTransactionDelta,
+} from '../lib/pensionTransactions';
+import { getS3ObjectBytes, uploadS3Object } from '../lib/s3';
 import {
   type NormalizedPensionTransactionPayload,
   validatePensionTransactionPayload,
 } from '../lib/pensionTransactionValidation';
 
 const app = new Hono();
+const PENSION_IMPORT_PDF_CONTEXT = 'pension statement import document';
 
 const EDITABLE_IMPORT_ROW_FIELDS = [
   'type',
@@ -116,17 +121,6 @@ function parseEditableImportRowPatch(body: unknown): ParseResult<Record<string, 
   }
 
   return ok(patch);
-}
-
-function buildImportStorageKey(params: { userId: number; potId: number }): string {
-  return [
-    'users',
-    String(params.userId),
-    'pensions',
-    String(params.potId),
-    'imports',
-    `${randomUUID()}${PDF_EXTENSION}`,
-  ].join('/');
 }
 
 function parseImportTtlDays(): number {
@@ -271,17 +265,6 @@ function normalizeImportRowResponse(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
-}
-
-async function deleteS3ObjectSafely(storageKey: string): Promise<void> {
-  try {
-    await deleteS3Object({ key: storageKey });
-  } catch (error) {
-    console.error('Failed to delete pension statement import document from storage', {
-      storageKey,
-      error,
-    });
-  }
 }
 
 async function getOwnedImport(userId: number, importId: number) {
@@ -522,14 +505,12 @@ async function commitRowsToLedger(params: {
       if (validated.value.type === 'annual_statement')
         annualStatementTransactionId = transaction.id;
 
-      await tx
-        .update(pensionPots)
-        .set({
-          balance: sql`CAST(${pensionPots.balance} AS numeric) + ${computePensionTransactionDelta(validated.value)}`,
-        })
-        .where(
-          and(eq(pensionPots.id, params.importRecord.potId), eq(pensionPots.userId, params.userId)),
-        );
+      await applyPensionPotBalanceDelta(
+        tx,
+        params.userId,
+        params.importRecord.potId,
+        computePensionTransactionDelta(validated.value),
+      );
 
       await tx
         .update(pensionStatementImportRows)
@@ -794,7 +775,10 @@ app.post('/', async (c) => {
     );
   }
 
-  const storageKey = buildImportStorageKey({ userId: user.id, potId });
+  const storageKey = buildPdfStorageKey({
+    userId: user.id,
+    pathSegments: ['pensions', potId, 'imports'],
+  });
   const safeFileName = normalizePdfFileName(file.name, 'annual-statement');
   const now = new Date();
   const expiresAt = getImportExpiryDate(now);
@@ -830,7 +814,7 @@ app.post('/', async (c) => {
       .returning();
     return c.json({ data: normalizeImportResponse(inserted) }, HTTP_STATUS.CREATED);
   } catch (error) {
-    await deleteS3ObjectSafely(storageKey);
+    await deleteStoredPdfSafely(storageKey, PENSION_IMPORT_PDF_CONTEXT);
     console.error('Failed to persist pension statement import metadata', error);
     return c.json({ error: 'Failed to create import' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
@@ -1065,7 +1049,7 @@ app.delete('/:id', async (c) => {
     )
     .returning();
 
-  await deleteS3ObjectSafely(importRecord.storageKey);
+  await deleteStoredPdfSafely(importRecord.storageKey, PENSION_IMPORT_PDF_CONTEXT);
 
   return c.json({ data: normalizeImportResponse(updated) });
 });
@@ -1108,7 +1092,7 @@ async function expireDraftImports(): Promise<void> {
         errorMessage: 'Draft expired after retention period',
       })
       .where(eq(pensionStatementImports.id, importRecord.id));
-    await deleteS3ObjectSafely(importRecord.storageKey);
+    await deleteStoredPdfSafely(importRecord.storageKey, PENSION_IMPORT_PDF_CONTEXT);
   }
 }
 

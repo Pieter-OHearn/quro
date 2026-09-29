@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { PENSION_POT_TYPES, type CurrencyCode, type PensionPotType } from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
@@ -35,7 +35,10 @@ import {
   rejectUnknownFields,
 } from '../lib/requestValidation';
 import { toNumberOrZero } from '../lib/numbers';
-import { computePensionTransactionDelta } from '../lib/pensionTransactions';
+import {
+  applyPensionPotBalanceDelta,
+  computePensionTransactionDelta,
+} from '../lib/pensionTransactions';
 import {
   type NormalizedPensionTransactionPayload,
   validatePensionTransactionPayload,
@@ -341,28 +344,11 @@ async function isPensionPotOwnedByUser(
   return Boolean(pot);
 }
 
-async function applyPensionPotBalanceDelta(
-  tx: DbTransaction,
-  userId: number,
-  potId: number,
-  delta: number,
-): Promise<void> {
-  if (delta === 0) return;
-  await tx
-    .update(pensionPots)
-    .set({
-      balance: sql`CAST(${pensionPots.balance} AS numeric) + ${delta}`,
-    })
-    .where(and(eq(pensionPots.id, potId), eq(pensionPots.userId, userId)));
-}
-
-type UploadStatementDocumentResult = ReplaceStoredPdfResult<PensionStatementDocumentRecord>;
-
 async function uploadStatementDocumentForTransaction(params: {
   userId: number;
   transactionId: number;
   file: File;
-}): Promise<UploadStatementDocumentResult> {
+}): Promise<ReplaceStoredPdfResult<PensionStatementDocumentRecord>> {
   const [transactionRow] = await db
     .select()
     .from(pensionTransactions)
@@ -911,7 +897,7 @@ app.get('/transactions/:id/document/download', async (c) => {
 
   return streamStoredPdf(c, {
     document,
-    context: 'pension statement document',
+    context: 'pension statement PDF',
     failureMessage: 'Failed to download document',
   });
 });

@@ -1,6 +1,6 @@
 import { HOUR_MS } from '../constants/time';
 
-export type IntervalJobOptions = {
+type IntervalJobOptions = {
   // Log prefix, e.g. 'bunq-sync'.
   name: string;
   intervalMs: number;
@@ -15,16 +15,25 @@ function isTestEnvironment(): boolean {
 
 // Start a recurring background job. Does nothing under test so importing an
 // app module never leaves timers running. A cycle that throws is logged and
-// never stops later cycles; cycles run detached from the caller.
+// never stops later cycles, and a tick is skipped while the previous cycle is
+// still running. Cycles run detached from the caller.
 export function startIntervalJob(options: Readonly<IntervalJobOptions>): void {
   if (isTestEnvironment()) return;
 
   const { name, intervalMs, runOnStart, run } = options;
+  let running = false;
   const runSafely = async (): Promise<void> => {
+    if (running) {
+      console.warn(`[${name}] Previous cycle still running, skipping`);
+      return;
+    }
+    running = true;
     try {
       await run();
     } catch (error) {
       console.error(`[${name}] Failed to run cycle:`, error);
+    } finally {
+      running = false;
     }
   };
 

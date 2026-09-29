@@ -13,7 +13,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db, type DbExecutor } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { applyRepayment, reverseRepayment } from '../lib/balance';
+import { applyRepayment, DEBT_BALANCE, reverseRepayment } from '../lib/balance';
 import { invalidateSnapshotsFrom } from '../lib/netWorth';
 import {
   err,
@@ -244,10 +244,7 @@ async function createDebtPayment(params: {
     const debt = await getDebtById(tx, params.userId, parsed.value.debtId);
     if (!debt) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
-    const updatedBalance = await applyRepayment(tx, {
-      table: debts,
-      idColumn: debts.id,
-      balanceColumn: debts.remainingBalance,
+    const updatedBalance = await applyRepayment(tx, DEBT_BALANCE, {
       id: debt.id,
       principal: parsed.value.principal,
       where: eq(debts.userId, params.userId),
@@ -280,14 +277,12 @@ function deleteDebtPayment(params: {
       .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)));
     if (!existing) return { error: 'Payment not found', status: HTTP_STATUS.NOT_FOUND };
 
-    await reverseRepayment(tx, {
-      table: debts,
-      idColumn: debts.id,
-      balanceColumn: debts.remainingBalance,
+    const restoredBalance = await reverseRepayment(tx, DEBT_BALANCE, {
       id: existing.debtId,
       principal: existing.principal,
       where: eq(debts.userId, params.userId),
     });
+    if (restoredBalance === null) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
     const [data] = await tx
       .delete(debtPayments)

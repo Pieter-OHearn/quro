@@ -18,7 +18,7 @@ import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
 import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
-import { applyRepayment, reverseRepayment } from '../lib/balance';
+import { applyRepayment, MORTGAGE_BALANCE, reverseRepayment } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
@@ -305,10 +305,7 @@ async function applyMortgageTxnEffect(
 ): Promise<string | null> {
   if (payload.type === 'repayment') {
     const principal = payload.principal ?? 0;
-    const updatedBalance = await applyRepayment(tx, {
-      table: mortgages,
-      idColumn: mortgages.id,
-      balanceColumn: mortgages.outstandingBalance,
+    const updatedBalance = await applyRepayment(tx, MORTGAGE_BALANCE, {
       id: mortgage.id,
       principal,
     });
@@ -340,10 +337,7 @@ async function reverseMortgageTxnEffect(
   txn: { type: string; principal: number | null },
 ): Promise<void> {
   if (txn.type !== 'repayment') return;
-  const updatedBalance = await reverseRepayment(tx, {
-    table: mortgages,
-    idColumn: mortgages.id,
-    balanceColumn: mortgages.outstandingBalance,
+  const updatedBalance = await reverseRepayment(tx, MORTGAGE_BALANCE, {
     id: mortgage.id,
     principal: txn.principal ?? 0,
   });

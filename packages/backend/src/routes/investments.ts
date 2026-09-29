@@ -27,7 +27,12 @@ import {
 } from '../db/schema';
 import { and, asc, eq, getTableColumns, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
-import { applyRepayment, reverseRepayment } from '../lib/balance';
+import {
+  applyRepayment,
+  MORTGAGE_BALANCE,
+  PROPERTY_MORTGAGE_BALANCE,
+  reverseRepayment,
+} from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
@@ -751,30 +756,16 @@ async function applyPropertyRepaymentEffect(
   property: typeof properties.$inferSelect,
   principal: number,
 ): Promise<string | null> {
-  const balanceError = 'Principal portion cannot exceed the current outstanding balance';
-  if (property.mortgageId != null) {
-    const updatedBalance = await applyRepayment(tx, {
-      table: mortgages,
-      idColumn: mortgages.id,
-      balanceColumn: mortgages.outstandingBalance,
-      id: property.mortgageId,
-      principal,
-    });
-    if (updatedBalance === null) return balanceError;
-    await tx
-      .update(properties)
-      .set({ mortgage: updatedBalance })
-      .where(eq(properties.mortgageId, property.mortgageId));
-    return null;
+  const { mortgageId } = property;
+  const updatedBalance =
+    mortgageId == null
+      ? await applyRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: property.id, principal })
+      : await applyRepayment(tx, MORTGAGE_BALANCE, { id: mortgageId, principal });
+  if (updatedBalance === null) {
+    return 'Principal portion cannot exceed the current outstanding balance';
   }
-  const updatedBalance = await applyRepayment(tx, {
-    table: properties,
-    idColumn: properties.id,
-    balanceColumn: properties.mortgage,
-    id: property.id,
-    principal,
-  });
-  return updatedBalance === null ? balanceError : null;
+  if (mortgageId != null) await syncPropertyMortgage(tx, mortgageId, updatedBalance);
+  return null;
 }
 
 // Inverse of applyPropertyRepaymentEffect, used when a repayment is removed
@@ -784,29 +775,30 @@ async function reversePropertyRepaymentEffect(
   property: typeof properties.$inferSelect,
   principal: number,
 ): Promise<void> {
-  if (property.mortgageId != null) {
-    const updatedBalance = await reverseRepayment(tx, {
-      table: mortgages,
-      idColumn: mortgages.id,
-      balanceColumn: mortgages.outstandingBalance,
-      id: property.mortgageId,
+  const { mortgageId } = property;
+  if (mortgageId != null) {
+    const updatedBalance = await reverseRepayment(tx, MORTGAGE_BALANCE, {
+      id: mortgageId,
       principal,
     });
     if (updatedBalance !== null) {
-      await tx
-        .update(properties)
-        .set({ mortgage: updatedBalance })
-        .where(eq(properties.mortgageId, property.mortgageId));
+      await syncPropertyMortgage(tx, mortgageId, updatedBalance);
       return;
     }
   }
-  await reverseRepayment(tx, {
-    table: properties,
-    idColumn: properties.id,
-    balanceColumn: properties.mortgage,
-    id: property.id,
-    principal,
-  });
+  await reverseRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: property.id, principal });
+}
+
+// Keep the property's mortgage snapshot in step with its linked mortgage.
+async function syncPropertyMortgage(
+  tx: DbTransaction,
+  mortgageId: number,
+  outstandingBalance: number,
+): Promise<void> {
+  await tx
+    .update(properties)
+    .set({ mortgage: outstandingBalance })
+    .where(eq(properties.mortgageId, mortgageId));
 }
 
 async function getAccessiblePropertyTransaction(

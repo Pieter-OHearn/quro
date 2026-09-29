@@ -6,7 +6,8 @@ describe('startIntervalJob', () => {
   const originalBunEnv = process.env.BUN_ENV;
 
   afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
     if (originalBunEnv === undefined) delete process.env.BUN_ENV;
     else process.env.BUN_ENV = originalBunEnv;
   });
@@ -62,6 +63,49 @@ describe('startIntervalJob', () => {
       globalThis.setInterval = realSetInterval;
       console.log = originalLog;
       console.error = originalError;
+    }
+  });
+
+  test('skips a tick while the previous cycle is still running', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.BUN_ENV;
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    console.log = () => {};
+    console.warn = () => {};
+    const realSetInterval = globalThis.setInterval;
+    let tick: () => void = () => {};
+    globalThis.setInterval = ((fn: () => void) => {
+      tick = fn;
+      return 0;
+    }) as unknown as typeof setInterval;
+
+    try {
+      let calls = 0;
+      let finish: () => void = () => {};
+      startIntervalJob({
+        name: 'test-job',
+        intervalMs: 1000,
+        runOnStart: false,
+        run: () => {
+          calls += 1;
+          return new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+        },
+      });
+      tick();
+      tick();
+      expect(calls).toBe(1);
+      finish();
+      await Promise.resolve();
+      await Promise.resolve();
+      tick();
+      expect(calls).toBe(2);
+    } finally {
+      globalThis.setInterval = realSetInterval;
+      console.log = originalLog;
+      console.warn = originalWarn;
     }
   });
 });
