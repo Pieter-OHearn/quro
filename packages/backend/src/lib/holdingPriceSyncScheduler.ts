@@ -1,20 +1,18 @@
-import { HOUR_MS } from '../constants/time';
+import { DAY_MS } from '../constants/time';
 import { db } from '../db/client';
 import { holdings } from '../db/schema';
 import { syncHoldingPricesForUser } from './holdingPriceSync';
+import { startIntervalJob } from './intervalJob';
 
-const SYNC_INTERVAL_HOURS = 24;
-const SYNC_INTERVAL_MS = SYNC_INTERVAL_HOURS * HOUR_MS;
+const SYNC_INTERVAL_MS = DAY_MS;
 
 export function startHoldingPriceSyncScheduler(): void {
-  console.log('[holding-price-sync] Scheduler started, interval: 24h');
-
-  setInterval(() => {
-    void runSync();
-  }, SYNC_INTERVAL_MS);
-
-  // Run immediately on startup
-  void runSync();
+  startIntervalJob({
+    name: 'holding-price-sync',
+    intervalMs: SYNC_INTERVAL_MS,
+    runOnStart: true,
+    run: runSync,
+  });
 }
 
 async function syncUserHoldings(userId: number): Promise<void> {
@@ -32,23 +30,19 @@ async function syncUserHoldings(userId: number): Promise<void> {
 }
 
 async function runSync(): Promise<void> {
-  try {
-    const users = await db
-      .selectDistinct({
-        userId: holdings.userId,
-      })
-      .from(holdings);
+  const users = await db
+    .selectDistinct({
+      userId: holdings.userId,
+    })
+    .from(holdings);
 
-    if (users.length === 0) {
-      console.log('[holding-price-sync] No users with holdings found');
-      return;
-    }
+  if (users.length === 0) {
+    console.log('[holding-price-sync] No users with holdings found');
+    return;
+  }
 
-    console.log(`[holding-price-sync] Starting sync for ${users.length} users`);
-    for (const { userId } of users) {
-      await syncUserHoldings(userId!);
-    }
-  } catch (error) {
-    console.error('[holding-price-sync] Failed to run sync cycle:', error);
+  console.log(`[holding-price-sync] Starting sync for ${users.length} users`);
+  for (const { userId } of users) {
+    await syncUserHoldings(userId!);
   }
 }

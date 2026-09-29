@@ -3,16 +3,17 @@ import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
+import { startIntervalJob } from './intervalJob';
 
-const SYNC_INTERVAL_HOURS = 1;
-const SYNC_INTERVAL_MS = SYNC_INTERVAL_HOURS * HOUR_MS;
+const SYNC_INTERVAL_MS = HOUR_MS;
 
 export function startBunqSyncScheduler(): void {
-  console.log('[bunq-sync] Scheduler started, interval: 1h');
-
-  setInterval(() => {
-    void runSync();
-  }, SYNC_INTERVAL_MS);
+  startIntervalJob({
+    name: 'bunq-sync',
+    intervalMs: SYNC_INTERVAL_MS,
+    runOnStart: false,
+    run: runSync,
+  });
 }
 
 function formatSyncStatus(status: string, issues: Array<{ message: string }>): string {
@@ -37,17 +38,13 @@ async function syncUserAccounts(userId: number): Promise<void> {
 }
 
 async function runSync(): Promise<void> {
-  try {
-    const connections = await db
-      .selectDistinct({
-        userId: bunqConnections.userId,
-      })
-      .from(bunqConnections);
+  const connections = await db
+    .selectDistinct({
+      userId: bunqConnections.userId,
+    })
+    .from(bunqConnections);
 
-    for (const { userId } of connections) {
-      await syncUserAccounts(userId);
-    }
-  } catch (error) {
-    console.error('[bunq-sync] Failed to run sync cycle:', error);
+  for (const { userId } of connections) {
+    await syncUserAccounts(userId);
   }
 }

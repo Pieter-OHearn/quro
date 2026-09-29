@@ -58,6 +58,7 @@ import {
   rejectUnknownFields,
 } from '../lib/requestValidation';
 import { toNumberOrZero } from '../lib/numbers';
+import { sumBrokerageValue } from '../lib/netWorth';
 
 const app = new Hono();
 const HISTORY_MONTHS = 12;
@@ -142,29 +143,6 @@ async function parsePatch<T extends object>(
   if (!strict.ok) return strict;
   const parsed = parsePatchFields(raw.value, parsers);
   return parsed.ok && Object.keys(parsed.value).length === 0 ? err('No fields provided') : parsed;
-}
-
-function sumHoldingValue(
-  holdingRows: readonly (typeof holdings.$inferSelect)[],
-  transactions: readonly (typeof holdingTransactions.$inferSelect)[],
-  convertToEur: (amount: number, currency: string) => number,
-): number {
-  const shares = new Map<number, number>();
-  for (const transaction of transactions) {
-    const current = shares.get(transaction.holdingId) ?? 0;
-    const delta = toNumberOrZero(transaction.shares);
-    if (transaction.type === 'buy') shares.set(transaction.holdingId, current + delta);
-    if (transaction.type === 'sell') shares.set(transaction.holdingId, current - delta);
-  }
-  return holdingRows.reduce(
-    (sum, holding) =>
-      sum +
-      convertToEur(
-        Math.max(0, shares.get(holding.id) ?? 0) * toNumberOrZero(holding.currentPrice),
-        holding.currency,
-      ),
-    0,
-  );
 }
 
 function buildBudgetInputs(
@@ -418,7 +396,7 @@ function buildLiquidAssets(data: RunwayData, convertToEur: MoneyConverter): Liqu
     isJoint: account.isJoint,
   }));
   assets.push({
-    amount: sumHoldingValue(data.holdingRows, data.holdingTxns, convertToEur),
+    amount: sumBrokerageValue(data.holdingRows, data.holdingTxns, convertToEur),
     kind: 'brokerage',
   });
   return assets;

@@ -1,4 +1,11 @@
-import { addMonthsUtc, monthEndUtc, monthStartUtc, toIsoDate, toUtcTimestamp } from '@quro/shared';
+import {
+  addMonthsUtc,
+  monthEndUtc,
+  monthStartUtc,
+  toIsoDate,
+  toUtcTimestamp,
+  type PensionTransactionType,
+} from '@quro/shared';
 import { Hono } from 'hono';
 import { and, eq, getTableColumns, gte, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -38,6 +45,7 @@ import {
 } from '../lib/netWorth';
 import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import { toNumberOrZero } from '../lib/numbers';
+import { computePensionTransactionDelta } from '../lib/pensionTransactions';
 
 const app = new Hono();
 const BASE_CURRENCY = FX_BASE_CURRENCY;
@@ -151,7 +159,7 @@ type DatedPropertyTransaction = {
 
 type DatedPensionTransaction = {
   potId: number;
-  type: 'contribution' | 'fee' | 'annual_statement' | 'tax';
+  type: PensionTransactionType;
   amount: number;
   taxAmount: number;
   timestamp: number;
@@ -164,17 +172,6 @@ type DatedDebtPayment = {
   interest: number;
   timestamp: number;
 };
-
-function computePensionTxnDelta(transaction: {
-  type: string;
-  amount: number;
-  taxAmount: number;
-}): number {
-  if (transaction.type === 'contribution') return transaction.amount - transaction.taxAmount;
-  if (transaction.type === 'fee' || transaction.type === 'tax') return -transaction.amount;
-  if (transaction.type === 'annual_statement') return transaction.amount;
-  return 0;
-}
 
 function groupByNumericId<T>(rows: readonly T[], getId: (row: T) => number): Map<number, T[]> {
   const grouped = new Map<number, T[]>();
@@ -384,8 +381,7 @@ function buildDatedPensionTransactions(
       (transaction) =>
         transaction.type === 'contribution' ||
         transaction.type === 'fee' ||
-        transaction.type === 'annual_statement' ||
-        transaction.type === 'tax',
+        transaction.type === 'annual_statement',
     )
     .map((transaction) => ({
       potId: transaction.potId,
@@ -522,7 +518,7 @@ function computePensionAtCutoff(
     let balance = toNumberOrZero(pot.balance);
     for (const transaction of txnsByPotId.get(pot.id) ?? []) {
       if (transaction.timestamp <= cutoff) continue;
-      balance -= computePensionTxnDelta(transaction);
+      balance -= computePensionTransactionDelta(transaction);
     }
     return sum + convertToBase(Math.max(0, balance), pot.currency, rates);
   }, 0);

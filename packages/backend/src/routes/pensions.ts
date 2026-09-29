@@ -2,20 +2,20 @@ import { Hono } from 'hono';
 import { PENSION_POT_TYPES, type CurrencyCode, type PensionPotType } from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
-import { getS3ObjectBytes } from '../lib/s3';
 import {
   asFile,
   buildPdfStorageKey,
   CLEAR_INLINE_PDF_DOCUMENT,
   deleteStoredPdfSafely,
-  isS3NotFoundError,
   PDF_MIME_TYPE,
   readInlinePdfDocument,
-  uploadPdfFile,
+  replaceStoredPdfDocument,
+  type ReplaceStoredPdfResult,
+  streamStoredPdf,
   validateUploadedPdf,
 } from '../lib/pdfDocuments';
 import {
@@ -35,6 +35,10 @@ import {
   rejectUnknownFields,
 } from '../lib/requestValidation';
 import { toNumberOrZero } from '../lib/numbers';
+import {
+  applyPensionPotBalanceDelta,
+  computePensionTransactionDelta,
+} from '../lib/pensionTransactions';
 import {
   type NormalizedPensionTransactionPayload,
   validatePensionTransactionPayload,
@@ -270,17 +274,6 @@ function buildPensionDocumentStorageKey(params: {
   });
 }
 
-function computePensionTransactionDelta(txn: {
-  type: string;
-  amount: number;
-  taxAmount: number;
-}): number {
-  if (txn.type === 'contribution') return txn.amount - txn.taxAmount;
-  if (txn.type === 'fee') return -txn.amount;
-  if (txn.type === 'annual_statement') return txn.amount;
-  return 0;
-}
-
 function normalizeTransactionRow(row: {
   potId: number;
   type: string;
@@ -351,85 +344,11 @@ async function isPensionPotOwnedByUser(
   return Boolean(pot);
 }
 
-async function applyPensionPotBalanceDelta(
-  tx: DbTransaction,
-  userId: number,
-  potId: number,
-  delta: number,
-): Promise<void> {
-  if (delta === 0) return;
-  await tx
-    .update(pensionPots)
-    .set({
-      balance: sql`CAST(${pensionPots.balance} AS numeric) + ${delta}`,
-    })
-    .where(and(eq(pensionPots.id, potId), eq(pensionPots.userId, userId)));
-}
-
-type UploadStatementDocumentResult =
-  | { ok: true; document: PensionStatementDocumentRecord }
-  | { ok: false; error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
-
-async function persistStatementDocumentMetadata(params: {
-  userId: number;
-  transactionId: number;
-  storageKey: string;
-  uploaded: Awaited<ReturnType<typeof uploadPdfFile>>;
-  previousDocument: ReturnType<typeof readInlinePdfDocument>;
-}): Promise<UploadStatementDocumentResult> {
-  try {
-    const [updated] = await db
-      .update(pensionTransactions)
-      .set({
-        documentStorageKey: params.storageKey,
-        documentFileName: params.uploaded.fileName,
-        documentSizeBytes: params.uploaded.sizeBytes,
-        documentUploadedAt: params.uploaded.uploadedAt,
-      })
-      .where(
-        and(
-          eq(pensionTransactions.id, params.transactionId),
-          eq(pensionTransactions.userId, params.userId),
-        ),
-      )
-      .returning();
-
-    if (!updated) {
-      await deleteStoredPdfSafely(params.storageKey, 'pension statement PDF');
-      return { ok: false, error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
-    }
-
-    if (params.previousDocument && params.previousDocument.storageKey !== params.storageKey) {
-      await deleteStoredPdfSafely(params.previousDocument.storageKey, 'pension statement PDF');
-    }
-
-    const document = formatStatementDocumentFromTransaction(updated);
-    if (!document) {
-      await deleteStoredPdfSafely(params.storageKey, 'pension statement PDF');
-      return {
-        ok: false,
-        error: 'Failed to save statement document',
-        status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      };
-    }
-
-    return { ok: true, document };
-  } catch (error) {
-    await deleteStoredPdfSafely(params.storageKey, 'pension statement PDF');
-    console.error('Failed to persist pension statement document metadata', error);
-    return {
-      ok: false,
-      error: 'Failed to save statement document',
-      status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    };
-  }
-}
-
 async function uploadStatementDocumentForTransaction(params: {
   userId: number;
   transactionId: number;
   file: File;
-}): Promise<UploadStatementDocumentResult> {
+}): Promise<ReplaceStoredPdfResult<PensionStatementDocumentRecord>> {
   const [transactionRow] = await db
     .select()
     .from(pensionTransactions)
@@ -451,34 +370,35 @@ async function uploadStatementDocumentForTransaction(params: {
     };
   }
 
-  const previousDocument = readInlinePdfDocument(transaction);
-  const storageKey = buildPensionDocumentStorageKey({
-    userId: params.userId,
-    potId: transaction.potId,
-    transactionId: params.transactionId,
-  });
-  const uploaded = await uploadPdfFile({
-    key: storageKey,
+  return replaceStoredPdfDocument({
+    storageKey: buildPensionDocumentStorageKey({
+      userId: params.userId,
+      potId: transaction.potId,
+      transactionId: params.transactionId,
+    }),
     file: params.file,
     fallbackBaseName: 'annual-statement',
-  }).catch((error: unknown) => {
-    console.error('Failed to upload pension statement document to storage', error);
-    return null;
-  });
-  if (!uploaded) {
-    return {
-      ok: false,
-      error: 'Failed to upload statement document',
-      status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    };
-  }
-
-  return persistStatementDocumentMetadata({
-    userId: params.userId,
-    transactionId: params.transactionId,
-    storageKey,
-    uploaded,
-    previousDocument,
+    context: 'pension statement PDF',
+    previousDocument: readInlinePdfDocument(transaction),
+    persist: async (fields) => {
+      const [updated] = await db
+        .update(pensionTransactions)
+        .set(fields)
+        .where(
+          and(
+            eq(pensionTransactions.id, params.transactionId),
+            eq(pensionTransactions.userId, params.userId),
+          ),
+        )
+        .returning();
+      return updated;
+    },
+    formatRow: formatStatementDocumentFromTransaction,
+    errors: {
+      notFound: 'Transaction not found',
+      uploadFailed: 'Failed to upload statement document',
+      saveFailed: 'Failed to save statement document',
+    },
   });
 }
 
@@ -975,23 +895,11 @@ app.get('/transactions/:id/document/download', async (c) => {
   });
   if (!document) return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
 
-  try {
-    const bytes = await getS3ObjectBytes({ key: document.storageKey });
-    if (!bytes) return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
-
-    return new Response(new Uint8Array(bytes), {
-      headers: {
-        'Content-Type': PDF_MIME_TYPE,
-        'Content-Disposition': `inline; filename="${document.fileName}"`,
-      },
-    });
-  } catch (error) {
-    if (isS3NotFoundError(error)) {
-      return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
-    }
-    console.error('Failed to download pension statement document', error);
-    return c.json({ error: 'Failed to download document' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
-  }
+  return streamStoredPdf(c, {
+    document,
+    context: 'pension statement PDF',
+    failureMessage: 'Failed to download document',
+  });
 });
 
 app.delete('/transactions/:id/document', async (c) => {

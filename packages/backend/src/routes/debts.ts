@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   DEBT_TYPES,
@@ -13,6 +13,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db, type DbExecutor } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { applyRepayment, DEBT_BALANCE, reverseRepayment } from '../lib/balance';
 import { invalidateSnapshotsFrom } from '../lib/netWorth';
 import {
   err,
@@ -125,10 +126,6 @@ export function computeDebtPrincipal(amount: number, interest: number): number {
   return Math.max(0, roundMoney(amount - interest));
 }
 
-function adjustDebtRemainingBalance(currentRemainingBalance: number, delta: number): number {
-  return roundMoney(currentRemainingBalance + delta);
-}
-
 export function validateDebtPrincipalAgainstBalance(
   principal: number,
   currentRemainingBalance: number,
@@ -138,20 +135,6 @@ export function validateDebtPrincipalAgainstBalance(
   }
 
   return null;
-}
-
-export function applyDebtPrincipalPayment(
-  currentRemainingBalance: number,
-  principal: number,
-): number {
-  return adjustDebtRemainingBalance(currentRemainingBalance, -principal);
-}
-
-export function restoreDebtPrincipalPayment(
-  currentRemainingBalance: number,
-  principal: number,
-): number {
-  return adjustDebtRemainingBalance(currentRemainingBalance, principal);
 }
 
 export function parseDebtPayload(raw: Record<string, unknown>): ParseResult<DebtPayload> {
@@ -261,20 +244,12 @@ async function createDebtPayment(params: {
     const debt = await getDebtById(tx, params.userId, parsed.value.debtId);
     if (!debt) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
-    const [updatedDebt] = await tx
-      .update(debts)
-      .set({
-        remainingBalance: sql`GREATEST(0, CAST(${debts.remainingBalance} AS numeric) - ${parsed.value.principal})`,
-      })
-      .where(
-        and(
-          eq(debts.id, debt.id),
-          eq(debts.userId, params.userId),
-          sql`CAST(${debts.remainingBalance} AS numeric) + 0.01 >= ${parsed.value.principal}`,
-        ),
-      )
-      .returning({ id: debts.id });
-    if (!updatedDebt) {
+    const updatedBalance = await applyRepayment(tx, DEBT_BALANCE, {
+      id: debt.id,
+      principal: parsed.value.principal,
+      where: eq(debts.userId, params.userId),
+    });
+    if (updatedBalance === null) {
       return {
         error: 'Principal portion cannot exceed the current remaining balance',
         status: HTTP_STATUS.BAD_REQUEST,
@@ -302,12 +277,12 @@ function deleteDebtPayment(params: {
       .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)));
     if (!existing) return { error: 'Payment not found', status: HTTP_STATUS.NOT_FOUND };
 
-    await tx
-      .update(debts)
-      .set({
-        remainingBalance: sql`CAST(${debts.remainingBalance} AS numeric) + ${existing.principal}`,
-      })
-      .where(and(eq(debts.id, existing.debtId), eq(debts.userId, params.userId)));
+    const restoredBalance = await reverseRepayment(tx, DEBT_BALANCE, {
+      id: existing.debtId,
+      principal: existing.principal,
+      where: eq(debts.userId, params.userId),
+    });
+    if (restoredBalance === null) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
     const [data] = await tx
       .delete(debtPayments)

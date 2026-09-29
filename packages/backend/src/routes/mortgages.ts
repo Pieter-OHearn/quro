@@ -16,8 +16,9 @@ import {
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
-import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import { applyRepayment, MORTGAGE_BALANCE, reverseRepayment } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
@@ -304,20 +305,14 @@ async function applyMortgageTxnEffect(
 ): Promise<string | null> {
   if (payload.type === 'repayment') {
     const principal = payload.principal ?? 0;
-    const [updated] = await tx
-      .update(mortgages)
-      .set({
-        outstandingBalance: sql`GREATEST(0, CAST(${mortgages.outstandingBalance} AS numeric) - ${principal})`,
-      })
-      .where(
-        and(
-          eq(mortgages.id, mortgage.id),
-          sql`CAST(${mortgages.outstandingBalance} AS numeric) + 0.01 >= ${principal}`,
-        ),
-      )
-      .returning({ outstandingBalance: mortgages.outstandingBalance });
-    if (!updated) return 'Principal portion cannot exceed the current outstanding balance';
-    await syncPropertyMortgageSnapshot(tx, mortgage.id, updated.outstandingBalance);
+    const updatedBalance = await applyRepayment(tx, MORTGAGE_BALANCE, {
+      id: mortgage.id,
+      principal,
+    });
+    if (updatedBalance === null) {
+      return 'Principal portion cannot exceed the current outstanding balance';
+    }
+    await syncPropertyMortgageSnapshot(tx, mortgage.id, updatedBalance);
     return null;
   }
   if (payload.type === 'rate_change') {
@@ -342,15 +337,12 @@ async function reverseMortgageTxnEffect(
   txn: { type: string; principal: number | null },
 ): Promise<void> {
   if (txn.type !== 'repayment') return;
-  const [updated] = await tx
-    .update(mortgages)
-    .set({
-      outstandingBalance: sql`CAST(${mortgages.outstandingBalance} AS numeric) + ${txn.principal ?? 0}`,
-    })
-    .where(eq(mortgages.id, mortgage.id))
-    .returning({ outstandingBalance: mortgages.outstandingBalance });
-  if (updated) {
-    await syncPropertyMortgageSnapshot(tx, mortgage.id, updated.outstandingBalance);
+  const updatedBalance = await reverseRepayment(tx, MORTGAGE_BALANCE, {
+    id: mortgage.id,
+    principal: txn.principal ?? 0,
+  });
+  if (updatedBalance !== null) {
+    await syncPropertyMortgageSnapshot(tx, mortgage.id, updatedBalance);
   }
 }
 

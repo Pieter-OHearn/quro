@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { deleteS3Object, uploadS3Object } from './s3';
+import { HTTP_STATUS } from '../constants/http';
+import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from './s3';
 
 const PDF_MAGIC = Buffer.from('%PDF', 'ascii');
 
@@ -133,7 +135,7 @@ export function formatInlinePdfDocument(
   };
 }
 
-export async function uploadPdfFile(params: {
+async function uploadPdfFile(params: {
   key: string;
   file: File;
   fallbackBaseName: string;
@@ -168,11 +170,111 @@ export async function deleteStoredPdfSafely(storageKey: string, context: string)
   }
 }
 
-export function isS3NotFoundError(error: unknown): boolean {
+function isS3NotFoundError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const maybeError = error as { name?: unknown; Code?: unknown; code?: unknown };
   const values = [maybeError.name, maybeError.Code, maybeError.code].map((value) =>
     String(value ?? ''),
   );
   return values.includes('NoSuchKey') || values.includes('NotFound');
+}
+
+type HttpStatus = (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS];
+
+export type ReplaceStoredPdfResult<TDocument> =
+  { ok: true; document: TDocument } | { ok: false; error: string; status: HttpStatus };
+
+// Upload a PDF, point the owning row at it, then drop the document it
+// replaces. The freshly uploaded object is removed again if the row is
+// missing or the update throws, so the row never points at a missing object.
+export async function replaceStoredPdfDocument<TRow, TDocument>(params: {
+  storageKey: string;
+  file: File;
+  fallbackBaseName: string;
+  // Names the document in log lines and cleanup, e.g. 'payslip PDF'.
+  context: string;
+  previousDocument: InlinePdfDocumentRecord | null;
+  // Writes the new document fields to the owning row (scoped to its owner)
+  // and resolves to the updated row, or undefined when the row is gone.
+  persist: (fields: {
+    documentStorageKey: string;
+    documentFileName: string;
+    documentSizeBytes: number;
+    documentUploadedAt: Date;
+  }) => Promise<TRow | undefined>;
+  formatRow: (row: TRow) => TDocument | null;
+  errors: { notFound: string; uploadFailed: string; saveFailed: string };
+}): Promise<ReplaceStoredPdfResult<TDocument>> {
+  const { storageKey, context, previousDocument, errors } = params;
+  const internalError = (error: string): ReplaceStoredPdfResult<TDocument> => ({
+    ok: false,
+    error,
+    status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+  });
+
+  const uploaded = await uploadPdfFile({
+    key: storageKey,
+    file: params.file,
+    fallbackBaseName: params.fallbackBaseName,
+  }).catch((error: unknown) => {
+    console.error(`Failed to upload ${context} to storage`, error);
+    return null;
+  });
+  if (!uploaded) return internalError(errors.uploadFailed);
+
+  let updated: TRow | undefined;
+  try {
+    updated = await params.persist({
+      documentStorageKey: storageKey,
+      documentFileName: uploaded.fileName,
+      documentSizeBytes: uploaded.sizeBytes,
+      documentUploadedAt: uploaded.uploadedAt,
+    });
+  } catch (error) {
+    await deleteStoredPdfSafely(storageKey, context);
+    console.error(`Failed to save ${context} metadata`, error);
+    return internalError(errors.saveFailed);
+  }
+  if (!updated) {
+    await deleteStoredPdfSafely(storageKey, context);
+    return { ok: false, error: errors.notFound, status: HTTP_STATUS.NOT_FOUND };
+  }
+
+  // The row now points at the new object, so from here nothing may delete it.
+  // The previous object goes only once the new document reads back cleanly.
+  const document = params.formatRow(updated);
+  if (!document) return internalError(errors.saveFailed);
+
+  if (previousDocument && previousDocument.storageKey !== storageKey) {
+    await deleteStoredPdfSafely(previousDocument.storageKey, context);
+  }
+  return { ok: true, document };
+}
+
+// Stream a stored PDF inline, mapping a missing object to 404.
+export async function streamStoredPdf(
+  c: Context,
+  params: {
+    document: Pick<InlinePdfDocumentRecord, 'storageKey' | 'fileName'>;
+    context: string;
+    failureMessage: string;
+  },
+): Promise<Response> {
+  const notFound = () => c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
+  try {
+    const bytes = await getS3ObjectBytes({ key: params.document.storageKey });
+    if (!bytes) return notFound();
+
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        'Content-Type': PDF_MIME_TYPE,
+        'Content-Disposition': `inline; filename="${params.document.fileName}"`,
+      },
+    });
+  } catch (error) {
+    if (isS3NotFoundError(error)) return notFound();
+
+    console.error(`Failed to download ${params.context}`, error);
+    return c.json({ error: params.failureMessage }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
+  }
 }

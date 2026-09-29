@@ -12,11 +12,11 @@ import {
   CLEAR_INLINE_PDF_DOCUMENT,
   deleteStoredPdfSafely,
   formatInlinePdfDocument,
-  isS3NotFoundError,
   type InlinePdfDocumentResponse,
-  PDF_MIME_TYPE,
   readInlinePdfDocument,
-  uploadPdfFile,
+  replaceStoredPdfDocument,
+  type ReplaceStoredPdfResult,
+  streamStoredPdf,
   validateUploadedPdf,
 } from '../lib/pdfDocuments';
 import {
@@ -36,7 +36,6 @@ import {
   rejectUnknownFields,
 } from '../lib/requestValidation';
 import { toNumberOrZero } from '../lib/numbers';
-import { getS3ObjectBytes } from '../lib/s3';
 
 const app = new Hono();
 
@@ -150,98 +149,39 @@ async function getOwnedPayslip(userId: number, payslipId: number): Promise<Paysl
   return payslipRow ?? null;
 }
 
-type UploadPayslipDocumentResult =
-  | { ok: true; document: InlinePdfDocumentResponse }
-  | { ok: false; error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
-
-async function persistPayslipDocumentMetadata(params: {
-  userId: number;
-  payslipId: number;
-  storageKey: string;
-  uploaded: Awaited<ReturnType<typeof uploadPdfFile>>;
-  previousDocument: ReturnType<typeof readInlinePdfDocument>;
-}): Promise<UploadPayslipDocumentResult> {
-  try {
-    const [updated] = await db
-      .update(payslips)
-      .set({
-        documentStorageKey: params.storageKey,
-        documentFileName: params.uploaded.fileName,
-        documentSizeBytes: params.uploaded.sizeBytes,
-        documentUploadedAt: params.uploaded.uploadedAt,
-      })
-      .where(and(eq(payslips.id, params.payslipId), eq(payslips.userId, params.userId)))
-      .returning();
-
-    if (!updated) {
-      await deleteStoredPdfSafely(params.storageKey, 'payslip PDF');
-      return { ok: false, error: 'Payslip not found', status: HTTP_STATUS.NOT_FOUND };
-    }
-
-    if (params.previousDocument && params.previousDocument.storageKey !== params.storageKey) {
-      await deleteStoredPdfSafely(params.previousDocument.storageKey, 'payslip PDF');
-    }
-
-    const document = formatInlinePdfDocument(updated);
-    if (!document) {
-      await deleteStoredPdfSafely(params.storageKey, 'payslip PDF');
-      return {
-        ok: false,
-        error: 'Failed to save payslip PDF',
-        status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      };
-    }
-
-    return { ok: true, document };
-  } catch (error) {
-    await deleteStoredPdfSafely(params.storageKey, 'payslip PDF');
-    console.error('Failed to save payslip PDF metadata', error);
-    return {
-      ok: false,
-      error: 'Failed to save payslip PDF',
-      status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    };
-  }
-}
-
 async function uploadPayslipDocumentForUser(params: {
   userId: number;
   payslipId: number;
   file: File;
-}): Promise<UploadPayslipDocumentResult> {
+}): Promise<ReplaceStoredPdfResult<InlinePdfDocumentResponse>> {
   const existingPayslip = await getOwnedPayslip(params.userId, params.payslipId);
   if (!existingPayslip) {
     return { ok: false, error: 'Payslip not found', status: HTTP_STATUS.NOT_FOUND };
   }
 
-  const previousDocument = readInlinePdfDocument(existingPayslip);
-  const storageKey = buildPdfStorageKey({
-    userId: params.userId,
-    pathSegments: ['salary', 'payslips', params.payslipId],
-  });
-  const uploaded = await uploadPdfFile({
-    key: storageKey,
+  return replaceStoredPdfDocument({
+    storageKey: buildPdfStorageKey({
+      userId: params.userId,
+      pathSegments: ['salary', 'payslips', params.payslipId],
+    }),
     file: params.file,
     fallbackBaseName: 'payslip',
-  }).catch((error: unknown) => {
-    console.error('Failed to upload payslip PDF to storage', error);
-    return null;
-  });
-
-  if (!uploaded) {
-    return {
-      ok: false,
-      error: 'Failed to upload payslip PDF',
-      status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-    };
-  }
-
-  return persistPayslipDocumentMetadata({
-    userId: params.userId,
-    payslipId: params.payslipId,
-    storageKey,
-    uploaded,
-    previousDocument,
+    context: 'payslip PDF',
+    previousDocument: readInlinePdfDocument(existingPayslip),
+    persist: async (fields) => {
+      const [updated] = await db
+        .update(payslips)
+        .set(fields)
+        .where(and(eq(payslips.id, params.payslipId), eq(payslips.userId, params.userId)))
+        .returning();
+      return updated;
+    },
+    formatRow: formatInlinePdfDocument,
+    errors: {
+      notFound: 'Payslip not found',
+      uploadFailed: 'Failed to upload payslip PDF',
+      saveFailed: 'Failed to save payslip PDF',
+    },
   });
 }
 
@@ -381,24 +321,11 @@ app.get('/payslips/:id/document/download', async (c) => {
   const document = readInlinePdfDocument(payslipRow);
   if (!document) return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
 
-  try {
-    const bytes = await getS3ObjectBytes({ key: document.storageKey });
-    if (!bytes) return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
-
-    return new Response(new Uint8Array(bytes), {
-      headers: {
-        'Content-Type': PDF_MIME_TYPE,
-        'Content-Disposition': `inline; filename="${document.fileName}"`,
-      },
-    });
-  } catch (error) {
-    if (isS3NotFoundError(error)) {
-      return c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
-    }
-
-    console.error('Failed to download payslip PDF', error);
-    return c.json({ error: 'Failed to download payslip PDF' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
-  }
+  return streamStoredPdf(c, {
+    document,
+    context: 'payslip PDF',
+    failureMessage: 'Failed to download payslip PDF',
+  });
 });
 
 app.delete('/payslips/:id/document', async (c) => {

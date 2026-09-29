@@ -25,8 +25,14 @@ import {
   propertyTransactions,
   stockExchanges,
 } from '../db/schema';
-import { and, asc, eq, getTableColumns, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
+import {
+  applyRepayment,
+  MORTGAGE_BALANCE,
+  PROPERTY_MORTGAGE_BALANCE,
+  reverseRepayment,
+} from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
@@ -750,41 +756,16 @@ async function applyPropertyRepaymentEffect(
   property: typeof properties.$inferSelect,
   principal: number,
 ): Promise<string | null> {
-  if (property.mortgageId != null) {
-    const [updatedMortgage] = await tx
-      .update(mortgages)
-      .set({
-        outstandingBalance: sql`GREATEST(0, CAST(${mortgages.outstandingBalance} AS numeric) - ${principal})`,
-      })
-      .where(
-        and(
-          eq(mortgages.id, property.mortgageId),
-          sql`CAST(${mortgages.outstandingBalance} AS numeric) + 0.01 >= ${principal}`,
-        ),
-      )
-      .returning({ id: mortgages.id, outstandingBalance: mortgages.outstandingBalance });
-    if (updatedMortgage) {
-      await tx
-        .update(properties)
-        .set({ mortgage: updatedMortgage.outstandingBalance })
-        .where(eq(properties.mortgageId, updatedMortgage.id));
-      return null;
-    }
+  const { mortgageId } = property;
+  const updatedBalance =
+    mortgageId == null
+      ? await applyRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: property.id, principal })
+      : await applyRepayment(tx, MORTGAGE_BALANCE, { id: mortgageId, principal });
+  if (updatedBalance === null) {
     return 'Principal portion cannot exceed the current outstanding balance';
   }
-  const [updatedProperty] = await tx
-    .update(properties)
-    .set({
-      mortgage: sql`GREATEST(0, CAST(${properties.mortgage} AS numeric) - ${principal})`,
-    })
-    .where(
-      and(
-        eq(properties.id, property.id),
-        sql`CAST(${properties.mortgage} AS numeric) + 0.01 >= ${principal}`,
-      ),
-    )
-    .returning({ id: properties.id });
-  return updatedProperty ? null : 'Principal portion cannot exceed the current outstanding balance';
+  if (mortgageId != null) await syncPropertyMortgage(tx, mortgageId, updatedBalance);
+  return null;
 }
 
 // Inverse of applyPropertyRepaymentEffect, used when a repayment is removed
@@ -794,26 +775,30 @@ async function reversePropertyRepaymentEffect(
   property: typeof properties.$inferSelect,
   principal: number,
 ): Promise<void> {
-  if (property.mortgageId != null) {
-    const [updatedMortgage] = await tx
-      .update(mortgages)
-      .set({
-        outstandingBalance: sql`CAST(${mortgages.outstandingBalance} AS numeric) + ${principal}`,
-      })
-      .where(eq(mortgages.id, property.mortgageId))
-      .returning({ id: mortgages.id, outstandingBalance: mortgages.outstandingBalance });
-    if (updatedMortgage) {
-      await tx
-        .update(properties)
-        .set({ mortgage: updatedMortgage.outstandingBalance })
-        .where(eq(properties.mortgageId, updatedMortgage.id));
+  const { mortgageId } = property;
+  if (mortgageId != null) {
+    const updatedBalance = await reverseRepayment(tx, MORTGAGE_BALANCE, {
+      id: mortgageId,
+      principal,
+    });
+    if (updatedBalance !== null) {
+      await syncPropertyMortgage(tx, mortgageId, updatedBalance);
       return;
     }
   }
+  await reverseRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: property.id, principal });
+}
+
+// Keep the property's mortgage snapshot in step with its linked mortgage.
+async function syncPropertyMortgage(
+  tx: DbTransaction,
+  mortgageId: number,
+  outstandingBalance: number,
+): Promise<void> {
   await tx
     .update(properties)
-    .set({ mortgage: sql`CAST(${properties.mortgage} AS numeric) + ${principal}` })
-    .where(eq(properties.id, property.id));
+    .set({ mortgage: outstandingBalance })
+    .where(eq(properties.mortgageId, mortgageId));
 }
 
 async function getAccessiblePropertyTransaction(
