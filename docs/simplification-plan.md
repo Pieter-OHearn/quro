@@ -9,19 +9,19 @@ Paths are relative to `packages/`. `BE` = `backend/src`, `FE` = `frontend/src`.
 
 ## Overview
 
-| WP  | Title                                            | Area     | Size | Risk   | Depends on |
-| --- | ------------------------------------------------ | -------- | ---- | ------ | ---------- |
-| 1   | Dead code removal                                | Both     | S    | Low    | —          |
-| 2   | Backend request-validation consolidation         | Backend  | M    | Low    | —          |
-| 3   | Shared money, date & finance utilities           | Shared   | M    | Low    | —          |
-| 4   | Backend domain-logic extraction                  | Backend  | M    | Medium | 2, 3       |
-| 5   | Route infrastructure: auth, ownership, lifecycle | Backend  | L    | Medium | 2, 4       |
-| 6   | Household & net-worth model                      | Both     | L    | High   | 4, 5       |
-| 7   | Backend performance                              | Backend  | L    | Medium | (6 helps)  |
-| 8   | Frontend data layer (query keys, hooks, typing)  | Frontend | L    | Medium | —          |
-| 9   | Frontend performance                             | Frontend | M    | Low    | 8 helps    |
-| 10  | Frontend state & component simplification        | Frontend | M    | Low    | 3          |
-| 11  | UI consistency & design tokens                   | Frontend | L    | Low    | —          |
+| WP  | Issue | Title                                            | Area     | Size | Risk   | Depends on |
+| --- | ----- | ------------------------------------------------ | -------- | ---- | ------ | ---------- |
+| 1   | #224  | Dead code removal                                | Both     | S    | Low    | —          |
+| 2   | #225  | Backend request-validation consolidation         | Backend  | M    | Low    | —          |
+| 3   | #226  | Shared money, date & finance utilities           | Shared   | M    | Low    | —          |
+| 4   | #227  | Backend domain-logic extraction                  | Backend  | M    | Medium | 2, 3       |
+| 5   | #228  | Route infrastructure: auth, ownership, lifecycle | Backend  | L    | Medium | 2, 4       |
+| 6   | #229  | Household & net-worth model                      | Both     | L    | High   | 4, 5       |
+| 7   | #230  | Backend performance                              | Backend  | L    | Medium | (6 helps)  |
+| 8   | #231  | Frontend data layer (query keys, hooks, typing)  | Frontend | L    | Medium | —          |
+| 9   | #232  | Frontend performance                             | Frontend | M    | Low    | 8 helps    |
+| 10  | #233  | Frontend state & component simplification        | Frontend | M    | Low    | 3          |
+| 11  | #234  | UI consistency & design tokens                   | Frontend | L    | Low    | —          |
 
 Suggested order: **1 → 2 → 3 → 8 → 4 → 9 → 10 → 11 → 5 → 7 → 6**. WPs 1–3 are pure extractions
 and deletions with the best payoff-to-risk ratio; WP 6 changes data semantics and should come last.
