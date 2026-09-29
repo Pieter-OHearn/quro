@@ -1,6 +1,6 @@
 import type { CurrencyCode } from '@quro/shared';
 import { and, eq, gte, isNull, sql } from 'drizzle-orm';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import {
   debts,
   holdingTransactions,
@@ -14,12 +14,11 @@ import {
 import { convertToBaseCurrency, FX_BASE_CURRENCY } from './currencyRateCache';
 import { getCurrentRatesToBaseCurrency } from './currencyRateSync';
 import { getAcceptedPartnerId, ownedOrJointPredicate } from './partner';
+import { toNumberOrZero } from './requestValidation';
 
 const JOINT_WEIGHT = 0.5;
 const ISO_MONTH_LENGTH = 7;
 const DATE_END_OF_MONTH = 0;
-
-export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type DerivedAllocation = {
   id: number;
@@ -48,16 +47,11 @@ type PensionRow = MoneyRow & { balance: unknown };
 type MortgageRow = { id: number; outstandingBalance: unknown };
 type DebtRow = MoneyRow & { remainingBalance: unknown };
 
-function toNumber(value: unknown): number {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function computeSharesByHolding(txns: readonly HoldingTransactionRow[]): Map<number, number> {
   const shares = new Map<number, number>();
   for (const transaction of txns) {
     const current = shares.get(transaction.holdingId) ?? 0;
-    const delta = toNumber(transaction.shares);
+    const delta = toNumberOrZero(transaction.shares);
     if (transaction.type === 'buy') shares.set(transaction.holdingId, current + delta);
     if (transaction.type === 'sell') shares.set(transaction.holdingId, current - delta);
   }
@@ -81,7 +75,7 @@ export function computeDerivedAllocations(
   const convert = (amount: number, currency: string) =>
     convertToBaseCurrency(amount, currency, rates);
   const savings = userSavings.reduce(
-    (sum, account) => sum + convert(toNumber(account.balance), account.currency),
+    (sum, account) => sum + convert(toNumberOrZero(account.balance), account.currency),
     0,
   );
   const shares = computeSharesByHolding(userHoldingTxns);
@@ -89,27 +83,27 @@ export function computeDerivedAllocations(
     (sum, holding) =>
       sum +
       convert(
-        Math.max(0, shares.get(holding.id) ?? 0) * toNumber(holding.currentPrice),
+        Math.max(0, shares.get(holding.id) ?? 0) * toNumberOrZero(holding.currentPrice),
         holding.currency,
       ),
     0,
   );
   const mortgageById = new Map(
-    userMortgages.map((mortgage) => [mortgage.id, toNumber(mortgage.outstandingBalance)]),
+    userMortgages.map((mortgage) => [mortgage.id, toNumberOrZero(mortgage.outstandingBalance)]),
   );
   const propertyEquity = userProperties.reduce((sum, property) => {
     const mortgage =
       property.mortgageId === null
-        ? toNumber(property.mortgage)
+        ? toNumberOrZero(property.mortgage)
         : (mortgageById.get(property.mortgageId) ?? 0);
-    return sum + convert(toNumber(property.currentValue) - mortgage, property.currency);
+    return sum + convert(toNumberOrZero(property.currentValue) - mortgage, property.currency);
   }, 0);
   const pension = userPensions.reduce(
-    (sum, pot) => sum + convert(toNumber(pot.balance), pot.currency),
+    (sum, pot) => sum + convert(toNumberOrZero(pot.balance), pot.currency),
     0,
   );
   const liabilitiesTotal = userDebts.reduce(
-    (sum, debt) => sum + convert(toNumber(debt.remainingBalance), debt.currency),
+    (sum, debt) => sum + convert(toNumberOrZero(debt.remainingBalance), debt.currency),
     0,
   );
 
@@ -173,7 +167,7 @@ export function resolveHistoricalHoldingPrice(
       high = mid - 1;
     }
   }
-  return candidate < 0 ? null : toNumber(sorted[candidate].closePrice);
+  return candidate < 0 ? null : toNumberOrZero(sorted[candidate].closePrice);
 }
 
 async function loadSnapshotInputs(userId: number) {
@@ -215,7 +209,7 @@ async function loadSnapshotInputs(userId: number) {
     return Object.fromEntries(
       Object.entries(row).map(([key, value]) => [
         key,
-        fields.includes(key) ? toNumber(value) * JOINT_WEIGHT : value,
+        fields.includes(key) ? toNumberOrZero(value) * JOINT_WEIGHT : value,
       ]),
     ) as T;
   };

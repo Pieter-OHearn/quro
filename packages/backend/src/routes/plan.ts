@@ -44,17 +44,18 @@ import {
 } from '../lib/runway';
 import {
   err,
+  type FieldParsers,
   isRecord,
   ok,
+  parseDateString,
   parseOptionalBooleanField,
   parseOptionalIntegerField,
   parseOptionalNumberField,
-  parseDateString,
   parsePatchFields,
+  type ParseResult,
   readJsonBody,
   rejectUnknownFields,
-  type FieldParsers,
-  type ParseResult,
+  toNumberOrZero,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -74,11 +75,6 @@ const ASSUMPTION_FIELDS = [
   'wwDurationConfirmedAt',
   'severanceMonthlySalaryOverride',
 ] as const;
-
-function toNumber(value: unknown): number {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
 function toDateMonthsAgo(now: Date, months: number): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months + 1, 1))
@@ -158,7 +154,7 @@ function sumHoldingValue(
   const shares = new Map<number, number>();
   for (const transaction of transactions) {
     const current = shares.get(transaction.holdingId) ?? 0;
-    const delta = toNumber(transaction.shares);
+    const delta = toNumberOrZero(transaction.shares);
     if (transaction.type === 'buy') shares.set(transaction.holdingId, current + delta);
     if (transaction.type === 'sell') shares.set(transaction.holdingId, current - delta);
   }
@@ -166,7 +162,7 @@ function sumHoldingValue(
     (sum, holding) =>
       sum +
       convertToEur(
-        Math.max(0, shares.get(holding.id) ?? 0) * toNumber(holding.currentPrice),
+        Math.max(0, shares.get(holding.id) ?? 0) * toNumberOrZero(holding.currentPrice),
         holding.currency,
       ),
     0,
@@ -188,7 +184,7 @@ function buildBudgetInputs(
     if (!category) continue;
     const monthly = spendByNameMonth.get(category.name) ?? new Map<string, number>();
     const month = transaction.date.slice(0, 7);
-    monthly.set(month, (monthly.get(month) ?? 0) + toNumber(transaction.amount));
+    monthly.set(month, (monthly.get(month) ?? 0) + toNumberOrZero(transaction.amount));
     spendByNameMonth.set(category.name, monthly);
   }
   const latestByName = new Map<string, typeof budgetCategories.$inferSelect>();
@@ -216,7 +212,7 @@ function buildBudgetInputs(
     monthlySpend: observedMonths.map(
       (month) => spendByNameMonth.get(category.name)?.get(month) ?? 0,
     ),
-    currentBudgeted: toNumber(category.budgeted),
+    currentBudgeted: toNumberOrZero(category.budgeted),
     wasDefaultClassified: !category.expenseClassConfirmed,
   }));
 }
@@ -419,7 +415,7 @@ type MoneyConverter = (amount: number, currency: string) => number;
 
 function buildLiquidAssets(data: RunwayData, convertToEur: MoneyConverter): LiquidAssetInput[] {
   const assets: LiquidAssetInput[] = data.savings.map((account) => ({
-    amount: convertToEur(toNumber(account.balance), account.currency),
+    amount: convertToEur(toNumberOrZero(account.balance), account.currency),
     kind: account.accountType === 'Term Deposit' ? 'term_deposit' : 'easy_access',
     isJoint: account.isJoint,
   }));
@@ -439,11 +435,11 @@ function calculateDerivedCashflow(
     const account = data.savings.find((item) => item.id === transaction.accountId);
     const weighted = account?.isJoint ? jointWeight : 1;
     const amount =
-      convertToEur(toNumber(transaction.amount), account?.currency ?? 'EUR') * weighted;
+      convertToEur(toNumberOrZero(transaction.amount), account?.currency ?? 'EUR') * weighted;
     return sum + (transaction.type === 'withdrawal' ? -amount : amount);
   }, 0);
   const netIncome = data.payslipRows.reduce(
-    (sum, payslip) => sum + convertToEur(toNumber(payslip.net), payslip.currency),
+    (sum, payslip) => sum + convertToEur(toNumberOrZero(payslip.net), payslip.currency),
     0,
   );
   const historyMonths = Math.max(1, Math.min(HISTORY_MONTHS, data.payslipRows.length));
@@ -454,13 +450,13 @@ function buildContractualInputs(data: RunwayData, convertToEur: MoneyConverter) 
   return [
     ...data.mortgageRows.map((mortgage) => ({
       label: mortgage.propertyAddress || mortgage.lender,
-      amount: convertToEur(toNumber(mortgage.monthlyPayment), mortgage.currency),
+      amount: convertToEur(toNumberOrZero(mortgage.monthlyPayment), mortgage.currency),
       source: 'mortgage' as const,
       isJoint: mortgage.isJoint,
     })),
     ...data.debtRows.map((debt) => ({
       label: debt.name,
-      amount: convertToEur(toNumber(debt.monthlyPayment), debt.currency),
+      amount: convertToEur(toNumberOrZero(debt.monthlyPayment), debt.currency),
       source: 'debt' as const,
     })),
   ];
@@ -516,9 +512,9 @@ function buildIncomeSupport(
     payslips: selectedPayslips.map((payslip) => ({
       id: payslip.id,
       date: payslip.date,
-      gross: convertToEur(toNumber(payslip.gross), payslip.currency),
-      tax: convertToEur(toNumber(payslip.tax), payslip.currency),
-      net: convertToEur(toNumber(payslip.net), payslip.currency),
+      gross: convertToEur(toNumberOrZero(payslip.gross), payslip.currency),
+      tax: convertToEur(toNumberOrZero(payslip.tax), payslip.currency),
+      net: convertToEur(toNumberOrZero(payslip.net), payslip.currency),
       currency: 'EUR',
     })),
     assumptions,
@@ -580,7 +576,7 @@ function buildEurRunwayResponse(
       data.savings.map((account) => ({
         id: account.id,
         bank: account.bank,
-        amount: toNumber(account.balance),
+        amount: toNumberOrZero(account.balance),
         currency: account.currency,
         isJoint: account.isJoint,
         confirmedEntity: account.bankingEntityConfirmedAt
@@ -588,7 +584,7 @@ function buildEurRunwayResponse(
               entityId: account.bankingEntityId,
               entityName: account.bankingEntityName,
               scheme: account.depositGuaranteeScheme,
-              cap: account.depositGuaranteeCap ? toNumber(account.depositGuaranteeCap) : null,
+              cap: account.depositGuaranteeCap ? toNumberOrZero(account.depositGuaranteeCap) : null,
               currency: account.depositGuaranteeCurrency,
             }
           : null,

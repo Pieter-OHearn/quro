@@ -6,18 +6,12 @@ import { mortgages, partnerLinks, properties, savingsAccounts, users } from '../
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { partnerInviteRateLimit } from '../middleware/rateLimit';
-import { hasPostgresErrorCode } from '../lib/postgresErrors';
+import { isUniqueViolation } from '../lib/postgresErrors';
 
 const app = new Hono();
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PG_UNIQUE_VIOLATION = '23505';
-
 type PartnerLinkRow = typeof partnerLinks.$inferSelect;
-
-function isUniqueViolation(error: unknown): boolean {
-  return hasPostgresErrorCode(error, PG_UNIQUE_VIOLATION);
-}
 
 function linkInvolving(userId: number) {
   return or(eq(partnerLinks.requesterId, userId), eq(partnerLinks.addresseeId, userId));

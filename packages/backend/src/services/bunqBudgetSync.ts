@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { BUDGET_MONTHS, type BudgetMonth } from '@quro/shared';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import {
   budgetCategories,
   budgetTransactions,
@@ -29,7 +29,6 @@ import {
 const MCC_SOURCE = 'mcc';
 
 type BunqConnectionRow = typeof bunqConnections.$inferSelect;
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type BudgetCategoryTemplate = {
   budgeted: number;
   emoji: string | null;

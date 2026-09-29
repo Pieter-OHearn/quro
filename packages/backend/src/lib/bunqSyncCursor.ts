@@ -1,12 +1,6 @@
-import {
-  HOURS_PER_DAY,
-  MINUTES_PER_HOUR,
-  MS_PER_SECOND,
-  SECONDS_PER_MINUTE,
-} from '../constants/time';
+import { DAY_MS } from '../constants/time';
 
-export const BUNQ_SYNC_LOOKBACK_MS =
-  2 * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+export const BUNQ_SYNC_LOOKBACK_MS = 2 * DAY_MS;
 
 export function toBunqNewerThanCursor(
   lastSyncAt: Date | null,

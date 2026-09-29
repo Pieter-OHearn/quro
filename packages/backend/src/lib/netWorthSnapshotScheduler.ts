@@ -1,13 +1,10 @@
+import { HOUR_MS } from '../constants/time';
 import { db } from '../db/client';
 import { users } from '../db/schema';
 import { upsertCurrentNetWorthSnapshot } from './netWorth';
 
-const SECONDS_PER_MINUTE = 60;
-const MINUTES_PER_HOUR = 60;
-const MS_PER_SECOND = 1000;
 const SNAPSHOT_INTERVAL_HOURS = 24;
-const SNAPSHOT_INTERVAL_MS =
-  SNAPSHOT_INTERVAL_HOURS * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const SNAPSHOT_INTERVAL_MS = SNAPSHOT_INTERVAL_HOURS * HOUR_MS;
 
 async function snapshotUser(userId: number): Promise<void> {
   try {

@@ -1,19 +1,30 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { DEBT_TYPES, isCurrencyCode, type CurrencyCode, type DebtType } from '@quro/shared';
+import { DEBT_TYPES, type CurrencyCode, type DebtType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { invalidateSnapshotsFrom } from '../lib/netWorth';
+import {
+  err,
+  type FieldParsers,
+  ok,
+  parseCurrencyField,
+  parseDateField,
+  parseId,
+  parseIntegerField,
+  parseNonEmptyString,
+  parseNumberField,
+  parseOptionalDateField,
+  parsePositiveNumberField,
+  parseRequiredFields,
+  type ParseResult,
+  parseTextField,
+  readJsonRecord,
+} from '../lib/requestValidation';
 
 const app = new Hono();
-const MAX_INT32 = 2_147_483_647;
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-type ValidationResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 type DebtPayload = {
   name: string;
@@ -95,46 +106,37 @@ function toDebtPaymentInsertPayload(
   };
 }
 
-function parseId(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > MAX_INT32) return null;
-  return parsed;
-}
-
-function normalizeBody(body: unknown): Record<string, unknown> {
-  return body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-}
-
-function toFiniteNumber(value: unknown): number | null {
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parseRequiredString(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function parseOptionalString(value: unknown): string | null {
-  return parseRequiredString(value);
-}
-
-function parseIsoDate(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return ISO_DATE_PATTERN.test(trimmed) ? trimmed : null;
-}
-
-function parseDebtType(value: unknown): DebtType | null {
+function parseDebtTypeField(value: unknown): ParseResult<DebtType> {
   return typeof value === 'string' && DEBT_TYPES.includes(value as DebtType)
-    ? (value as DebtType)
-    : null;
+    ? ok(value as DebtType)
+    : err('Invalid debt type');
 }
 
-function parseDebtBalance(value: unknown): number {
-  return Number.parseFloat(String(value ?? '0')) || 0;
-}
+const debtParsers: FieldParsers<DebtPayload> = {
+  name: (value) => parseTextField(value, 'Debt name is required'),
+  type: parseDebtTypeField,
+  lender: (value) => parseTextField(value, 'Lender is required'),
+  originalAmount: (value) =>
+    parsePositiveNumberField(value, 'Original amount must be greater than zero'),
+  remainingBalance: (value) =>
+    parseNumberField(value, 'Remaining balance must be zero or greater', 0),
+  currency: parseCurrencyField,
+  interestRate: (value) => parseNumberField(value, 'Interest rate must be zero or greater', 0),
+  monthlyPayment: (value) => parseNumberField(value, 'Monthly payment must be zero or greater', 0),
+  startDate: (value) => parseDateField(value, 'Start date must be a valid ISO date'),
+  endDate: (value) => parseOptionalDateField(value, 'End date must be a valid ISO date'),
+  color: (value) => parseTextField(value, 'Color is required'),
+  emoji: (value) => parseTextField(value, 'Emoji is required'),
+  notes: (value) => ok(parseNonEmptyString(value)),
+};
+
+const debtPaymentParsers: FieldParsers<Omit<DebtPaymentPayload, 'principal'>> = {
+  debtId: (value) => parseIntegerField(value, 'Invalid debt id', 1),
+  date: (value) => parseDateField(value, 'Payment date must be a valid ISO date'),
+  amount: (value) => parsePositiveNumberField(value, 'Payment amount must be greater than zero'),
+  interest: (value) => parseNumberField(value, 'Interest must be zero or greater', 0),
+  note: (value) => ok(parseNonEmptyString(value) ?? ''),
+};
 
 export function validateDebtBalance(
   originalAmount: number,
@@ -180,117 +182,35 @@ export function restoreDebtPrincipalPayment(
   return adjustDebtRemainingBalance(currentRemainingBalance, principal);
 }
 
-// eslint-disable-next-line complexity, sonarjs/cognitive-complexity
-export function parseDebtPayload(raw: Record<string, unknown>): ValidationResult<DebtPayload> {
-  const name = parseRequiredString(raw.name);
-  if (!name) return { ok: false, error: 'Debt name is required' };
+export function parseDebtPayload(raw: Record<string, unknown>): ParseResult<DebtPayload> {
+  const parsed = parseRequiredFields(raw, debtParsers);
+  if (!parsed.ok) return parsed;
 
-  const type = parseDebtType(raw.type);
-  if (!type) return { ok: false, error: 'Invalid debt type' };
-
-  const lender = parseRequiredString(raw.lender);
-  if (!lender) return { ok: false, error: 'Lender is required' };
-
-  const originalAmount = toFiniteNumber(raw.originalAmount);
-  if (originalAmount == null || originalAmount <= 0) {
-    return { ok: false, error: 'Original amount must be greater than zero' };
-  }
-
-  const remainingBalance = toFiniteNumber(raw.remainingBalance);
-  if (remainingBalance == null || remainingBalance < 0) {
-    return { ok: false, error: 'Remaining balance must be zero or greater' };
-  }
+  const { remainingBalance, originalAmount, startDate, endDate } = parsed.value;
   const balanceValidationError = validateDebtBalance(originalAmount, remainingBalance);
-  if (balanceValidationError) return { ok: false, error: balanceValidationError };
-
-  if (!isCurrencyCode(raw.currency)) return { ok: false, error: 'Invalid currency' };
-
-  const interestRate = toFiniteNumber(raw.interestRate);
-  if (interestRate == null || interestRate < 0) {
-    return { ok: false, error: 'Interest rate must be zero or greater' };
-  }
-
-  const monthlyPayment = toFiniteNumber(raw.monthlyPayment);
-  if (monthlyPayment == null || monthlyPayment < 0) {
-    return { ok: false, error: 'Monthly payment must be zero or greater' };
-  }
-
-  const startDate = parseIsoDate(raw.startDate);
-  if (!startDate) return { ok: false, error: 'Start date must be a valid ISO date' };
-
-  const rawEndDate = raw.endDate;
-  const endDate = rawEndDate == null || rawEndDate === '' ? null : parseIsoDate(rawEndDate);
-  if (rawEndDate != null && rawEndDate !== '' && !endDate) {
-    return { ok: false, error: 'End date must be a valid ISO date' };
-  }
+  if (balanceValidationError) return err(balanceValidationError);
   if (endDate != null && endDate < startDate) {
-    return { ok: false, error: 'End date cannot be earlier than the start date' };
+    return err('End date cannot be earlier than the start date');
   }
-
-  const color = parseRequiredString(raw.color);
-  if (!color) return { ok: false, error: 'Color is required' };
-
-  const emoji = parseRequiredString(raw.emoji);
-  if (!emoji) return { ok: false, error: 'Emoji is required' };
-
-  return {
-    ok: true,
-    data: {
-      name,
-      type,
-      lender,
-      originalAmount,
-      remainingBalance,
-      currency: raw.currency,
-      interestRate,
-      monthlyPayment,
-      startDate,
-      endDate,
-      color,
-      emoji,
-      notes: parseOptionalString(raw.notes),
-    },
-  };
+  return parsed;
 }
 
 export function parseDebtPaymentPayload(
   raw: Record<string, unknown>,
-): ValidationResult<DebtPaymentPayload> {
-  const debtId = parseId(String(raw.debtId ?? ''));
-  if (debtId == null) return { ok: false, error: 'Invalid debt id' };
+): ParseResult<DebtPaymentPayload> {
+  const parsed = parseRequiredFields(raw, debtPaymentParsers);
+  if (!parsed.ok) return parsed;
 
-  const date = parseIsoDate(raw.date);
-  if (!date) return { ok: false, error: 'Payment date must be a valid ISO date' };
-
-  const amount = toFiniteNumber(raw.amount);
-  if (amount == null || amount <= 0) {
-    return { ok: false, error: 'Payment amount must be greater than zero' };
-  }
-
-  const interest = toFiniteNumber(raw.interest);
-  if (interest == null || interest < 0) {
-    return { ok: false, error: 'Interest must be zero or greater' };
-  }
-  if (interest > amount) return { ok: false, error: 'Interest cannot exceed total payment' };
-
-  return {
-    ok: true,
-    data: {
-      debtId,
-      date,
-      amount,
-      interest,
-      principal: computeDebtPrincipal(amount, interest),
-      note: parseOptionalString(raw.note) ?? '',
-    },
-  };
+  const { amount, interest } = parsed.value;
+  if (interest > amount) return err('Interest cannot exceed total payment');
+  return ok({ ...parsed.value, principal: computeDebtPrincipal(amount, interest) });
 }
 
 // eslint-disable-next-line complexity
 function mergeDebtPayload(
   raw: Record<string, unknown>,
   existing: typeof debts.$inferSelect,
-): ValidationResult<DebtPayload> {
+): ParseResult<DebtPayload> {
   return parseDebtPayload({
     name: raw.name ?? existing.name,
     type: raw.type ?? existing.type,
@@ -330,7 +250,7 @@ async function createDebt(params: {
 
   const [data] = await db
     .insert(debts)
-    .values(toDebtInsertPayload(parsed.data, params.userId))
+    .values(toDebtInsertPayload(parsed.value, params.userId))
     .returning();
 
   return { data };
@@ -349,7 +269,7 @@ async function updateDebt(params: {
 
   const [data] = await db
     .update(debts)
-    .set(toDebtUpdatePayload(parsed.data))
+    .set(toDebtUpdatePayload(parsed.value))
     .where(and(eq(debts.id, params.debtId), eq(debts.userId, params.userId)))
     .returning();
 
@@ -365,19 +285,19 @@ async function createDebtPayment(params: {
   if (!parsed.ok) return { error: parsed.error, status: HTTP_STATUS.BAD_REQUEST };
 
   return await db.transaction(async (tx) => {
-    const debt = await getDebtById(tx, params.userId, parsed.data.debtId);
+    const debt = await getDebtById(tx, params.userId, parsed.value.debtId);
     if (!debt) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
     const [updatedDebt] = await tx
       .update(debts)
       .set({
-        remainingBalance: sql`GREATEST(0, CAST(${debts.remainingBalance} AS numeric) - ${parsed.data.principal})`,
+        remainingBalance: sql`GREATEST(0, CAST(${debts.remainingBalance} AS numeric) - ${parsed.value.principal})`,
       })
       .where(
         and(
           eq(debts.id, debt.id),
           eq(debts.userId, params.userId),
-          sql`CAST(${debts.remainingBalance} AS numeric) + 0.01 >= ${parsed.data.principal}`,
+          sql`CAST(${debts.remainingBalance} AS numeric) + 0.01 >= ${parsed.value.principal}`,
         ),
       )
       .returning({ id: debts.id });
@@ -390,9 +310,9 @@ async function createDebtPayment(params: {
 
     const [data] = await tx
       .insert(debtPayments)
-      .values(toDebtPaymentInsertPayload(parsed.data, params.userId))
+      .values(toDebtPaymentInsertPayload(parsed.value, params.userId))
       .returning();
-    await invalidateSnapshotsFrom(tx, params.userId, parsed.data.date);
+    await invalidateSnapshotsFrom(tx, params.userId, parsed.value.date);
 
     return { data };
   });
@@ -412,7 +332,7 @@ function deleteDebtPayment(params: {
     await tx
       .update(debts)
       .set({
-        remainingBalance: sql`CAST(${debts.remainingBalance} AS numeric) + ${parseDebtBalance(existing.principal)}`,
+        remainingBalance: sql`CAST(${debts.remainingBalance} AS numeric) + ${existing.principal}`,
       })
       .where(and(eq(debts.id, existing.debtId), eq(debts.userId, params.userId)));
 
@@ -450,8 +370,9 @@ app.get('/payments', async (c) => {
 
 app.post('/payments', async (c) => {
   const user = getAuthUser(c);
-  const body = normalizeBody(await c.req.json());
-  const { userId: _ignoredUserId, principal: _ignoredPrincipal, ...safeBody } = body;
+  const body = await readJsonRecord(c.req, 'Invalid debt payment payload');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const { userId: _ignoredUserId, principal: _ignoredPrincipal, ...safeBody } = body.value;
   const result = await createDebtPayment({ userId: user.id, raw: safeBody });
   if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data }, HTTP_STATUS.CREATED);
@@ -493,8 +414,9 @@ app.get('/:id', async (c) => {
 
 app.post('/', async (c) => {
   const user = getAuthUser(c);
-  const body = normalizeBody(await c.req.json());
-  const { userId: _ignoredUserId, ...safeBody } = body;
+  const body = await readJsonRecord(c.req, 'Invalid debt payload');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const { userId: _ignoredUserId, ...safeBody } = body.value;
   const result = await createDebt({ userId: user.id, raw: safeBody });
   if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data }, HTTP_STATUS.CREATED);
@@ -505,8 +427,9 @@ app.patch('/:id', async (c) => {
   const debtId = parseId(c.req.param('id'));
   if (debtId == null) return c.json({ error: 'Invalid debt id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const body = normalizeBody(await c.req.json());
-  const { userId: _ignoredUserId, ...safeBody } = body;
+  const body = await readJsonRecord(c.req, 'Invalid debt payload');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const { userId: _ignoredUserId, ...safeBody } = body.value;
   const result = await updateDebt({ userId: user.id, debtId, raw: safeBody });
   if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data });

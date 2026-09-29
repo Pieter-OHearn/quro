@@ -1,3 +1,5 @@
+import { toNumberOrZero } from './requestValidation';
+
 const DEFAULT_PARSER_TIMEOUT_MS = 300_000;
 const DEFAULT_PARSER_HEALTH_TIMEOUT_MS = 4_000;
 
@@ -49,12 +51,6 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function toFiniteNumber(value: unknown): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  const parsed = Number.parseFloat(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function toConfidenceLabel(value: unknown): PensionParserRow['confidenceLabel'] {
   if (value === 'high' || value === 'medium') return value;
   return 'low';
@@ -88,12 +84,12 @@ function normalizeRows(value: unknown): PensionParserRow[] {
 
       return {
         type,
-        amount: toFiniteNumber(row.amount),
-        taxAmount: toFiniteNumber(row.taxAmount),
+        amount: toNumberOrZero(row.amount),
+        taxAmount: toNumberOrZero(row.taxAmount),
         date,
         note: typeof row.note === 'string' ? row.note : '',
         isEmployer: typeof row.isEmployer === 'boolean' ? row.isEmployer : null,
-        confidence: Math.min(1, Math.max(0, toFiniteNumber(row.confidence))),
+        confidence: Math.min(1, Math.max(0, toNumberOrZero(row.confidence))),
         confidenceLabel: toConfidenceLabel(row.confidenceLabel),
         evidence: normalizeEvidence(row.evidence),
         isDerived: Boolean(row.isDerived),

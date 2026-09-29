@@ -1,12 +1,7 @@
-import {
-  HOURS_PER_DAY,
-  MINUTES_PER_HOUR,
-  MS_PER_SECOND,
-  SECONDS_PER_MINUTE,
-} from '../constants/time';
+import { DAY_MS } from '../constants/time';
 import { syncCurrencyRates } from './currencyRateSync';
 
-const SYNC_INTERVAL_MS = HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const SYNC_INTERVAL_MS = DAY_MS;
 
 function shouldSkipScheduler(): boolean {
   return process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';

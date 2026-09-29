@@ -30,9 +30,11 @@ import {
   ok,
   parseDateString,
   parseId,
+  type ParseResult,
   readJsonBody,
   rejectUnknownFields,
-  type ParseResult,
+  toFiniteNumberOrNull,
+  toNumberOrZero,
 } from '../lib/requestValidation';
 import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
 
@@ -136,16 +138,6 @@ type ImportFeedRow = {
   potEmoji: string | null;
 };
 
-function toFiniteNumber(value: unknown): number | null {
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function toNumber(value: unknown): number {
-  const parsed = toFiniteNumber(value);
-  return parsed ?? 0;
-}
-
 function parsePensionTransactionType(value: unknown): PensionTransactionType | null {
   if (typeof value !== 'string') return null;
   return TRANSACTION_TYPES.includes(value as PensionTransactionType)
@@ -162,10 +154,10 @@ function parsePensionTransactionPayloadBase(
   const type = parsePensionTransactionType(rawPayload.type);
   if (!type) return { ok: false, error: 'Invalid transaction type' };
 
-  const amount = toFiniteNumber(rawPayload.amount);
+  const amount = toFiniteNumberOrNull(rawPayload.amount);
   if (amount === null) return { ok: false, error: 'Invalid transaction amount' };
 
-  const taxAmount = toFiniteNumber(rawPayload.taxAmount ?? 0);
+  const taxAmount = toFiniteNumberOrNull(rawPayload.taxAmount ?? 0);
   if (taxAmount === null) return { ok: false, error: 'Invalid tax amount' };
 
   const date = parseDateString(rawPayload.date);
@@ -367,7 +359,7 @@ function normalizeImportResponse(row: {
     status: row.status,
     fileName: row.fileName,
     mimeType: row.mimeType,
-    sizeBytes: toNumber(row.sizeBytes),
+    sizeBytes: toNumberOrZero(row.sizeBytes),
     fileHashSha256: row.fileHashSha256,
     statementPeriodStart: row.statementPeriodStart,
     statementPeriodEnd: row.statementPeriodEnd,
@@ -410,12 +402,12 @@ function normalizeImportRowResponse(row: {
     importId: row.importId,
     rowOrder: row.rowOrder,
     type: row.type,
-    amount: toNumber(row.amount),
-    taxAmount: toNumber(row.taxAmount),
+    amount: toNumberOrZero(row.amount),
+    taxAmount: toNumberOrZero(row.taxAmount),
     date: row.date,
     note: row.note,
     isEmployer: row.isEmployer,
-    confidence: toNumber(row.confidence),
+    confidence: toNumberOrZero(row.confidence),
     confidenceLabel: row.confidenceLabel,
     evidence: Array.isArray(row.evidence) ? row.evidence : [],
     isDerived: row.isDerived,
@@ -581,8 +573,8 @@ function validateEditableRowUpdate(params: {
   return validatePensionTransactionPayload({
     potId: params.importRecord.potId,
     type: params.body.type ?? params.existingRow.type,
-    amount: params.body.amount ?? toNumber(params.existingRow.amount),
-    taxAmount: params.body.taxAmount ?? toNumber(params.existingRow.taxAmount),
+    amount: params.body.amount ?? toNumberOrZero(params.existingRow.amount),
+    taxAmount: params.body.taxAmount ?? toNumberOrZero(params.existingRow.taxAmount),
     date: params.body.date ?? params.existingRow.date,
     note: params.body.note ?? params.existingRow.note,
     isEmployer: params.body.isEmployer ?? params.existingRow.isEmployer,
@@ -614,8 +606,8 @@ function validateRowsForCommit(rows: ImportRowRecord[], potId: number): string |
     const validated = validatePensionTransactionPayload({
       potId,
       type: row.type,
-      amount: toNumber(row.amount),
-      taxAmount: toNumber(row.taxAmount),
+      amount: toNumberOrZero(row.amount),
+      taxAmount: toNumberOrZero(row.taxAmount),
       date: row.date,
       note: row.note,
       isEmployer: row.isEmployer,
@@ -646,8 +638,8 @@ async function commitRowsToLedger(params: {
       const validated = validatePensionTransactionPayload({
         potId: params.importRecord.potId,
         type: row.type,
-        amount: toNumber(row.amount),
-        taxAmount: toNumber(row.taxAmount),
+        amount: toNumberOrZero(row.amount),
+        taxAmount: toNumberOrZero(row.taxAmount),
         date: row.date,
         note: row.note,
         isEmployer: row.isEmployer,
@@ -822,7 +814,7 @@ function findPotentialCollision(
       (transaction) =>
         transaction.type === parsedRow.type &&
         transaction.date === parsedRow.date &&
-        Math.abs(toNumber(transaction.amount) - parsedRow.amount) <= 0.01,
+        Math.abs(toNumberOrZero(transaction.amount) - parsedRow.amount) <= 0.01,
     ) ?? null
   );
 }

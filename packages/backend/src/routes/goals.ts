@@ -7,6 +7,7 @@ import { goals, savingsAccounts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import {
   err,
+  type FieldParsers,
   ok,
   parseCurrencyField,
   parseId,
@@ -16,11 +17,11 @@ import {
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
+  type ParseResult,
   parseTextField,
+  pickPatchedValue,
   readJsonBody,
   rejectUnknownFields,
-  type FieldParsers,
-  type ParseResult,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -291,10 +292,6 @@ export function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>>
   const strictCheck = rejectUnknownFields(body as Record<string, unknown>, GOAL_FIELDS);
   if (!strictCheck.ok) return strictCheck;
   return parsePatchFields(body as Record<string, unknown>, goalParsers);
-}
-
-function pickPatchedValue<T>(value: T | undefined, fallback: T): T {
-  return value === undefined ? fallback : value;
 }
 
 async function getOwnedGoal(goalId: number, userId: number) {

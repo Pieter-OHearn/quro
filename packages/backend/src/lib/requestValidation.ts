@@ -29,6 +29,15 @@ export async function readJsonBody(
   }
 }
 
+export async function readJsonRecord(
+  request: Pick<Request, 'json'>,
+  error: string,
+): Promise<ParseResult<Record<string, unknown>>> {
+  const body = await readJsonBody(request, error);
+  if (!body.ok) return body;
+  return isRecord(body.value) ? ok(body.value) : err(error);
+}
+
 export function rejectUnknownFields(
   body: Record<string, unknown>,
   allowed: ReadonlyArray<string>,
@@ -183,4 +192,74 @@ export function parseOptionalIntegerField(
   if (value == null || value === '') return ok(null);
   const parsed = parseInteger(value);
   return parsed === null || parsed < min || parsed > max ? err(error) : ok(parsed);
+}
+
+export function parsePositiveNumberField(value: unknown, error: string): ParseResult<number> {
+  const parsed = parseNumber(value);
+  return parsed === null || parsed <= 0 ? err(error) : ok(parsed);
+}
+
+export function parseOptionalDateField(value: unknown, error: string): ParseResult<string | null> {
+  if (value == null || value === '') return ok(null);
+  const parsed = parseDateString(value);
+  return parsed ? ok(parsed) : err(error);
+}
+
+export function parseOptionalId(value: unknown): number | null | 'invalid' {
+  if (value == null || value === '') return null;
+  const parsed = parseId(String(value));
+  return parsed === null ? 'invalid' : parsed;
+}
+
+// Accepts both `1,234.56` and `1.234,56` style decimals; the last separator is the decimal point.
+export function parseNormalizedDecimal(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const compact = value.replace(/\s+/g, '');
+  if (!compact) return null;
+
+  const hasComma = compact.includes(',');
+  let normalized = compact;
+  if (hasComma && compact.includes('.')) {
+    normalized =
+      compact.lastIndexOf(',') > compact.lastIndexOf('.')
+        ? compact.replaceAll('.', '').replace(',', '.')
+        : compact.replaceAll(',', '');
+  } else if (hasComma) {
+    normalized = compact.replace(',', '.');
+  }
+
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function parseNormalizedDecimalField(
+  value: unknown,
+  error: string,
+  min = Number.NEGATIVE_INFINITY,
+): ParseResult<number> {
+  const parsed = parseNormalizedDecimal(value);
+  return parsed === null || parsed < min ? err(error) : ok(parsed);
+}
+
+export function parseOptionalNormalizedDecimalField(
+  value: unknown,
+  error: string,
+  min = Number.NEGATIVE_INFINITY,
+): ParseResult<number | null> {
+  if (value == null || value === '') return ok(null);
+  const parsed = parseNormalizedDecimal(value);
+  return parsed === null || parsed < min ? err(error) : ok(parsed);
+}
+
+export function pickPatchedValue<T, U>(patchValue: T | undefined, existingValue: U): T | U {
+  return patchValue === undefined ? existingValue : patchValue;
+}
+
+export function toFiniteNumberOrNull(value: unknown): number | null {
+  return parseNumber(value);
+}
+
+export function toNumberOrZero(value: unknown): number {
+  return parseNumber(value) ?? 0;
 }

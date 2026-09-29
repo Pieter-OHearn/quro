@@ -6,7 +6,7 @@ import {
   type PensionPotType,
   type PensionTransactionType,
 } from '@quro/shared';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
@@ -26,6 +26,7 @@ import {
 } from '../lib/pdfDocuments';
 import {
   err,
+  type FieldParsers,
   isRecord,
   ok,
   parseCurrencyField,
@@ -35,11 +36,12 @@ import {
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
+  type ParseResult,
   parseTextField,
   readJsonBody,
   rejectUnknownFields,
-  type FieldParsers,
-  type ParseResult,
+  toFiniteNumberOrNull,
+  toNumberOrZero,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -128,8 +130,6 @@ type ValidationResult =
 
 type RouteMutationResult =
   { data: unknown } | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function isMetadataPrimitive(v: unknown): v is string | number | boolean {
   return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
@@ -248,11 +248,6 @@ function toPensionTransactionUpdatePayload(
   };
 }
 
-function toFiniteNumber(value: unknown): number | null {
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function parsePensionTransactionType(value: unknown): PensionTransactionType | null {
   if (typeof value !== 'string') return null;
   return PENSION_TRANSACTION_TYPES.includes(value as PensionTransactionType)
@@ -328,10 +323,10 @@ function parsePensionTransactionPayloadBase(
   const type = parsePensionTransactionType(rawPayload.type);
   if (!type) return { ok: false, error: 'Invalid transaction type' };
 
-  const amount = toFiniteNumber(rawPayload.amount);
+  const amount = toFiniteNumberOrNull(rawPayload.amount);
   if (amount === null) return { ok: false, error: 'Invalid transaction amount' };
 
-  const taxAmount = toFiniteNumber(rawPayload.taxAmount ?? 0);
+  const taxAmount = toFiniteNumberOrNull(rawPayload.taxAmount ?? 0);
   if (taxAmount === null) return { ok: false, error: 'Invalid tax amount' };
 
   const date = parseDateString(rawPayload.date);
@@ -439,8 +434,8 @@ function normalizeTransactionRow(row: {
   return {
     potId: row.potId,
     type: row.type,
-    amount: toFiniteNumber(row.amount) ?? 0,
-    taxAmount: toFiniteNumber(row.taxAmount ?? 0) ?? 0,
+    amount: toNumberOrZero(row.amount),
+    taxAmount: toNumberOrZero(row.taxAmount),
     date: row.date,
     note: row.note ?? '',
     isEmployer: row.isEmployer ?? null,
@@ -456,12 +451,6 @@ function validatePensionTransactionPayload(
   if (parsed.data.type === 'contribution') return validateContributionPayload(parsed.data);
   if (parsed.data.type === 'fee') return validateFeePayload(parsed.data);
   return validateAnnualStatementPayload(parsed.data);
-}
-
-function isRouteMutationError(
-  result: RouteMutationResult,
-): result is { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] } {
-  return 'error' in result;
 }
 
 function formatStatementDocumentResponse(document: PensionStatementDocumentRecord) {
@@ -819,7 +808,7 @@ async function updatePensionTransaction(params: {
     return { data };
   });
 
-  if (!isRouteMutationError(result) && storageKeyToDelete) {
+  if (!('error' in result) && storageKeyToDelete) {
     await deleteStoredPdfSafely(storageKeyToDelete, 'pension statement PDF');
   }
 
@@ -866,7 +855,7 @@ async function deletePensionTransaction(params: {
     return { data };
   });
 
-  if (!isRouteMutationError(result) && storageKeyToDelete) {
+  if (!('error' in result) && storageKeyToDelete) {
     await deleteStoredPdfSafely(storageKeyToDelete, 'pension statement PDF');
   }
 
@@ -1023,7 +1012,7 @@ app.post('/transactions', async (c) => {
   if (!validated.ok) return c.json({ error: validated.error }, HTTP_STATUS.BAD_REQUEST);
 
   const result = await createPensionTransaction({ userId: user.id, payload: validated.value });
-  if (isRouteMutationError(result)) return c.json({ error: result.error }, result.status);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data }, HTTP_STATUS.CREATED);
 });
 
@@ -1046,7 +1035,7 @@ app.patch('/transactions/:id', async (c) => {
     transactionId: id,
     raw: body.value,
   });
-  if (isRouteMutationError(result)) return c.json({ error: result.error }, result.status);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data });
 });
 
@@ -1056,7 +1045,7 @@ app.delete('/transactions/:id', async (c) => {
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
   const result = await deletePensionTransaction({ userId: user.id, transactionId: id });
-  if (isRouteMutationError(result)) return c.json({ error: result.error }, result.status);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data });
 });
 

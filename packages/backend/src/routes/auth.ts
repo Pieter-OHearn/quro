@@ -11,6 +11,7 @@ import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { HTTP_STATUS } from '../constants/http';
+import { DAY_MS } from '../constants/time';
 import { signinEmailRateLimit, signinRateLimit, signupRateLimit } from '../middleware/rateLimit';
 import {
   DEFAULT_BASE_CURRENCY,
@@ -19,7 +20,7 @@ import {
   DEFAULT_USER_AGE,
   publicUserColumns,
 } from '../lib/users';
-import { hasPostgresErrorCode } from '../lib/postgresErrors';
+import { isUniqueViolation } from '../lib/postgresErrors';
 
 const app = new Hono();
 
@@ -27,20 +28,11 @@ const SESSION_ID_BYTES = 32;
 const HEX_RADIX = 16;
 const HEX_BYTE_LENGTH = 2;
 const SESSION_DURATION_DAYS = 30;
-const HOURS_PER_DAY = 24;
-const MINUTES_PER_HOUR = 60;
-const SECONDS_PER_MINUTE = 60;
-const MILLISECONDS_PER_SECOND = 1000;
 const BCRYPT_COST = 10;
-const PG_UNIQUE_VIOLATION = '23505';
 const DUMMY_PASSWORD_HASH = await Bun.password.hash('quro-dummy-password', {
   algorithm: 'bcrypt',
   cost: BCRYPT_COST,
 });
-
-export function isUniqueViolation(error: unknown): boolean {
-  return hasPostgresErrorCode(error, PG_UNIQUE_VIOLATION);
-}
 
 type SignUpPayload = {
   firstName: string;
@@ -94,12 +86,7 @@ function parseOptionalWholeNumber(rawValue: unknown, fallback: number) {
   return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
 }
 
-const SESSION_MAX_AGE =
-  SESSION_DURATION_DAYS *
-  HOURS_PER_DAY *
-  MINUTES_PER_HOUR *
-  SECONDS_PER_MINUTE *
-  MILLISECONDS_PER_SECOND;
+const SESSION_MAX_AGE = SESSION_DURATION_DAYS * DAY_MS;
 
 function parseSignUpPayload(rawBody: Record<string, unknown>): SignUpPayload {
   return {

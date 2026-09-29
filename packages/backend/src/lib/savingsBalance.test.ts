@@ -1,20 +1,17 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { savingsAccounts } from '../db/schema';
-import {
-  toFiniteNumber,
-  toSignedSavingsAmount,
-  updateSavingsAccountBalanceByDelta,
-} from './savingsBalance';
+import { toNumberOrZero } from './requestValidation';
+import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from './savingsBalance';
 
 type SavingsBalanceClient = Parameters<typeof updateSavingsAccountBalanceByDelta>[0];
 
 describe('savings balance helpers', () => {
   test('coerces finite values and defaults invalid values to zero', () => {
-    expect(toFiniteNumber('12.50')).toBe(12.5);
-    expect(toFiniteNumber(7)).toBe(7);
-    expect(toFiniteNumber(undefined)).toBe(0);
-    expect(toFiniteNumber(null)).toBe(0);
-    expect(toFiniteNumber('not-a-number')).toBe(0);
+    expect(toNumberOrZero('12.50')).toBe(12.5);
+    expect(toNumberOrZero(7)).toBe(7);
+    expect(toNumberOrZero(undefined)).toBe(0);
+    expect(toNumberOrZero(null)).toBe(0);
+    expect(toNumberOrZero('not-a-number')).toBe(0);
   });
 
   test('normalizes transaction signs independently of the input amount sign', () => {

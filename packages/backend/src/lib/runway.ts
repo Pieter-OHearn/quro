@@ -12,6 +12,7 @@ import {
   type SeveranceRule,
   type UnemploymentRule,
 } from '@quro/shared';
+import { DAY_MS } from '../constants/time';
 import { resolveBankingEntity } from './jurisdictions/bankingEntities';
 
 const JOINT_WEIGHT = 0.5;
@@ -256,8 +257,6 @@ function getEffectiveTaxRate(
   };
 }
 
-const DATE_MS = 86_400_000;
-
 function parseDateOnly(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -277,7 +276,7 @@ export function calculateServiceDuration(
   const start = parseDateOnly(startDate);
   const end = parseDateOnly(asOf);
   if (!start || !end || start > end) return null;
-  const serviceDays = Math.max(0, Math.floor((end.getTime() - start.getTime()) / DATE_MS));
+  const serviceDays = Math.max(0, Math.floor((end.getTime() - start.getTime()) / DAY_MS));
   let completedMonths =
     (end.getUTCFullYear() - start.getUTCFullYear()) * MONTHS_PER_YEAR +
     end.getUTCMonth() -

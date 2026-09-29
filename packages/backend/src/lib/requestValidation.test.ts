@@ -12,12 +12,21 @@ import {
   parseIntegerField,
   parseNonEmptyString,
   parseNumber,
+  parseNormalizedDecimal,
+  parseNormalizedDecimalField,
   parseNumberField,
+  parseOptionalDateField,
+  parseOptionalId,
   parseOptionalBooleanField,
   parseOptionalIntegerField,
   parseOptionalNumberField,
   parseOptionalTextField,
   parsePatchFields,
+  parsePositiveNumberField,
+  pickPatchedValue,
+  readJsonRecord,
+  toFiniteNumberOrNull,
+  toNumberOrZero,
   parseRequiredFields,
   parseString,
   parseTextField,
@@ -148,5 +157,57 @@ describe('object field parsing', () => {
     expect(parsePatchFields({ name: ' A ' }, parsers)).toEqual(ok({ name: 'A' }));
     expect(parsePatchFields({ count: 'bad' }, parsers)).toEqual(err('count required'));
     expect(parsePatchFields({}, parsers)).toEqual(ok({}));
+  });
+});
+
+describe('shared helpers', () => {
+  test('parses positive numbers and optional dates', () => {
+    expect(parsePositiveNumberField('2.5', 'bad')).toEqual(ok(2.5));
+    expect(parsePositiveNumberField(0, 'bad')).toEqual(err('bad'));
+    expect(parseOptionalDateField('', 'bad')).toEqual(ok(null));
+    expect(parseOptionalDateField('2024-02-29', 'bad')).toEqual(ok('2024-02-29'));
+    expect(parseOptionalDateField('2023-02-29', 'bad')).toEqual(err('bad'));
+  });
+
+  test('parses optional ids', () => {
+    expect(parseOptionalId(undefined)).toBeNull();
+    expect(parseOptionalId('')).toBeNull();
+    expect(parseOptionalId(7)).toBe(7);
+    expect(parseOptionalId('1.5')).toBe('invalid');
+  });
+
+  test('normalizes comma and dot decimals', () => {
+    expect(parseNormalizedDecimal('1.234,56')).toBe(1234.56);
+    expect(parseNormalizedDecimal('1,234.56')).toBe(1234.56);
+    expect(parseNormalizedDecimal('12,5')).toBe(12.5);
+    expect(parseNormalizedDecimal('  ')).toBeNull();
+    expect(parseNormalizedDecimalField('-1', 'bad', 0)).toEqual(err('bad'));
+  });
+
+  test('coerces numbers with null or zero fallbacks', () => {
+    expect(toFiniteNumberOrNull('3.5')).toBe(3.5);
+    expect(toFiniteNumberOrNull('abc')).toBeNull();
+    expect(toNumberOrZero(null)).toBe(0);
+    expect(toNumberOrZero('4')).toBe(4);
+  });
+
+  test('picks patched values over existing ones', () => {
+    expect(pickPatchedValue(undefined, 1)).toBe(1);
+    expect(pickPatchedValue(null, 1)).toBeNull();
+  });
+
+  test('reads JSON object bodies', async () => {
+    expect(await readJsonRecord({ json: () => Promise.resolve({ a: 1 }) }, 'bad')).toEqual(
+      ok({ a: 1 }),
+    );
+    expect(await readJsonRecord({ json: () => Promise.resolve([1]) }, 'bad')).toEqual(err('bad'));
+    expect(
+      await readJsonRecord(
+        {
+          json: () => Promise.reject(new Error('x')),
+        },
+        'bad',
+      ),
+    ).toEqual(err('bad'));
   });
 });
