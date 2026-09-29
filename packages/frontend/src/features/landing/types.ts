@@ -45,13 +45,6 @@ export type SignUpState = {
   handleSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-export type PasswordStrength = {
-  score: number;
-  label: string;
-  color: string;
-  textColor: string;
-};
-
 export type LandingPreviewBar = {
   id: string;
   height: number;

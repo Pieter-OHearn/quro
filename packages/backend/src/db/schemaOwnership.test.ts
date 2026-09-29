@@ -19,7 +19,6 @@ const USER_OWNED_TABLES = [
   'goals',
   'budget_categories',
   'budget_transactions',
-  'dashboard_transactions',
 ];
 
 function getTableDefinition(schema: string, tableName: string) {

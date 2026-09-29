@@ -11,8 +11,6 @@ import type {
   DashboardFormatFn,
   DashboardTransaction,
   DashboardTxnStats,
-  GoalDisplay,
-  GoalSummaryItem,
   MonthlySummaryItem,
   NetWorthMetricData,
 } from '../types';
@@ -23,41 +21,6 @@ export const getGreeting = (hour: number): string => {
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
-};
-
-export const deriveGoalDisplay = (g: GoalSummaryItem, monthlySalaryValue: number): GoalDisplay => {
-  const goalType = g.type ?? 'savings';
-
-  if (goalType === 'invest_habit') {
-    const monthlyTarget = g.monthlyTarget ?? 0;
-    const monthsCompleted = g.monthsCompleted ?? 0;
-    const totalMonths = g.totalMonths ?? 12;
-    return {
-      name: g.name,
-      current: monthlyTarget * monthsCompleted,
-      target: monthlyTarget * totalMonths,
-      color: g.color,
-      icon: g.emoji,
-    };
-  }
-
-  if (goalType === 'salary') {
-    return {
-      name: g.name,
-      current: monthlySalaryValue * 12,
-      target: g.targetAmount,
-      color: g.color,
-      icon: g.emoji,
-    };
-  }
-
-  return {
-    name: g.name,
-    current: g.currentAmount,
-    target: g.targetAmount,
-    color: g.color,
-    icon: g.emoji,
-  };
 };
 
 export const buildDashboardCards = (

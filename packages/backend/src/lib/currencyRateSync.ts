@@ -162,7 +162,7 @@ function shouldRefreshCurrencyRateCache(
   if (rows.length === 0) return true;
 
   try {
-    buildRatesToBaseCurrency(rows, new Date(), baseCurrency);
+    buildRatesToBaseCurrency(rows, baseCurrency);
     return false;
   } catch (error) {
     if (error instanceof CurrencyRatesUnavailableError) return true;
@@ -180,7 +180,7 @@ export async function getCurrentCurrencyRateRows(
     rows = await loadCurrencyRateCacheRows();
   }
 
-  buildRatesToBaseCurrency(rows, new Date(), baseCurrency);
+  buildRatesToBaseCurrency(rows, baseCurrency);
   return rows;
 }
 
@@ -188,7 +188,7 @@ export async function getCurrentRatesToBaseCurrency(
   baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
 ): Promise<Map<string, number>> {
   const rows = await getCurrentCurrencyRateRows(baseCurrency);
-  return buildRatesToBaseCurrency(rows, new Date(), baseCurrency);
+  return buildRatesToBaseCurrency(rows, baseCurrency);
 }
 
 export async function syncCurrencyRates(

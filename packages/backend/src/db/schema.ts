@@ -1008,25 +1008,6 @@ export const netWorthSnapshots = pgTable(
   }),
 );
 
-export const dashboardTransactions = pgTable(
-  'dashboard_transactions',
-  {
-    id: serial('id').primaryKey(),
-    userId: integer('user_id')
-      .references(() => users.id)
-      .notNull(),
-    name: text('name').notNull(),
-    type: text('type').notNull(),
-    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
-    date: date('date', { mode: 'string' }).notNull(),
-    category: text('category').notNull(),
-  },
-  (table) => ({
-    userIdx: index('dashboard_transactions_user_id_idx').on(table.userId),
-    userDateIdx: index('dashboard_transactions_user_date_idx').on(table.userId, table.date),
-  }),
-);
-
 // ── Bunq ─────────────────────────────────────────────────────────────────────
 
 export const bunqConnections = pgTable(

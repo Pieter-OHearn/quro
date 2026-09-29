@@ -1,13 +1,8 @@
 import { CURRENCY_CODES, isCurrencyCode, type CurrencyCode } from '@quro/shared';
 
 export const FX_BASE_CURRENCY: CurrencyCode = 'EUR';
-export const CURRENCY_RATE_STALE_AFTER_HOURS = 48;
 export const SEED_RATE_PROVIDER = 'seed';
 
-const MINUTES_PER_HOUR = 60;
-const SECONDS_PER_MINUTE = 60;
-const MS_PER_SECOND = 1000;
-const MS_PER_HOUR = MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
 const BINARY_SEARCH_DIVISOR = 2;
 
 export type CurrencyRateCacheRow = {
@@ -42,30 +37,8 @@ function parseRate(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function parseTimestamp(value: Date | string | null): number | null {
-  if (value instanceof Date) {
-    const timestamp = value.getTime();
-    return Number.isFinite(timestamp) ? timestamp : null;
-  }
-  if (typeof value !== 'string' || !value.trim()) return null;
-
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : null;
-}
-
-export function isCurrencyRateFresh(
-  updatedAt: Date | string | null,
-  now = new Date(),
-  staleAfterHours = CURRENCY_RATE_STALE_AFTER_HOURS,
-): boolean {
-  const timestamp = parseTimestamp(updatedAt);
-  if (timestamp === null) return false;
-  return now.getTime() - timestamp <= staleAfterHours * MS_PER_HOUR;
-}
-
 export function buildRatesToBaseCurrency(
   rows: readonly CurrencyRateCacheRow[],
-  _now = new Date(),
   baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
 ): Map<string, number> {
   const rates = new Map<string, number>();
@@ -163,7 +136,6 @@ export function buildRatesToBaseCurrencyAt(
   return {
     rates: buildRatesToBaseCurrency(
       selectedRates.map(({ row }) => row),
-      new Date(),
       baseCurrency,
     ),
     isEstimated: selectedRates.some(({ isEstimated }) => isEstimated),

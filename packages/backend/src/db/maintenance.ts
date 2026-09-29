@@ -11,7 +11,6 @@ export const CLEAR_TABLE_NAMES = [
   'pension_statement_imports',
   'budget_transactions',
   'budget_categories',
-  'dashboard_transactions',
   'savings_transactions',
   'savings_accounts',
   'holding_transactions',
@@ -92,10 +91,6 @@ export async function fileExists(filePath: string) {
   } catch {
     return false;
   }
-}
-
-export function getRepoRoot() {
-  return repoRoot;
 }
 
 export function getTimestamp() {

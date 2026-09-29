@@ -27,14 +27,6 @@ export type AllocationSummary = {
   netWorth: number;
 };
 
-export type GoalDisplay = {
-  name: string;
-  current: number;
-  target: number;
-  color: string;
-  icon: string;
-};
-
 export type MonthlySummaryItem = {
   label: string;
   value: string;
@@ -42,18 +34,6 @@ export type MonthlySummaryItem = {
   bg: string;
   text: string;
   border: string;
-};
-
-export type GoalSummaryItem = {
-  type?: string;
-  name: string;
-  currentAmount: number;
-  targetAmount: number;
-  monthlyTarget?: number;
-  monthsCompleted?: number;
-  totalMonths?: number;
-  color: string;
-  emoji: string;
 };
 
 export type DashboardCard = {

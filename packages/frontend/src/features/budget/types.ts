@@ -72,7 +72,6 @@ export type EditCategoryForm = {
   budgeted: string;
   color: string;
 };
-export type CreateBudgetTransactionInput = Omit<SharedBudgetTransaction, 'id'>;
 
 export type BudgetPageData = {
   isLoading: boolean;

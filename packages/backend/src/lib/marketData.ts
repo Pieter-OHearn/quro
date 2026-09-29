@@ -1,4 +1,4 @@
-import type { StockPriceResult, TickerLookupResult } from '@quro/shared';
+import type { TickerLookupResult } from '@quro/shared';
 import { getMarketDataClient } from './marketDataClient';
 
 function normalizeTicker(value: string): string {
@@ -26,25 +26,5 @@ export async function lookupTicker(symbol: string): Promise<TickerLookupResult> 
     priceCurrency: quote.priceCurrency,
     priceUpdatedAt: quote.tradeLast,
     eodDate: quote.eodDate,
-  };
-}
-
-export async function fetchStockPrice(ticker: string): Promise<StockPriceResult> {
-  const normalizedTicker = normalizeTicker(ticker);
-  const marketDataClient = getMarketDataClient();
-  const latestEod = await marketDataClient.getLatestEod([normalizedTicker]);
-  const quote = latestEod[normalizedTicker];
-
-  if (!quote || typeof quote.close !== 'number' || !Number.isFinite(quote.close)) {
-    throw new Error(`No valid EOD close price found for ticker: ${normalizedTicker}`);
-  }
-
-  return {
-    ticker: normalizedTicker,
-    price: quote.close,
-    currency: quote.priceCurrency ?? 'USD',
-    tradeLast: quote.tradeLast,
-    eodDate: quote.eodDate,
-    priceCurrency: quote.priceCurrency,
   };
 }

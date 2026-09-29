@@ -17,7 +17,6 @@ export {
 } from './usePensionImportNotifications';
 export { useArchivedPensionPots, usePensionPots } from './usePensionPots';
 export { usePensionStatementImport } from './usePensionStatementImport';
-export { usePensionStatementImports } from './usePensionStatementImports';
 export { usePensionStatementImportRows } from './usePensionStatementImportRows';
 export { usePensionStatementDocuments } from './usePensionStatementDocuments';
 export { usePensionTransactions } from './usePensionTransactions';

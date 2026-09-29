@@ -18,7 +18,6 @@ export { useInvestmentUIState } from './useInvestmentUIState';
 export { usePortfolioHistory } from './usePortfolioHistory';
 export { useArchivedProperties, useProperties } from './useProperties';
 export { usePropertyTransactions } from './usePropertyTransactions';
-export { useRefreshHoldingPrice } from './useRefreshHoldingPrice';
 export { useSyncHoldingPrices } from './useSyncHoldingPrices';
 export { useTickerLookup } from './useTickerLookup';
 export { useUpdateHolding } from './useUpdateHolding';
