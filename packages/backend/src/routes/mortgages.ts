@@ -7,6 +7,12 @@ import {
   type MortgageRateType,
   type MortgageRepaymentType,
   type MortgageTransactionType,
+  toIsoDate,
+  roundMoney,
+  validateBalanceWithinOriginal,
+  validateRateChange,
+  validateRepaymentSplit,
+  type MortgageTransactionPayload,
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
@@ -88,17 +94,6 @@ type MortgagePayload = {
   endDate: string;
   overpaymentLimit: number | null;
   isJoint: boolean;
-};
-
-type MortgageTransactionPayload = {
-  mortgageId: number;
-  type: MortgageTransactionType;
-  amount: number;
-  interest: number | null;
-  principal: number | null;
-  date: string;
-  note: string | null;
-  fixedYears: number | null;
 };
 
 type LinkedProperty = {
@@ -265,8 +260,6 @@ async function resolveLinkedProperty(
   return { ok: true, nextId, property: result.property };
 }
 
-const ISO_DATE_PART_LENGTH = 10;
-
 async function getAccessibleMortgage(
   userId: number,
   partnerId: number | null,
@@ -298,7 +291,7 @@ function addYearsToIsoDate(isoDate: string, years: number): string {
   const base = new Date(`${isoDate}T00:00:00Z`);
   if (Number.isNaN(base.getTime())) return 'N/A';
   base.setUTCFullYear(base.getUTCFullYear() + Math.round(years));
-  return base.toISOString().slice(0, ISO_DATE_PART_LENGTH);
+  return toIsoDate(base);
 }
 
 // Apply a transaction's effect to the mortgage: a repayment reduces the
@@ -464,9 +457,12 @@ async function syncLinkedProperty(
 }
 
 function validateMortgagePayload(payload: MortgagePayload): string | null {
-  if (payload.outstandingBalance > payload.originalAmount) {
-    return 'Outstanding balance cannot exceed the original amount';
-  }
+  const balanceError = validateBalanceWithinOriginal(
+    payload.originalAmount,
+    payload.outstandingBalance,
+    'Outstanding balance',
+  );
+  if (balanceError) return balanceError;
   if (payload.rateType === 'Fixed' && !payload.fixedUntil) {
     return 'Fixed mortgages require a fixed-until value';
   }
@@ -522,25 +518,12 @@ function parseMortgageTransactionPatch(
   return parsePatchFields(body, mortgageTransactionParsers);
 }
 
-function validateMortgageRepaymentBreakdown(
-  amount: number,
-  interest: number,
-  principal: number,
-): string | null {
-  if (interest > amount) return 'Interest cannot exceed the total repayment amount';
-  if (principal > amount) return 'Principal cannot exceed the total repayment amount';
-  if (Math.abs(interest + principal - amount) > 0.01) {
-    return 'Interest and principal must add up to the total repayment amount';
-  }
-  return null;
-}
-
 function normalizeRepaymentMortgageTransaction(
   payload: MortgageTransactionPayload,
 ): ParseResult<MortgageTransactionPayload> {
   const interest = payload.interest ?? 0;
-  const principal = payload.principal ?? Number((payload.amount - interest).toFixed(2));
-  const validationError = validateMortgageRepaymentBreakdown(payload.amount, interest, principal);
+  const principal = payload.principal ?? roundMoney(payload.amount - interest);
+  const validationError = validateRepaymentSplit({ amount: payload.amount, interest, principal });
   if (validationError) return err(validationError);
 
   return ok({
@@ -554,10 +537,8 @@ function normalizeRepaymentMortgageTransaction(
 function normalizeRateChangeMortgageTransaction(
   payload: MortgageTransactionPayload,
 ): ParseResult<MortgageTransactionPayload> {
-  if (payload.amount > 25) return err('Rate-change amount cannot exceed 25');
-  if (payload.fixedYears == null || payload.fixedYears <= 0) {
-    return err('Rate-change transactions require fixed years');
-  }
+  const rateChangeError = validateRateChange(payload.amount, payload.fixedYears);
+  if (rateChangeError) return err(rateChangeError);
 
   return ok({
     ...payload,

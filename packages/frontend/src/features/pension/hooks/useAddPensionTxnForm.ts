@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import type { PensionPot, PensionTransaction } from '@quro/shared';
+import {
+  todayIsoDate,
+  type PensionPot,
+  type PensionTransaction,
+  validateTaxWithinContribution,
+} from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { formatFixedInputValue } from '@/lib/utils';
 import type {
@@ -7,8 +12,6 @@ import type {
   PensionTxnType,
   SavePensionTransactionInput,
 } from '../types';
-
-const ISO_DATE_SLICE_END = 10;
 
 type InitialPensionTxnValues = {
   type: PensionTxnType;
@@ -47,7 +50,7 @@ function resolveInitialStatementDirection(
 }
 
 function resolveInitialDate(existing: PensionTransaction | undefined): string {
-  return existing?.date ?? new Date().toISOString().slice(0, ISO_DATE_SLICE_END);
+  return existing?.date ?? todayIsoDate();
 }
 
 function resolveInitialNote(existing: PensionTransaction | undefined): string {
@@ -122,11 +125,7 @@ function validatePensionTxnInput(params: {
 
   if (params.type !== 'contribution') return '';
   if (params.parsedTaxAmount < 0) return 'Tax amount cannot be negative';
-  if (params.parsedTaxAmount > params.parsedAmount) {
-    return 'Tax amount cannot exceed contribution amount';
-  }
-
-  return '';
+  return validateTaxWithinContribution(params.parsedAmount, params.parsedTaxAmount) ?? '';
 }
 
 export function useAddPensionTxnForm(pot: PensionPot, existing: PensionTransaction | undefined) {

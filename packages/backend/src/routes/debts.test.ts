@@ -98,7 +98,7 @@ describe('debt payment validation and balance helpers', () => {
       }),
     ).toEqual({
       ok: false,
-      error: 'Interest cannot exceed total payment',
+      error: 'Interest cannot exceed the total payment',
     });
 
     expect(validateDebtPrincipalAgainstBalance(200, 150)).toBe(

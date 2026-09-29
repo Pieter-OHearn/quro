@@ -73,10 +73,7 @@ export function estimateDebtRemainingInterest(
   );
   if (months == null) return null;
 
-  return Math.max(
-    0,
-    Number.parseFloat((months * debt.monthlyPayment - debt.remainingBalance).toFixed(2)),
-  );
+  return Math.max(0, roundMoney(months * debt.monthlyPayment - debt.remainingBalance));
 }
 
 export function buildDebtOverview(

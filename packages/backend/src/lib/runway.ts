@@ -11,6 +11,7 @@ import {
   type RunwayBurnSource,
   type SeveranceRule,
   type UnemploymentRule,
+  toIsoDate,
 } from '@quro/shared';
 import { DAY_MS } from '../constants/time';
 import { resolveBankingEntity } from './jurisdictions/bankingEntities';
@@ -260,9 +261,7 @@ function getEffectiveTaxRate(
 function parseDateOnly(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const parsed = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value
-    ? null
-    : parsed;
+  return Number.isNaN(parsed.getTime()) || toIsoDate(parsed) !== value ? null : parsed;
 }
 
 export function calculateServiceDuration(

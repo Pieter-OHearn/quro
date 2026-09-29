@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
-import { getMonthAbbreviationIndex, type Goal, type GoalType } from '@quro/shared';
+import { getMonthAbbreviationIndex, type Goal, type GoalType, DEFAULT_EMOJI } from '@quro/shared';
 import type { GoalFormField, GoalFormState, UpdateGoalInput } from '../types';
 import { GOAL_TYPE_META, COLORS } from '../utils/goals-constants';
 import { buildGoalPayload, normalizeGoalType } from '../utils/goal-utils';
@@ -35,7 +35,7 @@ function goalAmountFields(goal: Goal) {
 function goalToFormState(goal: Goal, baseCurrency: string): GoalFormState {
   return {
     name: goal.name,
-    emoji: goal.emoji ?? '🎯',
+    emoji: goal.emoji ?? DEFAULT_EMOJI.goal,
     color: goal.color ?? COLORS[0],
     notes: goal.notes ?? '',
     deadline: goal.deadline,

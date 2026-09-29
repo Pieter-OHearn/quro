@@ -9,6 +9,11 @@ import {
   type TickerItemType,
   type TickerLookupExchange,
   type TickerLookupResult,
+  toDateOnly,
+  toIsoDate,
+  roundMoney,
+  validateRepaymentSplit,
+  type PropertyTransactionPayload,
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import {
@@ -54,7 +59,6 @@ import {
 } from '../lib/requestValidation';
 
 const app = new Hono();
-const DATE_PART_LENGTH = 10;
 const LOOKUP_TICKER_UNAVAILABLE_MESSAGE = 'Lookup Ticker feature is not available.';
 const HOLDING_FIELDS = [
   'name',
@@ -198,16 +202,6 @@ type PropertyPayload = {
   currency: CurrencyCode;
   emoji: string | null;
   isJoint: boolean;
-};
-
-type PropertyTransactionPayload = {
-  propertyId: number;
-  type: PropertyTransactionType;
-  amount: number;
-  interest: number | null;
-  principal: number | null;
-  date: string;
-  note: string | null;
 };
 
 type PropertyCreateRequiredPayload = Omit<
@@ -435,7 +429,7 @@ function normalizePropertyTransactionPayload(
 ): PropertyTransactionPayload {
   if (payload.type === 'repayment') {
     const interest = payload.interest ?? 0;
-    const principal = payload.principal ?? Number((payload.amount - interest).toFixed(2));
+    const principal = payload.principal ?? roundMoney(payload.amount - interest);
     return { ...payload, interest, principal };
   }
 
@@ -446,19 +440,6 @@ function normalizePropertyTransactionPayload(
   };
 }
 
-function validateRepaymentBreakdown(
-  amount: number,
-  interest: number,
-  principal: number,
-): string | null {
-  if (interest > amount) return 'Interest cannot exceed the total repayment amount';
-  if (principal > amount) return 'Principal cannot exceed the total repayment amount';
-  if (Math.abs(interest + principal - amount) > 0.01) {
-    return 'Interest and principal must add up to the total repayment amount';
-  }
-  return null;
-}
-
 function validatePropertyRepaymentPayload(
   payload: PropertyTransactionPayload,
   property: typeof properties.$inferSelect,
@@ -467,7 +448,11 @@ function validatePropertyRepaymentPayload(
     return 'Property is not linked to a mortgage';
   }
 
-  return validateRepaymentBreakdown(payload.amount, payload.interest ?? 0, payload.principal ?? 0);
+  return validateRepaymentSplit({
+    amount: payload.amount,
+    interest: payload.interest ?? 0,
+    principal: payload.principal ?? 0,
+  });
 }
 
 function isRentOrExpenseTransaction(type: PropertyTransactionType): boolean {
@@ -669,13 +654,6 @@ function buildLookupPriceFields(result: TickerLookupResult): LookupPriceFields {
   };
 }
 
-function toDateOnly(value: unknown): string | null {
-  if (!value) return null;
-  const parsed = value instanceof Date ? value : new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString().slice(0, DATE_PART_LENGTH);
-}
-
 function parseTimestamp(value: unknown): Date | null {
   if (value == null || value === '') return null;
   const parsed = value instanceof Date ? value : new Date(String(value));
@@ -701,10 +679,10 @@ function parseHoldingIdsBody(body: unknown): ParseResult<number[] | undefined> {
 
 function resolveSnapshotEodDate(...candidates: unknown[]): string {
   for (const candidate of candidates) {
-    const parsed = toDateOnly(candidate);
+    const parsed = toDateOnly(candidate as Date | string | null | undefined);
     if (parsed) return parsed;
   }
-  return new Date().toISOString().slice(0, DATE_PART_LENGTH);
+  return toIsoDate(new Date());
 }
 
 function resolveSnapshotPriceCurrency(...candidates: unknown[]): string {

@@ -1,4 +1,9 @@
-import { PENSION_TRANSACTION_TYPES, type PensionTransactionType } from '@quro/shared';
+import {
+  PENSION_TRANSACTION_TYPES,
+  validateTaxWithinContribution,
+  type PensionTransactionPayload,
+  type PensionTransactionType,
+} from '@quro/shared';
 import {
   err,
   ok,
@@ -18,15 +23,7 @@ export type RawPensionTransactionPayload = {
   isEmployer: unknown;
 };
 
-export type NormalizedPensionTransactionPayload = {
-  potId: number;
-  type: PensionTransactionType;
-  amount: number;
-  taxAmount: number;
-  date: string;
-  note: string;
-  isEmployer: boolean | null;
-};
+export type NormalizedPensionTransactionPayload = PensionTransactionPayload;
 
 type ParsedPensionTransactionPayloadBase = Omit<
   NormalizedPensionTransactionPayload,
@@ -74,7 +71,8 @@ function validateContributionPayload(
 ): ParseResult<NormalizedPensionTransactionPayload> {
   if (base.amount <= 0) return err('Contribution amount must be greater than zero');
   if (base.taxAmount < 0) return err('Tax amount cannot be negative');
-  if (base.taxAmount > base.amount) return err('Tax amount cannot exceed contribution amount');
+  const taxError = validateTaxWithinContribution(base.amount, base.taxAmount);
+  if (taxError) return err(taxError);
   if (typeof base.isEmployer !== 'boolean') {
     return err('Contribution requires employer/employee source');
   }

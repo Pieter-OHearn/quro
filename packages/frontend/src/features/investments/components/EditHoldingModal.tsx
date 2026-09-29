@@ -15,6 +15,7 @@ import {
   type Holding,
   type TickerItemType,
   type TickerLookupResult,
+  todayIsoDate,
 } from '@quro/shared';
 import { useTickerLookup } from '../hooks/useTickerLookup';
 import type { DeleteHoldingMode } from '../hooks/useDeleteHolding';
@@ -350,7 +351,7 @@ function buildHolding(form: HoldingForm, existing: Holding | undefined): Holding
 }
 
 function buildInitialForm(existing: Holding | undefined): HoldingForm {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   if (!existing) {
     return {
       name: '',

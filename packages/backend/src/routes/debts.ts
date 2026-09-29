@@ -1,6 +1,14 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { DEBT_TYPES, type CurrencyCode, type DebtType } from '@quro/shared';
+import {
+  DEBT_TYPES,
+  type DebtType,
+  roundMoney,
+  validateBalanceWithinOriginal,
+  validateInterestWithinAmount,
+  type DebtPayload,
+  type DebtPaymentPayload,
+} from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db, type DbExecutor } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
@@ -25,31 +33,6 @@ import {
 } from '../lib/requestValidation';
 
 const app = new Hono();
-
-type DebtPayload = {
-  name: string;
-  type: DebtType;
-  lender: string;
-  originalAmount: number;
-  remainingBalance: number;
-  currency: CurrencyCode;
-  interestRate: number;
-  monthlyPayment: number;
-  startDate: string;
-  endDate: string | null;
-  color: string;
-  emoji: string;
-  notes: string | null;
-};
-
-type DebtPaymentPayload = {
-  debtId: number;
-  date: string;
-  amount: number;
-  interest: number;
-  principal: number;
-  note: string;
-};
 
 type RouteMutationResult =
   { data: unknown } | { error: string; status: (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS] };
@@ -142,19 +125,15 @@ export function validateDebtBalance(
   originalAmount: number,
   remainingBalance: number,
 ): string | null {
-  if (remainingBalance > originalAmount) {
-    return 'Remaining balance cannot exceed the original amount';
-  }
-
-  return null;
+  return validateBalanceWithinOriginal(originalAmount, remainingBalance);
 }
 
 export function computeDebtPrincipal(amount: number, interest: number): number {
-  return Math.max(0, Number.parseFloat((amount - interest).toFixed(2)));
+  return Math.max(0, roundMoney(amount - interest));
 }
 
 function adjustDebtRemainingBalance(currentRemainingBalance: number, delta: number): number {
-  return Number.parseFloat((currentRemainingBalance + delta).toFixed(2));
+  return roundMoney(currentRemainingBalance + delta);
 }
 
 export function validateDebtPrincipalAgainstBalance(
@@ -202,7 +181,8 @@ export function parseDebtPaymentPayload(
   if (!parsed.ok) return parsed;
 
   const { amount, interest } = parsed.value;
-  if (interest > amount) return err('Interest cannot exceed total payment');
+  const splitError = validateInterestWithinAmount(amount, interest);
+  if (splitError) return err(splitError);
   return ok({ ...parsed.value, principal: computeDebtPrincipal(amount, interest) });
 }
 

@@ -8,6 +8,7 @@ import {
   type PlanAssumptionsInput,
   type RunwayResponse,
   type WwWeeklyRequirementStatus,
+  toIsoDate,
 } from '@quro/shared';
 import { and, asc, desc, eq, getTableColumns, gte, isNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -59,7 +60,6 @@ import {
 import { toNumberOrZero } from '../lib/numbers';
 
 const app = new Hono();
-const ISO_DATE_LENGTH = 10;
 const HISTORY_MONTHS = 12;
 const MONTHS_PER_YEAR = 12;
 const JOINT_WEIGHT = 0.5;
@@ -77,9 +77,7 @@ const ASSUMPTION_FIELDS = [
 ] as const;
 
 function toDateMonthsAgo(now: Date, months: number): string {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months + 1, 1))
-    .toISOString()
-    .slice(0, ISO_DATE_LENGTH);
+  return toIsoDate(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months + 1, 1)));
 }
 
 function parseExcludedTiers(value: unknown): ParseResult<number[] | null> {
@@ -306,7 +304,7 @@ async function loadRunwayData(userId: number, now: Date) {
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
   const historyStart = toDateMonthsAgo(now, HISTORY_MONTHS);
-  const asOf = now.toISOString().slice(0, ISO_DATE_LENGTH);
+  const asOf = toIsoDate(now);
   const [primaryEmployment] = await db
     .select()
     .from(employments)
@@ -610,7 +608,7 @@ async function buildRunwayResponse(
   const convertToEur = (amount: number, currency: string) =>
     convertToBaseCurrency(amount, currency, data.rates);
   const jurisdiction = getJurisdictionProfile(data.user.jurisdiction);
-  const asOf = now.toISOString().slice(0, ISO_DATE_LENGTH);
+  const asOf = toIsoDate(now);
   const response = buildEurRunwayResponse(data, data.user, jurisdiction, asOf, convertToEur);
   const baseRate =
     data.user.baseCurrency === FX_BASE_CURRENCY ? 1 : data.rates.get(data.user.baseCurrency);

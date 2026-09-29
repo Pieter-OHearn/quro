@@ -33,6 +33,13 @@ export const MONTH_ABBREVIATIONS = [
   'Dec',
 ] as const;
 
+export const DEFAULT_EMOJI = {
+  goal: '🎯',
+  pension: '🏦',
+  property: '🏠',
+  budgetCategory: '📦',
+} as const;
+
 export type BudgetMonth = (typeof MONTH_ABBREVIATIONS)[number];
 
 const NUMBER_FORMAT_SET = new Set<string>(NUMBER_FORMATS);

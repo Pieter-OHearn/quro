@@ -3,6 +3,7 @@ import {
   type Employment,
   type EmploymentInput,
   type EmploymentType,
+  toIsoDate,
 } from '@quro/shared';
 import { and, asc, eq, gte, isNull, ne, or } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -96,7 +97,7 @@ function validateEmploymentDates(
   if (!partial && data.employmentType === 'employed' && !data.serviceStartDate) {
     return err('Start date is required for employees');
   }
-  if (data.serviceStartDate && data.serviceStartDate > new Date().toISOString().slice(0, 10)) {
+  if (data.serviceStartDate && data.serviceStartDate > toIsoDate(new Date())) {
     return err('Start date cannot be in the future');
   }
   return ok(undefined);
@@ -182,7 +183,7 @@ app.patch('/:id', async (c) => {
       return 'start_date_error' as const;
     if (merged.serviceStartDate && merged.endDate && merged.endDate < merged.serviceStartDate)
       return 'date_error' as const;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toIsoDate(new Date());
     const shouldPromoteReplacement =
       current.isPrimary && merged.endDate !== null && merged.endDate < today;
     const [replacement] = shouldPromoteReplacement
@@ -244,7 +245,7 @@ app.delete('/:id', async (c) => {
     if (!current) return false;
     await tx.delete(employments).where(eq(employments.id, id));
     if (current.isPrimary) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = toIsoDate(new Date());
       const [active] = await tx
         .select()
         .from(employments)

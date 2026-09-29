@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { and, eq, gte, isNull, or } from 'drizzle-orm';
-import type { CurrencyCode } from '@quro/shared';
+import { toIsoDate, type CurrencyCode } from '@quro/shared';
 import { db } from '../db/client';
 import { employments, payslips } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
@@ -41,7 +41,6 @@ import { getS3ObjectBytes } from '../lib/s3';
 const app = new Hono();
 
 const DATE_YEAR_LENGTH = 4;
-const ISO_DATE_LENGTH = 10;
 const DECIMAL_RADIX = 10;
 
 type PayslipInput = {
@@ -129,7 +128,7 @@ async function resolveEmploymentId(
     return owned ? { ok: true, value: owned.id } : { ok: false };
   }
   if (!autoLink) return { ok: true, value: null };
-  const today = new Date().toISOString().slice(0, ISO_DATE_LENGTH);
+  const today = toIsoDate(new Date());
   const active = await db
     .select({ id: employments.id })
     .from(employments)

@@ -11,7 +11,7 @@ import {
   SelectInput,
   TextInput,
 } from '@/components/ui';
-import type { PensionPot } from '@quro/shared';
+import { DEFAULT_EMOJI, type PensionPot } from '@quro/shared';
 import { PENSION_TYPES, PALETTE } from '../constants';
 
 type PensionModalProps = {
@@ -297,7 +297,7 @@ function buildInitialPensionState(existing: PensionPot | undefined): PensionForm
     employerMonthly: formatFixedInputValue(existing.employerMonthly),
     investmentStrategy: existing.investmentStrategy ?? '',
     notes: existing.notes,
-    emoji: existing.emoji ?? '🏦',
+    emoji: existing.emoji ?? DEFAULT_EMOJI.pension,
   };
 }
 

@@ -1,4 +1,4 @@
-import { CURRENCY_CODES, type CurrencyCode } from '@quro/shared';
+import { CURRENCY_CODES, type CurrencyCode, toDateOnly, toIsoDate } from '@quro/shared';
 import { asc, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { currencyRateHistory, currencyRates } from '../db/schema';
@@ -10,7 +10,6 @@ import {
 import { getMarketDataClient } from './marketDataClient';
 
 const YAHOO_FX_PROVIDER = 'yahoo_finance';
-const DATE_PART_LENGTH = 10;
 
 type CurrencyRateQuote = {
   fromCurrency: CurrencyCode;
@@ -60,14 +59,6 @@ function toYahooFxSymbol(fromCurrency: CurrencyCode, toCurrency: CurrencyCode): 
   return `${fromCurrency}${toCurrency}=X`;
 }
 
-function toDateOnly(value: string | null | undefined, fallback: Date): string {
-  if (!value) return fallback.toISOString().slice(0, DATE_PART_LENGTH);
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? fallback.toISOString().slice(0, DATE_PART_LENGTH)
-    : parsed.toISOString().slice(0, DATE_PART_LENGTH);
-}
-
 function buildIssue(
   fromCurrency: CurrencyCode,
   toCurrency: CurrencyCode,
@@ -101,7 +92,7 @@ export async function fetchYahooCurrencyRates(
       toCurrency: baseCurrency,
       rate: quote.close,
       provider: YAHOO_FX_PROVIDER,
-      sourceDate: toDateOnly(quote.eodDate ?? quote.tradeLast, now),
+      sourceDate: toDateOnly(quote.eodDate ?? quote.tradeLast) ?? toIsoDate(now),
     });
   }
 

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import { MONTH_ABBREVIATIONS, type BudgetMonth } from '@quro/shared';
+import { MONTH_ABBREVIATIONS, type BudgetMonth, toIsoDate } from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import {
   budgetCategories,
@@ -131,7 +131,7 @@ function isSelfTransfer(
 
 function toTransactionDate(created: string): string {
   const trimmed = created.trim();
-  if (!trimmed) return new Date().toISOString().slice(0, 10);
+  if (!trimmed) return toIsoDate(new Date());
   return trimmed.slice(0, 10);
 }
 

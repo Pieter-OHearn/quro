@@ -1,8 +1,7 @@
-import { isCurrencyCode, type CurrencyCode } from '@quro/shared';
+import { isCurrencyCode, type CurrencyCode, toIsoDate } from '@quro/shared';
 import { parseNumber } from './numbers';
 
 const MAX_INT32 = 2_147_483_647;
-const ISO_DATE_LENGTH = 10;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 export type ParseOk<T> = { ok: true; value: T };
@@ -113,7 +112,7 @@ export function parseDateString(value: unknown): string | null {
   if (!parsed || !ISO_DATE_REGEX.test(parsed)) return null;
   const candidate = new Date(`${parsed}T00:00:00Z`);
   if (Number.isNaN(candidate.getTime())) return null;
-  return candidate.toISOString().slice(0, ISO_DATE_LENGTH) === parsed ? parsed : null;
+  return toIsoDate(candidate) === parsed ? parsed : null;
 }
 
 export function parseCurrencyField(value: unknown): ParseResult<CurrencyCode> {

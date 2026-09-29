@@ -1,4 +1,10 @@
-import type { Debt } from '@quro/shared';
+import {
+  roundMoney,
+  todayIsoDate,
+  type Debt,
+  validateBalanceWithinOriginal,
+  validateInterestWithinAmount,
+} from '@quro/shared';
 import type {
   CreateDebtPayload,
   CreateDebtPaymentPayload,
@@ -39,20 +45,6 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function formatShortDate(isoDate: string) {
-  return new Date(isoDate).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
-function formatLocalDateOnly(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function parseAmount(value: string) {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -75,14 +67,8 @@ function getRemainingBalanceError(values: DebtAmountValues): string | null {
   if (values.remainingBalance == null || values.remainingBalance < 0) {
     return 'Enter a remaining balance of 0 or more.';
   }
-  if (
-    values.originalAmount != null &&
-    values.remainingBalance != null &&
-    values.remainingBalance > values.originalAmount
-  ) {
-    return 'Remaining balance cannot exceed the original amount.';
-  }
-  return null;
+  if (values.originalAmount == null) return null;
+  return validateBalanceWithinOriginal(values.originalAmount, values.remainingBalance);
 }
 
 function getMinimumZeroError(value: number | null, message: string): string | null {
@@ -174,7 +160,7 @@ export function buildInitialPaymentForm(debt: Debt): DebtPaymentFormState {
   const amount = Math.max(debt.monthlyPayment, estimatedInterest);
 
   return {
-    date: formatLocalDateOnly(),
+    date: todayIsoDate(),
     amount: amount > 0 ? amount.toFixed(2) : '',
     interest: estimatedInterest > 0 ? estimatedInterest.toFixed(2) : '0',
     note: 'Monthly payment',
@@ -191,9 +177,9 @@ function validatePaymentAmounts(
 
   if (amount == null || amount <= 0) errors.amount = 'Enter a payment amount above 0.';
   if (interest == null || interest < 0) errors.interest = 'Interest must be 0 or more.';
-  if (amount != null && interest != null && interest > amount) {
-    errors.interest = 'Interest cannot exceed the total payment.';
-  }
+  const splitError =
+    amount != null && interest != null ? validateInterestWithinAmount(amount, interest) : null;
+  if (splitError) errors.interest = splitError;
   if (principal > remainingBalance) {
     errors.amount = 'This payment would reduce more principal than the remaining balance.';
   }
@@ -202,7 +188,7 @@ function validatePaymentAmounts(
 }
 
 function calculatePrincipal(amount: number | null, interest: number | null) {
-  return amount != null && interest != null ? Number.parseFloat((amount - interest).toFixed(2)) : 0;
+  return amount != null && interest != null ? roundMoney(amount - interest) : 0;
 }
 
 export function validateDebtPaymentForm(form: DebtPaymentFormState, debt: Debt) {

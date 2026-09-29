@@ -1,10 +1,11 @@
+import { roundMoney } from '@quro/shared';
 // Shared balance-reconciliation helpers used by mortgage and property
 // repayment transactions. Mirrors the debt-payment pattern: a repayment's
 // principal portion reduces an outstanding balance when recorded and is
 // restored if the transaction is later removed or edited.
 
 export function roundCurrency(value: number): number {
-  return Number.parseFloat(value.toFixed(2));
+  return roundMoney(value);
 }
 
 // Reduce an outstanding balance by a repayment's principal, clamped at zero.

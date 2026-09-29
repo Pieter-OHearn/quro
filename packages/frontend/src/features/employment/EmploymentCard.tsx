@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Employment } from '@quro/shared';
+import { todayIsoDate, type Employment } from '@quro/shared';
 import { BriefcaseBusiness, CalendarDays } from 'lucide-react';
 import { Button, Card } from '@/components/ui';
 import { EmploymentEditorModal } from './EmploymentEditorModal';
@@ -25,7 +25,7 @@ function tenureLabel(employment: Employment, asOf: string) {
 
 export function selectCurrentEmployment(
   employments: readonly Employment[],
-  asOf = new Date().toISOString().slice(0, 10),
+  asOf = todayIsoDate(),
 ): Employment | null {
   const active = (employment: Employment) =>
     employment.endDate === null || employment.endDate >= asOf;
@@ -39,7 +39,7 @@ export function selectCurrentEmployment(
 
 export function EmploymentCard({
   employment,
-  asOf = new Date().toISOString().slice(0, 10),
+  asOf = todayIsoDate(),
 }: Readonly<{ employment: Employment | null; asOf?: string }>) {
   const [editing, setEditing] = useState(false);
   return (

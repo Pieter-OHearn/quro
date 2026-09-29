@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
+import {
+  todayIsoDate,
+  type Mortgage as MortgageType,
+  type MortgageTransaction,
+  validateInterestWithinAmount,
+  MAX_RATE_CHANGE_PERCENT,
+} from '@quro/shared';
 import { formatFixedInputValue } from '@/lib/utils';
 import type { MortgageTxnType, SaveMortgageTxnInput } from '../types';
 
@@ -10,9 +16,6 @@ type UseMortgageTxnModalParams = {
   onClose: () => void;
 };
 
-const MAX_RATE_CHANGE_PERCENT = 25;
-const ISO_DATE_LENGTH = 10;
-
 function validateTxn(
   type: MortgageTxnType,
   parsedAmount: number,
@@ -20,8 +23,10 @@ function validateTxn(
   parsedFixedYears: number,
 ): string {
   if (parsedAmount <= 0) return 'Enter a valid amount';
-  if (type === 'repayment' && parsedInterest > parsedAmount)
-    return 'Interest cannot exceed total repayment';
+  if (type === 'repayment') {
+    const splitError = validateInterestWithinAmount(parsedAmount, parsedInterest);
+    if (splitError) return splitError;
+  }
   if (type === 'rate_change' && (parsedAmount <= 0 || parsedAmount > MAX_RATE_CHANGE_PERCENT))
     return `Enter a valid interest rate (0-${MAX_RATE_CHANGE_PERCENT}%)`;
   if (type === 'rate_change' && parsedFixedYears <= 0)
@@ -45,7 +50,7 @@ function emptyTxnFormValues() {
     amount: '',
     interest: '',
     fixedYears: '',
-    date: new Date().toISOString().slice(0, ISO_DATE_LENGTH),
+    date: todayIsoDate(),
     note: '',
   };
 }

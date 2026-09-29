@@ -1,4 +1,10 @@
-import { isCurrencyCode, type HoldingPriceSyncResult, type StockPriceResult } from '@quro/shared';
+import {
+  isCurrencyCode,
+  type HoldingPriceSyncResult,
+  type StockPriceResult,
+  toDateOnly,
+  toIsoDate,
+} from '@quro/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client';
 import { holdingPriceHistory, holdings } from '../db/schema';
@@ -55,8 +61,6 @@ type HoldingQuoteCheck =
     }
   | { issue: HoldingIssue };
 
-const DATE_PART_LENGTH = 10;
-
 function normalizeTicker(value: string): string {
   return value.trim().toUpperCase();
 }
@@ -65,13 +69,6 @@ function normalizeCurrency(value: string | null | undefined): string | null {
   if (!value) return null;
   const normalized = value.trim().toUpperCase();
   return normalized || null;
-}
-
-function toDateOnly(value: Date | string | null | undefined): string {
-  if (!value) return new Date().toISOString().slice(0, DATE_PART_LENGTH);
-  const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, DATE_PART_LENGTH);
-  return parsed.toISOString().slice(0, DATE_PART_LENGTH);
 }
 
 function toTradeDate(value: string | null): Date {
@@ -179,7 +176,7 @@ async function applyQuoteToHolding(
   const resolvedHoldingCurrency = isCurrencyCode(normalizedPriceCurrency)
     ? normalizedPriceCurrency
     : holding.currency;
-  const eodDate = toDateOnly(quote.eodDate ?? quote.tradeLast);
+  const eodDate = toDateOnly(quote.eodDate ?? quote.tradeLast) ?? toIsoDate(new Date());
 
   const [updatedHolding] = await db
     .update(holdings)

@@ -3,6 +3,7 @@ import { DEMO_USER_EMAIL } from './maintenance';
 import { createDb } from './client';
 import { getRuntimeDatabaseUrl } from './config';
 import { currencyRates, users } from './schema';
+import { toIsoDate } from '@quro/shared';
 
 const DEFAULT_DEMO_PASSWORD = 'password123';
 
@@ -24,7 +25,7 @@ async function ensureCurrencyRates(db: ReturnType<typeof createDb>['db']): Promi
   if (existing) return;
 
   const updatedAt = new Date();
-  const sourceDate = updatedAt.toISOString().slice(0, 10);
+  const sourceDate = toIsoDate(updatedAt);
   await db.insert(currencyRates).values(
     SEED_RATES.map((r) => ({
       ...r,

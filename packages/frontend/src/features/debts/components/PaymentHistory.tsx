@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Debt, DebtPayment } from '@quro/shared';
+import { type Debt, type DebtPayment } from '@quro/shared';
 import { Clock, Plus, Trash2 } from 'lucide-react';
 import {
   Button,
@@ -9,7 +9,7 @@ import {
   type DataTableSortState,
 } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { formatShortDate } from '../utils/forms';
+import { formatDate } from '@/lib/utils';
 
 type PaymentHistoryProps = {
   debt: Debt;
@@ -102,7 +102,7 @@ function PaymentHistoryTable({
       {sortedPayments.map((payment) => (
         <DataTableRow key={payment.id} interactive>
           <DataTableCell columnKey="date" className="text-slate-600">
-            {formatShortDate(payment.date)}
+            {formatDate(payment.date, { day: 'numeric', month: 'short' })}
           </DataTableCell>
           <DataTableCell columnKey="amount">
             {fmtNative(payment.amount, debt.currency, true)}

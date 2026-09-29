@@ -69,3 +69,4 @@ export function formatCurrency(
 export * from './money.js';
 export * from './date.js';
 export * from './finance.js';
+export * from './validation.js';

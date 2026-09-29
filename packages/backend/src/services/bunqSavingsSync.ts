@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { isCurrencyCode, type CurrencyCode } from '@quro/shared';
+import { isCurrencyCode, type CurrencyCode, toIsoDate } from '@quro/shared';
 import { db } from '../db/client';
 import { bunqConnections, savingsAccounts, savingsTransactions } from '../db/schema';
 import {
@@ -182,7 +182,7 @@ export function classifySavingsPayment(
 
 function toTransactionDate(created: string): string {
   const trimmed = created.trim();
-  if (!trimmed) return new Date().toISOString().slice(0, 10);
+  if (!trimmed) return toIsoDate(new Date());
   return trimmed.slice(0, 10);
 }
 
