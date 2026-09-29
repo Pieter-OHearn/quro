@@ -71,24 +71,7 @@ export function computePosition(holdingId: number, txns: HoldingTransaction[]): 
 export type DatedHoldingTransaction = HoldingTransaction & { timestamp: number };
 export type DatedPropertyTransaction = PropertyTransaction & { timestamp: number };
 
-export function toUtcTimestamp(isoDate: string): number {
-  return Date.parse(`${isoDate}T00:00:00Z`);
-}
-
-export function monthStartUtc(timestamp: number): number {
-  const d = new Date(timestamp);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
-}
-
-export function monthEndUtc(monthStart: number): number {
-  const d = new Date(monthStart);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-export function addMonthsUtc(monthStart: number, months: number): number {
-  const d = new Date(monthStart);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1);
-}
+export { addMonthsUtc, monthEndUtc, monthStartUtc, toUtcTimestamp } from '@quro/shared';
 
 export function formatMonthLabel(monthStart: number): string {
   return new Date(monthStart).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });

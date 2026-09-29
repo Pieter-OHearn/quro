@@ -9,23 +9,10 @@ import {
   TrendingUp,
   Trophy,
 } from 'lucide-react';
-import type { GoalType } from '@quro/shared';
+import { MONTH_ABBREVIATIONS, type GoalType } from '@quro/shared';
 import type { FilterKey, GoalMeta, GoalStatus } from '../types';
 
-export const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
+export const MONTHS = MONTH_ABBREVIATIONS;
 
 export const COLORS = [
   '#6366f1',

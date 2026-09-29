@@ -1,4 +1,10 @@
-import { GOAL_SOURCE_TYPES, type Goal, type GoalSourceType, type GoalType } from '@quro/shared';
+import {
+  GOAL_SOURCE_TYPES,
+  MONTH_ABBREVIATIONS,
+  type Goal,
+  type GoalSourceType,
+  type GoalType,
+} from '@quro/shared';
 import type { CreateGoalInput, GoalFormState, GoalProgressContext, GoalStatus } from '../types';
 
 const DEFAULT_GOAL_TYPE: GoalType = 'savings';
@@ -207,20 +213,7 @@ const buildSalaryPayload = (base: CreateGoalInput, form: GoalFormState): CreateG
   return base;
 };
 
-const monthNames = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
+const monthNames: readonly string[] = MONTH_ABBREVIATIONS;
 
 function deadlineStringToYearMonth(deadline: string): { year: number; month: number } | null {
   const match = deadline.match(/^([A-Za-z]+)\s+(\d{4})$/);

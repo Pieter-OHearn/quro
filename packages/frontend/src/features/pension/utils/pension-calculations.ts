@@ -1,4 +1,4 @@
-import type { PensionPot, PensionTransaction } from '@quro/shared';
+import { toUtcTimestamp, type PensionPot, type PensionTransaction } from '@quro/shared';
 import { ANNUAL_GROWTH_RATE, DRAWDOWN_YEARS } from '../constants';
 import type { ConvertToBaseFn, DatedPensionTransaction, PensionGrowthPoint } from '../types';
 
@@ -9,10 +9,6 @@ const FINAL_MINUTE = 59;
 const FINAL_SECOND = 59;
 const FINAL_MILLISECOND = 999;
 const MIN_GROWTH_POINTS = 2;
-
-export function toUtcTimestamp(isoDate: string): number {
-  return Date.parse(`${isoDate}T00:00:00Z`);
-}
 
 export function yearEndUtc(year: number): number {
   return Date.UTC(

@@ -1,3 +1,4 @@
+import { addMonthsUtc, monthEndUtc, monthStartUtc, toUtcTimestamp } from '@quro/shared';
 import { Hono } from 'hono';
 import { and, eq, getTableColumns, gte, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -46,29 +47,10 @@ const ISO_DATE_LENGTH = 10;
 // Joint assets count half for each partner so the two dashboards sum to reality.
 const JOINT_WEIGHT = 0.5;
 
-function toUtcTimestamp(value: string): number {
-  return Date.parse(`${value}T00:00:00Z`);
-}
-
 function toOptionalTimestamp(value: Date | string | null | undefined): number | null {
   if (!value) return null;
   const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
-}
-
-function monthStartUtc(timestamp: number): number {
-  const date = new Date(timestamp);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
-}
-
-function monthEndUtc(monthStart: number): number {
-  const date = new Date(monthStart); // eslint-disable-next-line no-magic-numbers
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-function addMonthsUtc(monthStart: number, delta: number): number {
-  const date = new Date(monthStart);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1);
 }
 
 export function getActivityCutoff(now = new Date()): string {

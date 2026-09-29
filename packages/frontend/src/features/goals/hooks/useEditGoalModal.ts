@@ -2,25 +2,12 @@ import { useMemo, useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
-import type { Goal, GoalType } from '@quro/shared';
+import { MONTH_ABBREVIATIONS, type Goal, type GoalType } from '@quro/shared';
 import type { GoalFormField, GoalFormState, UpdateGoalInput } from '../types';
 import { GOAL_TYPE_META, COLORS } from '../utils/goals-constants';
 import { buildGoalPayload, normalizeGoalType } from '../utils/goal-utils';
 
-const monthNames = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
+const monthNames: readonly string[] = MONTH_ABBREVIATIONS;
 
 function deadlineToDateString(deadline: string): string {
   if (!deadline) return '';

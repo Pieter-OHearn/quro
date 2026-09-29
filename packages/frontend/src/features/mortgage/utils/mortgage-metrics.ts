@@ -1,4 +1,11 @@
-import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
+import {
+  fromCents,
+  monthsToPayoff,
+  roundMoney,
+  toCents,
+  type Mortgage as MortgageType,
+  type MortgageTransaction,
+} from '@quro/shared';
 import type { AmortizationRow, PaymentBreakdownRow } from '../types';
 
 const SCHEDULE_YEAR_STEP = 2;
@@ -6,16 +13,6 @@ const MONTHS_PER_YEAR = 12;
 const SCHEDULE_MONTH_STEP = SCHEDULE_YEAR_STEP * MONTHS_PER_YEAR;
 const PAYMENT_BREAKDOWN_LIMIT = 6;
 const ISO_YEAR_MONTH_LENGTH = 7;
-
-const CENTS_PER_UNIT = 100;
-
-function toCents(amount: number): number {
-  return Math.round(amount * CENTS_PER_UNIT);
-}
-
-function fromCents(cents: number): number {
-  return cents / CENTS_PER_UNIT;
-}
 
 type YearMonth = { year: number; monthIndex: number };
 type CalendarDate = YearMonth & { day: number };
@@ -105,9 +102,9 @@ function buildScheduleRow(
 ): AmortizationRow {
   return {
     year: String(date.year),
-    balance: fromCents(toCents(balance)),
-    principal: fromCents(toCents(principal)),
-    interest: fromCents(toCents(interest)),
+    balance: roundMoney(balance),
+    principal: roundMoney(principal),
+    interest: roundMoney(interest),
   };
 }
 
@@ -187,17 +184,7 @@ export function calculateRemainingMonths(
   monthlyRate: number,
   monthlyPayment: number,
 ): number | null {
-  const inputs = [balance, monthlyRate, monthlyPayment];
-  if (inputs.some((value) => !Number.isFinite(value))) return null;
-  if (balance <= 0 || monthlyPayment <= 0) return null;
-  if (monthlyRate <= 0) return balance / monthlyPayment;
-
-  const ratio = 1 - (balance * monthlyRate) / monthlyPayment;
-  if (!(ratio > 0 && ratio < 1)) return null;
-
-  const months = -Math.log(ratio) / Math.log(1 + monthlyRate);
-  if (!(Number.isFinite(months) && months > 0)) return null;
-  return months;
+  return monthsToPayoff(balance, monthlyRate, monthlyPayment);
 }
 
 export function computePaymentBreakdownRows(txns: MortgageTransaction[]): PaymentBreakdownRow[] {

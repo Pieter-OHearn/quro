@@ -11,7 +11,7 @@ import {
   CurrencyInput,
   EmojiPickerField,
 } from '@/components/ui';
-import type { GoalType, SavingsAccount } from '@quro/shared';
+import { MONTH_ABBREVIATIONS, type GoalType, type SavingsAccount } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddGoalModal } from '../hooks';
 import { COLORS, GOAL_TYPE_META } from '../utils/goals-constants';
@@ -25,20 +25,7 @@ import type {
 
 type SetField = (key: GoalFormField, value: string) => void;
 
-const monthNames = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
+const monthNames: readonly string[] = MONTH_ABBREVIATIONS;
 
 function dateStringToDeadline(dateStr: string): string {
   if (!dateStr) return '';

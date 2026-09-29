@@ -8,7 +8,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import type { Goal, GoalType } from '@quro/shared';
+import { MONTH_ABBREVIATIONS, type Goal, type GoalType } from '@quro/shared';
 import type { GoalMeta, GoalProgressContext, GoalStatus } from '../types';
 import { GOAL_TYPE_META, MONTHS, STATUS_META } from '../utils/goals-constants';
 import {
@@ -198,20 +198,7 @@ function GoalCardSalary({
   );
 }
 
-const MONTH_ABBR = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
+const MONTH_ABBR: readonly string[] = MONTH_ABBREVIATIONS;
 
 function buildMonthRange(startDeadline: string, endDeadline: string): string[] {
   const parse = (d: string) => {

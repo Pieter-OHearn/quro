@@ -18,7 +18,7 @@ export const MAX_USER_AGE = 100;
 export const MIN_RETIREMENT_AGE = 17;
 export const MAX_RETIREMENT_AGE = 80;
 
-export const BUDGET_MONTHS = [
+export const MONTH_ABBREVIATIONS = [
   'Jan',
   'Feb',
   'Mar',
@@ -33,7 +33,10 @@ export const BUDGET_MONTHS = [
   'Dec',
 ] as const;
 
-export type BudgetMonth = (typeof BUDGET_MONTHS)[number];
+/** @deprecated alias of MONTH_ABBREVIATIONS */
+export const BUDGET_MONTHS = MONTH_ABBREVIATIONS;
+
+export type BudgetMonth = (typeof MONTH_ABBREVIATIONS)[number];
 
 const NUMBER_FORMAT_SET = new Set<string>(NUMBER_FORMATS);
 const BUDGET_MONTH_SET = new Set<string>(BUDGET_MONTHS);
