@@ -2,7 +2,6 @@ import { normalizePdfDocument } from '@/lib/pdfDocuments';
 import type {
   PensionStatementImportFeedItem,
   PensionStatementImport,
-  PensionStatementImportSummary,
   PensionStatementImportRow,
   PensionPot,
   PensionStatementDocument,
@@ -11,7 +10,6 @@ import type {
 import type {
   ApiPensionStatementImportFeedItem,
   ApiPensionStatementImport,
-  ApiPensionStatementImportSummary,
   ApiPensionStatementImportRow,
   ApiPensionPot,
   ApiPensionStatementDocument,
@@ -22,7 +20,6 @@ import type {
 const DEFAULT_STATEMENT_FILE_NAME = 'statement.pdf';
 const DEFAULT_POT_NAME = 'Pension Pot';
 const DEFAULT_POT_PROVIDER = 'Unknown provider';
-const DEFAULT_POT_EMOJI = '🏦';
 
 const PENSION_TYPE_ALIASES: Record<string, PensionPot['type']> = {
   'workplace pension': 'Workplace Pension',
@@ -62,11 +59,6 @@ function toStringOr(value: unknown, fallback = ''): string {
 
 function toOptionalString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
-}
-
-function toNonEmptyStringOr(value: unknown, fallback: string): string {
-  if (typeof value !== 'string') return fallback;
-  return value.trim() ? value : fallback;
 }
 
 function toIsoStringOrNow(value: unknown): string {
@@ -144,10 +136,6 @@ function toOptionalCount(value: number | undefined): number | undefined {
   return value;
 }
 
-function toCount(value: number | undefined): number {
-  return value ?? 0;
-}
-
 function normalizeImportRowType(value: unknown): PensionStatementImportRow['type'] {
   if (typeof value !== 'string') return 'annual_statement';
   return ROW_TYPES.has(value as PensionStatementImportRow['type'])
@@ -222,24 +210,6 @@ export const normalizePensionStatementImport = (
   totalRows: toOptionalCount(value.totalRows),
   deletedRows: toOptionalCount(value.deletedRows),
   activeRows: toOptionalCount(value.activeRows),
-});
-
-export const normalizePensionStatementImportSummary = (
-  value: ApiPensionStatementImportSummary,
-): PensionStatementImportSummary => ({
-  id: toPositiveInt((value as { id?: IntegerLike }).id),
-  potId: toPositiveInt((value as { potId?: IntegerLike }).potId),
-  status: toStatus(value.status),
-  fileName: toStringOr(value.fileName, DEFAULT_STATEMENT_FILE_NAME),
-  errorMessage: toOptionalString(value.errorMessage),
-  createdAt: toIsoStringOrNow(value.createdAt),
-  updatedAt: toIsoStringOrNow(value.updatedAt),
-  totalRows: toCount(value.totalRows),
-  deletedRows: toCount(value.deletedRows),
-  activeRows: toCount(value.activeRows),
-  potName: toStringOr(value.potName, DEFAULT_POT_NAME),
-  potProvider: toStringOr(value.potProvider, DEFAULT_POT_PROVIDER),
-  potEmoji: toNonEmptyStringOr(value.potEmoji, DEFAULT_POT_EMOJI),
 });
 
 export const normalizePensionStatementImportFeedItem = (

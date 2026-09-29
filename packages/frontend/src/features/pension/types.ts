@@ -5,7 +5,6 @@ import type {
   PensionStatementDocument,
   PensionStatementImportFeedItem,
   PensionStatementImport,
-  PensionStatementImportSummary,
   PensionStatementImportRow,
   PensionTransaction,
 } from '@quro/shared';
@@ -53,8 +52,6 @@ export type ApiPensionStatementImportFeedItem = Omit<PensionStatementImportFeedI
     emoji: string | null;
   };
 };
-
-export type ApiPensionStatementImportSummary = PensionStatementImportSummary;
 
 export type ApiPensionStatementImportRow = Omit<PensionStatementImportRow, 'collisionWarning'> & {
   collisionWarning?: PensionImportCollisionWarning | null;

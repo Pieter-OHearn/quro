@@ -7,7 +7,6 @@ import {
 } from './currencyRateCache';
 
 const freshUpdatedAt = new Date('2026-05-08T10:00:00.000Z');
-const now = new Date('2026-05-08T12:00:00.000Z');
 
 const completeRows = [
   { fromCurrency: 'GBP', toCurrency: 'EUR', rate: '1.18', updatedAt: freshUpdatedAt },
@@ -26,14 +25,14 @@ const historicalRows = completeRows.flatMap((row) => [
 
 describe('currency rate cache', () => {
   test('builds a complete fresh rate map and converts strictly', () => {
-    const rates = buildRatesToBaseCurrency(completeRows, now);
+    const rates = buildRatesToBaseCurrency(completeRows);
 
     expect(rates.get('EUR')).toBe(1);
     expect(convertToBaseCurrency(100, 'GBP', rates)).toBe(118);
   });
 
   test('rejects missing rates instead of falling back to 1:1', () => {
-    expect(() => buildRatesToBaseCurrency(completeRows.slice(1), now)).toThrow(
+    expect(() => buildRatesToBaseCurrency(completeRows.slice(1))).toThrow(
       CurrencyRatesUnavailableError,
     );
     expect(() => convertToBaseCurrency(100, 'GBP', new Map([['EUR', 1]]))).toThrow(
@@ -48,17 +47,16 @@ describe('currency rate cache', () => {
           ? { ...row, updatedAt: new Date('2026-05-05T10:00:00.000Z') }
           : row,
       ),
-      now,
     );
 
     expect(convertToBaseCurrency(100, 'GBP', rates)).toBe(118);
   });
 
   test('ignores stale or invalid base-currency rows because EUR is synthetic', () => {
-    const rates = buildRatesToBaseCurrency(
-      [...completeRows, { fromCurrency: 'EUR', toCurrency: 'EUR', rate: '0', updatedAt: null }],
-      now,
-    );
+    const rates = buildRatesToBaseCurrency([
+      ...completeRows,
+      { fromCurrency: 'EUR', toCurrency: 'EUR', rate: '0', updatedAt: null },
+    ]);
 
     expect(rates.get('EUR')).toBe(1);
   });

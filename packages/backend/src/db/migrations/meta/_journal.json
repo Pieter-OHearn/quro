@@ -211,6 +211,13 @@
       "when": 1786531731552,
       "tag": "0029_track_expense_class_confirmation",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790703916622,
+      "tag": "0030_drop_dashboard_transactions",
+      "breakpoints": true
     }
   ]
 }

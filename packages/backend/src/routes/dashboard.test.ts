@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  buildActivityList,
-  buildNetWorthHistory,
-  computeDerivedAllocations,
-  getActivityCutoff,
-} from './dashboard';
+import { computeDerivedAllocations } from '../lib/netWorth';
+import { buildActivityList, buildNetWorthHistory, getActivityCutoff } from './dashboard';
 
 describe('dashboard debt integration helpers', () => {
   test('bounds activity queries from the start of the previous UTC month', () => {

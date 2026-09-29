@@ -37,8 +37,6 @@ import {
 } from '../lib/netWorth';
 import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 
-export { computeDerivedAllocations } from '../lib/netWorth';
-
 const app = new Hono();
 const BASE_CURRENCY = FX_BASE_CURRENCY;
 const NET_WORTH_HISTORY_MONTHS = 7;
