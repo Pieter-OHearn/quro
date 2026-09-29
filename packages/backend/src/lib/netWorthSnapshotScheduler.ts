@@ -1,10 +1,10 @@
-import { HOUR_MS } from '../constants/time';
+import { DAY_MS } from '../constants/time';
 import { db } from '../db/client';
 import { users } from '../db/schema';
+import { startIntervalJob } from './intervalJob';
 import { upsertCurrentNetWorthSnapshot } from './netWorth';
 
-const SNAPSHOT_INTERVAL_HOURS = 24;
-const SNAPSHOT_INTERVAL_MS = SNAPSHOT_INTERVAL_HOURS * HOUR_MS;
+const SNAPSHOT_INTERVAL_MS = DAY_MS;
 
 async function snapshotUser(userId: number): Promise<void> {
   try {
@@ -17,17 +17,16 @@ async function snapshotUser(userId: number): Promise<void> {
 }
 
 async function runSnapshots(): Promise<void> {
-  try {
-    const userRows = await db.select({ userId: users.id }).from(users);
-    console.log(`[net-worth-snapshot] Starting snapshots for ${userRows.length} users`);
-    for (const { userId } of userRows) await snapshotUser(userId);
-  } catch (error) {
-    console.error('[net-worth-snapshot] Failed to run snapshot cycle:', error);
-  }
+  const userRows = await db.select({ userId: users.id }).from(users);
+  console.log(`[net-worth-snapshot] Starting snapshots for ${userRows.length} users`);
+  for (const { userId } of userRows) await snapshotUser(userId);
 }
 
 export function startNetWorthSnapshotScheduler(): void {
-  console.log('[net-worth-snapshot] Scheduler started, interval: 24h');
-  setInterval(() => void runSnapshots(), SNAPSHOT_INTERVAL_MS);
-  void runSnapshots();
+  startIntervalJob({
+    name: 'net-worth-snapshot',
+    intervalMs: SNAPSHOT_INTERVAL_MS,
+    runOnStart: true,
+    run: runSnapshots,
+  });
 }

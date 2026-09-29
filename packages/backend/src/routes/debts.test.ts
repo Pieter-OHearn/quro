@@ -1,10 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  applyDebtPrincipalPayment,
   computeDebtPrincipal,
   parseDebtPayload,
   parseDebtPaymentPayload,
-  restoreDebtPrincipalPayment,
   validateDebtPrincipalAgainstBalance,
 } from './debts';
 
@@ -104,13 +102,5 @@ describe('debt payment validation and balance helpers', () => {
     expect(validateDebtPrincipalAgainstBalance(200, 150)).toBe(
       'Principal portion cannot exceed the current remaining balance',
     );
-  });
-
-  test('applies and restores remaining balances transactionally', () => {
-    const afterPayment = applyDebtPrincipalPayment(1000, 125.5);
-    const afterDelete = restoreDebtPrincipalPayment(afterPayment, 125.5);
-
-    expect(afterPayment).toBe(874.5);
-    expect(afterDelete).toBe(1000);
   });
 });

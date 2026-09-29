@@ -58,6 +58,25 @@ function computeSharesByHolding(txns: readonly HoldingTransactionRow[]): Map<num
   return shares;
 }
 
+// Current value of all holdings (net shares × current price), converted with
+// `convert`. Holdings that are net short are floored at zero.
+export function sumBrokerageValue(
+  holdingRows: readonly HoldingRow[],
+  transactions: readonly HoldingTransactionRow[],
+  convert: (amount: number, currency: string) => number,
+): number {
+  const shares = computeSharesByHolding(transactions);
+  return holdingRows.reduce(
+    (sum, holding) =>
+      sum +
+      convert(
+        Math.max(0, shares.get(holding.id) ?? 0) * toNumberOrZero(holding.currentPrice),
+        holding.currency,
+      ),
+    0,
+  );
+}
+
 function allocation(id: number, name: string, value: number, color: string): DerivedAllocation {
   return { id, name, value, color, currency: FX_BASE_CURRENCY };
 }
@@ -78,16 +97,7 @@ export function computeDerivedAllocations(
     (sum, account) => sum + convert(toNumberOrZero(account.balance), account.currency),
     0,
   );
-  const shares = computeSharesByHolding(userHoldingTxns);
-  const brokerage = userHoldings.reduce(
-    (sum, holding) =>
-      sum +
-      convert(
-        Math.max(0, shares.get(holding.id) ?? 0) * toNumberOrZero(holding.currentPrice),
-        holding.currency,
-      ),
-    0,
-  );
+  const brokerage = sumBrokerageValue(userHoldings, userHoldingTxns, convert);
   const mortgageById = new Map(
     userMortgages.map((mortgage) => [mortgage.id, toNumberOrZero(mortgage.outstandingBalance)]),
   );

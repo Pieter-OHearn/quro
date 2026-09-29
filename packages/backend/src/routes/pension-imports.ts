@@ -34,6 +34,7 @@ import {
   rejectUnknownFields,
 } from '../lib/requestValidation';
 import { toNumberOrZero } from '../lib/numbers';
+import { computePensionTransactionDelta } from '../lib/pensionTransactions';
 import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
 import {
   type NormalizedPensionTransactionPayload,
@@ -115,17 +116,6 @@ function parseEditableImportRowPatch(body: unknown): ParseResult<Record<string, 
   }
 
   return ok(patch);
-}
-
-function computePensionTransactionDelta(txn: {
-  type: string;
-  amount: number;
-  taxAmount: number;
-}): number {
-  if (txn.type === 'contribution') return txn.amount - txn.taxAmount;
-  if (txn.type === 'fee') return -txn.amount;
-  if (txn.type === 'annual_statement') return txn.amount;
-  return 0;
 }
 
 function buildImportStorageKey(params: { userId: number; potId: number }): string {
