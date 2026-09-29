@@ -12,21 +12,6 @@ import {
 import type { GoalType } from '@quro/shared';
 import type { FilterKey, GoalMeta, GoalStatus } from '../types';
 
-export const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
 export const COLORS = [
   '#6366f1',
   '#0ea5e9',

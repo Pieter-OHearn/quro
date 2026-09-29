@@ -4,9 +4,17 @@ export function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(inputs.filter(Boolean).join(' '));
 }
 
-export function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const DEFAULT_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+};
+
+export function formatDate(
+  iso: string,
+  options: Intl.DateTimeFormatOptions = DEFAULT_DATE_OPTIONS,
+) {
+  return new Date(iso).toLocaleDateString('en-GB', options);
 }
 
 export function formatFixedInputValue(

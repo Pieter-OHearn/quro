@@ -1,4 +1,4 @@
-import type { Mortgage as MortgageType } from '@quro/shared';
+import { formatPercent, type Mortgage as MortgageType } from '@quro/shared';
 import type { MortgageFormatFn } from '../types';
 
 type MortgageRepaymentProgressProps = {
@@ -19,7 +19,7 @@ export function MortgageRepaymentProgress({
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-slate-900">Mortgage Repayment Progress</h3>
         <span className="text-sm font-semibold text-indigo-600">
-          {paidPct.toFixed(1)}% paid off
+          {formatPercent(paidPct, 1)} paid off
         </span>
       </div>
       <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden mb-2">

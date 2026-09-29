@@ -6,7 +6,7 @@ import type {
   EditCategoryForm,
   RecentBudgetTx,
 } from '../types';
-import { formatBudgetMonthFromDate } from '@quro/shared';
+import { formatBudgetMonthFromDate, DEFAULT_EMOJI } from '@quro/shared';
 
 export function deriveBudgetStats(categories: readonly BudgetCategory[]): BudgetStats {
   const totalBudgeted = categories.reduce((sum, category) => sum + category.budgeted, 0);
@@ -36,7 +36,7 @@ export function mapMonthlyTransactions(
       categoryId: transaction.categoryId,
       amount: transaction.amount,
       date: transaction.date,
-      emoji: category?.emoji ?? '\ud83d\udce6',
+      emoji: category?.emoji ?? DEFAULT_EMOJI.budgetCategory,
       color: category?.color,
       bunqTransactionId: transaction.bunqTransactionId,
       sourceProvider: transaction.sourceProvider,
@@ -53,7 +53,7 @@ export function buildCreateBudgetCategoryInput(
 ): CreateBudgetCategoryInput {
   return {
     name: newCategory.name.trim(),
-    emoji: newCategory.emoji || '\ud83d\udce6',
+    emoji: newCategory.emoji || DEFAULT_EMOJI.budgetCategory,
     budgeted: Number.parseFloat(newCategory.budgeted) || 0,
     spent: 0,
     color: newCategory.color || '#94a3b8',

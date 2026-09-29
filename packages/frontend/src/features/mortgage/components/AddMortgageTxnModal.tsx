@@ -1,6 +1,12 @@
 import { Modal, ModalFooter, ModalHeader } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
-import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
+import {
+  monthlyInterest,
+  type Mortgage as MortgageType,
+  type MortgageTransaction,
+  formatPercent,
+  DEFAULT_EMOJI,
+} from '@quro/shared';
 import { useMortgageTxnModal } from '../hooks';
 import type { MortgageTxnType, SaveMortgageTxnInput } from '../types';
 import { MORTGAGE_TXN_TYPES, TXN_META } from '../utils/mortgage-meta';
@@ -173,7 +179,7 @@ function ValuationPreview({
       <div className="flex justify-between text-xs border-t border-emerald-100 pt-1.5 mt-1">
         <span className="text-slate-600">New LTV</span>
         <span className="font-semibold text-slate-800">
-          {((mortgage.outstandingBalance / parsedAmount) * 100).toFixed(1)}%
+          {formatPercent((mortgage.outstandingBalance / parsedAmount) * 100, 1)}
         </span>
       </div>
     </div>
@@ -203,7 +209,7 @@ function RateChangePreview({
       <div className="flex justify-between text-xs">
         <span className="text-slate-600">Monthly interest est.</span>
         <span className="font-semibold text-slate-800">
-          {fmt((mortgage.outstandingBalance * parsedAmount) / 100 / 12)}
+          {fmt(monthlyInterest(mortgage.outstandingBalance, parsedAmount))}
         </span>
       </div>
       {computedFixedUntil && (
@@ -513,7 +519,7 @@ export function AddMortgageTxnModal({
   return (
     <Modal
       title={title}
-      subtitle={`🏠 ${mortgage.propertyAddress}`}
+      subtitle={`${DEFAULT_EMOJI.property} ${mortgage.propertyAddress}`}
       onClose={onClose}
       maxWidth="md"
       bodyClassName="p-0 space-y-0"
@@ -521,7 +527,7 @@ export function AddMortgageTxnModal({
         <ModalHeader
           onClose={onClose}
           title={title}
-          subtitle={`🏠 ${mortgage.propertyAddress}`}
+          subtitle={`${DEFAULT_EMOJI.property} ${mortgage.propertyAddress}`}
           contentClassName="min-w-0"
           subtitleClassName="truncate max-w-[240px]"
         />

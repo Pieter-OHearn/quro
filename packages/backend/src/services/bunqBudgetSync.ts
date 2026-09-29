@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import { BUDGET_MONTHS, type BudgetMonth } from '@quro/shared';
+import { MONTH_ABBREVIATIONS, type BudgetMonth, toIsoDate } from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import {
   budgetCategories,
@@ -131,17 +131,17 @@ function isSelfTransfer(
 
 function toTransactionDate(created: string): string {
   const trimmed = created.trim();
-  if (!trimmed) return new Date().toISOString().slice(0, 10);
+  if (!trimmed) return toIsoDate(new Date());
   return trimmed.slice(0, 10);
 }
 
 function parseMonthYear(dateStr: string): { month: BudgetMonth; year: number } {
   const [yearStr, monthStr] = dateStr.split('-');
   const monthIndex = parseInt(monthStr, 10) - 1;
-  if (Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex >= BUDGET_MONTHS.length) {
+  if (Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex >= MONTH_ABBREVIATIONS.length) {
     throw new Error(`Invalid Bunq payment date: ${dateStr}`);
   }
-  const month = BUDGET_MONTHS[monthIndex];
+  const month = MONTH_ABBREVIATIONS[monthIndex];
   const year = parseInt(yearStr, 10);
   if (!month || Number.isNaN(year)) {
     throw new Error(`Invalid Bunq payment date: ${dateStr}`);
@@ -151,7 +151,7 @@ function parseMonthYear(dateStr: string): { month: BudgetMonth; year: number } {
 
 const budgetCategoryMonthIndex = sql<number>`case
   ${sql.join(
-    BUDGET_MONTHS.map(
+    MONTH_ABBREVIATIONS.map(
       (month, index) =>
         sql`when ${budgetCategories.month} = ${sql.raw(`'${month}'`)} then ${sql.raw(String(index))}`,
     ),

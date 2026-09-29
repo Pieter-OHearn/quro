@@ -1,11 +1,13 @@
 import { normalizePdfDocument } from '@/lib/pdfDocuments';
-import type {
-  PensionStatementImportFeedItem,
-  PensionStatementImport,
-  PensionStatementImportRow,
-  PensionPot,
-  PensionStatementDocument,
-  PensionTransaction,
+import {
+  todayIsoDate,
+  type PensionStatementImportFeedItem,
+  type PensionStatementImport,
+  type PensionStatementImportRow,
+  type PensionPot,
+  type PensionStatementDocument,
+  type PensionTransaction,
+  DEFAULT_EMOJI,
 } from '@quro/shared';
 import type {
   ApiPensionStatementImportFeedItem,
@@ -66,7 +68,7 @@ function toIsoStringOrNow(value: unknown): string {
 }
 
 function toDateOnlyOrToday(value: unknown): string {
-  return typeof value === 'string' ? value : new Date().toISOString().slice(0, 10);
+  return typeof value === 'string' ? value : todayIsoDate();
 }
 
 function normalizePensionPotType(rawType: unknown): PensionPot['type'] {
@@ -159,7 +161,7 @@ export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
   investmentStrategy: toOptionalString(pot.investmentStrategy)?.trim() || null,
   metadata: normalizePensionMetadata(pot.metadata),
   color: toOptionalString(pot.color)?.trim() || '#475569',
-  emoji: toOptionalString(pot.emoji)?.trim() || '🏦',
+  emoji: toOptionalString(pot.emoji)?.trim() || DEFAULT_EMOJI.pension,
   notes: toStringOr(pot.notes),
 });
 
@@ -216,7 +218,10 @@ export const normalizePensionStatementImportFeedItem = (
   value: ApiPensionStatementImportFeedItem,
 ): PensionStatementImportFeedItem => {
   const pot = value.pot;
-  const emoji = typeof pot?.emoji === 'string' && pot.emoji.trim().length > 0 ? pot.emoji : null;
+  const emoji =
+    typeof pot?.emoji === 'string' && pot.emoji.trim().length > 0
+      ? pot.emoji
+      : DEFAULT_EMOJI.pension;
 
   return {
     import: normalizePensionStatementImport(value.import),

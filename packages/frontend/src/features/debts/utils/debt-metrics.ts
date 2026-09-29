@@ -1,4 +1,4 @@
-import type { Debt } from '@quro/shared';
+import { monthlyInterest, monthsToPayoff, roundMoney, type Debt } from '@quro/shared';
 
 export type DebtOverview = {
   debtCount: number;
@@ -21,7 +21,7 @@ export function calculateDebtPaidPercentage(
 
 export function estimateDebtMonthlyInterest(debt: Pick<Debt, 'remainingBalance' | 'interestRate'>) {
   if (debt.remainingBalance <= 0 || debt.interestRate <= 0) return 0;
-  return Number.parseFloat(((debt.remainingBalance * debt.interestRate) / 100 / 12).toFixed(2));
+  return roundMoney(monthlyInterest(debt.remainingBalance, debt.interestRate));
 }
 
 export function calculateDebtMonthsRemaining(
@@ -30,19 +30,8 @@ export function calculateDebtMonthsRemaining(
   monthlyPayment: number,
 ): number | null {
   if (balance <= 0) return 0;
-  if (monthlyPayment <= 0) return null;
-
-  const monthlyRate = annualInterestRate / 100 / 12;
-  if (monthlyRate <= 0) return Math.ceil(balance / monthlyPayment);
-  if (monthlyPayment <= balance * monthlyRate) return null;
-
-  const payoffFactor = 1 - (monthlyRate * balance) / monthlyPayment;
-  if (payoffFactor <= 0) return null;
-
-  const months = -Math.log(payoffFactor) / Math.log(1 + monthlyRate);
-  if (!Number.isFinite(months) || months < 0) return null;
-
-  return Math.ceil(months);
+  const months = monthsToPayoff(balance, annualInterestRate / 100 / 12, monthlyPayment);
+  return months === null ? null : Math.ceil(months);
 }
 
 export function calculateDebtPayoffDate(
@@ -84,10 +73,7 @@ export function estimateDebtRemainingInterest(
   );
   if (months == null) return null;
 
-  return Math.max(
-    0,
-    Number.parseFloat((months * debt.monthlyPayment - debt.remainingBalance).toFixed(2)),
-  );
+  return Math.max(0, roundMoney(months * debt.monthlyPayment - debt.remainingBalance));
 }
 
 export function buildDebtOverview(

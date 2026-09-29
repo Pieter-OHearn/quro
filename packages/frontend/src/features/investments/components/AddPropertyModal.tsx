@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CURRENCY_CODES, type CurrencyCode, useCurrency } from '@/lib/CurrencyContext';
 import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
 import { JointToggleField } from '@/features/partner';
-import type { Property } from '@quro/shared';
+import { DEFAULT_EMOJI, type Property } from '@quro/shared';
 
 const PROPERTY_TYPES = [
   'Buy-to-Let',
@@ -181,7 +181,7 @@ function validatePropertyForm(
 
 function useAddPropertyForm() {
   const [form, setForm] = useState<PropertyFormState>({
-    emoji: '🏠',
+    emoji: DEFAULT_EMOJI.property,
     address: '',
     propertyType: 'Buy-to-Let',
     currency: 'EUR' as CurrencyCode,

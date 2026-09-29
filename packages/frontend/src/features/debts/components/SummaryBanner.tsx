@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Debt } from '@quro/shared';
+import { formatPercent, type Debt } from '@quro/shared';
 import { TrendingDown } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { buildDebtOverview } from '../utils/debt-metrics';
@@ -29,12 +29,12 @@ export function SummaryBanner({ debts }: Readonly<{ debts: readonly Debt[] }>) {
             { label: 'Monthly Payments', value: fmtBase(overview.totalMonthlyPayment), icon: '📅' },
             {
               label: 'Avg Interest',
-              value: `${overview.averageInterestRate.toFixed(2)}% APR`,
+              value: `${formatPercent(overview.averageInterestRate, 2)} APR`,
               icon: '📊',
             },
             {
               label: 'Highest Rate',
-              value: `${overview.highestInterestRate.toFixed(2)}% APR`,
+              value: `${formatPercent(overview.highestInterestRate, 2)} APR`,
               icon: '⚠️',
             },
           ].map((metric) => (

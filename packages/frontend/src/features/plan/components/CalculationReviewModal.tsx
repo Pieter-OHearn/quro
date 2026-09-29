@@ -1,4 +1,4 @@
-import type { RunwayResponse } from '@quro/shared';
+import { formatPercent, type RunwayResponse } from '@quro/shared';
 import { Badge, Modal } from '@/components/ui';
 
 const STATUS_LABELS = {
@@ -115,7 +115,7 @@ export function CalculationReviewModal({
           <div>
             <dt className="text-fg-subtle">Effective tax estimate</dt>
             <dd className="font-medium text-fg">
-              {(support.effectiveTaxRate * 100).toFixed(1)}% ·{' '}
+              {formatPercent(support.effectiveTaxRate * 100, 1)} ·{' '}
               {support.taxRateSource.replace('_', ' ')}
             </dd>
           </div>

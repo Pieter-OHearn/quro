@@ -9,7 +9,7 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import { todayIsoDate, type SavingsAccount, type SavingsTransaction } from '@quro/shared';
 import { TXN_META, TXN_TYPE_LIST } from '../constants';
 import type { SaveTransactionInput, TxnType } from '../types';
 import { saveSavingsTransaction } from '../utils/save-transaction';
@@ -77,7 +77,7 @@ function useAddTxnForm(
 ) {
   const [type, setType] = useState<TxnType>(existing?.type ?? 'deposit');
   const [amount, setAmount] = useState(existing ? formatFixedInputValue(existing.amount) : '');
-  const [date, setDate] = useState(existing?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(existing?.date ?? todayIsoDate());
   const [note, setNote] = useState(existing?.note ?? '');
   const [error, setError] = useState('');
 

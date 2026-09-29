@@ -1,12 +1,10 @@
-import type { PensionStatementImportFeedItem } from '@quro/shared';
+import { DEFAULT_EMOJI, type PensionStatementImportFeedItem } from '@quro/shared';
 import type {
   ImportNotificationItem,
   NotificationItem,
   NotificationStatus,
   NotificationStatusCounts,
 } from './types';
-
-const FALLBACK_POT_EMOJI = '🏦';
 
 function toNotificationStatus(
   status: PensionStatementImportFeedItem['import']['status'],
@@ -55,7 +53,7 @@ export function mapImportFeedToNotifications(
         potEmoji:
           typeof item.pot.emoji === 'string' && item.pot.emoji.trim().length > 0
             ? item.pot.emoji
-            : FALLBACK_POT_EMOJI,
+            : DEFAULT_EMOJI.pension,
         fileName: item.import.fileName,
         status,
         updatedAt: item.import.updatedAt,

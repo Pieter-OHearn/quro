@@ -1,5 +1,5 @@
 import { ArrowUpRight, Percent, PiggyBank, TrendingUp } from 'lucide-react';
-import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import { formatPercent, type SavingsAccount, type SavingsTransaction } from '@quro/shared';
 import type { SavingsFormatFn } from '../types';
 
 type SavingsStatsProps = {
@@ -66,7 +66,7 @@ export function SavingsStats({
           </div>
           <p className="text-sm text-slate-500">Avg. Interest Rate</p>
         </div>
-        <p className="text-2xl font-bold text-slate-900">{avgRate.toFixed(2)}%</p>
+        <p className="text-2xl font-bold text-slate-900">{formatPercent(avgRate, 2)}</p>
         <p className="text-xs text-slate-400 mt-1">Weighted average APY</p>
       </div>
       <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">

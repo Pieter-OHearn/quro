@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
-import type { Goal, GoalType } from '@quro/shared';
+import { DEFAULT_EMOJI, type Goal, type GoalType } from '@quro/shared';
 import type { CreateGoalInput, GoalFormField, GoalFormState } from '../types';
 import { GOAL_TYPE_META, COLORS } from '../utils/goals-constants';
 import { buildGoalPayload } from '../utils/goal-utils';
@@ -15,7 +15,7 @@ const defaultForm = (): GoalFormState => {
 
   return {
     name: '',
-    emoji: '🎯',
+    emoji: DEFAULT_EMOJI.goal,
     color: COLORS[0],
     notes: '',
     deadline: buildDefaultGoalDeadline(now),

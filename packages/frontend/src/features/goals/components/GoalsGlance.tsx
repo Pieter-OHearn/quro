@@ -1,4 +1,4 @@
-import type { Goal } from '@quro/shared';
+import { formatPercent, type Goal } from '@quro/shared';
 import type { GoalProgressContext } from '../types';
 import { STATUS_META } from '../utils/goals-constants';
 import {
@@ -21,14 +21,14 @@ function GlanceItem({ goal, goalProgressContext, currentYear }: Readonly<GlanceI
 
   return (
     <div className="group flex items-center gap-3">
-      <span className="text-base w-7 text-center flex-shrink-0">{goal.emoji ?? '🎯'}</span>
+      <span className="text-base w-7 text-center flex-shrink-0">{goal.emoji}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-medium text-slate-700 truncate">{goal.name}</span>
           <span className="text-xs font-semibold text-slate-500 flex-shrink-0 ml-2">
             {type === 'invest_habit'
               ? `${resolveInvestHabitMonthsCompleted(goal, goalProgressContext)}/${goal.totalMonths ?? 12}mo`
-              : `${pct.toFixed(0)}%`}
+              : formatPercent(pct, 0)}
           </span>
         </div>
         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">

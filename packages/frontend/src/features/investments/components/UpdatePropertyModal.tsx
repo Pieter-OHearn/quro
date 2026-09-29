@@ -4,7 +4,7 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { ArchiveOrDeleteDialog, Modal, ModalFooter, FormField, TextInput } from '@/components/ui';
 import { JointToggleField } from '@/features/partner';
 import { formatFixedInputValue } from '@/lib/utils';
-import type { Property } from '@quro/shared';
+import { formatPercent, type Property } from '@quro/shared';
 import type { DeletePropertyMode } from '../hooks/useDeleteProperty';
 
 type UpdatePropertyModalProps = {
@@ -45,7 +45,7 @@ function PropertyStatsPreview({
         >
           {appreciation >= 0 ? '+' : ''}
           {fmtNative(appreciation, currency)} ({appreciationPct >= 0 ? '+' : ''}
-          {appreciationPct.toFixed(1)}%)
+          {formatPercent(appreciationPct, 1)})
         </span>
       </div>
     </div>

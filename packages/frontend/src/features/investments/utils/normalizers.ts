@@ -5,6 +5,7 @@ import {
   type HoldingTransaction,
   type Property,
   type PropertyTransaction,
+  DEFAULT_EMOJI,
 } from '@quro/shared';
 
 function toNullableId(value: unknown): number | null {
@@ -41,7 +42,7 @@ export function normalizeProperty(raw: Property): Property {
   return {
     ...raw,
     mortgageId: toNullableId(raw.mortgageId),
-    emoji: raw.emoji?.trim() || '🏠',
+    emoji: raw.emoji?.trim() || DEFAULT_EMOJI.property,
   };
 }
 

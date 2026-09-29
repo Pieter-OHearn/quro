@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  BUDGET_MONTHS,
+  MONTH_ABBREVIATIONS,
   formatBudgetMonthFromDate,
   toBudgetMonthIndex,
   type BudgetMonth,
@@ -32,7 +32,7 @@ function shiftMonth(month: BudgetMonth, year: number, delta: number) {
   const total = year * 12 + toBudgetMonthIndex(month) + delta;
   const nextMonthIndex = ((total % 12) + 12) % 12;
   return {
-    month: BUDGET_MONTHS[nextMonthIndex] ?? BUDGET_MONTHS[0],
+    month: MONTH_ABBREVIATIONS[nextMonthIndex] ?? MONTH_ABBREVIATIONS[0],
     year: Math.floor(total / 12),
   };
 }

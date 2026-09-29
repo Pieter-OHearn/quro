@@ -11,7 +11,7 @@ import {
   DateNoteRow,
 } from '@/components/ui';
 import type { TxnTypeMeta } from '@/components/ui';
-import type { Holding, HoldingTransaction } from '@quro/shared';
+import { todayIsoDate, type Holding, type HoldingTransaction } from '@quro/shared';
 import type { SaveHoldingTxnInput } from '../types';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
@@ -471,7 +471,7 @@ function computeRealizedGainEstimate(
 function buildInitialHoldingTxnValues(
   existing: HoldingTransaction | undefined,
 ): InitialHoldingTxnFormValues {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   return {
     type: existing?.type ?? 'buy',
     shares: existing?.shares != null ? String(existing.shares) : '',

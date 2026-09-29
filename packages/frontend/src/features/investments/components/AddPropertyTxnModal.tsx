@@ -11,7 +11,12 @@ import {
   DateNoteRow,
 } from '@/components/ui';
 import type { TxnTypeMeta } from '@/components/ui';
-import type { Property, PropertyTransaction } from '@quro/shared';
+import {
+  todayIsoDate,
+  type Property,
+  type PropertyTransaction,
+  validateInterestWithinAmount,
+} from '@quro/shared';
 import type { SavePropertyTxnInput } from '../types';
 import { isInvestmentProperty, type PropertyTxnType } from '../utils/position';
 
@@ -334,8 +339,7 @@ function validateRepayment(
   if (type !== 'repayment') return '';
   if (mortgageBalance <= 0) return 'Link a mortgage to record repayments';
   if (parsedInterest < 0) return 'Interest cannot be negative';
-  if (parsedInterest > parsedAmount) return 'Interest cannot exceed total payment';
-  return '';
+  return validateInterestWithinAmount(parsedAmount, parsedInterest) ?? '';
 }
 
 type RepaymentFieldProps = {
@@ -413,7 +417,7 @@ function usePropertyTxnForm(property: Property, existing: PropertyTransaction | 
   const [interest, setInterest] = useState(
     existing?.interest != null ? formatFixedInputValue(existing.interest) : '',
   );
-  const [date, setDate] = useState(existing?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(existing?.date ?? todayIsoDate());
   const [note, setNote] = useState(existing?.note ?? '');
   const [error, setError] = useState('');
 
@@ -591,7 +595,7 @@ export function AddPropertyTxnModal({
   return (
     <Modal
       title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
-      subtitle={`${property.emoji ?? '🏠'} ${property.address}`}
+      subtitle={`${property.emoji} ${property.address}`}
       onClose={onClose}
       footer={
         <ModalFooter

@@ -9,6 +9,7 @@ import type {
   SavingsFormatFn,
   SavingsNativeFormatFn,
 } from '../types';
+import { monthlyInterest } from '@quro/shared';
 
 type AccountRowProps = {
   acc: SavingsAccount;
@@ -197,7 +198,7 @@ function AccountRow({
   const pct = totalInBase > 0 ? (balanceInBase / totalInBase) * 100 : 0;
   const foreign = isForeign(acc.currency);
   const accTxns = transactions.filter((transaction) => transaction.accountId === acc.id);
-  const monthlyInterest = (acc.balance * acc.interestRate) / 100 / 12;
+  const accMonthlyInterest = monthlyInterest(acc.balance, acc.interestRate);
 
   return (
     <div>
@@ -207,7 +208,7 @@ function AccountRow({
         pct={pct}
         foreign={foreign}
         balanceInBase={balanceInBase}
-        monthlyInterest={monthlyInterest}
+        monthlyInterest={accMonthlyInterest}
         isExpanded={isExpanded}
         fmtBase={fmtBase}
         fmtNative={fmtNative}

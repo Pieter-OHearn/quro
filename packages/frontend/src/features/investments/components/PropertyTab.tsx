@@ -2,7 +2,12 @@ import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } fr
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
-import type { Mortgage, Property, PropertyTransaction } from '@quro/shared';
+import {
+  formatPercent,
+  type Mortgage,
+  type Property,
+  type PropertyTransaction,
+} from '@quro/shared';
 import { getPropertyMortgageBalance, getPropertyOwnershipShare } from '../utils/position';
 import { PropertiesArchivedSection } from './PropertiesArchivedSection';
 import { PropertyTxnHistory } from './PropertyTxnHistory';
@@ -119,7 +124,7 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
           {stats.appreciation >= 0 ? '+' : ''}
           {fmtNative(stats.appreciation, property.currency, true)} (
           {stats.appreciationPct >= 0 ? '+' : ''}
-          {stats.appreciationPct.toFixed(1)}%)
+          {formatPercent(stats.appreciationPct, 1)})
         </p>
       </div>
       <div className="bg-slate-50 rounded-xl p-3">
@@ -142,7 +147,7 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
                   : 'text-amber-600 font-medium'
               }
             >
-              {stats.ltv.toFixed(1)}%
+              {formatPercent(stats.ltv, 1)}
             </span>
           </p>
         )}
@@ -172,7 +177,7 @@ function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRo
             <p className="text-xs font-semibold text-slate-800 truncate">
               {fmtNative(linkedMortgage.outstandingBalance, linkedMortgage.currency, true)}{' '}
               {property.isJoint ? 'total outstanding' : 'outstanding'} ·{' '}
-              {linkedMortgage.interestRate.toFixed(2)}%
+              {formatPercent(linkedMortgage.interestRate, 2)}
             </p>
           </div>
         </div>
@@ -263,12 +268,12 @@ function PropertyYieldBadges({ grossYield, netYield }: PropertyYieldBadgesProps)
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">
-        Gross yield {grossYield.toFixed(2)}%
+        Gross yield {formatPercent(grossYield, 2)}
       </span>
       <span
         className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${netYield >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}
       >
-        Net yield {netYield.toFixed(2)}%
+        Net yield {formatPercent(netYield, 2)}
       </span>
     </div>
   );
@@ -307,7 +312,7 @@ function PropertyCardHeader({
   return (
     <div className="flex items-start justify-between gap-3 mb-4">
       <div className="flex items-center gap-3 min-w-0">
-        <span className="text-2xl leading-none flex-shrink-0">{property.emoji ?? '🏠'}</span>
+        <span className="text-2xl leading-none flex-shrink-0">{property.emoji}</span>
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 truncate">{property.address}</p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">

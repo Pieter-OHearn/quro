@@ -1,4 +1,9 @@
-import { parseTickerItemType, type TickerItemType, type TickerLookupExchange } from '@quro/shared';
+import {
+  parseTickerItemType,
+  type TickerItemType,
+  type TickerLookupExchange,
+  toDateOnly,
+} from '@quro/shared';
 import YahooFinance from 'yahoo-finance2';
 import type {
   EodLatestMap,
@@ -6,8 +11,6 @@ import type {
   MarketDataClient,
   TickerLookupProfile,
 } from './marketDataClient';
-
-const DATE_PART_LENGTH = 10;
 
 // Maps exchange MIC codes to Yahoo Finance exchange suffixes.
 // US exchanges (XNAS, XNYS, XASE, ARCX, BATS, etc.) have no suffix.
@@ -64,10 +67,6 @@ function toIsoString(value: Date | number | null | undefined): string | null {
   if (value == null) return null;
   const date = value instanceof Date ? value : new Date((value as number) * 1000);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function toDateOnly(isoString: string | null): string | null {
-  return isoString ? isoString.slice(0, DATE_PART_LENGTH) : null;
 }
 
 function emptyQuote(symbol: string): EodLatestQuote {

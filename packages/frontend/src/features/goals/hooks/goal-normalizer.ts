@@ -1,4 +1,10 @@
-import { GOAL_SOURCE_TYPES, type Goal, type GoalSourceType, type GoalType } from '@quro/shared';
+import {
+  GOAL_SOURCE_TYPES,
+  type Goal,
+  type GoalSourceType,
+  type GoalType,
+  DEFAULT_EMOJI,
+} from '@quro/shared';
 
 const GOAL_TYPES: GoalType[] = [
   'savings',
@@ -43,7 +49,7 @@ const resolveGoalYear = (goal: Goal): number =>
 const normalizeGoalMeta = (goal: Goal) => ({
   type: normalizeGoalTypeValue(goal.type),
   name: goal.name?.trim() || 'Untitled Goal',
-  emoji: goal.emoji || '🎯',
+  emoji: goal.emoji || DEFAULT_EMOJI.goal,
   deadline: goal.deadline?.trim() || 'TBD',
   category: goal.category?.trim() || 'Other',
 });

@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router';
-import { formatNumber, type Goal, type GoalType } from '@quro/shared';
+import { formatNumber, type Goal, type GoalType, formatPercent } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { GoalProgressContext } from '@/features/goals/types';
 import { GOAL_TYPE_META } from '@/features/goals/utils/goals-constants';
@@ -107,13 +107,14 @@ const buildSalarySubtext = (
   if (annualGross <= 0) return 'Add a payslip to track this goal';
   const raisePct = (toBase(goal.targetAmount || 0) / annualGross - 1) * 100;
   if (raisePct <= 0) return 'Target reached';
-  return `+${raisePct.toFixed(1)}% raise needed`;
+  return `+${formatPercent(raisePct, 1)} raise needed`;
 };
 
 const buildInvestHabitSubtext = (goal: Goal, context: GoalProgressContext): string =>
   `${resolveInvestHabitMonthsCompleted(goal, context)} of ${goal.totalMonths ?? 12} months hit`;
 
-const buildAnnualSubtext = (clampedPct: number): string => `currently ${clampedPct.toFixed(0)}%`;
+const buildAnnualSubtext = (clampedPct: number): string =>
+  `currently ${formatPercent(clampedPct, 0)}`;
 
 const buildAmountSubtext = (
   goal: Goal,
@@ -128,7 +129,7 @@ const buildAmountSubtext = (
     const monthsLeft = Math.ceil(remaining / monthlyContrib);
     return `${monthsLeft} months left at ${fmtBase(monthlyContrib)}/mo`;
   }
-  return `${clampedPct.toFixed(0)}% complete`;
+  return `${formatPercent(clampedPct, 0)} complete`;
 };
 
 const buildGoalSubtext = (

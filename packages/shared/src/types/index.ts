@@ -18,7 +18,7 @@ export const MAX_USER_AGE = 100;
 export const MIN_RETIREMENT_AGE = 17;
 export const MAX_RETIREMENT_AGE = 80;
 
-export const BUDGET_MONTHS = [
+export const MONTH_ABBREVIATIONS = [
   'Jan',
   'Feb',
   'Mar',
@@ -33,10 +33,17 @@ export const BUDGET_MONTHS = [
   'Dec',
 ] as const;
 
-export type BudgetMonth = (typeof BUDGET_MONTHS)[number];
+export const DEFAULT_EMOJI = {
+  goal: '🎯',
+  pension: '🏦',
+  property: '🏠',
+  budgetCategory: '📦',
+} as const;
+
+export type BudgetMonth = (typeof MONTH_ABBREVIATIONS)[number];
 
 const NUMBER_FORMAT_SET = new Set<string>(NUMBER_FORMATS);
-const BUDGET_MONTH_SET = new Set<string>(BUDGET_MONTHS);
+const BUDGET_MONTH_SET = new Set<string>(MONTH_ABBREVIATIONS);
 
 export function isNumberFormatPreference(value: unknown): value is NumberFormatPreference {
   return typeof value === 'string' && NUMBER_FORMAT_SET.has(value);
@@ -47,11 +54,16 @@ export function isBudgetMonth(value: unknown): value is BudgetMonth {
 }
 
 export function toBudgetMonthIndex(month: BudgetMonth): number {
-  return BUDGET_MONTHS.indexOf(month);
+  return MONTH_ABBREVIATIONS.indexOf(month);
+}
+
+/** Index of a month abbreviation, or -1 when the value is not one. */
+export function getMonthAbbreviationIndex(value: string): number {
+  return (MONTH_ABBREVIATIONS as readonly string[]).indexOf(value);
 }
 
 export function formatBudgetMonthFromDate(date: Date): BudgetMonth {
-  return BUDGET_MONTHS[date.getMonth()] ?? BUDGET_MONTHS[0];
+  return MONTH_ABBREVIATIONS[date.getMonth()] ?? MONTH_ABBREVIATIONS[0];
 }
 
 export type User = {

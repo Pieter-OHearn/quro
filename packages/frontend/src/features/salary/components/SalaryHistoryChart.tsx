@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import type { TooltipContentProps } from 'recharts';
 import type { FmtFn, SalaryChartEntry } from '../types';
+import { formatPercent } from '@quro/shared';
 
 type SalaryHistoryChartProps = {
   data: readonly SalaryChartEntry[];
@@ -73,7 +74,8 @@ export function SalaryHistoryChart({
           <div className="mt-3 flex items-center gap-2 bg-emerald-50 rounded-xl p-3">
             <ArrowUpRight size={16} className="text-emerald-600" />
             <p className="text-xs text-emerald-700">
-              Salary has grown by <strong>+{growthPct.toFixed(0)}%</strong> since {data[0].year}
+              Salary has grown by <strong>+{formatPercent(growthPct, 0)}</strong> since{' '}
+              {data[0].year}
             </p>
           </div>
         ) : undefined
