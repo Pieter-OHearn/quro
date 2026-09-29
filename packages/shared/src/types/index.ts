@@ -33,13 +33,10 @@ export const MONTH_ABBREVIATIONS = [
   'Dec',
 ] as const;
 
-/** @deprecated alias of MONTH_ABBREVIATIONS */
-export const BUDGET_MONTHS = MONTH_ABBREVIATIONS;
-
 export type BudgetMonth = (typeof MONTH_ABBREVIATIONS)[number];
 
 const NUMBER_FORMAT_SET = new Set<string>(NUMBER_FORMATS);
-const BUDGET_MONTH_SET = new Set<string>(BUDGET_MONTHS);
+const BUDGET_MONTH_SET = new Set<string>(MONTH_ABBREVIATIONS);
 
 export function isNumberFormatPreference(value: unknown): value is NumberFormatPreference {
   return typeof value === 'string' && NUMBER_FORMAT_SET.has(value);
@@ -50,11 +47,16 @@ export function isBudgetMonth(value: unknown): value is BudgetMonth {
 }
 
 export function toBudgetMonthIndex(month: BudgetMonth): number {
-  return BUDGET_MONTHS.indexOf(month);
+  return MONTH_ABBREVIATIONS.indexOf(month);
+}
+
+/** Index of a month abbreviation, or -1 when the value is not one. */
+export function getMonthAbbreviationIndex(value: string): number {
+  return isBudgetMonth(value) ? toBudgetMonthIndex(value) : -1;
 }
 
 export function formatBudgetMonthFromDate(date: Date): BudgetMonth {
-  return BUDGET_MONTHS[date.getMonth()] ?? BUDGET_MONTHS[0];
+  return MONTH_ABBREVIATIONS[date.getMonth()] ?? MONTH_ABBREVIATIONS[0];
 }
 
 export type User = {

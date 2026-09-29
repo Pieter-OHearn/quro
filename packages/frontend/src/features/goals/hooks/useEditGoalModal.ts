@@ -2,18 +2,16 @@ import { useMemo, useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
-import { MONTH_ABBREVIATIONS, type Goal, type GoalType } from '@quro/shared';
+import { getMonthAbbreviationIndex, type Goal, type GoalType } from '@quro/shared';
 import type { GoalFormField, GoalFormState, UpdateGoalInput } from '../types';
 import { GOAL_TYPE_META, COLORS } from '../utils/goals-constants';
 import { buildGoalPayload, normalizeGoalType } from '../utils/goal-utils';
-
-const monthNames: readonly string[] = MONTH_ABBREVIATIONS;
 
 function deadlineToDateString(deadline: string): string {
   if (!deadline) return '';
   const match = deadline.match(/^([A-Za-z]+)\s+(\d{4})$/);
   if (!match) return '';
-  const month = monthNames.indexOf(match[1]);
+  const month = getMonthAbbreviationIndex(match[1]);
   if (month === -1) return '';
   return `${match[2]}-${String(month + 1).padStart(2, '0')}-01`;
 }

@@ -1,4 +1,4 @@
-import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import { monthlyInterest, type SavingsAccount, type SavingsTransaction } from '@quro/shared';
 import type {
   ConvertToBaseFn,
   MonthBucket,
@@ -39,7 +39,7 @@ export function computeSavingsMetrics(
 
   const totalInterest = accounts.reduce((sum, account) => {
     return (
-      sum + convertToBase((account.balance * account.interestRate) / 100 / 12, account.currency)
+      sum + convertToBase(monthlyInterest(account.balance, account.interestRate), account.currency)
     );
   }, 0);
 

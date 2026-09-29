@@ -71,8 +71,6 @@ export function computePosition(holdingId: number, txns: HoldingTransaction[]): 
 export type DatedHoldingTransaction = HoldingTransaction & { timestamp: number };
 export type DatedPropertyTransaction = PropertyTransaction & { timestamp: number };
 
-export { addMonthsUtc, monthEndUtc, monthStartUtc, toUtcTimestamp } from '@quro/shared';
-
 export function formatMonthLabel(monthStart: number): string {
   return new Date(monthStart).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 }

@@ -11,9 +11,25 @@ function resolveNumberFormat(
 }
 
 const numberFormatCache = new Map<string, Intl.NumberFormat>();
+const CACHEABLE_OPTION_KEYS = new Set([
+  'style',
+  'currency',
+  'minimumFractionDigits',
+  'maximumFractionDigits',
+]);
 
 function getNumberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
-  const key = `${locale}|${JSON.stringify(options)}`;
+  const entries = Object.entries(options);
+  if (!entries.every(([key]) => CACHEABLE_OPTION_KEYS.has(key))) {
+    return new Intl.NumberFormat(locale, options);
+  }
+  const key = [
+    locale,
+    options.style,
+    options.currency,
+    options.minimumFractionDigits,
+    options.maximumFractionDigits,
+  ].join('|');
   let formatter = numberFormatCache.get(key);
   if (!formatter) {
     formatter = new Intl.NumberFormat(locale, options);
@@ -30,8 +46,10 @@ export function formatNumber(
   return getNumberFormat(resolveNumberFormat(numberFormat), options).format(amount);
 }
 
+/** Formats a percentage; non-finite values and negative zero render as 0. */
 export function formatPercent(value: number, fractionDigits = 1): string {
-  return `${value.toFixed(fractionDigits)}%`;
+  const text = (Number.isFinite(value) ? value : 0).toFixed(fractionDigits);
+  return `${Number(text) === 0 ? (0).toFixed(fractionDigits) : text}%`;
 }
 
 export function formatCurrency(

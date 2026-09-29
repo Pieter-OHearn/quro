@@ -9,6 +9,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { PensionFormatBaseFn, PensionGrowthPoint } from '../types';
+import { formatPercent } from '@quro/shared';
 
 type PensionGrowthChartProps = {
   pensionGrowthData: PensionGrowthPoint[];
@@ -77,7 +78,7 @@ export function PensionGrowthChart({
             className={`text-sm px-4 py-2 rounded-full font-semibold ${pensionGrowthPct >= 0 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-600'}`}
           >
             {pensionGrowthPct >= 0 ? '+' : ''}
-            {pensionGrowthPct.toFixed(0)}% since {pensionGrowthData[0].year}
+            {formatPercent(pensionGrowthPct, 0)} since {pensionGrowthData[0].year}
           </span>
         ) : undefined
       }

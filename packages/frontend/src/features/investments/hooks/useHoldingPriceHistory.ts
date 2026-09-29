@@ -1,15 +1,19 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { HoldingPriceHistoryEntry } from '@quro/shared';
-import { addMonthsUtc, monthEndUtc, monthStartUtc } from '../utils/position';
+import {
+  addMonthsUtc,
+  monthEndUtc,
+  monthStartUtc,
+  toIsoDate,
+  type HoldingPriceHistoryEntry,
+} from '@quro/shared';
 import { normalizeHoldingPriceHistoryEntry } from '../utils/normalizers';
 
-const DATE_PART_LENGTH = 10;
 const HISTORY_LOOKBACK_MONTHS = 12;
 
 function toDateOnly(timestamp: number): string {
-  return new Date(timestamp).toISOString().slice(0, DATE_PART_LENGTH);
+  return toIsoDate(new Date(timestamp));
 }
 
 export function useHoldingPriceHistory(holdingIds: number[]) {

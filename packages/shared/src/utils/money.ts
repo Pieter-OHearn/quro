@@ -10,10 +10,5 @@ export function fromCents(cents: number): number {
 
 /** Rounds a monetary amount to whole cents (2 decimal places). */
 export function roundMoney(amount: number): number {
-  return fromCents(toCents(amount));
-}
-
-/** Sums monetary amounts in integer cents to avoid floating point drift. */
-export function sumMoney(amounts: readonly number[]): number {
-  return fromCents(amounts.reduce((total, amount) => total + toCents(amount), 0));
+  return fromCents(toCents(amount)) || 0;
 }

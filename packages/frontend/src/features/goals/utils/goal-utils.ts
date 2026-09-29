@@ -1,5 +1,6 @@
 import {
   GOAL_SOURCE_TYPES,
+  getMonthAbbreviationIndex,
   MONTH_ABBREVIATIONS,
   type Goal,
   type GoalSourceType,
@@ -213,12 +214,10 @@ const buildSalaryPayload = (base: CreateGoalInput, form: GoalFormState): CreateG
   return base;
 };
 
-const monthNames: readonly string[] = MONTH_ABBREVIATIONS;
-
 function deadlineStringToYearMonth(deadline: string): { year: number; month: number } | null {
   const match = deadline.match(/^([A-Za-z]+)\s+(\d{4})$/);
   if (!match) return null;
-  const month = monthNames.indexOf(match[1]);
+  const month = getMonthAbbreviationIndex(match[1]);
   if (month === -1) return null;
   return { year: Number(match[2]), month };
 }
@@ -233,7 +232,7 @@ function monthsBetweenDeadlines(startDeadline: string, endDeadline: string): num
 function dateStringToDeadline(dateStr: string): string {
   if (!dateStr) return '';
   const date = new Date(dateStr + 'T00:00:00Z');
-  const month = monthNames[date.getUTCMonth()];
+  const month = MONTH_ABBREVIATIONS[date.getUTCMonth()];
   const year = date.getUTCFullYear();
   return `${month} ${year}`;
 }

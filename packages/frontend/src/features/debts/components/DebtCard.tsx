@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Debt, DebtPayment } from '@quro/shared';
+import { formatPercent, type Debt, type DebtPayment } from '@quro/shared';
 import {
   AlertTriangle,
   Calendar,
@@ -130,7 +130,9 @@ function DebtProgress({ debt }: Readonly<{ debt: Debt }>) {
   return (
     <div className="mb-4">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[10px] text-slate-400">{paidPercentage.toFixed(0)}% paid off</span>
+        <span className="text-[10px] text-slate-400">
+          {formatPercent(paidPercentage, 0)} paid off
+        </span>
         <span className="text-[10px] text-slate-400">
           {fmtNative(paidAmount, debt.currency)} repaid
         </span>
@@ -154,7 +156,7 @@ function DebtMetricGrid({ debt, highInterest }: Readonly<{ debt: Debt; highInter
       {[
         {
           label: 'APR',
-          value: `${debt.interestRate.toFixed(2)}%`,
+          value: formatPercent(debt.interestRate, 2),
           icon: Percent,
           className: highInterest
             ? 'bg-rose-50 border-rose-100 text-rose-600'

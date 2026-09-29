@@ -11,7 +11,12 @@ import {
   CurrencyInput,
   EmojiPickerField,
 } from '@/components/ui';
-import { MONTH_ABBREVIATIONS, type GoalType, type SavingsAccount } from '@quro/shared';
+import {
+  getMonthAbbreviationIndex,
+  MONTH_ABBREVIATIONS,
+  type GoalType,
+  type SavingsAccount,
+} from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddGoalModal } from '../hooks';
 import { COLORS, GOAL_TYPE_META } from '../utils/goals-constants';
@@ -25,12 +30,10 @@ import type {
 
 type SetField = (key: GoalFormField, value: string) => void;
 
-const monthNames: readonly string[] = MONTH_ABBREVIATIONS;
-
 function dateStringToDeadline(dateStr: string): string {
   if (!dateStr) return '';
   const date = new Date(dateStr + 'T00:00:00Z');
-  const month = monthNames[date.getUTCMonth()];
+  const month = MONTH_ABBREVIATIONS[date.getUTCMonth()];
   const year = date.getUTCFullYear();
   return `${month} ${year}`;
 }
@@ -41,7 +44,7 @@ function deadlineToDateString(deadline: string): string {
   if (!match) return '';
   const monthStr = match[1];
   const year = match[2];
-  const month = monthNames.indexOf(monthStr);
+  const month = getMonthAbbreviationIndex(monthStr);
   if (month === -1) return '';
   const monthPad = String(month + 1).padStart(2, '0');
   return `${year}-${monthPad}-01`;
@@ -51,7 +54,7 @@ function monthsBetween(startDeadline: string, endDeadline: string): number {
   const parseDeadline = (d: string) => {
     const m = d.match(/^([A-Za-z]+)\s+(\d{4})$/);
     if (!m) return null;
-    const mo = monthNames.indexOf(m[1]);
+    const mo = getMonthAbbreviationIndex(m[1]);
     return mo === -1 ? null : { year: Number(m[2]), month: mo };
   };
   const s = parseDeadline(startDeadline);

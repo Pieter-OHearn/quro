@@ -1,6 +1,6 @@
 import { Calendar, Home, Percent, TrendingDown } from 'lucide-react';
 import { StatCard, StatsGrid } from '@/components/ui';
-import type { Mortgage as MortgageType } from '@quro/shared';
+import { formatPercent, type Mortgage as MortgageType } from '@quro/shared';
 import type { MortgageFormatFn } from '../types';
 
 const GOOD_LTV_THRESHOLD = 70;
@@ -34,13 +34,13 @@ export function MortgageStatCards({
       <StatCard
         label="Equity Built"
         value={fmt(equity)}
-        subtitle={`${((equity / mortgage.propertyValue) * 100).toFixed(0)}% of property value`}
+        subtitle={`${formatPercent((equity / mortgage.propertyValue) * 100, 0)} of property value`}
         icon={TrendingDown}
         color="indigo"
       />
       <StatCard
         label="Loan-to-Value"
-        value={`${ltv.toFixed(1)}%`}
+        value={formatPercent(ltv, 1)}
         subtitle={ltv < GOOD_LTV_THRESHOLD ? `Good — below ${GOOD_LTV_THRESHOLD}%` : 'High LTV'}
         icon={Percent}
         color="sky"
@@ -48,7 +48,7 @@ export function MortgageStatCards({
       <StatCard
         label="Capital Repaid"
         value={fmt(paid)}
-        subtitle={`${paidPct.toFixed(0)}% of original loan`}
+        subtitle={`${formatPercent(paidPct, 0)} of original loan`}
         icon={Calendar}
         color="amber"
       />

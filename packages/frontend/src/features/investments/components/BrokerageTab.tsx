@@ -15,6 +15,7 @@ import {
   type Holding,
   type HoldingPriceSyncResult,
   type HoldingTransaction,
+  formatPercent,
 } from '@quro/shared';
 import {
   DataTable,
@@ -285,7 +286,7 @@ function HoldingGainCell({ gain, gainPctHolding, holding, fmtNative }: HoldingGa
       </div>
       <p className="text-xs">
         {gainPctHolding >= 0 ? '+' : ''}
-        {gainPctHolding.toFixed(1)}%
+        {formatPercent(gainPctHolding, 1)}
       </p>
     </div>
   );
@@ -516,7 +517,7 @@ function BrokerageSummary({
           {totalGainBase >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
           <p className="font-bold">
             {totalGainBase >= 0 ? '+' : ''}
-            {fmtBase(Math.abs(totalGainBase))} ({gainPct.toFixed(1)}%)
+            {fmtBase(Math.abs(totalGainBase))} ({formatPercent(gainPct, 1)})
           </p>
         </div>
       </div>
@@ -814,7 +815,7 @@ function ClosedHoldingRealizedCell({
           </p>
         </div>
         <p className="text-xs">
-          {costBasis > 0 ? `${realizedPct >= 0 ? '+' : ''}${realizedPct.toFixed(1)}%` : '—'}
+          {costBasis > 0 ? `${realizedPct >= 0 ? '+' : ''}${formatPercent(realizedPct, 1)}` : '—'}
         </p>
       </div>
     </DataTableCell>

@@ -8,9 +8,15 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { MONTH_ABBREVIATIONS, type Goal, type GoalType } from '@quro/shared';
+import {
+  getMonthAbbreviationIndex,
+  MONTH_ABBREVIATIONS,
+  type Goal,
+  type GoalType,
+  formatPercent,
+} from '@quro/shared';
 import type { GoalMeta, GoalProgressContext, GoalStatus } from '../types';
-import { GOAL_TYPE_META, MONTHS, STATUS_META } from '../utils/goals-constants';
+import { GOAL_TYPE_META, STATUS_META } from '../utils/goals-constants';
 import {
   getGoalPct,
   getGoalStatus,
@@ -104,7 +110,7 @@ function GoalCardSavings({
         <div className="flex justify-between mb-1.5">
           <span className="text-xs text-slate-500">Progress</span>
           <span className="text-xs font-semibold" style={{ color }}>
-            {clampedPct.toFixed(0)}%
+            {formatPercent(clampedPct, 0)}
           </span>
         </div>
         <ProgressBar pct={clampedPct} color={color} />
@@ -170,7 +176,7 @@ function GoalCardSalary({
         <div className="flex justify-between mb-1.5">
           <span className="text-xs text-slate-500">Current - Target</span>
           <span className="text-xs font-semibold" style={{ color }}>
-            {clampedPct.toFixed(0)}%
+            {formatPercent(clampedPct, 0)}
           </span>
         </div>
         <ProgressBar pct={clampedPct} color={color} />
@@ -186,7 +192,7 @@ function GoalCardSalary({
         <p className="text-xs text-slate-600">
           {annualGross > 0 ? (
             <>
-              <strong>{((targetAmount / annualGross - 1) * 100).toFixed(1)}% raise</strong> -{' '}
+              <strong>{formatPercent((targetAmount / annualGross - 1) * 100, 1)} raise</strong> -{' '}
               {fmtBase(Math.max(0, targetAmount - annualGross))} gap
             </>
           ) : (
@@ -198,13 +204,11 @@ function GoalCardSalary({
   );
 }
 
-const MONTH_ABBR: readonly string[] = MONTH_ABBREVIATIONS;
-
 function buildMonthRange(startDeadline: string, endDeadline: string): string[] {
   const parse = (d: string) => {
     const m = d.match(/^([A-Za-z]+)\s+(\d{4})$/);
     if (!m) return null;
-    const mo = MONTH_ABBR.indexOf(m[1]);
+    const mo = getMonthAbbreviationIndex(m[1]);
     return mo === -1 ? null : { year: Number(m[2]), month: mo };
   };
   const s = parse(startDeadline);
@@ -262,7 +266,7 @@ function CalendarMonthGrid({
         const done = completedKeys.has(key);
         const missed = missedMonths.includes(key);
         const isFuture = key > currentKey;
-        const label = MONTH_ABBR[Number(key.split('-')[1]) - 1]?.[0] ?? '';
+        const label = MONTH_ABBREVIATIONS[Number(key.split('-')[1]) - 1]?.[0] ?? '';
         return (
           <div key={key} className="flex flex-col items-center gap-1">
             <button
@@ -288,7 +292,7 @@ function InvestHabitMonthGrid({
 }: Readonly<{ totalMonths: number; monthsCompleted: number; color: string }>) {
   return (
     <div className="grid grid-cols-12 gap-px">
-      {MONTHS.slice(0, Math.max(1, Math.min(totalMonths, 12))).map((month, index) => {
+      {MONTH_ABBREVIATIONS.slice(0, Math.max(1, Math.min(totalMonths, 12))).map((month, index) => {
         const done = index < monthsCompleted;
         return (
           <div key={month} className="flex flex-col items-center gap-1">
@@ -528,7 +532,7 @@ function GoalCardAnnual({
             Progress {goal.unit ? `(${goal.unit})` : ''}
           </span>
           <span className="text-xs font-semibold" style={{ color: barColor }}>
-            {lowerIsBetter ? `${currentAmount} -> ${targetAmount}` : `${clampedPct.toFixed(0)}%`}
+            {lowerIsBetter ? `${currentAmount} -> ${targetAmount}` : formatPercent(clampedPct, 0)}
           </span>
         </div>
         <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">

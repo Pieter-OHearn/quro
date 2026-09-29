@@ -13,7 +13,7 @@ import {
   SelectInput,
   EmojiPickerField,
 } from '@/components/ui';
-import type { SavingsAccount } from '@quro/shared';
+import { monthlyInterest, type SavingsAccount } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
 import type { DeleteSavingsAccountMode, SaveAccountInput } from '../types';
 
@@ -94,7 +94,7 @@ function InterestPreview({
   currency: string;
 }) {
   if (!balance || !rate) return null;
-  const monthly = ((parseFloat(balance) * parseFloat(rate)) / 100 / 12).toFixed(2);
+  const monthly = monthlyInterest(parseFloat(balance), parseFloat(rate)).toFixed(2);
   return (
     <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center justify-between">
       <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import { addMonthsUtc, monthEndUtc, monthStartUtc, toUtcTimestamp } from '@quro/shared';
+import { addMonthsUtc, monthEndUtc, monthStartUtc, toIsoDate, toUtcTimestamp } from '@quro/shared';
 import { Hono } from 'hono';
 import { and, eq, getTableColumns, gte, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -43,7 +43,6 @@ const app = new Hono();
 const BASE_CURRENCY = FX_BASE_CURRENCY;
 const NET_WORTH_HISTORY_MONTHS = 7;
 const ACTIVITY_LOOKBACK_MONTHS = 1;
-const ISO_DATE_LENGTH = 10;
 // Joint assets count half for each partner so the two dashboards sum to reality.
 const JOINT_WEIGHT = 0.5;
 
@@ -54,10 +53,8 @@ function toOptionalTimestamp(value: Date | string | null | undefined): number | 
 }
 
 export function getActivityCutoff(now = new Date()): string {
-  const currentMonthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  return new Date(addMonthsUtc(currentMonthStart, -ACTIVITY_LOOKBACK_MONTHS))
-    .toISOString()
-    .slice(0, ISO_DATE_LENGTH);
+  const currentMonthStart = monthStartUtc(now.getTime());
+  return toIsoDate(new Date(addMonthsUtc(currentMonthStart, -ACTIVITY_LOOKBACK_MONTHS)));
 }
 
 function formatMonthShort(monthStart: number): string {
@@ -479,8 +476,8 @@ function buildRollingMonths() {
     const cutoff = month === currentMonth ? now : monthEndUtc(month);
     months.push({
       cutoff,
-      asOfDate: new Date(cutoff).toISOString().slice(0, ISO_DATE_LENGTH),
-      snapshotDate: new Date(monthEndUtc(month)).toISOString().slice(0, ISO_DATE_LENGTH),
+      asOfDate: toIsoDate(new Date(cutoff)),
+      snapshotDate: toIsoDate(new Date(monthEndUtc(month))),
       isCurrent: month === currentMonth,
       label: formatMonthShort(month),
       year: new Date(month).getUTCFullYear(),

@@ -1,4 +1,4 @@
-import type { Payslip } from '@quro/shared';
+import { formatPercent, type Payslip } from '@quro/shared';
 import { PdfAttachmentField } from '@/components/ui';
 import { buildApiDownloadUrl, usePdfAttachmentState } from '@/lib/pdfDocuments';
 import { useDeletePayslipDocument, useUploadPayslipDocument } from '../hooks';
@@ -82,7 +82,7 @@ function PayBreakdownDetail({
             </div>
             <div className="flex items-center gap-3">
               {pct !== undefined && (
-                <span className="text-xs text-slate-400">{pct.toFixed(0)}%</span>
+                <span className="text-xs text-slate-400">{formatPercent(pct, 0)}</span>
               )}
               <span className={`text-sm font-semibold ${tc}`}>
                 {val >= 0 ? '+' : '\u2212'}

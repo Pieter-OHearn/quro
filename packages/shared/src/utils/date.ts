@@ -5,11 +5,6 @@ export function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, ISO_DATE_LENGTH);
 }
 
-/** Today's `YYYY-MM-DD` in UTC. */
-export function todayIsoDate(now: Date = new Date()): string {
-  return toIsoDate(now);
-}
-
 export function toUtcTimestamp(isoDate: string): number {
   return Date.parse(`${isoDate}T00:00:00Z`);
 }

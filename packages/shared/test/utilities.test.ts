@@ -9,7 +9,6 @@ import {
   monthsToPayoff,
   monthStartUtc,
   roundMoney,
-  sumMoney,
   toCents,
   toIsoDate,
   toUtcTimestamp,
@@ -18,7 +17,7 @@ import {
 test('money helpers work in cents', () => {
   expect(toCents(19.99)).toBe(1999);
   expect(roundMoney(0.1 + 0.2)).toBe(0.3);
-  expect(sumMoney([0.1, 0.2, 0.3])).toBe(0.6);
+  expect(Object.is(roundMoney(-0.001), 0)).toBe(true);
 });
 
 test('date helpers operate in UTC', () => {
@@ -34,4 +33,6 @@ test('finance helpers', () => {
   expect(monthsToPayoff(1200, 0, 100)).toBe(12);
   expect(monthsToPayoff(1000, 0.01, 5)).toBeNull();
   expect(formatPercent(12.345, 2)).toBe('12.35%');
+  expect(formatPercent(Number.NaN)).toBe('0.0%');
+  expect(formatPercent(-0.001)).toBe('0.0%');
 });
