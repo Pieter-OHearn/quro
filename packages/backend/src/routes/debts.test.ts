@@ -28,8 +28,8 @@ describe('debt payload validation', () => {
 
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.data.remainingBalance).toBe(14_800);
-    expect(parsed.data.notes).toBe('No early repayment penalty');
+    expect(parsed.value.remainingBalance).toBe(14_800);
+    expect(parsed.value.notes).toBe('No early repayment penalty');
   });
 
   test('rejects incoherent debt balances and dates', () => {
@@ -84,7 +84,7 @@ describe('debt payment validation and balance helpers', () => {
 
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.data.principal).toBe(360);
+    expect(parsed.value.principal).toBe(360);
     expect(computeDebtPrincipal(420, 60)).toBe(360);
   });
 

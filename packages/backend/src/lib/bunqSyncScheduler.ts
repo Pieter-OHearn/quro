@@ -1,14 +1,11 @@
+import { HOUR_MS } from '../constants/time';
 import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 
-const SECONDS_PER_MINUTE = 60;
-const MINUTES_PER_HOUR = 60;
-const MS_PER_SECOND = 1000;
 const SYNC_INTERVAL_HOURS = 1;
-const SYNC_INTERVAL_MS =
-  SYNC_INTERVAL_HOURS * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const SYNC_INTERVAL_MS = SYNC_INTERVAL_HOURS * HOUR_MS;
 
 export function startBunqSyncScheduler(): void {
   console.log('[bunq-sync] Scheduler started, interval: 1h');

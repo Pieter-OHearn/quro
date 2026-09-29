@@ -20,26 +20,16 @@ import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { publicUserColumns } from '../lib/users';
 import { changePasswordRateLimit } from '../middleware/rateLimit';
+import { err, ok, parseWholeNumber, type ParseResult } from '../lib/requestValidation';
 
 const app = new Hono();
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type ParseResult<T> = { ok: true; data: T } | { ok: false; error: string };
-
-function parseNumberValue(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isInteger(value)) return value;
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number.parseInt(value, 10);
-    return Number.isInteger(parsed) ? parsed : null;
-  }
-  return null;
-}
-
 // eslint-disable-next-line complexity
 function parseProfilePayload(payload: unknown): ParseResult<UpdateUserProfileInput> {
   if (typeof payload !== 'object' || payload === null) {
-    return { ok: false, error: 'Invalid profile payload' };
+    return err('Invalid profile payload');
   }
 
   const raw = payload as Partial<Record<keyof UpdateUserProfileInput, unknown>>;
@@ -47,16 +37,16 @@ function parseProfilePayload(payload: unknown): ParseResult<UpdateUserProfileInp
   const lastName = typeof raw.lastName === 'string' ? raw.lastName.trim() : '';
   const email = typeof raw.email === 'string' ? raw.email.toLowerCase().trim() : '';
   const location = typeof raw.location === 'string' ? raw.location.trim() : '';
-  const age = parseNumberValue(raw.age);
-  const retirementAge = parseNumberValue(raw.retirementAge);
+  const age = parseWholeNumber(raw.age);
+  const retirementAge = parseWholeNumber(raw.retirementAge);
 
-  if (!firstName) return { ok: false, error: 'First name is required' };
-  if (!lastName) return { ok: false, error: 'Last name is required' };
+  if (!firstName) return err('First name is required');
+  if (!lastName) return err('Last name is required');
   if (!email || !EMAIL_PATTERN.test(email)) {
-    return { ok: false, error: 'Enter a valid email address' };
+    return err('Enter a valid email address');
   }
   if (age === null || age < MIN_USER_AGE || age > MAX_USER_AGE) {
-    return { ok: false, error: `Age must be between ${MIN_USER_AGE} and ${MAX_USER_AGE}` };
+    return err(`Age must be between ${MIN_USER_AGE} and ${MAX_USER_AGE}`);
   }
 
   const minRetirementAge = Math.max(age + 1, MIN_RETIREMENT_AGE);
@@ -65,23 +55,17 @@ function parseProfilePayload(payload: unknown): ParseResult<UpdateUserProfileInp
     retirementAge < minRetirementAge ||
     retirementAge > MAX_RETIREMENT_AGE
   ) {
-    return {
-      ok: false,
-      error: `Retirement age must be between ${minRetirementAge} and ${MAX_RETIREMENT_AGE}`,
-    };
+    return err(`Retirement age must be between ${minRetirementAge} and ${MAX_RETIREMENT_AGE}`);
   }
 
-  return {
-    ok: true,
-    data: {
-      firstName,
-      lastName,
-      email,
-      location,
-      age,
-      retirementAge,
-    },
-  };
+  return ok({
+    firstName,
+    lastName,
+    email,
+    location,
+    age,
+    retirementAge,
+  });
 }
 
 function parseOptionalPreference<T>(
@@ -89,13 +73,13 @@ function parseOptionalPreference<T>(
   isValid: (candidate: unknown) => candidate is T,
   error: string,
 ): ParseResult<T | undefined> {
-  if (value === undefined) return { ok: true, data: undefined };
-  return isValid(value) ? { ok: true, data: value } : { ok: false, error };
+  if (value === undefined) return ok(undefined);
+  return isValid(value) ? ok(value) : err(error);
 }
 
 function parsePreferencesPayload(payload: unknown): ParseResult<UpdateUserPreferencesInput> {
   if (typeof payload !== 'object' || payload === null) {
-    return { ok: false, error: 'Invalid preferences payload' };
+    return err('Invalid preferences payload');
   }
 
   const raw = payload as Partial<Record<keyof UpdateUserPreferencesInput, unknown>>;
@@ -119,43 +103,37 @@ function parsePreferencesPayload(payload: unknown): ParseResult<UpdateUserPrefer
   if (!jurisdiction.ok) return jurisdiction;
 
   const data: UpdateUserPreferencesInput = {
-    ...(currency.data ? { baseCurrency: currency.data } : {}),
-    ...(numberFormat.data ? { numberFormat: numberFormat.data } : {}),
-    ...(jurisdiction.data ? { jurisdiction: jurisdiction.data } : {}),
+    ...(currency.value ? { baseCurrency: currency.value } : {}),
+    ...(numberFormat.value ? { numberFormat: numberFormat.value } : {}),
+    ...(jurisdiction.value ? { jurisdiction: jurisdiction.value } : {}),
   };
   if (Object.keys(data).length === 0) {
-    return { ok: false, error: 'Choose at least one preference to update' };
+    return err('Choose at least one preference to update');
   }
-  return { ok: true, data };
+  return ok(data);
 }
 
 function parsePasswordPayload(payload: unknown): ParseResult<UpdateUserPasswordInput> {
   if (typeof payload !== 'object' || payload === null) {
-    return { ok: false, error: 'Invalid password payload' };
+    return err('Invalid password payload');
   }
 
   const raw = payload as Partial<Record<keyof UpdateUserPasswordInput, unknown>>;
   const currentPassword = typeof raw.currentPassword === 'string' ? raw.currentPassword : '';
   const nextPassword = typeof raw.nextPassword === 'string' ? raw.nextPassword : '';
 
-  if (!currentPassword) return { ok: false, error: 'Current password is required' };
+  if (!currentPassword) return err('Current password is required');
   if (nextPassword.length < MIN_PASSWORD_LENGTH) {
-    return {
-      ok: false,
-      error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters`,
-    };
+    return err(`New password must be at least ${MIN_PASSWORD_LENGTH} characters`);
   }
   if (currentPassword === nextPassword) {
-    return { ok: false, error: 'New password must be different from your current password' };
+    return err('New password must be different from your current password');
   }
 
-  return {
-    ok: true,
-    data: {
-      currentPassword,
-      nextPassword,
-    },
-  };
+  return ok({
+    currentPassword,
+    nextPassword,
+  });
 }
 
 app.get('/', async (c) => {
@@ -180,7 +158,7 @@ app.put('/profile', async (c) => {
   const [existingEmailUser] = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.email, parsed.data.email), ne(users.id, authUser.id)));
+    .where(and(eq(users.email, parsed.value.email), ne(users.id, authUser.id)));
 
   if (existingEmailUser) {
     return c.json({ error: 'An account with this email already exists' }, HTTP_STATUS.CONFLICT);
@@ -189,12 +167,12 @@ app.put('/profile', async (c) => {
   const [data] = await db
     .update(users)
     .set({
-      firstName: parsed.data.firstName,
-      lastName: parsed.data.lastName,
-      email: parsed.data.email,
-      location: parsed.data.location,
-      age: parsed.data.age,
-      retirementAge: parsed.data.retirementAge,
+      firstName: parsed.value.firstName,
+      lastName: parsed.value.lastName,
+      email: parsed.value.email,
+      location: parsed.value.location,
+      age: parsed.value.age,
+      retirementAge: parsed.value.retirementAge,
     })
     .where(eq(users.id, authUser.id))
     .returning(publicUserColumns);
@@ -215,9 +193,9 @@ app.put('/preferences', async (c) => {
   }
 
   const updatePayload: Partial<typeof users.$inferInsert> = {};
-  if (parsed.data.baseCurrency) updatePayload.baseCurrency = parsed.data.baseCurrency;
-  if (parsed.data.numberFormat) updatePayload.numberFormat = parsed.data.numberFormat;
-  if (parsed.data.jurisdiction) updatePayload.jurisdiction = parsed.data.jurisdiction;
+  if (parsed.value.baseCurrency) updatePayload.baseCurrency = parsed.value.baseCurrency;
+  if (parsed.value.numberFormat) updatePayload.numberFormat = parsed.value.numberFormat;
+  if (parsed.value.jurisdiction) updatePayload.jurisdiction = parsed.value.jurisdiction;
 
   const [data] = await db
     .update(users)
@@ -250,12 +228,15 @@ app.put('/password', changePasswordRateLimit, async (c) => {
     return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
   }
 
-  const passwordIsValid = await Bun.password.verify(parsed.data.currentPassword, user.passwordHash);
+  const passwordIsValid = await Bun.password.verify(
+    parsed.value.currentPassword,
+    user.passwordHash,
+  );
   if (!passwordIsValid) {
     return c.json({ error: 'Current password is incorrect' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
-  const passwordHash = await Bun.password.hash(parsed.data.nextPassword, {
+  const passwordHash = await Bun.password.hash(parsed.value.nextPassword, {
     algorithm: 'bcrypt',
     cost: 10,
   });

@@ -11,10 +11,17 @@ import { db } from '../db/client';
 import { employments } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import {
-  isRecord,
-  parseDateString,
+  err,
+  type FieldParsers,
+  ok,
+  parseBooleanField,
   parseId,
-  readJsonBody,
+  parseOptionalDateField,
+  parsePatchFields,
+  parseRequiredFields,
+  type ParseResult,
+  parseTextField,
+  readJsonRecord,
   rejectUnknownFields,
 } from '../lib/requestValidation';
 
@@ -44,83 +51,75 @@ function toDto(row: typeof employments.$inferSelect): Employment {
   };
 }
 
-function parseOptionalDate(
-  value: unknown,
-  label: string,
-): { value: string | null } | { error: string } {
-  if (value === null || value === '') return { value: null };
-  const parsed = parseDateString(value);
-  return parsed ? { value: parsed } : { error: `${label} must be a valid ISO date` };
+const MAX_NOTICE_PERIOD_MONTHS = 24;
+
+function parseEmploymentTypeField(value: unknown): ParseResult<EmploymentType> {
+  return typeof value === 'string' && EMPLOYMENT_TYPES.includes(value as EmploymentType)
+    ? ok(value as EmploymentType)
+    : err('Invalid employment type');
+}
+
+// These keys must be sent on create; `null` or '' clears them.
+function parseNullableDateField(value: unknown, label: string): ParseResult<string | null> {
+  const error = `${label} must be a valid ISO date`;
+  return value === undefined ? err(error) : parseOptionalDateField(value, error);
+}
+
+function parseNoticePeriodField(value: unknown): ParseResult<number | null> {
+  if (value === null || value === '') return ok(null);
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= MAX_NOTICE_PERIOD_MONTHS
+    ? ok(value)
+    : err('Notice period must be 0 to 24 months');
 }
 
 // Keep create and patch validation in one strict field parser so both endpoints cannot drift.
-// eslint-disable-next-line complexity, sonarjs/cognitive-complexity
+const employmentParsers: FieldParsers<EmploymentValues> = {
+  employerName: (value) => parseTextField(value, 'Employer name is required'),
+  employmentType: parseEmploymentTypeField,
+  serviceStartDate: (value) => parseNullableDateField(value, 'Start date'),
+  endDate: (value) => parseNullableDateField(value, 'End date'),
+  noticePeriodMonths: parseNoticePeriodField,
+  isPrimary: (value) =>
+    value === undefined ? ok(undefined) : parseBooleanField(value, 'Primary must be true or false'),
+};
+
+function validateEmploymentDates(
+  data: Partial<EmploymentValues>,
+  partial: boolean,
+): ParseResult<void> {
+  if (data.serviceStartDate && data.endDate && data.endDate < data.serviceStartDate) {
+    return err('End date cannot be earlier than the start date');
+  }
+  if (!partial && data.employmentType === 'employed' && !data.serviceStartDate) {
+    return err('Start date is required for employees');
+  }
+  if (data.serviceStartDate && data.serviceStartDate > new Date().toISOString().slice(0, 10)) {
+    return err('Start date cannot be in the future');
+  }
+  return ok(undefined);
+}
+
 function parseValues(
   raw: Record<string, unknown>,
   partial: boolean,
-): { data: Partial<EmploymentValues> } | { error: string } {
+): ParseResult<Partial<EmploymentValues>> {
   const strict = rejectUnknownFields(raw, FIELDS);
-  if (!strict.ok) return { error: strict.error };
-  const data: Partial<EmploymentValues> = {};
-  if (!partial || 'employerName' in raw) {
-    if (typeof raw.employerName !== 'string' || !raw.employerName.trim()) {
-      return { error: 'Employer name is required' };
-    }
-    data.employerName = raw.employerName.trim();
-  }
-  if (!partial || 'employmentType' in raw) {
-    if (
-      typeof raw.employmentType !== 'string' ||
-      !EMPLOYMENT_TYPES.includes(raw.employmentType as EmploymentType)
-    ) {
-      return { error: 'Invalid employment type' };
-    }
-    data.employmentType = raw.employmentType as EmploymentType;
-  }
-  for (const [field, label] of [
-    ['serviceStartDate', 'Start date'],
-    ['endDate', 'End date'],
-  ] as const) {
-    if (!partial || field in raw) {
-      const parsed = parseOptionalDate(raw[field], label);
-      if ('error' in parsed) return parsed;
-      data[field] = parsed.value;
-    }
-  }
-  if (!partial || 'noticePeriodMonths' in raw) {
-    if (raw.noticePeriodMonths === null || raw.noticePeriodMonths === '') {
-      data.noticePeriodMonths = null;
-    } else if (
-      !Number.isInteger(raw.noticePeriodMonths) ||
-      Number(raw.noticePeriodMonths) < 0 ||
-      Number(raw.noticePeriodMonths) > 24
-    ) {
-      return { error: 'Notice period must be 0 to 24 months' };
-    } else {
-      data.noticePeriodMonths = Number(raw.noticePeriodMonths);
-    }
-  }
-  if ('isPrimary' in raw) {
-    if (typeof raw.isPrimary !== 'boolean') return { error: 'Primary must be true or false' };
-    data.isPrimary = raw.isPrimary;
-  }
-  if (data.serviceStartDate && data.endDate && data.endDate < data.serviceStartDate) {
-    return { error: 'End date cannot be earlier than the start date' };
-  }
-  if (!partial && data.employmentType === 'employed' && !data.serviceStartDate) {
-    return { error: 'Start date is required for employees' };
-  }
-  if (data.serviceStartDate && data.serviceStartDate > new Date().toISOString().slice(0, 10)) {
-    return { error: 'Start date cannot be in the future' };
-  }
-  return { data };
+  if (!strict.ok) return strict;
+  const parsed = partial
+    ? parsePatchFields(raw, employmentParsers)
+    : parseRequiredFields(raw, employmentParsers);
+  if (!parsed.ok) return parsed;
+  const dates = validateEmploymentDates(parsed.value, partial);
+  return dates.ok ? parsed : dates;
 }
 
 async function readPayload(request: Pick<Request, 'json'>, partial: boolean) {
-  const body = await readJsonBody(request, 'Invalid employment payload');
-  if (!body.ok || !isRecord(body.value))
-    return { error: body.ok ? 'Invalid employment payload' : body.error };
-  if (partial && Object.keys(body.value).length === 0) return { error: 'No fields provided' };
+  const body = await readJsonRecord(request, 'Invalid employment payload');
+  if (!body.ok) return body;
+  if (partial && Object.keys(body.value).length === 0) return err('No fields provided');
   return parseValues(body.value, partial);
 }
 
@@ -137,13 +136,13 @@ app.get('/', async (c) => {
 app.post('/', async (c) => {
   const user = getAuthUser(c);
   const parsed = await readPayload(c.req, false);
-  if ('error' in parsed) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
+  if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
   const data = await db.transaction(async (tx) => {
     const existing = await tx
       .select({ id: employments.id })
       .from(employments)
       .where(eq(employments.userId, user.id));
-    const isPrimary = parsed.data.isPrimary === true || existing.length === 0;
+    const isPrimary = parsed.value.isPrimary === true || existing.length === 0;
     if (isPrimary)
       await tx
         .update(employments)
@@ -153,7 +152,7 @@ app.post('/', async (c) => {
       .insert(employments)
       .values({
         userId: user.id,
-        ...(parsed.data as EmploymentValues),
+        ...(parsed.value as EmploymentValues),
         isPrimary,
         updatedAt: new Date(),
       })
@@ -168,7 +167,7 @@ app.patch('/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (!id) return c.json({ error: 'Invalid employment ID' }, HTTP_STATUS.BAD_REQUEST);
   const parsed = await readPayload(c.req, true);
-  if ('error' in parsed) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
+  if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
   // The branches preserve date, ownership, and exactly-one-primary invariants.
   // eslint-disable-next-line complexity
   const data = await db.transaction(async (tx) => {
@@ -177,8 +176,8 @@ app.patch('/:id', async (c) => {
       .from(employments)
       .where(and(eq(employments.id, id), eq(employments.userId, user.id)));
     if (!current) return null;
-    if (current.isPrimary && parsed.data.isPrimary === false) return 'primary_error' as const;
-    const merged = { ...current, ...parsed.data };
+    if (current.isPrimary && parsed.value.isPrimary === false) return 'primary_error' as const;
+    const merged = { ...current, ...parsed.value };
     if (merged.employmentType === 'employed' && !merged.serviceStartDate)
       return 'start_date_error' as const;
     if (merged.serviceStartDate && merged.endDate && merged.endDate < merged.serviceStartDate)
@@ -200,14 +199,14 @@ app.patch('/:id', async (c) => {
           .orderBy(asc(employments.id))
           .limit(1)
       : [];
-    if (parsed.data.isPrimary === true && !replacement)
+    if (parsed.value.isPrimary === true && !replacement)
       await tx
         .update(employments)
         .set({ isPrimary: false, updatedAt: new Date() })
         .where(eq(employments.userId, user.id));
     const [updated] = await tx
       .update(employments)
-      .set({ ...parsed.data, ...(replacement ? { isPrimary: false } : {}), updatedAt: new Date() })
+      .set({ ...parsed.value, ...(replacement ? { isPrimary: false } : {}), updatedAt: new Date() })
       .where(eq(employments.id, id))
       .returning();
     if (replacement)

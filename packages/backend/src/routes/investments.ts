@@ -10,7 +10,7 @@ import {
   type TickerLookupExchange,
   type TickerLookupResult,
 } from '@quro/shared';
-import { db } from '../db/client';
+import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import {
   holdings,
   holdingPriceHistory,
@@ -29,6 +29,7 @@ import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
+  type FieldParsers,
   isRecord,
   ok,
   parseBooleanField,
@@ -37,14 +38,19 @@ import {
   parseDateString,
   parseId,
   parseIntegerField,
+  parseNormalizedDecimal,
+  parseNormalizedDecimalField,
+  parseOptionalDateField,
+  parseOptionalId,
+  parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
+  type ParseResult,
   parseTextField,
+  pickPatchedValue,
   readJsonBody,
   rejectUnknownFields,
-  type FieldParsers,
-  type ParseResult,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -101,13 +107,6 @@ const INVESTMENT_PROPERTY_TYPE_KEYS = new Set([
   'rental',
 ]);
 
-function parseOptionalId(value: unknown): number | null | 'invalid' {
-  if (value == null || value === '') return null;
-  const parsed = parseId(String(value));
-  if (parsed === null) return 'invalid';
-  return parsed;
-}
-
 function parseDateOnly(value: string | null): string | null {
   return parseDateString(value);
 }
@@ -127,10 +126,6 @@ function parseHoldingIdsParam(value: string | null): number[] | null {
     parsedIds.push(parsed);
   }
   return [...new Set(parsedIds)];
-}
-
-function pickPatchedValue<T>(patchValue: T | undefined, existingValue: T): T {
-  return patchValue === undefined ? existingValue : patchValue;
 }
 
 type HoldingPriceHistoryQuery = {
@@ -219,25 +214,6 @@ type PropertyCreateRequiredPayload = Omit<
   PropertyPayload,
   'mortgage' | 'mortgageId' | 'emoji' | 'isJoint'
 >;
-
-function parseNormalizedDecimalField(
-  value: unknown,
-  error: string,
-  min = Number.NEGATIVE_INFINITY,
-): ParseResult<number> {
-  const parsed = toNormalizedDecimal(value);
-  return parsed === null || parsed < min ? err(error) : ok(parsed);
-}
-
-function parseOptionalNormalizedDecimalField(
-  value: unknown,
-  error: string,
-  min = Number.NEGATIVE_INFINITY,
-): ParseResult<number | null> {
-  if (value == null || value === '') return ok(null);
-  const parsed = toNormalizedDecimal(value);
-  return parsed === null || parsed < min ? err(error) : ok(parsed);
-}
 
 function parseOptionalTimestampField(value: unknown, error: string): ParseResult<Date | null> {
   if (value == null || value === '') return ok(null);
@@ -369,12 +345,6 @@ function parseHoldingCreate(body: unknown): ParseResult<HoldingCreatePayload> {
   });
 }
 
-function parseOptionalDateField(value: unknown, error: string): ParseResult<string | null> {
-  if (value == null || value === '') return ok(null);
-  const parsed = parseDateString(value);
-  return parsed ? ok(parsed) : err(error);
-}
-
 function parseHoldingPatch(body: unknown): ParseResult<Partial<HoldingPayload>> {
   if (!isRecord(body)) return err('Invalid holding payload');
   const strictCheck = rejectUnknownFields(body, HOLDING_FIELDS);
@@ -493,7 +463,7 @@ function validatePropertyRepaymentPayload(
   payload: PropertyTransactionPayload,
   property: typeof properties.$inferSelect,
 ): string | null {
-  if ((toNormalizedDecimal(property.mortgage) ?? 0) <= 0 && property.mortgageId == null) {
+  if ((parseNormalizedDecimal(property.mortgage) ?? 0) <= 0 && property.mortgageId == null) {
     return 'Property is not linked to a mortgage';
   }
 
@@ -713,30 +683,6 @@ function parseTimestamp(value: unknown): Date | null {
   return parsed;
 }
 
-function toNormalizedDecimal(value: unknown): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  const hasComma = trimmed.includes(',');
-  const hasDot = trimmed.includes('.');
-  const compact = trimmed.replace(/\s+/g, '');
-  let normalized = compact;
-
-  if (hasComma && hasDot) {
-    normalized =
-      compact.lastIndexOf(',') > compact.lastIndexOf('.')
-        ? compact.replaceAll('.', '').replace(',', '.')
-        : compact.replaceAll(',', '');
-  } else if (hasComma) {
-    normalized = compact.replace(',', '.');
-  }
-
-  const parsed = Number.parseFloat(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function parseHoldingIdsBody(body: unknown): ParseResult<number[] | undefined> {
   if (!isRecord(body)) return err('Invalid holdingIds payload');
   const strictCheck = rejectUnknownFields(body, ['holdingIds']);
@@ -806,9 +752,6 @@ async function getOwnedHoldingTransaction(userId: number, transactionId: number)
     .where(and(eq(holdingTransactions.id, transactionId), eq(holdingTransactions.userId, userId)));
   return transaction ?? null;
 }
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type DbExecutor = typeof db | DbTransaction;
 
 async function getAccessibleProperty(
   userId: number,
@@ -1006,7 +949,7 @@ async function resolvePropertyMortgagePatch(params: {
   const nextMortgageId = pickPatchedValue(params.patch.mortgageId, params.existing.mortgageId);
   const requestedMortgageBalance = pickPatchedValue(
     params.patch.mortgage,
-    toNormalizedDecimal(params.existing.mortgage) ?? 0,
+    parseNormalizedDecimal(params.existing.mortgage) ?? 0,
   );
 
   if (nextMortgageId === null) {
@@ -1042,7 +985,7 @@ async function resolvePropertyMortgagePatch(params: {
     ok: true,
     value: {
       mortgageId: nextMortgageId,
-      mortgage: toNormalizedDecimal(mortgage.outstandingBalance) ?? 0,
+      mortgage: parseNormalizedDecimal(mortgage.outstandingBalance) ?? 0,
     },
   };
 }
@@ -1436,7 +1379,7 @@ app.post('/properties', async (c) => {
       return c.json({ error: 'Mortgage already linked to another property' }, HTTP_STATUS.CONFLICT);
     }
 
-    mortgageBalance = toNormalizedDecimal(mortgage.outstandingBalance) ?? 0;
+    mortgageBalance = parseNormalizedDecimal(mortgage.outstandingBalance) ?? 0;
     // A property linked to a joint mortgage is joint too (and vice versa).
     isJoint = isJoint || mortgage.isJoint;
   }

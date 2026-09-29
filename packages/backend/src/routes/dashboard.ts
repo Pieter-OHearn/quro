@@ -36,6 +36,7 @@ import {
   type DerivedAllocationSummary,
 } from '../lib/netWorth';
 import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
+import { toNumberOrZero } from '../lib/numbers';
 
 const app = new Hono();
 const BASE_CURRENCY = FX_BASE_CURRENCY;
@@ -44,15 +45,6 @@ const ACTIVITY_LOOKBACK_MONTHS = 1;
 const ISO_DATE_LENGTH = 10;
 // Joint assets count half for each partner so the two dashboards sum to reality.
 const JOINT_WEIGHT = 0.5;
-
-const toNumber = (value: unknown): number => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (typeof value === 'string') {
-    const parsed = parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-};
 
 function toUtcTimestamp(value: string): number {
   return Date.parse(`${value}T00:00:00Z`);
@@ -249,7 +241,7 @@ function weighJointSavingsAccounts(
   rows: ReadonlyArray<typeof savingsAccounts.$inferSelect>,
 ): HistoricalSavingsAccountRow[] {
   return rows.map((row) =>
-    row.isJoint ? { ...row, balance: toNumber(row.balance) * JOINT_WEIGHT } : row,
+    row.isJoint ? { ...row, balance: toNumberOrZero(row.balance) * JOINT_WEIGHT } : row,
   );
 }
 
@@ -259,7 +251,7 @@ function weighJointSavingsTransactions(
 ): SavingsTransactionRow[] {
   return rows.map((row) =>
     jointAccountIds.has(row.accountId)
-      ? { ...row, amount: toNumber(row.amount) * JOINT_WEIGHT }
+      ? { ...row, amount: toNumberOrZero(row.amount) * JOINT_WEIGHT }
       : row,
   );
 }
@@ -271,9 +263,9 @@ function weighJointProperties(
     row.isJoint
       ? {
           ...row,
-          purchasePrice: toNumber(row.purchasePrice) * JOINT_WEIGHT,
-          currentValue: toNumber(row.currentValue) * JOINT_WEIGHT,
-          mortgage: toNumber(row.mortgage) * JOINT_WEIGHT,
+          purchasePrice: toNumberOrZero(row.purchasePrice) * JOINT_WEIGHT,
+          currentValue: toNumberOrZero(row.currentValue) * JOINT_WEIGHT,
+          mortgage: toNumberOrZero(row.mortgage) * JOINT_WEIGHT,
         }
       : row,
   );
@@ -287,9 +279,9 @@ function weighJointPropertyTransactions(
     jointPropertyIds.has(row.propertyId)
       ? {
           ...row,
-          amount: toNumber(row.amount) * JOINT_WEIGHT,
-          interest: row.interest == null ? null : toNumber(row.interest) * JOINT_WEIGHT,
-          principal: row.principal == null ? null : toNumber(row.principal) * JOINT_WEIGHT,
+          amount: toNumberOrZero(row.amount) * JOINT_WEIGHT,
+          interest: row.interest == null ? null : toNumberOrZero(row.interest) * JOINT_WEIGHT,
+          principal: row.principal == null ? null : toNumberOrZero(row.principal) * JOINT_WEIGHT,
         }
       : row,
   );
@@ -300,7 +292,7 @@ function weighJointMortgages(
 ): Array<MortgageRow & { isJoint: boolean }> {
   return rows.map((row) =>
     row.isJoint
-      ? { ...row, outstandingBalance: toNumber(row.outstandingBalance) * JOINT_WEIGHT }
+      ? { ...row, outstandingBalance: toNumberOrZero(row.outstandingBalance) * JOINT_WEIGHT }
       : row,
   );
 }
@@ -365,7 +357,7 @@ function buildDatedSavingsTransactions(
     .map((transaction) => ({
       accountId: transaction.accountId,
       type: transaction.type as DatedSavingsTransaction['type'],
-      amount: toNumber(transaction.amount),
+      amount: toNumberOrZero(transaction.amount),
       timestamp: toUtcTimestamp(transaction.date),
     }))
     .filter((transaction) => Number.isFinite(transaction.timestamp))
@@ -380,8 +372,8 @@ function buildDatedHoldingTransactions(
     .map((transaction) => ({
       holdingId: transaction.holdingId,
       type: transaction.type as DatedHoldingTransaction['type'],
-      shares: toNumber(transaction.shares),
-      price: toNumber(transaction.price),
+      shares: toNumberOrZero(transaction.shares),
+      price: toNumberOrZero(transaction.price),
       timestamp: toUtcTimestamp(transaction.date),
     }))
     .filter((transaction) => Number.isFinite(transaction.timestamp))
@@ -396,9 +388,9 @@ function buildDatedPropertyTransactions(
     .map((transaction) => ({
       propertyId: transaction.propertyId,
       type: transaction.type as DatedPropertyTransaction['type'],
-      amount: toNumber(transaction.amount),
-      interest: transaction.interest == null ? null : toNumber(transaction.interest),
-      principal: transaction.principal == null ? null : toNumber(transaction.principal),
+      amount: toNumberOrZero(transaction.amount),
+      interest: transaction.interest == null ? null : toNumberOrZero(transaction.interest),
+      principal: transaction.principal == null ? null : toNumberOrZero(transaction.principal),
       timestamp: toUtcTimestamp(transaction.date),
     }))
     .filter((transaction) => Number.isFinite(transaction.timestamp))
@@ -419,8 +411,8 @@ function buildDatedPensionTransactions(
     .map((transaction) => ({
       potId: transaction.potId,
       type: transaction.type as DatedPensionTransaction['type'],
-      amount: toNumber(transaction.amount),
-      taxAmount: toNumber(transaction.taxAmount),
+      amount: toNumberOrZero(transaction.amount),
+      taxAmount: toNumberOrZero(transaction.taxAmount),
       timestamp: toUtcTimestamp(transaction.date),
     }))
     .filter((transaction) => Number.isFinite(transaction.timestamp))
@@ -431,9 +423,9 @@ function buildDatedDebtPayments(payments: readonly DebtPaymentRow[]): DatedDebtP
   return payments
     .map((payment) => ({
       debtId: payment.debtId,
-      amount: toNumber(payment.amount),
-      principal: toNumber(payment.principal),
-      interest: toNumber(payment.interest),
+      amount: toNumberOrZero(payment.amount),
+      principal: toNumberOrZero(payment.principal),
+      interest: toNumberOrZero(payment.interest),
       timestamp: toUtcTimestamp(payment.date),
     }))
     .filter((payment) => Number.isFinite(payment.timestamp))
@@ -448,7 +440,7 @@ function computeDebtLiabilitiesAtCutoff(
 ): number {
   return debts.reduce((sum, debt) => {
     if (isArchivedAtCutoff(debt, cutoff)) return sum;
-    let balance = toNumber(debt.remainingBalance);
+    let balance = toNumberOrZero(debt.remainingBalance);
     for (const payment of paymentsByDebtId.get(debt.id) ?? []) {
       if (payment.timestamp <= cutoff) continue;
       balance += payment.principal;
@@ -525,7 +517,7 @@ function computeSavingsAtCutoff(
   return accounts.reduce((sum, account) => {
     if (isArchivedAtCutoff(account, cutoff)) return sum;
 
-    let balance = toNumber(account.balance);
+    let balance = toNumberOrZero(account.balance);
     for (const transaction of txnsByAccountId.get(account.id) ?? []) {
       if (transaction.timestamp <= cutoff) continue;
       if (transaction.type === 'withdrawal') balance += transaction.amount;
@@ -548,7 +540,7 @@ function computePensionAtCutoff(
 ): number {
   return pots.reduce((sum, pot) => {
     if (isArchivedAtCutoff(pot, cutoff)) return sum;
-    let balance = toNumber(pot.balance);
+    let balance = toNumberOrZero(pot.balance);
     for (const transaction of txnsByPotId.get(pot.id) ?? []) {
       if (transaction.timestamp <= cutoff) continue;
       balance -= computePensionTxnDelta(transaction);
@@ -598,7 +590,7 @@ function computeHoldingAtCutoff(
     latestTransactionPrice = transaction.price;
   }
   const historicalPrice = resolveHistoricalHoldingPrice(prices, cutoffDate);
-  const price = historicalPrice ?? latestTransactionPrice ?? toNumber(holding.currentPrice);
+  const price = historicalPrice ?? latestTransactionPrice ?? toNumberOrZero(holding.currentPrice);
   return {
     value: convertToBase(Math.max(0, shares) * price, holding.currency, rates),
     isEstimated: historicalPrice === null && shares > 0,
@@ -612,7 +604,7 @@ function buildActiveMortgageBalanceAtCutoff(
   const balances = new Map<number, number>();
   for (const mortgage of userMortgages) {
     if (isArchivedAtCutoff(mortgage, cutoff)) continue;
-    balances.set(mortgage.id, toNumber(mortgage.outstandingBalance));
+    balances.set(mortgage.id, toNumberOrZero(mortgage.outstandingBalance));
   }
   return balances;
 }
@@ -632,8 +624,8 @@ function computePropertyEquityAtCutoff(
       (transaction) => transaction.type === 'valuation',
     );
     let propertyValue = hasValuationTransaction
-      ? toNumber(property.purchasePrice)
-      : toNumber(property.currentValue);
+      ? toNumberOrZero(property.purchasePrice)
+      : toNumberOrZero(property.currentValue);
 
     for (const transaction of transactions) {
       if (transaction.timestamp > cutoff) break;
@@ -645,7 +637,7 @@ function computePropertyEquityAtCutoff(
   function resolveBaseMortgageBalance(property: PropertyRow): number {
     // Linked mortgages are the source of truth; an archived one (absent from
     // the active set at this cutoff) leaves the property unencumbered.
-    if (property.mortgageId == null) return toNumber(property.mortgage);
+    if (property.mortgageId == null) return toNumberOrZero(property.mortgage);
     return mortgageBalanceById.get(property.mortgageId) ?? 0;
   }
 
@@ -882,7 +874,7 @@ function buildNetWorthHistoryPoint(
       id: index + 1,
       month: month.label,
       year: month.year,
-      totalValue: toNumber(snapshot.totalValue),
+      totalValue: toNumberOrZero(snapshot.totalValue),
       currency: snapshot.baseCurrency,
       isEstimated: snapshot.isEstimated,
     };
@@ -1015,7 +1007,7 @@ function mapSavingsTxn(
     return {
       name: row.note || 'Savings interest',
       type: 'income' as const,
-      amount: Math.abs(toNumber(row.amount)),
+      amount: Math.abs(toNumberOrZero(row.amount)),
       date: row.date,
       category: 'Savings',
       currency,
@@ -1026,7 +1018,9 @@ function mapSavingsTxn(
   return {
     name: row.note || (isDeposit ? 'Savings deposit' : 'Savings withdrawal'),
     type: 'transfer' as const,
-    amount: isDeposit ? -Math.abs(toNumber(row.amount)) : Math.abs(toNumber(row.amount)),
+    amount: isDeposit
+      ? -Math.abs(toNumberOrZero(row.amount))
+      : Math.abs(toNumberOrZero(row.amount)),
     date: row.date,
     category: 'Savings',
     currency,
@@ -1040,14 +1034,14 @@ function mapHoldingTxn(row: HoldingActivityRow, currencyByHoldingId: ReadonlyMap
     return {
       name: row.note || 'Dividend',
       type: 'income' as const,
-      amount: Math.abs(toNumber(row.price)),
+      amount: Math.abs(toNumberOrZero(row.price)),
       date: row.date,
       category: 'Investment',
       currency,
       isJoint: false,
     };
   }
-  const gross = toNumber(row.shares) * toNumber(row.price);
+  const gross = toNumberOrZero(row.shares) * toNumberOrZero(row.price);
   const isBuy = row.type === 'buy';
   return {
     name: row.note || (isBuy ? 'Investment buy' : 'Investment sell'),
@@ -1069,7 +1063,7 @@ function mapPropertyTxn(
   return {
     name: row.note || (isIncome ? 'Rent income' : 'Property expense'),
     type: isIncome ? ('income' as const) : ('expense' as const),
-    amount: isIncome ? Math.abs(toNumber(row.amount)) : -Math.abs(toNumber(row.amount)),
+    amount: isIncome ? Math.abs(toNumberOrZero(row.amount)) : -Math.abs(toNumberOrZero(row.amount)),
     date: row.date,
     category: 'Property',
     currency,
@@ -1081,7 +1075,7 @@ function mapPayslipActivity(row: PayslipActivityRow) {
   return {
     name: `Salary ${row.month}`,
     type: 'income' as const,
-    amount: toNumber(row.net) + toNumber(row.bonus),
+    amount: toNumberOrZero(row.net) + toNumberOrZero(row.bonus),
     date: row.date,
     category: 'Salary',
     currency: row.currency,
@@ -1093,7 +1087,7 @@ function mapBudgetActivity(row: BudgetActivityRow) {
   return {
     name: row.description,
     type: 'expense' as const,
-    amount: -Math.abs(toNumber(row.amount)),
+    amount: -Math.abs(toNumberOrZero(row.amount)),
     date: row.date,
     category: 'Budget',
     currency: BASE_CURRENCY,
@@ -1109,7 +1103,7 @@ function mapMortgageTxn(
   return {
     name: row.note || 'Mortgage repayment',
     type: 'expense' as const,
-    amount: -Math.abs(toNumber(row.amount)),
+    amount: -Math.abs(toNumberOrZero(row.amount)),
     date: row.date,
     category: 'Mortgage',
     currency,
@@ -1121,7 +1115,7 @@ function mapDebtPayment(row: DebtActivityRow, debtCurrencyById: ReadonlyMap<numb
   return {
     name: row.note || 'Debt payment',
     type: 'expense' as const,
-    amount: -Math.abs(toNumber(row.amount)),
+    amount: -Math.abs(toNumberOrZero(row.amount)),
     date: row.date,
     category: 'Debt',
     currency: resolveCurrency(debtCurrencyById, row.debtId),
@@ -1133,8 +1127,8 @@ function mapPensionTxn(
   row: PensionActivityRow,
   pensionCurrencyByPotId: ReadonlyMap<number, string>,
 ) {
-  const amount = toNumber(row.amount);
-  const taxAmount = toNumber(row.taxAmount);
+  const amount = toNumberOrZero(row.amount);
+  const taxAmount = toNumberOrZero(row.taxAmount);
   const currency = resolveCurrency(pensionCurrencyByPotId, row.potId);
 
   if (row.type === 'contribution') {

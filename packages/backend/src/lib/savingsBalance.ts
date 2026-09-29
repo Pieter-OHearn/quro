@@ -1,17 +1,12 @@
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { savingsAccounts } from '../db/schema';
-import { parseNumber } from './requestValidation';
+import { toNumberOrZero } from './numbers';
 
 type SavingsBalanceDb = Pick<typeof db, 'update'>;
 
-export function toFiniteNumber(value: unknown): number {
-  const parsed = parseNumber(value);
-  return parsed ?? 0;
-}
-
 export function toSignedSavingsAmount(type: unknown, amount: unknown): number {
-  const absoluteAmount = Math.abs(toFiniteNumber(amount));
+  const absoluteAmount = Math.abs(toNumberOrZero(amount));
   return type === 'withdrawal' ? -absoluteAmount : absoluteAmount;
 }
 

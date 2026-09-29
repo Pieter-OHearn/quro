@@ -8,7 +8,7 @@ import {
   type SavingsTransactionType,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import {
@@ -19,31 +19,28 @@ import {
 } from '../lib/jurisdictions/bankingEntities';
 import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
-import {
-  toFiniteNumber,
-  toSignedSavingsAmount,
-  updateSavingsAccountBalanceByDelta,
-} from '../lib/savingsBalance';
+import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from '../lib/savingsBalance';
 import {
   err,
+  type FieldParsers,
+  isRecord,
   ok,
   parseBooleanField,
   parseCurrencyField,
   parseDateField,
   parseId,
   parseIntegerField,
-  isRecord,
-  parseNumber,
   parseNumberField,
   parseOptionalTextField,
   parsePatchFields,
+  parsePositiveNumberField,
   parseRequiredFields,
+  type ParseResult,
   parseTextField,
   readJsonBody,
   rejectUnknownFields,
-  type FieldParsers,
-  type ParseResult,
 } from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
 
 const app = new Hono();
 
@@ -125,8 +122,6 @@ function parseBankingEntityConfirmation(
 
 type SavingsAccountInsert = typeof savingsAccounts.$inferInsert;
 type SavingsTransactionInsert = typeof savingsTransactions.$inferInsert;
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 function parseSavingsAccountTypeField(value: unknown): ParseResult<SavingsAccountType> {
   return typeof value === 'string' && SAVINGS_ACCOUNT_TYPES.includes(value as SavingsAccountType)
     ? ok(value as SavingsAccountType)
@@ -138,11 +133,6 @@ function parseSavingsTransactionTypeField(value: unknown): ParseResult<SavingsTr
     SAVINGS_TRANSACTION_TYPES.includes(value as SavingsTransactionType)
     ? ok(value as SavingsTransactionType)
     : err('Invalid transaction type');
-}
-
-function parsePositiveNumberField(value: unknown, error: string): ParseResult<number> {
-  const parsed = parseNumber(value);
-  return parsed === null || parsed <= 0 ? err(error) : ok(parsed);
 }
 
 const savingsAccountParsers: FieldParsers<SavingsAccountPayload> = {
@@ -351,7 +341,7 @@ function resolveNextSavingsTransactionState(
   return {
     accountId: patch.accountId ?? existing.accountId,
     type: patch.type ?? existing.type,
-    amount: patch.amount ?? toFiniteNumber(existing.amount),
+    amount: patch.amount ?? toNumberOrZero(existing.amount),
   };
 }
 

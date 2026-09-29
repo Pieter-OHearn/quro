@@ -8,7 +8,7 @@ import {
   type MortgageRepaymentType,
   type MortgageTransactionType,
 } from '@quro/shared';
-import { db } from '../db/client';
+import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
 import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
@@ -17,6 +17,7 @@ import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
 import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
+  type FieldParsers,
   isRecord,
   ok,
   parseBooleanField,
@@ -24,14 +25,18 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  parseNormalizedDecimalField,
+  parseNumber,
+  parseOptionalId,
+  parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
+  type ParseResult,
   parseTextField,
+  pickPatchedValue,
   readJsonBody,
   rejectUnknownFields,
-  type FieldParsers,
-  type ParseResult,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -96,17 +101,6 @@ type MortgageTransactionPayload = {
   fixedYears: number | null;
 };
 
-function parseOptionalId(value: unknown): number | null | 'invalid' {
-  if (value == null || value === '') return null;
-  const parsed = parseId(String(value));
-  if (parsed === null) return 'invalid';
-  return parsed;
-}
-
-function pickPatchedValue<T, U>(patchValue: T | undefined, existingValue: U): T | U {
-  return patchValue === undefined ? existingValue : patchValue;
-}
-
 type LinkedProperty = {
   id: number;
   userId: number | null;
@@ -116,30 +110,6 @@ type LinkedProperty = {
   mortgageId: number | null;
   isJoint: boolean;
 };
-
-function toFiniteNumber(value: unknown): number | null {
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parseNormalizedDecimalField(
-  value: unknown,
-  error: string,
-  min = Number.NEGATIVE_INFINITY,
-): ParseResult<number> {
-  const parsed = toFiniteNumber(value);
-  return parsed === null || parsed < min ? err(error) : ok(parsed);
-}
-
-function parseOptionalNormalizedDecimalField(
-  value: unknown,
-  error: string,
-  min = Number.NEGATIVE_INFINITY,
-): ParseResult<number | null> {
-  if (value == null || value === '') return ok(null);
-  const parsed = toFiniteNumber(value);
-  return parsed === null || parsed < min ? err(error) : ok(parsed);
-}
 
 function parseMortgageRateTypeField(value: unknown): ParseResult<MortgageRateType> {
   if (typeof value !== 'string') return err('Invalid mortgage rate type');
@@ -294,9 +264,6 @@ async function resolveLinkedProperty(
   if (!result.ok) return { ok: false, error: result.error, status: result.status };
   return { ok: true, nextId, property: result.property };
 }
-
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type DbExecutor = typeof db | DbTransaction;
 
 const ISO_DATE_PART_LENGTH = 10;
 
@@ -670,7 +637,7 @@ function toMortgageValues(
     currency: property.currency as CurrencyCode,
     originalAmount: payload.originalAmount,
     outstandingBalance: payload.outstandingBalance,
-    propertyValue: toFiniteNumber(property.currentValue) ?? payload.propertyValue,
+    propertyValue: parseNumber(property.currentValue) ?? payload.propertyValue,
     monthlyPayment: payload.monthlyPayment,
     interestRate: payload.interestRate,
     rateType: payload.rateType,
@@ -770,7 +737,7 @@ app.post('/', async (c) => {
   const propertyResult = await fetchLinkedProperty(user.id, partnerId, linkedPropertyId.value, 0);
   if (!propertyResult.ok) return c.json({ error: propertyResult.error }, propertyResult.status);
   const property = propertyResult.property;
-  const propertyValue = toFiniteNumber(property.currentValue);
+  const propertyValue = parseNumber(property.currentValue);
   if (propertyValue === null || propertyValue <= 0) {
     return c.json({ error: 'Property value must be greater than zero' }, HTTP_STATUS.BAD_REQUEST);
   }

@@ -8,39 +8,33 @@ import {
   type ExpenseClass,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { hasPostgresErrorCode } from '../lib/postgresErrors';
+import { isForeignKeyViolation } from '../lib/postgresErrors';
 import { CATEGORY_PRESETS } from '../services/bunqCategoryRules';
 import {
   err,
+  type FieldParsers,
+  isRecord,
   ok,
   parseDateField,
   parseId,
   parseIntegerField,
-  isRecord,
-  parseNumber,
   parseNumberField,
   parsePatchFields,
+  parsePositiveNumberField,
   parseRequiredFields,
+  type ParseResult,
   parseTextField,
   readJsonBody,
   rejectUnknownFields,
-  type FieldParsers,
-  type ParseResult,
 } from '../lib/requestValidation';
 
 const app = new Hono();
 const MIN_BUDGET_YEAR = 2000;
 const MAX_BUDGET_YEAR = 9999;
 const DEFAULT_TRANSACTION_LIMIT = 100;
-const PG_FOREIGN_KEY_VIOLATION = '23503';
-
-function isForeignKeyViolation(error: unknown): boolean {
-  return hasPostgresErrorCode(error, PG_FOREIGN_KEY_VIOLATION);
-}
-
 const BUDGET_CATEGORY_FIELDS = [
   'name',
   'emoji',
@@ -101,15 +95,8 @@ type BudgetTransactionPayload = {
 
 type BudgetCategoryInsert = typeof budgetCategories.$inferInsert;
 type BudgetTransactionInsert = typeof budgetTransactions.$inferInsert;
-type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 function parseBudgetMonthField(value: unknown): ParseResult<BudgetMonth> {
   return isBudgetMonth(value) ? ok(value) : err('Invalid month');
-}
-
-function parsePositiveNumberField(value: unknown, error: string): ParseResult<number> {
-  const parsed = parseNumber(value);
-  return parsed === null || parsed <= 0 ? err(error) : ok(parsed);
 }
 
 const budgetCategoryParsers: FieldParsers<BudgetCategoryPayload> = {

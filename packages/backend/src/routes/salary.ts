@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { and, eq, gte, isNull, or } from 'drizzle-orm';
+import type { CurrencyCode } from '@quro/shared';
 import { db } from '../db/client';
 import { employments, payslips } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
@@ -18,26 +19,30 @@ import {
   uploadPdfFile,
   validateUploadedPdf,
 } from '../lib/pdfDocuments';
-import { parseId, readJsonBody } from '../lib/requestValidation';
+import {
+  err,
+  type FieldParsers,
+  ok,
+  parseCurrencyField,
+  parseDateField,
+  parseId,
+  parseNumberField,
+  parsePatchFields,
+  parseRequiredFields,
+  type ParseResult,
+  parseTextField,
+  parseWholeNumber,
+  readJsonRecord,
+  rejectUnknownFields,
+} from '../lib/requestValidation';
+import { toNumberOrZero } from '../lib/numbers';
 import { getS3ObjectBytes } from '../lib/s3';
 
 const app = new Hono();
 
-type CurrencyCode = 'EUR' | 'GBP' | 'USD' | 'AUD' | 'NZD' | 'CAD' | 'CHF' | 'SGD';
-
 const DATE_YEAR_LENGTH = 4;
 const ISO_DATE_LENGTH = 10;
 const DECIMAL_RADIX = 10;
-const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
-const CURRENCY_SET = new Set<CurrencyCode>(CURRENCY_CODES);
-
-type ParseOk<T> = { ok: true; value: T };
-type ParseErr = { ok: false; error: string };
-type ParseResult<T> = ParseOk<T> | ParseErr;
-type FieldParsers<T extends object> = {
-  [K in keyof T]: (value: unknown) => ParseResult<T[K]>;
-};
 
 type PayslipInput = {
   employmentId: number | null;
@@ -65,142 +70,31 @@ const PAYSLIP_FIELDS = [
   'currency',
 ] as const;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const parseNumber = (value: unknown): number | null => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const parseString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim() ? value.trim() : null;
-
-const parseDateString = (value: unknown): string | null => {
-  const parsed = parseString(value);
-  if (!parsed || !ISO_DATE_REGEX.test(parsed)) return null;
-  const candidate = new Date(`${parsed}T00:00:00Z`);
-  if (Number.isNaN(candidate.getTime())) return null;
-  return candidate.toISOString().slice(0, ISO_DATE_LENGTH) === parsed ? parsed : null;
-};
-
-function parseCurrency(value: unknown): CurrencyCode | null {
-  if (typeof value !== 'string' || !CURRENCY_SET.has(value as CurrencyCode)) return null;
-  return value as CurrencyCode;
-}
-
-function rejectUnknownFields(
-  body: Record<string, unknown>,
-  allowed: ReadonlyArray<string>,
-): ParseResult<void> {
-  const allowedKeys = new Set(['userId', ...allowed]);
-  for (const key of Object.keys(body)) {
-    if (!allowedKeys.has(key)) {
-      return { ok: false, error: `Unknown field: ${key}` };
-    }
-  }
-  return { ok: true, value: undefined };
-}
-
-const ok = <T>(value: T): ParseOk<T> => ({ ok: true, value });
-const err = (error: string): ParseErr => ({ ok: false, error });
-
-function parseRequiredFields<T extends object>(
-  body: Record<string, unknown>,
-  parsers: FieldParsers<T>,
-): ParseResult<T> {
-  const parsed: Partial<T> = {};
-  for (const key of Object.keys(parsers) as Array<keyof T>) {
-    const result = parsers[key](body[key as string]);
-    if (!result.ok) return result;
-    parsed[key] = result.value;
-  }
-  return ok(parsed as T);
-}
-
-function parsePatchFields<T extends object>(
-  body: Record<string, unknown>,
-  parsers: FieldParsers<T>,
-): ParseResult<Partial<T>> {
-  const patch: Partial<T> = {};
-  for (const key of Object.keys(parsers) as Array<keyof T>) {
-    if (!((key as string) in body)) continue;
-    const result = parsers[key](body[key as string]);
-    if (!result.ok) return result;
-    patch[key] = result.value;
-  }
-  return ok(patch);
-}
-
-const parseTextField = (value: unknown, error: string): ParseResult<string> => {
-  const parsed = parseString(value);
-  return parsed ? ok(parsed) : err(error);
-};
-
-const parseDateField = (value: unknown, error: string): ParseResult<string> => {
-  const parsed = parseDateString(value);
-  return parsed ? ok(parsed) : err(error);
-};
-
-const parseNumericField = (
-  value: unknown,
-  error: string,
-  min = Number.NEGATIVE_INFINITY,
-): ParseResult<number> => {
-  const parsed = parseNumber(value);
-  if (parsed === null || parsed < min) return err(error);
-  return ok(parsed);
-};
-
-const parseNullableNumericField = (
-  value: unknown,
-  error: string,
-  min = Number.NEGATIVE_INFINITY,
-): ParseResult<number | null> => {
-  if (value == null) return ok(null);
-  const parsed = parseNumber(value);
-  if (parsed === null || parsed < min) return err(error);
-  return ok(parsed);
-};
-
-const parseCurrencyField = (value: unknown): ParseResult<CurrencyCode> => {
-  const currency = parseCurrency(value);
-  return currency ? ok(currency) : err('Invalid currency');
-};
-
-const parseEmploymentIdField = (value: unknown): ParseResult<number | null> => {
+function parseEmploymentIdField(value: unknown): ParseResult<number | null> {
   if (value == null || value === '') return ok(null);
-  const parsed = parseNumber(value);
-  return parsed !== null && Number.isInteger(parsed) && parsed > 0
-    ? ok(parsed)
-    : err('Invalid employment');
-};
+  const parsed = parseWholeNumber(value);
+  return parsed !== null && parsed > 0 ? ok(parsed) : err('Invalid employment');
+}
 
 const payslipFieldParsers: FieldParsers<PayslipInput> = {
   employmentId: parseEmploymentIdField,
   month: (value) => parseTextField(value, 'Invalid month'),
   date: (value) => parseDateField(value, 'Invalid date (expected YYYY-MM-DD)'),
-  gross: (value) => parseNumericField(value, 'Invalid gross', 0),
-  tax: (value) => parseNumericField(value, 'Invalid tax', 0),
-  pension: (value) => parseNumericField(value, 'Invalid pension', 0),
-  net: (value) => parseNumericField(value, 'Invalid net', 0),
-  bonus: (value) => parseNullableNumericField(value, 'Invalid bonus', 0),
+  gross: (value) => parseNumberField(value, 'Invalid gross', 0),
+  tax: (value) => parseNumberField(value, 'Invalid tax', 0),
+  pension: (value) => parseNumberField(value, 'Invalid pension', 0),
+  net: (value) => parseNumberField(value, 'Invalid net', 0),
+  bonus: (value) => (value == null ? ok(null) : parseNumberField(value, 'Invalid bonus', 0)),
   currency: parseCurrencyField,
 };
 
-function parsePayslipCreate(body: unknown): ParseResult<PayslipInput> {
-  if (!isRecord(body)) return err('Invalid payslip payload');
+function parsePayslipCreate(body: Record<string, unknown>): ParseResult<PayslipInput> {
   const strictCheck = rejectUnknownFields(body, PAYSLIP_FIELDS);
   if (!strictCheck.ok) return strictCheck;
   return parseRequiredFields(body, payslipFieldParsers);
 }
 
-function parsePayslipPatch(body: unknown): ParseResult<Partial<PayslipInput>> {
-  if (!isRecord(body)) return err('Invalid payslip payload');
+function parsePayslipPatch(body: Record<string, unknown>): ParseResult<Partial<PayslipInput>> {
   const strictCheck = rejectUnknownFields(body, PAYSLIP_FIELDS);
   if (!strictCheck.ok) return strictCheck;
   return parsePatchFields(body, payslipFieldParsers);
@@ -373,7 +267,7 @@ app.get('/payslips/:id', async (c) => {
 
 app.post('/payslips', async (c) => {
   const user = getAuthUser(c);
-  const rawBody = await readJsonBody(c.req, 'Invalid payslip payload');
+  const rawBody = await readJsonRecord(c.req, 'Invalid payslip payload');
   if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
 
   const body = parsePayslipCreate(rawBody.value);
@@ -398,7 +292,7 @@ app.patch('/payslips/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const rawBody = await readJsonBody(c.req, 'Invalid payslip payload');
+  const rawBody = await readJsonRecord(c.req, 'Invalid payslip payload');
   if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
 
   const body = parsePayslipPatch(rawBody.value);
@@ -551,7 +445,7 @@ app.get('/history', async (c) => {
     const year = Number.parseInt(payslipRow.date.slice(0, DATE_YEAR_LENGTH), DECIMAL_RADIX);
     if (!Number.isInteger(year)) continue;
 
-    const gross = (parseNumber(payslipRow.gross) ?? 0) + (parseNumber(payslipRow.bonus) ?? 0);
+    const gross = toNumberOrZero(payslipRow.gross) + toNumberOrZero(payslipRow.bonus);
     const key = `${year}:${payslipRow.currency}`;
     const existing = annualSalaryByYearAndCurrency.get(key);
 
