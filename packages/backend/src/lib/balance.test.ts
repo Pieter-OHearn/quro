@@ -1,15 +1,15 @@
+import { roundMoney } from '@quro/shared';
 import { describe, expect, test } from 'bun:test';
 import {
   applyPrincipalToBalance,
   restorePrincipalToBalance,
-  roundCurrency,
   validatePrincipalAgainstBalance,
 } from './balance';
 
 describe('balance reconciliation helpers', () => {
   test('rounds currency values and floating-point artifacts to two decimals', () => {
-    expect(roundCurrency(12.345)).toBe(12.35);
-    expect(roundCurrency(0.1 + 0.2)).toBe(0.3);
+    expect(roundMoney(12.345)).toBe(12.35);
+    expect(roundMoney(0.1 + 0.2)).toBe(0.3);
   });
 
   test('applies principal and clamps the resulting balance at zero', () => {

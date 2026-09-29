@@ -2,8 +2,7 @@ import {
   isCurrencyCode,
   type HoldingPriceSyncResult,
   type StockPriceResult,
-  toDateOnly,
-  toIsoDate,
+  toDateOnlyOr,
 } from '@quro/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -176,7 +175,7 @@ async function applyQuoteToHolding(
   const resolvedHoldingCurrency = isCurrencyCode(normalizedPriceCurrency)
     ? normalizedPriceCurrency
     : holding.currency;
-  const eodDate = toDateOnly(quote.eodDate ?? quote.tradeLast) ?? toIsoDate(new Date());
+  const eodDate = toDateOnlyOr(quote.eodDate ?? quote.tradeLast);
 
   const [updatedHolding] = await db
     .update(holdings)

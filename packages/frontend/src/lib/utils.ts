@@ -1,5 +1,4 @@
 import { twMerge } from 'tailwind-merge';
-import {} from '@quro/shared';
 
 export function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(inputs.filter(Boolean).join(' '));

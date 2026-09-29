@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { isCurrencyCode, type CurrencyCode, toIsoDate } from '@quro/shared';
+import { isCurrencyCode, type CurrencyCode, toIsoDate, DEFAULT_EMOJI } from '@quro/shared';
 import { db } from '../db/client';
 import { bunqConnections, savingsAccounts, savingsTransactions } from '../db/schema';
 import {
@@ -16,7 +16,6 @@ import {
 import { toBunqNewerThanCursor } from '../lib/bunqSyncCursor';
 
 const DEFAULT_BUNQ_COLOR = '#3b82f6';
-const DEFAULT_BUNQ_EMOJI = '🏦';
 
 type BunqConnectionRow = typeof bunqConnections.$inferSelect;
 type SavingsAccountRow = typeof savingsAccounts.$inferSelect;
@@ -130,7 +129,7 @@ async function createLocalSavingsAccount(
       interestRate: 0,
       accountType: 'Easy Access',
       color: DEFAULT_BUNQ_COLOR,
-      emoji: DEFAULT_BUNQ_EMOJI,
+      emoji: DEFAULT_EMOJI.pension,
       bunqAccountId: String(account.id),
     })
     .returning();

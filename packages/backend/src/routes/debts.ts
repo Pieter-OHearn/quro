@@ -121,13 +121,6 @@ const debtPaymentParsers: FieldParsers<Omit<DebtPaymentPayload, 'principal'>> = 
   note: (value) => ok(parseNonEmptyString(value) ?? ''),
 };
 
-export function validateDebtBalance(
-  originalAmount: number,
-  remainingBalance: number,
-): string | null {
-  return validateBalanceWithinOriginal(originalAmount, remainingBalance);
-}
-
 export function computeDebtPrincipal(amount: number, interest: number): number {
   return Math.max(0, roundMoney(amount - interest));
 }
@@ -166,7 +159,7 @@ export function parseDebtPayload(raw: Record<string, unknown>): ParseResult<Debt
   if (!parsed.ok) return parsed;
 
   const { remainingBalance, originalAmount, startDate, endDate } = parsed.value;
-  const balanceValidationError = validateDebtBalance(originalAmount, remainingBalance);
+  const balanceValidationError = validateBalanceWithinOriginal(originalAmount, remainingBalance);
   if (balanceValidationError) return err(balanceValidationError);
   if (endDate != null && endDate < startDate) {
     return err('End date cannot be earlier than the start date');

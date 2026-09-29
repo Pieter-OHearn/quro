@@ -10,7 +10,7 @@ import {
   type TickerLookupExchange,
   type TickerLookupResult,
   toDateOnly,
-  toIsoDate,
+  toDateOnlyOr,
   roundMoney,
   validateRepaymentSplit,
   type PropertyTransactionPayload,
@@ -677,12 +677,8 @@ function parseHoldingIdsBody(body: unknown): ParseResult<number[] | undefined> {
   return ok([...new Set(parsedIds)]);
 }
 
-function resolveSnapshotEodDate(...candidates: unknown[]): string {
-  for (const candidate of candidates) {
-    const parsed = toDateOnly(candidate as Date | string | null | undefined);
-    if (parsed) return parsed;
-  }
-  return toIsoDate(new Date());
+function resolveSnapshotEodDate(...candidates: (Date | string | null | undefined)[]): string {
+  return toDateOnlyOr(candidates.find((candidate) => toDateOnly(candidate)));
 }
 
 function resolveSnapshotPriceCurrency(...candidates: unknown[]): string {

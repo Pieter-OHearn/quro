@@ -15,8 +15,7 @@ export function monthsToPayoff(
   monthlyRate: number,
   monthlyPayment: number,
 ): number | null {
-  const inputs = [balance, monthlyRate, monthlyPayment];
-  if (inputs.some((value) => !Number.isFinite(value))) return null;
+  if (!Number.isFinite(balance + monthlyRate + monthlyPayment)) return null;
   if (balance <= 0 || monthlyPayment <= 0) return null;
   if (monthlyRate <= 0) return balance / monthlyPayment;
 

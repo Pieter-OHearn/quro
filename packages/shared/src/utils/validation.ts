@@ -6,7 +6,7 @@
 export const MAX_RATE_CHANGE_PERCENT = 25;
 const SPLIT_TOLERANCE = 0.01;
 
-export const VALIDATION_MESSAGES = {
+const VALIDATION_MESSAGES = {
   interestExceedsAmount: 'Interest cannot exceed the total payment',
   principalExceedsAmount: 'Principal cannot exceed the total payment',
   splitMismatch: 'Interest and principal must add up to the total payment',

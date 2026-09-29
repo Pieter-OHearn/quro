@@ -125,11 +125,7 @@ function calculateProjectedRemainingMonths(
     return mortgage.outstandingBalance / monthlyPrincipal;
   }
 
-  return calculateRemainingMonths(
-    mortgage.outstandingBalance,
-    monthlyRate,
-    mortgage.monthlyPayment,
-  );
+  return monthsToPayoff(mortgage.outstandingBalance, monthlyRate, mortgage.monthlyPayment);
 }
 
 export function generateSchedule(
@@ -177,14 +173,6 @@ export function generateSchedule(
   }
 
   return schedule;
-}
-
-export function calculateRemainingMonths(
-  balance: number,
-  monthlyRate: number,
-  monthlyPayment: number,
-): number | null {
-  return monthsToPayoff(balance, monthlyRate, monthlyPayment);
 }
 
 export function computePaymentBreakdownRows(txns: MortgageTransaction[]): PaymentBreakdownRow[] {

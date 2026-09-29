@@ -1,9 +1,8 @@
 const CENTS_PER_UNIT = 100;
 
 export function toCents(amount: number): number {
-  // Shift the decimal point via exponent notation so half-cent values such as 12.345 round up.
-  const shifted = Math.round(Number(`${amount}e2`));
-  return Number.isFinite(shifted) ? shifted : Math.round(amount * CENTS_PER_UNIT);
+  // The epsilon nudge makes half-cent values such as 12.345 round up despite float error.
+  return Math.round(amount * CENTS_PER_UNIT * (1 + Number.EPSILON));
 }
 
 export function fromCents(cents: number): number {

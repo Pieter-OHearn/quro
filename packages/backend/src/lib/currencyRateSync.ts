@@ -1,4 +1,4 @@
-import { CURRENCY_CODES, type CurrencyCode, toDateOnly, toIsoDate } from '@quro/shared';
+import { CURRENCY_CODES, type CurrencyCode, toDateOnlyOr } from '@quro/shared';
 import { asc, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { currencyRateHistory, currencyRates } from '../db/schema';
@@ -92,7 +92,7 @@ export async function fetchYahooCurrencyRates(
       toCurrency: baseCurrency,
       rate: quote.close,
       provider: YAHOO_FX_PROVIDER,
-      sourceDate: toDateOnly(quote.eodDate ?? quote.tradeLast) ?? toIsoDate(now),
+      sourceDate: toDateOnlyOr(quote.eodDate ?? quote.tradeLast, now),
     });
   }
 

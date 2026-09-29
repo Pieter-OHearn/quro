@@ -1,4 +1,4 @@
-import type { RunwayResponse } from '@quro/shared';
+import { formatPercent, type RunwayResponse } from '@quro/shared';
 import { Card, ProgressMeter } from '@/components/ui';
 import { RUNWAY_CITATIONS } from '../utils/runway-display';
 
@@ -25,7 +25,7 @@ export function LiquidityTierBar({
                   Tier {tier.tier} · {tier.label}
                 </span>
                 <span className="ml-2 text-xs text-fg-faint">
-                  {(tier.haircutPct * 100).toFixed(0)}% haircut
+                  {formatPercent(tier.haircutPct * 100, 0)} haircut
                 </span>
               </div>
               <span className="font-semibold text-fg">{fmtBase(tier.amount)}</span>

@@ -20,6 +20,14 @@ export function toDateOnly(value: Date | string | number | null | undefined): st
   return Number.isNaN(parsed.getTime()) ? null : toIsoDate(parsed);
 }
 
+/** Like `toDateOnly`, falling back to the UTC date of `now` when the value is empty or invalid. */
+export function toDateOnlyOr(
+  value: Date | string | number | null | undefined,
+  now: Date = new Date(),
+): string {
+  return toDateOnly(value) ?? toIsoDate(now);
+}
+
 export function toUtcTimestamp(isoDate: string): number {
   return Date.parse(`${isoDate}T00:00:00Z`);
 }

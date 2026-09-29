@@ -1,4 +1,4 @@
-import type { ExpenseClass } from '@quro/shared';
+import { DEFAULT_EMOJI, type ExpenseClass } from '@quro/shared';
 
 export const UNCATEGORISED_NAME = 'Uncategorised';
 
@@ -16,7 +16,11 @@ export const CATEGORY_PRESETS: Record<string, CategoryPreset> = {
   Utilities: { emoji: '💡', color: '#eab308', expenseClass: 'essential' },
   'Personal Care': { emoji: '✂️', color: '#f43f5e', expenseClass: 'discretionary' },
   Travel: { emoji: '✈️', color: '#0ea5e9', expenseClass: 'discretionary' },
-  [UNCATEGORISED_NAME]: { emoji: '📦', color: '#94a3b8', expenseClass: 'essential' },
+  [UNCATEGORISED_NAME]: {
+    emoji: DEFAULT_EMOJI.budgetCategory,
+    color: '#94a3b8',
+    expenseClass: 'essential',
+  },
 };
 
 export const DEFAULT_CATEGORY_PRESET: CategoryPreset = CATEGORY_PRESETS[UNCATEGORISED_NAME];

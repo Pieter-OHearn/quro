@@ -59,7 +59,7 @@ export function toBudgetMonthIndex(month: BudgetMonth): number {
 
 /** Index of a month abbreviation, or -1 when the value is not one. */
 export function getMonthAbbreviationIndex(value: string): number {
-  return isBudgetMonth(value) ? toBudgetMonthIndex(value) : -1;
+  return (MONTH_ABBREVIATIONS as readonly string[]).indexOf(value);
 }
 
 export function formatBudgetMonthFromDate(date: Date): BudgetMonth {

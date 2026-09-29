@@ -19,17 +19,10 @@ const CACHEABLE_OPTION_KEYS = new Set([
 ]);
 
 function getNumberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
-  const entries = Object.entries(options);
-  if (!entries.every(([key]) => CACHEABLE_OPTION_KEYS.has(key))) {
-    return new Intl.NumberFormat(locale, options);
+  for (const key in options) {
+    if (!CACHEABLE_OPTION_KEYS.has(key)) return new Intl.NumberFormat(locale, options);
   }
-  const key = [
-    locale,
-    options.style,
-    options.currency,
-    options.minimumFractionDigits,
-    options.maximumFractionDigits,
-  ].join('|');
+  const key = `${locale}|${options.style}|${options.currency}|${options.minimumFractionDigits}|${options.maximumFractionDigits}`;
   let formatter = numberFormatCache.get(key);
   if (!formatter) {
     formatter = new Intl.NumberFormat(locale, options);

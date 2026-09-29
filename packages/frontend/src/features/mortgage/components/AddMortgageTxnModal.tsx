@@ -5,6 +5,7 @@ import {
   type Mortgage as MortgageType,
   type MortgageTransaction,
   formatPercent,
+  DEFAULT_EMOJI,
 } from '@quro/shared';
 import { useMortgageTxnModal } from '../hooks';
 import type { MortgageTxnType, SaveMortgageTxnInput } from '../types';
@@ -518,7 +519,7 @@ export function AddMortgageTxnModal({
   return (
     <Modal
       title={title}
-      subtitle={`🏠 ${mortgage.propertyAddress}`}
+      subtitle={`${DEFAULT_EMOJI.property} ${mortgage.propertyAddress}`}
       onClose={onClose}
       maxWidth="md"
       bodyClassName="p-0 space-y-0"
@@ -526,7 +527,7 @@ export function AddMortgageTxnModal({
         <ModalHeader
           onClose={onClose}
           title={title}
-          subtitle={`🏠 ${mortgage.propertyAddress}`}
+          subtitle={`${DEFAULT_EMOJI.property} ${mortgage.propertyAddress}`}
           contentClassName="min-w-0"
           subtitleClassName="truncate max-w-[240px]"
         />
