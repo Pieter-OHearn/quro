@@ -32,7 +32,7 @@ import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { convertToBaseCurrency, FX_BASE_CURRENCY } from '../lib/currencyRateCache';
 import { getCurrentRatesToBaseCurrency } from '../lib/currencyRateSync';
 import { getJurisdictionProfile } from '../lib/jurisdictions';
-import { ownedOrJointPredicate } from '../lib/partner';
+import { ownedOrJointPredicate, loadHouseholdRows, householdShare } from '../lib/partner';
 import {
   aggregateDepositGuarantees,
   calculateBurn,
@@ -63,7 +63,6 @@ import { sumBrokerageValue } from '../lib/netWorth';
 const app = new Hono();
 const HISTORY_MONTHS = 12;
 const MONTHS_PER_YEAR = 12;
-const JOINT_WEIGHT = 0.5;
 const ASSUMPTION_FIELDS = [
   'leanBurnOverride',
   'emergencyLifestylePct',
@@ -193,68 +192,6 @@ function buildBudgetInputs(
   }));
 }
 
-function convertEurResponse(response: RunwayResponse, factor: number): RunwayResponse {
-  const money = (value: number) => value * factor;
-  return {
-    ...response,
-    burn: {
-      ...response.burn,
-      lean: money(response.burn.lean),
-      current: money(response.burn.current),
-      components: response.burn.components.map((component) => ({
-        ...component,
-        amount: money(component.amount),
-      })),
-    },
-    tiers: response.tiers.map((tier) => ({ ...tier, amount: money(tier.amount) })),
-    incomeSupport: {
-      ...response.incomeSupport,
-      salaryBasis: {
-        ...response.incomeSupport.salaryBasis,
-        monthlyGross: money(response.incomeSupport.salaryBasis.monthlyGross),
-        monthlyNet: money(response.incomeSupport.salaryBasis.monthlyNet),
-        currency: response.baseCurrency,
-      },
-      notice: {
-        ...response.incomeSupport.notice,
-        monthlyNet: money(response.incomeSupport.notice.monthlyNet),
-        totalNet: money(response.incomeSupport.notice.totalNet),
-      },
-      severance: {
-        ...response.incomeSupport.severance,
-        monthlyGross: money(response.incomeSupport.severance.monthlyGross),
-        gross: money(response.incomeSupport.severance.gross),
-        net: money(response.incomeSupport.severance.net),
-        cap:
-          response.incomeSupport.severance.cap === null
-            ? null
-            : money(response.incomeSupport.severance.cap),
-      },
-      unemployment: {
-        ...response.incomeSupport.unemployment,
-        monthlyNetByMonth: response.incomeSupport.unemployment.monthlyNetByMonth.map(money),
-      },
-    },
-    runway: {
-      ...response.runway,
-      ledger: response.runway.ledger.map((entry) => ({
-        ...entry,
-        income: money(entry.income),
-        burn: money(entry.burn),
-        drawdown: money(entry.drawdown),
-        liquidRemaining: money(entry.liquidRemaining),
-      })),
-    },
-    depositGuarantee: response.depositGuarantee.map((entry) => ({
-      ...entry,
-      total: money(entry.total),
-      cap: entry.cap === null ? null : money(entry.cap),
-      excess: entry.excess === null ? null : money(entry.excess),
-      ineligibleCurrencyTotal: money(entry.ineligibleCurrencyTotal),
-    })),
-  };
-}
-
 function resolveJurisdictionMetadata(
   jurisdiction: ReturnType<typeof getJurisdictionProfile>,
   asOf: string,
@@ -268,6 +205,8 @@ function resolveJurisdictionMetadata(
   if (jurisdiction.severance) resolutions.push(resolveRule(jurisdiction.severance, asOf));
   return {
     code: jurisdiction.code,
+    labels: jurisdiction.labels,
+    unemploymentModel: jurisdiction.unemploymentModel,
     rulesEffectiveFrom: resolutions
       .map((resolution) => resolution.effectiveFrom)
       .sort()
@@ -279,7 +218,6 @@ function resolveJurisdictionMetadata(
 // eslint-disable-next-line max-lines-per-function
 async function loadRunwayData(userId: number, partnerId: number | null, now: Date) {
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
-  const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
   const historyStart = toDateMonthsAgo(now, HISTORY_MONTHS);
   const asOf = toIsoDate(now);
   const [primaryEmployment] = await db
@@ -311,12 +249,13 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
   ] = await Promise.all([
     db.select().from(users).where(eq(users.id, userId)),
     db.select().from(planAssumptions).where(eq(planAssumptions.userId, userId)),
+    loadHouseholdRows(savingsAccounts, userId, partnerId),
     db
-      .select()
-      .from(savingsAccounts)
-      .where(and(savingsAccess, isNull(savingsAccounts.archivedAt))),
-    db
-      .select(getTableColumns(savingsTransactions))
+      .select({
+        ...getTableColumns(savingsTransactions),
+        currency: savingsAccounts.currency,
+        isJoint: savingsAccounts.isJoint,
+      })
       .from(savingsTransactions)
       .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
       .where(and(savingsAccess, gte(savingsTransactions.date, historyStart))),
@@ -325,10 +264,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
       .from(holdings)
       .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
     db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-    db
-      .select()
-      .from(mortgages)
-      .where(and(mortgageAccess, isNull(mortgages.archivedAt))),
+    loadHouseholdRows(mortgages, userId, partnerId),
     db
       .select()
       .from(debts)
@@ -404,13 +340,12 @@ function buildLiquidAssets(data: RunwayData, convertToEur: MoneyConverter): Liqu
 function calculateDerivedCashflow(
   data: RunwayData,
   convertToEur: MoneyConverter,
-  jointWeight: number,
+  fullJoint: boolean,
 ): number {
   const liquidDelta = data.savingsTxns.reduce((sum, transaction) => {
-    const account = data.savings.find((item) => item.id === transaction.accountId);
-    const weighted = account?.isJoint ? jointWeight : 1;
+    const weighted = householdShare(transaction.isJoint, fullJoint ? 'full' : 'personal');
     const amount =
-      convertToEur(toNumberOrZero(transaction.amount), account?.currency ?? 'EUR') * weighted;
+      convertToEur(toNumberOrZero(transaction.amount), transaction.currency) * weighted;
     return sum + (transaction.type === 'withdrawal' ? -amount : amount);
   }, 0);
   const netIncome = data.payslipRows.reduce(
@@ -520,11 +455,15 @@ function buildEurRunwayResponse(
   convertToEur: MoneyConverter,
 ): RunwayResponse {
   const assumptions = convertAssumptionsToEur(data.assumptions, user.baseCurrency, convertToEur);
-  const jointWeight = assumptions?.countFullJointBalances ? 1 : JOINT_WEIGHT;
+  const fullJoint = assumptions?.countFullJointBalances === true;
   const burn = calculateBurn({
-    categories: buildBudgetInputs(data.categories, data.budgetTxns),
+    categories: buildBudgetInputs(data.categories, data.budgetTxns).map((category) => ({
+      ...category,
+      monthlySpend: category.monthlySpend.map((amount) => convertToEur(amount, user.baseCurrency)),
+      currentBudgeted: convertToEur(category.currentBudgeted, user.baseCurrency),
+    })),
     contractual: buildContractualInputs(data, convertToEur),
-    derivedCashflowMonthly: calculateDerivedCashflow(data, convertToEur, jointWeight),
+    derivedCashflowMonthly: calculateDerivedCashflow(data, convertToEur, fullJoint),
     assumptions,
   });
   const incomeSupport = buildIncomeSupport(data, jurisdiction, asOf, convertToEur, assumptions);
@@ -535,7 +474,7 @@ function buildEurRunwayResponse(
     : null;
   const missingFields = getMissingEmploymentFields(data.primaryEmployment);
   return {
-    baseCurrency: user.baseCurrency,
+    baseCurrency: FX_BASE_CURRENCY,
     asOf,
     jurisdiction: resolveJurisdictionMetadata(jurisdiction, asOf),
     employment: {
@@ -587,10 +526,7 @@ async function buildRunwayResponse(
     convertToBaseCurrency(amount, currency, data.rates);
   const jurisdiction = getJurisdictionProfile(data.user.jurisdiction);
   const asOf = toIsoDate(now);
-  const response = buildEurRunwayResponse(data, data.user, jurisdiction, asOf, convertToEur);
-  const baseRate =
-    data.user.baseCurrency === FX_BASE_CURRENCY ? 1 : data.rates.get(data.user.baseCurrency);
-  return convertEurResponse(response, baseRate ? 1 / baseRate : 1);
+  return buildEurRunwayResponse(data, data.user, jurisdiction, asOf, convertToEur);
 }
 
 app.get('/runway', async (c) => {

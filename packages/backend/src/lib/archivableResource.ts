@@ -21,6 +21,7 @@ type ResourceOptions<T extends ArchivableTable> = {
   scope?: (scope: Readonly<AccessScope>) => ReturnType<typeof accessPredicate>;
   beforeDelete?: LifecycleHook<T>;
   beforeUnarchive?: LifecycleHook<T>;
+  serialize?: (row: T['$inferSelect']) => Promise<T['$inferSelect']>;
 };
 
 function mutateResource<T extends ArchivableTable>(
@@ -77,7 +78,7 @@ export function registerArchivableResource<T extends ArchivableTable>(
     );
     if ('error' in result) return c.json({ error: result.error }, result.status);
     if (!result.data) return c.json({ error: `${options.label} not found` }, HTTP_STATUS.NOT_FOUND);
-    return c.json({ data: result.data });
+    return c.json({ data: options.serialize ? await options.serialize(result.data) : result.data });
   };
   app.delete(`${options.path}/:id`, handle('archive'));
   app.post(`${options.path}/:id/unarchive`, handle('unarchive'));

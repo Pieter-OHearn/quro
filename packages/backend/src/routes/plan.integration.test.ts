@@ -126,17 +126,19 @@ describe('plan integration', () => {
       await integration.request('/api/plan/runway', { cookie: owner.cookie }),
     );
     expect(derived.jurisdiction.code).toBe('AU');
+    expect(derived.baseCurrency).toBe('EUR');
+    expect(derived.jurisdiction.labels.unemploymentShort).toBe('JobSeeker');
     expect(derived.depositGuarantee[0]).toMatchObject({
       entityId: 'cba-au',
       excess: 0,
       confidence: 'verified',
     });
-    expect(derived.depositGuarantee[0]?.cap).toBeCloseTo(250_000, 2);
+    expect(derived.depositGuarantee[0]?.cap).toBeCloseTo(250_000 * 0.58, 2);
     expect(derived.incomeSupport.severance).toMatchObject({
       status: 'included',
     });
-    expect(derived.incomeSupport.severance.gross).toBeCloseTo(24_000, 2);
-    expect(derived.incomeSupport.severance.net).toBeCloseTo(16_800, 2);
+    expect(derived.incomeSupport.severance.gross).toBeCloseTo(24_000 * 0.58, 2);
+    expect(derived.incomeSupport.severance.net).toBeCloseTo(16_800 * 0.58, 2);
     expect(derived.incomeSupport.unemployment.status).toBe('unknown');
 
     await readData(

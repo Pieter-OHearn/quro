@@ -10,6 +10,21 @@ import {
 import { baselineIncomeSupport, baselineLiquidAssets } from './__fixtures__/runway';
 import { auJurisdiction } from './jurisdictions/au';
 
+test('income support uses the profile strategy independently of its jurisdiction code', () => {
+  const input = {
+    ...baselineIncomeSupport,
+    jurisdiction: auJurisdiction,
+    assumptions: { benefitMonthlyOverride: 1000, benefitMaxMonthsOverride: 6 },
+  };
+  const expected = calculateIncomeSupport(input);
+  expect(
+    calculateIncomeSupport({
+      ...input,
+      jurisdiction: { ...auJurisdiction, code: 'GENERIC' },
+    }),
+  ).toEqual(expected);
+});
+
 describe('runway burn', () => {
   test('amortises annual spending and excludes employment-linked costs from lean burn', () => {
     const result = calculateBurn({

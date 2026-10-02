@@ -38,6 +38,11 @@ const DASHBOARD_TXN_LIMIT = 6;
 const MONTH_KEY_PAD_LENGTH = 2;
 const EMPTY_ALLOCATIONS_SUMMARY: DashboardAllocationsSummary = {
   allocations: [],
+  currency: 'EUR',
+  liabilitiesCurrency: 'EUR',
+  netWorth: 0,
+  portfolioTotal: 0,
+  totalAssets: 0,
   liabilitiesTotal: 0,
   debtCount: 0,
 };
@@ -52,9 +57,9 @@ const computeAnnualGross = (
   return convertToBase(latest.gross * 12, latest.currency);
 };
 
-const buildAllocationsByName = (allocationData: ReadonlyArray<{ name: string; value: number }>) =>
+const buildAllocationsByKey = (allocationData: ReadonlyArray<{ key: string; value: number }>) =>
   allocationData.reduce<Record<string, number>>((acc, item) => {
-    acc[item.name] = item.value;
+    acc[item.key] = item.value;
     return acc;
   }, {});
 
@@ -143,7 +148,7 @@ function useDashboardData(
   );
   const chartData = normalizeNetWorthSnapshots(netWorthData, convertToBase);
   const allocationSummary = normalizeAssetAllocations(allocations, convertToBase);
-  const allocationByName = buildAllocationsByName(allocationSummary.allocationData);
+  const allocationByKey = buildAllocationsByKey(allocationSummary.allocationData);
   const investHabitBuyMonths = useMemo(
     () => computeInvestHabitBuyMonths(holdingTxns),
     [holdingTxns],
@@ -151,7 +156,7 @@ function useDashboardData(
   const goalProgressContext: GoalProgressContext = {
     annualGross,
     savingsAccounts,
-    portfolioTotal: allocationByName['Brokerage'] ?? 0,
+    portfolioTotal: allocationSummary.portfolioTotal,
     netWorth: allocationSummary.netWorth,
     investHabitBuyMonths,
     convertToBase,
@@ -183,7 +188,7 @@ function useDashboardData(
     monthlySalaryValue,
     monthlyCategoryChange,
     salaryTrendChange,
-    allocationByName,
+    allocationByKey,
     netWorth,
     monthChange,
     ytdPct,
@@ -259,7 +264,7 @@ function DashboardPageBody({
     monthlySalaryValue,
     monthlyCategoryChange,
     salaryTrendChange,
-    allocationByName,
+    allocationByKey,
     netWorth,
     monthChange,
     ytdPct,
@@ -268,7 +273,7 @@ function DashboardPageBody({
 
   const hour = new Date().getHours();
   const dashboardCards = buildDashboardCards(
-    allocationByName,
+    allocationByKey,
     monthlySalaryValue,
     salaryTrendChange,
     monthlyCategoryChange,
@@ -302,6 +307,7 @@ function DashboardPageBody({
           chartData={chartData}
           allocationData={allocationData}
           totalAlloc={totalAssets}
+          netWorth={netWorth}
           liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
           ytdPct={ytdPct}

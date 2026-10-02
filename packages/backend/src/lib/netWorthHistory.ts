@@ -1,3 +1,4 @@
+import { getPropertyDebt } from './propertyDebt';
 import {
   addMonthsUtc,
   monthEndUtc,
@@ -38,14 +39,12 @@ import {
   resolveHistoricalHoldingPrice,
   type DerivedAllocationSummary,
 } from '../lib/netWorth';
-import { ownedOrJointPredicate } from '../lib/partner';
+import { ownedOrJointPredicate, loadHouseholdRows, scopeHouseholdRows } from '../lib/partner';
 import { toNumberOrZero } from '../lib/numbers';
 import { computePensionTransactionDelta } from '../lib/pensionTransactions';
 
 const BASE_CURRENCY = FX_BASE_CURRENCY;
 const NET_WORTH_HISTORY_MONTHS = 7;
-// Joint assets count half for each partner so the two dashboards sum to reality.
-const JOINT_WEIGHT = 0.5;
 
 function toOptionalTimestamp(value: Date | string | null | undefined): number | null {
   if (!value) return null;
@@ -170,79 +169,6 @@ function groupByNumericId<T>(rows: readonly T[], getId: (row: T) => number): Map
   return grouped;
 }
 
-// ── Joint-asset weighting ────────────────────────────────────────────────────
-// All net-worth/allocation formulas are linear in an asset's monetary fields,
-// so pre-scaling joint rows (and their transactions) by JOINT_WEIGHT halves
-// their contribution exactly without touching the compute functions.
-
-function buildJointIdSet(rows: ReadonlyArray<{ id: number; isJoint: boolean }>): Set<number> {
-  const ids = new Set<number>();
-  for (const row of rows) {
-    if (row.isJoint) ids.add(row.id);
-  }
-  return ids;
-}
-
-function weighJointSavingsAccounts(
-  rows: ReadonlyArray<typeof savingsAccounts.$inferSelect>,
-): HistoricalSavingsAccountRow[] {
-  return rows.map((row) =>
-    row.isJoint ? { ...row, balance: toNumberOrZero(row.balance) * JOINT_WEIGHT } : row,
-  );
-}
-
-function weighJointSavingsTransactions(
-  rows: ReadonlyArray<typeof savingsTransactions.$inferSelect>,
-  jointAccountIds: ReadonlySet<number>,
-): SavingsTransactionRow[] {
-  return rows.map((row) =>
-    jointAccountIds.has(row.accountId)
-      ? { ...row, amount: toNumberOrZero(row.amount) * JOINT_WEIGHT }
-      : row,
-  );
-}
-
-function weighJointProperties(
-  rows: ReadonlyArray<typeof properties.$inferSelect>,
-): Array<PropertyRow & { isJoint: boolean }> {
-  return rows.map((row) =>
-    row.isJoint
-      ? {
-          ...row,
-          purchasePrice: toNumberOrZero(row.purchasePrice) * JOINT_WEIGHT,
-          currentValue: toNumberOrZero(row.currentValue) * JOINT_WEIGHT,
-          mortgage: toNumberOrZero(row.mortgage) * JOINT_WEIGHT,
-        }
-      : row,
-  );
-}
-
-function weighJointPropertyTransactions(
-  rows: ReadonlyArray<typeof propertyTransactions.$inferSelect>,
-  jointPropertyIds: ReadonlySet<number>,
-): PropertyTransactionRow[] {
-  return rows.map((row) =>
-    jointPropertyIds.has(row.propertyId)
-      ? {
-          ...row,
-          amount: toNumberOrZero(row.amount) * JOINT_WEIGHT,
-          interest: row.interest == null ? null : toNumberOrZero(row.interest) * JOINT_WEIGHT,
-          principal: row.principal == null ? null : toNumberOrZero(row.principal) * JOINT_WEIGHT,
-        }
-      : row,
-  );
-}
-
-function weighJointMortgages(
-  rows: ReadonlyArray<typeof mortgages.$inferSelect>,
-): Array<MortgageRow & { isJoint: boolean }> {
-  return rows.map((row) =>
-    row.isJoint
-      ? { ...row, outstandingBalance: toNumberOrZero(row.outstandingBalance) * JOINT_WEIGHT }
-      : row,
-  );
-}
-
 type JointScopedSourceRows = {
   savings: Array<typeof savingsAccounts.$inferSelect>;
   savingsTransactions: Array<typeof savingsTransactions.$inferSelect>;
@@ -257,10 +183,13 @@ async function loadJointScopedRows(
 ): Promise<JointScopedSourceRows> {
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const propertyAccess = ownedOrJointPredicate(properties, userId, partnerId);
-  const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
 
   const [savings, savingsTxns, propertyRows, propertyTxns, mortgageRows] = await Promise.all([
-    safeLoad('savings accounts', db.select().from(savingsAccounts).where(savingsAccess), []),
+    safeLoad(
+      'savings accounts',
+      loadHouseholdRows(savingsAccounts, userId, partnerId, { includeArchived: true }),
+      [],
+    ),
     safeLoad(
       'savings transactions',
       db
@@ -270,7 +199,11 @@ async function loadJointScopedRows(
         .where(savingsAccess),
       [],
     ),
-    safeLoad('properties', db.select().from(properties).where(propertyAccess), []),
+    safeLoad(
+      'properties',
+      loadHouseholdRows(properties, userId, partnerId, { includeArchived: true }),
+      [],
+    ),
     safeLoad(
       'property transactions',
       db
@@ -280,7 +213,11 @@ async function loadJointScopedRows(
         .where(propertyAccess),
       [],
     ),
-    safeLoad('mortgages', db.select().from(mortgages).where(mortgageAccess), []),
+    safeLoad(
+      'mortgages',
+      loadHouseholdRows(mortgages, userId, partnerId, { includeArchived: true }),
+      [],
+    ),
   ]);
 
   return {
@@ -420,12 +357,24 @@ export async function buildDerivedAllocations(
     ]);
   return computeDerivedAllocations(
     rates,
-    weighJointSavingsAccounts(jointScoped.savings.filter((row) => !row.archivedAt)),
+    scopeHouseholdRows(
+      'savings',
+      jointScoped.savings.filter((row) => !row.archivedAt),
+      (row) => row.isJoint,
+    ),
     userHoldings,
     userHoldingTxns,
-    weighJointProperties(jointScoped.properties.filter((row) => !row.archivedAt)),
+    scopeHouseholdRows(
+      'properties',
+      jointScoped.properties.filter((row) => !row.archivedAt),
+      (row) => row.isJoint,
+    ),
     userPensions,
-    weighJointMortgages(jointScoped.mortgages.filter((row) => !row.archivedAt)),
+    scopeHouseholdRows(
+      'mortgages',
+      jointScoped.mortgages.filter((row) => !row.archivedAt),
+      (row) => row.isJoint,
+    ),
     userDebts,
   );
 }
@@ -584,18 +533,11 @@ function computePropertyEquityAtCutoff(
     return propertyValue;
   }
 
-  function resolveBaseMortgageBalance(property: PropertyRow): number {
-    // Linked mortgages are the source of truth; an archived one (absent from
-    // the active set at this cutoff) leaves the property unencumbered.
-    if (property.mortgageId == null) return toNumberOrZero(property.mortgage);
-    return mortgageBalanceById.get(property.mortgageId) ?? 0;
-  }
-
   function resolveMortgageBalanceAtCutoff(
     property: PropertyRow,
     transactions: readonly DatedPropertyTransaction[],
   ): number {
-    let mortgageBalance = resolveBaseMortgageBalance(property);
+    let mortgageBalance = getPropertyDebt(property, mortgageBalanceById);
     for (const transaction of transactions) {
       if (transaction.timestamp <= cutoff || transaction.type !== 'repayment') continue;
       const principal =
@@ -708,22 +650,25 @@ export async function loadNetWorthSourceData(
   return {
     rates,
     historicalRates,
-    savings: weighJointSavingsAccounts(jointScoped.savings),
-    savingsTransactions: weighJointSavingsTransactions(
+    savings: scopeHouseholdRows('savings', jointScoped.savings, (row) => row.isJoint),
+    savingsTransactions: scopeHouseholdRows(
+      'savingsTransactions',
       jointScoped.savingsTransactions,
-      buildJointIdSet(jointScoped.savings),
+      (row) => jointScoped.savings.some((parent) => parent.id === row.accountId && parent.isJoint),
     ),
     holdings: holdingsData,
     holdingTransactions: holdingTransactionsData,
     holdingPrices: holdingPricesData,
-    properties: weighJointProperties(jointScoped.properties),
-    propertyTransactions: weighJointPropertyTransactions(
+    properties: scopeHouseholdRows('properties', jointScoped.properties, (row) => row.isJoint),
+    propertyTransactions: scopeHouseholdRows(
+      'propertyTransactions',
       jointScoped.propertyTransactions,
-      buildJointIdSet(jointScoped.properties),
+      (row) =>
+        jointScoped.properties.some((parent) => parent.id === row.propertyId && parent.isJoint),
     ),
     pensions,
     pensionTransactions: pensionTransactionsData,
-    mortgages: weighJointMortgages(jointScoped.mortgages),
+    mortgages: scopeHouseholdRows('mortgages', jointScoped.mortgages, (row) => row.isJoint),
     debts: debtsData,
     debtPayments: debtPaymentsData,
     snapshots,
@@ -738,15 +683,13 @@ function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthH
     dropArchived(sourceData.savings),
     dropArchived(sourceData.holdings),
     sourceData.holdingTransactions,
-    sourceData.properties,
+    dropArchived(sourceData.properties),
     dropArchived(sourceData.pensions),
     dropArchived(sourceData.mortgages),
     dropArchived(sourceData.debts),
   );
   const currentMonth = monthStartUtc(Date.now());
-  const totalValue =
-    allocationSummary.allocations.reduce((sum, item) => sum + item.value, 0) -
-    allocationSummary.liabilitiesTotal;
+  const totalValue = allocationSummary.netWorth;
 
   return [
     {

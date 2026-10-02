@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type {
   PlanAssumptions,
   PlanAssumptionsInput,
-  JurisdictionCode,
+  RunwayResponse,
   WwWeeklyRequirementStatus,
 } from '@quro/shared';
 import { X } from 'lucide-react';
@@ -83,7 +83,7 @@ function toInput(form: AssumptionForm): PlanAssumptionsInput {
 type AssumptionsDrawerProps = {
   open: boolean;
   assumptions: PlanAssumptions | null;
-  jurisdiction: JurisdictionCode;
+  jurisdiction: RunwayResponse['jurisdiction'];
   onClose: () => void;
 };
 
@@ -127,7 +127,7 @@ function AssumptionFields({
   toggleTier,
 }: Readonly<{
   form: AssumptionForm;
-  jurisdiction: JurisdictionCode;
+  jurisdiction: RunwayResponse['jurisdiction'];
   setField: SetAssumptionField;
   toggleTier: (tier: number) => void;
 }>) {
@@ -169,7 +169,7 @@ function AssumptionFields({
         </span>
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
-        {jurisdiction === 'NL' ? (
+        {jurisdiction.unemploymentModel === 'salary_replacement' ? (
           <>
             <FormField
               label="UWV 26-of-36 weeks condition"
@@ -209,16 +209,8 @@ function AssumptionFields({
           </>
         ) : null}
         <FormField
-          label={
-            jurisdiction === 'AU'
-              ? 'Redundancy monthly base-pay override'
-              : 'Severance monthly salary override'
-          }
-          hint={
-            jurisdiction === 'AU'
-              ? 'Optional; use base pay for ordinary hours, excluding bonuses and separate allowances'
-              : 'Optional; include fixed allowances used by the statutory calculation'
-          }
+          label={jurisdiction.labels.severanceSalaryOverride}
+          hint={jurisdiction.labels.severanceSalaryHint}
         >
           <TextInput
             type="number"
@@ -228,12 +220,8 @@ function AssumptionFields({
           />
         </FormField>
         <FormField
-          label={jurisdiction === 'AU' ? 'Monthly JobSeeker estimate' : 'Monthly benefit override'}
-          hint={
-            jurisdiction === 'AU'
-              ? 'Use an estimate based on your Services Australia circumstances'
-              : undefined
-          }
+          label={jurisdiction.labels.benefitOverride}
+          hint={jurisdiction.labels.benefitHint ?? undefined}
         >
           <TextInput
             type="number"
@@ -242,13 +230,7 @@ function AssumptionFields({
             onChange={(value) => setField('benefitMonthlyOverride', value)}
           />
         </FormField>
-        <FormField
-          label={
-            jurisdiction === 'AU'
-              ? 'JobSeeker planning duration (months)'
-              : 'Benefit duration (months)'
-          }
-        >
+        <FormField label={jurisdiction.labels.benefitDuration}>
           <TextInput
             type="number"
             min={0}

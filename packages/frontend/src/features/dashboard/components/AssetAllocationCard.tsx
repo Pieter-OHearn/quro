@@ -16,7 +16,7 @@ export function AllocationPieChart({ data }: Readonly<{ data: readonly Allocatio
           dataKey="value"
         >
           {data.map((entry) => (
-            <Cell key={entry.name} fill={entry.color} />
+            <Cell key={entry.key} fill={entry.color} />
           ))}
         </Pie>
       </PieChart>
@@ -36,7 +36,7 @@ function AllocationLegend({
   return (
     <div className="space-y-2">
       {data.map((item) => (
-        <div key={item.name} className="flex items-center justify-between">
+        <div key={item.key} className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
             <span className="text-xs text-slate-600">{item.name}</span>
@@ -57,16 +57,17 @@ export function AssetAllocationCard({
   allocationData,
   totalAlloc,
   liabilitiesTotal,
+  netWorth,
   baseCurrency,
   fmtBase,
 }: Readonly<{
   allocationData: readonly AllocationItem[];
   totalAlloc: number;
   liabilitiesTotal: number;
+  netWorth: number;
   baseCurrency: string;
   fmtBase: DashboardFormatFn;
 }>) {
-  const netWorth = totalAlloc - liabilitiesTotal;
   const hasAssets = allocationData.length > 0;
 
   return (

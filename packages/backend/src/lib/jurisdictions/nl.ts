@@ -24,6 +24,53 @@ const severanceSource = {
 // - Belastingdienst Box 3: https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/content/berekening-box-3-inkomen-2026
 export const nlJurisdiction: PlanningJurisdictionProfile = {
   code: 'NL',
+  labels: {
+    unemployment: 'WW benefit',
+    unemploymentShort: 'WW',
+    severance: 'Transition compensation',
+    provider: 'UWV',
+    severanceSalaryOverride: 'Severance monthly salary override',
+    severanceSalaryHint: 'Optional; include fixed allowances used by the statutory calculation',
+    benefitOverride: 'Monthly benefit override',
+    benefitHint: null,
+    benefitDuration: 'Benefit duration (months)',
+  },
+  unemploymentModel: 'salary_replacement',
+  sources: [
+    {
+      id: 'uwv-ww-eligibility',
+      title: 'When am I entitled to WW benefit?',
+      url: 'https://www.uwv.nl/nl/ww/wanneer-recht-op-ww',
+      publisher: 'UWV',
+      reviewedAt: '2026-08-05',
+    },
+    {
+      id: 'uwv-ww-duration',
+      title: 'How long will I receive WW benefit?',
+      url: 'https://www.uwv.nl/nl/ww/hoelang-ww',
+      publisher: 'UWV',
+      reviewedAt: '2026-08-05',
+    },
+    {
+      id: 'uwv-maximum-daily-wage',
+      title: 'Maximum daily wage',
+      url: 'https://www.uwv.nl/nl/premies-bedragen/maximum-dagloon',
+      publisher: 'UWV',
+      reviewedAt: '2026-08-05',
+    },
+    {
+      id: 'uwv-daily-wage-calculation',
+      title: 'Calculating daily wage',
+      url: 'https://www.uwv.nl/nl/premies-bedragen/dagloon-berekenen',
+      publisher: 'UWV',
+      reviewedAt: '2026-08-05',
+    },
+  ],
+  warnings: [
+    'Dutch transition-pay salary can include holiday allowance and fixed pay components; use the salary override if the payslip gross does not include them.',
+  ],
+  manualBenefit: null,
+
   safeWithdrawalRate: [
     { effectiveFrom: '2025-01-01', effectiveTo: '2025-12-31', value: 0.0282 },
     { effectiveFrom: '2026-01-01', effectiveTo: '2026-12-31', value: 0.0282 },

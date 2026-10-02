@@ -1,5 +1,6 @@
 import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
 import type {
+  AllocationKey,
   DashboardAllocationsSummary as DashboardAllocationSummaryPayload,
   DashboardTransaction as DashboardTransactionPayload,
   NetWorthSnapshot,
@@ -24,14 +25,14 @@ export const getGreeting = (hour: number): string => {
 };
 
 export const buildDashboardCards = (
-  allocationByName: Record<string, number>,
+  allocationByKey: Record<string, number>,
   monthlySalaryValue: number,
   salaryTrendChange: number,
   monthlyCategoryChange: (category: string) => number,
 ): DashboardCard[] => [
   {
     label: 'Total Savings',
-    value: allocationByName.Savings ?? 0,
+    value: allocationByKey.savings ?? 0,
     change: {
       amount: monthlyCategoryChange('Savings'),
       label: 'this month',
@@ -42,7 +43,7 @@ export const buildDashboardCards = (
   },
   {
     label: 'Investments',
-    value: allocationByName.Brokerage ?? 0,
+    value: allocationByKey.brokerage ?? 0,
     change: {
       amount: monthlyCategoryChange('Investment'),
       label: 'this month',
@@ -53,7 +54,7 @@ export const buildDashboardCards = (
   },
   {
     label: 'Pension',
-    value: allocationByName.Pension ?? 0,
+    value: allocationByKey.pension ?? 0,
     change: {
       amount: monthlyCategoryChange('Pension'),
       label: 'this month',
@@ -87,25 +88,33 @@ export function normalizeNetWorthSnapshots(
   }));
 }
 
+const ALLOCATION_COLORS: Record<AllocationKey, string> = {
+  savings: '#6366f1',
+  brokerage: '#0ea5e9',
+  property_equity: '#10b981',
+  pension: '#f59e0b',
+};
+
 export function normalizeAssetAllocations(
   summary: DashboardAllocationSummaryPayload,
   convertToBase: (amount: number, currency: string) => number,
 ): AllocationSummary {
-  const summaryCurrency = summary.allocations[0]?.currency ?? 'EUR';
   const allocationData = summary.allocations.map((allocation) => ({
+    key: allocation.key,
     name: allocation.name,
     value: convertToBase(allocation.value, allocation.currency),
-    color: allocation.color,
+    color: ALLOCATION_COLORS[allocation.key],
   }));
-  const totalAssets = allocationData.reduce((sum, item) => sum + item.value, 0);
-  const liabilitiesTotal = convertToBase(summary.liabilitiesTotal, summaryCurrency);
+  const totalAssets = convertToBase(summary.totalAssets, summary.currency);
+  const liabilitiesTotal = convertToBase(summary.liabilitiesTotal, summary.liabilitiesCurrency);
 
   return {
     allocationData,
     totalAssets,
     liabilitiesTotal,
     debtCount: summary.debtCount,
-    netWorth: totalAssets - liabilitiesTotal,
+    netWorth: convertToBase(summary.netWorth, summary.currency),
+    portfolioTotal: convertToBase(summary.portfolioTotal, summary.currency),
   };
 }
 
@@ -186,7 +195,7 @@ export const computeNWMetrics = (
   chartData: readonly NetWorthMetricData[],
   fallbackNetWorth: number,
 ) => {
-  const currentNW = chartData.length > 0 ? chartData[chartData.length - 1].value : fallbackNetWorth;
+  const currentNW = fallbackNetWorth;
   const prevNW = chartData.length > 1 ? chartData[chartData.length - 2].value : currentNW;
   const currentYear = new Date().getFullYear();
   const firstCurrentYearPoint = chartData.find((point) => point.year === currentYear);

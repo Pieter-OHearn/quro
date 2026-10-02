@@ -40,18 +40,12 @@ const PLAN_SECTIONS = [
   },
 ] as const;
 
-function unemploymentSupportLabel(jurisdiction: 'NL' | 'AU' | 'GENERIC'): string {
-  if (jurisdiction === 'NL') return 'WW';
-  if (jurisdiction === 'AU') return 'JobSeeker';
-  return 'Unemployment support';
-}
-
 // The page intentionally keeps its section order and modal state together for readability.
 // eslint-disable-next-line max-lines-per-function
 export function Plan() {
   const runwayQuery = useRunway();
   const assumptionsQuery = usePlanAssumptions();
-  const { fmtBase } = useCurrency();
+  const { fmtBase, convertToBase } = useCurrency();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [bankingReviewOpen, setBankingReviewOpen] = useState(false);
@@ -68,6 +62,7 @@ export function Plan() {
   }
   const data = runwayQuery.data;
   if (!data) return null;
+  const fmtPlanMoney = (value: number) => fmtBase(convertToBase(value, data.baseCurrency));
 
   return (
     <PageStack as="main">
@@ -93,20 +88,20 @@ export function Plan() {
       <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
       <ContentSection spacing="lg">
         <RunwayHeroCard data={data} onReview={() => setReviewOpen(true)} />
-        <BurnRateCards burn={data.burn} fmtBase={(value) => fmtBase(value)} />
+        <BurnRateCards burn={data.burn} fmtBase={fmtPlanMoney} />
       </ContentSection>
       <ContentSection spacing="lg" className="grid gap-6 xl:grid-cols-2">
-        <LiquidityTierBar tiers={data.tiers} fmtBase={(value) => fmtBase(value)} />
-        <RunwayLedgerChart ledger={data.runway.ledger} fmtBase={(value) => fmtBase(value)} />
+        <LiquidityTierBar tiers={data.tiers} fmtBase={fmtPlanMoney} />
+        <RunwayLedgerChart ledger={data.runway.ledger} fmtBase={fmtPlanMoney} />
       </ContentSection>
       <DepositGuaranteeNotice
         guarantees={data.depositGuarantee}
-        fmtBase={(value) => fmtBase(value)}
+        fmtBase={fmtPlanMoney}
         onReview={() => setBankingReviewOpen(true)}
       />
       {data.incomeSupport.unemployment.status === 'unknown' ? (
         <p className="text-xs leading-5 text-fg-subtle">
-          {unemploymentSupportLabel(data.jurisdiction.code)} is not included yet:{' '}
+          {data.jurisdiction.labels.unemploymentShort} is not included yet:{' '}
           {data.incomeSupport.unemployment.reason}
         </p>
       ) : null}
@@ -114,13 +109,13 @@ export function Plan() {
       <AssumptionsDrawer
         open={drawerOpen}
         assumptions={assumptionsQuery.data ?? null}
-        jurisdiction={data.jurisdiction.code}
+        jurisdiction={data.jurisdiction}
         onClose={() => setDrawerOpen(false)}
       />
       {reviewOpen ? (
         <CalculationReviewModal
           data={data}
-          fmtBase={(value) => fmtBase(value)}
+          fmtBase={fmtPlanMoney}
           onClose={() => setReviewOpen(false)}
         />
       ) : null}

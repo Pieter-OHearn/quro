@@ -1,3 +1,4 @@
+import { resolvePropertyDebts } from '../lib/propertyDebt';
 import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
 import { registerArchivableResource } from '../lib/archivableResource';
 import { findAccessible, findAccessibleChild } from '../lib/access';
@@ -348,7 +349,7 @@ function getAccessibleProperty(
 }
 
 // A property repayment reduces the linked mortgage's outstanding balance (the
-// source of truth, with the property's snapshot kept in step). For properties
+// source of truth). For properties
 // with no linked mortgage it reduces the property's own mortgage balance.
 async function applyPropertyRepaymentEffect(
   tx: DbTransaction,
@@ -363,7 +364,6 @@ async function applyPropertyRepaymentEffect(
   if (updatedBalance === null) {
     return 'Principal portion cannot exceed the current outstanding balance';
   }
-  if (mortgageId != null) await syncPropertyMortgage(tx, mortgageId, updatedBalance);
   return null;
 }
 
@@ -374,30 +374,11 @@ async function reversePropertyRepaymentEffect(
   property: typeof properties.$inferSelect,
   principal: number,
 ): Promise<void> {
-  const { mortgageId } = property;
-  if (mortgageId != null) {
-    const updatedBalance = await reverseRepayment(tx, MORTGAGE_BALANCE, {
-      id: mortgageId,
-      principal,
-    });
-    if (updatedBalance !== null) {
-      await syncPropertyMortgage(tx, mortgageId, updatedBalance);
-      return;
-    }
+  if (property.mortgageId !== null) {
+    await reverseRepayment(tx, MORTGAGE_BALANCE, { id: property.mortgageId, principal });
+  } else {
+    await reverseRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: property.id, principal });
   }
-  await reverseRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: property.id, principal });
-}
-
-// Keep the property's mortgage snapshot in step with its linked mortgage.
-async function syncPropertyMortgage(
-  tx: DbTransaction,
-  mortgageId: number,
-  outstandingBalance: number,
-): Promise<void> {
-  await tx
-    .update(properties)
-    .set({ mortgage: outstandingBalance })
-    .where(eq(properties.mortgageId, mortgageId));
 }
 
 function getAccessiblePropertyTransaction(
@@ -462,7 +443,7 @@ async function getPropertyLinkedToMortgage(params: {
 // Mortgage id comes from an access-checked property row, so the update is by
 // id only. Jointness propagates to keep the linked pair consistent for the
 // 50% dashboard weighting.
-async function syncMortgageSnapshotFromProperty(params: {
+async function syncLinkedMortgageMetadata(params: {
   mortgageId: number | null;
   property: typeof properties.$inferSelect;
   executor?: DbExecutor;
@@ -487,7 +468,7 @@ async function resolvePropertyMortgagePatch(params: {
   existing: typeof properties.$inferSelect;
   patch: Partial<PropertyPayload>;
 }): Promise<
-  | { ok: true; value: { mortgageId: number | null; mortgage: number } }
+  | { ok: true; value: { mortgageId: number | null; mortgage: number; isJoint?: boolean } }
   | { ok: false; error: string; status: 404 | 409 }
 > {
   const nextMortgageId = pickPatchedValue(params.patch.mortgageId, params.existing.mortgageId);
@@ -529,7 +510,8 @@ async function resolvePropertyMortgagePatch(params: {
     ok: true,
     value: {
       mortgageId: nextMortgageId,
-      mortgage: parseNormalizedDecimal(mortgage.outstandingBalance) ?? 0,
+      mortgage: 0,
+      isJoint: params.patch.isJoint ?? (params.existing.isJoint || mortgage.isJoint),
     },
   };
 }
@@ -545,7 +527,7 @@ app.get('/properties', async (c) => {
     .select()
     .from(properties)
     .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(properties.archivedAt)));
-  return c.json({ data });
+  return c.json({ data: await resolvePropertyDebts(data) });
 });
 
 app.get('/properties/:id', async (c) => {
@@ -555,7 +537,7 @@ app.get('/properties/:id', async (c) => {
   const partnerId = getPartnerId(c);
   const data = await getAccessibleProperty(user.id, partnerId, id);
   if (!data) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+  return c.json({ data: (await resolvePropertyDebts([data]))[0] });
 });
 
 app.post('/properties', async (c) => {
@@ -584,7 +566,7 @@ app.post('/properties', async (c) => {
       return c.json({ error: 'Mortgage already linked to another property' }, HTTP_STATUS.CONFLICT);
     }
 
-    mortgageBalance = parseNormalizedDecimal(mortgage.outstandingBalance) ?? 0;
+    mortgageBalance = 0;
     // A property linked to a joint mortgage is joint too (and vice versa).
     isJoint = isJoint || mortgage.isJoint;
   }
@@ -604,14 +586,14 @@ app.post('/properties', async (c) => {
       .values(toPropertyInsertValues(propertyPayload, user.id))
       .returning();
 
-    await syncMortgageSnapshotFromProperty({
+    await syncLinkedMortgageMetadata({
       mortgageId: created.mortgageId,
       property: created,
       executor: tx,
     });
     return created;
   });
-  return c.json({ data }, HTTP_STATUS.CREATED);
+  return c.json({ data: (await resolvePropertyDebts([data]))[0] }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/properties/:id', async (c) => {
@@ -650,14 +632,14 @@ app.patch('/properties/:id', async (c) => {
       .where(eq(properties.id, id))
       .returning();
 
-    await syncMortgageSnapshotFromProperty({
+    await syncLinkedMortgageMetadata({
       mortgageId: updated.mortgageId,
       property: updated,
       executor: tx,
     });
     return updated;
   });
-  return c.json({ data });
+  return c.json({ data: (await resolvePropertyDebts([data]))[0] });
 });
 
 async function hasActiveLinkedMortgage(
@@ -675,6 +657,7 @@ async function hasActiveLinkedMortgage(
 registerArchivableResource(app, {
   path: '/properties',
   table: properties,
+  serialize: async (property) => (await resolvePropertyDebts([property]))[0],
   label: 'Property',
   idLabel: 'property',
   beforeDelete: async (tx, property) => {

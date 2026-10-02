@@ -1,4 +1,9 @@
-import type { JurisdictionCode, RuleSource } from './jurisdiction.js';
+import type {
+  JurisdictionCode,
+  RuleSource,
+  PlanningLabels,
+  UnemploymentModel,
+} from './jurisdiction.js';
 
 export * from './jurisdiction.js';
 
@@ -797,6 +802,8 @@ export type RunwayResponse = {
   asOf: string;
   jurisdiction: {
     code: JurisdictionCode;
+    labels: PlanningLabels;
+    unemploymentModel: UnemploymentModel;
     rulesEffectiveFrom: string;
     isExtrapolated: boolean;
   };
@@ -861,16 +868,23 @@ export type RunwayResponse = {
   isEstimated: boolean;
 };
 
+export type AllocationKey = 'savings' | 'brokerage' | 'property_equity' | 'pension';
+
 export type AssetAllocation = {
+  key: AllocationKey;
   id: number;
   name: string;
   value: number;
-  color: string;
   currency: CurrencyCode;
 };
 
 export type DashboardAllocationsSummary = {
   allocations: AssetAllocation[];
+  currency: CurrencyCode;
+  netWorth: number;
+  portfolioTotal: number;
+  totalAssets: number;
+  liabilitiesCurrency: CurrencyCode;
   liabilitiesTotal: number;
   debtCount: number;
 };

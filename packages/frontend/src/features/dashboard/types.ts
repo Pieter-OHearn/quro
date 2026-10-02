@@ -14,6 +14,7 @@ export type DashboardTransaction = {
 };
 
 export type AllocationItem = {
+  key: import('@quro/shared').AllocationKey;
   name: string;
   value: number;
   color: string;
@@ -25,6 +26,7 @@ export type AllocationSummary = {
   liabilitiesTotal: number;
   debtCount: number;
   netWorth: number;
+  portfolioTotal: number;
 };
 
 export type MonthlySummaryItem = {

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.6.2] - 2026-10-02
+
+- Resolve linked property debt directly from mortgages and share household attribution across allocations, snapshots, history, and runway.
+- Return authoritative net-worth and portfolio totals with stable allocation keys and explicit currency metadata; keep allocation colours on the client.
+- Standardize derived API amounts on EUR with client display conversion, and correct non-EUR budget inputs in runway calculations.
+- Drive runway labels, warnings, sources, and unemployment models from jurisdiction profiles.
+
 ## [v0.6.1] - 2026-10-02
 
 - Protect new API routes by default using a shared list of public paths, and resolve the accepted partner in the session query.
