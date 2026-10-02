@@ -210,7 +210,10 @@ export function NotificationBell() {
         ring={ring}
         unreadCount={unreadCount}
         hasActiveJobs={hasActiveJobs}
-        onToggle={() => setOpen((value) => !value)}
+        onToggle={() => {
+          if (!open) void notificationsQuery.refetch();
+          setOpen((value) => !value);
+        }}
       />
       {open && (
         <Dropdown

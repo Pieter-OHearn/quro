@@ -37,6 +37,7 @@ export function usePensionImportNotifications(options: UsePensionImportNotificat
 
       return payload.map(normalizePensionStatementImportFeedItem);
     },
+    refetchOnWindowFocus: 'always',
     refetchInterval: (query) => {
       const imports = query.state.data ?? [];
       if (imports.some((item) => ACTIVE_STATUSES.has(item.import.status))) return 2000;

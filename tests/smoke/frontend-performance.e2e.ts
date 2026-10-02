@@ -118,3 +118,67 @@ test('notification polling stops once an active import becomes ready', async ({ 
   await page.clock.fastForward(60_000);
   expect(api.importRequests()).toBe(2);
 });
+
+test('opening idle notifications discovers external jobs and restarts active polling', async ({
+  page,
+}) => {
+  const api = await mockApi(page, true, ['ready_for_review', 'queued', 'ready_for_review']);
+  await page.goto('/');
+  await expect(page.getByTestId('dashboard-net-worth-value')).toBeVisible();
+  await expect.poll(api.importRequests).toBe(1);
+  await page.getByTitle('Notifications', { exact: true }).click();
+  await expect(page.getByText('Statement queued', { exact: true })).toBeVisible();
+  await expect.poll(api.importRequests).toBe(3);
+  await expect(page.getByText('Statement ready to review', { exact: true })).toBeVisible();
+});
+
+test('returning to the window refreshes a recently cached idle notification feed', async ({
+  page,
+}) => {
+  const api = await mockApi(page, true, ['ready_for_review', 'queued', 'ready_for_review']);
+  await page.goto('/');
+  await expect(page.getByTestId('dashboard-net-worth-value')).toBeVisible();
+  await expect.poll(api.importRequests).toBe(1);
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+  await expect.poll(api.importRequests).toBe(3);
+});
+
+test('mortgage metrics refresh after calendar rollover with unchanged server data', async ({
+  page,
+}) => {
+  await mockApi(page, true);
+  await page.route('**/api/mortgages', (route) =>
+    route.fulfill({
+      json: {
+        data: [
+          {
+            id: 1,
+            userId: USER.id,
+            propertyAddress: 'Calendar Test',
+            lender: 'Test Bank',
+            currency: 'EUR',
+            originalAmount: 100000,
+            outstandingBalance: 50000,
+            propertyValue: 200000,
+            monthlyPayment: 2500,
+            interestRate: 3,
+            rateType: 'Fixed',
+            repaymentType: 'Annuity',
+            fixedUntil: '2034-03-31',
+            termYears: 4,
+            startDate: '2030-03-31',
+            endDate: '2034-03-31',
+            overpaymentLimit: 10,
+            isJoint: false,
+          },
+        ],
+      },
+    }),
+  );
+  await page.clock.setFixedTime(new Date('2032-04-30T12:00:00Z'));
+  await page.goto('/mortgage');
+  await expect(page.getByText('~24 months', { exact: true })).toBeVisible();
+  await page.clock.setFixedTime(new Date('2032-05-01T12:00:00Z'));
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByText('~23 months', { exact: true })).toBeVisible();
+});
