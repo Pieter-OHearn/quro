@@ -5,16 +5,18 @@ import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import type { PensionPageState } from '../types';
-import { useCreatePensionPot } from './useCreatePensionPot';
-import { useCreatePensionTransaction } from './useCreatePensionTransaction';
-import { useDeletePensionPot } from './useDeletePensionPot';
-import { useDeletePensionTransaction } from './useDeletePensionTransaction';
+import {
+  useCreatePensionPot,
+  useCreatePensionTransaction,
+  useDeletePensionPot,
+  useDeletePensionTransaction,
+  useUpdatePensionPot,
+  useUpdatePensionTransaction,
+} from './mutations';
 import { usePensionComputations } from './usePensionComputations';
 import { usePensionPots } from './usePensionPots';
 import { usePensionStatementDocuments } from './usePensionStatementDocuments';
 import { usePensionTransactions } from './usePensionTransactions';
-import { useUpdatePensionPot } from './useUpdatePensionPot';
-import { useUpdatePensionTransaction } from './useUpdatePensionTransaction';
 
 function usePensionUiState() {
   const [showModal, setShowModal] = useState(false);

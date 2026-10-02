@@ -1,3 +1,4 @@
+import { MORTGAGE_TRANSACTION_TYPES } from '@quro/shared';
 import { Home, Landmark, Percent } from 'lucide-react';
 import type { MortgageTxnType } from '../types';
 
@@ -34,5 +35,5 @@ export const TXN_META: Record<
   },
 };
 
-export const MORTGAGE_TXN_TYPES: MortgageTxnType[] = ['repayment', 'valuation', 'rate_change'];
+export const MORTGAGE_TXN_TYPES = MORTGAGE_TRANSACTION_TYPES;
 export const MORTGAGE_TXN_FILTER_OPTIONS = ['all', ...MORTGAGE_TXN_TYPES] as const;

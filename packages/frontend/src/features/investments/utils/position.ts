@@ -1,7 +1,7 @@
 import type { HoldingTransaction, Mortgage, Property, PropertyTransaction } from '@quro/shared';
 
-export type HoldingTxnType = 'buy' | 'sell' | 'dividend';
-export type PropertyTxnType = 'repayment' | 'valuation' | 'rent_income' | 'expense';
+export type { HoldingTransactionType as HoldingTxnType } from '@quro/shared';
+export type { PropertyTransactionType as PropertyTxnType } from '@quro/shared';
 
 const INVESTMENT_PROPERTY_TYPES = new Set([
   'Buy-to-Let',

@@ -1,6 +1,6 @@
 import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
 import type { MortgageFormPayload, SaveMortgageTxnInput } from '../types';
-import type { DeleteMortgageMode } from '../hooks/useDeleteMortgage';
+import type { DeleteMortgageMode } from '../hooks/mutations';
 import { AddMortgageModal } from './AddMortgageModal';
 import { AddMortgageTxnModal } from './AddMortgageTxnModal';
 

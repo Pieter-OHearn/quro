@@ -1,12 +1,4 @@
-import {
-  parseTickerItemType,
-  type Holding,
-  type HoldingPriceHistoryEntry,
-  type HoldingTransaction,
-  type Property,
-  type PropertyTransaction,
-  DEFAULT_EMOJI,
-} from '@quro/shared';
+import { parseTickerItemType, type Holding, type Property, DEFAULT_EMOJI } from '@quro/shared';
 
 function toNullableId(value: unknown): number | null {
   if (value == null || value === '') return null;
@@ -28,24 +20,10 @@ export function normalizeHolding(raw: Holding): Holding {
   };
 }
 
-export function normalizeHoldingTransaction(raw: HoldingTransaction): HoldingTransaction {
-  return raw;
-}
-
-export function normalizeHoldingPriceHistoryEntry(
-  raw: HoldingPriceHistoryEntry,
-): HoldingPriceHistoryEntry {
-  return raw;
-}
-
 export function normalizeProperty(raw: Property): Property {
   return {
     ...raw,
     mortgageId: toNullableId(raw.mortgageId),
     emoji: raw.emoji?.trim() || DEFAULT_EMOJI.property,
   };
-}
-
-export function normalizePropertyTransaction(raw: PropertyTransaction): PropertyTransaction {
-  return raw;
 }

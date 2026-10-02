@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosRequestConfig } from 'axios';
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z\d+.-]*:\/\//i;
 const UNAUTHORIZED_STATUS = 401;
@@ -65,3 +65,58 @@ api.interceptors.response.use(undefined, (error: unknown) => {
   }
   return Promise.reject(error);
 });
+
+// Keep transport envelopes at the API boundary. T describes the JSON payload;
+// endpoints with a different wire shape still normalize explicitly at the caller.
+type ApiResponse<T> = { data: T };
+
+export async function apiGet<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
+  const response = await api.get<ApiResponse<T>>(path, config);
+  return response.data.data;
+}
+
+export async function apiPost<T>(
+  path: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> {
+  const response = await api.post<ApiResponse<T>>(path, body, config);
+  return response.data.data;
+}
+
+export async function apiPatch<T>(
+  path: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> {
+  const response = await api.patch<ApiResponse<T>>(path, body, config);
+  return response.data.data;
+}
+
+export async function apiPut<T>(
+  path: string,
+  body?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<T> {
+  const response = await api.put<ApiResponse<T>>(path, body, config);
+  return response.data.data;
+}
+
+export async function apiDelete<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
+  const response = await api.delete<ApiResponse<T>>(path, config);
+  return response.data.data;
+}
+
+export function readApiErrorMessage(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const responseError = (error as { response?: { data?: { error?: unknown } } }).response?.data
+    ?.error;
+  return typeof responseError === 'string' ? responseError : null;
+}
+
+export function resolveApiErrorMessage(error: unknown, fallback: string): string {
+  const apiError = readApiErrorMessage(error);
+  if (apiError) return apiError;
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return fallback;
+}

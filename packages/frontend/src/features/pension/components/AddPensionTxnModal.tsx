@@ -12,9 +12,9 @@ import type { PensionPot, PensionStatementDocument, PensionTransaction } from '@
 import {
   PdfAttachmentUploadError,
   buildApiDownloadUrl,
-  resolveApiErrorMessage,
   usePdfAttachmentState,
 } from '@/lib/pdfDocuments';
+import { resolveApiErrorMessage } from '@/lib/api';
 import { PENSION_TXN_META } from '../constants';
 import {
   useAddPensionTxnForm,

@@ -10,7 +10,6 @@ const FRONTEND_NORMALIZERS = [
   'packages/frontend/src/features/investments/utils/normalizers.ts',
   'packages/frontend/src/features/goals/hooks/goal-normalizer.ts',
   'packages/frontend/src/features/debts/utils/debt-normalizers.ts',
-  'packages/frontend/src/features/mortgage/utils/mortgage-normalizers.ts',
   'packages/frontend/src/features/pension/utils/pension-api-normalizers.ts',
   'packages/frontend/src/features/salary/utils/normalizers.ts',
   'packages/frontend/src/features/budget/utils/normalizers.ts',

@@ -1,47 +1,31 @@
+import { useDomainMutation } from '@/lib/useDomainMutation';
+import { queryKeys } from '@/lib/queryKeys';
+import { apiGet, apiPost, apiPatch } from '@/lib/api';
 import type { Employment, EmploymentInput, EmploymentPatch } from '@quro/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 
-export const EMPLOYMENTS_QUERY_KEY = ['employments'] as const;
-
-function useEmploymentInvalidation() {
-  const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: EMPLOYMENTS_QUERY_KEY }),
-      queryClient.invalidateQueries({ queryKey: ['plan'] }),
-      queryClient.invalidateQueries({ queryKey: ['salary'] }),
-    ]);
-}
+export const EMPLOYMENTS_QUERY_KEY = queryKeys.employments;
 
 export function useEmployments() {
   return useQuery({
     queryKey: EMPLOYMENTS_QUERY_KEY,
     queryFn: async () => {
-      const response = await api.get('/api/employments');
-      return response.data.data as Employment[];
+      return apiGet<Employment[]>('/api/employments');
     },
   });
 }
 
 export function useCreateEmployment() {
-  const invalidate = useEmploymentInvalidation();
-  return useMutation({
-    mutationFn: async (input: EmploymentInput) => {
-      const response = await api.post('/api/employments', input);
-      return response.data.data as Employment;
-    },
-    onSuccess: invalidate,
+  return useDomainMutation('employment', async (input: EmploymentInput) => {
+    return apiPost<Employment>('/api/employments', input);
   });
 }
 
 export function useUpdateEmployment() {
-  const invalidate = useEmploymentInvalidation();
-  return useMutation({
-    mutationFn: async ({ id, patch }: { id: number; patch: EmploymentPatch }) => {
-      const response = await api.patch(`/api/employments/${id}`, patch);
-      return response.data.data as Employment;
+  return useDomainMutation(
+    'employment',
+    async ({ id, patch }: { id: number; patch: EmploymentPatch }) => {
+      return apiPatch<Employment>(`/api/employments/${id}`, patch);
     },
-    onSuccess: invalidate,
-  });
+  );
 }

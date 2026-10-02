@@ -7,11 +7,9 @@ import { useHoldingTransactions } from '@/features/investments/hooks';
 import { usePayslips } from '@/features/salary/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
 import type { FilterKey, GoalsPageState, UpdateGoalInput } from '../types';
-import { useCreateGoal } from './useCreateGoal';
-import { useDeleteGoal } from './useDeleteGoal';
+import { useCreateGoal, useDeleteGoal, useUpdateGoal } from './mutations';
 import { useGoals } from './useGoals';
 import { useGoalsComputations } from './useGoalsComputations';
-import { useUpdateGoal } from './useUpdateGoal';
 
 function useGoalsQueries() {
   const goalsQuery = useGoals();

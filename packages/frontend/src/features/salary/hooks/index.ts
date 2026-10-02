@@ -1,8 +1,11 @@
 export { useAddPayslipForm } from './useAddPayslipForm';
-export { useCreatePayslip } from './useCreatePayslip';
-export { useDeletePayslipDocument } from './useDeletePayslipDocument';
-export { useDeletePayslip } from './useDeletePayslip';
+export {
+  useCreatePayslip,
+  useDeletePayslipDocument,
+  useDeletePayslip,
+  useUploadPayslipDocument,
+  useUpdatePayslip,
+} from './mutations';
+
 export { usePayslips } from './usePayslips';
 export { useSalaryHistory } from './useSalaryHistory';
-export { useUploadPayslipDocument } from './useUploadPayslipDocument';
-export { useUpdatePayslip } from './useUpdatePayslip';

@@ -5,7 +5,7 @@ import { ArchiveOrDeleteDialog, Modal, ModalFooter, FormField, TextInput } from 
 import { JointToggleField } from '@/features/partner';
 import { formatFixedInputValue } from '@/lib/utils';
 import { formatPercent, type Property } from '@quro/shared';
-import type { DeletePropertyMode } from '../hooks/useDeleteProperty';
+import type { DeletePropertyMode } from '../hooks/mutations';
 
 type UpdatePropertyModalProps = {
   property: Property;

@@ -1,5 +1,5 @@
+import { apiGet } from '@/lib/api';
 import { useRef, useState } from 'react';
-import { api } from '@/lib/api';
 import type { TickerLookupResult } from '@quro/shared';
 
 type TickerLookupState = {
@@ -37,10 +37,10 @@ export function useTickerLookup() {
     const requestId = requestTracker.issue();
     setState({ data: null, isLoading: true, error: null });
     try {
-      const { data } = await api.get(
+      const payload = await apiGet<TickerLookupResult>(
         `/api/investments/ticker-lookup/${encodeURIComponent(symbol.trim().toUpperCase())}`,
       );
-      const result = data.data as TickerLookupResult;
+      const result = payload;
       if (!requestTracker.isLatest(requestId)) return null;
       setState({ data: result, isLoading: false, error: null });
       return result;

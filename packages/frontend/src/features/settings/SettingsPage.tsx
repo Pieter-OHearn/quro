@@ -1,3 +1,4 @@
+import { invalidateDomain } from '@/lib/queryInvalidation';
 /* eslint-disable complexity, max-lines-per-function */
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ElementType } from 'react';
@@ -51,9 +52,8 @@ import {
   TextInput,
 } from '@/components/ui';
 import { CURRENCY_CODES, CURRENCY_META } from '@/lib/CurrencyContext';
-import { api, buildApiUrl } from '@/lib/api';
+import { apiPut, buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/AuthContext';
-import { resolveApiErrorMessage } from '@/lib/pdfDocuments';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
 import { PartnerSection } from '@/features/partner';
@@ -386,8 +386,8 @@ function ProfileSection({ user, replaceUser, initials }: Readonly<ProfileSection
 
     setIsSaving(true);
     try {
-      const response = await api.put('/api/settings/profile', nextState.payload);
-      replaceUser(response.data.data);
+      const response = await apiPut<User>('/api/settings/profile', nextState.payload);
+      replaceUser(response);
       showSaved();
     } catch (error) {
       setFormError(resolveApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
@@ -582,8 +582,8 @@ function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) 
 
     setIsSaving(true);
     try {
-      const response = await api.put('/api/settings/password', payload);
-      replaceUser(response.data.data);
+      const response = await apiPut<User>('/api/settings/password', payload);
+      replaceUser(response);
       setForm(createEmptyPasswordForm());
       showSaved();
     } catch (error) {
@@ -767,12 +767,9 @@ function PreferencesSection({ user, replaceUser }: Readonly<PreferencesSectionPr
     setIsSaving(true);
     setFormError('');
     try {
-      const response = await api.put('/api/settings/preferences', payload);
-      replaceUser(response.data.data);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['plan'] }),
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-      ]);
+      const response = await apiPut<User>('/api/settings/preferences', payload);
+      replaceUser(response);
+      await invalidateDomain(queryClient, 'preferences');
       showSaved();
     } catch (error) {
       setFormError(resolveApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));

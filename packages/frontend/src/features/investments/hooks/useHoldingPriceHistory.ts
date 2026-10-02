@@ -1,6 +1,7 @@
+import { queryKeys } from '@/lib/queryKeys';
+import { apiGet } from '@/lib/api';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import {
   addMonthsUtc,
   monthEndUtc,
@@ -8,7 +9,6 @@ import {
   toIsoDate,
   type HoldingPriceHistoryEntry,
 } from '@quro/shared';
-import { normalizeHoldingPriceHistoryEntry } from '../utils/normalizers';
 
 const HISTORY_LOOKBACK_MONTHS = 12;
 
@@ -33,23 +33,16 @@ export function useHoldingPriceHistory(holdingIds: number[]) {
   }, []);
 
   return useQuery({
-    queryKey: [
-      'investments',
-      'holdingPriceHistory',
-      sortedHoldingIds.join(','),
-      range.from,
-      range.to,
-    ],
+    queryKey: queryKeys.investments.priceHistory(sortedHoldingIds.join(','), range.from, range.to),
     enabled: sortedHoldingIds.length > 0,
     queryFn: async () => {
-      const { data } = await api.get('/api/investments/holding-price-history', {
+      return apiGet<HoldingPriceHistoryEntry[]>('/api/investments/holding-price-history', {
         params: {
           holdingIds: sortedHoldingIds.join(','),
           from: range.from,
           to: range.to,
         },
       });
-      return (data.data as HoldingPriceHistoryEntry[]).map(normalizeHoldingPriceHistoryEntry);
     },
   });
 }

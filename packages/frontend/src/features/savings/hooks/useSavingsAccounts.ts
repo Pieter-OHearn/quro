@@ -1,7 +1,7 @@
+import { queryKeys } from '@/lib/queryKeys';
+import { apiGet } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import type { SavingsAccount } from '@quro/shared';
-import { normalizeSavingsAccount } from '../utils/normalizers';
 
 export function useSavingsAccounts() {
   return useSavingsAccountsQuery(false);
@@ -9,12 +9,11 @@ export function useSavingsAccounts() {
 
 export function useSavingsAccountsQuery(includeArchived: boolean) {
   return useQuery({
-    queryKey: ['savings', 'accounts', { includeArchived }],
+    queryKey: queryKeys.savings.accountList(includeArchived),
     queryFn: async () => {
-      const { data } = await api.get('/api/savings/accounts', {
+      return apiGet<SavingsAccount[]>('/api/savings/accounts', {
         params: includeArchived ? { includeArchived: true } : undefined,
       });
-      return (data.data as SavingsAccount[]).map(normalizeSavingsAccount);
     },
   });
 }

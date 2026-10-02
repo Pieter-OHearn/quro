@@ -17,7 +17,7 @@ function Status({ value }: Readonly<{ value: keyof typeof STATUS_LABELS }>) {
 }
 
 // The sections deliberately follow the backend component order for auditability.
-// eslint-disable-next-line max-lines-per-function, complexity, sonarjs/cognitive-complexity
+// eslint-disable-next-line max-lines-per-function, complexity
 export function CalculationReviewModal({
   data,
   fmtBase,

@@ -1,10 +1,8 @@
+export type { ConvertToBaseFn, IsForeignFn } from '@/lib/CurrencyContext';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 
 export type SavingsFormatFn = (value: number, unit?: string, compact?: boolean) => string;
 export type SavingsNativeFormatFn = (value: number, currency: string, compact?: boolean) => string;
-
-export type ConvertToBaseFn = (value: number, currency: string) => number;
-export type IsForeignFn = (currency: string) => boolean;
 
 export type SavingsChartDatum = {
   month: string;
@@ -18,7 +16,7 @@ export type SavingsContributionDatum = {
   withdrawals: number;
 };
 
-export type TxnType = 'deposit' | 'withdrawal' | 'interest';
+export type { SavingsTransactionType as TxnType } from '@quro/shared';
 export type DeleteSavingsAccountMode = 'preserveTransactions' | 'deleteTransactions';
 
 export type SaveAccountInput = Omit<SavingsAccount, 'id'> & { id?: number };

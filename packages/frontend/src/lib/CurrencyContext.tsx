@@ -8,10 +8,11 @@ import {
   isNumberFormatPreference,
   type CurrencyCode,
   type NumberFormatPreference,
+  type User,
 } from '@quro/shared';
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from './AuthContext';
-import { api } from './api';
+import { apiPut } from './api';
 import { convertCurrencyAmount } from './currencyRates';
 import {
   getCurrencyRatesErrorDetail,
@@ -24,7 +25,7 @@ export type { CurrencyCode };
 
 export type CurrencyRatesStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-type CurrencyContextType = {
+export type CurrencyContextType = {
   baseCurrency: CurrencyCode;
   numberFormat: NumberFormatPreference;
   setBaseCurrency: (c: CurrencyCode) => void;
@@ -167,10 +168,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
       if (!user) return;
 
-      void api
-        .put('/api/settings/preferences', { baseCurrency: nextCurrency })
+      void apiPut<User>('/api/settings/preferences', { baseCurrency: nextCurrency })
         .then((response) => {
-          replaceUser(response.data.data);
+          replaceUser(response);
         })
         .catch(() => {
           setBaseCurrencyState(previousCurrency);
@@ -232,3 +232,6 @@ export function useCurrency() {
   if (!ctx) throw new Error('useCurrency must be used within CurrencyProvider');
   return ctx;
 }
+
+export type ConvertToBaseFn = CurrencyContextType['convertToBase'];
+export type IsForeignFn = CurrencyContextType['isForeign'];

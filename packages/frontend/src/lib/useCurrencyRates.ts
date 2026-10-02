@@ -1,3 +1,4 @@
+import { queryKeys } from './queryKeys';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from './AuthContext';
@@ -8,7 +9,7 @@ import {
   type CurrencyRateTable,
 } from './currencyRates';
 
-export const CURRENCY_RATES_QUERY_KEY = ['currency', 'rates'] as const;
+export const CURRENCY_RATES_QUERY_KEY = queryKeys.currencyRates;
 const SERVICE_UNAVAILABLE_STATUS = 503;
 
 export class CurrencyRatesUnavailableError extends Error {
