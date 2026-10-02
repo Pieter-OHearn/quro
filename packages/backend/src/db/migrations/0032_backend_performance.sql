@@ -1,0 +1,4 @@
+CREATE INDEX "holding_transactions_holding_date_idx" ON "holding_transactions" USING btree ("holding_id","date");--> statement-breakpoint
+CREATE INDEX "pension_statement_imports_queued_idx" ON "pension_statement_imports" USING btree ("created_at","id") WHERE "pension_statement_imports"."status" = 'queued';--> statement-breakpoint
+CREATE INDEX "pension_statement_imports_expiry_idx" ON "pension_statement_imports" USING btree ("expires_at") WHERE "pension_statement_imports"."status" in ('queued', 'processing', 'ready_for_review');--> statement-breakpoint
+CREATE INDEX "pension_transactions_pot_date_idx" ON "pension_transactions" USING btree ("pot_id","date");

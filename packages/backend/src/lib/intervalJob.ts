@@ -1,4 +1,5 @@
-import { HOUR_MS } from '../constants/time';
+import { HOUR_MS, MINUTE_MS } from '../constants/time';
+import { runScheduledJob } from './scheduledJob';
 
 type IntervalJobOptions = {
   // Log prefix, e.g. 'bunq-sync'.
@@ -6,6 +7,7 @@ type IntervalJobOptions = {
   intervalMs: number;
   // Also run once immediately at startup.
   runOnStart: boolean;
+  coordinated?: boolean;
   run: () => Promise<void>;
 };
 
@@ -29,7 +31,8 @@ export function startIntervalJob(options: Readonly<IntervalJobOptions>): void {
     }
     running = true;
     try {
-      await run();
+      if (options.coordinated) await runScheduledJob(name, intervalMs, run);
+      else await run();
     } catch (error) {
       console.error(`[${name}] Failed to run cycle:`, error);
     } finally {
@@ -38,6 +41,7 @@ export function startIntervalJob(options: Readonly<IntervalJobOptions>): void {
   };
 
   console.log(`[${name}] Scheduler started, interval: ${intervalMs / HOUR_MS}h`);
-  setInterval(() => void runSafely(), intervalMs);
+  const pollMs = options.coordinated ? Math.min(intervalMs, MINUTE_MS) : intervalMs;
+  setInterval(() => void runSafely(), pollMs);
   if (runOnStart) void runSafely();
 }

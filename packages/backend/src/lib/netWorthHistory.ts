@@ -7,7 +7,7 @@ import {
   toUtcTimestamp,
   type PensionTransactionType,
 } from '@quro/shared';
-import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, gte, lt, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   debtPayments,
@@ -25,7 +25,7 @@ import {
   savingsTransactions,
 } from '../db/schema';
 import {
-  buildRatesToBaseCurrencyAt,
+  createHistoricalRateResolver,
   convertToBaseCurrency,
   FX_BASE_CURRENCY,
   type HistoricalCurrencyRateRow,
@@ -36,7 +36,8 @@ import {
 } from '../lib/currencyRateSync';
 import {
   computeDerivedAllocations,
-  resolveHistoricalHoldingPrice,
+  resolvePreparedHoldingPrice,
+  loadSnapshotInputs,
   type DerivedAllocationSummary,
 } from '../lib/netWorth';
 import { ownedOrJointPredicate, loadHouseholdRows, scopeHouseholdRows } from '../lib/partner';
@@ -177,9 +178,166 @@ type JointScopedSourceRows = {
   mortgages: Array<typeof mortgages.$inferSelect>;
 };
 
+// Retain a boundary row so old-only ledgers still produce the same seven points.
+function loadSavingsHistory(access: SQL | undefined, start: string) {
+  const columns = getTableColumns(savingsTransactions);
+  const query = () =>
+    db
+      .select(columns)
+      .from(savingsTransactions)
+      .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id));
+  const before = db
+    .selectDistinctOn([savingsTransactions.accountId], columns)
+    .from(savingsTransactions)
+    .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
+    .where(and(access, lt(savingsTransactions.date, start)))
+    .orderBy(
+      savingsTransactions.accountId,
+      desc(savingsTransactions.date),
+      desc(savingsTransactions.id),
+    );
+  return query()
+    .where(and(access, gte(savingsTransactions.date, start)))
+    .unionAll(before);
+}
+
+function loadPropertyHistory(access: SQL | undefined, start: string) {
+  const columns = getTableColumns(propertyTransactions);
+  const before = db
+    .selectDistinctOn([propertyTransactions.propertyId], columns)
+    .from(propertyTransactions)
+    .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
+    .where(
+      and(access, lt(propertyTransactions.date, start), eq(propertyTransactions.type, 'valuation')),
+    )
+    .orderBy(
+      propertyTransactions.propertyId,
+      desc(propertyTransactions.date),
+      desc(propertyTransactions.id),
+    );
+  // A second boundary row preserves history presence for repayment-only ledgers.
+  const boundary = db
+    .selectDistinctOn([propertyTransactions.propertyId], columns)
+    .from(propertyTransactions)
+    .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
+    .where(and(access, lt(propertyTransactions.date, start)))
+    .orderBy(
+      propertyTransactions.propertyId,
+      desc(propertyTransactions.date),
+      desc(propertyTransactions.id),
+    );
+  return db
+    .select(columns)
+    .from(propertyTransactions)
+    .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
+    .where(and(access, gte(propertyTransactions.date, start)))
+    .union(before)
+    .union(boundary);
+}
+
+function loadHoldingHistory(userId: number, start: string) {
+  const columns = {
+    holdingId: holdingTransactions.holdingId,
+    type: holdingTransactions.type,
+    shares: holdingTransactions.shares,
+    price: holdingTransactions.price,
+    date: holdingTransactions.date,
+  };
+  const latest = db
+    .selectDistinctOn([holdingTransactions.holdingId], columns)
+    .from(holdingTransactions)
+    .where(
+      and(
+        eq(holdingTransactions.userId, userId),
+        lt(holdingTransactions.date, start),
+        sql`${holdingTransactions.type} in ('buy', 'sell')`,
+      ),
+    )
+    .orderBy(
+      holdingTransactions.holdingId,
+      desc(holdingTransactions.date),
+      desc(holdingTransactions.id),
+    )
+    .as('latest');
+  // Shares require the entire opening position, not just the last transaction.
+  const opening = db
+    .select({
+      holdingId: holdingTransactions.holdingId,
+      type: sql<string>`'buy'`,
+      shares:
+        sql<number>`sum(case when ${holdingTransactions.type} = 'buy' then ${holdingTransactions.shares} else -${holdingTransactions.shares} end)`.mapWith(
+          Number,
+        ),
+      price: latest.price,
+      date: latest.date,
+    })
+    .from(holdingTransactions)
+    .innerJoin(latest, eq(latest.holdingId, holdingTransactions.holdingId))
+    .where(
+      and(
+        eq(holdingTransactions.userId, userId),
+        lt(holdingTransactions.date, start),
+        sql`${holdingTransactions.type} in ('buy', 'sell')`,
+      ),
+    )
+    .groupBy(holdingTransactions.holdingId, latest.price, latest.date);
+  return db
+    .select(columns)
+    .from(holdingTransactions)
+    .where(and(eq(holdingTransactions.userId, userId), gte(holdingTransactions.date, start)))
+    .unionAll(opening);
+}
+
+function loadHoldingPrices(userId: number, start: string) {
+  const columns = getTableColumns(holdingPriceHistory);
+  const before = db
+    .selectDistinctOn([holdingPriceHistory.holdingId], columns)
+    .from(holdingPriceHistory)
+    .where(and(eq(holdingPriceHistory.userId, userId), lt(holdingPriceHistory.eodDate, start)))
+    .orderBy(holdingPriceHistory.holdingId, desc(holdingPriceHistory.eodDate));
+  return db
+    .select(columns)
+    .from(holdingPriceHistory)
+    .where(and(eq(holdingPriceHistory.userId, userId), gte(holdingPriceHistory.eodDate, start)))
+    .unionAll(before);
+}
+
+function loadPensionHistory(userId: number, start: string) {
+  const columns = getTableColumns(pensionTransactions);
+  const before = db
+    .selectDistinctOn([pensionTransactions.potId], columns)
+    .from(pensionTransactions)
+    .where(and(eq(pensionTransactions.userId, userId), lt(pensionTransactions.date, start)))
+    .orderBy(
+      pensionTransactions.potId,
+      desc(pensionTransactions.date),
+      desc(pensionTransactions.id),
+    );
+  return db
+    .select(columns)
+    .from(pensionTransactions)
+    .where(and(eq(pensionTransactions.userId, userId), gte(pensionTransactions.date, start)))
+    .unionAll(before);
+}
+
+function loadDebtHistory(userId: number, start: string) {
+  const columns = getTableColumns(debtPayments);
+  const before = db
+    .selectDistinctOn([debtPayments.debtId], columns)
+    .from(debtPayments)
+    .where(and(eq(debtPayments.userId, userId), lt(debtPayments.date, start)))
+    .orderBy(debtPayments.debtId, desc(debtPayments.date), desc(debtPayments.id));
+  return db
+    .select(columns)
+    .from(debtPayments)
+    .where(and(eq(debtPayments.userId, userId), gte(debtPayments.date, start)))
+    .unionAll(before);
+}
+
 async function loadJointScopedRows(
   userId: number,
   partnerId: number | null,
+  windowStart: string,
 ): Promise<JointScopedSourceRows> {
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const propertyAccess = ownedOrJointPredicate(properties, userId, partnerId);
@@ -190,29 +348,13 @@ async function loadJointScopedRows(
       loadHouseholdRows(savingsAccounts, userId, partnerId, { includeArchived: true }),
       [],
     ),
-    safeLoad(
-      'savings transactions',
-      db
-        .select(getTableColumns(savingsTransactions))
-        .from(savingsTransactions)
-        .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
-        .where(savingsAccess),
-      [],
-    ),
+    safeLoad('savings transactions', loadSavingsHistory(savingsAccess, windowStart), []),
     safeLoad(
       'properties',
       loadHouseholdRows(properties, userId, partnerId, { includeArchived: true }),
       [],
     ),
-    safeLoad(
-      'property transactions',
-      db
-        .select(getTableColumns(propertyTransactions))
-        .from(propertyTransactions)
-        .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
-        .where(propertyAccess),
-      [],
-    ),
+    safeLoad('property transactions', loadPropertyHistory(propertyAccess, windowStart), []),
     safeLoad(
       'mortgages',
       loadHouseholdRows(mortgages, userId, partnerId, { includeArchived: true }),
@@ -337,45 +479,31 @@ export async function buildDerivedAllocations(
   userId: number,
   partnerId: number | null,
 ): Promise<DerivedAllocationSummary> {
-  const [rates, jointScoped, userHoldings, userHoldingTxns, userPensions, userDebts] =
-    await Promise.all([
-      getRatesToBaseCurrency(),
-      loadJointScopedRows(userId, partnerId),
-      db
-        .select()
-        .from(holdings)
-        .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
-      db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-      db
-        .select()
-        .from(pensionPots)
-        .where(and(eq(pensionPots.userId, userId), isNull(pensionPots.archivedAt))),
-      db
-        .select()
-        .from(debts)
-        .where(and(eq(debts.userId, userId), isNull(debts.archivedAt))),
-    ]);
+  const input = await loadSnapshotInputs(userId, { partnerId });
   return computeDerivedAllocations(
-    rates,
-    scopeHouseholdRows(
-      'savings',
-      jointScoped.savings.filter((row) => !row.archivedAt),
-      (row) => row.isJoint,
-    ),
-    userHoldings,
-    userHoldingTxns,
-    scopeHouseholdRows(
-      'properties',
-      jointScoped.properties.filter((row) => !row.archivedAt),
-      (row) => row.isJoint,
-    ),
-    userPensions,
-    scopeHouseholdRows(
-      'mortgages',
-      jointScoped.mortgages.filter((row) => !row.archivedAt),
-      (row) => row.isJoint,
-    ),
-    userDebts,
+    input.rates,
+    input.savings,
+    input.holdings,
+    input.holdingTransactions,
+    input.properties,
+    input.pensions,
+    input.mortgages,
+    input.debts,
+  );
+}
+
+export function buildAllocationsFromSource(source: NetWorthSourceData): DerivedAllocationSummary {
+  const active = <T extends Archivable>(rows: readonly T[]) =>
+    rows.filter((row) => !row.archivedAt);
+  return computeDerivedAllocations(
+    source.rates,
+    active(source.savings),
+    active(source.holdings),
+    source.holdingTransactions,
+    active(source.properties),
+    active(source.pensions),
+    active(source.mortgages),
+    active(source.debts),
   );
 }
 
@@ -488,7 +616,7 @@ function computeHoldingAtCutoff(
     shares += transaction.type === 'buy' ? transaction.shares : -transaction.shares;
     latestTransactionPrice = transaction.price;
   }
-  const historicalPrice = resolveHistoricalHoldingPrice(prices, cutoffDate);
+  const historicalPrice = resolvePreparedHoldingPrice(prices, cutoffDate);
   const price = historicalPrice ?? latestTransactionPrice ?? toNumberOrZero(holding.currentPrice);
   return {
     value: convertToBase(Math.max(0, shares) * price, holding.currency, rates),
@@ -597,6 +725,25 @@ export async function loadNetWorthSourceData(
   userId: number,
   partnerId: number | null,
 ): Promise<NetWorthSourceData> {
+  const months = buildRollingMonths();
+  const snapshots = await safeLoad(
+    'net worth snapshots',
+    db
+      .select()
+      .from(netWorthSnapshots)
+      .where(
+        and(
+          eq(netWorthSnapshots.userId, userId),
+          gte(netWorthSnapshots.snapshotDate, months[0].snapshotDate),
+        ),
+      ),
+    [],
+  );
+  const snapshotDates = new Set(snapshots.map((row) => row.snapshotDate));
+  const firstMissing = months.find(
+    (month) => month.isCurrent || !snapshotDates.has(month.snapshotDate),
+  )!;
+  const windowStart = firstMissing.asOfDate;
   const [
     rates,
     historicalRates,
@@ -608,43 +755,21 @@ export async function loadNetWorthSourceData(
     pensionTransactionsData,
     debtsData,
     debtPaymentsData,
-    snapshots,
   ] = await Promise.all([
     getRatesToBaseCurrency(),
-    getHistoricalCurrencyRateRows(),
-    loadJointScopedRows(userId, partnerId),
+    getHistoricalCurrencyRateRows(windowStart),
+    loadJointScopedRows(userId, partnerId, windowStart),
     safeLoad('holdings', db.select().from(holdings).where(eq(holdings.userId, userId)), []),
-    safeLoad(
-      'holding transactions',
-      db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-      [],
-    ),
-    safeLoad(
-      'holding price history',
-      db.select().from(holdingPriceHistory).where(eq(holdingPriceHistory.userId, userId)),
-      [],
-    ),
+    safeLoad('holding transactions', loadHoldingHistory(userId, windowStart), []),
+    safeLoad('holding price history', loadHoldingPrices(userId, windowStart), []),
     safeLoad(
       'pension pots',
       db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
       [],
     ),
-    safeLoad(
-      'pension transactions',
-      db.select().from(pensionTransactions).where(eq(pensionTransactions.userId, userId)),
-      [],
-    ),
+    safeLoad('pension transactions', loadPensionHistory(userId, windowStart), []),
     safeLoad('debts', db.select().from(debts).where(eq(debts.userId, userId)), []),
-    safeLoad(
-      'debt payments',
-      db.select().from(debtPayments).where(eq(debtPayments.userId, userId)),
-      [],
-    ),
-    safeLoad(
-      'net worth snapshots',
-      db.select().from(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId)),
-      [],
-    ),
+    safeLoad('debt payments', loadDebtHistory(userId, windowStart), []),
   ]);
 
   return {
@@ -720,6 +845,7 @@ type NetWorthHistoryContext = {
   propertiesById: Map<number, DatedPropertyTransaction[]>;
   pensionsByPotId: Map<number, DatedPensionTransaction[]>;
   debtPaymentsByDebtId: Map<number, DatedDebtPayment[]>;
+  ratesAt: ReturnType<typeof createHistoricalRateResolver> | null;
   snapshotByDate: Map<string, NetWorthSourceData['snapshots'][number]>;
 };
 
@@ -729,10 +855,19 @@ function buildNetWorthHistoryContext(sourceData: NetWorthSourceData): NetWorthHi
   const datedPropertyTransactions = buildDatedPropertyTransactions(sourceData.propertyTransactions);
   const datedPensionTransactions = buildDatedPensionTransactions(sourceData.pensionTransactions);
   const datedDebtPayments = buildDatedDebtPayments(sourceData.debtPayments);
+  const holdingPricesById = groupByNumericId(
+    sourceData.holdingPrices ?? [],
+    (item) => item.holdingId,
+  );
+  for (const prices of holdingPricesById.values())
+    prices.sort((left, right) => left.eodDate.localeCompare(right.eodDate));
   return {
+    ratesAt: sourceData.historicalRates?.length
+      ? createHistoricalRateResolver(sourceData.historicalRates)
+      : null,
     savingsByAccount: groupByNumericId(datedSavingsTransactions, (item) => item.accountId),
     holdingsById: groupByNumericId(datedHoldingTransactions, (item) => item.holdingId),
-    holdingPricesById: groupByNumericId(sourceData.holdingPrices ?? [], (item) => item.holdingId),
+    holdingPricesById,
     propertiesById: groupByNumericId(datedPropertyTransactions, (item) => item.propertyId),
     pensionsByPotId: groupByNumericId(datedPensionTransactions, (item) => item.potId),
     debtPaymentsByDebtId: groupByNumericId(datedDebtPayments, (item) => item.debtId),
@@ -775,8 +910,8 @@ function buildNetWorthHistoryPoint(
       isEstimated: snapshot.isEstimated,
     };
   }
-  const historicalRates = sourceData.historicalRates?.length
-    ? buildRatesToBaseCurrencyAt(sourceData.historicalRates, month.asOfDate)
+  const historicalRates = context.ratesAt
+    ? context.ratesAt(month.asOfDate)
     : { rates: sourceData.rates, isEstimated: true };
   const savings = computeSavingsAtCutoff(
     sourceData.savings,

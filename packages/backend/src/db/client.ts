@@ -21,9 +21,9 @@ export function createDb(connectionString: string, options: Parameters<typeof po
   };
 }
 
-const { db } = createDb(getRuntimeDatabaseUrl());
+const { db, queryClient } = createDb(getRuntimeDatabaseUrl());
 
-export { db };
+export { db, queryClient };
 
 export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type DbExecutor = typeof db | DbTransaction;

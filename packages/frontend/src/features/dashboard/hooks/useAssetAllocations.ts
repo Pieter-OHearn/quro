@@ -1,13 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import type { DashboardAllocationsSummary } from '@quro/shared';
-import { api } from '@/lib/api';
+import { useDashboardSummary } from './useDashboardSummary';
 
 export function useAssetAllocations() {
-  return useQuery({
-    queryKey: ['dashboard', 'allocations'],
-    queryFn: async () => {
-      const { data } = await api.get('/api/dashboard/allocations');
-      return data.data as DashboardAllocationsSummary;
-    },
-  });
+  return useDashboardSummary((summary) => summary.allocations);
 }

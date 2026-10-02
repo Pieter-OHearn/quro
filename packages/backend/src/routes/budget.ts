@@ -3,7 +3,7 @@ import {
   normalizeBudgetTransactionMoney,
 } from '../lib/budgetCurrency';
 import { findOwnedRow } from '../lib/access';
-import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   EXPENSE_CLASSES,
@@ -296,21 +296,37 @@ function classifyBudgetCategories(
   updates: readonly CategoryClassificationUpdate[],
 ) {
   return db.transaction(async (tx) => {
-    const updatedRows: Array<typeof budgetCategories.$inferSelect> = [];
-    for (const update of updates) {
-      const [category] = await tx
-        .select()
-        .from(budgetCategories)
-        .where(and(eq(budgetCategories.id, update.id), eq(budgetCategories.userId, userId)));
-      if (!category) return null;
-      const rows = await tx
-        .update(budgetCategories)
-        .set({ expenseClass: update.expenseClass, expenseClassConfirmed: true })
-        .where(and(eq(budgetCategories.userId, userId), eq(budgetCategories.name, category.name)))
-        .returning();
-      updatedRows.push(...rows);
-    }
-    return updatedRows;
+    const categories = await tx
+      .select({ id: budgetCategories.id, name: budgetCategories.name })
+      .from(budgetCategories)
+      .where(
+        and(
+          eq(budgetCategories.userId, userId),
+          inArray(
+            budgetCategories.id,
+            updates.map((update) => update.id),
+          ),
+        ),
+      );
+    const namesById = new Map(categories.map((category) => [category.id, category.name]));
+    if (updates.some((update) => !namesById.has(update.id))) return null;
+    const classesByName = new Map(
+      updates.map((update) => [namesById.get(update.id)!, update.expenseClass]),
+    );
+    if (classesByName.size === 0) return [];
+    const cases = [...classesByName].map(
+      ([name, expenseClass]) => sql`when ${budgetCategories.name} = ${name} then ${expenseClass}`,
+    );
+    return tx
+      .update(budgetCategories)
+      .set({ expenseClass: sql`case ${sql.join(cases, sql` `)} end`, expenseClassConfirmed: true })
+      .where(
+        and(
+          eq(budgetCategories.userId, userId),
+          inArray(budgetCategories.name, [...classesByName.keys()]),
+        ),
+      )
+      .returning();
   });
 }
 

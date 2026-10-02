@@ -1,7 +1,7 @@
 import { findOwnedRow } from '../lib/access';
 import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
-import { and, asc, desc, eq, inArray, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { HTTP_STATUS } from '../constants/http';
 import {
@@ -40,7 +40,7 @@ import {
   applyPensionPotBalanceDelta,
   computePensionTransactionDelta,
 } from '../lib/pensionTransactions';
-import { getS3ObjectBytes, uploadS3Object } from '../lib/s3';
+import { deleteS3Objects, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
 import {
   type NormalizedPensionTransactionPayload,
   validatePensionTransactionPayload,
@@ -536,22 +536,19 @@ function toLanguageHints(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
-async function lockNextQueuedImport(): Promise<ImportRecord | null> {
-  const [nextImport] = await db
-    .select()
-    .from(pensionStatementImports)
-    .where(eq(pensionStatementImports.status, 'queued'))
-    .orderBy(asc(pensionStatementImports.createdAt))
-    .limit(1);
-  if (!nextImport) return null;
-
+export async function lockNextQueuedImport(): Promise<ImportRecord | null> {
   const [locked] = await db
     .update(pensionStatementImports)
     .set({ status: 'processing', updatedAt: new Date(), errorMessage: null })
     .where(
-      and(
-        eq(pensionStatementImports.id, nextImport.id),
-        eq(pensionStatementImports.status, 'queued'),
+      eq(
+        pensionStatementImports.id,
+        sql`(
+      SELECT id FROM pension_statement_imports
+      WHERE status = 'queued' AND expires_at > now()
+      ORDER BY created_at, id
+      FOR UPDATE SKIP LOCKED LIMIT 1
+    )`,
       ),
     )
     .returning();
@@ -1058,28 +1055,49 @@ async function processQueuedImport(): Promise<void> {
   }
 }
 
+const STORAGE_CLEANUP_UPDATE_BATCH_SIZE = 1000;
+
+async function markImportStorageDeleted(ids: number[], now: Date): Promise<void> {
+  for (let offset = 0; offset < ids.length; offset += STORAGE_CLEANUP_UPDATE_BATCH_SIZE) {
+    await db
+      .update(pensionStatementImports)
+      .set({ storageDeletedAt: now })
+      .where(
+        and(
+          eq(pensionStatementImports.status, 'expired'),
+          inArray(
+            pensionStatementImports.id,
+            ids.slice(offset, offset + STORAGE_CLEANUP_UPDATE_BATCH_SIZE),
+          ),
+        ),
+      );
+  }
+}
+
 async function expireDraftImports(): Promise<void> {
   const now = new Date();
   const expired = await db
-    .select()
-    .from(pensionStatementImports)
+    .update(pensionStatementImports)
+    .set({
+      status: 'expired',
+      updatedAt: now,
+      errorMessage: 'Draft expired after retention period',
+    })
     .where(
       and(
-        inArray(pensionStatementImports.status, ['queued', 'processing', 'ready_for_review']),
+        sql`${pensionStatementImports.status} in ('queued', 'processing', 'ready_for_review', 'expired')`,
+        isNull(pensionStatementImports.storageDeletedAt),
         lte(pensionStatementImports.expiresAt, now),
       ),
-    );
-
-  for (const importRecord of expired) {
-    await db
-      .update(pensionStatementImports)
-      .set({
-        status: 'expired',
-        updatedAt: now,
-        errorMessage: 'Draft expired after retention period',
-      })
-      .where(eq(pensionStatementImports.id, importRecord.id));
-    await deleteStoredPdfSafely(importRecord.storageKey, PENSION_IMPORT_PDF_CONTEXT);
+    )
+    .returning({ id: pensionStatementImports.id, storageKey: pensionStatementImports.storageKey });
+  try {
+    const result = await deleteS3Objects(expired.map((row) => row.storageKey));
+    const deleted = new Set(result.deletedKeys);
+    const ids = expired.filter((row) => deleted.has(row.storageKey)).map((row) => row.id);
+    await markImportStorageDeleted(ids, now);
+  } catch (error) {
+    console.error('Failed to delete expired pension import PDFs', error);
   }
 }
 
