@@ -9,7 +9,7 @@ export function useBunqConnection() {
     queryKey: queryKeys.bunqConnection,
     queryFn: async (): Promise<BunqConnection | null> => {
       try {
-        return apiGet<BunqConnection>('/api/bunq/connection');
+        return await apiGet<BunqConnection>('/api/bunq/connection');
       } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response?.status === 404) return null;
         throw error;

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [v0.6.3] - 2026-10-02
 
+- Preserve the disconnected Bunq state by handling missing-connection responses before resolving the query.
+
 - Centralize frontend query keys and domain dependencies, narrow mutation invalidation, and consolidate feature mutation hooks.
 - Add typed API payload helpers, share error extraction and currency/transaction types, and remove redundant response normalization and invented pension import timestamps.
 
