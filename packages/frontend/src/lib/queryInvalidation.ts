@@ -21,7 +21,7 @@ export const domainQueryDependencies = {
   categoryMapping: [keys.budget.mappings],
   savings: [...savings, ...dashboard, keys.plan.all],
   bankingEntity: [keys.savings.accounts, keys.plan.all],
-  holding: [...holdings, ...dashboard, keys.plan.all],
+  holding: [...holdings, ...dashboard, keys.dashboard.insights, keys.plan.all],
   holdingPrices: [
     keys.investments.holdings,
     keys.investments.prices,
@@ -35,9 +35,9 @@ export const domainQueryDependencies = {
   pensionTransaction: [...pension, ...dashboard, keys.plan.all],
   pensionDocument: [keys.pensions.documents, keys.pensions.transactions],
   // Payslip writes also discard persisted net-worth snapshots on the server.
-  salary: [keys.salary.all, ...dashboard, keys.plan.all],
+  salary: [keys.salary.all, ...dashboard, keys.dashboard.insights, keys.plan.all],
   salaryDocument: [keys.salary.payslips],
-  employment: [keys.employments, keys.salary.all, keys.plan.all],
+  employment: [keys.employments, keys.salary.all, keys.dashboard.insights, keys.plan.all],
   plan: [keys.plan.all],
   preferences: [keys.plan.all, ...dashboard],
   partner: [keys.partner],

@@ -1,19 +1,12 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router';
+import { LoadingSpinner } from '@/components/ui';
 import { Layout } from '@/components/layout/Layout';
-import { Dashboard } from '@/features/dashboard';
-import { Savings } from '@/features/savings';
-import { Investments } from '@/features/investments';
-import { Mortgage } from '@/features/mortgage';
-import { Debts } from '@/features/debts';
-import { Salary } from '@/features/salary';
-import { Goals } from '@/features/goals';
-import { Budget } from '@/features/budget';
-import { Pension } from '@/features/pension';
-import { LandingPage } from '@/features/landing';
-import { Settings } from '@/features/settings';
-import { Plan } from '@/features/plan';
 import { useAuth } from '@/lib/AuthContext';
 import { RouteErrorScreen } from '@/router/RouteErrorScreen';
+
+function RouteLoading() {
+  return <LoadingSpinner className="min-h-screen" label="Loading page" />;
+}
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -56,24 +49,61 @@ export const router = createBrowserRouter([
     path: '/welcome',
     Component: PublicOnly,
     ErrorBoundary: RouteErrorScreen,
-    children: [{ index: true, Component: LandingPage }],
+    HydrateFallback: RouteLoading,
+    children: [
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('@/features/landing')).LandingPage }),
+      },
+    ],
   },
   {
     path: '/',
     Component: RequireAuth,
     ErrorBoundary: RouteErrorScreen,
+    HydrateFallback: RouteLoading,
     children: [
-      { index: true, Component: Dashboard },
-      { path: 'plan', Component: Plan },
-      { path: 'savings', Component: Savings },
-      { path: 'investments', Component: Investments },
-      { path: 'mortgage', Component: Mortgage },
-      { path: 'debts', Component: Debts },
-      { path: 'salary', Component: Salary },
-      { path: 'pension', Component: Pension },
-      { path: 'goals', Component: Goals },
-      { path: 'budget', Component: Budget },
-      { path: 'settings', Component: Settings },
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('@/features/dashboard')).Dashboard }),
+      },
+      { path: 'plan', lazy: async () => ({ Component: (await import('@/features/plan')).Plan }) },
+      {
+        path: 'savings',
+        lazy: async () => ({ Component: (await import('@/features/savings')).Savings }),
+      },
+      {
+        path: 'investments',
+        lazy: async () => ({ Component: (await import('@/features/investments')).Investments }),
+      },
+      {
+        path: 'mortgage',
+        lazy: async () => ({ Component: (await import('@/features/mortgage')).Mortgage }),
+      },
+      {
+        path: 'debts',
+        lazy: async () => ({ Component: (await import('@/features/debts')).Debts }),
+      },
+      {
+        path: 'salary',
+        lazy: async () => ({ Component: (await import('@/features/salary')).Salary }),
+      },
+      {
+        path: 'pension',
+        lazy: async () => ({ Component: (await import('@/features/pension')).Pension }),
+      },
+      {
+        path: 'goals',
+        lazy: async () => ({ Component: (await import('@/features/goals')).Goals }),
+      },
+      {
+        path: 'budget',
+        lazy: async () => ({ Component: (await import('@/features/budget')).Budget }),
+      },
+      {
+        path: 'settings',
+        lazy: async () => ({ Component: (await import('@/features/settings')).Settings }),
+      },
     ],
   },
 ]);

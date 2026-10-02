@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { Mortgage as MortgageType } from '@quro/shared';
@@ -73,7 +74,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
     yearsRemaining,
     amortization,
     paymentBreakdown,
-  } = computeMortgageMetrics(mortgage, state.txns);
+  } = useMemo(() => computeMortgageMetrics(mortgage, state.txns), [mortgage, state.txns]);
 
   return (
     <div className="p-6 space-y-6">

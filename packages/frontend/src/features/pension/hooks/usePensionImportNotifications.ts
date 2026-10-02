@@ -40,7 +40,7 @@ export function usePensionImportNotifications(options: UsePensionImportNotificat
     refetchInterval: (query) => {
       const imports = query.state.data ?? [];
       if (imports.some((item) => ACTIVE_STATUSES.has(item.import.status))) return 2000;
-      return 15_000;
+      return false;
     },
   });
 }

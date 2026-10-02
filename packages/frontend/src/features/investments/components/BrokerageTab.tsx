@@ -24,7 +24,7 @@ import {
   type DataTableColumn,
   type DataTableSortState,
 } from '@/components/ui';
-import type { Position } from '../utils/position';
+import { groupHoldingTransactions, type Position } from '../utils/position';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
 type BrokerageTabProps = {
@@ -58,6 +58,7 @@ const SORT_ASCENDING = 1;
 const SORT_DESCENDING = -1;
 
 type HoldingRowProps = {
+  metrics: HoldingRowMetrics;
   holding: Holding;
   holdingTxns: HoldingTransaction[];
   position: Position;
@@ -211,7 +212,7 @@ function formatSyncDate(priceUpdatedAt: string | null | undefined): string | nul
 
 function computeHoldingRowMetrics(
   holding: Holding,
-  holdingTxns: HoldingTransaction[],
+  holdingTxns: readonly HoldingTransaction[],
   position: Position,
   convertToBase: (value: number, currency: string) => number,
   isForeign: (currency: string) => boolean,
@@ -419,19 +420,9 @@ function HoldingHistory({
 }
 
 function HoldingRow(props: HoldingRowProps) {
-  const {
-    holding,
-    holdingTxns,
-    position,
-    isExpanded,
-    fmtBase,
-    fmtNative,
-    convertToBase,
-    isForeign,
-  } = props;
+  const { holding, holdingTxns, position, isExpanded, fmtBase, fmtNative } = props;
   const { onEditHolding, onToggleExpanded } = props;
-  const { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount } =
-    computeHoldingRowMetrics(holding, holdingTxns, position, convertToBase, isForeign);
+  const { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount } = props.metrics;
 
   return (
     <>
@@ -542,77 +533,48 @@ type BrokerageHoldingsListProps = {
   onDeleteTxn: (id: number) => void;
 };
 
-function sortActiveHoldings({
-  holdings,
-  holdingTxns,
-  positions,
-  convertToBase,
-  isForeign,
-  sort,
-}: {
-  holdings: readonly Holding[];
-  holdingTxns: readonly HoldingTransaction[];
-  positions: Record<number, Position>;
-  convertToBase: (value: number, currency: string) => number;
-  isForeign: (currency: string) => boolean;
-  sort: DataTableSortState;
-}): Holding[] {
-  const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
-
-  return [...holdings].sort((left, right) => {
-    const comparison = getActiveHoldingSortComparison({
-      left,
-      right,
-      holdingTxns,
-      positions,
-      convertToBase,
-      isForeign,
-      columnKey: sort.columnKey,
-    });
-
-    return comparison * direction || left.name.localeCompare(right.name) || left.id - right.id;
-  });
+function getActiveHoldingSortValue(
+  holding: Holding,
+  position: Position,
+  metrics: HoldingRowMetrics,
+  columnKey: string,
+) {
+  if (columnKey === 'asset') return holding.name;
+  if (columnKey === 'position') return position.shares;
+  if (columnKey === 'current') return getEffectivePrice(holding);
+  if (columnKey === 'gain') return metrics.gain;
+  return metrics.valueInBase;
 }
 
-function getActiveHoldingSortComparison({
-  left,
-  right,
-  holdingTxns,
-  positions,
-  convertToBase,
-  isForeign,
-  columnKey,
-}: {
-  left: Holding;
-  right: Holding;
-  holdingTxns: readonly HoldingTransaction[];
-  positions: Record<number, Position>;
-  convertToBase: (value: number, currency: string) => number;
-  isForeign: (currency: string) => boolean;
-  columnKey: string;
-}) {
-  const leftPosition = positions[left.id];
-  const rightPosition = positions[right.id];
-  if (columnKey === 'asset') return left.name.localeCompare(right.name);
-  if (columnKey === 'position') return leftPosition.shares - rightPosition.shares;
-  if (columnKey === 'current') return getEffectivePrice(left) - getEffectivePrice(right);
+function compareSortValues(left: string | number, right: string | number): number {
+  return typeof left === 'string' && typeof right === 'string'
+    ? left.localeCompare(right)
+    : Number(left) - Number(right);
+}
 
-  const leftMetrics = computeHoldingRowMetrics(
-    left,
-    [...holdingTxns],
-    leftPosition,
-    convertToBase,
-    isForeign,
-  );
-  const rightMetrics = computeHoldingRowMetrics(
-    right,
-    [...holdingTxns],
-    rightPosition,
-    convertToBase,
-    isForeign,
-  );
-  if (columnKey === 'gain') return leftMetrics.gain - rightMetrics.gain;
-  return leftMetrics.valueInBase - rightMetrics.valueInBase;
+function useHoldingRowMetrics(
+  holdings: Holding[],
+  holdingTxns: HoldingTransaction[],
+  positions: Record<number, Position>,
+  convertToBase: BrokerageTabProps['convertToBase'],
+  isForeign: BrokerageTabProps['isForeign'],
+) {
+  const metricsById = useMemo(() => {
+    const grouped = groupHoldingTransactions(holdingTxns);
+    return Object.fromEntries(
+      holdings.map((holding) => [
+        holding.id,
+        computeHoldingRowMetrics(
+          holding,
+          grouped.get(holding.id) ?? [],
+          positions[holding.id],
+          convertToBase,
+          isForeign,
+        ),
+      ]),
+    );
+  }, [holdings, holdingTxns, positions, convertToBase, isForeign]);
+  return metricsById;
 }
 
 function BrokerageHoldingsList({
@@ -632,18 +594,33 @@ function BrokerageHoldingsList({
   onDeleteTxn,
 }: BrokerageHoldingsListProps) {
   const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'value', direction: 'desc' });
-  const sortedHoldings = useMemo(
-    () =>
-      sortActiveHoldings({
-        holdings,
-        holdingTxns,
-        positions,
-        convertToBase,
-        isForeign,
-        sort,
-      }),
-    [convertToBase, holdingTxns, holdings, isForeign, positions, sort],
+  const metricsById = useHoldingRowMetrics(
+    holdings,
+    holdingTxns,
+    positions,
+    convertToBase,
+    isForeign,
   );
+  const sortedHoldings = useMemo(() => {
+    const values = new Map(
+      holdings.map((holding) => [
+        holding.id,
+        getActiveHoldingSortValue(
+          holding,
+          positions[holding.id],
+          metricsById[holding.id],
+          sort.columnKey,
+        ),
+      ]),
+    );
+    const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
+    return [...holdings].sort(
+      (left, right) =>
+        compareSortValues(values.get(left.id)!, values.get(right.id)!) * direction ||
+        left.name.localeCompare(right.name) ||
+        left.id - right.id,
+    );
+  }, [holdings, positions, metricsById, sort]);
 
   return (
     <DataTable
@@ -657,6 +634,7 @@ function BrokerageHoldingsList({
     >
       {sortedHoldings.map((holding) => (
         <HoldingRow
+          metrics={metricsById[holding.id]}
           key={holding.id}
           holding={holding}
           holdingTxns={holdingTxns}
@@ -686,7 +664,7 @@ type ClosedHoldingMetrics = {
 
 function computeClosedHoldingMetrics(
   holding: Holding,
-  holdingTxns: HoldingTransaction[],
+  holdingTxns: readonly HoldingTransaction[],
   position: Position,
 ): ClosedHoldingMetrics {
   const txns = holdingTxns.filter((txn) => txn.holdingId === holding.id);
@@ -704,6 +682,7 @@ function computeClosedHoldingMetrics(
 }
 
 type ClosedHoldingRowProps = {
+  metrics: ClosedHoldingMetrics;
   holding: Holding;
   holdingTxns: HoldingTransaction[];
   position: Position;
@@ -926,6 +905,7 @@ function ClosedHoldingExpandedRow({
 }
 
 function ClosedHoldingRow({
+  metrics,
   holding,
   holdingTxns,
   position,
@@ -941,11 +921,7 @@ function ClosedHoldingRow({
   onDeleteTxn,
 }: ClosedHoldingRowProps) {
   const isForeignHolding = isForeign(holding.currency);
-  const { txnCount, lastSellPrice, costBasis, realizedPct } = computeClosedHoldingMetrics(
-    holding,
-    holdingTxns,
-    position,
-  );
+  const { txnCount, lastSellPrice, costBasis, realizedPct } = metrics;
 
   return (
     <>
@@ -1096,6 +1072,23 @@ function ClosedHoldingsHeader({
   );
 }
 
+function useClosedHoldingMetrics(
+  closedHoldings: Holding[],
+  holdingTxns: HoldingTransaction[],
+  positions: Record<number, Position>,
+) {
+  const metricsById = useMemo(() => {
+    const grouped = groupHoldingTransactions(holdingTxns);
+    return Object.fromEntries(
+      closedHoldings.map((holding) => [
+        holding.id,
+        computeClosedHoldingMetrics(holding, grouped.get(holding.id) ?? [], positions[holding.id]),
+      ]),
+    );
+  }, [closedHoldings, holdingTxns, positions]);
+  return metricsById;
+}
+
 function ClosedHoldingsTable({
   closedHoldings,
   holdingTxns,
@@ -1129,9 +1122,10 @@ function ClosedHoldingsTable({
     columnKey: 'realized',
     direction: 'desc',
   });
+  const metricsById = useClosedHoldingMetrics(closedHoldings, holdingTxns, positions);
   const sortedClosedHoldings = useSortedClosedHoldings({
     closedHoldings,
-    holdingTxns,
+    metricsById,
     positions,
     sort,
   });
@@ -1149,6 +1143,7 @@ function ClosedHoldingsTable({
     >
       {sortedClosedHoldings.map((holding) => (
         <ClosedHoldingRow
+          metrics={metricsById[holding.id]}
           key={holding.id}
           holding={holding}
           holdingTxns={holdingTxns}
@@ -1171,54 +1166,47 @@ function ClosedHoldingsTable({
 
 function useSortedClosedHoldings({
   closedHoldings,
-  holdingTxns,
+  metricsById,
   positions,
   sort,
 }: {
   closedHoldings: readonly Holding[];
-  holdingTxns: readonly HoldingTransaction[];
+  metricsById: Record<number, ClosedHoldingMetrics>;
   positions: Record<number, Position>;
   sort: DataTableSortState;
 }) {
   return useMemo(() => {
+    const values = new Map(
+      closedHoldings.map((holding) => [
+        holding.id,
+        getClosedHoldingSortValue(
+          holding,
+          positions[holding.id],
+          metricsById[holding.id],
+          sort.columnKey,
+        ),
+      ]),
+    );
     const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
-
-    return [...closedHoldings].sort((left, right) => {
-      const comparison = getClosedHoldingSortComparison({
-        left,
-        right,
-        holdingTxns,
-        positions,
-        columnKey: sort.columnKey,
-      });
-
-      return comparison * direction || left.name.localeCompare(right.name) || left.id - right.id;
-    });
-  }, [closedHoldings, holdingTxns, positions, sort]);
+    return [...closedHoldings].sort(
+      (left, right) =>
+        compareSortValues(values.get(left.id)!, values.get(right.id)!) * direction ||
+        left.name.localeCompare(right.name) ||
+        left.id - right.id,
+    );
+  }, [closedHoldings, metricsById, positions, sort]);
 }
 
-function getClosedHoldingSortComparison({
-  left,
-  right,
-  holdingTxns,
-  positions,
-  columnKey,
-}: {
-  left: Holding;
-  right: Holding;
-  holdingTxns: readonly HoldingTransaction[];
-  positions: Record<number, Position>;
-  columnKey: string;
-}) {
-  const leftPosition = positions[left.id];
-  const rightPosition = positions[right.id];
-  if (columnKey === 'asset') return left.name.localeCompare(right.name);
-  if (columnKey === 'dividends') return leftPosition.totalDividends - rightPosition.totalDividends;
-  if (columnKey === 'realized') return leftPosition.realizedGain - rightPosition.realizedGain;
-
-  const leftMetrics = computeClosedHoldingMetrics(left, [...holdingTxns], leftPosition);
-  const rightMetrics = computeClosedHoldingMetrics(right, [...holdingTxns], rightPosition);
-  return (leftMetrics.lastSellPrice ?? 0) - (rightMetrics.lastSellPrice ?? 0);
+function getClosedHoldingSortValue(
+  holding: Holding,
+  position: Position,
+  metrics: ClosedHoldingMetrics,
+  columnKey: string,
+) {
+  if (columnKey === 'asset') return holding.name;
+  if (columnKey === 'dividends') return position.totalDividends;
+  if (columnKey === 'realized') return position.realizedGain;
+  return metrics.lastSellPrice ?? 0;
 }
 
 function ClosedHoldingsFooter({

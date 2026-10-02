@@ -226,3 +226,41 @@ test('halves joint transactions in monthly stats but keeps full display amounts'
   expect(stats.totalIncome).toBe(1000 / 2);
   expect(stats.monthlyCategoryChange('Savings')).toBe(500 / 2 + 200);
 });
+
+test('compact salary months preserve the exact baseline month and mixed-currency bonus totals', () => {
+  const payslips = [
+    { date: '2024-02-01', net: 90000, bonus: 0, currency: 'EUR' },
+    { date: '2024-03-01', net: 1000, bonus: 100, currency: 'EUR' },
+    { date: '2024-03-31', net: 2000, bonus: 0, currency: 'EUR' },
+    { date: '2024-03-31', net: 500, bonus: 50, currency: 'GBP' },
+    { date: '2024-06-01', net: 3300, bonus: null, currency: 'EUR' },
+    { date: '2025-03-28', net: 4000, bonus: 500, currency: 'GBP' },
+  ] as const;
+  const compact = [
+    { date: '2024-03-01', net: 3000, bonus: 100, currency: 'EUR' },
+    { date: '2024-03-01', net: 500, bonus: 50, currency: 'GBP' },
+    { date: '2024-06-01', net: 3300, bonus: 0, currency: 'EUR' },
+    { date: '2025-03-01', net: 4000, bonus: 500, currency: 'GBP' },
+  ] as const;
+  const convert = createConvertToBase('EUR');
+  const before = computeDashboardTxnStats([], payslips, convert);
+  const after = computeDashboardTxnStats([], compact, convert);
+  expect(after.monthlySalaryValue).toBeCloseTo(4500 * 1.18);
+  expect(after.salaryTrendChange).toBeCloseTo(4500 * 1.18 - (3100 + 550 * 1.18));
+  expect(after.monthlySalaryValue).toBe(before.monthlySalaryValue);
+  expect(after.salaryTrendChange).toBe(before.salaryTrendChange);
+});
+
+test('compact salary months keep the earliest available baseline inside an incomplete year', () => {
+  const stats = computeDashboardTxnStats(
+    [],
+    [
+      { date: '2024-06-01', net: 2000, bonus: 100, currency: 'EUR' },
+      { date: '2024-10-01', net: 9000, bonus: 0, currency: 'EUR' },
+      { date: '2025-03-01', net: 3000, bonus: 50, currency: 'EUR' },
+    ],
+    createConvertToBase('EUR'),
+  );
+  expect(stats.monthlySalaryValue).toBe(3050);
+  expect(stats.salaryTrendChange).toBe(950);
+});
