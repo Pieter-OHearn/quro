@@ -273,13 +273,10 @@ Key points:
 
 **File:** `packages/backend/src/index.ts`
 
-Add two lines: one to apply `requireAuth` to the path prefix and one to mount the Hono app.
+Mount the Hono app. The global `/api/*` authentication guard already protects new features. Public exceptions must be added explicitly to the shared exact-path list in `src/lib/publicPaths.ts`.
 
 ```ts
 import recurringPayments from './routes/recurring-payments';
-
-// in the "Protected routes" section:
-app.use('/api/recurring-payments/*', requireAuth);
 
 // in the route mounting section:
 app.route('/api/recurring-payments', recurringPayments);

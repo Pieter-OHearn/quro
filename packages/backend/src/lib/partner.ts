@@ -33,11 +33,9 @@ export function ownedOrJointPredicate(
   return or(owned, jointWithPartner) as SQL;
 }
 
-export async function assertJointAllowed(
-  userId: number,
+export function assertJointAllowed(
+  partnerId: number | null,
   isJoint: boolean | undefined,
-): Promise<string | null> {
-  if (!isJoint) return null;
-  const partnerId = await getAcceptedPartnerId(userId);
-  return partnerId === null ? 'No partner linked' : null;
+): string | null {
+  return isJoint && partnerId === null ? 'No partner linked' : null;
 }

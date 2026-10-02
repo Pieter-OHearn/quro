@@ -1,3 +1,6 @@
+import { findOwnedRow } from '../lib/access';
+import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
+import { registerArchivableResource } from '../lib/archivableResource';
 import { Hono } from 'hono';
 import { PENSION_POT_TYPES, type CurrencyCode, type PensionPotType } from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
@@ -5,7 +8,8 @@ import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
-import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
+import { earliestDate } from '../lib/netWorth';
+import { withLedgerWrite } from '../lib/ledgerWrite';
 import {
   asFile,
   buildPdfStorageKey,
@@ -337,11 +341,7 @@ async function isPensionPotOwnedByUser(
   userId: number,
   potId: number,
 ): Promise<boolean> {
-  const [pot] = await tx
-    .select({ id: pensionPots.id })
-    .from(pensionPots)
-    .where(and(eq(pensionPots.id, potId), eq(pensionPots.userId, userId)));
-  return Boolean(pot);
+  return Boolean(await findOwnedRow(pensionPots, potId, userId, tx));
 }
 
 async function uploadStatementDocumentForTransaction(params: {
@@ -510,7 +510,7 @@ function createPensionTransaction(params: {
       params.payload.potId,
       computePensionTransactionDelta(params.payload),
     );
-    await invalidateSnapshotsFrom(tx, params.userId, params.payload.date);
+    await withLedgerWrite(tx, { userId: params.userId }, params.payload.date);
 
     return { data };
   });
@@ -575,9 +575,9 @@ async function updatePensionTransaction(params: {
       nextType: nextPayload.type,
       existingRow: existing,
     });
-    await invalidateSnapshotsFrom(
+    await withLedgerWrite(
       tx,
-      params.userId,
+      { userId: params.userId },
       earliestDate(normalizedExisting.date, nextPayload.date),
     );
 
@@ -626,7 +626,7 @@ async function deletePensionTransaction(params: {
       normalizedExisting.potId,
       -computePensionTransactionDelta(normalizedExisting),
     );
-    await invalidateSnapshotsFrom(tx, params.userId, normalizedExisting.date);
+    await withLedgerWrite(tx, { userId: params.userId }, normalizedExisting.date);
 
     return { data };
   });
@@ -658,10 +658,7 @@ app.get('/pots/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
-  const [data] = await db
-    .select()
-    .from(pensionPots)
-    .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)));
+  const data = await findOwnedRow(pensionPots, id, user.id);
   if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -704,79 +701,26 @@ app.patch('/pots/:id', async (c) => {
   return c.json({ data });
 });
 
-app.delete('/pots/:id', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
-
-  if (c.req.query('cascade') === 'true') {
-    const [data] = await db
-      .delete(pensionPots)
-      .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)))
-      .returning();
-    if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
-    return c.json({ data });
-  }
-
-  const [data] = await db
-    .update(pensionPots)
-    .set({ archivedAt: new Date() })
-    .where(
-      and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id), isNull(pensionPots.archivedAt)),
-    )
-    .returning();
-  if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
-});
-
-app.post('/pots/:id/unarchive', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const [data] = await db
-    .update(pensionPots)
-    .set({ archivedAt: null })
-    .where(and(eq(pensionPots.id, id), eq(pensionPots.userId, user.id)))
-    .returning();
-  if (!data) return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+registerArchivableResource(app, {
+  path: '/pots',
+  table: pensionPots,
+  label: 'Pension pot',
+  idLabel: 'pension pot',
 });
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 
-app.get('/transactions', async (c) => {
-  const user = getAuthUser(c);
-  const potId = c.req.query('potId');
-  if (potId !== undefined) {
-    const parsedPotId = parseId(potId);
-    if (parsedPotId === null)
-      return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
-    const data = await db
-      .select()
-      .from(pensionTransactions)
-      .where(
-        and(eq(pensionTransactions.potId, parsedPotId), eq(pensionTransactions.userId, user.id)),
-      );
-    return c.json({ data });
-  }
-  const data = await db
-    .select()
-    .from(pensionTransactions)
-    .where(eq(pensionTransactions.userId, user.id));
-  return c.json({ data });
-});
-
-app.get('/transactions/:id', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
-  const [data] = await db
-    .select()
-    .from(pensionTransactions)
-    .where(and(eq(pensionTransactions.id, id), eq(pensionTransactions.userId, user.id)));
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+registerTransactionReadRoutes(app, {
+  path: '/transactions',
+  table: pensionTransactions,
+  parent: pensionPots,
+  parentId: pensionTransactions.potId,
+  parentQuery: 'potId',
+  parentLabel: 'Pension pot',
+  parentIdLabel: 'pension pot',
+  checkParent: false,
+  emptyParentIsAbsent: false,
+  scopeByChildOwner: true,
 });
 
 app.post('/transactions', async (c) => {

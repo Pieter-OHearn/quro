@@ -1,6 +1,6 @@
 import type { CurrencyCode } from '@quro/shared';
-import { and, eq, gte, isNull, sql } from 'drizzle-orm';
-import { db, type DbTransaction } from '../db/client';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { db } from '../db/client';
 import {
   debts,
   holdingTransactions,
@@ -137,21 +137,6 @@ export function monthEnd(date: Date): string {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, DATE_END_OF_MONTH))
     .toISOString()
     .slice(0, 10);
-}
-
-export async function invalidateSnapshotsFrom(
-  tx: DbTransaction,
-  userId: number,
-  fromDate: string,
-): Promise<void> {
-  await tx
-    .delete(netWorthSnapshots)
-    .where(
-      and(
-        eq(netWorthSnapshots.userId, userId),
-        gte(netWorthSnapshots.snapshotDate, monthStart(fromDate)),
-      ),
-    );
 }
 
 export function earliestDate(left: string, right: string): string {

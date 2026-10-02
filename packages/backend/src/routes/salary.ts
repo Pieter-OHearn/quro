@@ -1,3 +1,4 @@
+import { findOwnedRow } from '../lib/access';
 import { Hono } from 'hono';
 import { and, eq, gte, isNull, or } from 'drizzle-orm';
 import { toIsoDate, type CurrencyCode } from '@quro/shared';
@@ -5,7 +6,8 @@ import { db } from '../db/client';
 import { employments, payslips } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
-import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
+import { earliestDate } from '../lib/netWorth';
+import { withLedgerWrite } from '../lib/ledgerWrite';
 import {
   asFile,
   buildPdfStorageKey,
@@ -140,21 +142,12 @@ async function resolveEmploymentId(
   return { ok: true, value: active.length === 1 ? active[0].id : null };
 }
 
-async function getOwnedPayslip(userId: number, payslipId: number): Promise<PayslipRow | null> {
-  const [payslipRow] = await db
-    .select()
-    .from(payslips)
-    .where(and(eq(payslips.id, payslipId), eq(payslips.userId, userId)));
-
-  return payslipRow ?? null;
-}
-
 async function uploadPayslipDocumentForUser(params: {
   userId: number;
   payslipId: number;
   file: File;
 }): Promise<ReplaceStoredPdfResult<InlinePdfDocumentResponse>> {
-  const existingPayslip = await getOwnedPayslip(params.userId, params.payslipId);
+  const existingPayslip = await findOwnedRow(payslips, params.payslipId, params.userId);
   if (!existingPayslip) {
     return { ok: false, error: 'Payslip not found', status: HTTP_STATUS.NOT_FOUND };
   }
@@ -198,7 +191,7 @@ app.get('/payslips/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const data = await getOwnedPayslip(user.id, id);
+  const data = await findOwnedRow(payslips, id, user.id);
   if (!data) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
 
   return c.json({ data: formatPayslipResponse(data) });
@@ -219,7 +212,7 @@ app.post('/payslips', async (c) => {
       .insert(payslips)
       .values({ ...body.value, employmentId: employment.value, userId: user.id })
       .returning();
-    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
+    await withLedgerWrite(tx, { userId: user.id }, body.value.date);
     return [created];
   });
 
@@ -239,7 +232,7 @@ app.patch('/payslips/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No payslip fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
-  const existing = await getOwnedPayslip(user.id, id);
+  const existing = await findOwnedRow(payslips, id, user.id);
   if (!existing) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
   if ('employmentId' in body.value) {
     const employment = await resolveEmploymentId(user.id, body.value.employmentId, false);
@@ -253,9 +246,9 @@ app.patch('/payslips/:id', async (c) => {
       .set(body.value)
       .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
       .returning();
-    await invalidateSnapshotsFrom(
+    await withLedgerWrite(
       tx,
-      user.id,
+      { userId: user.id },
       earliestDate(existing.date, body.value.date ?? existing.date),
     );
     return [updated];
@@ -275,7 +268,7 @@ app.delete('/payslips/:id', async (c) => {
       .delete(payslips)
       .where(and(eq(payslips.id, id), eq(payslips.userId, user.id)))
       .returning();
-    if (deleted) await invalidateSnapshotsFrom(tx, user.id, deleted.date);
+    if (deleted) await withLedgerWrite(tx, { userId: user.id }, deleted.date);
     return [deleted];
   });
 
@@ -315,7 +308,7 @@ app.get('/payslips/:id/document/download', async (c) => {
   const payslipId = parseId(c.req.param('id'));
   if (payslipId === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const payslipRow = await getOwnedPayslip(user.id, payslipId);
+  const payslipRow = await findOwnedRow(payslips, payslipId, user.id);
   if (!payslipRow) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
 
   const document = readInlinePdfDocument(payslipRow);
@@ -333,7 +326,7 @@ app.delete('/payslips/:id/document', async (c) => {
   const payslipId = parseId(c.req.param('id'));
   if (payslipId === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const existingPayslip = await getOwnedPayslip(user.id, payslipId);
+  const existingPayslip = await findOwnedRow(payslips, payslipId, user.id);
   if (!existingPayslip) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
 
   const deletedDocument = readInlinePdfDocument(existingPayslip);

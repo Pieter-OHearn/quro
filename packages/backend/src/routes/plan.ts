@@ -28,11 +28,11 @@ import {
   savingsTransactions,
   users,
 } from '../db/schema';
-import { getAuthUser } from '../lib/authUser';
+import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { convertToBaseCurrency, FX_BASE_CURRENCY } from '../lib/currencyRateCache';
 import { getCurrentRatesToBaseCurrency } from '../lib/currencyRateSync';
 import { getJurisdictionProfile } from '../lib/jurisdictions';
-import { getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
+import { ownedOrJointPredicate } from '../lib/partner';
 import {
   aggregateDepositGuarantees,
   calculateBurn,
@@ -277,8 +277,7 @@ function resolveJurisdictionMetadata(
 }
 
 // eslint-disable-next-line max-lines-per-function
-async function loadRunwayData(userId: number, now: Date) {
-  const partnerId = await getAcceptedPartnerId(userId);
+async function loadRunwayData(userId: number, partnerId: number | null, now: Date) {
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
   const historyStart = toDateMonthsAgo(now, HISTORY_MONTHS);
@@ -579,9 +578,10 @@ function buildEurRunwayResponse(
 
 async function buildRunwayResponse(
   userId: number,
+  partnerId: number | null,
   now = new Date(),
 ): Promise<RunwayResponse | null> {
-  const data = await loadRunwayData(userId, now);
+  const data = await loadRunwayData(userId, partnerId, now);
   if (!data.user || !isJurisdictionCode(data.user.jurisdiction)) return null;
   const convertToEur = (amount: number, currency: string) =>
     convertToBaseCurrency(amount, currency, data.rates);
@@ -595,7 +595,7 @@ async function buildRunwayResponse(
 
 app.get('/runway', async (c) => {
   const user = getAuthUser(c);
-  const data = await buildRunwayResponse(user.id);
+  const data = await buildRunwayResponse(user.id, getPartnerId(c));
   return data ? c.json({ data }) : c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
 });
 
