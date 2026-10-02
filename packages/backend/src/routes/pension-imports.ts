@@ -1,3 +1,4 @@
+import { findOwnedRow } from '../lib/access';
 import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import { and, asc, desc, eq, inArray, lte, ne, sql } from 'drizzle-orm';
@@ -10,7 +11,7 @@ import {
   pensionTransactions,
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { invalidateSnapshotsFrom } from '../lib/netWorth';
+import { withLedgerWrite } from '../lib/ledgerWrite';
 import { getPensionStatementImportCapability } from '../lib/capabilities';
 import {
   parsePensionStatement,
@@ -267,22 +268,8 @@ function normalizeImportRowResponse(row: {
   };
 }
 
-async function getOwnedImport(userId: number, importId: number) {
-  const [importRecord] = await db
-    .select()
-    .from(pensionStatementImports)
-    .where(
-      and(eq(pensionStatementImports.userId, userId), eq(pensionStatementImports.id, importId)),
-    );
-  return importRecord ?? null;
-}
-
 async function assertOwnedPot(userId: number, potId: number): Promise<boolean> {
-  const [pot] = await db
-    .select({ id: pensionPots.id })
-    .from(pensionPots)
-    .where(and(eq(pensionPots.userId, userId), eq(pensionPots.id, potId)));
-  return Boolean(pot);
+  return Boolean(await findOwnedRow(pensionPots, potId, userId));
 }
 
 async function hasDuplicateImport(params: {
@@ -379,7 +366,7 @@ function toImportFeedPayload(importRow: ImportFeedRow): Record<string, unknown> 
 }
 
 async function getEditableImport(userId: number, importId: number): Promise<ImportRecord | null> {
-  const importRecord = await getOwnedImport(userId, importId);
+  const importRecord = await findOwnedRow(pensionStatementImports, importId, userId);
   if (!importRecord) return null;
   if (importRecord.status !== 'ready_for_review') return null;
   return importRecord;
@@ -537,7 +524,7 @@ async function commitRowsToLedger(params: {
 
     const earliestCommittedDate = earliestRowDate(params.rows);
     if (earliestCommittedDate) {
-      await invalidateSnapshotsFrom(tx, params.userId, earliestCommittedDate);
+      await withLedgerWrite(tx, { userId: params.userId }, earliestCommittedDate);
     }
   });
 
@@ -825,7 +812,7 @@ app.get('/:id', async (c) => {
   const importId = parseId(c.req.param('id'));
   if (importId === null) return c.json({ error: 'Invalid import id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const importRecord = await getOwnedImport(user.id, importId);
+  const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [rowStats] = await db
@@ -852,7 +839,7 @@ app.get('/:id/rows', async (c) => {
   const importId = parseId(c.req.param('id'));
   if (importId === null) return c.json({ error: 'Invalid import id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const importRecord = await getOwnedImport(user.id, importId);
+  const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
 
   const rows = await db
@@ -873,7 +860,7 @@ app.patch('/:id/rows/:rowId', async (c) => {
 
   const editableImport = await getEditableImport(user.id, importId);
   if (!editableImport) {
-    const importRecord = await getOwnedImport(user.id, importId);
+    const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
     if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
     return c.json({ error: 'Import is not editable' }, HTTP_STATUS.BAD_REQUEST);
   }
@@ -923,7 +910,7 @@ app.delete('/:id/rows/:rowId', async (c) => {
   if (importId === null || rowId === null)
     return c.json({ error: 'Invalid import row id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const importRecord = await getOwnedImport(user.id, importId);
+  const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
   if (importRecord.status !== 'ready_for_review') {
     return c.json({ error: 'Import is not editable' }, HTTP_STATUS.BAD_REQUEST);
@@ -950,7 +937,7 @@ app.post('/:id/rows/:rowId/restore', async (c) => {
   if (importId === null || rowId === null)
     return c.json({ error: 'Invalid import row id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const importRecord = await getOwnedImport(user.id, importId);
+  const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
   if (importRecord.status !== 'ready_for_review') {
     return c.json({ error: 'Import is not editable' }, HTTP_STATUS.BAD_REQUEST);
@@ -975,7 +962,7 @@ app.post('/:id/commit', async (c) => {
   const importId = parseId(c.req.param('id'));
   if (importId === null) return c.json({ error: 'Invalid import id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const importRecord = await getOwnedImport(user.id, importId);
+  const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
   if (importRecord.status !== 'ready_for_review')
     return c.json({ error: 'Import is not ready for commit' }, HTTP_STATUS.BAD_REQUEST);
@@ -1015,7 +1002,7 @@ app.post('/:id/commit', async (c) => {
     return c.json({ error: 'Failed to commit import' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 
-  const committedImport = await getOwnedImport(user.id, importId);
+  const committedImport = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!committedImport) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
 
   return c.json({
@@ -1031,7 +1018,7 @@ app.delete('/:id', async (c) => {
   const importId = parseId(c.req.param('id'));
   if (importId === null) return c.json({ error: 'Invalid import id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const importRecord = await getOwnedImport(user.id, importId);
+  const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
   if (importRecord.status === 'committed') {
     return c.json({ error: 'Committed imports cannot be cancelled' }, HTTP_STATUS.BAD_REQUEST);

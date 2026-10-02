@@ -1,3 +1,6 @@
+import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
+import { registerArchivableResource } from '../lib/archivableResource';
+import { findAccessible, findAccessibleChild } from '../lib/access';
 import { Hono } from 'hono';
 import {
   MORTGAGE_RATE_TYPES,
@@ -16,12 +19,13 @@ import {
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
-import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
-import { getAuthUser } from '../lib/authUser';
+import { and, eq, isNull } from 'drizzle-orm';
+import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { applyRepayment, MORTGAGE_BALANCE, reverseRepayment } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
-import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
-import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
+import { earliestDate } from '../lib/netWorth';
+import { withLedgerWrite } from '../lib/ledgerWrite';
+import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
   type FieldParsers,
@@ -212,20 +216,7 @@ async function fetchLinkedProperty(
 ): Promise<
   { ok: true; property: LinkedProperty } | { ok: false; error: string; status: 404 | 409 }
 > {
-  const [property] = await db
-    .select({
-      id: properties.id,
-      userId: properties.userId,
-      address: properties.address,
-      currency: properties.currency,
-      currentValue: properties.currentValue,
-      mortgageId: properties.mortgageId,
-      isJoint: properties.isJoint,
-    })
-    .from(properties)
-    .where(
-      and(eq(properties.id, propertyId), ownedOrJointPredicate(properties, userId, partnerId)),
-    );
+  const property = await findAccessible(properties, propertyId, { userId, partnerId });
   if (!property) return { ok: false, error: 'Property not found', status: 404 };
   if (property.mortgageId != null && property.mortgageId !== mortgageId) {
     // An archived mortgage no longer "occupies" the property — allow
@@ -261,17 +252,13 @@ async function resolveLinkedProperty(
   return { ok: true, nextId, property: result.property };
 }
 
-async function getAccessibleMortgage(
+function getAccessibleMortgage(
   userId: number,
   partnerId: number | null,
   mortgageId: number,
   executor: DbExecutor = db,
 ) {
-  const [mortgage] = await executor
-    .select()
-    .from(mortgages)
-    .where(and(eq(mortgages.id, mortgageId), ownedOrJointPredicate(mortgages, userId, partnerId)));
-  return mortgage ?? null;
+  return findAccessible(mortgages, mortgageId, { userId, partnerId }, { executor });
 }
 
 // The mortgage is the source of truth for its balance; keep the linked
@@ -643,7 +630,7 @@ function toMortgageTransactionValues(
 
 app.get('/', async (c) => {
   const user = getAuthUser(c);
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const includeArchived = c.req.query('includeArchived') === 'true';
   const accessPredicate = ownedOrJointPredicate(mortgages, user.id, partnerId);
   const data = await db
@@ -655,35 +642,24 @@ app.get('/', async (c) => {
 
 // ── Mortgage Transactions ────────────────────────────────────────────────────
 
-app.get('/transactions', async (c) => {
-  const user = getAuthUser(c);
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const mortgageId = c.req.query('mortgageId');
-  if (mortgageId) {
-    const parsedMortgageId = parseId(mortgageId);
-    if (parsedMortgageId === null)
-      return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
-    const mortgage = await getAccessibleMortgage(user.id, partnerId, parsedMortgageId);
-    if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-    const data = await db
-      .select()
-      .from(mortgageTransactions)
-      .where(eq(mortgageTransactions.mortgageId, parsedMortgageId));
-    return c.json({ data });
-  }
-  const data = await db
-    .select(getTableColumns(mortgageTransactions))
-    .from(mortgageTransactions)
-    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
-    .where(ownedOrJointPredicate(mortgages, user.id, partnerId));
-  return c.json({ data });
+registerTransactionReadRoutes(app, {
+  path: '/transactions',
+  table: mortgageTransactions,
+  parent: mortgages,
+  parentId: mortgageTransactions.mortgageId,
+  parentQuery: 'mortgageId',
+  parentLabel: 'Mortgage',
+  parentIdLabel: 'mortgage',
+  checkParent: true,
+  emptyParentIsAbsent: true,
+  scopeByChildOwner: false,
 });
 
 app.get('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const data = await getAccessibleMortgage(user.id, partnerId, id);
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
@@ -706,7 +682,7 @@ app.post('/', async (c) => {
   if (!linkedPropertyId.ok)
     return c.json({ error: linkedPropertyId.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const propertyResult = await fetchLinkedProperty(user.id, partnerId, linkedPropertyId.value, 0);
   if (!propertyResult.ok) return c.json({ error: propertyResult.error }, propertyResult.status);
   const property = propertyResult.property;
@@ -725,7 +701,7 @@ app.post('/', async (c) => {
 
   // A mortgage linked to a joint property is joint too (and vice versa).
   const isJoint = body.value.isJoint || property.isJoint;
-  const jointError = await assertJointAllowed(user.id, isJoint);
+  const jointError = assertJointAllowed(getPartnerId(c), isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
   const data = await db.transaction(async (tx) => {
@@ -757,7 +733,7 @@ app.patch('/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const existingMortgage = await getAccessibleMortgage(user.id, partnerId, id);
   if (!existingMortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
 
@@ -778,7 +754,7 @@ app.patch('/:id', async (c) => {
   );
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const jointError = await assertJointAllowed(user.id, merged.value.isJoint);
+  const jointError = assertJointAllowed(getPartnerId(c), merged.value.isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
   const data = await db.transaction(async (tx) => {
@@ -801,94 +777,27 @@ app.patch('/:id', async (c) => {
   return c.json({ data });
 });
 
-app.delete('/:id', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const accessPredicate = and(
-    eq(mortgages.id, id),
-    ownedOrJointPredicate(mortgages, user.id, partnerId),
-  );
-
-  // Hard delete removes the mortgage and its repayment history, so the linked
-  // property is unlinked and becomes unencumbered.
-  if (c.req.query('cascade') === 'true') {
-    const data = await db.transaction(async (tx) => {
-      // Captured before the delete: the FK's ON DELETE SET NULL already nulls
-      // properties.mortgage_id once the mortgage row is gone, so matching on
-      // mortgageId afterwards would find nothing.
-      const linkedPropertyId = await getCurrentLinkedPropertyId(id, tx);
-      const [deleted] = await tx.delete(mortgages).where(accessPredicate).returning();
-      if (!deleted) return null;
-      if (linkedPropertyId != null) {
-        await tx
-          .update(properties)
-          .set({ mortgageId: null, mortgage: 0 })
-          .where(eq(properties.id, linkedPropertyId));
-      }
-      return deleted;
-    });
-    if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-    return c.json({ data });
-  }
-
-  // Archiving keeps the property link intact so unarchiving restores the
-  // balance; the dashboard treats an archived mortgage as a zero balance.
-  const [data] = await db
-    .update(mortgages)
-    .set({ archivedAt: new Date() })
-    .where(and(accessPredicate, isNull(mortgages.archivedAt)))
-    .returning();
-  if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-
-  return c.json({ data });
-});
-
-app.post('/:id/unarchive', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid mortgage id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const mortgage = await getAccessibleMortgage(user.id, partnerId, id);
-  if (!mortgage) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-
-  // While archived, the property may have been re-linked to another mortgage.
-  // Restoring this one would orphan it (a mortgage must stay linked to remain
-  // editable), so block and explain.
-  const stillLinked = await getCurrentLinkedPropertyId(id);
-  if (stillLinked == null) {
-    return c.json(
-      { error: 'The linked property now belongs to another mortgage; re-link it first' },
-      HTTP_STATUS.CONFLICT,
-    );
-  }
-
-  const [data] = await db
-    .update(mortgages)
-    .set({ archivedAt: null })
-    .where(and(eq(mortgages.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)))
-    .returning();
-  if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
-});
-
-app.get('/transactions/:id', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const [data] = await db
-    .select(getTableColumns(mortgageTransactions))
-    .from(mortgageTransactions)
-    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
-    .where(
-      and(eq(mortgageTransactions.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)),
-    );
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+registerArchivableResource(app, {
+  path: '',
+  table: mortgages,
+  label: 'Mortgage',
+  idLabel: 'mortgage',
+  beforeDelete: async (tx, mortgage) => {
+    await tx
+      .update(properties)
+      .set({ mortgageId: null, mortgage: 0 })
+      .where(eq(properties.mortgageId, mortgage.id));
+    return null;
+  },
+  beforeUnarchive: async (tx, mortgage) => {
+    if ((await getCurrentLinkedPropertyId(mortgage.id, tx)) == null) {
+      return {
+        error: 'The linked property now belongs to another mortgage; re-link it first',
+        status: HTTP_STATUS.CONFLICT,
+      };
+    }
+    return null;
+  },
 });
 
 app.post('/transactions', async (c) => {
@@ -899,7 +808,7 @@ app.post('/transactions', async (c) => {
   const body = parseMortgageTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const result = await db.transaction(async (tx) => {
     const mortgage = await getAccessibleMortgage(user.id, partnerId, body.value.mortgageId, tx);
     if (!mortgage) return { error: 'Mortgage not found', status: HTTP_STATUS.NOT_FOUND } as const;
@@ -911,7 +820,11 @@ app.post('/transactions', async (c) => {
       .insert(mortgageTransactions)
       .values({ ...toMortgageTransactionValues(body.value), userId: mortgage.userId ?? user.id })
       .returning();
-    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
+    await withLedgerWrite(
+      tx,
+      { table: mortgages, id: body.value.mortgageId, partnerId, actorId: user.id },
+      body.value.date,
+    );
     return { data: created } as const;
   });
   if ('error' in result) return c.json({ error: result.error }, result.status);
@@ -923,14 +836,12 @@ app.patch('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const [existing] = await db
-    .select(getTableColumns(mortgageTransactions))
-    .from(mortgageTransactions)
-    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
-    .where(
-      and(eq(mortgageTransactions.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)),
-    );
+  const partnerId = getPartnerId(c);
+  const existing = await findAccessibleChild(
+    { table: mortgageTransactions, parent: mortgages, parentId: mortgageTransactions.mortgageId },
+    id,
+    { userId: user.id, partnerId },
+  );
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   const rawBody = await readJsonBody(c.req, 'Invalid mortgage transaction payload');
@@ -962,7 +873,14 @@ app.patch('/transactions/:id', async (c) => {
       .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
       .where(eq(mortgageTransactions.id, id))
       .returning();
-    await invalidateSnapshotsFrom(tx, user.id, earliestDate(existing.date, merged.value.date));
+    await withLedgerWrite(
+      tx,
+      [
+        { table: mortgages, id: existing.mortgageId, partnerId, actorId: user.id },
+        { table: mortgages, id: merged.value.mortgageId, partnerId, actorId: user.id },
+      ],
+      earliestDate(existing.date, merged.value.date),
+    );
     return { data: updated } as const;
   });
   if ('error' in result) return c.json({ error: result.error }, result.status);
@@ -973,14 +891,12 @@ app.delete('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const [existing] = await db
-    .select(getTableColumns(mortgageTransactions))
-    .from(mortgageTransactions)
-    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
-    .where(
-      and(eq(mortgageTransactions.id, id), ownedOrJointPredicate(mortgages, user.id, partnerId)),
-    );
+  const partnerId = getPartnerId(c);
+  const existing = await findAccessibleChild(
+    { table: mortgageTransactions, parent: mortgages, parentId: mortgageTransactions.mortgageId },
+    id,
+    { userId: user.id, partnerId },
+  );
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   const data = await db.transaction(async (tx) => {
@@ -992,7 +908,11 @@ app.delete('/transactions/:id', async (c) => {
       .delete(mortgageTransactions)
       .where(eq(mortgageTransactions.id, id))
       .returning();
-    await invalidateSnapshotsFrom(tx, user.id, existing.date);
+    await withLedgerWrite(
+      tx,
+      { table: mortgages, id: existing.mortgageId, partnerId, actorId: user.id },
+      existing.date,
+    );
     return deleted ?? null;
   });
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);

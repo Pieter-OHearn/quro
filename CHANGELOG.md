@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.6.1] - 2026-10-02
+
+- Protect new API routes by default using a shared list of public paths, and resolve the accepted partner in the session query.
+- Consolidate ownership checks, transaction reads, and archive/restore/cascade handlers while preserving existing validation and property/mortgage link rules.
+- Invalidate historical net-worth snapshots for both partners on joint ledger writes and for both parents when a transaction moves.
+- Separate dashboard history/activity and investment holdings/properties into focused modules.
+- Upgrade Axios, brace-expansion, and pypdf to resolve dependency security advisories and restore passing CI audits.
+
 ## [v0.6.0] - 2026-09-28
 
 - Add optional OpenTelemetry tracing for the backend: a server span per API request that continues the caller's trace, and a client span per Postgres query. It's enabled by setting `OTEL_EXPORTER_OTLP_ENDPOINT` and exports over OTLP/HTTP; query strings and parameter values aren't recorded.

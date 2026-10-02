@@ -89,7 +89,7 @@ The Vite dev server runs on `:5173` and the Bun API server on `:3000`. The Axios
 
 ### Authentication
 
-Authentication is session-based. On login, the backend writes a random session ID to the `sessions` table and sets an HTTP-only cookie on the response. All subsequent requests carry the cookie. The `requireAuth` middleware reads the cookie, validates the session against the DB, and attaches `{ id, name, email }` to the Hono context. Sessions have a 30-day TTL and are cleaned up by a background interval started in `index.ts` via `startSessionCleanup()`.
+Authentication is session-based. On login, the backend writes a random session ID to the `sessions` table and sets an HTTP-only cookie on the response. All subsequent requests carry the cookie. The `requireAuth` middleware reads the cookie, validates the session against the DB, and attaches `{ id, email }` and the accepted `partnerId` to the Hono context in one session query. Sessions have a 30-day TTL and are cleaned up by a background interval started in `index.ts` via `startSessionCleanup()`.
 
 ### CSRF protection
 
@@ -118,7 +118,7 @@ graph TD
   Nginx --> Browser
 ```
 
-Public routes (`/api/auth/*`, `/api/health`, `/api/readiness`, `/api/readiness/pension-import`) bypass `requireAuth` but still pass through the CORS and CSRF middleware.
+All `/api/*` routes require authentication by default. Exact public paths in `src/lib/publicPaths.ts` (signin, signup, signout, session discovery, health, readiness, and the signed Bunq OAuth callback) are shared by auth and CSRF middleware; new routes under these prefixes remain protected.
 
 The global error handler (`src/middleware/errorHandler.ts`) catches any unhandled exception and returns `{ error: message }` JSON with an appropriate status code.
 
@@ -276,14 +276,17 @@ All features follow a consistent structure on both sides of the stack.
 
 ### Backend
 
-Each feature is a `new Hono()` instance in `src/routes/<feature>.ts`, exported as default. It is mounted in `src/index.ts` with two lines:
+Each feature is a `new Hono()` instance in `src/routes/<feature>.ts`, exported as default. It is mounted in `src/index.ts` with one line:
 
 ```ts
-app.use('/api/<feature>/*', requireAuth);   // guard
-app.route('/api/<feature>', <feature>);     // mount
+app.route('/api/<feature>', feature);
 ```
 
-There is no shared base router for protected routes; auth is applied per-prefix. The pension import feature is an exception — its routes live in `src/routes/pension-imports.ts` but are mounted at `/api/pensions/imports` and under the `requireAuth` guard for `/api/pensions/*`.
+The global `app.use('/api/*', requireAuth)` guard also protects newly mounted features. Pension imports live in `src/routes/pension-imports.ts` and mount at `/api/pensions/imports`.
+
+`src/lib/access.ts` provides owned and joint parent/child queries with a consistent id and access scope. `registerTransactionReadRoutes` shares transaction list/get handlers while preserving each ledger's query validation and inaccessible-parent response. `registerArchivableResource` handles archive, restore, and explicit cascade deletion, with transaction hooks for property/mortgage link rules. Dated ledger mutations call `withLedgerWrite` inside the database transaction to invalidate snapshots for all affected owners, including both partners on joint assets and both parents when a transaction moves.
+
+Dashboard history and activity live in `src/lib/netWorthHistory.ts` and `src/lib/activity.ts`. Investments mounts the holding and property routers from `src/routes/holdings.ts` and `src/routes/properties.ts`.
 
 ### Frontend
 

@@ -1,3 +1,5 @@
+import { registerArchivableResource } from '../lib/archivableResource';
+import { findOwnedRow } from '../lib/access';
 import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
@@ -14,7 +16,7 @@ import { db, type DbExecutor } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { applyRepayment, DEBT_BALANCE, reverseRepayment } from '../lib/balance';
-import { invalidateSnapshotsFrom } from '../lib/netWorth';
+import { withLedgerWrite } from '../lib/ledgerWrite';
 import {
   err,
   type FieldParsers,
@@ -184,17 +186,12 @@ function mergeDebtPayload(
   });
 }
 
-async function getDebtById(
+function getDebtById(
   tx: DbExecutor,
   userId: number,
   debtId: number,
 ): Promise<typeof debts.$inferSelect | null> {
-  const [existing] = await tx
-    .select()
-    .from(debts)
-    .where(and(eq(debts.id, debtId), eq(debts.userId, userId)));
-
-  return existing ?? null;
+  return findOwnedRow(debts, debtId, userId, tx);
 }
 
 async function createDebt(params: {
@@ -260,7 +257,7 @@ async function createDebtPayment(params: {
       .insert(debtPayments)
       .values(toDebtPaymentInsertPayload(parsed.value, params.userId))
       .returning();
-    await invalidateSnapshotsFrom(tx, params.userId, parsed.value.date);
+    await withLedgerWrite(tx, { userId: params.userId }, parsed.value.date);
 
     return { data };
   });
@@ -288,7 +285,7 @@ function deleteDebtPayment(params: {
       .delete(debtPayments)
       .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)))
       .returning();
-    await invalidateSnapshotsFrom(tx, params.userId, existing.date);
+    await withLedgerWrite(tx, { userId: params.userId }, existing.date);
 
     return { data };
   });
@@ -383,41 +380,11 @@ app.patch('/:id', async (c) => {
   return c.json({ data: result.data });
 });
 
-app.delete('/:id', async (c) => {
-  const user = getAuthUser(c);
-  const debtId = parseId(c.req.param('id'));
-  if (debtId == null) return c.json({ error: 'Invalid debt id' }, HTTP_STATUS.BAD_REQUEST);
-
-  if (c.req.query('cascade') === 'true') {
-    const [data] = await db
-      .delete(debts)
-      .where(and(eq(debts.id, debtId), eq(debts.userId, user.id)))
-      .returning();
-    if (!data) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
-    return c.json({ data });
-  }
-
-  const [data] = await db
-    .update(debts)
-    .set({ archivedAt: new Date() })
-    .where(and(eq(debts.id, debtId), eq(debts.userId, user.id), isNull(debts.archivedAt)))
-    .returning();
-  if (!data) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
-});
-
-app.post('/:id/unarchive', async (c) => {
-  const user = getAuthUser(c);
-  const debtId = parseId(c.req.param('id'));
-  if (debtId == null) return c.json({ error: 'Invalid debt id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const [data] = await db
-    .update(debts)
-    .set({ archivedAt: null })
-    .where(and(eq(debts.id, debtId), eq(debts.userId, user.id)))
-    .returning();
-  if (!data) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+registerArchivableResource(app, {
+  path: '',
+  table: debts,
+  label: 'Debt',
+  idLabel: 'debt',
 });
 
 export default app;

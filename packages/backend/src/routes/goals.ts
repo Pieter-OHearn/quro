@@ -1,3 +1,4 @@
+import { findOwnedRow } from '../lib/access';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { GOAL_SOURCE_TYPES, GOAL_TYPES, type GoalSourceType, type GoalType } from '@quro/shared';
@@ -294,14 +295,6 @@ export function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>>
   return parsePatchFields(body as Record<string, unknown>, goalParsers);
 }
 
-async function getOwnedGoal(goalId: number, userId: number) {
-  const [goal] = await db
-    .select()
-    .from(goals)
-    .where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
-  return goal ?? null;
-}
-
 export function mergeGoalPayload(
   patch: Partial<GoalPayload>,
   existing: typeof goals.$inferSelect,
@@ -369,7 +362,7 @@ app.get('/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid goal id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const data = await getOwnedGoal(id, user.id);
+  const data = await findOwnedRow(goals, id, user.id);
   if (!data) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -403,7 +396,7 @@ app.patch('/:id', async (c) => {
     return c.json({ error: 'No goal fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  const existing = await getOwnedGoal(id, user.id);
+  const existing = await findOwnedRow(goals, id, user.id);
   if (!existing) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
 
   const merged = mergeGoalPayload(body.value, existing);

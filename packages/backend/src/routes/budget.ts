@@ -1,3 +1,4 @@
+import { findOwnedRow } from '../lib/access';
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
@@ -173,22 +174,6 @@ async function readBudgetTransactionPatch(
   return Object.keys(body.value).length === 0 ? err('No budget transaction fields provided') : body;
 }
 
-async function getOwnedBudgetCategory(categoryId: number, userId: number) {
-  const [category] = await db
-    .select()
-    .from(budgetCategories)
-    .where(and(eq(budgetCategories.id, categoryId), eq(budgetCategories.userId, userId)));
-  return category ?? null;
-}
-
-async function getOwnedBudgetTransaction(transactionId: number, userId: number) {
-  const [transaction] = await db
-    .select()
-    .from(budgetTransactions)
-    .where(and(eq(budgetTransactions.id, transactionId), eq(budgetTransactions.userId, userId)));
-  return transaction ?? null;
-}
-
 function toBudgetCategoryInsertValues(
   payload: BudgetCategoryPayload,
   userId: number,
@@ -351,7 +336,7 @@ app.get('/categories/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid category id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const data = await getOwnedBudgetCategory(id, user.id);
+  const data = await findOwnedRow(budgetCategories, id, user.id);
   if (!data) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -460,7 +445,7 @@ app.get('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const data = await getOwnedBudgetTransaction(id, user.id);
+  const data = await findOwnedRow(budgetTransactions, id, user.id);
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -473,7 +458,7 @@ app.post('/transactions', async (c) => {
   const body = parseBudgetTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const category = await getOwnedBudgetCategory(body.value.categoryId, user.id);
+  const category = await findOwnedRow(budgetCategories, body.value.categoryId, user.id);
   if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db.transaction(async (tx) => {
@@ -542,7 +527,7 @@ app.delete('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const existing = await getOwnedBudgetTransaction(id, user.id);
+  const existing = await findOwnedRow(budgetTransactions, id, user.id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
   const [data] = await db.transaction(async (tx) => {

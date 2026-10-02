@@ -30,11 +30,11 @@ The minimum accepted password length is 8 characters, enforced at sign-up.
 Every protected request goes through the `requireAuth` middleware, which:
 
 1. Reads the `session` cookie.
-2. Queries the `sessions` table by session ID.
+2. Queries the `sessions` table by session ID, joining the user and accepted partner link.
 3. Rejects the request if the session does not exist or `expires_at` is in the past.
 4. Loads the user row and attaches `{ id, email }` to the Hono context.
 
-All routes under `/api/*` except `/api/auth/*` and `/api/health` require a valid session.
+All routes under `/api/*` require a valid session by default. The shared exact-path list in `src/lib/publicPaths.ts` allows signin, signup, signout, session discovery, health/readiness probes, and the signed Bunq OAuth callback. New routes under these prefixes are protected. The accepted partner id is available on the request context; personal rows remain owner-only and partner access requires a joint parent entity.
 
 ### Session cleanup
 
@@ -54,7 +54,7 @@ A cross-origin attacker cannot read the `csrf_token` cookie value (due to the sa
 
 ### Exempt endpoints
 
-Three endpoints are exempt from CSRF checking:
+Auth and CSRF middleware share the public path list. Its state-changing endpoints are:
 
 - `POST /api/auth/signin`
 - `POST /api/auth/signup`

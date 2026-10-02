@@ -39,6 +39,7 @@ export const app = new Hono();
 app.use('*', httpTracing);
 app.use('*', corsMiddleware);
 app.use('*', requireCsrf);
+app.use('/api/*', requireAuth);
 app.onError(errorHandler);
 
 // Public routes
@@ -54,33 +55,6 @@ app.get('/api/readiness/pension-import', async (c) => {
 });
 
 // Protected routes
-app.use('/api/savings/*', requireAuth);
-app.use('/api/investments/*', requireAuth);
-app.use('/api/pensions/*', requireAuth);
-app.use('/api/mortgages/*', requireAuth);
-app.use('/api/debts/*', requireAuth);
-app.use('/api/salary/*', requireAuth);
-app.use('/api/goals/*', requireAuth);
-app.use('/api/budget/*', requireAuth);
-app.use('/api/dashboard/*', requireAuth);
-app.use('/api/currency/*', requireAuth);
-app.use('/api/capabilities', requireAuth);
-app.use('/api/capabilities/*', requireAuth);
-app.use('/api/settings', requireAuth);
-app.use('/api/settings/*', requireAuth);
-app.use('/api/partner', requireAuth);
-app.use('/api/partner/*', requireAuth);
-app.use('/api/bunq/oauth/start', requireAuth);
-// /api/bunq/oauth/callback is intentionally public: bunq may redirect back in a
-// different browser/in-app webview that lacks the Quro session cookie. The user
-// is identified by the HMAC-signed `state` param instead (see routes/bunq.ts).
-app.use('/api/bunq/connection', requireAuth);
-app.use('/api/bunq/sync', requireAuth);
-app.use('/api/bunq/sync/*', requireAuth);
-app.use('/api/plan/*', requireAuth);
-app.use('/api/employments', requireAuth);
-app.use('/api/employments/*', requireAuth);
-
 app.route('/api/savings', savings);
 app.route('/api/investments', investments);
 app.route('/api/pensions/imports', pensionImports);

@@ -1,4 +1,7 @@
-import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
+import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
+import { registerArchivableResource } from '../lib/archivableResource';
+import { findAccessible, findAccessibleChild } from '../lib/access';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   SAVINGS_ACCOUNT_TYPES,
@@ -10,15 +13,16 @@ import {
 import { HTTP_STATUS } from '../constants/http';
 import { db, type DbTransaction } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
-import { getAuthUser } from '../lib/authUser';
+import { getAuthUser, getPartnerId } from '../lib/authUser';
 import {
   BANKING_ENTITIES,
   buildManualBankingEntityId,
   getBankingEntity,
   normalizeBankName,
 } from '../lib/jurisdictions/bankingEntities';
-import { earliestDate, invalidateSnapshotsFrom } from '../lib/netWorth';
-import { assertJointAllowed, getAcceptedPartnerId, ownedOrJointPredicate } from '../lib/partner';
+import { earliestDate } from '../lib/netWorth';
+import { withLedgerWrite } from '../lib/ledgerWrite';
+import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from '../lib/savingsBalance';
 import {
   err,
@@ -276,35 +280,34 @@ function getSavingsAccountPredicate(
     : and(basePredicate, isNull(savingsAccounts.archivedAt));
 }
 
-async function getAccessibleSavingsAccount(
+function getAccessibleSavingsAccount(
   accountId: number,
   userId: number,
   partnerId: number | null,
   options: { includeArchived?: boolean } = {},
 ) {
-  const [account] = await db
-    .select()
-    .from(savingsAccounts)
-    .where(getSavingsAccountPredicate(accountId, userId, partnerId, options));
-  return account ?? null;
+  return findAccessible(
+    savingsAccounts,
+    accountId,
+    { userId, partnerId },
+    { where: options.includeArchived ? undefined : isNull(savingsAccounts.archivedAt) },
+  );
 }
 
-async function getAccessibleSavingsTransaction(
+function getAccessibleSavingsTransaction(
   transactionId: number,
   userId: number,
   partnerId: number | null,
 ) {
-  const [transaction] = await db
-    .select(getTableColumns(savingsTransactions))
-    .from(savingsTransactions)
-    .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
-    .where(
-      and(
-        eq(savingsTransactions.id, transactionId),
-        ownedOrJointPredicate(savingsAccounts, userId, partnerId),
-      ),
-    );
-  return transaction ?? null;
+  return findAccessibleChild(
+    {
+      table: savingsTransactions,
+      parent: savingsAccounts,
+      parentId: savingsTransactions.accountId,
+    },
+    transactionId,
+    { userId, partnerId },
+  );
 }
 
 async function syncSavingsBalancesForEditedTransaction(
@@ -397,7 +400,7 @@ async function resolvePatchedSavingsTransactionAccount(params: {
 
 app.get('/accounts', async (c) => {
   const user = getAuthUser(c);
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const includeArchived = c.req.query('includeArchived') === 'true';
   const accessPredicate = ownedOrJointPredicate(savingsAccounts, user.id, partnerId);
   const data = await db
@@ -427,7 +430,7 @@ app.get('/accounts/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid account id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const data = await getAccessibleSavingsAccount(id, user.id, partnerId);
   if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
@@ -441,7 +444,7 @@ app.post('/accounts', async (c) => {
   const body = parseSavingsAccountCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const jointError = await assertJointAllowed(user.id, body.value.isJoint);
+  const jointError = assertJointAllowed(getPartnerId(c), body.value.isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
@@ -465,10 +468,10 @@ app.patch('/accounts/:id', async (c) => {
     return c.json({ error: 'No savings account fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  const jointError = await assertJointAllowed(user.id, body.value.isJoint);
+  const jointError = assertJointAllowed(getPartnerId(c), body.value.isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const current = await getAccessibleSavingsAccount(id, user.id, partnerId);
   if (!current) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   const updateValues = toSavingsAccountUpdateValues(body.value);
@@ -540,7 +543,7 @@ app.patch('/accounts/:id/banking-entity', async (c) => {
     };
   }
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const [data] = await db
     .update(savingsAccounts)
     .set(confirmation)
@@ -549,84 +552,26 @@ app.patch('/accounts/:id/banking-entity', async (c) => {
   return data ? c.json({ data }) : c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
 });
 
-app.delete('/accounts/:id', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid account id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const partnerId = await getAcceptedPartnerId(user.id);
-  if (c.req.query('cascade') === 'true') {
-    const [data] = await db
-      .delete(savingsAccounts)
-      .where(getSavingsAccountPredicate(id, user.id, partnerId, { includeArchived: true }))
-      .returning();
-    if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
-    return c.json({ data });
-  }
-
-  const [data] = await db
-    .update(savingsAccounts)
-    .set({ archivedAt: new Date() })
-    .where(getSavingsAccountPredicate(id, user.id, partnerId))
-    .returning();
-  if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
-});
-
-app.post('/accounts/:id/unarchive', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid account id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const [data] = await db
-    .update(savingsAccounts)
-    .set({ archivedAt: null })
-    .where(getSavingsAccountPredicate(id, user.id, partnerId, { includeArchived: true }))
-    .returning();
-  if (!data) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+registerArchivableResource(app, {
+  path: '/accounts',
+  table: savingsAccounts,
+  label: 'Account',
+  idLabel: 'account',
 });
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 
-app.get('/transactions', async (c) => {
-  const user = getAuthUser(c);
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const accountId = c.req.query('accountId');
-  if (accountId) {
-    const parsedAccountId = parseId(accountId);
-    if (parsedAccountId === null) {
-      return c.json({ error: 'Invalid account id' }, HTTP_STATUS.BAD_REQUEST);
-    }
-    const account = await getAccessibleSavingsAccount(parsedAccountId, user.id, partnerId, {
-      includeArchived: true,
-    });
-    if (!account) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
-    const data = await db
-      .select()
-      .from(savingsTransactions)
-      .where(eq(savingsTransactions.accountId, parsedAccountId));
-    return c.json({ data });
-  }
-
-  const data = await db
-    .select(getTableColumns(savingsTransactions))
-    .from(savingsTransactions)
-    .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
-    .where(ownedOrJointPredicate(savingsAccounts, user.id, partnerId));
-  return c.json({ data });
-});
-
-app.get('/transactions/:id', async (c) => {
-  const user = getAuthUser(c);
-  const id = parseId(c.req.param('id'));
-  if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const partnerId = await getAcceptedPartnerId(user.id);
-  const data = await getAccessibleSavingsTransaction(id, user.id, partnerId);
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+registerTransactionReadRoutes(app, {
+  path: '/transactions',
+  table: savingsTransactions,
+  parent: savingsAccounts,
+  parentId: savingsTransactions.accountId,
+  parentQuery: 'accountId',
+  parentLabel: 'Account',
+  parentIdLabel: 'account',
+  checkParent: true,
+  emptyParentIsAbsent: true,
+  scopeByChildOwner: false,
 });
 
 app.post('/transactions', async (c) => {
@@ -637,7 +582,7 @@ app.post('/transactions', async (c) => {
   const body = parseSavingsTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const account = await getAccessibleSavingsAccount(body.value.accountId, user.id, partnerId);
   if (!account) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
   if (account.bunqAccountId) {
@@ -658,7 +603,11 @@ app.post('/transactions', async (c) => {
       body.value.accountId,
       toSignedSavingsAmount(body.value.type, body.value.amount),
     );
-    await invalidateSnapshotsFrom(tx, user.id, body.value.date);
+    await withLedgerWrite(
+      tx,
+      { ...account, partnerId: account.userId === user.id ? partnerId : user.id },
+      body.value.date,
+    );
 
     return [inserted];
   });
@@ -680,7 +629,7 @@ app.patch('/transactions/:id', async (c) => {
     return c.json({ error: 'No savings transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const editable = await getEditableSavingsTransaction(id, user.id, partnerId, 'modify');
   if (!editable.ok) return c.json({ error: editable.error }, editable.status);
   const existing = editable.transaction;
@@ -719,9 +668,12 @@ app.patch('/transactions/:id', async (c) => {
       previousAmount: existing.amount,
       nextAmount: nextState.amount,
     });
-    await invalidateSnapshotsFrom(
+    await withLedgerWrite(
       tx,
-      user.id,
+      [
+        { table: savingsAccounts, id: existing.accountId, partnerId, actorId: user.id },
+        { table: savingsAccounts, id: nextState.accountId, partnerId, actorId: user.id },
+      ],
       earliestDate(existing.date, body.value.date ?? existing.date),
     );
 
@@ -737,7 +689,7 @@ app.delete('/transactions/:id', async (c) => {
   const id = parseId(c.req.param('id'));
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const partnerId = await getAcceptedPartnerId(user.id);
+  const partnerId = getPartnerId(c);
   const editable = await getEditableSavingsTransaction(id, user.id, partnerId, 'delete');
   if (!editable.ok) return c.json({ error: editable.error }, editable.status);
 
@@ -754,7 +706,11 @@ app.delete('/transactions/:id', async (c) => {
       deleted.accountId,
       -toSignedSavingsAmount(deleted.type, deleted.amount),
     );
-    await invalidateSnapshotsFrom(tx, user.id, deleted.date);
+    await withLedgerWrite(
+      tx,
+      { table: savingsAccounts, id: deleted.accountId, partnerId, actorId: user.id },
+      deleted.date,
+    );
 
     return [deleted];
   });
