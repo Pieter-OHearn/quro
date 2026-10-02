@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
 import { eq, inArray } from 'drizzle-orm';
 
 const s3Objects = new Map<string, Uint8Array>();
+const failedDeletionKeys = new Set<string>();
+const deletionRequests: string[][] = [];
 let pensionImportCapabilityEnabled = true;
 
 await mock.module('../lib/s3', () => ({
@@ -22,6 +24,15 @@ await mock.module('../lib/s3', () => ({
   },
   deleteS3Object: ({ key }: { key: string }) => {
     s3Objects.delete(key);
+  },
+  deleteS3Objects: (keys: readonly string[]) => {
+    deletionRequests.push([...keys]);
+    const deletedKeys = keys.filter((key) => !failedDeletionKeys.has(key));
+    for (const key of deletedKeys) s3Objects.delete(key);
+    return Promise.resolve({
+      deletedKeys,
+      failedKeys: keys.filter((key) => failedDeletionKeys.has(key)),
+    });
   },
 }));
 
@@ -361,5 +372,93 @@ describe('pension imports integration', () => {
     expect(await twoAnnualResponse.json()).toEqual({
       error: 'Exactly one annual statement row is required before commit',
     });
+  });
+
+  test('expires drafts in a batch while retaining committed PDFs', async () => {
+    const owner = await integration.signUp('expired-drafts');
+    const potId = await createPensionPot(owner.cookie, 'Expired drafts');
+    const past = new Date(Date.now() - 60000);
+    const statuses = ['queued', 'processing', 'ready_for_review', 'committed'] as const;
+    const rows = await db
+      .insert(pensionStatementImports)
+      .values(
+        statuses.map((status) => ({
+          userId: owner.user.id,
+          potId,
+          status,
+          expiresAt: past,
+          storageKey: `expired-draft-${owner.user.id}-${status}`,
+          fileName: 'test.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 1,
+          fileHashSha256: crypto.randomUUID(),
+        })),
+      )
+      .returning();
+    for (const row of rows) s3Objects.set(row.storageKey, new Uint8Array([1]));
+    await runPensionImportWorkerTick();
+    const updated = await db
+      .select()
+      .from(pensionStatementImports)
+      .where(eq(pensionStatementImports.userId, owner.user.id));
+    expect(updated.filter((row) => row.status === 'expired')).toHaveLength(3);
+    expect(updated.filter((row) => row.status === 'committed')).toHaveLength(1);
+    for (const row of rows) expect(s3Objects.has(row.storageKey)).toBe(row.status === 'committed');
+  });
+
+  test('retries failed deletions on later ticks and skips completed cleanup', async () => {
+    const owner = await integration.signUp('cleanup-retry');
+    const potId = await createPensionPot(owner.cookie, 'Cleanup retry');
+    const rows = await db
+      .insert(pensionStatementImports)
+      .values(
+        ['expired', 'queued'].map((status, index) => ({
+          userId: owner.user.id,
+          potId,
+          status: status as 'expired' | 'queued',
+          expiresAt: new Date(Date.now() - 60000),
+          storageKey: `cleanup-retry-${owner.user.id}-${index}`,
+          fileName: 'test.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 1,
+          fileHashSha256: crypto.randomUUID(),
+        })),
+      )
+      .returning();
+    const failed = rows[0];
+    const successful = rows[1];
+    for (const row of rows) s3Objects.set(row.storageKey, new Uint8Array([1]));
+    failedDeletionKeys.add(failed.storageKey);
+    deletionRequests.length = 0;
+    try {
+      await runPensionImportWorkerTick();
+      const first = await db
+        .select()
+        .from(pensionStatementImports)
+        .where(eq(pensionStatementImports.userId, owner.user.id));
+      expect(first.find((row) => row.id === failed.id)).toMatchObject({
+        status: 'expired',
+        storageDeletedAt: null,
+      });
+      expect(first.find((row) => row.id === successful.id)?.storageDeletedAt).toBeInstanceOf(Date);
+      expect(s3Objects.has(failed.storageKey)).toBe(true);
+      expect(s3Objects.has(successful.storageKey)).toBe(false);
+      failedDeletionKeys.clear();
+      deletionRequests.length = 0;
+      await runPensionImportWorkerTick();
+      expect(deletionRequests.flat()).toContain(failed.storageKey);
+      expect(deletionRequests.flat()).not.toContain(successful.storageKey);
+      const [retried] = await db
+        .select()
+        .from(pensionStatementImports)
+        .where(eq(pensionStatementImports.id, failed.id));
+      expect(retried.storageDeletedAt).toBeInstanceOf(Date);
+      expect(s3Objects.has(failed.storageKey)).toBe(false);
+      deletionRequests.length = 0;
+      await runPensionImportWorkerTick();
+      expect(deletionRequests.flat()).not.toContain(failed.storageKey);
+    } finally {
+      failedDeletionKeys.clear();
+    }
   });
 });

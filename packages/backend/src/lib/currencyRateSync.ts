@@ -1,12 +1,8 @@
 import { CURRENCY_CODES, type CurrencyCode, toDateOnlyOr } from '@quro/shared';
-import { asc, sql } from 'drizzle-orm';
+import { asc, desc, gte, lt, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { currencyRateHistory, currencyRates } from '../db/schema';
-import {
-  buildRatesToBaseCurrency,
-  CurrencyRatesUnavailableError,
-  FX_BASE_CURRENCY,
-} from './currencyRateCache';
+import { buildRatesToBaseCurrency, FX_BASE_CURRENCY } from './currencyRateCache';
 import { getMarketDataClient } from './marketDataClient';
 
 const YAHOO_FX_PROVIDER = 'yahoo_finance';
@@ -120,7 +116,30 @@ export function loadCurrencyRateCacheRows(): Promise<CurrentCurrencyRateRow[]> {
     .orderBy(asc(currencyRates.fromCurrency), asc(currencyRates.toCurrency));
 }
 
-export function loadCurrencyRateHistoryRows(): Promise<HistoricalCurrencyRateDbRow[]> {
+export function loadCurrencyRateHistoryRows(
+  windowStart?: string,
+): Promise<HistoricalCurrencyRateDbRow[]> {
+  const columns = {
+    fromCurrency: currencyRateHistory.fromCurrency,
+    toCurrency: currencyRateHistory.toCurrency,
+    rate: currencyRateHistory.rate,
+    provider: currencyRateHistory.provider,
+    sourceDate: currencyRateHistory.sourceDate,
+    updatedAt: currencyRateHistory.updatedAt,
+  };
+  if (windowStart) {
+    const pairs = [currencyRateHistory.fromCurrency, currencyRateHistory.toCurrency];
+    const before = db
+      .selectDistinctOn(pairs, columns)
+      .from(currencyRateHistory)
+      .where(lt(currencyRateHistory.sourceDate, windowStart))
+      .orderBy(...pairs, desc(currencyRateHistory.sourceDate));
+    return db
+      .select(columns)
+      .from(currencyRateHistory)
+      .where(gte(currencyRateHistory.sourceDate, windowStart))
+      .unionAll(before);
+  }
   return db
     .select({
       fromCurrency: currencyRateHistory.fromCurrency,
@@ -138,39 +157,40 @@ export function loadCurrencyRateHistoryRows(): Promise<HistoricalCurrencyRateDbR
     );
 }
 
-export async function getHistoricalCurrencyRateRows(): Promise<HistoricalCurrencyRateDbRow[]> {
+export async function getHistoricalCurrencyRateRows(
+  windowStart?: string,
+): Promise<HistoricalCurrencyRateDbRow[]> {
   const [history, current] = await Promise.all([
-    loadCurrencyRateHistoryRows(),
+    loadCurrencyRateHistoryRows(windowStart),
     getCurrentCurrencyRateRows(),
   ]);
   return [...history, ...current.map(({ id: _id, ...row }) => row)];
 }
 
-function shouldRefreshCurrencyRateCache(
-  rows: readonly CurrentCurrencyRateRow[],
-  baseCurrency: CurrencyCode,
-): boolean {
-  if (rows.length === 0) return true;
-
-  try {
-    buildRatesToBaseCurrency(rows, baseCurrency);
-    return false;
-  } catch (error) {
-    if (error instanceof CurrencyRatesUnavailableError) return true;
-    throw error;
-  }
-}
+const CURRENT_RATE_CACHE_MS = 60_000;
+let cacheRevision = 0;
+let currentRows: { rows: CurrentCurrencyRateRow[]; loadedAt: number } | null = null;
+let currentLoad: Promise<CurrentCurrencyRateRow[]> | null = null;
+const syncs = new Map<CurrencyCode, Promise<CurrencyRateSyncSummary>>();
 
 export async function getCurrentCurrencyRateRows(
   baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
 ): Promise<CurrentCurrencyRateRow[]> {
-  let rows = await loadCurrencyRateCacheRows();
-
-  if (shouldRefreshCurrencyRateCache(rows, baseCurrency)) {
-    await syncCurrencyRates({ baseCurrency });
-    rows = await loadCurrencyRateCacheRows();
+  if (!currentRows || Date.now() - currentRows.loadedAt >= CURRENT_RATE_CACHE_MS) {
+    const revision = cacheRevision;
+    currentLoad ??= loadCurrencyRateCacheRows()
+      .then((rows) => {
+        if (revision === cacheRevision) currentRows = { rows, loadedAt: Date.now() };
+        return rows;
+      })
+      .finally(() => {
+        currentLoad = null;
+      });
+    await currentLoad;
+    if (!currentRows) return getCurrentCurrencyRateRows(baseCurrency);
   }
-
+  const rows = currentRows!.rows;
+  // Provider refresh belongs to the scheduler, never to a dashboard request.
   buildRatesToBaseCurrency(rows, baseCurrency);
   return rows;
 }
@@ -182,7 +202,7 @@ export async function getCurrentRatesToBaseCurrency(
   return buildRatesToBaseCurrency(rows, baseCurrency);
 }
 
-export async function syncCurrencyRates(
+async function performCurrencyRateSync(
   options: {
     baseCurrency?: CurrencyCode;
     fetchRates?: CurrencyRateFetcher;
@@ -231,6 +251,7 @@ export async function syncCurrencyRates(
     });
   }
 
+  invalidateCurrentCurrencyRateCache();
   return {
     requestedRates: fromCurrencies.length,
     updatedRates: result.rates.length,
@@ -238,4 +259,22 @@ export async function syncCurrencyRates(
     issues: result.issues,
     syncedAt: syncedAt.toISOString(),
   };
+}
+
+export function syncCurrencyRates(
+  options: Parameters<typeof performCurrencyRateSync>[0] = {},
+): Promise<CurrencyRateSyncSummary> {
+  const base = options.baseCurrency ?? FX_BASE_CURRENCY;
+  const existing = syncs.get(base);
+  if (existing) return existing;
+  const pending = performCurrencyRateSync(options).finally(() => {
+    syncs.delete(base);
+  });
+  syncs.set(base, pending);
+  return pending;
+}
+
+export function invalidateCurrentCurrencyRateCache(): void {
+  cacheRevision++;
+  currentRows = null;
 }

@@ -4,7 +4,7 @@ import {
   type StockPriceResult,
   toDateOnlyOr,
 } from '@quro/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { holdingPriceHistory, holdings } from '../db/schema';
 import { getMarketDataClient } from './marketDataClient';
@@ -297,4 +297,111 @@ export async function syncHoldingPricesForUser(
     },
     updates,
   };
+}
+
+// One provider fetch per unique exchange-aware symbol across all users.
+export async function syncAllHoldingPrices(): Promise<HoldingPriceSyncOutcome> {
+  const rows = await db
+    .select()
+    .from(holdings)
+    .where(and(eq(holdings.excludeFromSync, false), isNull(holdings.archivedAt)));
+  const symbols = new Map(
+    rows.map((row) => [row.id, toYahooSymbol(normalizeTicker(row.ticker), row.exchangeMic)]),
+  );
+  const uniqueSymbols = [...new Set(symbols.values())];
+  const { quotes, symbolFetchErrors } = await fetchQuotesBySymbol(uniqueSymbols);
+  const issues: HoldingIssue[] = [];
+  const candidates: UpdatedHoldingPrice[] = [];
+  for (const row of rows) {
+    const check = validateHoldingQuote(row, symbols.get(row.id)!, quotes, symbolFetchErrors);
+    if ('issue' in check) {
+      issues.push(check.issue);
+      continue;
+    }
+    const normalizedCurrency = normalizeCurrency(check.quote.priceCurrency);
+    const currency = isCurrencyCode(normalizedCurrency) ? normalizedCurrency : row.currency;
+    candidates.push({
+      holding: {
+        ...row,
+        currentPrice: check.quote.close,
+        currency,
+        priceUpdatedAt: toTradeDate(check.quote.tradeLast),
+      },
+      price: {
+        ticker: check.ticker,
+        price: check.quote.close,
+        currency: normalizedCurrency ?? row.currency,
+        tradeLast: check.quote.tradeLast,
+        eodDate: toDateOnlyOr(check.quote.eodDate ?? check.quote.tradeLast),
+        priceCurrency: normalizedCurrency,
+      },
+    });
+  }
+  const updates = await persistHoldingPriceBatches(candidates);
+  return {
+    summary: {
+      requestedHoldings: rows.length,
+      requestedSymbols: uniqueSymbols.length,
+      updatedHoldings: updates.length,
+      skippedHoldings: rows.length - updates.length,
+      issues,
+      syncedAt: new Date().toISOString(),
+    },
+    updates,
+  };
+}
+
+const HOLDING_WRITE_BATCH_SIZE = 500;
+
+async function persistHoldingPriceBatches(
+  candidates: UpdatedHoldingPrice[],
+): Promise<UpdatedHoldingPrice[]> {
+  const updates: UpdatedHoldingPrice[] = [];
+  for (let offset = 0; offset < candidates.length; offset += HOLDING_WRITE_BATCH_SIZE) {
+    const batch = candidates.slice(offset, offset + HOLDING_WRITE_BATCH_SIZE);
+    // Update existing rows only; an upsert could resurrect a deleted holding.
+    const changed = await db.transaction(async (tx) => {
+      const values = sql.join(
+        batch.map(
+          ({ holding }) => sql`(
+        ${holding.id}::integer, ${holding.userId}::integer, ${holding.currentPrice}::numeric,
+        ${holding.currency}::currency_code, ${holding.priceUpdatedAt!.toISOString()}::timestamp
+      )`,
+        ),
+        sql`, `,
+      );
+      const updated = await tx.execute<{ id: number }>(sql`
+        update holdings as h set current_price = v.price, currency = v.currency, price_updated_at = v.updated_at
+        from (values ${values}) as v(id, user_id, price, currency, updated_at)
+        where h.id = v.id and h.user_id = v.user_id and h.archived_at is null and h.exclude_from_sync = false
+        returning h.id
+      `);
+      const ids = new Set(updated.map((row) => row.id));
+      const changed = batch.filter(({ holding }) => ids.has(holding.id));
+      if (changed.length)
+        await tx
+          .insert(holdingPriceHistory)
+          .values(
+            changed.map(({ holding, price }) => ({
+              holdingId: holding.id,
+              userId: holding.userId,
+              closePrice: price.price,
+              eodDate: price.eodDate!,
+              priceCurrency: price.currency,
+              syncedAt: new Date(),
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [holdingPriceHistory.holdingId, holdingPriceHistory.eodDate],
+            set: {
+              closePrice: sql`excluded.close_price`,
+              priceCurrency: sql`excluded.price_currency`,
+              syncedAt: sql`excluded.synced_at`,
+            },
+          });
+      return changed;
+    });
+    updates.push(...changed);
+  }
+  return updates;
 }

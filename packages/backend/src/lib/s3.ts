@@ -3,9 +3,11 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   HeadBucketCommand,
 } from '@aws-sdk/client-s3';
 import type { Readable } from 'node:stream';
+import { deleteObjectsInBatches, type ObjectDeletionResult } from './s3Deletes';
 
 type S3Config = {
   endpoint: string;
@@ -160,4 +162,20 @@ export async function deleteS3Object(params: { key: string }): Promise<void> {
       Key: params.key,
     }),
   );
+}
+
+export function deleteS3Objects(keys: readonly string[]): Promise<ObjectDeletionResult> {
+  return deleteObjectsInBatches(keys, async (batch) => {
+    const result = await getS3Client().send(
+      new DeleteObjectsCommand({
+        Bucket: getS3BucketName(),
+        Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+      }),
+    );
+    const errors = result.Errors ?? [];
+    if (errors.length) console.error('Some S3 objects could not be deleted', errors);
+    // An error without a key cannot safely be attributed to one object.
+    if (errors.some((error) => !error.Key)) return batch;
+    return errors.map((error) => error.Key!);
+  });
 }

@@ -6,7 +6,7 @@ import type {
   RunwayResponse,
   SavingsAccount,
 } from '@quro/shared';
-import { db } from '../db/client';
+import { db, queryClient } from '../db/client';
 import { currencyRates } from '../db/schema';
 import { createIntegrationHelpers } from '../test/integration';
 
@@ -599,4 +599,20 @@ describe('plan integration', () => {
       ).status,
     ).toBe(404);
   });
+});
+
+test('a runway request executes its primary employment lookup once', async () => {
+  const owner = await integration.signUp('primary-employment-query');
+  const queries: string[] = [];
+  const originalDebug = queryClient.options.debug;
+  queryClient.options.debug = (_connection, query) => {
+    queries.push(query);
+  };
+  try {
+    const runway = await integration.request('/api/plan/runway', { cookie: owner.cookie });
+    expect(runway.status).toBe(200);
+    expect(queries.filter((query) => query.includes('from "employments"'))).toHaveLength(1);
+  } finally {
+    queryClient.options.debug = originalDebug;
+  }
 });

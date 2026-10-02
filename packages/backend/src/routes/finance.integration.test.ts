@@ -49,6 +49,10 @@ await mock.module('../lib/s3', () => ({
   deleteS3Object: ({ key }: { key: string }) => {
     s3Objects.delete(key);
   },
+  deleteS3Objects: (keys: readonly string[]) => {
+    for (const key of keys) s3Objects.delete(key);
+    return Promise.resolve({ deletedKeys: [...keys], failedKeys: [] });
+  },
 }));
 
 await mock.module('../lib/marketDataClient', () => ({

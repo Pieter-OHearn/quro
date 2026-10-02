@@ -9,6 +9,7 @@ const SYNC_INTERVAL_MS = HOUR_MS;
 
 export function startBunqSyncScheduler(): void {
   startIntervalJob({
+    coordinated: true,
     name: 'bunq-sync',
     intervalMs: SYNC_INTERVAL_MS,
     runOnStart: false,

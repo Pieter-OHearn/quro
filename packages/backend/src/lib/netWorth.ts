@@ -145,7 +145,16 @@ export function resolveHistoricalHoldingPrice(
   rows: readonly HistoricalHoldingPrice[],
   cutoffDate: string,
 ): number | null {
-  const sorted = [...rows].sort((left, right) => left.eodDate.localeCompare(right.eodDate));
+  return resolvePreparedHoldingPrice(
+    [...rows].sort((left, right) => left.eodDate.localeCompare(right.eodDate)),
+    cutoffDate,
+  );
+}
+
+export function resolvePreparedHoldingPrice(
+  sorted: readonly HistoricalHoldingPrice[],
+  cutoffDate: string,
+): number | null {
   let low = 0;
   let high = sorted.length - 1;
   let candidate = -1;
@@ -161,11 +170,15 @@ export function resolveHistoricalHoldingPrice(
   return candidate < 0 ? null : toNumberOrZero(sorted[candidate].closePrice);
 }
 
-async function loadSnapshotInputs(userId: number) {
-  const partnerId = await getAcceptedPartnerId(userId);
+export async function loadSnapshotInputs(
+  userId: number,
+  options: { partnerId?: number | null; rates?: Map<string, number> } = {},
+) {
+  const partnerId =
+    options.partnerId === undefined ? await getAcceptedPartnerId(userId) : options.partnerId;
   const [rates, savings, holdingRows, holdingTxns, propertyRows, mortgageRows, pensions, debtRows] =
     await Promise.all([
-      getCurrentRatesToBaseCurrency(FX_BASE_CURRENCY),
+      options.rates ?? getCurrentRatesToBaseCurrency(FX_BASE_CURRENCY),
       loadHouseholdRows(savingsAccounts, userId, partnerId),
       db
         .select()
@@ -198,8 +211,9 @@ async function loadSnapshotInputs(userId: number) {
 export async function upsertCurrentNetWorthSnapshot(
   userId: number,
   now = new Date(),
+  options: Parameters<typeof loadSnapshotInputs>[1] = {},
 ): Promise<void> {
-  const input = await loadSnapshotInputs(userId);
+  const input = await loadSnapshotInputs(userId, options);
   const summary = computeDerivedAllocations(
     input.rates,
     input.savings,

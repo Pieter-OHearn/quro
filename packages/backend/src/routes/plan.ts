@@ -220,7 +220,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const historyStart = toDateMonthsAgo(now, HISTORY_MONTHS);
   const asOf = toIsoDate(now);
-  const [primaryEmployment] = await db
+  const primaryEmploymentQuery = db
     .select()
     .from(employments)
     .where(
@@ -230,8 +230,10 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
       ),
     )
     .orderBy(desc(employments.isPrimary), asc(employments.id))
-    .limit(1);
+    .limit(1)
+    .execute();
   const [
+    primaryEmploymentRows,
     userRows,
     assumptionRows,
     savings,
@@ -247,6 +249,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
     budgetTxns,
     rates,
   ] = await Promise.all([
+    primaryEmploymentQuery,
     db.select().from(users).where(eq(users.id, userId)),
     db.select().from(planAssumptions).where(eq(planAssumptions.userId, userId)),
     loadHouseholdRows(savingsAccounts, userId, partnerId),
@@ -275,14 +278,18 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
       .where(eq(payslips.userId, userId))
       .orderBy(desc(payslips.date))
       .limit(HISTORY_MONTHS),
-    primaryEmployment
-      ? db
-          .select()
-          .from(payslips)
-          .where(and(eq(payslips.userId, userId), eq(payslips.employmentId, primaryEmployment.id)))
-          .orderBy(desc(payslips.date))
-          .limit(HISTORY_MONTHS)
-      : Promise.resolve([]),
+    primaryEmploymentQuery.then(([primaryEmployment]) =>
+      primaryEmployment
+        ? db
+            .select()
+            .from(payslips)
+            .where(
+              and(eq(payslips.userId, userId), eq(payslips.employmentId, primaryEmployment.id)),
+            )
+            .orderBy(desc(payslips.date))
+            .limit(HISTORY_MONTHS)
+        : Promise.resolve([]),
+    ),
     db
       .select()
       .from(payslips)
@@ -305,7 +312,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
   ]);
   return {
     user: userRows[0],
-    primaryEmployment: primaryEmployment ?? null,
+    primaryEmployment: primaryEmploymentRows[0] ?? null,
     assumptions: assumptionRows[0] ?? null,
     savings,
     savingsTxns,

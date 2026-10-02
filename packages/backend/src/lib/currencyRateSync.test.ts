@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, mock, test } from 'bun:test';
+import { CURRENCY_CODES } from '@quro/shared';
 import { currencyRateHistory, currencyRates } from '../db/schema';
 
 type CurrencyRateWrite = {
@@ -8,10 +9,31 @@ type CurrencyRateWrite = {
 };
 
 const writes: CurrencyRateWrite[] = [];
-const { db: realDb } = await import('../db/client');
+let reads = 0;
+const rateRows = CURRENCY_CODES.filter((currency) => currency !== 'EUR').map(
+  (fromCurrency, index) => ({
+    id: index + 1,
+    fromCurrency,
+    toCurrency: 'EUR' as const,
+    rate: 1,
+    provider: 'test',
+    sourceDate: '2026-01-01',
+    updatedAt: new Date(),
+  }),
+);
+const { db: realDb, queryClient } = await import('../db/client');
 
 await mock.module('../db/client', () => ({
+  queryClient,
   db: {
+    select: () => ({
+      from: () => ({
+        orderBy: () => {
+          reads++;
+          return Promise.resolve(rateRows);
+        },
+      }),
+    }),
     transaction: (callback: (tx: unknown) => Promise<void>) =>
       callback({
         insert: (table: unknown) => ({
@@ -30,10 +52,16 @@ await mock.module('../db/client', () => ({
   },
 }));
 
-const { getCurrencyRateSyncCurrencies, syncCurrencyRates } = await import('./currencyRateSync');
+const {
+  getCurrencyRateSyncCurrencies,
+  syncCurrencyRates,
+  getCurrentCurrencyRateRows,
+  invalidateCurrentCurrencyRateCache,
+} = await import('./currencyRateSync');
 
 afterAll(async () => {
-  await mock.module('../db/client', () => ({ db: realDb }));
+  invalidateCurrentCurrencyRateCache();
+  await mock.module('../db/client', () => ({ db: realDb, queryClient }));
   mock.restore();
 });
 
@@ -97,4 +125,36 @@ describe('currency rate sync', () => {
     expect(writes[0]?.values).toHaveLength(7);
     expect(writes[1]?.values).toEqual(writes[0]?.values);
   });
+});
+
+test('concurrent current-rate reads share a DB load and reuse the cache', async () => {
+  invalidateCurrentCurrencyRateCache();
+  reads = 0;
+  const results = await Promise.all(Array.from({ length: 10 }, () => getCurrentCurrencyRateRows()));
+  expect(reads).toBe(1);
+  expect(results.every((rows) => rows === rateRows)).toBe(true);
+  await getCurrentCurrencyRateRows();
+  expect(reads).toBe(1);
+});
+
+test('provider refreshes share a promise and invalidate cached current rates', async () => {
+  let calls = 0;
+  let finish: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const fetchRates = async () => {
+    calls++;
+    await gate;
+    return { rates: [], issues: [] };
+  };
+  const first = syncCurrencyRates({ fetchRates });
+  const second = syncCurrencyRates({ fetchRates });
+  expect(second).toBe(first);
+  expect(calls).toBe(1);
+  finish();
+  await first;
+  const previousReads = reads;
+  await getCurrentCurrencyRateRows();
+  expect(reads).toBe(previousReads + 1);
 });

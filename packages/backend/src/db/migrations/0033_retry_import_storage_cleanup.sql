@@ -1,0 +1,3 @@
+DROP INDEX "pension_statement_imports_expiry_idx";--> statement-breakpoint
+ALTER TABLE "pension_statement_imports" ADD COLUMN "storage_deleted_at" timestamp;--> statement-breakpoint
+CREATE INDEX "pension_statement_imports_expiry_idx" ON "pension_statement_imports" USING btree ("expires_at") WHERE "pension_statement_imports"."status" in ('queued', 'processing', 'ready_for_review', 'expired') and "pension_statement_imports"."storage_deleted_at" is null;

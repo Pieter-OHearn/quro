@@ -427,6 +427,7 @@ export const holdingTransactions = pgTable(
   (table) => ({
     userIdx: index('holding_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('holding_transactions_user_date_idx').on(table.userId, table.date),
+    holdingDateIdx: index('holding_transactions_holding_date_idx').on(table.holdingId, table.date),
   }),
 );
 
@@ -558,6 +559,7 @@ export const pensionTransactions = pgTable(
   (table) => ({
     userIdx: index('pension_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('pension_transactions_user_date_idx').on(table.userId, table.date),
+    potDateIdx: index('pension_transactions_pot_date_idx').on(table.potId, table.date),
     documentStateChk: inlinePdfDocumentStateCheck(
       'pension_transactions_document_fields_chk',
       table,
@@ -581,6 +583,7 @@ export const pensionStatementImports = pgTable(
       .notNull(),
     status: pensionImportStatusEnum('status').notNull().default('queued'),
     storageKey: text('storage_key').notNull(),
+    storageDeletedAt: timestamp('storage_deleted_at'),
     fileName: text('file_name').notNull(),
     mimeType: text('mime_type').notNull(),
     sizeBytes: integer('size_bytes').notNull(),
@@ -604,6 +607,14 @@ export const pensionStatementImports = pgTable(
     ),
     potIdx: index('pension_statement_imports_pot_id_idx').on(table.potId),
     hashIdx: index('pension_statement_imports_hash_idx').on(table.fileHashSha256),
+    queuedIdx: index('pension_statement_imports_queued_idx')
+      .on(table.createdAt, table.id)
+      .where(sql`${table.status} = 'queued'`),
+    expiryIdx: index('pension_statement_imports_expiry_idx')
+      .on(table.expiresAt)
+      .where(
+        sql`${table.status} in ('queued', 'processing', 'ready_for_review', 'expired') and ${table.storageDeletedAt} is null`,
+      ),
   }),
 );
 

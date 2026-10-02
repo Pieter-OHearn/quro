@@ -106,6 +106,9 @@ function groupHistoricalRows(
     rowsByCurrency.set(row.fromCurrency, currencyRows);
   }
 
+  for (const bucket of rowsByCurrency.values()) {
+    bucket.sort((left, right) => left.sourceDate.localeCompare(right.sourceDate));
+  }
   return rowsByCurrency;
 }
 
@@ -114,7 +117,6 @@ function selectHistoricalRate(
   rows: HistoricalCurrencyRateRow[],
   asOfDate: string,
 ): { row: HistoricalCurrencyRateRow; isEstimated: boolean } {
-  rows.sort((left, right) => left.sourceDate.localeCompare(right.sourceDate));
   const historicalRow = findRateAtOrBefore(rows, asOfDate);
   const selectedRow = historicalRow ?? rows[rows.length - 1];
   if (!selectedRow) {
@@ -128,17 +130,27 @@ export function buildRatesToBaseCurrencyAt(
   asOfDate: string,
   baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
 ): HistoricalRatesToBaseCurrency {
-  const rowsByCurrency = groupHistoricalRows(rows, baseCurrency);
-  const selectedRates = CURRENCY_CODES.filter((currency) => currency !== baseCurrency).map(
-    (currency) => selectHistoricalRate(currency, rowsByCurrency.get(currency) ?? [], asOfDate),
-  );
+  return createHistoricalRateResolver(rows, baseCurrency)(asOfDate);
+}
 
-  return {
-    rates: buildRatesToBaseCurrency(
-      selectedRates.map(({ row }) => row),
-      baseCurrency,
-    ),
-    isEstimated: selectedRates.some(({ isEstimated }) => isEstimated),
+// Group and sort once for all month lookups in a request.
+export function createHistoricalRateResolver(
+  rows: readonly HistoricalCurrencyRateRow[],
+  baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
+): (asOfDate: string) => HistoricalRatesToBaseCurrency {
+  const rowsByCurrency = groupHistoricalRows(rows, baseCurrency);
+  return (asOfDate) => {
+    const selectedRates = CURRENCY_CODES.filter((currency) => currency !== baseCurrency).map(
+      (currency) => selectHistoricalRate(currency, rowsByCurrency.get(currency) ?? [], asOfDate),
+    );
+
+    return {
+      rates: buildRatesToBaseCurrency(
+        selectedRates.map(({ row }) => row),
+        baseCurrency,
+      ),
+      isEstimated: selectedRates.some(({ isEstimated }) => isEstimated),
+    };
   };
 }
 

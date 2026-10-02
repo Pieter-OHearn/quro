@@ -1,11 +1,12 @@
 import { DAY_MS } from '../constants/time';
-import { syncCurrencyRates } from './currencyRateSync';
+import { getCurrentCurrencyRateRows, syncCurrencyRates } from './currencyRateSync';
 import { startIntervalJob } from './intervalJob';
 
 const SYNC_INTERVAL_MS = DAY_MS;
 
 export function startCurrencyRateSyncScheduler(): void {
   startIntervalJob({
+    coordinated: true,
     name: 'currency-rate-sync',
     intervalMs: SYNC_INTERVAL_MS,
     runOnStart: true,
@@ -15,6 +16,7 @@ export function startCurrencyRateSyncScheduler(): void {
 
 async function runSync(): Promise<void> {
   const result = await syncCurrencyRates();
+  await getCurrentCurrencyRateRows();
   const status =
     result.issues.length > 0
       ? `partial (${result.updatedRates}/${result.requestedRates} updated)`

@@ -1,5 +1,5 @@
 import { normalizeBudgetTransactionMoney } from '../lib/budgetCurrency';
-import { and, asc, desc, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   MONTH_ABBREVIATIONS,
   type BudgetMonth,
@@ -415,6 +415,7 @@ export async function importBudgetPayment(
 
   const categoryName = await resolveCategoryName(userId, payment);
   await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'bunq-budget:' + userId}))`);
     if (await repairLegacyBudgetPayment(tx, userId, bunqTransactionId, money)) return;
     const claimedManual = await claimMatchingManualBudgetTransaction(
       tx,
@@ -460,6 +461,370 @@ export async function importBudgetPayment(
       })
       .where(eq(budgetCategories.id, categoryId));
   });
+}
+
+type PreparedBudgetPayment = {
+  payment: BunqPayment;
+  date: string;
+  month: BudgetMonth;
+  year: number;
+  nativeAmount: number;
+  money: Awaited<
+    ReturnType<typeof normalizeBudgetTransactionMoney<{ amount: number; currency: CurrencyCode }>>
+  >;
+};
+
+function shouldImportBudgetPayment(
+  payment: BunqPayment,
+  account: BunqMonetaryAccount,
+  ownIbans: ReadonlySet<string>,
+  bunqUserId: string,
+): boolean {
+  return (
+    isDebit(payment) &&
+    !isSelfTransfer(payment, ownIbans, bunqUserId) &&
+    payment.amount.currency === account.balance.currency
+  );
+}
+
+async function prepareBudgetPayments(
+  payments: readonly BunqPayment[],
+  account: BunqMonetaryAccount,
+  ownIbans: ReadonlySet<string>,
+  bunqUserId: string,
+): Promise<{ prepared: PreparedBudgetPayment[]; issues: BunqSyncIssue[] }> {
+  const prepared: PreparedBudgetPayment[] = [];
+  const issues: BunqSyncIssue[] = [];
+  const seen = new Set<string>();
+  for (const payment of payments) {
+    if (!shouldImportBudgetPayment(payment, account, ownIbans, bunqUserId)) continue;
+    const nativeAmount = Math.abs(Number(payment.amount.value) || 0);
+    if (nativeAmount <= 0 || seen.has(String(payment.id))) continue;
+    seen.add(String(payment.id));
+    try {
+      if (!isCurrencyCode(payment.amount.currency))
+        throw new Error('Unsupported Bunq payment currency');
+      const date = toTransactionDate(payment.created);
+      prepared.push({
+        payment,
+        date,
+        ...parseMonthYear(date),
+        nativeAmount,
+        money: await normalizeBudgetTransactionMoney({
+          amount: nativeAmount,
+          currency: payment.amount.currency,
+        }),
+      });
+    } catch (error) {
+      issues.push({
+        accountId: account.id,
+        paymentId: String(payment.id),
+        message: error instanceof Error ? error.message : 'Budget payment import failed',
+      });
+    }
+  }
+  return { prepared, issues };
+}
+
+function categoryKey(name: string, month: string, year: number): string {
+  return JSON.stringify([name, month, year]);
+}
+
+async function loadBatchMappings(tx: DbTransaction, userId: number, rows: PreparedBudgetPayment[]) {
+  const defaults = new Map<string, string>();
+  for (const { payment } of rows) {
+    const mcc = payment.counterpartyAlias.merchantCategoryCode;
+    if (mcc && MCC_DEFAULTS[mcc]) defaults.set(mcc, MCC_DEFAULTS[mcc]);
+  }
+  if (defaults.size)
+    await tx
+      .insert(categoryMappings)
+      .values(
+        [...defaults].map(([sourceKey, categoryName]) => ({
+          userId,
+          source: MCC_SOURCE,
+          sourceKey,
+          categoryName,
+        })),
+      )
+      .onConflictDoNothing();
+  const mappings = await tx
+    .select()
+    .from(categoryMappings)
+    .where(and(eq(categoryMappings.userId, userId), eq(categoryMappings.source, MCC_SOURCE)));
+  return new Map(mappings.map((mapping) => [mapping.sourceKey, mapping.categoryName]));
+}
+
+function buildMissingCategories(
+  userId: number,
+  rows: PreparedBudgetPayment[],
+  mappings: Map<string, string>,
+  categories: Map<string, number>,
+  templates: Map<string, BudgetCategoryTemplate>,
+) {
+  const missing = new Map<string, typeof budgetCategories.$inferInsert>();
+  for (const row of rows) {
+    const name = batchCategoryName(row.payment, mappings);
+    const key = categoryKey(name, row.month, row.year);
+    if (categories.has(key) || missing.has(key)) continue;
+    const preset = Object.hasOwn(CATEGORY_PRESETS, name) ? CATEGORY_PRESETS[name] : undefined;
+    missing.set(key, {
+      userId,
+      name,
+      month: row.month,
+      year: row.year,
+      spent: 0,
+      ...categoryTemplateValues(templates.get(name) ?? null, preset ?? DEFAULT_CATEGORY_PRESET),
+      expenseClass: (preset ?? DEFAULT_CATEGORY_PRESET).expenseClass,
+      expenseClassConfirmed: preset !== undefined,
+    });
+  }
+  return missing;
+}
+
+function batchCategoryName(payment: BunqPayment, mappings: Map<string, string>): string {
+  const mcc = payment.counterpartyAlias.merchantCategoryCode;
+  return (mcc && mappings.get(mcc)) || UNCATEGORISED_NAME;
+}
+
+async function loadBatchCategories(
+  tx: DbTransaction,
+  userId: number,
+  rows: PreparedBudgetPayment[],
+  mappings: Map<string, string>,
+) {
+  const existing = await tx
+    .select()
+    .from(budgetCategories)
+    .where(eq(budgetCategories.userId, userId))
+    .orderBy(
+      desc(budgetCategories.year),
+      desc(budgetCategoryMonthIndex),
+      desc(budgetCategories.id),
+    );
+  const categories = new Map(
+    existing.map((row) => [categoryKey(row.name, row.month, row.year), row.id]),
+  );
+  const templates = new Map<string, BudgetCategoryTemplate>();
+  for (const category of existing) {
+    if (category.budgeted > 0 && !templates.has(category.name))
+      templates.set(category.name, category);
+  }
+  const missing = buildMissingCategories(userId, rows, mappings, categories, templates);
+  if (missing.size) {
+    const created = await tx
+      .insert(budgetCategories)
+      .values([...missing.values()])
+      .onConflictDoUpdate({
+        target: [
+          budgetCategories.userId,
+          budgetCategories.month,
+          budgetCategories.year,
+          budgetCategories.name,
+        ],
+        set: { name: sql`excluded.name` },
+      })
+      .returning();
+    for (const category of created)
+      categories.set(categoryKey(category.name, category.month, category.year), category.id);
+  }
+  return categories;
+}
+
+function manualPaymentKey(
+  date: string,
+  merchant: string,
+  description: string,
+  amount: number,
+  currency: string,
+): string {
+  return JSON.stringify([date, merchant, description, amount, currency]);
+}
+
+async function reconcileBatchPayments(
+  tx: DbTransaction,
+  userId: number,
+  rows: PreparedBudgetPayment[],
+  account: BunqMonetaryAccount,
+): Promise<PreparedBudgetPayment[]> {
+  const existing = await tx
+    .select()
+    .from(budgetTransactions)
+    .where(
+      and(
+        eq(budgetTransactions.userId, userId),
+        inArray(
+          budgetTransactions.bunqTransactionId,
+          rows.map(({ payment }) => String(payment.id)),
+        ),
+      ),
+    );
+  const imported = new Map(existing.map((row) => [row.bunqTransactionId, row]));
+  const manual = await tx
+    .select()
+    .from(budgetTransactions)
+    .where(
+      and(
+        eq(budgetTransactions.userId, userId),
+        isNull(budgetTransactions.bunqTransactionId),
+        inArray(budgetTransactions.date, [...new Set(rows.map((row) => row.date))]),
+      ),
+    );
+  const manualKeys = new Set(
+    manual.map((row) =>
+      manualPaymentKey(
+        row.date,
+        row.merchant,
+        row.description,
+        row.sourceAmount ?? row.amount,
+        row.sourceCurrency ?? 'EUR',
+      ),
+    ),
+  );
+  const pending: PreparedBudgetPayment[] = [];
+  for (const row of rows) {
+    const id = String(row.payment.id);
+    const previous = imported.get(id);
+    if (previous) {
+      if (previous.currencyNeedsReview) await repairLegacyBudgetPayment(tx, userId, id, row.money);
+      continue;
+    }
+    const key = manualPaymentKey(
+      row.date,
+      row.payment.counterpartyAlias.displayName || '',
+      row.payment.description || '',
+      row.nativeAmount,
+      row.payment.amount.currency,
+    );
+    if (
+      manualKeys.has(key) &&
+      (await claimMatchingManualBudgetTransaction(
+        tx,
+        userId,
+        row.payment,
+        account,
+        row.nativeAmount,
+        row.date,
+        id,
+      ))
+    )
+      continue;
+    pending.push(row);
+  }
+  return pending;
+}
+
+function batchTransactionValues(
+  userId: number,
+  row: PreparedBudgetPayment,
+  account: BunqMonetaryAccount,
+  categoryId: number,
+) {
+  return {
+    userId,
+    categoryId,
+    description: row.payment.description || '',
+    ...row.money,
+    date: row.date,
+    merchant: row.payment.counterpartyAlias.displayName || '',
+    bunqTransactionId: String(row.payment.id),
+    bunqMcc: row.payment.counterpartyAlias.merchantCategoryCode,
+    bunqPaymentType: row.payment.type || null,
+    sourceProvider: 'bunq',
+    sourceAccountId: String(account.id),
+    sourceAccountName: account.description || null,
+    sourceAccountType: account.type,
+    counterpartyIban: row.payment.counterpartyAlias.iban,
+  };
+}
+
+async function persistBudgetBatch(
+  userId: number,
+  rows: PreparedBudgetPayment[],
+  account: BunqMonetaryAccount,
+): Promise<void> {
+  if (!rows.length) return;
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'bunq-budget:' + userId}))`);
+    const mappings = await loadBatchMappings(tx, userId, rows);
+    const pending = await reconcileBatchPayments(tx, userId, rows, account);
+    if (!pending.length) return;
+    const categories = await loadBatchCategories(tx, userId, pending, mappings);
+    const inserted = await tx
+      .insert(budgetTransactions)
+      .values(
+        pending.map((row) => {
+          const mcc = row.payment.counterpartyAlias.merchantCategoryCode;
+          const name = (mcc && mappings.get(mcc)) || UNCATEGORISED_NAME;
+          return batchTransactionValues(
+            userId,
+            row,
+            account,
+            categories.get(categoryKey(name, row.month, row.year))!,
+          );
+        }),
+      )
+      .onConflictDoNothing({
+        target: [budgetTransactions.userId, budgetTransactions.bunqTransactionId],
+      })
+      .returning({ categoryId: budgetTransactions.categoryId, amount: budgetTransactions.amount });
+    if (!inserted.length) return;
+    const spentByCategory = new Map<number, number>();
+    for (const row of inserted)
+      spentByCategory.set(row.categoryId, (spentByCategory.get(row.categoryId) ?? 0) + row.amount);
+    const deltas = sql.join(
+      [...spentByCategory].map(([id, amount]) => sql`(${id}::integer, ${amount}::numeric)`),
+      sql`, `,
+    );
+    await tx.execute(sql`update budget_categories as c set spent = c.spent + v.amount
+      from (values ${deltas}) as v(id, amount) where c.id = v.id and c.user_id = ${userId}`);
+  });
+}
+
+const BUDGET_IMPORT_BATCH_SIZE = 500;
+
+async function importBudgetBatchIndividually(
+  userId: number,
+  rows: PreparedBudgetPayment[],
+  account: BunqMonetaryAccount,
+  ownIbans: ReadonlySet<string>,
+  bunqUserId: string,
+): Promise<BunqSyncIssue[]> {
+  const issues: BunqSyncIssue[] = [];
+  for (const { payment } of rows) {
+    try {
+      await importBudgetPayment(userId, payment, account, ownIbans, bunqUserId);
+    } catch (error) {
+      issues.push({
+        accountId: account.id,
+        paymentId: String(payment.id),
+        message: error instanceof Error ? error.message : 'Budget payment import failed',
+      });
+    }
+  }
+  return issues;
+}
+
+export async function importBudgetPaymentBatch(
+  userId: number,
+  payments: readonly BunqPayment[],
+  account: BunqMonetaryAccount,
+  ownIbans: ReadonlySet<string>,
+  bunqUserId: string,
+): Promise<BunqSyncIssue[]> {
+  const { prepared, issues } = await prepareBudgetPayments(payments, account, ownIbans, bunqUserId);
+  for (let offset = 0; offset < prepared.length; offset += BUDGET_IMPORT_BATCH_SIZE) {
+    const batch = prepared.slice(offset, offset + BUDGET_IMPORT_BATCH_SIZE);
+    try {
+      await persistBudgetBatch(userId, batch, account);
+    } catch (error) {
+      console.warn('[bunq-budget-sync] Batch failed, retrying payments individually', error);
+      issues.push(
+        ...(await importBudgetBatchIndividually(userId, batch, account, ownIbans, bunqUserId)),
+      );
+    }
+  }
+  return issues;
 }
 
 function collectOwnIbans(accounts: readonly BunqMonetaryAccount[]): Set<string> {
@@ -511,25 +876,13 @@ async function importBudgetPaymentsForAccount(params: {
     params.account.id,
     params.newerThan,
   );
-  const issues: BunqSyncIssue[] = [];
-  for (const payment of payments) {
-    try {
-      await importBudgetPayment(
-        params.userId,
-        payment,
-        params.account,
-        params.ownIbans,
-        params.bunqUserId,
-      );
-    } catch (error) {
-      issues.push({
-        accountId: params.account.id,
-        paymentId: String(payment.id),
-        message: error instanceof Error ? error.message : 'Budget payment import failed',
-      });
-    }
-  }
-  return issues;
+  return importBudgetPaymentBatch(
+    params.userId,
+    payments,
+    params.account,
+    params.ownIbans,
+    params.bunqUserId,
+  );
 }
 
 async function finishBudgetSync(params: {
