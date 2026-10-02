@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 - Consolidate ownership checks, transaction reads, and archive/restore/cascade handlers while preserving existing validation and property/mortgage link rules.
 - Invalidate historical net-worth snapshots for both partners on joint ledger writes and for both parents when a transaction moves.
 - Separate dashboard history/activity and investment holdings/properties into focused modules.
+- Upgrade Axios, brace-expansion, and pypdf to resolve dependency security advisories and restore passing CI audits.
 
 ## [v0.6.0] - 2026-09-28
 
