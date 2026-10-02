@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [v0.6.2] - 2026-10-02
 
+- Preserve budget currency across display preference changes: normalize manual and Bunq writes to EUR, retain native transaction provenance, and flag ambiguous legacy amounts for review.
+
 - Resolve linked property debt directly from mortgages and share household attribution across allocations, snapshots, history, and runway.
 - Return authoritative net-worth and portfolio totals with stable allocation keys and explicit currency metadata; keep allocation colours on the client.
 - Standardize derived API amounts on EUR with client display conversion, and correct non-EUR budget inputs in runway calculations.

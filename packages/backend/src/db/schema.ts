@@ -854,6 +854,8 @@ export const budgetCategories = pgTable(
   'budget_categories',
   {
     id: serial('id').primaryKey(),
+    currency: currencyCodeEnum('currency').notNull().default('EUR'),
+    currencyNeedsReview: boolean('currency_needs_review').notNull().default(false),
     userId: integer('user_id')
       .references(() => users.id)
       .notNull(),
@@ -868,6 +870,7 @@ export const budgetCategories = pgTable(
     expenseClassConfirmed: boolean('expense_class_confirmed').notNull().default(false),
   },
   (table) => ({
+    currencyEur: check('budget_categories_currency_eur', sql`${table.currency} = 'EUR'`),
     userIdx: index('budget_categories_user_id_idx').on(table.userId),
     userMonthNameUnique: uniqueIndex('budget_categories_user_month_name_unique').on(
       table.userId,
@@ -886,6 +889,8 @@ export const budgetTransactions = pgTable(
   'budget_transactions',
   {
     id: serial('id').primaryKey(),
+    currency: currencyCodeEnum('currency').notNull().default('EUR'),
+    currencyNeedsReview: boolean('currency_needs_review').notNull().default(false),
     userId: integer('user_id')
       .references(() => users.id)
       .notNull(),
@@ -895,6 +900,8 @@ export const budgetTransactions = pgTable(
     description: text('description').notNull(),
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
+    sourceAmount: numericAsNumber('source_amount', { precision: 19, scale: 2 }),
+    sourceCurrency: currencyCodeEnum('source_currency'),
     merchant: text('merchant').notNull(),
     bunqTransactionId: text('bunq_transaction_id'),
     bunqMcc: text('bunq_mcc'),
@@ -906,6 +913,7 @@ export const budgetTransactions = pgTable(
     counterpartyIban: text('counterparty_iban'),
   },
   (table) => ({
+    currencyEur: check('budget_transactions_currency_eur', sql`${table.currency} = 'EUR'`),
     userIdx: index('budget_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('budget_transactions_user_date_idx').on(table.userId, table.date),
     bunqTransactionUnique: uniqueIndex('budget_transactions_user_bunq_transaction_id_unique').on(

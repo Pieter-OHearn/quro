@@ -347,8 +347,8 @@ test('runway uses EUR for foreign budgets and keeps joint liquidity overrides se
       .values({
         userId: owner.user.id,
         name: 'Food',
-        budgeted: 1000,
-        spent: 1000,
+        budgeted: 1180,
+        spent: 1180,
         month: date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }),
         year: date.getUTCFullYear(),
       })
@@ -356,7 +356,7 @@ test('runway uses EUR for foreign budgets and keeps joint liquidity overrides se
     await db.insert(budgetTransactions).values({
       userId: owner.user.id,
       categoryId: category!.id,
-      amount: 1000,
+      amount: 1180,
       description: 'Food',
       merchant: 'Food shop',
       date: date.toISOString().slice(0, 10),

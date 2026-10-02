@@ -66,6 +66,12 @@ export function Plan() {
 
   return (
     <PageStack as="main">
+      {data.budgetCurrencyNeedsReview && (
+        <p role="status" className="rounded-lg bg-warning-soft p-4 text-sm text-warning-fg">
+          Some older budget amounts have no recorded currency and are treated as EUR. Review these
+          records against your statements before relying on spending or runway estimates.
+        </p>
+      )}
       <ContentSection className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand">Plan</p>

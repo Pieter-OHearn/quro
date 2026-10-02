@@ -295,6 +295,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
         categoryId: budgetTransactions.categoryId,
         amount: budgetTransactions.amount,
         date: budgetTransactions.date,
+        currencyNeedsReview: budgetTransactions.currencyNeedsReview,
       })
       .from(budgetTransactions)
       .where(
@@ -457,11 +458,7 @@ function buildEurRunwayResponse(
   const assumptions = convertAssumptionsToEur(data.assumptions, user.baseCurrency, convertToEur);
   const fullJoint = assumptions?.countFullJointBalances === true;
   const burn = calculateBurn({
-    categories: buildBudgetInputs(data.categories, data.budgetTxns).map((category) => ({
-      ...category,
-      monthlySpend: category.monthlySpend.map((amount) => convertToEur(amount, user.baseCurrency)),
-      currentBudgeted: convertToEur(category.currentBudgeted, user.baseCurrency),
-    })),
+    categories: buildBudgetInputs(data.categories, data.budgetTxns),
     contractual: buildContractualInputs(data, convertToEur),
     derivedCashflowMonthly: calculateDerivedCashflow(data, convertToEur, fullJoint),
     assumptions,
@@ -508,8 +505,13 @@ function buildEurRunwayResponse(
       })),
       convertToEur,
     ),
+    budgetCurrencyNeedsReview:
+      data.categories.some((row) => row.currencyNeedsReview) ||
+      data.budgetTxns.some((row) => row.currencyNeedsReview),
     setupComplete: missingFields.length === 0,
     isEstimated:
+      data.categories.some((row) => row.currencyNeedsReview) ||
+      data.budgetTxns.some((row) => row.currencyNeedsReview) ||
       incomeSupport.salaryBasis.status === 'unlinked_fallback' ||
       incomeSupport.unemployment.status === 'unknown',
   };

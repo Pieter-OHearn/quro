@@ -1,3 +1,7 @@
+import {
+  normalizeBudgetCategoryMoney,
+  normalizeBudgetTransactionMoney,
+} from '../lib/budgetCurrency';
 import { findOwnedRow } from '../lib/access';
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -7,6 +11,7 @@ import {
   toBudgetMonthIndex,
   type BudgetMonth,
   type ExpenseClass,
+  type CurrencyCode,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db, type DbTransaction } from '../db/client';
@@ -20,6 +25,7 @@ import {
   isRecord,
   ok,
   parseDateField,
+  parseCurrencyField,
   parseId,
   parseIntegerField,
   parseNumberField,
@@ -37,6 +43,7 @@ const MIN_BUDGET_YEAR = 2000;
 const MAX_BUDGET_YEAR = 9999;
 const DEFAULT_TRANSACTION_LIMIT = 100;
 const BUDGET_CATEGORY_FIELDS = [
+  'currency',
   'name',
   'emoji',
   'budgeted',
@@ -46,6 +53,7 @@ const BUDGET_CATEGORY_FIELDS = [
   'year',
 ] as const;
 const BUDGET_TRANSACTION_FIELDS = [
+  'currency',
   'categoryId',
   'description',
   'amount',
@@ -77,6 +85,7 @@ function monthYearToDateRange(month: BudgetMonth, year: number): { start: string
 }
 
 type BudgetCategoryPayload = {
+  currency: CurrencyCode;
   name: string;
   emoji: string;
   budgeted: number;
@@ -87,6 +96,7 @@ type BudgetCategoryPayload = {
 };
 
 type BudgetTransactionPayload = {
+  currency: CurrencyCode;
   categoryId: number;
   description: string;
   amount: number;
@@ -101,6 +111,7 @@ function parseBudgetMonthField(value: unknown): ParseResult<BudgetMonth> {
 }
 
 const budgetCategoryParsers: FieldParsers<BudgetCategoryPayload> = {
+  currency: (value) => parseCurrencyField(value === undefined ? 'EUR' : value),
   name: (value) => parseTextField(value, 'Category name is required'),
   emoji: (value) => parseTextField(value, 'Emoji is required'),
   budgeted: (value) => parseNumberField(value, 'Budgeted amount must be zero or greater', 0),
@@ -111,6 +122,7 @@ const budgetCategoryParsers: FieldParsers<BudgetCategoryPayload> = {
 };
 
 const budgetTransactionParsers: FieldParsers<BudgetTransactionPayload> = {
+  currency: (value) => parseCurrencyField(value === undefined ? 'EUR' : value),
   categoryId: (value) => parseIntegerField(value, 'Invalid category id', 1),
   description: (value) => parseTextField(value, 'Description is required'),
   amount: (value) =>
@@ -351,7 +363,10 @@ app.post('/categories', async (c) => {
 
   const [data] = await db
     .insert(budgetCategories)
-    .values(toBudgetCategoryInsertValues(body.value, user.id))
+    .values({
+      ...toBudgetCategoryInsertValues(body.value, user.id),
+      ...(await normalizeBudgetCategoryMoney(body.value)),
+    })
     .returning();
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
@@ -372,7 +387,10 @@ app.patch('/categories/:id', async (c) => {
 
   const [data] = await db
     .update(budgetCategories)
-    .set(toBudgetCategoryUpdateValues(body.value))
+    .set({
+      ...toBudgetCategoryUpdateValues(body.value),
+      ...(await normalizeBudgetCategoryMoney(body.value)),
+    })
     .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
@@ -461,12 +479,13 @@ app.post('/transactions', async (c) => {
   const category = await findOwnedRow(budgetCategories, body.value.categoryId, user.id);
   if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
 
+  const money = await normalizeBudgetTransactionMoney(body.value);
   const [data] = await db.transaction(async (tx) => {
     const inserted = await tx
       .insert(budgetTransactions)
-      .values(toBudgetTransactionInsertValues(body.value, user.id))
+      .values({ ...toBudgetTransactionInsertValues(body.value, user.id), ...money })
       .returning();
-    await adjustCategorySpent(tx, body.value.categoryId, body.value.amount);
+    await adjustCategorySpent(tx, body.value.categoryId, money.amount);
     return inserted;
   });
   return c.json({ data }, HTTP_STATUS.CREATED);
@@ -480,6 +499,7 @@ app.patch('/transactions/:id', async (c) => {
   const body = await readBudgetTransactionPatch(c.req);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
+  const patch = await normalizeBudgetTransactionMoney(body.value);
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx
       .select()
@@ -487,7 +507,7 @@ app.patch('/transactions/:id', async (c) => {
       .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)));
     if (!existing) return null;
 
-    const nextCategoryId = body.value.categoryId ?? existing.categoryId;
+    const nextCategoryId = patch.categoryId ?? existing.categoryId;
     const categoryChanging = nextCategoryId !== existing.categoryId;
     if (categoryChanging) {
       const [category] = await tx
@@ -499,13 +519,13 @@ app.patch('/transactions/:id', async (c) => {
 
     const [updated] = await tx
       .update(budgetTransactions)
-      .set(toBudgetTransactionUpdateValues(body.value))
+      .set({ ...toBudgetTransactionUpdateValues(patch), ...patch })
       .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
       .returning();
     if (!updated) return null;
 
     const existingAmount = Number(existing.amount);
-    const nextAmount = body.value.amount ?? existingAmount;
+    const nextAmount = patch.amount ?? existingAmount;
     if (nextCategoryId !== existing.categoryId) {
       await adjustCategorySpent(tx, existing.categoryId, -existingAmount);
       await adjustCategorySpent(tx, nextCategoryId, nextAmount);

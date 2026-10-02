@@ -5,12 +5,24 @@ import type {
 
 export type BudgetCategory = Pick<
   SharedBudgetCategory,
-  'id' | 'name' | 'budgeted' | 'spent' | 'color' | 'emoji' | 'month' | 'year' | 'expenseClass'
+  | 'currency'
+  | 'currencyNeedsReview'
+  | 'id'
+  | 'name'
+  | 'budgeted'
+  | 'spent'
+  | 'color'
+  | 'emoji'
+  | 'month'
+  | 'year'
+  | 'expenseClass'
 >;
 
 export type BudgetTx = Pick<
   SharedBudgetTransaction,
   | 'id'
+  | 'currency'
+  | 'currencyNeedsReview'
   | 'description'
   | 'amount'
   | 'date'
@@ -60,10 +72,10 @@ export type BudgetStats = {
 
 export type CreateBudgetCategoryInput = Omit<
   SharedBudgetCategory,
-  'id' | 'expenseClass' | 'expenseClassConfirmed'
+  'id' | 'expenseClass' | 'expenseClassConfirmed' | 'currencyNeedsReview'
 >;
 export type UpdateBudgetCategoryInput = { id: number } & Partial<
-  Omit<SharedBudgetCategory, 'id' | 'expenseClassConfirmed'>
+  Omit<SharedBudgetCategory, 'id' | 'expenseClassConfirmed' | 'currencyNeedsReview'>
 >;
 
 export type EditCategoryForm = {

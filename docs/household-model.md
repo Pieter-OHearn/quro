@@ -43,11 +43,42 @@ once for display. Runway no longer walks its response to convert each money fiel
 Its `baseCurrency` now identifies the calculation currency, always EUR, rather than
 the user's preference. Deploy the shared contract, backend and frontend together.
 
-Budget amounts and monetary plan assumptions are stored in the user's base
-currency, so runway converts them on input too. This corrects the previous handling
-of non-EUR budgets as EUR. Historical cashflow also retains the parent currency
-and household share for archived savings accounts. Ratios, durations, percentages and eligibility flags are
-never currency-converted.
+Budget category `budgeted`/`spent` and transaction `amount` are stored in EUR,
+with database constraints enforcing `currency = EUR`. Manual POST/PATCH payloads
+accept an explicit input `currency`; omission always means EUR, independently of
+user preferences. Monetary fields are converted using the cached current rate and
+rounded to cents once on write. Transaction `sourceAmount` and `sourceCurrency`
+retain the native input for audit and Bunq matching. Edits, moves, deletes and
+monthly templates operate on the stored EUR values. Bunq uses the payment's
+currency, never the display preference; repeated confirmed imports do not revalue
+existing payments. The budget UI converts EUR to the selected display currency
+and sends that currency explicitly when entering a new monetary value.
+
+Migration `0031_budget_currency_provenance.sql` pins existing numeric amounts to
+the pre-WP6 EUR interpretation and marks them `currencyNeedsReview = true`. It
+retains transaction amounts in `sourceAmount`, leaving `sourceCurrency` unknown.
+Neither historical manual input currencies nor payment currencies were stored.
+Current preferences and editable linked-account currencies cannot recover that
+history, so the migration deliberately does not guess or apply FX to these rows.
+Budget and Plan display a review notice; runway marks the result estimated while
+any relevant record remains unresolved. A repeated Bunq import can recover a
+payment's authoritative currency, normalize it at the current cached rate, and
+adjust the category aggregate by the EUR delta exactly once. The regular sync
+cursor may not fetch older payments; those require an explicit historical replay
+or statement-based correction. Historical settlement FX rates cannot be recovered.
+
+To remediate manually, PATCH each affected transaction with its verified `amount`
+and input `currency`; this also adjusts its category's `spent`. Then PATCH each
+legacy category with **both** verified `budgeted` and `spent` in one explicit
+`currency` to clear its review flag (avoid double counting already corrected
+transactions). Partial/nonmonetary edits retain the flag. The current category
+editor changes the budget limit only; full legacy aggregate corrections use the
+API after statement review. Reconcile before relying on migrated foreign budgets.
+
+Monetary plan assumptions retain their existing preference-based input contract.
+Historical cashflow retains the parent currency and household share for archived
+savings accounts. Ratios, durations, percentages and eligibility flags are never
+currency-converted.
 
 ## Jurisdiction profiles
 

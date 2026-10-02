@@ -1,5 +1,12 @@
-import { and, asc, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import { MONTH_ABBREVIATIONS, type BudgetMonth, toIsoDate } from '@quro/shared';
+import { normalizeBudgetTransactionMoney } from '../lib/budgetCurrency';
+import { and, asc, desc, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import {
+  MONTH_ABBREVIATIONS,
+  type BudgetMonth,
+  type CurrencyCode,
+  toIsoDate,
+  isCurrencyCode,
+} from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import {
   budgetCategories,
@@ -31,6 +38,7 @@ const MCC_SOURCE = 'mcc';
 type BunqConnectionRow = typeof bunqConnections.$inferSelect;
 type BudgetCategoryTemplate = {
   budgeted: number;
+  currencyNeedsReview: boolean;
   emoji: string | null;
   color: string | null;
 };
@@ -168,6 +176,7 @@ async function findLatestCategoryTemplate(
   const [template] = await tx
     .select({
       budgeted: budgetCategories.budgeted,
+      currencyNeedsReview: budgetCategories.currencyNeedsReview,
       emoji: budgetCategories.emoji,
       color: budgetCategories.color,
     })
@@ -183,6 +192,18 @@ async function findLatestCategoryTemplate(
     .limit(1);
 
   return template ?? null;
+}
+
+function categoryTemplateValues(
+  template: BudgetCategoryTemplate | null,
+  preset: typeof DEFAULT_CATEGORY_PRESET,
+) {
+  return {
+    emoji: template?.emoji ?? preset.emoji,
+    budgeted: template?.budgeted ?? 0,
+    currencyNeedsReview: template?.currencyNeedsReview ?? false,
+    color: template?.color ?? preset.color,
+  };
 }
 
 export async function findOrCreateCategoryByName(
@@ -214,10 +235,8 @@ export async function findOrCreateCategoryByName(
     .values({
       userId,
       name,
-      emoji: template?.emoji ?? preset.emoji,
-      budgeted: template?.budgeted ?? 0,
+      ...categoryTemplateValues(template, preset),
       spent: 0,
-      color: template?.color ?? preset.color,
       month,
       year,
       expenseClass: preset.expenseClass,
@@ -290,7 +309,17 @@ async function claimMatchingManualBudgetTransaction(
       and(
         eq(budgetTransactions.userId, userId),
         isNull(budgetTransactions.bunqTransactionId),
-        eq(budgetTransactions.amount, amount),
+        or(
+          and(
+            eq(budgetTransactions.sourceAmount, amount),
+            eq(budgetTransactions.sourceCurrency, payment.amount.currency as CurrencyCode),
+          ),
+          and(
+            eq(budgetTransactions.amount, amount),
+            isNull(budgetTransactions.sourceCurrency),
+            sql`${payment.amount.currency} = 'EUR'`,
+          ),
+        ),
         eq(budgetTransactions.date, dateStr),
         eq(budgetTransactions.merchant, payment.counterpartyAlias.displayName || ''),
         eq(budgetTransactions.description, payment.description || ''),
@@ -308,6 +337,9 @@ async function claimMatchingManualBudgetTransaction(
       bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
       bunqPaymentType: payment.type || null,
       sourceProvider: 'bunq',
+      sourceAmount: amount,
+      sourceCurrency: payment.amount.currency as CurrencyCode,
+      currencyNeedsReview: false,
       sourceAccountId: String(account.id),
       sourceAccountName: account.description || null,
       sourceAccountType: account.type,
@@ -325,7 +357,40 @@ async function claimMatchingManualBudgetTransaction(
   return claimed.length > 0;
 }
 
-async function importBudgetPayment(
+// Re-import can recover an ambiguous legacy payment once Bunq supplies its
+// currency again. Confirmed payments remain idempotent even if FX rates change.
+async function repairLegacyBudgetPayment(
+  tx: DbTransaction,
+  userId: number,
+  bunqTransactionId: string,
+  money: Awaited<
+    ReturnType<typeof normalizeBudgetTransactionMoney<{ amount: number; currency: CurrencyCode }>>
+  >,
+): Promise<boolean> {
+  const [existing] = await tx
+    .select()
+    .from(budgetTransactions)
+    .where(
+      and(
+        eq(budgetTransactions.userId, userId),
+        eq(budgetTransactions.bunqTransactionId, bunqTransactionId),
+      ),
+    )
+    .for('update');
+  if (!existing) return false;
+  if (existing.currencyNeedsReview) {
+    await tx.update(budgetTransactions).set(money).where(eq(budgetTransactions.id, existing.id));
+    await tx
+      .update(budgetCategories)
+      .set({
+        spent: sql`GREATEST(0, ${budgetCategories.spent} + ${money.amount - existing.amount}::numeric)`,
+      })
+      .where(eq(budgetCategories.id, existing.categoryId));
+  }
+  return true;
+}
+
+export async function importBudgetPayment(
   userId: number,
   payment: BunqPayment,
   account: BunqMonetaryAccount,
@@ -340,10 +405,17 @@ async function importBudgetPayment(
   const { month, year } = parseMonthYear(dateStr);
   const amount = Math.abs(Number(payment.amount.value) || 0);
   if (amount <= 0) return;
+  if (!isCurrencyCode(payment.amount.currency))
+    throw new Error('Unsupported Bunq payment currency');
+  const money = await normalizeBudgetTransactionMoney({
+    amount,
+    currency: payment.amount.currency,
+  });
   const bunqTransactionId = String(payment.id);
 
   const categoryName = await resolveCategoryName(userId, payment);
   await db.transaction(async (tx) => {
+    if (await repairLegacyBudgetPayment(tx, userId, bunqTransactionId, money)) return;
     const claimedManual = await claimMatchingManualBudgetTransaction(
       tx,
       userId,
@@ -362,7 +434,7 @@ async function importBudgetPayment(
         userId,
         categoryId,
         description: payment.description || '',
-        amount,
+        ...money,
         date: dateStr,
         merchant: payment.counterpartyAlias.displayName || '',
         bunqTransactionId,
@@ -384,7 +456,7 @@ async function importBudgetPayment(
     await tx
       .update(budgetCategories)
       .set({
-        spent: sql`${budgetCategories.spent} + ${amount}`,
+        spent: sql`${budgetCategories.spent} + ${money.amount}`,
       })
       .where(eq(budgetCategories.id, categoryId));
   });

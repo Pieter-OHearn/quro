@@ -218,6 +218,13 @@
       "when": 1790703916622,
       "tag": "0030_drop_dashboard_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790934249826,
+      "tag": "0031_budget_currency_provenance",
+      "breakpoints": true
     }
   ]
 }

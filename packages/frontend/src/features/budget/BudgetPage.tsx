@@ -20,6 +20,12 @@ export function Budget() {
 
   return (
     <PageStack>
+      {page.currencyNeedsReview && (
+        <p role="status" className="rounded-lg bg-warning-soft p-4 text-sm text-warning-fg">
+          Some older budget amounts have no recorded currency and are treated as EUR. Review these
+          records against your statements before relying on spending or runway estimates.
+        </p>
+      )}
       <ContentSection>
         <BudgetSummaryCards
           totalBudgeted={page.totalBudgeted}

@@ -4,11 +4,13 @@ import {
   formatBudgetMonthFromDate,
   toBudgetMonthIndex,
   type BudgetMonth,
+  type CurrencyCode,
 } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
   buildCreateBudgetCategoryInput,
+  budgetValuesForDisplay,
   deriveBudgetStats,
   mapMonthlyTransactions,
 } from '../utils/budget-data';
@@ -61,9 +63,15 @@ function useBudgetMonthSelection() {
   };
 }
 
-function createAddCategoryDraft(month: BudgetMonth, year: number): BudgetCategory {
+function createAddCategoryDraft(
+  month: BudgetMonth,
+  year: number,
+  currency: CurrencyCode,
+): BudgetCategory {
   return {
     id: 0,
+    currency,
+    currencyNeedsReview: false,
     name: '',
     emoji: '\ud83d\udce6',
     budgeted: 0,
@@ -76,13 +84,19 @@ function createAddCategoryDraft(month: BudgetMonth, year: number): BudgetCategor
 }
 
 function useBudgetCategoryDialog(monthSelection: ReturnType<typeof useBudgetMonthSelection>) {
+  const { baseCurrency } = useCurrency();
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<BudgetCategory | null>(null);
   const createCategory = useCreateBudgetCategory();
   const updateCategory = useUpdateBudgetCategory();
   const addCategoryDraft = useMemo(
-    () => createAddCategoryDraft(monthSelection.selectedMonth, monthSelection.selectedYear),
-    [monthSelection.selectedMonth, monthSelection.selectedYear],
+    () =>
+      createAddCategoryDraft(
+        monthSelection.selectedMonth,
+        monthSelection.selectedYear,
+        baseCurrency,
+      ),
+    [monthSelection.selectedMonth, monthSelection.selectedYear, baseCurrency],
   );
 
   const openAddCategory = () => {
@@ -101,6 +115,7 @@ function useBudgetCategoryDialog(monthSelection: ReturnType<typeof useBudgetMont
       buildCreateBudgetCategoryInput(
         form,
         new Date(monthSelection.selectedYear, toBudgetMonthIndex(monthSelection.selectedMonth)),
+        addCategoryDraft.currency,
       ),
     );
     setIsAddingCategory(false);
@@ -110,9 +125,13 @@ function useBudgetCategoryDialog(monthSelection: ReturnType<typeof useBudgetMont
     if (!editingCategory) return;
     await updateCategory.mutateAsync({
       id: editingCategory.id,
+      currency: editingCategory.currency,
       name: form.name.trim() || editingCategory.name,
       emoji: form.emoji || editingCategory.emoji,
-      budgeted: Number.parseFloat(form.budgeted) || 0,
+      budgeted:
+        (Number.parseFloat(form.budgeted) || 0) === editingCategory.budgeted
+          ? undefined
+          : Number.parseFloat(form.budgeted) || 0,
       color: form.color || editingCategory.color,
     });
     setEditingCategory(null);
@@ -132,7 +151,7 @@ function useBudgetCategoryDialog(monthSelection: ReturnType<typeof useBudgetMont
 }
 
 export function useBudgetPage() {
-  const { fmtBase } = useCurrency();
+  const { fmtBase, convertToBase, baseCurrency } = useCurrency();
   const fmt = (n: number) => fmtBase(n);
   const fmtDec = (n: number) => fmtBase(n, undefined, true);
 
@@ -145,8 +164,12 @@ export function useBudgetPage() {
   const deleteTransaction = useDeleteBudgetTransaction();
   const updateTransaction = useUpdateBudgetTransaction();
 
-  const categories = categoriesQuery.data ?? [];
-  const budgetTransactions = transactionsQuery.data ?? [];
+  const { categories, budgetTransactions } = budgetValuesForDisplay(
+    categoriesQuery.data ?? [],
+    transactionsQuery.data ?? [],
+    baseCurrency,
+    convertToBase,
+  );
   const { totalBudgeted, totalSpent, remaining, savingsRate, overBudget, pieData } =
     deriveBudgetStats(categories);
   const monthlyTransactions = mapMonthlyTransactions(budgetTransactions, categories);
@@ -157,6 +180,9 @@ export function useBudgetPage() {
       { label: 'budget categories', ...categoriesQuery },
       { label: 'budget transactions', ...transactionsQuery },
     ]),
+    currencyNeedsReview: [...categories, ...budgetTransactions].some(
+      (row) => row.currencyNeedsReview,
+    ),
     fmt,
     fmtDec,
     categories,

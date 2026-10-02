@@ -653,6 +653,8 @@ export type Goal = {
 };
 
 export type BudgetCategory = {
+  currency: CurrencyCode;
+  currencyNeedsReview: boolean;
   id: number;
   name: string;
   emoji: string;
@@ -666,6 +668,10 @@ export type BudgetCategory = {
 };
 
 export type BudgetTransaction = {
+  currency: CurrencyCode;
+  currencyNeedsReview: boolean;
+  sourceAmount?: number | null;
+  sourceCurrency?: CurrencyCode | null;
   id: number;
   categoryId: number;
   description: string;
@@ -798,6 +804,7 @@ export type IncomeSupportCalculation = {
 };
 
 export type RunwayResponse = {
+  budgetCurrencyNeedsReview: boolean;
   baseCurrency: CurrencyCode;
   asOf: string;
   jurisdiction: {
