@@ -17,10 +17,12 @@ import {
 import type { BudgetCategory, EditCategoryForm } from '../types';
 import { useBudgetCategories } from './useBudgetCategories';
 import { useBudgetTransactions } from './useBudgetTransactions';
-import { useCreateBudgetCategory } from './useCreateBudgetCategory';
-import { useUpdateBudgetCategory } from './useUpdateBudgetCategory';
-import { useDeleteBudgetTransaction } from './useDeleteBudgetTransaction';
-import { useUpdateBudgetTransaction } from './useUpdateBudgetTransaction';
+import {
+  useCreateBudgetCategory,
+  useUpdateBudgetCategory,
+  useDeleteBudgetTransaction,
+  useUpdateBudgetTransaction,
+} from './mutations';
 
 const PREVIOUS_MONTH_DELTA = -1;
 const NEXT_MONTH_DELTA = 1;

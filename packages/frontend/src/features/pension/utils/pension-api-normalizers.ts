@@ -1,8 +1,6 @@
 import { normalizePdfDocument } from '@/lib/pdfDocuments';
 import {
-  todayIsoDate,
   type PensionStatementImportFeedItem,
-  type PensionStatementImport,
   type PensionStatementImportRow,
   type PensionPot,
   type PensionStatementDocument,
@@ -11,7 +9,6 @@ import {
 } from '@quro/shared';
 import type {
   ApiPensionStatementImportFeedItem,
-  ApiPensionStatementImport,
   ApiPensionStatementImportRow,
   ApiPensionPot,
   ApiPensionStatementDocument,
@@ -38,12 +35,6 @@ const PENSION_TYPE_ALIASES: Record<string, PensionPot['type']> = {
   other: 'Other',
 };
 
-const ROW_TYPES = new Set<PensionStatementImportRow['type']>([
-  'contribution',
-  'fee',
-  'annual_statement',
-]);
-
 const toPositiveInt = (value: IntegerLike): number => {
   if (typeof value === 'number') {
     return Number.isInteger(value) && value > 0 ? value : 0;
@@ -61,14 +52,6 @@ function toStringOr(value: unknown, fallback = ''): string {
 
 function toOptionalString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
-}
-
-function toIsoStringOrNow(value: unknown): string {
-  return typeof value === 'string' ? value : new Date().toISOString();
-}
-
-function toDateOnlyOrToday(value: unknown): string {
-  return typeof value === 'string' ? value : todayIsoDate();
 }
 
 function normalizePensionPotType(rawType: unknown): PensionPot['type'] {
@@ -95,31 +78,6 @@ function normalizePensionMetadata(value: unknown): Record<string, string> {
   }, {});
 }
 
-function toStatus(value: unknown): PensionStatementImport['status'] {
-  if (
-    value === 'queued' ||
-    value === 'processing' ||
-    value === 'ready_for_review' ||
-    value === 'failed' ||
-    value === 'committed' ||
-    value === 'expired' ||
-    value === 'cancelled'
-  ) {
-    return value;
-  }
-  return 'failed';
-}
-
-function toConfidenceLabel(value: unknown): PensionStatementImportRow['confidenceLabel'] {
-  if (value === 'high' || value === 'medium') return value;
-  return 'low';
-}
-
-function normalizeStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === 'string');
-}
-
 function normalizeEvidence(evidence: unknown): Array<{ page: number | null; snippet: string }> {
   if (!Array.isArray(evidence)) return [];
   return evidence
@@ -132,26 +90,6 @@ function normalizeEvidence(evidence: unknown): Array<{ page: number | null; snip
       return { page, snippet };
     })
     .filter((entry): entry is { page: number | null; snippet: string } => entry !== null);
-}
-
-function toOptionalCount(value: number | undefined): number | undefined {
-  return value;
-}
-
-function normalizeImportRowType(value: unknown): PensionStatementImportRow['type'] {
-  if (typeof value !== 'string') return 'annual_statement';
-  return ROW_TYPES.has(value as PensionStatementImportRow['type'])
-    ? (value as PensionStatementImportRow['type'])
-    : 'annual_statement';
-}
-
-function normalizeCollisionWarning(value: unknown): PensionStatementImportRow['collisionWarning'] {
-  if (!value || typeof value !== 'object') return null;
-  const collision = value as { existingTransactionId?: IntegerLike; reason?: unknown };
-  return {
-    existingTransactionId: toPositiveInt(collision.existingTransactionId),
-    reason: toStringOr(collision.reason),
-  };
 }
 
 export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
@@ -185,34 +123,9 @@ export const normalizePensionStatementDocument = (
     sizeBytes: normalizedDocument?.sizeBytes ?? 0,
     mimeType: 'application/pdf',
     fileName: normalizedDocument?.fileName ?? DEFAULT_STATEMENT_FILE_NAME,
-    uploadedAt: normalizedDocument?.uploadedAt ?? toIsoStringOrNow(document.uploadedAt),
+    uploadedAt: normalizedDocument?.uploadedAt ?? document.uploadedAt,
   };
 };
-
-export const normalizePensionStatementImport = (
-  value: ApiPensionStatementImport,
-): PensionStatementImport => ({
-  ...value,
-  id: toPositiveInt((value as { id?: IntegerLike }).id),
-  potId: toPositiveInt((value as { potId?: IntegerLike }).potId),
-  status: toStatus(value.status),
-  mimeType: 'application/pdf',
-  fileName: toStringOr(value.fileName, DEFAULT_STATEMENT_FILE_NAME),
-  fileHashSha256: toStringOr(value.fileHashSha256),
-  statementPeriodStart: toOptionalString(value.statementPeriodStart),
-  statementPeriodEnd: toOptionalString(value.statementPeriodEnd),
-  languageHints: normalizeStringList(value.languageHints),
-  modelName: toOptionalString(value.modelName),
-  modelVersion: toOptionalString(value.modelVersion),
-  errorMessage: toOptionalString(value.errorMessage),
-  createdAt: toIsoStringOrNow(value.createdAt),
-  updatedAt: toIsoStringOrNow(value.updatedAt),
-  expiresAt: toIsoStringOrNow(value.expiresAt),
-  committedAt: toOptionalString(value.committedAt),
-  totalRows: toOptionalCount(value.totalRows),
-  deletedRows: toOptionalCount(value.deletedRows),
-  activeRows: toOptionalCount(value.activeRows),
-});
 
 export const normalizePensionStatementImportFeedItem = (
   value: ApiPensionStatementImportFeedItem,
@@ -224,7 +137,7 @@ export const normalizePensionStatementImportFeedItem = (
       : DEFAULT_EMOJI.pension;
 
   return {
-    import: normalizePensionStatementImport(value.import),
+    import: value.import,
     pot: {
       id: toPositiveInt(pot?.id),
       name: toStringOr(pot?.name, DEFAULT_POT_NAME),
@@ -236,28 +149,8 @@ export const normalizePensionStatementImportFeedItem = (
 
 export const normalizePensionStatementImportRow = (
   value: ApiPensionStatementImportRow,
-): PensionStatementImportRow => {
-  const committedTransactionId = toPositiveInt(
-    (value as { committedTransactionId?: IntegerLike }).committedTransactionId,
-  );
-
-  return {
-    ...value,
-    id: toPositiveInt((value as { id?: IntegerLike }).id),
-    importId: toPositiveInt((value as { importId?: IntegerLike }).importId),
-    rowOrder: toPositiveInt((value as { rowOrder?: IntegerLike }).rowOrder),
-    type: normalizeImportRowType(value.type),
-    confidenceLabel: toConfidenceLabel(value.confidenceLabel),
-    evidence: normalizeEvidence(value.evidence),
-    isDeleted: Boolean(value.isDeleted),
-    isDerived: Boolean(value.isDerived),
-    note: toStringOr(value.note),
-    date: toDateOnlyOrToday(value.date),
-    isEmployer: typeof value.isEmployer === 'boolean' ? value.isEmployer : null,
-    collisionWarning: normalizeCollisionWarning(value.collisionWarning),
-    committedTransactionId: committedTransactionId > 0 ? committedTransactionId : null,
-    editedAt: toOptionalString(value.editedAt),
-    createdAt: toIsoStringOrNow(value.createdAt),
-    updatedAt: toIsoStringOrNow(value.updatedAt),
-  };
-};
+): PensionStatementImportRow => ({
+  ...value,
+  evidence: normalizeEvidence(value.evidence),
+  collisionWarning: value.collisionWarning ?? null,
+});

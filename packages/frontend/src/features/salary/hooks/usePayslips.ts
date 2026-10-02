@@ -1,15 +1,15 @@
+import { apiGet } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import type { ApiPayslip } from '../types';
 import { normalizePayslip } from '../utils/normalizers';
-import { salaryQueryKeys } from './queryKeys';
+import { queryKeys } from '@/lib/queryKeys';
 
 export function usePayslips() {
   return useQuery({
-    queryKey: salaryQueryKeys.payslips,
+    queryKey: queryKeys.salary.payslips,
     queryFn: async () => {
-      const { data } = await api.get('/api/salary/payslips');
-      return (data.data as ApiPayslip[]).map(normalizePayslip);
+      const payload = await apiGet<ApiPayslip[]>('/api/salary/payslips');
+      return payload.map(normalizePayslip);
     },
   });
 }

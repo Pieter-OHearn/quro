@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { toBudgetMonthIndex, type BudgetCategory, type ExpenseClass } from '@quro/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Tags } from 'lucide-react';
 import { Button, Card, SelectInput } from '@/components/ui';
-import { api } from '@/lib/api';
-import { PLAN_QUERY_KEY } from '../hooks';
+import { useAllBudgetCategories, useClassifyBudgetCategories } from '../hooks';
 
 const CLASS_OPTIONS = [
   { value: 'essential', label: 'Essential' },
@@ -56,14 +54,7 @@ function ClassificationRows({
 export function CategoryClassificationCard({
   defaultedCount,
 }: Readonly<{ defaultedCount: number }>) {
-  const queryClient = useQueryClient();
-  const categoriesQuery = useQuery({
-    queryKey: ['budget', 'categories', 'all'],
-    queryFn: async () => {
-      const response = await api.get('/api/budget/categories');
-      return response.data.data as BudgetCategory[];
-    },
-  });
+  const categoriesQuery = useAllBudgetCategories();
   const categories = useMemo(
     () => newestCategories(categoriesQuery.data ?? []),
     [categoriesQuery.data],
@@ -76,21 +67,7 @@ export function CategoryClassificationCard({
       ),
     );
   }, [categories]);
-  const classify = useMutation({
-    mutationFn: async () => {
-      const updates = categories.map((category) => ({
-        id: category.id,
-        expenseClass: classes[category.id] ?? 'essential',
-      }));
-      return api.patch('/api/budget/categories/classify', { updates });
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: PLAN_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: ['budget'] }),
-      ]);
-    },
-  });
+  const classify = useClassifyBudgetCategories();
 
   if (categoriesQuery.isPending || categories.length === 0) return null;
   return (
@@ -117,7 +94,17 @@ export function CategoryClassificationCard({
           <p className="mt-3 text-sm text-danger-fg">Spending classes could not be saved.</p>
         ) : null}
         <div className="mt-4 flex justify-end">
-          <Button onClick={() => classify.mutate()} loading={classify.isPending}>
+          <Button
+            onClick={() =>
+              classify.mutate(
+                categories.map((category) => ({
+                  id: category.id,
+                  expenseClass: classes[category.id] ?? 'essential',
+                })),
+              )
+            }
+            loading={classify.isPending}
+          >
             Save spending classes
           </Button>
         </div>

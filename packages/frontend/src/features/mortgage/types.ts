@@ -1,16 +1,17 @@
-import type { CurrencyCode } from '@/lib/CurrencyContext';
-import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 import type {
+  MortgageTransactionType as MortgageTxnType,
   Mortgage as MortgageType,
   MortgageRateType,
   MortgageRepaymentType,
   MortgageTransaction,
   Property,
 } from '@quro/shared';
+import type { CurrencyCode } from '@/lib/CurrencyContext';
+import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 
 export type MortgageFormatFn = (n: number) => string;
 
-export type MortgageTxnType = 'repayment' | 'valuation' | 'rate_change';
+export type { MortgageTransactionType as MortgageTxnType } from '@quro/shared';
 export type MortgageTxnFilter = MortgageTxnType | 'all';
 
 export type SaveMortgageTxnInput = Omit<MortgageTransaction, 'id'> & { id?: number };

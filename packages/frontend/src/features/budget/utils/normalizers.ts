@@ -1,9 +1,5 @@
-import type { BudgetCategory, BudgetTx } from '../types';
+import type { BudgetCategory } from '../types';
 
 export function normalizeBudgetCategory(raw: BudgetCategory): BudgetCategory {
   return { ...raw, expenseClass: raw.expenseClass ?? 'essential' };
-}
-
-export function normalizeBudgetTransaction(raw: BudgetTx): BudgetTx {
-  return raw;
 }

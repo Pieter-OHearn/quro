@@ -1,3 +1,4 @@
+export type { ConvertToBaseFn, IsForeignFn } from '@/lib/CurrencyContext';
 import type {
   Holding,
   HoldingPriceSyncResult,
@@ -17,8 +18,6 @@ export type InvestmentNativeFormatFn = (
   currency: string,
   compact?: boolean,
 ) => string;
-export type ConvertToBaseFn = (value: number, currency: string) => number;
-export type IsForeignFn = (currency: string) => boolean;
 
 export type PortfolioHistoryPoint = {
   month: string;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PdfDocument } from '@quro/shared';
-import { buildApiUrl } from './api';
+import { buildApiUrl, resolveApiErrorMessage } from './api';
 
 const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
 const KILOBYTE = 1024;
@@ -28,8 +28,7 @@ export function normalizePdfDocument(
     fileName: typeof document.fileName === 'string' ? document.fileName : 'document.pdf',
     mimeType: 'application/pdf',
     sizeBytes: toNumber(document.sizeBytes),
-    uploadedAt:
-      typeof document.uploadedAt === 'string' ? document.uploadedAt : new Date().toISOString(),
+    uploadedAt: document.uploadedAt,
   };
 }
 
@@ -51,20 +50,6 @@ export function validatePdfFile(file: File): string {
 
 export function buildApiDownloadUrl(path: string): string {
   return buildApiUrl(path);
-}
-
-export function readApiErrorMessage(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null;
-  const responseError = (error as { response?: { data?: { error?: unknown } } }).response?.data
-    ?.error;
-  return typeof responseError === 'string' ? responseError : null;
-}
-
-export function resolveApiErrorMessage(error: unknown, fallback: string): string {
-  const apiError = readApiErrorMessage(error);
-  if (apiError) return apiError;
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return fallback;
 }
 
 export class PdfAttachmentUploadError extends Error {

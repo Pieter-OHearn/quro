@@ -18,7 +18,7 @@ import {
   todayIsoDate,
 } from '@quro/shared';
 import { useTickerLookup } from '../hooks/useTickerLookup';
-import type { DeleteHoldingMode } from '../hooks/useDeleteHolding';
+import type { DeleteHoldingMode } from '../hooks/mutations';
 
 type EditHoldingModalProps = {
   existing?: Holding;

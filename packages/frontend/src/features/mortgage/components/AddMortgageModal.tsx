@@ -13,7 +13,7 @@ import {
 } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
 import { useAddMortgageForm } from '../hooks';
-import type { DeleteMortgageMode } from '../hooks/useDeleteMortgage';
+import type { DeleteMortgageMode } from '../hooks/mutations';
 import type { MortgageFormPayload, MortgageFormState } from '../types';
 
 export type { MortgageFormPayload } from '../types';

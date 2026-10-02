@@ -21,9 +21,9 @@ import {
 import {
   PdfAttachmentUploadError,
   buildApiDownloadUrl,
-  resolveApiErrorMessage,
   usePdfAttachmentState,
 } from '@/lib/pdfDocuments';
+import { resolveApiErrorMessage } from '@/lib/api';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddPayslipForm, useDeletePayslipDocument, useUploadPayslipDocument } from '../hooks';
 import type { PayslipFieldErrorMap, PayslipFormState, SavePayslipInput } from '../types';

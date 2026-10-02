@@ -1,7 +1,11 @@
 export { useBudgetCategories } from './useBudgetCategories';
-export { useCreateBudgetCategory } from './useCreateBudgetCategory';
-export { useUpdateBudgetCategory } from './useUpdateBudgetCategory';
+export {
+  useCreateBudgetCategory,
+  useUpdateBudgetCategory,
+  useDeleteBudgetTransaction,
+  useUpdateBudgetTransaction,
+} from './mutations';
+
 export { useBudgetTransactions } from './useBudgetTransactions';
-export { useDeleteBudgetTransaction } from './useDeleteBudgetTransaction';
-export { useUpdateBudgetTransaction } from './useUpdateBudgetTransaction';
+
 export { useBudgetPage } from './useBudgetPage';

@@ -28,22 +28,7 @@ type DebtAmountValues = {
   monthlyPayment: number | null;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function getApiErrorValue(error: unknown): unknown {
-  if (!isRecord(error) || !isRecord(error.response)) return null;
-  if (!isRecord(error.response.data)) return null;
-  return error.response.data.error;
-}
-
-export function getApiErrorMessage(error: unknown, fallback: string) {
-  const apiError = getApiErrorValue(error);
-  if (typeof apiError === 'string') return apiError;
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-}
+export { resolveApiErrorMessage as getApiErrorMessage } from '@/lib/api';
 
 function parseAmount(value: string) {
   const parsed = Number.parseFloat(value);

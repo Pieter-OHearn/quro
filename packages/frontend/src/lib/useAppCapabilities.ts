@@ -1,8 +1,9 @@
+import { queryKeys } from './queryKeys';
+import { apiGet } from './api';
 import { useQuery } from '@tanstack/react-query';
 import type { AppCapabilities } from '@quro/shared';
-import { api } from './api';
 
-export const APP_CAPABILITIES_QUERY_KEY = ['app', 'capabilities'] as const;
+export const APP_CAPABILITIES_QUERY_KEY = queryKeys.capabilities;
 
 export const DEFAULT_APP_CAPABILITIES: AppCapabilities = {
   ai: {
@@ -23,8 +24,7 @@ export function useAppCapabilities() {
   return useQuery({
     queryKey: APP_CAPABILITIES_QUERY_KEY,
     queryFn: async (): Promise<AppCapabilities> => {
-      const { data } = await api.get('/api/capabilities');
-      return data.data as AppCapabilities;
+      return apiGet<AppCapabilities>('/api/capabilities');
     },
     refetchInterval: 15_000,
   });

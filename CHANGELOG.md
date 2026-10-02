@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.6.3] - 2026-10-02
+
+- Centralize frontend query keys and domain dependencies, narrow mutation invalidation, and consolidate feature mutation hooks.
+- Add typed API payload helpers, share error extraction and currency/transaction types, and remove redundant response normalization and invented pension import timestamps.
+
 ## [v0.6.2] - 2026-10-02
 
 - Preserve budget currency across display preference changes: normalize manual and Bunq writes to EUR, retain native transaction provenance, and flag ambiguous legacy amounts for review.

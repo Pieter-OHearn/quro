@@ -1,5 +1,6 @@
+import { queryKeys } from '@/lib/queryKeys';
+import { apiGet } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import type { ApiPensionStatementDocument } from '../types';
 import { normalizePensionStatementDocument } from '../utils/pension-api-normalizers';
 
@@ -8,11 +9,13 @@ export function usePensionStatementDocuments(potId?: number) {
     Number.isInteger(potId) && (potId as number) > 0 ? (potId as number) : undefined;
 
   return useQuery({
-    queryKey: ['pensions', 'documents', normalizedPotId],
+    queryKey: queryKeys.pensions.documentList(normalizedPotId),
     queryFn: async () => {
       const params = normalizedPotId ? { potId: normalizedPotId } : undefined;
-      const { data } = await api.get('/api/pensions/documents', { params });
-      return (data.data as ApiPensionStatementDocument[])
+      const payload = await apiGet<ApiPensionStatementDocument[]>('/api/pensions/documents', {
+        params,
+      });
+      return payload
         .map(normalizePensionStatementDocument)
         .filter((document) => document.id > 0 && document.transactionId > 0 && document.potId > 0);
     },

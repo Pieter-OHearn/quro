@@ -1,8 +1,4 @@
-import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
-
-export function normalizeSavingsAccount(raw: SavingsAccount): SavingsAccount {
-  return raw;
-}
+import type { SavingsTransaction } from '@quro/shared';
 
 export function normalizeSavingsTransaction(raw: SavingsTransaction): SavingsTransaction {
   return {

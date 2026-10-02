@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { PartnerLink } from '@quro/shared';
 import { Check, Heart, Send, Unlink, X } from 'lucide-react';
 import { Badge, Button, FormField, TextInput } from '@/components/ui';
-import { resolveApiErrorMessage } from '@/lib/pdfDocuments';
+import { resolveApiErrorMessage } from '@/lib/api';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import {
   useAcceptPartner,

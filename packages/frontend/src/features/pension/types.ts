@@ -1,3 +1,5 @@
+import type { ConvertToBaseFn, IsForeignFn } from '@/lib/CurrencyContext';
+export type { ConvertToBaseFn, IsForeignFn } from '@/lib/CurrencyContext';
 import type {
   AppCapabilityStatus,
   PensionImportCollisionWarning,
@@ -10,8 +12,7 @@ import type {
 } from '@quro/shared';
 import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 import type { ApiPdfDocument } from '@/lib/pdfDocuments';
-
-export type PensionTxnType = 'contribution' | 'fee' | 'annual_statement';
+export type { PensionTransactionType as PensionTxnType } from '@quro/shared';
 export type AnnualStatementDirection = 'gain' | 'loss';
 
 export type PensionGrowthPoint = {
@@ -25,8 +26,6 @@ export type DatedPensionTransaction = PensionTransaction & {
 
 export type PensionFormatBaseFn = (n: number) => string;
 export type PensionFormatNativeFn = (n: number, currency: string, compact?: boolean) => string;
-export type ConvertToBaseFn = (n: number, currency: string) => number;
-export type IsForeignFn = (currency: string) => boolean;
 
 export type IntegerLike = number | string | null | undefined;
 

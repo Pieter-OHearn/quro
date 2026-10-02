@@ -1,42 +1,37 @@
+import { useDomainMutation } from '@/lib/useDomainMutation';
+import { queryKeys } from '@/lib/queryKeys';
+import { apiGet, apiPatch } from '@/lib/api';
 import type {
   BankingEntityConfirmationInput,
   BankingEntityOption,
   SavingsAccount,
 } from '@quro/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 
 export function useBankingEntities() {
   return useQuery({
-    queryKey: ['savings', 'banking-entities'],
+    queryKey: queryKeys.savings.bankingEntities,
     queryFn: async () => {
-      const response = await api.get('/api/savings/banking-entities');
-      return response.data.data as BankingEntityOption[];
+      return apiGet<BankingEntityOption[]>('/api/savings/banking-entities');
     },
     staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
 export function useConfirmBankingEntity() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
+  return useDomainMutation(
+    'bankingEntity',
+    async ({
       accountId,
       confirmation,
     }: {
       accountId: number;
       confirmation: BankingEntityConfirmationInput;
     }) => {
-      const response = await api.patch(
+      return apiPatch<SavingsAccount>(
         `/api/savings/accounts/${accountId}/banking-entity`,
         confirmation,
       );
-      return response.data.data as SavingsAccount;
     },
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['savings'] }),
-        queryClient.invalidateQueries({ queryKey: ['plan'] }),
-      ]),
-  });
+  );
 }

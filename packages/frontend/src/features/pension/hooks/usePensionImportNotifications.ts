@@ -1,6 +1,7 @@
+import { queryKeys } from '@/lib/queryKeys';
+import { apiGet } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import type { PensionImportStatus, PensionStatementImportFeedItem } from '@quro/shared';
-import { api } from '@/lib/api';
 import type { ApiPensionStatementImportFeedItem } from '../types';
 import { normalizePensionStatementImportFeedItem } from '../utils/pension-api-normalizers';
 
@@ -13,11 +14,7 @@ const DEFAULT_IMPORT_STATUSES: PensionImportStatus[] = [
 const DEFAULT_LIMIT = 30;
 const ACTIVE_STATUSES = new Set<PensionImportStatus>(['queued', 'processing']);
 
-export const PENSION_IMPORT_NOTIFICATIONS_QUERY_KEY = [
-  'pensions',
-  'imports',
-  'notifications',
-] as const;
+export const PENSION_IMPORT_NOTIFICATIONS_QUERY_KEY = queryKeys.pensions.notifications;
 
 type UsePensionImportNotificationsOptions = {
   statuses?: PensionImportStatus[];
@@ -29,18 +26,16 @@ export function usePensionImportNotifications(options: UsePensionImportNotificat
   const limit = options.limit ?? DEFAULT_LIMIT;
 
   return useQuery({
-    queryKey: [...PENSION_IMPORT_NOTIFICATIONS_QUERY_KEY, statuses.join(','), limit],
+    queryKey: queryKeys.pensions.notificationList(statuses.join(','), limit),
     queryFn: async (): Promise<PensionStatementImportFeedItem[]> => {
-      const { data } = await api.get('/api/pensions/imports', {
+      const payload = await apiGet<ApiPensionStatementImportFeedItem[]>('/api/pensions/imports', {
         params: {
           statuses: statuses.join(','),
           limit,
         },
       });
 
-      return (data.data as ApiPensionStatementImportFeedItem[]).map(
-        normalizePensionStatementImportFeedItem,
-      );
+      return payload.map(normalizePensionStatementImportFeedItem);
     },
     refetchInterval: (query) => {
       const imports = query.state.data ?? [];

@@ -1,45 +1,52 @@
-import type { PlanAssumptions, PlanAssumptionsInput, RunwayResponse } from '@quro/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import type {
+  BudgetCategory,
+  ExpenseClass,
+  PlanAssumptions,
+  PlanAssumptionsInput,
+  RunwayResponse,
+} from '@quro/shared';
+import { apiPatch, apiGet, apiPut } from '@/lib/api';
+import { useDomainMutation } from '@/lib/useDomainMutation';
+import { queryKeys } from '@/lib/queryKeys';
+import { useQuery } from '@tanstack/react-query';
 
-export const PLAN_QUERY_KEY = ['plan'] as const;
+export const PLAN_QUERY_KEY = queryKeys.plan.all;
 
 export function useRunway() {
   return useQuery({
-    queryKey: [...PLAN_QUERY_KEY, 'runway'],
+    queryKey: queryKeys.plan.runway,
     queryFn: async () => {
-      const response = await api.get('/api/plan/runway');
-      return response.data.data as RunwayResponse;
+      return apiGet<RunwayResponse>('/api/plan/runway');
     },
   });
 }
 
 export function usePlanAssumptions() {
   return useQuery({
-    queryKey: [...PLAN_QUERY_KEY, 'assumptions'],
+    queryKey: queryKeys.plan.assumptions,
     queryFn: async () => {
-      const response = await api.get('/api/plan/assumptions');
-      return response.data.data as PlanAssumptions | null;
+      return apiGet<PlanAssumptions | null>('/api/plan/assumptions');
     },
   });
-}
-
-function usePlanInvalidation() {
-  const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: PLAN_QUERY_KEY }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-    ]);
 }
 
 export function useUpdateAssumptions() {
-  const invalidate = usePlanInvalidation();
-  return useMutation({
-    mutationFn: async (input: PlanAssumptionsInput) => {
-      const response = await api.put('/api/plan/assumptions', input);
-      return response.data.data as PlanAssumptions;
-    },
-    onSuccess: invalidate,
+  return useDomainMutation('plan', async (input: PlanAssumptionsInput) => {
+    return apiPut<PlanAssumptions>('/api/plan/assumptions', input);
   });
+}
+
+export function useAllBudgetCategories() {
+  return useQuery({
+    queryKey: queryKeys.budget.allCategories,
+    queryFn: () => apiGet<BudgetCategory[]>('/api/budget/categories'),
+  });
+}
+
+export function useClassifyBudgetCategories() {
+  return useDomainMutation(
+    'budgetClassification',
+    (updates: Array<{ id: number; expenseClass: ExpenseClass }>) =>
+      apiPatch<BudgetCategory[]>('/api/budget/categories/classify', { updates }),
+  );
 }

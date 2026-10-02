@@ -1,5 +1,6 @@
+import { queryKeys } from '@/lib/queryKeys';
+import { apiGet } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 
 export type CategoryMapping = {
   id: number;
@@ -12,10 +13,9 @@ export type CategoryMapping = {
 
 export function useCategoryMappings() {
   return useQuery({
-    queryKey: ['budget', 'category-mappings'],
+    queryKey: queryKeys.budget.mappings,
     queryFn: async () => {
-      const { data } = await api.get('/api/budget/category-mappings');
-      return data.data as CategoryMapping[];
+      return apiGet<CategoryMapping[]>('/api/budget/category-mappings');
     },
   });
 }

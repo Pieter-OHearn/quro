@@ -11,15 +11,19 @@ import type {
   SaveMortgageTxnInput,
   UpdateMortgagePayload,
 } from '../types';
-import { useCreateMortgage } from './useCreateMortgage';
-import { useCreateMortgageTransaction } from './useCreateMortgageTransaction';
-import { useDeleteMortgage, type DeleteMortgageMode } from './useDeleteMortgage';
-import { useDeleteMortgageTransaction } from './useDeleteMortgageTransaction';
+import {
+  useCreateMortgage,
+  useCreateMortgageTransaction,
+  useDeleteMortgageTransaction,
+  useUpdateMortgage,
+  useUpdateMortgageTransaction,
+  useDeleteMortgage,
+  type DeleteMortgageMode,
+} from './mutations';
+
 import { useMortgageModals } from './useMortgageModals';
 import { useMortgages } from './useMortgages';
 import { useMortgageTransactions } from './useMortgageTransactions';
-import { useUpdateMortgage } from './useUpdateMortgage';
-import { useUpdateMortgageTransaction } from './useUpdateMortgageTransaction';
 
 function buildLinkedPropertyMap(properties: Property[]): Map<number, Property> {
   const map = new Map<number, Property>();
