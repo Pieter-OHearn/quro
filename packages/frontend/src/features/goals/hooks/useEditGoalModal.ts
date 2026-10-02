@@ -1,3 +1,4 @@
+import { allocationTotals } from '@/lib/allocationTotals';
 import { useMemo, useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAssetAllocations } from '@/features/dashboard/hooks';
@@ -61,20 +62,10 @@ export function useEditGoalModal(
   const type = normalizeGoalType(goal);
   const [form, setForm] = useState<GoalFormState>(() => goalToFormState(goal, baseCurrency));
 
-  const { portfolioTotal, netWorth } = useMemo(() => {
-    const allocs = allocationsQuery.data;
-    if (!allocs) return { portfolioTotal: 0, netWorth: 0 };
-    const currency = allocs.allocations[0]?.currency ?? 'EUR';
-    const totalAssets = allocs.allocations.reduce(
-      (sum, a) => sum + convertToBase(a.value, a.currency),
-      0,
-    );
-    const brokerage = allocs.allocations.find((a) => a.name === 'Brokerage');
-    return {
-      portfolioTotal: brokerage ? convertToBase(brokerage.value, brokerage.currency) : 0,
-      netWorth: totalAssets - convertToBase(allocs.liabilitiesTotal, currency),
-    };
-  }, [allocationsQuery.data, convertToBase]);
+  const { portfolioTotal, netWorth } = useMemo(
+    () => allocationTotals(allocationsQuery.data, convertToBase),
+    [allocationsQuery.data, convertToBase],
+  );
 
   const setField = (key: GoalFormField, value: string) => {
     setForm((previous) => ({ ...previous, [key]: value }));

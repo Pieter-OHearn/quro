@@ -1,4 +1,9 @@
-import type { JurisdictionCode, RuleSource } from './jurisdiction.js';
+import type {
+  JurisdictionCode,
+  RuleSource,
+  PlanningLabels,
+  UnemploymentModel,
+} from './jurisdiction.js';
 
 export * from './jurisdiction.js';
 
@@ -648,6 +653,8 @@ export type Goal = {
 };
 
 export type BudgetCategory = {
+  currency: CurrencyCode;
+  currencyNeedsReview: boolean;
   id: number;
   name: string;
   emoji: string;
@@ -661,6 +668,10 @@ export type BudgetCategory = {
 };
 
 export type BudgetTransaction = {
+  currency: CurrencyCode;
+  currencyNeedsReview: boolean;
+  sourceAmount?: number | null;
+  sourceCurrency?: CurrencyCode | null;
   id: number;
   categoryId: number;
   description: string;
@@ -793,10 +804,13 @@ export type IncomeSupportCalculation = {
 };
 
 export type RunwayResponse = {
+  budgetCurrencyNeedsReview: boolean;
   baseCurrency: CurrencyCode;
   asOf: string;
   jurisdiction: {
     code: JurisdictionCode;
+    labels: PlanningLabels;
+    unemploymentModel: UnemploymentModel;
     rulesEffectiveFrom: string;
     isExtrapolated: boolean;
   };
@@ -861,16 +875,23 @@ export type RunwayResponse = {
   isEstimated: boolean;
 };
 
+export type AllocationKey = 'savings' | 'brokerage' | 'property_equity' | 'pension';
+
 export type AssetAllocation = {
+  key: AllocationKey;
   id: number;
   name: string;
   value: number;
-  color: string;
   currency: CurrencyCode;
 };
 
 export type DashboardAllocationsSummary = {
   allocations: AssetAllocation[];
+  currency: CurrencyCode;
+  netWorth: number;
+  portfolioTotal: number;
+  totalAssets: number;
+  liabilitiesCurrency: CurrencyCode;
   liabilitiesTotal: number;
   debtCount: number;
 };

@@ -12,6 +12,7 @@ export function useUpdateBudgetTransaction() {
       // id-only input carries no month/year; broad invalidation until input type is extended
       void queryClient.invalidateQueries({ queryKey: ['budget'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['plan'] });
     },
   });
 }

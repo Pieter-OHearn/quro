@@ -18,6 +18,7 @@ export function useCreateBudgetCategory() {
         queryKey: ['budget', 'transactions', variables.month, variables.year],
       });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['plan'] });
     },
   });
 }

@@ -261,20 +261,6 @@ function getAccessibleMortgage(
   return findAccessible(mortgages, mortgageId, { userId, partnerId }, { executor });
 }
 
-// The mortgage is the source of truth for its balance; keep the linked
-// property's denormalized snapshot in step so the dashboard and property
-// cards stay consistent.
-async function syncPropertyMortgageSnapshot(
-  executor: DbExecutor,
-  mortgageId: number,
-  outstandingBalance: number,
-): Promise<void> {
-  await executor
-    .update(properties)
-    .set({ mortgage: outstandingBalance })
-    .where(eq(properties.mortgageId, mortgageId));
-}
-
 function addYearsToIsoDate(isoDate: string, years: number): string {
   const base = new Date(`${isoDate}T00:00:00Z`);
   if (Number.isNaN(base.getTime())) return 'N/A';
@@ -299,7 +285,6 @@ async function applyMortgageTxnEffect(
     if (updatedBalance === null) {
       return 'Principal portion cannot exceed the current outstanding balance';
     }
-    await syncPropertyMortgageSnapshot(tx, mortgage.id, updatedBalance);
     return null;
   }
   if (payload.type === 'rate_change') {
@@ -324,13 +309,10 @@ async function reverseMortgageTxnEffect(
   txn: { type: string; principal: number | null },
 ): Promise<void> {
   if (txn.type !== 'repayment') return;
-  const updatedBalance = await reverseRepayment(tx, MORTGAGE_BALANCE, {
+  await reverseRepayment(tx, MORTGAGE_BALANCE, {
     id: mortgage.id,
     principal: txn.principal ?? 0,
   });
-  if (updatedBalance !== null) {
-    await syncPropertyMortgageSnapshot(tx, mortgage.id, updatedBalance);
-  }
 }
 
 async function readMortgagePatchPayload(
@@ -418,7 +400,6 @@ async function syncLinkedProperty(
   prevId: number | null,
   nextId: number | null,
   mortgageId: number,
-  balance: number,
   isJoint: boolean,
 ) {
   if (prevId != null && prevId !== nextId) {
@@ -430,7 +411,7 @@ async function syncLinkedProperty(
   if (nextId != null) {
     await executor
       .update(properties)
-      .set({ mortgageId, mortgage: balance, isJoint })
+      .set({ mortgageId, mortgage: 0, isJoint })
       .where(eq(properties.id, nextId));
   }
 }
@@ -717,7 +698,7 @@ app.post('/', async (c) => {
       .update(properties)
       .set({
         mortgageId: created.id,
-        mortgage: body.value.outstandingBalance,
+        mortgage: 0,
         isJoint,
       })
       .where(eq(properties.id, property.id));
@@ -769,7 +750,6 @@ app.patch('/:id', async (c) => {
       patchContext.value.currentPropertyId,
       patchContext.value.nextPropertyId,
       id,
-      merged.value.outstandingBalance,
       merged.value.isJoint,
     );
     return updated;

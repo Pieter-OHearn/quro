@@ -61,8 +61,32 @@ export type WealthTaxRule = {
   };
 };
 
+export type PlanningLabels = {
+  unemployment: string;
+  unemploymentShort: string;
+  severance: string;
+  provider: string;
+  severanceSalaryOverride: string;
+  severanceSalaryHint: string;
+  benefitOverride: string;
+  benefitHint: string | null;
+  benefitDuration: string;
+};
+
+export type UnemploymentModel = 'salary_replacement' | 'manual_estimate' | 'none';
+
 export type PlanningJurisdictionProfile = {
   code: JurisdictionCode;
+  labels: PlanningLabels;
+  unemploymentModel: UnemploymentModel;
+  sources: readonly RuleSource[];
+  warnings: readonly string[];
+  manualBenefit: {
+    includedReason: string;
+    unknownReason: string;
+    includedConditions: readonly string[];
+    unknownConditions: readonly string[];
+  } | null;
   safeWithdrawalRate: NonEmptyDatedRules<number>;
   defaultEffectiveTaxRate: NonEmptyDatedRules<number>;
   unemploymentBenefit: NonEmptyDatedRules<UnemploymentRule> | null;

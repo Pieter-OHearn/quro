@@ -1,3 +1,4 @@
+import { householdShare } from './partner';
 import {
   resolveRule,
   type CalculationRuleSource,
@@ -16,7 +17,6 @@ import {
 import { DAY_MS } from '../constants/time';
 import { resolveBankingEntity } from './jurisdictions/bankingEntities';
 
-const JOINT_WEIGHT = 0.5;
 const MONTHS_PER_YEAR = 12;
 const TIER_TWO_HAIRCUT = 0.02;
 const TIER_THREE_HAIRCUT = 0.15;
@@ -149,7 +149,7 @@ function buildContractualComponents(
 ): BurnCalculation['components'] {
   return contractual.map((component) => ({
     label: component.label,
-    amount: Math.max(0, component.amount) * (component.isJoint ? JOINT_WEIGHT : 1),
+    amount: Math.max(0, component.amount) * householdShare(component.isJoint),
     source: component.source,
     expenseClass: 'essential',
   }));
@@ -235,7 +235,9 @@ export function calculateLiquidityTiers(
       .filter((asset) => asset.kind === kind)
       .reduce(
         (sum, asset) =>
-          sum + Math.max(0, asset.amount) * (asset.isJoint && !fullJoint ? JOINT_WEIGHT : 1),
+          sum +
+          Math.max(0, asset.amount) *
+            householdShare(asset.isJoint, fullJoint ? 'full' : 'personal'),
         0,
       );
     return { ...definition, amount, included: !excluded.has(definition.tier) };
@@ -403,71 +405,20 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
   const service = input.serviceStartDate
     ? calculateServiceDuration(input.serviceStartDate, serviceAsOf)
     : null;
-  const sources: CalculationRuleSource[] = [];
-  if (input.jurisdiction.code === 'NL' && input.jurisdiction.unemploymentBenefit) {
-    const wwResolution = resolveRule(input.jurisdiction.unemploymentBenefit, input.asOf);
-    const common = {
-      publisher: 'UWV',
-      reviewedAt: '2026-08-05',
-      effectiveFrom: wwResolution.effectiveFrom,
-      effectiveTo: wwResolution.effectiveTo,
-      isExtrapolated: wwResolution.isExtrapolated,
-    };
-    sources.push(
-      {
-        ...common,
-        id: 'uwv-ww-eligibility',
-        title: 'When am I entitled to WW benefit?',
-        url: 'https://www.uwv.nl/nl/ww/wanneer-recht-op-ww',
-      },
-      {
-        ...common,
-        id: 'uwv-ww-duration',
-        title: 'How long will I receive WW benefit?',
-        url: 'https://www.uwv.nl/nl/ww/hoelang-ww',
-      },
-      {
-        ...common,
-        id: 'uwv-maximum-daily-wage',
-        title: 'Maximum daily wage',
-        url: 'https://www.uwv.nl/nl/premies-bedragen/maximum-dagloon',
-      },
-      {
-        ...common,
-        id: 'uwv-daily-wage-calculation',
-        title: 'Calculating daily wage',
-        url: 'https://www.uwv.nl/nl/premies-bedragen/dagloon-berekenen',
-      },
-    );
-  }
+  const benefitResolution = input.jurisdiction.unemploymentBenefit
+    ? resolveRule(input.jurisdiction.unemploymentBenefit, input.asOf)
+    : null;
+  const sources: CalculationRuleSource[] = input.jurisdiction.sources.map((source) => ({
+    ...source,
+    effectiveFrom: benefitResolution?.effectiveFrom ?? input.asOf,
+    effectiveTo: benefitResolution?.effectiveTo ?? null,
+    isExtrapolated: benefitResolution?.isExtrapolated ?? false,
+  }));
   if (input.jurisdiction.unemploymentBenefit) {
     const source = sourceFromResolution(
       resolveRule(input.jurisdiction.unemploymentBenefit, input.asOf),
     );
     if (source) sources.push(source);
-  }
-  if (input.jurisdiction.code === 'AU') {
-    const common = {
-      publisher: 'Services Australia',
-      reviewedAt: '2026-08-11',
-      effectiveFrom: input.asOf,
-      effectiveTo: null,
-      isExtrapolated: false,
-    };
-    sources.push(
-      {
-        ...common,
-        id: 'services-australia-jobseeker-eligibility',
-        title: 'Who can get JobSeeker Payment',
-        url: 'https://www.servicesaustralia.gov.au/who-can-get-jobseeker-payment?context=51411',
-      },
-      {
-        ...common,
-        id: 'services-australia-jobseeker-means-tests',
-        title: 'Income and assets tests for JobSeeker Payment',
-        url: 'https://www.servicesaustralia.gov.au/income-and-assets-tests-for-jobseeker-payment?context=51411',
-      },
-    );
   }
   if (input.jurisdiction.severance) {
     const source = sourceFromResolution(resolveRule(input.jurisdiction.severance, input.asOf));
@@ -475,17 +426,8 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
   }
   const warnings = [
     'Net amounts use the effective tax rate from your payslips and are planning estimates, not tax advice.',
+    ...input.jurisdiction.warnings,
   ];
-  if (input.jurisdiction.code === 'NL') {
-    warnings.push(
-      'Dutch transition-pay salary can include holiday allowance and fixed pay components; use the salary override if the payslip gross does not include them.',
-    );
-  } else if (input.jurisdiction.code === 'AU') {
-    warnings.push(
-      'Australian redundancy pay uses base pay for ordinary hours and can be unavailable or reduced under Fair Work exceptions.',
-      'JobSeeker is household means- and assets-tested, so it is excluded until you enter an estimate and planning duration.',
-    );
-  }
 
   const notice: IncomeSupportCalculation['notice'] = !employed
     ? {
@@ -568,8 +510,8 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
   const weeklyRequirement = input.assumptions?.wwWeeklyRequirement ?? 'unknown';
   const benefitOverride = input.assumptions?.benefitMonthlyOverride;
   const benefitDurationOverride = input.assumptions?.benefitMaxMonthsOverride;
-  const hasAustralianBenefitOverride =
-    input.jurisdiction.code === 'AU' &&
+  const hasManualBenefitOverride =
+    input.jurisdiction.unemploymentModel === 'manual_estimate' &&
     benefitOverride !== null &&
     benefitOverride !== undefined &&
     benefitDurationOverride !== null &&
@@ -585,7 +527,7 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
       unverifiedConditions: [],
       reason: 'Unemployment support is only modelled for employees.',
     };
-  } else if (hasAustralianBenefitOverride) {
+  } else if (hasManualBenefitOverride) {
     unemployment = {
       status: 'included',
       weeklyRequirement: 'unknown',
@@ -593,16 +535,10 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
       durationConfirmedAt: null,
       durationSource: 'override',
       monthlyNetByMonth: Array.from({ length: benefitDurationOverride }, () => benefitOverride),
-      unverifiedConditions: [
-        'age and Australian residence rules',
-        'household income test',
-        'household assets test',
-        'mutual-obligation or temporary incapacity requirements',
-      ],
-      reason:
-        'Uses your JobSeeker estimate and planning duration; Services Australia determines actual eligibility and payment.',
+      unverifiedConditions: [...(input.jurisdiction.manualBenefit?.includedConditions ?? [])],
+      reason: input.jurisdiction.manualBenefit?.includedReason ?? '',
     };
-  } else if (input.jurisdiction.code === 'AU') {
+  } else if (input.jurisdiction.unemploymentModel === 'manual_estimate') {
     unemployment = {
       status: 'unknown',
       weeklyRequirement: 'unknown',
@@ -610,14 +546,8 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
       durationConfirmedAt: null,
       durationSource: 'unknown',
       monthlyNetByMonth: [],
-      unverifiedConditions: [
-        'age and Australian residence rules',
-        'household income test',
-        'household assets test',
-        'unemployed, looking for work, or temporarily unable to work',
-      ],
-      reason:
-        'JobSeeker is not derived from salary. Enter the monthly estimate from Services Australia and a planning duration to include it.',
+      unverifiedConditions: [...(input.jurisdiction.manualBenefit?.unknownConditions ?? [])],
+      reason: input.jurisdiction.manualBenefit?.unknownReason ?? '',
     };
   } else if (!input.jurisdiction.unemploymentBenefit) {
     unemployment = {
@@ -716,7 +646,7 @@ export function calculateIncomeSupport(input: IncomeSupportInput): IncomeSupport
     input.assumptions?.severanceMonthlySalaryOverride !== undefined
   ) {
     warnings.push(
-      'Transition compensation uses your severance salary override; notice and WW use the latest payslip.',
+      `${input.jurisdiction.labels.severance} uses your severance salary override; notice and ${input.jurisdiction.labels.unemploymentShort} use the latest payslip.`,
     );
   }
 
@@ -892,7 +822,7 @@ export function aggregateDepositGuarantees(
       accountIds: [],
     };
     // Without explicit ownership shares, the plan attributes half of a joint balance to this depositor.
-    const attributedNative = Math.max(0, account.amount) * (account.isJoint ? JOINT_WEIGHT : 1);
+    const attributedNative = Math.max(0, account.amount) * householdShare(account.isJoint);
     const attributedAmount = convertMoney(attributedNative, account.currency);
     const eligibleCurrencies = entity.eligibleCurrencies ?? undefined;
     group.total += attributedAmount;

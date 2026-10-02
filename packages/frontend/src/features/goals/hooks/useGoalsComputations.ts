@@ -1,3 +1,4 @@
+import { allocationTotals } from '@/lib/allocationTotals';
 import { useEffect, useMemo } from 'react';
 import type { DashboardAllocationsSummary, Goal, HoldingTransaction } from '@quro/shared';
 import type {
@@ -38,22 +39,6 @@ function computeInvestHabitBuyMonths(
   return yearMap;
 }
 
-function computeAllocationsContext(
-  allocations: DashboardAllocationsSummary | null,
-  convertToBase: (amount: number, fromCurrency: string) => number,
-): { portfolioTotal: number; netWorth: number } {
-  if (!allocations) return { portfolioTotal: 0, netWorth: 0 };
-  const currency = allocations.allocations[0]?.currency ?? 'EUR';
-  const totalAssets = allocations.allocations.reduce(
-    (sum, a) => sum + convertToBase(a.value, a.currency),
-    0,
-  );
-  const brokerage = allocations.allocations.find((a) => a.name === 'Brokerage');
-  const portfolioTotal = brokerage ? convertToBase(brokerage.value, brokerage.currency) : 0;
-  const netWorth = totalAssets - convertToBase(allocations.liabilitiesTotal, currency);
-  return { portfolioTotal, netWorth };
-}
-
 export function useGoalsComputations(
   goals: Goal[],
   payslips: SalaryPoint[],
@@ -77,7 +62,7 @@ export function useGoalsComputations(
   }, [convertToBase, payslips, currentYear]);
 
   const { portfolioTotal, netWorth } = useMemo(
-    () => computeAllocationsContext(allocations, convertToBase),
+    () => allocationTotals(allocations, convertToBase),
     [allocations, convertToBase],
   );
 

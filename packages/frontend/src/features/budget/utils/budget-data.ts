@@ -6,7 +6,12 @@ import type {
   EditCategoryForm,
   RecentBudgetTx,
 } from '../types';
-import { formatBudgetMonthFromDate, DEFAULT_EMOJI } from '@quro/shared';
+import {
+  formatBudgetMonthFromDate,
+  DEFAULT_EMOJI,
+  roundMoney,
+  type CurrencyCode,
+} from '@quro/shared';
 
 export function deriveBudgetStats(categories: readonly BudgetCategory[]): BudgetStats {
   const totalBudgeted = categories.reduce((sum, category) => sum + category.budgeted, 0);
@@ -50,8 +55,10 @@ export function mapMonthlyTransactions(
 export function buildCreateBudgetCategoryInput(
   newCategory: EditCategoryForm,
   now = new Date(),
+  currency: CurrencyCode = 'EUR',
 ): CreateBudgetCategoryInput {
   return {
+    currency,
     name: newCategory.name.trim(),
     emoji: newCategory.emoji || DEFAULT_EMOJI.budgetCategory,
     budgeted: Number.parseFloat(newCategory.budgeted) || 0,
@@ -59,5 +66,28 @@ export function buildCreateBudgetCategoryInput(
     color: newCategory.color || '#94a3b8',
     month: formatBudgetMonthFromDate(now),
     year: now.getFullYear(),
+  };
+}
+
+// Keep the query cache in EUR. Only page values and monetary form inputs use
+// the display currency, so toggling the preference never rewrites the ledger.
+export function budgetValuesForDisplay(
+  categories: readonly BudgetCategory[],
+  transactions: readonly BudgetTx[],
+  currency: CurrencyCode,
+  convert: (amount: number, from: CurrencyCode) => number,
+) {
+  return {
+    categories: categories.map((category) => ({
+      ...category,
+      budgeted: roundMoney(convert(category.budgeted, category.currency)),
+      spent: roundMoney(convert(category.spent, category.currency)),
+      currency,
+    })),
+    budgetTransactions: transactions.map((transaction) => ({
+      ...transaction,
+      amount: roundMoney(convert(transaction.amount, transaction.currency)),
+      currency,
+    })),
   };
 }

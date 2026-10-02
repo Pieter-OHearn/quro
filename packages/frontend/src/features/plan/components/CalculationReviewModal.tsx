@@ -24,10 +24,10 @@ export function CalculationReviewModal({
   onClose,
 }: Readonly<{ data: RunwayResponse; fmtBase: (value: number) => string; onClose: () => void }>) {
   const support = data.incomeSupport;
-  const isNl = data.jurisdiction.code === 'NL';
-  const isAu = data.jurisdiction.code === 'AU';
-  const severanceLabel = isAu ? 'Redundancy pay' : 'Transition compensation';
-  const benefitLabel = isNl ? 'WW benefit' : isAu ? 'JobSeeker Payment' : 'Unemployment benefit';
+  const { labels, unemploymentModel } = data.jurisdiction;
+  const hasWeeklyRequirement = unemploymentModel === 'salary_replacement';
+  const severanceLabel = labels.severance;
+  const benefitLabel = labels.unemployment;
   return (
     <Modal
       title="Review calculation"
@@ -119,7 +119,7 @@ export function CalculationReviewModal({
               {support.taxRateSource.replace('_', ' ')}
             </dd>
           </div>
-          {isNl ? (
+          {hasWeeklyRequirement ? (
             <div>
               <dt className="text-fg-subtle">WW 26-of-36 condition</dt>
               <dd className="font-medium text-fg">
@@ -127,7 +127,7 @@ export function CalculationReviewModal({
               </dd>
             </div>
           ) : null}
-          {isNl ? (
+          {hasWeeklyRequirement ? (
             <div>
               <dt className="text-fg-subtle">WW duration source</dt>
               <dd className="font-medium text-fg">
@@ -141,9 +141,7 @@ export function CalculationReviewModal({
         </dl>
         {support.unemployment.unverifiedConditions.length > 0 ? (
           <div className="mt-4 rounded-lg bg-warning-soft p-3 text-sm text-warning-fg">
-            <p className="font-medium">
-              Still to verify with {isNl ? 'UWV' : isAu ? 'Services Australia' : 'the provider'}
-            </p>
+            <p className="font-medium">Still to verify with {labels.provider}</p>
             <ul className="mt-1 list-disc pl-5">
               {support.unemployment.unverifiedConditions.map((condition) => (
                 <li key={condition}>{condition}</li>

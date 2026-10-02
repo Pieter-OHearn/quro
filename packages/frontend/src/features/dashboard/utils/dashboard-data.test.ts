@@ -69,8 +69,13 @@ test('normalizes dashboard payload rows using each row currency metadata', () =>
     { id: 1, month: 'Mar', year: 2026, totalValue: 1000, currency: 'EUR' },
   ];
   const allocations: DashboardAllocationsSummary = {
-    allocations: [{ id: 1, name: 'Savings', value: 1000, color: '#6366f1', currency: 'EUR' }],
+    allocations: [{ id: 1, key: 'savings', name: 'Savings', value: 1000, currency: 'EUR' }],
     liabilitiesTotal: 250,
+    liabilitiesCurrency: 'EUR',
+    currency: 'EUR',
+    totalAssets: 1000,
+    netWorth: 750,
+    portfolioTotal: 0,
     debtCount: 2,
   };
   const transactions: DashboardTransactionPayload[] = [

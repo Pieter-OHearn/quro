@@ -49,6 +49,7 @@ type EditCategoryDialogProps = {
 };
 
 type CategoryFieldsProps = {
+  currency: BudgetCategory['currency'];
   form: EditCategoryForm;
   set: <K extends keyof EditCategoryForm>(key: K, value: EditCategoryForm[K]) => void;
 };
@@ -76,7 +77,7 @@ function DialogError({ message }: Readonly<{ message: string | null }>) {
   );
 }
 
-function CategoryFields({ form, set }: Readonly<CategoryFieldsProps>) {
+function CategoryFields({ form, set, currency }: Readonly<CategoryFieldsProps>) {
   return (
     <>
       <div className="flex gap-3">
@@ -90,7 +91,7 @@ function CategoryFields({ form, set }: Readonly<CategoryFieldsProps>) {
           />
         </FormField>
       </div>
-      <FormField label="Monthly budget (€)">
+      <FormField label={`Monthly budget (${currency})`}>
         <input
           data-testid="budget-category-budget-input"
           type="number"
@@ -159,7 +160,7 @@ export function EditCategoryDialog({
     >
       <div className="space-y-4">
         <DialogError message={error} />
-        <CategoryFields form={form} set={set} />
+        <CategoryFields form={form} set={set} currency={category.currency} />
       </div>
     </Modal>
   );

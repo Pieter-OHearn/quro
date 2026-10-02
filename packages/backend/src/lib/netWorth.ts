@@ -1,4 +1,5 @@
-import type { CurrencyCode } from '@quro/shared';
+import { getPropertyDebt } from './propertyDebt';
+import type { AssetAllocation, DashboardAllocationsSummary, AllocationKey } from '@quro/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
@@ -13,26 +14,14 @@ import {
 } from '../db/schema';
 import { convertToBaseCurrency, FX_BASE_CURRENCY } from './currencyRateCache';
 import { getCurrentRatesToBaseCurrency } from './currencyRateSync';
-import { getAcceptedPartnerId, ownedOrJointPredicate } from './partner';
+import { getAcceptedPartnerId, loadHouseholdRows, scopeHouseholdRows } from './partner';
 import { toNumberOrZero } from './numbers';
 
-const JOINT_WEIGHT = 0.5;
 const ISO_MONTH_LENGTH = 7;
 const DATE_END_OF_MONTH = 0;
 
-export type DerivedAllocation = {
-  id: number;
-  name: string;
-  value: number;
-  color: string;
-  currency: CurrencyCode;
-};
-
-export type DerivedAllocationSummary = {
-  allocations: DerivedAllocation[];
-  liabilitiesTotal: number;
-  debtCount: number;
-};
+export type DerivedAllocation = AssetAllocation;
+export type DerivedAllocationSummary = DashboardAllocationsSummary;
 
 type MoneyRow = { currency: string };
 type SavingsRow = MoneyRow & { balance: unknown };
@@ -77,8 +66,13 @@ export function sumBrokerageValue(
   );
 }
 
-function allocation(id: number, name: string, value: number, color: string): DerivedAllocation {
-  return { id, name, value, color, currency: FX_BASE_CURRENCY };
+function allocation(
+  id: number,
+  key: AllocationKey,
+  name: string,
+  value: number,
+): DerivedAllocation {
+  return { id, key, name, value, currency: FX_BASE_CURRENCY };
 }
 
 export function computeDerivedAllocations(
@@ -102,10 +96,7 @@ export function computeDerivedAllocations(
     userMortgages.map((mortgage) => [mortgage.id, toNumberOrZero(mortgage.outstandingBalance)]),
   );
   const propertyEquity = userProperties.reduce((sum, property) => {
-    const mortgage =
-      property.mortgageId === null
-        ? toNumberOrZero(property.mortgage)
-        : (mortgageById.get(property.mortgageId) ?? 0);
+    const mortgage = getPropertyDebt(property, mortgageById);
     return sum + convert(toNumberOrZero(property.currentValue) - mortgage, property.currency);
   }, 0);
   const pension = userPensions.reduce(
@@ -119,11 +110,16 @@ export function computeDerivedAllocations(
 
   return {
     allocations: [
-      allocation(1, 'Savings', savings, '#6366f1'),
-      allocation(2, 'Brokerage', brokerage, '#0ea5e9'),
-      allocation(3, 'Property Equity', propertyEquity, '#10b981'),
-      allocation(4, 'Pension', pension, '#f59e0b'),
+      allocation(1, 'savings', 'Savings', savings),
+      allocation(2, 'brokerage', 'Brokerage', brokerage),
+      allocation(3, 'property_equity', 'Property Equity', propertyEquity),
+      allocation(4, 'pension', 'Pension', pension),
     ],
+    currency: FX_BASE_CURRENCY,
+    netWorth: savings + brokerage + propertyEquity + pension - liabilitiesTotal,
+    totalAssets: savings + brokerage + propertyEquity + pension,
+    portfolioTotal: brokerage,
+    liabilitiesCurrency: FX_BASE_CURRENCY,
     liabilitiesTotal,
     debtCount: userDebts.length,
   };
@@ -167,29 +163,17 @@ export function resolveHistoricalHoldingPrice(
 
 async function loadSnapshotInputs(userId: number) {
   const partnerId = await getAcceptedPartnerId(userId);
-  const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
-  const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
-  const propertyAccess = ownedOrJointPredicate(properties, userId, partnerId);
   const [rates, savings, holdingRows, holdingTxns, propertyRows, mortgageRows, pensions, debtRows] =
     await Promise.all([
       getCurrentRatesToBaseCurrency(FX_BASE_CURRENCY),
-      db
-        .select()
-        .from(savingsAccounts)
-        .where(and(savingsAccess, isNull(savingsAccounts.archivedAt))),
+      loadHouseholdRows(savingsAccounts, userId, partnerId),
       db
         .select()
         .from(holdings)
         .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
       db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-      db
-        .select()
-        .from(properties)
-        .where(and(propertyAccess, isNull(properties.archivedAt))),
-      db
-        .select()
-        .from(mortgages)
-        .where(and(mortgageAccess, isNull(mortgages.archivedAt))),
+      loadHouseholdRows(properties, userId, partnerId),
+      loadHouseholdRows(mortgages, userId, partnerId),
       db
         .select()
         .from(pensionPots)
@@ -199,24 +183,13 @@ async function loadSnapshotInputs(userId: number) {
         .from(debts)
         .where(and(eq(debts.userId, userId), isNull(debts.archivedAt))),
     ]);
-  const weigh = <T extends { isJoint: boolean }>(row: T, fields: string[]): T => {
-    if (!row.isJoint) return row;
-    return Object.fromEntries(
-      Object.entries(row).map(([key, value]) => [
-        key,
-        fields.includes(key) ? toNumberOrZero(value) * JOINT_WEIGHT : value,
-      ]),
-    ) as T;
-  };
   return {
     rates,
-    savings: savings.map((row) => weigh(row, ['balance'])),
+    savings: scopeHouseholdRows('savings', savings, (row) => row.isJoint),
     holdings: holdingRows,
     holdingTransactions: holdingTxns,
-    properties: propertyRows.map((row) =>
-      weigh(row, ['currentValue', 'purchasePrice', 'mortgage']),
-    ),
-    mortgages: mortgageRows.map((row) => weigh(row, ['outstandingBalance'])),
+    properties: scopeHouseholdRows('properties', propertyRows, (row) => row.isJoint),
+    mortgages: scopeHouseholdRows('mortgages', mortgageRows, (row) => row.isJoint),
     pensions,
     debts: debtRows,
   };
@@ -238,13 +211,13 @@ export async function upsertCurrentNetWorthSnapshot(
     input.debts,
   );
   const values = Object.fromEntries(
-    summary.allocations.map((item) => [item.name, item.value]),
+    summary.allocations.map((item) => [item.key, item.value]),
   ) as Record<string, number>;
-  const savings = values.Savings ?? 0;
-  const brokerage = values.Brokerage ?? 0;
-  const propertyEquity = values['Property Equity'] ?? 0;
-  const pension = values.Pension ?? 0;
-  const totalValue = savings + brokerage + propertyEquity + pension - summary.liabilitiesTotal;
+  const savings = values.savings ?? 0;
+  const brokerage = values.brokerage ?? 0;
+  const propertyEquity = values.property_equity ?? 0;
+  const pension = values.pension ?? 0;
+  const totalValue = summary.netWorth;
   const snapshot = {
     userId,
     snapshotDate: monthEnd(now),

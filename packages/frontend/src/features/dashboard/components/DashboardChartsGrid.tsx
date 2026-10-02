@@ -8,6 +8,7 @@ export function DashboardChartsGrid({
   allocationData,
   totalAlloc,
   liabilitiesTotal,
+  netWorth,
   baseCurrency,
   ytdPct,
   fmtBase,
@@ -16,6 +17,7 @@ export function DashboardChartsGrid({
   allocationData: readonly AllocationItem[];
   totalAlloc: number;
   liabilitiesTotal: number;
+  netWorth: number;
   baseCurrency: string;
   ytdPct: number;
   fmtBase: DashboardFormatFn;
@@ -51,6 +53,7 @@ export function DashboardChartsGrid({
         allocationData={allocationData}
         totalAlloc={totalAlloc}
         liabilitiesTotal={liabilitiesTotal}
+        netWorth={netWorth}
         baseCurrency={baseCurrency}
         fmtBase={fmtBase}
       />

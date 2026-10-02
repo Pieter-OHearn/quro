@@ -52,6 +52,7 @@ describe('Bunq budget sync categories', () => {
       name: 'Groceries',
       emoji: 'G',
       budgeted: 420,
+      currencyNeedsReview: true,
       spent: 185,
       color: '#111827',
       month: 'Mar',
@@ -68,6 +69,8 @@ describe('Bunq budget sync categories', () => {
 
     if (!category) throw new Error('Expected April Groceries category to be created');
     expect(Number(category.budgeted)).toBe(420);
+    expect(category.currencyNeedsReview).toBe(true);
+    expect(category.currency).toBe('EUR');
     expect(Number(category.spent)).toBe(0);
     expect(category.emoji).toBe('G');
     expect(category.color).toBe('#111827');
