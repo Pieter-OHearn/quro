@@ -47,7 +47,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'whitespace-nowrap font-semibold text-slate-800',
+    cellClassName: 'whitespace-nowrap font-semibold text-fg-emphasis',
   },
   {
     key: 'tax',
@@ -85,7 +85,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'whitespace-nowrap font-bold text-emerald-600',
+    cellClassName: 'whitespace-nowrap font-bold text-success',
   },
   { key: 'actions', header: '', priority: 'actions', width: 96 },
 ];
@@ -123,7 +123,7 @@ function PayslipRowActions({
           icon={Download}
           label="No payslip PDF"
           title="No payslip PDF"
-          className="text-slate-200"
+          className="text-border-default"
         />
       )}
       <IconButton
@@ -155,14 +155,14 @@ function PayslipTableRow({
   onEdit: (payslip: Payslip) => void;
 }>) {
   const currencyMeta = CURRENCY_META[payslip.currency];
-  const taxClass = payslip.tax < 0 ? 'text-emerald-600' : 'text-rose-500';
-  const pensionClass = payslip.pension < 0 ? 'text-emerald-600' : 'text-indigo-600';
+  const taxClass = payslip.tax < 0 ? 'text-success' : 'text-danger';
+  const pensionClass = payslip.pension < 0 ? 'text-success' : 'text-brand';
 
   return (
     <DataTableRow onClick={() => onSelect(payslip.id)} selected={isSelected} interactive>
       <DataTableCell columnKey="month">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-800">{payslip.month}</span>
+          <span className="font-semibold text-fg-emphasis">{payslip.month}</span>
           <Badge tone="info" size="sm">
             <span aria-hidden>{currencyMeta.flag}</span>
             <span>{payslip.currency}</span>
@@ -173,7 +173,7 @@ function PayslipTableRow({
             </Badge>
           )}
         </div>
-        <p className="text-xs text-slate-400">{formatDate(payslip.date)}</p>
+        <p className="text-xs text-fg-faint">{formatDate(payslip.date)}</p>
       </DataTableCell>
       <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
       <DataTableCell columnKey="tax" className={taxClass}>

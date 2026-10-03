@@ -76,13 +76,13 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
         subtitle="Change your password and keep your account credentials current."
       />
 
-      <div className="mb-6 flex items-center gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50">
-          <ShieldCheck size={18} className="text-emerald-600" />
+      <div className="mb-6 flex items-center gap-4 rounded-3xl border border-border-default bg-surface-sunken p-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-success-soft-strong bg-success-soft">
+          <ShieldCheck size={18} className="text-success" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-900">Password protected</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-semibold text-fg">Password protected</p>
+          <p className="text-xs text-fg-subtle">
             Last changed: {formatPasswordChangedAt(user.passwordUpdatedAt)}
           </p>
         </div>
@@ -123,7 +123,7 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
                     key={index}
                     className={cn(
                       'h-1.5 flex-1 rounded-full transition-colors',
-                      index <= strength.score ? strength.barClassName : 'bg-slate-200',
+                      index <= strength.score ? strength.barClassName : 'bg-border-default',
                     )}
                   />
                 ))}
@@ -145,7 +145,7 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
                     key={item.label}
                     className={cn(
                       'flex items-center gap-1.5',
-                      item.valid ? 'text-emerald-600' : 'text-slate-400',
+                      item.valid ? 'text-success' : 'text-fg-faint',
                     )}
                   >
                     <Check size={12} className={item.valid ? 'opacity-100' : 'opacity-0'} />
@@ -170,7 +170,7 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
             onToggle={() => setShowConfirmPassword((current) => !current)}
           />
           {form.confirmPassword && form.confirmPassword === form.nextPassword ? (
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-success">
               <Check size={12} />
               Passwords match
             </p>
@@ -178,16 +178,16 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
         </FormField>
       </div>
 
-      <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
-        <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-amber-600" />
-        <p className="text-sm text-amber-800">
+      <div className="mb-6 flex items-start gap-3 rounded-2xl border border-warning-soft-strong bg-warning-soft px-4 py-3">
+        <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-warning" />
+        <p className="text-sm text-warning-strong">
           Use a password you are not reusing anywhere else. Quro stores password hashes, not raw
           passwords.
         </p>
       </div>
 
       {formError ? (
-        <p className="mb-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+        <p className="mb-4 rounded-2xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
           {formError}
         </p>
       ) : null}

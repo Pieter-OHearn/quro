@@ -33,13 +33,13 @@ export function DashboardChartsGrid({
           dataKey="value"
           estimatedKey="isEstimated"
           xKey="month"
-          color="#6366f1"
+          color="var(--data-primary)"
           height={220}
           formatValue={fmtBase}
           badge={
             ytdPct !== 0 ? (
               <span
-                className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
+                className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg'}`}
               >
                 {ytdPct >= 0 ? '+' : ''}
                 {formatPercent(ytdPct, 1)} YTD

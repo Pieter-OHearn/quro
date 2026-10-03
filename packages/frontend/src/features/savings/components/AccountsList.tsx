@@ -73,7 +73,7 @@ function AccountRowMeta({
   return (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-        <p className="text-sm font-semibold text-slate-800">{acc.name}</p>
+        <p className="text-sm font-semibold text-fg-emphasis">{acc.name}</p>
         {acc.bunqAccountId && (
           <Badge tone="info" size="sm">
             Bunq
@@ -87,10 +87,10 @@ function AccountRowMeta({
           {acc.currency}
         </Badge>
       </div>
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-fg-faint">
         {acc.bank} · {accTxns.length} transactions
       </p>
-      <div className="mt-2 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+      <div className="mt-2 w-full bg-surface-muted h-1.5 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full"
           style={{ width: `${pct}%`, backgroundColor: acc.color }}
@@ -117,12 +117,12 @@ function AccountRowBalance({
 }) {
   return (
     <div className="text-right flex-shrink-0">
-      <p className="font-bold text-slate-900">{fmtNative(acc.balance, acc.currency)}</p>
+      <p className="font-bold text-fg">{fmtNative(acc.balance, acc.currency)}</p>
       {foreign && (
-        <p className="text-xs text-indigo-600 font-medium">{`\u2248 ${fmtBase(balanceInBase)}`}</p>
+        <p className="text-xs text-brand font-medium">{`\u2248 ${fmtBase(balanceInBase)}`}</p>
       )}
-      <p className="text-xs text-emerald-600">{acc.interestRate}% APY</p>
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-success">{acc.interestRate}% APY</p>
+      <p className="text-xs text-fg-faint">
         {fmtNative(monthlyInterest, acc.currency, true)}/mo interest
       </p>
     </div>
@@ -143,10 +143,10 @@ function AccountRowHeader({
   onEdit,
 }: Readonly<AccountRowHeaderProps>) {
   return (
-    <div className="flex items-center gap-4 px-6 py-4 hover:bg-slate-50/60 transition-colors group">
+    <div className="flex items-center gap-4 px-6 py-4 hover:bg-surface-sunken/60 transition-colors group">
       <button
         onClick={onToggleExpand}
-        className="w-11 h-11 rounded-xl flex items-center justify-center text-xl bg-white border border-slate-100 shadow-sm flex-shrink-0 hover:shadow-md transition-shadow"
+        className="w-11 h-11 rounded-xl flex items-center justify-center text-xl bg-surface border border-border-subtle shadow-sm flex-shrink-0 hover:shadow-md transition-shadow"
       >
         {acc.emoji}
       </button>
@@ -262,11 +262,11 @@ function AnnualProjection({
   fmtBase: SavingsFormatFn;
 }) {
   return (
-    <div className="mx-6 mb-6 mt-2 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-100 flex items-center gap-4">
-      <Calendar size={20} className="text-emerald-600 flex-shrink-0" />
+    <div className="mx-6 mb-6 mt-2 p-4 bg-gradient-to-r from-success-soft to-accent-secondary-soft rounded-xl border border-success-soft-strong flex items-center gap-4">
+      <Calendar size={20} className="text-success flex-shrink-0" />
       <div>
-        <p className="text-sm font-semibold text-emerald-800">Annual Interest Projection</p>
-        <p className="text-xs text-emerald-600 mt-0.5">
+        <p className="text-sm font-semibold text-success-strong">Annual Interest Projection</p>
+        <p className="text-xs text-success mt-0.5">
           At current balances and rates you'll earn approximately{' '}
           <strong>{fmtBase(totalInterest * 12)}</strong> in interest over the next 12 months.
         </p>
@@ -296,11 +296,11 @@ export function AccountsList({
     <Card padding="none" className="overflow-hidden">
       <AccountsListHeader accounts={accounts} onAddAccount={onAddAccount} />
       {accounts.length === 0 && (
-        <p className="text-center py-10 text-slate-400 text-sm">
+        <p className="text-center py-10 text-fg-faint text-sm">
           No accounts yet. Click <strong>Add Account</strong> to get started.
         </p>
       )}
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-surface-sunken">
         {accounts.map((account) => (
           <AccountRow
             key={account.id}

@@ -26,40 +26,44 @@ function MortgageBalanceChart({
   repaymentType,
 }: Readonly<MortgageBalanceChartProps>) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <h3 className="font-semibold text-slate-900 mb-1">Balance Projection</h3>
-      <p className="text-xs text-slate-400 mb-5">
+    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
+      <h3 className="font-semibold text-fg mb-1">Balance Projection</h3>
+      <p className="text-xs text-fg-faint mb-5">
         Remaining balance using the {repaymentType.toLowerCase()} repayment method
       </p>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={amortization}>
           <defs>
             <linearGradient id="mortGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              <stop offset="5%" stopColor="var(--data-primary)" stopOpacity={0.15} />
+              <stop offset="95%" stopColor="var(--data-primary)" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
           <XAxis
             dataKey="year"
-            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 11, fill: '#94a3b8' }}
+            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
           />
           <Tooltip
             formatter={(value) => [fmt(Number(value) || 0), 'Balance']}
-            contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+            contentStyle={{
+              borderRadius: '12px',
+              border: '1px solid var(--border-default)',
+              fontSize: '12px',
+            }}
           />
           <Area
             type="monotone"
             dataKey="balance"
-            stroke="#6366f1"
+            stroke="var(--data-primary)"
             strokeWidth={2.5}
             fill="url(#mortGrad)"
             dot={false}
@@ -74,12 +78,12 @@ function PaymentChartLegend() {
   return (
     <div className="flex items-center gap-5 mt-3">
       <div className="flex items-center gap-1.5">
-        <div className="w-3 h-3 rounded-sm bg-indigo-500" />
-        <span className="text-xs text-slate-500">Principal</span>
+        <div className="w-3 h-3 rounded-sm bg-brand-accent" />
+        <span className="text-xs text-fg-subtle">Principal</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <div className="w-3 h-3 rounded-sm bg-amber-400" />
-        <span className="text-xs text-slate-500">Interest</span>
+        <div className="w-3 h-3 rounded-sm bg-warning-muted" />
+        <span className="text-xs text-fg-subtle">Interest</span>
       </div>
     </div>
   );
@@ -92,22 +96,22 @@ type MortgagePaymentChartProps = {
 
 function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymentChartProps>) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <h3 className="font-semibold text-slate-900 mb-1">Payment Breakdown</h3>
-      <p className="text-xs text-slate-400 mb-5">Principal vs Interest per month</p>
+    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
+      <h3 className="font-semibold text-fg mb-1">Payment Breakdown</h3>
+      <p className="text-xs text-fg-faint mb-5">Principal vs Interest per month</p>
       {paymentBreakdown.length > 0 ? (
         <>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={paymentBreakdown} barSize={22}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
@@ -115,7 +119,7 @@ function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymen
               <Tooltip
                 contentStyle={{
                   borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border-default)',
                   fontSize: '12px',
                 }}
                 formatter={(value, name) => [
@@ -126,14 +130,14 @@ function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymen
               <Bar
                 dataKey="principal"
                 name="principal"
-                fill="#6366f1"
+                fill="var(--data-primary)"
                 stackId="a"
                 radius={[0, 0, 0, 0]}
               />
               <Bar
                 dataKey="interest"
                 name="interest"
-                fill="#f59e0b"
+                fill="var(--data-forecast)"
                 stackId="a"
                 radius={[ROUNDED_BAR_RADIUS, ROUNDED_BAR_RADIUS, 0, 0]}
               />
@@ -142,7 +146,7 @@ function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymen
           <PaymentChartLegend />
         </>
       ) : (
-        <div className="flex items-center justify-center py-12 text-sm text-slate-400">
+        <div className="flex items-center justify-center py-12 text-sm text-fg-faint">
           No repayment transactions yet.
         </div>
       )}

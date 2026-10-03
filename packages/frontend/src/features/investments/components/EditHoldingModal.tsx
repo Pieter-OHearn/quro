@@ -8,6 +8,8 @@ import {
   FormField,
   SelectInput,
   TextInput,
+  IconButton,
+  DateInput,
 } from '@/components/ui';
 import {
   ITEM_TYPE_LABELS,
@@ -185,13 +187,11 @@ function TickerSearch({
   foundName,
 }: TickerSearchProps) {
   return (
-    <div className="mb-4">
-      <p className="text-xs font-semibold text-slate-600 mb-2">Lookup Ticker</p>
+    <FormField label="Lookup Ticker" className="mb-4" labelClassName="mb-2">
       <div className="flex gap-2">
-        <input
-          type="text"
+        <TextInput
           value={searchTicker}
-          onChange={(e) => onSearchTickerChange(e.target.value.toUpperCase())}
+          onChange={(value) => onSearchTickerChange(value.toUpperCase())}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !isLoading) {
               e.preventDefault();
@@ -199,25 +199,25 @@ function TickerSearch({
             }
           }}
           placeholder="e.g. NDQ.AX, AAPL"
-          className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          className="flex-1 min-w-0"
         />
         <button
           onClick={onFind}
           disabled={isLoading || !searchTicker.trim()}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-medium transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-border-strong text-fg-inverted text-sm font-medium transition-colors"
         >
           {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           Find
         </button>
       </div>
-      {error && <p className="text-xs text-rose-500 mt-1.5">{error}</p>}
+      {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
       {foundName && (
-        <div className="mt-2 bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 flex items-center gap-2">
-          <Check size={13} className="text-emerald-600 flex-shrink-0" />
-          <span className="text-xs text-emerald-700">Found: {foundName}</span>
+        <div className="mt-2 bg-success-soft border border-success-soft-strong rounded-xl p-2.5 flex items-center gap-2">
+          <Check size={13} className="text-success flex-shrink-0" />
+          <span className="text-xs text-success-fg">Found: {foundName}</span>
         </div>
       )}
-    </div>
+    </FormField>
   );
 }
 
@@ -230,8 +230,8 @@ type InitialBuySectionProps = {
 
 function InitialBuySection({ form, errors, currency, onChange }: InitialBuySectionProps) {
   return (
-    <div className="border-t border-dashed border-slate-200 pt-4">
-      <p className="text-xs font-semibold text-slate-600 mb-3">Initial Buy Transaction</p>
+    <div className="border-t border-dashed border-border-default pt-4">
+      <p className="text-xs font-semibold text-fg-muted mb-3">Initial Buy Transaction</p>
       <div className="grid grid-cols-3 gap-3">
         <FormField label="Shares" required error={errors.initShares}>
           <TextInput
@@ -254,19 +254,14 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
           />
         </FormField>
         <FormField label="Date">
-          <input
-            type="date"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            value={form.initDate}
-            onChange={(event) => onChange('initDate', event.target.value)}
-          />
+          <DateInput value={form.initDate} onChange={(value) => onChange('initDate', value)} />
         </FormField>
       </div>
 
       {form.initShares && form.initPrice && (
-        <div className="mt-3 bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-2">
-          <Check size={13} className="text-emerald-600" />
-          <span className="text-xs text-emerald-700">
+        <div className="mt-3 bg-success-soft border border-success-soft-strong rounded-xl p-3 flex items-center gap-2">
+          <Check size={13} className="text-success" />
+          <span className="text-xs text-success-fg">
             Initial position: {form.initShares} shares @ {currency} {form.initPrice} = {currency}{' '}
             {(
               (toNormalizedNumber(form.initShares) ?? 0) * (toNormalizedNumber(form.initPrice) ?? 0)
@@ -399,13 +394,14 @@ function buildDeleteButton(
 ): React.ReactNode {
   if (!existing || !onDelete) return undefined;
   return (
-    <button
+    <IconButton
+      icon={Trash2}
+      label="Remove holding"
+      variant="danger"
+      size="lg"
+      className="border border-danger-border text-danger"
       onClick={onRequestConfirm}
-      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-      title="Remove holding"
-    >
-      <Trash2 size={14} />
-    </button>
+    />
   );
 }
 
@@ -464,8 +460,8 @@ function PriceControlsSection({
   onToggleExcludeFromSync,
 }: PriceControlsSectionProps) {
   return (
-    <div className="border-t border-dashed border-slate-200 pt-4 mt-1">
-      <p className="text-xs font-semibold text-slate-600 mb-3">Price Controls</p>
+    <div className="border-t border-dashed border-border-default pt-4 mt-1">
+      <p className="text-xs font-semibold text-fg-muted mb-3">Price Controls</p>
       <FormField label="Manual Price" hint="Overrides the synced price when set">
         <TextInput
           type="text"
@@ -480,9 +476,9 @@ function PriceControlsSection({
           type="checkbox"
           checked={form.excludeFromSync}
           onChange={(e) => onToggleExcludeFromSync(e.target.checked)}
-          className="w-4 h-4 rounded border-slate-300 accent-indigo-600"
+          className="w-4 h-4 rounded border-border-strong accent-brand"
         />
-        <span className="text-sm text-slate-700">Exclude from price sync</span>
+        <span className="text-sm text-fg-strong">Exclude from price sync</span>
       </label>
     </div>
   );

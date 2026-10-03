@@ -72,7 +72,7 @@ function AgeFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) {
       <FormField
         label={
           <span className="inline-flex items-center gap-2">
-            <CalendarDays size={14} className="text-slate-400" />
+            <CalendarDays size={14} className="text-fg-faint" />
             <span>Current age</span>
           </span>
         }
@@ -92,7 +92,7 @@ function AgeFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) {
       <FormField
         label={
           <span className="inline-flex items-center gap-2">
-            <Target size={14} className="text-slate-400" />
+            <Target size={14} className="text-fg-faint" />
             <span>Retirement age</span>
           </span>
         }
@@ -169,7 +169,7 @@ function SignUpForm({ state, onSwitchToSignIn }: Readonly<SignUpFormProps>) {
       onSubmit={(event) => {
         void handleSubmit(event);
       }}
-      className="space-y-4 px-8 py-7 text-slate-900"
+      className="space-y-4 px-8 py-7 text-fg"
     >
       <SignUpFormFields state={state} />
       <SubmitButton
@@ -182,12 +182,12 @@ function SignUpForm({ state, onSwitchToSignIn }: Readonly<SignUpFormProps>) {
           </>
         }
       />
-      <p className="pb-1 text-center text-sm text-slate-500">
+      <p className="pb-1 text-center text-sm text-fg-subtle">
         Already have an account?{' '}
         <button
           type="button"
           onClick={onSwitchToSignIn}
-          className="font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
+          className="font-semibold text-brand transition-colors hover:text-brand-strong"
         >
           Sign in
         </button>
@@ -213,7 +213,7 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
             <QuroLogo size={52} showBg={false} />
           </div>
         ),
-        className: 'bg-gradient-to-br from-[#0a0f1e] to-[#1a2550] px-8 pb-10 pt-8',
+        className: 'bg-gradient-to-br from-surface-inverse to-surface-auth-end px-8 pb-10 pt-8',
         titleClassName: 'text-2xl font-black tracking-tight',
         subtitleClassName: 'mt-1 text-sm',
         closeIconSize: 16,

@@ -56,14 +56,12 @@ function PensionTxnRow({
       date={transaction.date}
       badge={
         transaction.type === 'contribution' && transaction.isEmployer
-          ? { text: 'Employer', className: 'bg-indigo-100 text-indigo-600' }
+          ? { text: 'Employer', className: 'bg-brand-soft-strong text-brand' }
           : undefined
       }
       amount={
         <div className="text-right flex-shrink-0">
-          <p
-            className={`text-sm font-semibold ${isDeduction ? 'text-rose-500' : 'text-emerald-600'}`}
-          >
+          <p className={`text-sm font-semibold ${isDeduction ? 'text-danger' : 'text-success'}`}>
             {isDeduction ? '\u2212' : '+'}
             {fmtNative(displayAmount, currency, true)}
           </p>
@@ -108,7 +106,7 @@ export function PensionTxnHistory({
       stats={stats}
       statsColumns={5}
       onAdd={onAdd}
-      accentColor="bg-amber-500 hover:bg-amber-600"
+      accentColor="bg-warning-accent hover:bg-warning"
       emptyMessage="No transactions."
       isEmpty={sortedTransactions.length === 0}
       footer={
@@ -120,7 +118,7 @@ export function PensionTxnHistory({
             rangeEnd={rangeEnd}
             totalCount={sortedTransactions.length}
             onChange={handlePageChange}
-            activePageClassName="bg-amber-500 text-white"
+            activePageClassName="bg-warning-accent text-fg-inverted"
           />
         ) : undefined
       }

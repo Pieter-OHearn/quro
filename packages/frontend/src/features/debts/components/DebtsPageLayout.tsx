@@ -26,14 +26,14 @@ function DebtsHeader({ onAddDebt }: Readonly<{ onAddDebt: () => void }>) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Debts & Liabilities</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-bold text-fg">Debts & Liabilities</h1>
+        <p className="mt-1 text-sm text-fg-faint">
           Loans, credit cards, overdrafts, and other non-mortgage obligations.
         </p>
       </div>
       <Button
         onClick={onAddDebt}
-        className="bg-rose-600 hover:bg-rose-700"
+        className="bg-danger-hover hover:bg-danger-fg"
         leadingIcon={<Plus size={15} />}
       >
         Add Debt
@@ -44,7 +44,7 @@ function DebtsHeader({ onAddDebt }: Readonly<{ onAddDebt: () => void }>) {
 
 function EmptyFilterResult() {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 px-6 py-12 text-center text-sm text-slate-400">
+    <div className="rounded-2xl border border-dashed border-border-default px-6 py-12 text-center text-sm text-fg-faint">
       No debts match this filter.
     </div>
   );
@@ -52,11 +52,11 @@ function EmptyFilterResult() {
 
 function DebtsInfoCallout() {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
-      <Info size={14} className="mt-0.5 flex-shrink-0 text-slate-400" />
-      <p className="text-xs leading-relaxed text-slate-500">
+    <div className="flex items-start gap-3 rounded-2xl border border-border-default bg-surface-sunken px-5 py-4">
+      <Info size={14} className="mt-0.5 flex-shrink-0 text-fg-faint" />
+      <p className="text-xs leading-relaxed text-fg-subtle">
         Outstanding debt balances are subtracted from your total assets on the dashboard to
-        calculate <span className="font-semibold text-slate-700">net worth</span>. Payoff
+        calculate <span className="font-semibold text-fg-strong">net worth</span>. Payoff
         projections use standard amortisation and assume a constant monthly payment.
       </p>
     </div>

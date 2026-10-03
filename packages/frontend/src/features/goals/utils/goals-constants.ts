@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import type { ElementType } from 'react';
 import {
   BarChart2,
@@ -13,66 +14,66 @@ import type { GoalType } from '@quro/shared';
 import type { FilterKey, GoalMeta, GoalStatus } from '../types';
 
 export const COLORS = [
-  '#6366f1',
-  '#0ea5e9',
-  '#f59e0b',
-  '#10b981',
-  '#f97316',
-  '#ec4899',
-  '#14b8a6',
-  '#8b5cf6',
-  '#06b6d4',
-  '#a78bfa',
-  '#fb7185',
-  '#94a3b8',
+  DATA_COLORS['primary'],
+  DATA_COLORS['cash'],
+  DATA_COLORS['forecast'],
+  DATA_COLORS['income'],
+  DATA_COLORS['property'],
+  DATA_COLORS['milestone'],
+  DATA_COLORS['recurring'],
+  DATA_COLORS['portfolio'],
+  DATA_COLORS['liquidity'],
+  DATA_COLORS['portfolio-muted'],
+  DATA_COLORS['expense-muted'],
+  DATA_COLORS['neutral'],
 ] as const;
 
 export const GOAL_TYPE_META: Record<GoalType, GoalMeta> = {
   savings: {
     label: 'Savings Goal',
     Icon: PiggyBank,
-    bg: 'bg-indigo-50',
-    text: 'text-indigo-600',
+    bg: 'bg-brand-soft',
+    text: 'text-brand',
     filterKey: 'savings',
     description: 'Save up to a target amount',
   },
   salary: {
     label: 'Career',
     Icon: Briefcase,
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-600',
+    bg: 'bg-success-soft',
+    text: 'text-success',
     filterKey: 'career',
     description: 'Hit a gross salary milestone',
   },
   invest_habit: {
     label: 'Invest Habit',
     Icon: RefreshCw,
-    bg: 'bg-sky-50',
-    text: 'text-sky-600',
+    bg: 'bg-info-soft',
+    text: 'text-info',
     filterKey: 'investing',
     description: 'Invest a set amount every month',
   },
   portfolio: {
     label: 'Portfolio Value',
     Icon: BarChart2,
-    bg: 'bg-sky-50',
-    text: 'text-sky-600',
+    bg: 'bg-info-soft',
+    text: 'text-info',
     filterKey: 'investing',
     description: 'Grow your portfolio to a target',
   },
   net_worth: {
     label: 'Net Worth',
     Icon: Trophy,
-    bg: 'bg-pink-50',
-    text: 'text-pink-600',
+    bg: 'bg-accent-highlight-soft',
+    text: 'text-accent-highlight',
     filterKey: 'annual',
     description: 'Reach a total net worth milestone',
   },
   annual: {
     label: 'Annual Goal',
     Icon: ClipboardList,
-    bg: 'bg-teal-50',
-    text: 'text-teal-600',
+    bg: 'bg-accent-secondary-soft',
+    text: 'text-accent-secondary',
     filterKey: 'annual',
     description: 'Yearly financial habit or target',
   },
@@ -81,23 +82,23 @@ export const GOAL_TYPE_META: Record<GoalType, GoalMeta> = {
 export const STATUS_META: Record<GoalStatus, { label: string; color: string; dot: string }> = {
   complete: {
     label: 'Completed',
-    color: 'text-emerald-700 bg-emerald-100',
-    dot: 'bg-emerald-500',
+    color: 'text-success-fg bg-success-soft-strong',
+    dot: 'bg-success-accent',
   },
   on_track: {
     label: 'On Track',
-    color: 'text-indigo-700 bg-indigo-100',
-    dot: 'bg-indigo-500',
+    color: 'text-brand-fg bg-brand-soft-strong',
+    dot: 'bg-brand-accent',
   },
   at_risk: {
     label: 'At Risk',
-    color: 'text-amber-700 bg-amber-100',
-    dot: 'bg-amber-500',
+    color: 'text-warning-fg bg-warning-soft-strong',
+    dot: 'bg-warning-accent',
   },
   pending: {
     label: 'In Progress',
-    color: 'text-slate-600 bg-slate-100',
-    dot: 'bg-slate-400',
+    color: 'text-fg-muted bg-surface-muted',
+    dot: 'bg-fg-faint',
   },
 };
 

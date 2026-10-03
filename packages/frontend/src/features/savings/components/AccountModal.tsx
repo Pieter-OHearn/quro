@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import { useState } from 'react';
 import { Trash2, Check } from 'lucide-react';
 import { CURRENCY_CODES } from '@/lib/CurrencyContext';
@@ -12,6 +13,7 @@ import {
   TextInput,
   SelectInput,
   EmojiPickerField,
+  IconButton,
 } from '@/components/ui';
 import { monthlyInterest, type SavingsAccount } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
@@ -26,14 +28,14 @@ type AccountModalProps = {
 
 const ACCOUNT_TYPES: ('Easy Access' | 'Term Deposit')[] = ['Easy Access', 'Term Deposit'];
 const COLORS = [
-  '#6366f1',
-  '#0ea5e9',
-  '#10b981',
-  '#f59e0b',
-  '#f97316',
-  '#ec4899',
-  '#8b5cf6',
-  '#14b8a6',
+  DATA_COLORS['primary'],
+  DATA_COLORS['cash'],
+  DATA_COLORS['income'],
+  DATA_COLORS['forecast'],
+  DATA_COLORS['property'],
+  DATA_COLORS['milestone'],
+  DATA_COLORS['portfolio'],
+  DATA_COLORS['recurring'],
 ];
 
 type FormState = {
@@ -96,12 +98,12 @@ function InterestPreview({
   if (!balance || !rate) return null;
   const monthly = monthlyInterest(parseFloat(balance), parseFloat(rate)).toFixed(2);
   return (
-    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center justify-between">
+    <div className="bg-success-soft border border-success-soft-strong rounded-xl p-3 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <Check size={14} className="text-emerald-600" />
-        <span className="text-sm text-emerald-700">Monthly interest preview</span>
+        <Check size={14} className="text-success" />
+        <span className="text-sm text-success-fg">Monthly interest preview</span>
       </div>
-      <span className="text-sm font-bold text-emerald-700">
+      <span className="text-sm font-bold text-success-fg">
         {currency} {monthly}/mo
       </span>
     </div>
@@ -277,7 +279,7 @@ function useAccountModalForm(
 function SubmitError({ message }: Readonly<{ message: string | null }>) {
   if (!message) return null;
   return (
-    <div className="mb-4 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+    <div className="mb-4 rounded-lg border border-danger-soft-strong bg-danger-soft px-3 py-2 text-sm text-danger-hover">
       {message}
     </div>
   );
@@ -295,13 +297,14 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
 
   const deleteButton =
     existing && onDelete ? (
-      <button
+      <IconButton
+        icon={Trash2}
+        label="Remove account"
+        variant="danger"
+        size="lg"
+        className="border border-danger-border text-danger"
         onClick={() => setConfirmingDelete(true)}
-        className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-        title="Remove account"
-      >
-        <Trash2 size={14} />
-      </button>
+      />
     ) : undefined;
 
   const runDelete = (mode: DeleteSavingsAccountMode) => {

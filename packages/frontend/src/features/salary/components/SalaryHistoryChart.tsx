@@ -32,7 +32,7 @@ function SalaryTooltip({ active, payload, fmtBase }: TooltipContentProps & { fmt
     <div
       style={{
         borderRadius: '12px',
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--border-default)',
         fontSize: '12px',
         background: '#fff',
         padding: '10px 14px',
@@ -47,7 +47,12 @@ function SalaryTooltip({ active, payload, fmtBase }: TooltipContentProps & { fmt
         </div>
       ))}
       <div
-        style={{ color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: 6, marginTop: 2 }}
+        style={{
+          color: 'var(--fg-subtle)',
+          borderTop: '1px solid var(--border-subtle)',
+          paddingTop: 6,
+          marginTop: 2,
+        }}
       >
         Gross: {fmtBase(gross)}
       </div>
@@ -71,9 +76,9 @@ export function SalaryHistoryChart({
       emptyMessage="No salary history yet."
       footer={
         growthPct > 0 ? (
-          <div className="mt-3 flex items-center gap-2 bg-emerald-50 rounded-xl p-3">
-            <ArrowUpRight size={16} className="text-emerald-600" />
-            <p className="text-xs text-emerald-700">
+          <div className="mt-3 flex items-center gap-2 bg-success-soft rounded-xl p-3">
+            <ArrowUpRight size={16} className="text-success" />
+            <p className="text-xs text-success-fg">
               Salary has grown by <strong>+{formatPercent(growthPct, 0)}</strong> since{' '}
               {data[0].year}
             </p>
@@ -84,15 +89,15 @@ export function SalaryHistoryChart({
       {chartData.length > 0 && (
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={chartData} barSize={32}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
             <XAxis
               dataKey="year"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
@@ -102,10 +107,10 @@ export function SalaryHistoryChart({
               formatter={(value) => (value === 'net' ? 'Net Pay' : 'Deductions')}
               wrapperStyle={{ fontSize: '11px' }}
             />
-            <Bar dataKey="net" fill="#10b981" stackId="salary" name="net" />
+            <Bar dataKey="net" fill="var(--data-income)" stackId="salary" name="net" />
             <Bar
               dataKey="deductions"
-              fill="#f43f5e"
+              fill="var(--data-expense)"
               stackId="salary"
               name="deductions"
               radius={[6, 6, 0, 0]}

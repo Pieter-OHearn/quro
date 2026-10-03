@@ -102,7 +102,7 @@ function InvestmentPageBody({
       />
       <InvestmentStatCards {...stats} trends={statTrends} fmtBase={fmtBase} />
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-surface rounded-2xl border border-border-subtle shadow-sm overflow-hidden">
         <TabSwitcher tab={ui.tab} onSetTab={ui.setTab} />
         <InvestmentTabPanel
           tab={ui.tab}

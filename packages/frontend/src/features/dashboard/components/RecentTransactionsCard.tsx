@@ -4,9 +4,9 @@ import { JointBadge } from '@/features/partner';
 import type { DashboardFormatFn, DashboardTransaction } from '../types';
 
 const txIconClass = (type: string) => {
-  if (type === 'income') return 'bg-emerald-50 text-emerald-600';
-  if (type === 'transfer') return 'bg-indigo-50 text-indigo-600';
-  return 'bg-slate-100 text-slate-500';
+  if (type === 'income') return 'bg-success-soft text-success';
+  if (type === 'transfer') return 'bg-brand-soft text-brand';
+  return 'bg-surface-muted text-fg-subtle';
 };
 
 function TransactionItem({
@@ -26,16 +26,16 @@ function TransactionItem({
         </div>
         <div>
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-slate-800">{tx.name}</p>
+            <p className="text-sm font-medium text-fg-emphasis">{tx.name}</p>
             <JointBadge isJoint={tx.isJoint} size="xs" />
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-fg-faint">
             {tx.category} · {tx.date}
           </p>
         </div>
       </div>
       <span
-        className={`text-sm font-semibold ${tx.amount > 0 ? 'text-emerald-600' : 'text-slate-700'}`}
+        className={`text-sm font-semibold ${tx.amount > 0 ? 'text-success' : 'text-fg-strong'}`}
       >
         {tx.amount > 0 ? '+' : ''}
         {fmtBase(Math.abs(tx.amount), undefined, true)}
@@ -54,15 +54,15 @@ export function RecentTransactionsCard({
   fmtBase: DashboardFormatFn;
 }>) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="font-semibold text-slate-900">Recent Transactions</h3>
-          <p className="text-xs text-slate-400 mt-0.5">This month in {baseCurrency}</p>
+          <h3 className="font-semibold text-fg">Recent Transactions</h3>
+          <p className="text-xs text-fg-faint mt-0.5">This month in {baseCurrency}</p>
         </div>
         <Link
           to="/budget"
-          className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+          className="text-xs text-brand hover:text-brand-fg font-medium flex items-center gap-1"
         >
           View all <ArrowRight size={12} />
         </Link>
@@ -74,7 +74,7 @@ export function RecentTransactionsCard({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-slate-400 py-8 text-center">No transactions yet.</p>
+        <p className="text-sm text-fg-faint py-8 text-center">No transactions yet.</p>
       )}
     </div>
   );

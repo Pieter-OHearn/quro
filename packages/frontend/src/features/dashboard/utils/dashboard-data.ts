@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
 import type {
   AllocationKey,
@@ -89,10 +90,10 @@ export function normalizeNetWorthSnapshots(
 }
 
 const ALLOCATION_COLORS: Record<AllocationKey, string> = {
-  savings: '#6366f1',
-  brokerage: '#0ea5e9',
-  property_equity: '#10b981',
-  pension: '#f59e0b',
+  savings: DATA_COLORS['primary'],
+  brokerage: DATA_COLORS['cash'],
+  property_equity: DATA_COLORS['income'],
+  pension: DATA_COLORS['forecast'],
 };
 
 export function normalizeAssetAllocations(
@@ -219,25 +220,25 @@ export const buildMonthlySummaryItems = (
     label: 'Monthly Income',
     value: fmtBase(income, undefined, true),
     icon: '\ud83d\udcb0',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-100',
+    bg: 'bg-success-soft',
+    text: 'text-success-fg',
+    border: 'border-success-soft-strong',
   },
   {
     label: 'Monthly Expenses',
     value: fmtBase(expenses, undefined, true),
     icon: '\ud83d\udce4',
-    bg: 'bg-rose-50',
-    text: 'text-rose-700',
-    border: 'border-rose-100',
+    bg: 'bg-danger-soft',
+    text: 'text-danger-fg',
+    border: 'border-danger-soft-strong',
   },
   {
     label: 'Monthly Savings',
     value: fmtBase(savingsDeposited, undefined, true),
     icon: '\ud83c\udfe6',
-    bg: 'bg-indigo-50',
-    text: 'text-indigo-700',
-    border: 'border-indigo-100',
+    bg: 'bg-brand-soft',
+    text: 'text-brand-fg',
+    border: 'border-brand-soft-strong',
   },
 ];
 

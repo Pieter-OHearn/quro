@@ -44,16 +44,16 @@ function DebtPaymentSummary({ debt }: Readonly<{ debt: Debt }>) {
   const monthlyInterest = estimateDebtMonthlyInterest(debt);
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+    <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-sunken px-4 py-3">
       <div className="flex-1">
-        <p className="text-[10px] uppercase tracking-wide text-slate-400">Current Balance</p>
-        <p className="text-sm font-bold text-slate-800">
+        <p className="text-[10px] uppercase tracking-wide text-fg-faint">Current Balance</p>
+        <p className="text-sm font-bold text-fg-emphasis">
           {fmtNative(debt.remainingBalance, debt.currency)}
         </p>
       </div>
       <div className="text-right">
-        <p className="text-[10px] uppercase tracking-wide text-slate-400">Monthly Interest</p>
-        <p className="text-sm font-semibold text-rose-500">
+        <p className="text-[10px] uppercase tracking-wide text-fg-faint">Monthly Interest</p>
+        <p className="text-sm font-semibold text-danger">
           {fmtNative(monthlyInterest, debt.currency, true)}
         </p>
       </div>
@@ -98,9 +98,9 @@ function PrincipalPreview({ debt, principal }: Readonly<{ debt: Debt; principal:
   const { fmtNative } = useCurrency();
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-      <TrendingDown size={13} className="flex-shrink-0 text-emerald-500" />
-      <p className="text-xs text-emerald-700">
+    <div className="flex items-center gap-2 rounded-xl border border-success-soft-strong bg-success-soft px-4 py-3">
+      <TrendingDown size={13} className="flex-shrink-0 text-success-accent" />
+      <p className="text-xs text-success-fg">
         <span className="font-semibold">{fmtNative(principal, debt.currency, true)}</span> reduces
         your remaining balance.
       </p>
@@ -139,7 +139,7 @@ function DebtPaymentModalShell({
             size="lg"
             loading={submitting}
             loadingLabel="Logging Payment..."
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+            className="flex-1 bg-success hover:bg-success-fg"
           >
             Log Payment
           </Button>
@@ -210,7 +210,7 @@ export function DebtPaymentModal({ debt, onClose, onSubmit }: Readonly<DebtPayme
           placeholder="e.g. Extra repayment"
         />
       </FormField>
-      {errors.submit ? <p className="text-sm text-rose-500">{errors.submit}</p> : null}
+      {errors.submit ? <p className="text-sm text-danger">{errors.submit}</p> : null}
     </DebtPaymentModalShell>
   );
 }

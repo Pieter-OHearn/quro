@@ -1,20 +1,21 @@
+import { dataColorToken, DATA_COLORS } from '@/lib/dataColors';
 import { useEffect, useRef, useState } from 'react';
-import { EmojiPickerField, FormField, Modal, ModalFooter } from '@/components/ui';
+import { EmojiPickerField, FormField, Modal, ModalFooter, TextInput } from '@/components/ui';
 import type { BudgetCategory, EditCategoryForm } from '../types';
 
 const PRESET_COLORS = [
-  '#22c55e',
-  '#f97316',
-  '#3b82f6',
-  '#ef4444',
-  '#a855f7',
-  '#6366f1',
-  '#ec4899',
-  '#14b8a6',
-  '#eab308',
-  '#f43f5e',
-  '#0ea5e9',
-  '#94a3b8',
+  DATA_COLORS['growth'],
+  DATA_COLORS['property'],
+  DATA_COLORS['link'],
+  DATA_COLORS['alert'],
+  DATA_COLORS['premium'],
+  DATA_COLORS['primary'],
+  DATA_COLORS['milestone'],
+  DATA_COLORS['recurring'],
+  DATA_COLORS['sun'],
+  DATA_COLORS['expense'],
+  DATA_COLORS['cash'],
+  DATA_COLORS['neutral'],
 ];
 
 type ColorSwatchesProps = { selected: string; onSelect: (color: string) => void };
@@ -27,12 +28,14 @@ function ColorSwatches({ selected, onSelect }: Readonly<ColorSwatchesProps>) {
           key={color}
           type="button"
           onClick={() => onSelect(color)}
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: dataColorToken(color) }}
           className="h-7 w-7 rounded-full transition-transform hover:scale-110"
           aria-label={color}
         >
           {selected === color && (
-            <span className="flex items-center justify-center text-white text-xs font-bold">✓</span>
+            <span className="flex items-center justify-center text-fg-inverted text-xs font-bold">
+              ✓
+            </span>
           )}
         </button>
       ))}
@@ -71,7 +74,7 @@ function getConfirmLabel(mode: 'create' | 'edit', isSaving: boolean) {
 function DialogError({ message }: Readonly<{ message: string | null }>) {
   if (!message) return null;
   return (
-    <div className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+    <div className="rounded-lg border border-danger-soft-strong bg-danger-soft px-3 py-2 text-sm text-danger-hover">
       {message}
     </div>
   );
@@ -83,24 +86,22 @@ function CategoryFields({ form, set, currency }: Readonly<CategoryFieldsProps>) 
       <div className="flex gap-3">
         <EmojiPickerField label="Icon" value={form.emoji} onChange={(e) => set('emoji', e)} />
         <FormField label="Name" className="flex-1">
-          <input
+          <TextInput
             data-testid="budget-category-name-input"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
             value={form.name}
-            onChange={(e) => set('name', e.target.value)}
+            onChange={(value) => set('name', value)}
           />
         </FormField>
       </div>
       <FormField label={`Monthly budget (${currency})`}>
-        <input
+        <TextInput
           data-testid="budget-category-budget-input"
           type="number"
           inputMode="decimal"
           min={0}
           step="0.01"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
           value={form.budgeted}
-          onChange={(e) => set('budgeted', e.target.value)}
+          onChange={(value) => set('budgeted', value)}
         />
       </FormField>
       <FormField label="Colour">

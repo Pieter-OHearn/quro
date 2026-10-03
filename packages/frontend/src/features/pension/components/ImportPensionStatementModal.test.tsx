@@ -34,6 +34,9 @@ function renderImport(status?: PensionImportStatus) {
 test('new imports show the upload step with pension identity', () => {
   const markup = renderImport();
   expect(markup).toContain('Retirement');
+  expect(markup).toContain('role="dialog"');
+  expect(markup).toContain('aria-modal="true"');
+  expect(markup).toContain('aria-label="Import Annual Statement"');
   expect(markup).toContain('Upload');
   expect(markup).not.toContain('Commit Transactions');
 });
@@ -44,6 +47,7 @@ test('queued and processing imports keep their corresponding progress captions',
 test('review and committed imports show review controls and require valid rows to commit', () => {
   for (const status of ['ready_for_review', 'committed'] as const) {
     const markup = renderImport(status);
+    expect(markup).toContain('max-w-3xl');
     expect(markup).toContain('Commit Transactions');
     expect(markup).toMatch(/disabled=""[^>]*>Commit Transactions/);
   }

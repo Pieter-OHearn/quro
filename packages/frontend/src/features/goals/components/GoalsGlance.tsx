@@ -24,19 +24,19 @@ function GlanceItem({ goal, goalProgressContext, currentYear }: Readonly<GlanceI
       <span className="text-base w-7 text-center flex-shrink-0">{goal.emoji}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-slate-700 truncate">{goal.name}</span>
-          <span className="text-xs font-semibold text-slate-500 flex-shrink-0 ml-2">
+          <span className="text-xs font-medium text-fg-strong truncate">{goal.name}</span>
+          <span className="text-xs font-semibold text-fg-subtle flex-shrink-0 ml-2">
             {type === 'invest_habit'
               ? `${resolveInvestHabitMonthsCompleted(goal, goalProgressContext)}/${goal.totalMonths ?? 12}mo`
               : formatPercent(pct, 0)}
           </span>
         </div>
-        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-surface-muted rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-700"
             style={{
               width: `${Math.max(0, Math.min(pct, 100))}%`,
-              backgroundColor: goal.color || '#6366f1',
+              backgroundColor: goal.color || 'var(--data-primary)',
             }}
           />
         </div>
@@ -64,9 +64,9 @@ export function GoalsGlance({
   activeYear,
 }: Readonly<GoalsGlanceProps>) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <h3 className="font-semibold text-slate-900 mb-1">{activeYear} Goals at a Glance</h3>
-      <p className="text-xs text-slate-400 mb-5">All goals sorted by progress</p>
+    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
+      <h3 className="font-semibold text-fg mb-1">{activeYear} Goals at a Glance</h3>
+      <p className="text-xs text-fg-faint mb-5">All goals sorted by progress</p>
       <div className="space-y-3">
         {[...yearGoals]
           .sort((a, b) => getGoalPct(b, goalProgressContext) - getGoalPct(a, goalProgressContext))

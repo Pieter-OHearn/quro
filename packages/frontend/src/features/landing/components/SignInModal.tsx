@@ -62,7 +62,7 @@ function SignInForm({ state, onSwitchToSignUp }: Readonly<SignInFormProps>) {
       onSubmit={(event) => {
         void handleSubmit(event);
       }}
-      className="space-y-4 px-8 py-7 text-slate-900"
+      className="space-y-4 px-8 py-7 text-fg"
     >
       <SignInFormFields state={state} />
       <SubmitButton
@@ -75,12 +75,12 @@ function SignInForm({ state, onSwitchToSignUp }: Readonly<SignInFormProps>) {
           </>
         }
       />
-      <p className="pt-1 text-center text-sm text-slate-500">
+      <p className="pt-1 text-center text-sm text-fg-subtle">
         Don't have an account?{' '}
         <button
           type="button"
           onClick={onSwitchToSignUp}
-          className="font-semibold text-indigo-600 transition-colors hover:text-indigo-800"
+          className="font-semibold text-brand transition-colors hover:text-brand-strong"
         >
           Sign up free
         </button>
@@ -106,7 +106,7 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
             <QuroLogo size={52} showBg={false} />
           </div>
         ),
-        className: 'bg-gradient-to-br from-[#0a0f1e] to-[#1a2550] px-8 pb-10 pt-8',
+        className: 'bg-gradient-to-br from-surface-inverse to-surface-auth-end px-8 pb-10 pt-8',
         titleClassName: 'text-2xl font-black tracking-tight',
         subtitleClassName: 'mt-1 text-sm',
         closeIconSize: 16,

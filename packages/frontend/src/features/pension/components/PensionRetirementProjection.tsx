@@ -42,13 +42,13 @@ export function PensionRetirementProjection({
   ];
 
   return (
-    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-100">
-      <h3 className="font-semibold text-slate-900 mb-4">Retirement Projection</h3>
-      <div className="mb-4 rounded-xl border border-amber-200 bg-white/80 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+    <div className="bg-gradient-to-br from-warning-soft to-accent-warm-soft rounded-2xl p-6 border border-warning-soft-strong">
+      <h3 className="font-semibold text-fg mb-4">Retirement Projection</h3>
+      <div className="mb-4 rounded-xl border border-warning-border bg-surface/80 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
           Profile Retirement Target
         </p>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-fg-muted">
           {currentAge == null || targetRetirementAge == null
             ? 'Set your current age and target retirement age in Settings.'
             : `Using age ${currentAge} and retirement age ${targetRetirementAge} from your profile.`}
@@ -56,10 +56,10 @@ export function PensionRetirementProjection({
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {items.map(({ label, value, note }) => (
-          <div key={label} className="bg-white/80 rounded-xl p-4">
-            <p className="text-xs text-slate-500 mb-1">{label}</p>
-            <p className="font-bold text-amber-700">{value}</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">{note}</p>
+          <div key={label} className="bg-surface/80 rounded-xl p-4">
+            <p className="text-xs text-fg-subtle mb-1">{label}</p>
+            <p className="font-bold text-warning-fg">{value}</p>
+            <p className="text-[10px] text-fg-faint mt-0.5">{note}</p>
           </div>
         ))}
       </div>

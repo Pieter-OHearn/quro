@@ -22,20 +22,20 @@ const TYPE_BADGE_LABEL: Record<GoalType, string> = {
 };
 
 const TYPE_BADGE_CLASS: Record<GoalType, string> = {
-  savings: 'bg-indigo-50 text-indigo-700',
-  salary: 'bg-emerald-50 text-emerald-700',
-  invest_habit: 'bg-sky-50 text-sky-700',
-  portfolio: 'bg-cyan-50 text-cyan-700',
-  net_worth: 'bg-pink-50 text-pink-700',
-  annual: 'bg-teal-50 text-teal-700',
+  savings: 'bg-brand-soft text-brand-fg',
+  salary: 'bg-success-soft text-success-fg',
+  invest_habit: 'bg-info-soft text-info-fg',
+  portfolio: 'bg-accent-cool-soft text-accent-cool-fg',
+  net_worth: 'bg-accent-highlight-soft text-accent-highlight-fg',
+  annual: 'bg-accent-secondary-soft text-accent-secondary-fg',
 };
 
 const getAnnualBarColor = (goal: Goal, type: GoalType, clampedPct: number): string => {
-  const color = goal.color || '#6366f1';
+  const color = goal.color || 'var(--data-primary)';
   if (type !== 'annual') return color;
   const lowerIsBetter =
     Boolean(goal.unit?.endsWith('/mo')) && (goal.currentAmount || 0) > (goal.targetAmount || 0);
-  if (lowerIsBetter && clampedPct < 100) return '#f59e0b';
+  if (lowerIsBetter && clampedPct < 100) return 'var(--data-forecast)';
   return color;
 };
 
@@ -212,21 +212,21 @@ function GoalProgressItem({
         <div className="flex items-start gap-2.5 min-w-0">
           <span className="text-xl leading-none mt-0.5">{goal.emoji}</span>
           <div className="min-w-0">
-            <p className="text-base font-semibold text-slate-700 leading-tight truncate">
+            <p className="text-base font-semibold text-fg-strong leading-tight truncate">
               {goal.name}
             </p>
             <div className="mt-1 flex items-center gap-2 min-w-0">
               <GoalTypePill type={type} />
-              <p className="text-xs text-slate-500 truncate">{subtext}</p>
+              <p className="text-xs text-fg-subtle truncate">{subtext}</p>
             </div>
           </div>
         </div>
         <p className="text-sm whitespace-nowrap pl-3">
-          <span className="font-semibold text-slate-800">{valueParts.primary}</span>
-          {valueParts.secondary && <span className="text-slate-400">{valueParts.secondary}</span>}
+          <span className="font-semibold text-fg-emphasis">{valueParts.primary}</span>
+          {valueParts.secondary && <span className="text-fg-faint">{valueParts.secondary}</span>}
         </p>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-slate-200/80 overflow-hidden">
+      <div className="h-1.5 w-full rounded-full bg-border-default/80 overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${clampedPct}%`, backgroundColor: barColor }}
@@ -248,15 +248,15 @@ export function GoalsOverviewCard({
   fmtBase: CompactFormatFn;
 }>) {
   return (
-    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+    <div className="bg-surface rounded-3xl p-6 border border-border-default shadow-sm">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="text-3xl font-semibold text-slate-900">Financial Goals</h3>
-          <p className="text-sm text-slate-500 mt-0.5">{currentYear} snapshot</p>
+          <h3 className="text-3xl font-semibold text-fg">Financial Goals</h3>
+          <p className="text-sm text-fg-subtle mt-0.5">{currentYear} snapshot</p>
         </div>
         <Link
           to="/goals"
-          className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1"
+          className="text-sm text-brand hover:text-brand-fg font-semibold flex items-center gap-1"
         >
           View all <ArrowRight size={14} />
         </Link>
@@ -273,9 +273,9 @@ export function GoalsOverviewCard({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-slate-400 py-8 text-center">
+        <p className="text-sm text-fg-faint py-8 text-center">
           No goals yet.{' '}
-          <Link to="/goals" className="text-indigo-500">
+          <Link to="/goals" className="text-brand-accent">
             Create one
           </Link>
         </p>

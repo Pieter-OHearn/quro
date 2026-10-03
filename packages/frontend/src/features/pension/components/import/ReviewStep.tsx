@@ -6,7 +6,7 @@ import {
   type RowDraft,
   type ConfirmMode,
 } from '../../hooks/usePensionImportModalController';
-import { DataTable, DataTableCell, DataTableRow } from '@/components/ui';
+import { DataTable, DataTableCell, DataTableRow, getFieldChrome } from '@/components/ui';
 
 type ConfidenceLevel = PensionStatementImportRow['confidenceLabel'];
 
@@ -21,9 +21,9 @@ const TYPE_META: Record<PensionStatementImportRow['type'], TypeMeta> = {
 };
 
 const CONF_META: Record<ConfidenceLevel, { label: string; cls: string }> = {
-  high: { label: 'high', cls: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
-  medium: { label: 'medium', cls: 'bg-amber-50 text-amber-600 border border-amber-200' },
-  low: { label: 'low', cls: 'bg-rose-50 text-rose-500 border border-rose-200' },
+  high: { label: 'high', cls: 'bg-success-soft text-success border border-success-border' },
+  medium: { label: 'medium', cls: 'bg-warning-soft text-warning border border-warning-border' },
+  low: { label: 'low', cls: 'bg-danger-soft text-danger border border-danger-border' },
 };
 
 type RowActionProps = {
@@ -54,11 +54,11 @@ function ReviewDeletedRow({
   onToggleDelete: (row: PensionStatementImportRow) => Promise<void>;
 }>) {
   return (
-    <DataTableRow className="bg-slate-50 opacity-50">
+    <DataTableRow className="bg-surface-sunken opacity-50">
       <DataTableCell colSpan={6} className="px-4 py-2.5">
         <div className="flex items-center gap-3">
           <div className="w-1 flex-shrink-0" />
-          <span className="text-xs text-slate-400 line-through flex-1">
+          <span className="text-xs text-fg-faint line-through flex-1">
             {typeMeta.label} · {draft.amount} · {draft.date}
           </span>
           <button
@@ -67,7 +67,7 @@ function ReviewDeletedRow({
               void onToggleDelete(row);
             }}
             disabled={isRowBusy}
-            className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors flex-shrink-0 disabled:opacity-60"
+            className="flex items-center gap-1 text-xs text-brand-accent hover:text-brand-fg transition-colors flex-shrink-0 disabled:opacity-60"
           >
             {deleting ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />} Undo
           </button>
@@ -95,7 +95,10 @@ function ReviewTypeCell({ row, draft, onPatch }: Readonly<ReviewTypeCellProps>) 
             isEmployer: nextType === 'contribution' ? (draft.isEmployer ?? false) : null,
           });
         }}
-        className="w-full text-xs rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-300 text-slate-700"
+        className={getFieldChrome({
+          paddingClassName: 'px-2 py-1.5',
+          className: 'text-xs rounded-lg focus:ring-1 text-fg-strong',
+        })}
       >
         <option value="contribution">Contribution</option>
         <option value="fee">Fee</option>
@@ -109,8 +112,8 @@ function ReviewTypeCell({ row, draft, onPatch }: Readonly<ReviewTypeCellProps>) 
           className={cn(
             'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
             draft.isEmployer
-              ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-600',
+              ? 'bg-brand-soft border-brand-tint text-brand'
+              : 'bg-success-soft border-success-border text-success',
           )}
         >
           {draft.isEmployer ? 'Employer' : 'Employee'}
@@ -118,7 +121,7 @@ function ReviewTypeCell({ row, draft, onPatch }: Readonly<ReviewTypeCellProps>) 
       )}
 
       {row.isDerived && (
-        <span className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded-full">
+        <span className="inline-flex items-center gap-1 text-[10px] bg-warning-soft text-warning border border-warning-soft-strong px-1.5 py-0.5 rounded-full">
           <Brain size={9} /> AI derived
         </span>
       )}
@@ -141,11 +144,14 @@ function ReviewNoteCell({
         type="text"
         value={draft.note}
         onChange={(event) => onPatch(row, { note: event.target.value })}
-        className="text-xs rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-300 text-slate-500 w-full"
+        className={getFieldChrome({
+          paddingClassName: 'px-2 py-1.5',
+          className: 'text-xs rounded-lg focus:ring-1 text-fg-subtle',
+        })}
         placeholder="Add note..."
       />
       {row.collisionWarning && (
-        <p className="text-[10px] text-amber-700 truncate">{row.collisionWarning.reason}</p>
+        <p className="text-[10px] text-warning-fg truncate">{row.collisionWarning.reason}</p>
       )}
     </div>
   );
@@ -165,7 +171,7 @@ function ReviewConfidenceCell({
       >
         {confidenceMeta.label}
       </span>
-      {row.isDerived && <span className="text-[9px] text-amber-500 font-medium">derived</span>}
+      {row.isDerived && <span className="text-[9px] text-warning-accent font-medium">derived</span>}
     </div>
   );
 }
@@ -199,8 +205,8 @@ function ReviewActionsCell({
         className={cn(
           'w-7 h-7 flex items-center justify-center rounded-lg transition-all flex-shrink-0 disabled:opacity-60',
           isSaved
-            ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-100'
-            : 'border border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50',
+            ? 'bg-success-accent text-fg-inverted shadow-sm shadow-success-soft-strong'
+            : 'border border-border-default text-fg-faint hover:border-success-border-strong hover:text-success hover:bg-success-soft',
         )}
       >
         {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
@@ -212,7 +218,7 @@ function ReviewActionsCell({
         }}
         disabled={isRowBusy}
         title="Remove row"
-        className="w-7 h-7 flex items-center justify-center rounded-lg border border-transparent text-slate-300 hover:border-rose-200 hover:text-rose-500 hover:bg-rose-50 transition-all flex-shrink-0 disabled:opacity-60"
+        className="w-7 h-7 flex items-center justify-center rounded-lg border border-transparent text-fg-disabled hover:border-danger-border hover:text-danger hover:bg-danger-soft transition-all flex-shrink-0 disabled:opacity-60"
       >
         {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
       </button>
@@ -238,8 +244,8 @@ function ReviewEditableRow({
       className={cn(
         'border transition-all',
         isSaved
-          ? 'border-emerald-200 bg-emerald-50/20'
-          : 'border-slate-100 hover:border-slate-200 bg-white',
+          ? 'border-success-border bg-success-soft/20'
+          : 'border-border-subtle hover:border-border-default bg-surface',
       )}
     >
       <DataTableCell columnKey="type">
@@ -251,7 +257,10 @@ function ReviewEditableRow({
           step="0.01"
           value={draft.amount}
           onChange={(event) => onPatch(row, { amount: event.target.value })}
-          className="text-xs rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-300 text-slate-700 w-full"
+          className={getFieldChrome({
+            paddingClassName: 'px-2 py-1.5',
+            className: 'text-xs rounded-lg focus:ring-1 text-fg-strong',
+          })}
           placeholder="0.00"
         />
       </DataTableCell>
@@ -260,7 +269,10 @@ function ReviewEditableRow({
           type="date"
           value={draft.date}
           onChange={(event) => onPatch(row, { date: event.target.value })}
-          className="text-xs rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-300 text-slate-700 w-full"
+          className={getFieldChrome({
+            paddingClassName: 'px-2 py-1.5',
+            className: 'text-xs rounded-lg focus:ring-1 text-fg-strong',
+          })}
         />
       </DataTableCell>
       <DataTableCell columnKey="note">
@@ -335,25 +347,25 @@ function ReviewSummaryChips({
   derivedRows: PensionStatementImportRow[];
 }>) {
   return (
-    <div className="px-5 pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap border-b border-slate-100">
-      <span className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+    <div className="px-5 pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap border-b border-border-subtle">
+      <span className="flex items-center gap-1.5 text-xs bg-surface-muted text-fg-muted px-3 py-1.5 rounded-full">
+        <span className="w-1.5 h-1.5 rounded-full bg-success-accent flex-shrink-0" />
         {activeRows.length} active row{activeRows.length !== 1 ? 's' : ''}
       </span>
       {derivedRows.length > 0 && (
-        <span className="flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-3 py-1.5 rounded-full">
+        <span className="flex items-center gap-1.5 text-xs bg-brand-soft text-brand border border-brand-soft-strong px-3 py-1.5 rounded-full">
           <Brain size={11} className="flex-shrink-0" />
           {derivedRows.length} AI derived
         </span>
       )}
       {warnRows.length > 0 && (
-        <span className="flex items-center gap-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-100 px-3 py-1.5 rounded-full">
+        <span className="flex items-center gap-1.5 text-xs bg-warning-soft text-warning-fg border border-warning-soft-strong px-3 py-1.5 rounded-full">
           <AlertTriangle size={11} className="flex-shrink-0" />
           {warnRows.length} need{warnRows.length === 1 ? 's' : ''} review
         </span>
       )}
       {deletedRows.length > 0 && (
-        <span className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-400 px-3 py-1.5 rounded-full ml-auto">
+        <span className="flex items-center gap-1.5 text-xs bg-surface-muted text-fg-faint px-3 py-1.5 rounded-full ml-auto">
           {deletedRows.length} removed
         </span>
       )}
@@ -432,7 +444,7 @@ function ReviewRowsList({
       tableLayout="fixed"
       minWidth={760}
       className="px-5 py-3"
-      bodyClassName="rounded-xl border border-slate-100"
+      bodyClassName="rounded-xl border border-border-subtle"
     >
       {rows.map((row) => (
         <ReviewRow
@@ -466,12 +478,12 @@ function ReviewCancelConfirm({
   onClose,
 }: Readonly<ReviewCancelConfirmProps>) {
   return (
-    <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 space-y-3">
+    <div className="bg-danger-soft border border-danger-border rounded-xl px-4 py-3 space-y-3">
       <div className="flex items-start gap-2.5">
-        <XCircle size={14} className="text-rose-500 mt-0.5 flex-shrink-0" />
+        <XCircle size={14} className="text-danger mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-xs font-semibold text-rose-700">Discard this import?</p>
-          <p className="text-[11px] text-rose-500 mt-0.5 leading-relaxed">
+          <p className="text-xs font-semibold text-danger-fg">Discard this import?</p>
+          <p className="text-[11px] text-danger mt-0.5 leading-relaxed">
             All staged transactions will be discarded and the job will be removed from your
             notification list. Nothing will be added to your ledger.
           </p>
@@ -481,7 +493,7 @@ function ReviewCancelConfirm({
         <button
           type="button"
           onClick={() => onSetConfirmMode('none')}
-          className="flex-1 rounded-xl border border-slate-200 bg-white text-slate-600 py-2 text-xs hover:bg-slate-50 transition-colors font-medium"
+          className="flex-1 rounded-xl border border-border-default bg-surface text-fg-muted py-2 text-xs hover:bg-surface-sunken transition-colors font-medium"
         >
           Keep Reviewing
         </button>
@@ -494,7 +506,7 @@ function ReviewCancelConfirm({
             })();
           }}
           disabled={isCancelling}
-          className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white py-2 text-xs transition-colors font-medium flex items-center justify-center gap-1.5 disabled:opacity-70"
+          className="flex-1 rounded-xl bg-danger-hover hover:bg-danger-fg text-fg-inverted py-2 text-xs transition-colors font-medium flex items-center justify-center gap-1.5 disabled:opacity-70"
         >
           {isCancelling ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
           Discard &amp; Cancel
@@ -526,24 +538,24 @@ function ReviewDefaultFooter({
   onClose: () => void;
 }>) {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={() => onSetConfirmMode('review-cancel')}
-          className="flex items-center gap-1.5 px-4 rounded-xl border border-rose-200 text-rose-500 py-2.5 text-sm hover:bg-rose-50 transition-colors font-medium whitespace-nowrap"
+          className="flex items-center gap-1.5 px-4 rounded-xl border border-danger-border text-danger py-2.5 text-sm hover:bg-danger-soft transition-colors font-medium whitespace-nowrap"
         >
           <XCircle size={14} />
           Cancel Job
         </button>
-        <p className="text-xs text-slate-500 hidden sm:block">
-          <span className="font-semibold text-slate-700">{activeRows.length}</span> transaction
+        <p className="text-xs text-fg-subtle hidden sm:block">
+          <span className="font-semibold text-fg-strong">{activeRows.length}</span> transaction
           {activeRows.length !== 1 ? 's' : ''} to commit
           {deletedRows.length > 0 && (
-            <span className="text-slate-400 ml-1.5">· {deletedRows.length} removed</span>
+            <span className="text-fg-faint ml-1.5">· {deletedRows.length} removed</span>
           )}
           {warnRows.length > 0 && (
-            <span className="text-amber-500 ml-1.5">· {warnRows.length} flagged</span>
+            <span className="text-warning-accent ml-1.5">· {warnRows.length} flagged</span>
           )}
         </p>
       </div>
@@ -556,7 +568,7 @@ function ReviewDefaultFooter({
           })();
         }}
         disabled={!canCommit || reviewBusy}
-        className="px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 text-sm transition-colors font-medium shadow-sm shadow-indigo-200 whitespace-nowrap"
+        className="px-6 rounded-xl bg-brand hover:bg-brand-hover disabled:opacity-40 disabled:cursor-not-allowed text-fg-inverted py-2.5 text-sm transition-colors font-medium shadow-sm shadow-brand-tint whitespace-nowrap"
       >
         {isCommitting ? 'Committing...' : 'Commit Transactions'}
       </button>
@@ -613,7 +625,7 @@ export function ReviewStep({
         />
       </div>
 
-      <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex-shrink-0">
+      <div className="px-6 py-4 bg-surface-sunken border-t border-border-subtle flex-shrink-0">
         {confirmMode === 'review-cancel' ? (
           <ReviewCancelConfirm
             isCancelling={isCancelling}
@@ -636,7 +648,7 @@ export function ReviewStep({
         )}
 
         {errorMessage && (
-          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div className="mt-3 rounded-xl border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-fg">
             {errorMessage}
           </div>
         )}

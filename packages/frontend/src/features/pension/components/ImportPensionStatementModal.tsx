@@ -1,3 +1,4 @@
+import { Modal } from '@/components/ui';
 import type { PensionPot } from '@quro/shared';
 
 import { usePensionImportModalController } from '../hooks/usePensionImportModalController';
@@ -90,27 +91,30 @@ function ImportPensionStatementModalContent({
   const displayFileName = controller.fileName || controller.importQuery.data?.fileName || '';
 
   return (
-    <div className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4">
-      <div className="absolute -inset-4 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className={`relative bg-white rounded-2xl shadow-2xl w-full overflow-hidden flex flex-col ${
-          reviewLayout ? 'max-w-3xl max-h-[90vh]' : 'max-w-lg'
-        }`}
-      >
+    <Modal
+      title="Import Annual Statement"
+      onClose={onClose}
+      maxWidth={reviewLayout ? '3xl' : 'lg'}
+      scrollable
+      backdropClassName="bg-overlay/40 backdrop-blur-sm"
+      contentClassName="shadow-2xl"
+      bodyClassName="p-0 space-y-0 min-h-0 flex flex-col"
+      header={
         <ImportHeader
           pot={pot}
           step={controller.step}
           jobPhase={controller.jobPhase}
           onClose={onClose}
         />
-        <ModalStepContent
-          controller={controller}
-          pot={pot}
-          onClose={onClose}
-          displayFileName={displayFileName}
-        />
-      </div>
-    </div>
+      }
+    >
+      <ModalStepContent
+        controller={controller}
+        pot={pot}
+        onClose={onClose}
+        displayFileName={displayFileName}
+      />
+    </Modal>
   );
 }
 

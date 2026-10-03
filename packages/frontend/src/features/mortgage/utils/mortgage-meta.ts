@@ -15,23 +15,23 @@ export const TXN_META: Record<
   repayment: {
     label: 'Repayment',
     icon: Landmark,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-    borderColor: 'border-indigo-300',
+    color: 'text-brand',
+    bg: 'bg-brand-soft',
+    borderColor: 'border-brand-border',
   },
   valuation: {
     label: 'Valuation',
     icon: Home,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    borderColor: 'border-emerald-300',
+    color: 'text-success',
+    bg: 'bg-success-soft',
+    borderColor: 'border-success-border-strong',
   },
   rate_change: {
     label: 'Rate Change',
     icon: Percent,
-    color: 'text-amber-600',
-    bg: 'bg-amber-50',
-    borderColor: 'border-amber-300',
+    color: 'text-warning',
+    bg: 'bg-warning-soft',
+    borderColor: 'border-warning-border-strong',
   },
 };
 

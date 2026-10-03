@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import type {
   BudgetCategory,
   BudgetStats,
@@ -63,7 +64,7 @@ export function buildCreateBudgetCategoryInput(
     emoji: newCategory.emoji || DEFAULT_EMOJI.budgetCategory,
     budgeted: Number.parseFloat(newCategory.budgeted) || 0,
     spent: 0,
-    color: newCategory.color || '#94a3b8',
+    color: newCategory.color || DATA_COLORS['neutral'],
     month: formatBudgetMonthFromDate(now),
     year: now.getFullYear(),
   };

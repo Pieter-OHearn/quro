@@ -73,21 +73,21 @@ function BellButton({
       onClick={onToggle}
       className={`relative p-2 rounded-xl transition-colors ${
         open
-          ? 'bg-slate-100 text-slate-700'
-          : 'hover:bg-slate-100 text-slate-500 hover:text-slate-700'
+          ? 'bg-surface-muted text-fg-strong'
+          : 'hover:bg-surface-muted text-fg-subtle hover:text-fg-strong'
       }`}
       title="Notifications"
     >
       <Bell size={18} className={ring ? 'animate-bounce' : ''} />
 
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-rose-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-white px-0.5 tabular-nums">
+        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-danger rounded-full flex items-center justify-center text-[9px] font-bold text-fg-inverted border-2 border-fg-inverted px-0.5 tabular-nums">
           {unreadCount > BADGE_OVERFLOW_LIMIT ? '9+' : unreadCount}
         </span>
       )}
 
       {unreadCount === 0 && hasActiveJobs && (
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-400 rounded-full border border-white animate-pulse" />
+        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-disabled rounded-full border border-fg-inverted animate-pulse" />
       )}
     </button>
   );
@@ -115,13 +115,13 @@ function Dropdown({
   onRetry,
 }: Readonly<DropdownProps>) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-[360px] max-w-[92vw] bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-[360px] max-w-[92vw] bg-surface rounded-2xl border border-border-default shadow-2xl z-50 overflow-hidden">
       <NotificationPanelHeader totalCount={notifications.length} isFetching={isFetching} />
       <NotificationStatusRow counts={counts} />
 
       {isLoading ? (
         <div className="py-8 flex items-center justify-center">
-          <Loader2 size={18} className="animate-spin text-slate-400" />
+          <Loader2 size={18} className="animate-spin text-fg-faint" />
         </div>
       ) : notifications.length === 0 ? (
         <NotificationEmptyState />
@@ -130,12 +130,12 @@ function Dropdown({
       )}
 
       {isError && (
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-rose-50/60 flex items-center justify-between gap-3">
-          <p className="text-[11px] text-rose-700">Couldn&apos;t refresh notifications.</p>
+        <div className="px-4 py-2.5 border-t border-border-subtle bg-danger-soft/60 flex items-center justify-between gap-3">
+          <p className="text-[11px] text-danger-fg">Couldn&apos;t refresh notifications.</p>
           <button
             type="button"
             onClick={onRetry}
-            className="text-[11px] font-medium text-rose-700 hover:text-rose-800"
+            className="text-[11px] font-medium text-danger-fg hover:text-danger-strong"
           >
             Retry
           </button>

@@ -13,3 +13,5 @@ export * from './SelectInput';
 export * from './Spinner';
 export * from './Textarea';
 export * from './TextInput';
+
+export { getFieldChrome } from './sharedFieldStyles';

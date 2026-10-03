@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import { useMemo, useState } from 'react';
 import {
   MONTH_ABBREVIATIONS,
@@ -78,7 +79,7 @@ function createAddCategoryDraft(
     emoji: '\ud83d\udce6',
     budgeted: 0,
     spent: 0,
-    color: '#94a3b8',
+    color: DATA_COLORS['neutral'],
     month,
     year,
     expenseClass: 'essential',

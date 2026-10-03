@@ -27,35 +27,39 @@ function PensionGrowthAreaChart({
       <AreaChart data={data} margin={{ top: 8, right: 6, left: -16, bottom: 0 }}>
         <defs>
           <linearGradient id="pensionGrowthGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.12} />
-            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+            <stop offset="5%" stopColor="var(--data-forecast)" stopOpacity={0.12} />
+            <stop offset="95%" stopColor="var(--data-forecast)" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" />
         <XAxis
           dataKey="year"
-          tick={{ fontSize: 12, fill: '#94a3b8' }}
+          tick={{ fontSize: 12, fill: 'var(--data-neutral)' }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fontSize: 12, fill: '#94a3b8' }}
+          tick={{ fontSize: 12, fill: 'var(--data-neutral)' }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
         />
         <Tooltip
           formatter={(value) => [fmtBase(Number(value) || 0), 'Pension Value']}
-          contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+          contentStyle={{
+            borderRadius: '12px',
+            border: '1px solid var(--border-default)',
+            fontSize: '12px',
+          }}
         />
         <Area
           type="monotone"
           dataKey="value"
-          stroke="#f59e0b"
+          stroke="var(--data-forecast)"
           strokeWidth={4}
           fill="url(#pensionGrowthGrad)"
           dot={false}
-          activeDot={{ r: 5, fill: '#f59e0b' }}
+          activeDot={{ r: 5, fill: 'var(--data-forecast)' }}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -75,7 +79,7 @@ export function PensionGrowthChart({
       badge={
         pensionGrowthPct !== null && pensionGrowthData.length > 0 ? (
           <span
-            className={`text-sm px-4 py-2 rounded-full font-semibold ${pensionGrowthPct >= 0 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-600'}`}
+            className={`text-sm px-4 py-2 rounded-full font-semibold ${pensionGrowthPct >= 0 ? 'bg-warning-soft text-warning-fg' : 'bg-danger-soft text-danger-hover'}`}
           >
             {pensionGrowthPct >= 0 ? '+' : ''}
             {formatPercent(pensionGrowthPct, 0)} since {pensionGrowthData[0].year}

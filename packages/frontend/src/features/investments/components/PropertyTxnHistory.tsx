@@ -23,15 +23,15 @@ function PropertyTxnAmount({ transaction, currency, fmtNative }: PropertyTxnAmou
   if (transaction.type === 'repayment') {
     return (
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-slate-700">
+        <p className="text-sm font-semibold text-fg-strong">
           -{fmtNative(transaction.amount, currency, true)}
         </p>
-        <p className="text-[10px] text-slate-400">
-          <span className="text-rose-400">
+        <p className="text-[10px] text-fg-faint">
+          <span className="text-danger-muted">
             {fmtNative(transaction.interest ?? 0, currency, true)} int
           </span>
           {' · '}
-          <span className="text-indigo-500">
+          <span className="text-brand-accent">
             {fmtNative(transaction.principal ?? 0, currency, true)} prin
           </span>
         </p>
@@ -41,29 +41,29 @@ function PropertyTxnAmount({ transaction, currency, fmtNative }: PropertyTxnAmou
   if (transaction.type === 'valuation') {
     return (
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-emerald-600">
+        <p className="text-sm font-semibold text-success">
           {fmtNative(transaction.amount, currency, true)}
         </p>
-        <p className="text-[10px] text-slate-400">new value</p>
+        <p className="text-[10px] text-fg-faint">new value</p>
       </div>
     );
   }
   if (transaction.type === 'rent_income') {
     return (
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-sky-600">
+        <p className="text-sm font-semibold text-info">
           +{fmtNative(transaction.amount, currency, true)}
         </p>
-        <p className="text-[10px] text-slate-400">rent received</p>
+        <p className="text-[10px] text-fg-faint">rent received</p>
       </div>
     );
   }
   return (
     <div className="text-right flex-shrink-0">
-      <p className="text-sm font-semibold text-rose-500">
+      <p className="text-sm font-semibold text-danger">
         -{fmtNative(transaction.amount, currency, true)}
       </p>
-      <p className="text-[10px] text-slate-400">expense</p>
+      <p className="text-[10px] text-fg-faint">expense</p>
     </div>
   );
 }
@@ -85,12 +85,12 @@ function buildCashflowTxnStats(
     {
       label: 'Rent Income',
       value: `+${fmtNative(totalRentIncome, currency, true)}`,
-      color: 'text-sky-600',
+      color: 'text-info',
     },
     {
       label: 'Expenses',
       value: `-${fmtNative(totalExpenses, currency, true)}`,
-      color: 'text-rose-500',
+      color: 'text-danger',
     },
   ];
 }
@@ -115,19 +115,19 @@ function buildPropertyTxnStats(
     {
       label: 'Total Repaid',
       value: fmtNative(totalRepaid, currency, true),
-      color: 'text-slate-800',
+      color: 'text-fg-emphasis',
     },
     {
       label: 'Principal',
       value: fmtNative(totalPrincipal, currency, true),
-      color: 'text-indigo-600',
+      color: 'text-brand',
     },
     {
       label: 'Interest Paid',
       value: fmtNative(totalInterest, currency, true),
-      color: 'text-rose-500',
+      color: 'text-danger',
     },
-    { label: 'Valuations', value: `${valuationCount}`, color: 'text-emerald-600' },
+    { label: 'Valuations', value: `${valuationCount}`, color: 'text-success' },
   ];
   if (!supportsCashflowTxns) return base;
   return [...base, ...buildCashflowTxnStats(transactions, currency, fmtNative)];

@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import {
   GOAL_SOURCE_TYPES,
   type Goal,
@@ -56,7 +57,7 @@ const normalizeGoalMeta = (goal: Goal) => ({
 
 const normalizeGoalDisplay = (goal: Goal) => ({
   unit: goal.unit ?? null,
-  color: goal.color || '#6366f1',
+  color: goal.color || DATA_COLORS['primary'],
   notes: goal.notes || '',
   currency: goal.currency || 'EUR',
 });

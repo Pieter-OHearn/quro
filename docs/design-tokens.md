@@ -31,9 +31,9 @@ the table/list patterns feature work should follow.
 1. **In shared primitives** (anything under `packages/frontend/src/components/ui/`):
    use semantic tokens. Do not add raw Tailwind palette utilities like
    `bg-indigo-600` or `text-slate-500` when a token covers the use case.
-2. **In feature components:** existing raw-palette usage is fine and does not
-   need to migrate in a single pass. New shared primitives **must** use tokens
-   from day one.
+2. **In feature components:** use semantic tokens too. ESLint's
+   `quro-ui/no-raw-palette` rule rejects raw color utilities in JSX, class maps,
+   and template strings, including variants and opacity modifiers.
 3. **Need a color that isn't covered?** Add a token to `theme.css` first, then
    use it. Don't reach for an ad-hoc Tailwind class.
 4. **Visual baseline:** the current Quro look is the baseline. Token values map
@@ -46,9 +46,21 @@ the table/list patterns feature work should follow.
    button, icon button, input, segmented control, pagination, table, or empty
    state, use it before adding one-off hardcoded Tailwind styling in a feature
    module.
-7. **Feature modules may own domain color:** domain-specific positive/negative
-   states can use local classes when no semantic token fits yet, but shared UI
-   primitives should first add or reuse a semantic token.
+7. **Feature modules own data color choices:** `DATA_COLORS` in
+   `packages/frontend/src/lib/dataColors.ts` contains stable categorical values
+   saved in API payloads. Keep their hex identity for existing records and swatch
+   selection; use `dataColorToken()` to display preset swatches through the matching
+   `--data-*` theme variables. Custom user colors pass through unchanged. Charts
+   and UI-only inline colors use CSS variables directly.
+
+## Extended tones and data colors
+
+The status and brand families also expose `-accent`, `-muted`, `-border-strong`,
+and `-strong` where feature surfaces need a distinct intensity. `fg-emphasis`
+retains the intermediate heading tone between `fg-strong` and `fg`.
+Named accent families (`accent-warm`, `accent-secondary`, `accent-creative`,
+`accent-highlight`, `accent-premium`, and `accent-cool`) distinguish domain badges.
+Inverse surface tokens preserve existing hero, authentication, and tooltip gradients.
 
 ## Adding a new token
 

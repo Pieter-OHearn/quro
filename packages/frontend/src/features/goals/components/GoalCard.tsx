@@ -42,7 +42,7 @@ type GoalCardProps = {
 
 function ProgressBar({ pct, color }: Readonly<{ pct: number; color: string }>) {
   return (
-    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+    <div className="w-full h-2.5 bg-surface-muted rounded-full overflow-hidden">
       <div
         className="h-full rounded-full transition-all duration-700"
         style={{ width: `${pct}%`, backgroundColor: color }}
@@ -69,20 +69,20 @@ function SavingsDetailsRow({
   return (
     <div className="flex items-end justify-between">
       <div>
-        <p className="font-bold text-slate-900">{fmtBase(currentAmount)}</p>
-        <p className="text-xs text-slate-400">of {fmtBase(targetAmount)}</p>
+        <p className="font-bold text-fg">{fmtBase(currentAmount)}</p>
+        <p className="text-xs text-fg-faint">of {fmtBase(targetAmount)}</p>
       </div>
       {status !== 'complete' && (
         <div className="text-right">
-          <p className="text-xs text-slate-500">{fmtBase(remaining)} to go</p>
+          <p className="text-xs text-fg-subtle">{fmtBase(remaining)} to go</p>
           {monthlyContrib > 0 && (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-fg-faint">
               ~{Math.ceil(remaining / monthlyContrib)}mo at {fmtBase(monthlyContrib)}/mo
             </p>
           )}
         </div>
       )}
-      {status === 'complete' && <p className="text-sm text-emerald-600 font-semibold">Done!</p>}
+      {status === 'complete' && <p className="text-sm text-success font-semibold">Done!</p>}
     </div>
   );
 }
@@ -108,7 +108,7 @@ function GoalCardSavings({
     <>
       <div>
         <div className="flex justify-between mb-1.5">
-          <span className="text-xs text-slate-500">Progress</span>
+          <span className="text-xs text-fg-subtle">Progress</span>
           <span className="text-xs font-semibold" style={{ color }}>
             {formatPercent(clampedPct, 0)}
           </span>
@@ -139,15 +139,18 @@ function SalaryComparisonGrid({
 }>) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <div className="bg-slate-50 rounded-xl px-3 py-2.5">
-        <p className="text-[10px] text-slate-400 mb-0.5">Current Gross</p>
-        <p className="font-bold text-slate-800">
+      <div className="bg-surface-sunken rounded-xl px-3 py-2.5">
+        <p className="text-[10px] text-fg-faint mb-0.5">Current Gross</p>
+        <p className="font-bold text-fg-emphasis">
           {fmtBase(annualGross)}
-          <span className="text-xs font-normal text-slate-400">/yr</span>
+          <span className="text-xs font-normal text-fg-faint">/yr</span>
         </p>
       </div>
-      <div className="rounded-xl px-3 py-2.5" style={{ backgroundColor: `${color}18` }}>
-        <p className="text-[10px] text-slate-400 mb-0.5">Target Gross</p>
+      <div
+        className="rounded-xl px-3 py-2.5"
+        style={{ backgroundColor: `color-mix(in srgb, ${color} 9.4118%, transparent)` }}
+      >
+        <p className="text-[10px] text-fg-faint mb-0.5">Target Gross</p>
         <p className="font-bold" style={{ color }}>
           {fmtBase(targetAmount)}
           <span className="text-xs font-normal opacity-60">/yr</span>
@@ -174,7 +177,7 @@ function GoalCardSalary({
     <>
       <div>
         <div className="flex justify-between mb-1.5">
-          <span className="text-xs text-slate-500">Current - Target</span>
+          <span className="text-xs text-fg-subtle">Current - Target</span>
           <span className="text-xs font-semibold" style={{ color }}>
             {formatPercent(clampedPct, 0)}
           </span>
@@ -188,8 +191,8 @@ function GoalCardSalary({
         fmtBase={fmtBase}
       />
       <div className="flex items-center gap-2">
-        <ArrowUpRight size={13} className="text-emerald-500 flex-shrink-0" />
-        <p className="text-xs text-slate-600">
+        <ArrowUpRight size={13} className="text-success-accent flex-shrink-0" />
+        <p className="text-xs text-fg-muted">
           {annualGross > 0 ? (
             <>
               <strong>{formatPercent((targetAmount / annualGross - 1) * 100, 1)} raise</strong> -{' '}
@@ -236,9 +239,9 @@ function monthCellTitle(done: boolean, missed: boolean, isFuture: boolean): stri
 
 function monthCellBg(done: boolean, missed: boolean, isFuture: boolean, color: string): string {
   if (done) return color;
-  if (missed) return '#f59e0b';
-  if (isFuture) return '#f1f5f9';
-  return '#e2e8f0';
+  if (missed) return 'var(--data-forecast)';
+  if (isFuture) return 'var(--border-subtle)';
+  return 'var(--border-default)';
 }
 
 function CalendarMonthGrid({
@@ -277,7 +280,7 @@ function CalendarMonthGrid({
               className={`w-full aspect-square rounded-sm transition-all ${isFuture || done ? 'cursor-default' : 'cursor-pointer hover:opacity-70'}`}
               style={{ backgroundColor: monthCellBg(done, missed, isFuture, color) }}
             />
-            <span className="text-[8px] text-slate-400 leading-none">{label}</span>
+            <span className="text-[8px] text-fg-faint leading-none">{label}</span>
           </div>
         );
       })}
@@ -297,10 +300,10 @@ function InvestHabitMonthGrid({
         return (
           <div key={month} className="flex flex-col items-center gap-1">
             <div
-              className={`w-full aspect-square rounded-sm transition-all ${done ? '' : 'bg-slate-100'}`}
+              className={`w-full aspect-square rounded-sm transition-all ${done ? '' : 'bg-surface-muted'}`}
               style={done ? { backgroundColor: color } : undefined}
             />
-            <span className="text-[8px] text-slate-400 leading-none">{month[0]}</span>
+            <span className="text-[8px] text-fg-faint leading-none">{month[0]}</span>
           </div>
         );
       })}
@@ -324,15 +327,15 @@ function InvestHabitControls({
       <button
         onClick={() => onUpdateMonths(goalId, PREVIOUS_MONTH_DELTA)}
         disabled={monthsCompleted <= 0}
-        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-30 transition-colors"
+        className="w-7 h-7 rounded-lg border border-border-default flex items-center justify-center hover:bg-surface-sunken disabled:opacity-30 transition-colors"
       >
         <Minus size={11} />
       </button>
-      <span className="text-xs text-slate-500 px-1">{monthsCompleted}</span>
+      <span className="text-xs text-fg-subtle px-1">{monthsCompleted}</span>
       <button
         onClick={() => onUpdateMonths(goalId, NEXT_MONTH_DELTA)}
         disabled={monthsCompleted >= totalMonths}
-        className="w-7 h-7 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 flex items-center justify-center hover:bg-indigo-100 disabled:opacity-30 transition-colors"
+        className="w-7 h-7 rounded-lg border border-brand-tint bg-brand-soft text-brand flex items-center justify-center hover:bg-brand-soft-strong disabled:opacity-30 transition-colors"
       >
         <Check size={11} />
       </button>
@@ -381,7 +384,7 @@ function InvestHabitProgress({
   return (
     <div>
       <div className="flex justify-between mb-2">
-        <span className="text-xs text-slate-500">Monthly hits</span>
+        <span className="text-xs text-fg-subtle">Monthly hits</span>
         <span className="text-xs font-semibold" style={{ color }}>
           {monthsCompleted}/{totalMonths} months
         </span>
@@ -402,8 +405,8 @@ function InvestHabitProgress({
         />
       )}
       <div className="mt-3">
-        <p className="font-bold text-slate-900">{fmtBase(monthlyTarget * monthsCompleted)}</p>
-        <p className="text-xs text-slate-400">
+        <p className="font-bold text-fg">{fmtBase(monthlyTarget * monthsCompleted)}</p>
+        <p className="text-xs text-fg-faint">
           invested so far - {fmtBase(monthlyTarget)}/mo target
         </p>
       </div>
@@ -480,19 +483,17 @@ function AnnualAmountRow({
   return (
     <div className="flex items-end justify-between">
       <div>
-        <p className="font-bold text-slate-900">
+        <p className="font-bold text-fg">
           {currentAmount}
-          {goal.unit && (
-            <span className="text-xs font-normal text-slate-400 ml-1">{goal.unit}</span>
-          )}
+          {goal.unit && <span className="text-xs font-normal text-fg-faint ml-1">{goal.unit}</span>}
         </p>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-fg-faint">
           target: {targetAmount}
           {goal.unit ? ` ${goal.unit}` : ''}
         </p>
       </div>
       {lowerIsBetter && clampedPct < 100 && (
-        <div className="flex items-center gap-1.5 text-xs text-amber-600">
+        <div className="flex items-center gap-1.5 text-xs text-warning">
           <AlertCircle size={12} />
           <span>
             Reduce by {Math.max(0, currentAmount - targetAmount)}
@@ -500,7 +501,7 @@ function AnnualAmountRow({
           </span>
         </div>
       )}
-      {status === 'complete' && <p className="text-sm text-emerald-600 font-semibold">Done!</p>}
+      {status === 'complete' && <p className="text-sm text-success font-semibold">Done!</p>}
     </div>
   );
 }
@@ -522,20 +523,20 @@ function GoalCardAnnual({
   lowerIsBetter: boolean;
   status: GoalStatus;
 }>) {
-  const barColor = lowerIsBetter && clampedPct < 100 ? '#f59e0b' : color;
+  const barColor = lowerIsBetter && clampedPct < 100 ? 'var(--data-forecast)' : color;
   const barWidth = getAnnualBarWidth(lowerIsBetter, clampedPct, currentAmount, targetAmount);
   return (
     <>
       <div>
         <div className="flex justify-between mb-1.5">
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-fg-subtle">
             Progress {goal.unit ? `(${goal.unit})` : ''}
           </span>
           <span className="text-xs font-semibold" style={{ color: barColor }}>
             {lowerIsBetter ? `${currentAmount} -> ${targetAmount}` : formatPercent(clampedPct, 0)}
           </span>
         </div>
-        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="w-full h-2.5 bg-surface-muted rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-700"
             style={{ width: `${barWidth}%`, backgroundColor: barColor }}
@@ -573,9 +574,9 @@ function GoalNameAndBadges({
       <span className="text-2xl flex-shrink-0 leading-none mt-0.5">{goal.emoji}</span>
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-semibold text-slate-800 leading-tight">{goal.name}</p>
+          <p className="font-semibold text-fg-emphasis leading-tight">{goal.name}</p>
           {status === 'complete' && (
-            <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />
+            <CheckCircle2 size={14} className="text-success-accent flex-shrink-0" />
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -595,8 +596,8 @@ function GoalNameAndBadges({
             <span
               className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                 sourceResolution.status === 'linked'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-amber-50 text-amber-700'
+                  ? 'bg-success-soft text-success-fg'
+                  : 'bg-warning-soft text-warning-fg'
               }`}
             >
               <Link2Icon status={sourceResolution.status} />
@@ -613,7 +614,7 @@ function Link2Icon({ status }: Readonly<{ status: GoalCurrentAmountResolution['s
   return (
     <span
       className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${
-        status === 'linked' ? 'bg-emerald-500' : 'bg-amber-500'
+        status === 'linked' ? 'bg-success-accent' : 'bg-warning-accent'
       }`}
     />
   );
@@ -643,16 +644,16 @@ function GoalCardHeader({
         sourceResolution={sourceResolution}
       />
       <div className="flex items-center gap-1 flex-shrink-0">
-        <span className="text-xs text-slate-400 mr-1">{`🗓 ${goal.deadline}`}</span>
+        <span className="text-xs text-fg-faint mr-1">{`🗓 ${goal.deadline}`}</span>
         <button
           onClick={() => onEdit(goal.id)}
-          className="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-300 hover:text-indigo-500 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-brand-soft text-fg-disabled hover:text-brand-accent transition-colors"
         >
           <Pencil size={13} />
         </button>
         <button
           onClick={() => onDelete(goal.id)}
-          className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-danger-soft text-fg-disabled hover:text-danger transition-colors"
         >
           <Trash2 size={13} />
         </button>
@@ -787,7 +788,7 @@ function GoalCardBody(props: Readonly<GoalBodyContentProps>) {
     <div className="px-5 pb-5 flex-1 flex flex-col gap-3">
       {renderGoalTypeContent(props)}
       {props.goal.notes && (
-        <p className="text-[11px] text-slate-400 pt-3 border-t border-slate-50 leading-relaxed">
+        <p className="text-[11px] text-fg-faint pt-3 border-t border-surface-sunken leading-relaxed">
           {props.goal.notes}
         </p>
       )}
@@ -812,12 +813,12 @@ export function GoalCard({
   const status = getGoalStatus(goal, goalProgressContext, currentYear);
   const type = normalizeGoalType(goal);
   const meta = GOAL_TYPE_META[type];
-  const color = goal.color || '#6366f1';
+  const color = goal.color || 'var(--data-primary)';
   const clampedPct = Math.max(0, Math.min(pct, 100));
 
   return (
     <div
-      className={`bg-white rounded-2xl border shadow-sm transition-all hover:shadow-md flex flex-col ${status === 'complete' ? 'border-emerald-200' : 'border-slate-100'}`}
+      className={`bg-surface rounded-2xl border shadow-sm transition-all hover:shadow-md flex flex-col ${status === 'complete' ? 'border-success-border' : 'border-border-subtle'}`}
     >
       <GoalCardHeader
         goal={goal}

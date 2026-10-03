@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.6.6] - 2026-10-03
+
+- Reuse shared form controls, delete actions, and savings stat cards across frontend features.
+- Use the accessible shared modal for pension imports and respect number-format preferences in archive warnings.
+- Migrate frontend colors and charts to semantic design tokens, retain saved categorical colors, and guard raw palette regressions with ESLint.
+
 ## [v0.6.5] - 2026-10-03
 
 - Share table sorting and pagination across frontend transaction histories while preserving default ordering and page resets.

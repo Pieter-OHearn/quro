@@ -255,30 +255,30 @@ function HoldingAssetCell({ holding, foreign, txnCount }: HoldingAssetCellProps)
   const sectorLabel = holding.sector?.trim();
   return (
     <div className="col-span-3 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
+      <div className="w-9 h-9 rounded-xl bg-brand-soft flex items-center justify-center text-xs font-bold text-brand-fg flex-shrink-0">
         {holding.ticker.slice(0, 2)}
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-800 truncate">{holding.name}</p>
+        <p className="text-sm font-semibold text-fg-emphasis truncate">{holding.name}</p>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-400">{holding.ticker}</span>
+          <span className="text-xs text-fg-faint">{holding.ticker}</span>
           {itemTypeLabel && (
-            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded-full">
+            <span className="text-[10px] bg-surface-muted text-fg-subtle px-1.5 rounded-full">
               {itemTypeLabel}
             </span>
           )}
           {sectorLabel && sectorLabel !== itemTypeLabel && (
-            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded-full">
+            <span className="text-[10px] bg-surface-muted text-fg-subtle px-1.5 rounded-full">
               {sectorLabel}
             </span>
           )}
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full ${foreign ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
+            className={`text-[10px] px-1.5 py-0.5 rounded-full ${foreign ? 'bg-warning-soft text-warning-fg' : 'bg-surface-muted text-fg-subtle'}`}
           >
             {holding.currency}
           </span>
         </div>
-        <p className="text-[10px] text-slate-400 mt-0.5">{txnCount} transactions</p>
+        <p className="text-[10px] text-fg-faint mt-0.5">{txnCount} transactions</p>
       </div>
     </div>
   );
@@ -293,7 +293,7 @@ type HoldingGainCellProps = {
 
 function HoldingGainCell({ gain, gainPctHolding, holding, fmtNative }: HoldingGainCellProps) {
   return (
-    <div className={`col-span-2 text-right ${gain >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+    <div className={`col-span-2 text-right ${gain >= 0 ? 'text-success' : 'text-danger'}`}>
       <div className="flex items-center justify-end gap-0.5">
         {gain >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
         <p className="text-sm font-semibold">
@@ -332,10 +332,10 @@ function HoldingValueCells({
     <>
       <DataTableCell columnKey="position">
         <div>
-          <p className="text-sm font-semibold text-slate-800">
+          <p className="text-sm font-semibold text-fg-emphasis">
             {position.shares.toFixed(4).replace(/\.?0+$/, '')}
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-fg-faint">
             @ {fmtNative(position.avgCost, holding.currency, true)}
           </p>
         </div>
@@ -343,16 +343,16 @@ function HoldingValueCells({
       <DataTableCell columnKey="current">
         <div>
           <div className="flex items-center justify-end gap-1">
-            <p className="text-sm font-semibold text-slate-800">
+            <p className="text-sm font-semibold text-fg-emphasis">
               {fmtNative(getEffectivePrice(holding), holding.currency, true)}
             </p>
             {holding.manualPrice != null && (
-              <span className="text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-medium">
+              <span className="text-[9px] bg-warning-soft-strong text-warning-fg px-1 py-0.5 rounded font-medium">
                 M
               </span>
             )}
           </div>
-          <p className="text-[10px] text-slate-400">
+          <p className="text-[10px] text-fg-faint">
             {holding.excludeFromSync
               ? 'sync off'
               : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency)}
@@ -361,11 +361,9 @@ function HoldingValueCells({
       </DataTableCell>
       <DataTableCell columnKey="value">
         <div>
-          <p className="text-sm font-semibold text-slate-800">{fmtBase(valueInBase)}</p>
+          <p className="text-sm font-semibold text-fg-emphasis">{fmtBase(valueInBase)}</p>
           {foreign && (
-            <p className="text-xs text-amber-600">
-              {fmtNative(nativeValue, holding.currency, true)}
-            </p>
+            <p className="text-xs text-warning">{fmtNative(nativeValue, holding.currency, true)}</p>
           )}
         </div>
       </DataTableCell>
@@ -390,14 +388,14 @@ function HoldingRowActions({
     <div className="col-span-1 flex items-center justify-end gap-0.5">
       <button
         onClick={() => onEditHolding(holding)}
-        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+        className="p-1.5 rounded-lg hover:bg-surface-muted text-fg-faint hover:text-fg-muted transition-colors"
         title="Edit holding"
       >
         <Edit3 size={13} />
       </button>
       <button
         onClick={() => onToggleExpanded(holding.id)}
-        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+        className="p-1.5 rounded-lg hover:bg-surface-muted text-fg-faint transition-colors"
         title={isExpanded ? 'Collapse' : 'View transactions'}
       >
         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -508,18 +506,18 @@ function BrokerageSummary({
   fmtBase,
 }: BrokerageSummaryProps) {
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/60">
+    <div className="flex items-center justify-between px-6 py-4 border-t border-border-subtle bg-surface-sunken/60">
       <div>
-        <p className="text-sm font-semibold text-slate-700">Total Portfolio</p>
-        <p className="text-xs text-slate-400">
+        <p className="text-sm font-semibold text-fg-strong">Total Portfolio</p>
+        <p className="text-xs text-fg-faint">
           +{fmtBase(totalDividendsBase)} dividends · {totalRealizedBase >= 0 ? '+' : ''}
           {fmtBase(totalRealizedBase)} realized
         </p>
       </div>
       <div className="flex items-center gap-6">
-        <p className="font-bold text-slate-900">{fmtBase(totalBrokerageBase)}</p>
+        <p className="font-bold text-fg">{fmtBase(totalBrokerageBase)}</p>
         <div
-          className={`flex items-center gap-1 ${totalGainBase >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+          className={`flex items-center gap-1 ${totalGainBase >= 0 ? 'text-success' : 'text-danger'}`}
         >
           {totalGainBase >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
           <p className="font-bold">
@@ -697,8 +695,8 @@ function ClosedHoldingPriceCell({
     return (
       <DataTableCell columnKey="sold">
         <div>
-          <p className="text-sm text-slate-300">—</p>
-          <p className="text-xs text-slate-300">no sells</p>
+          <p className="text-sm text-fg-disabled">—</p>
+          <p className="text-xs text-fg-disabled">no sells</p>
         </div>
       </DataTableCell>
     );
@@ -707,8 +705,8 @@ function ClosedHoldingPriceCell({
   return (
     <DataTableCell columnKey="sold">
       <div>
-        <p className="text-sm text-slate-500">{fmtNative(lastSellPrice, holding.currency, true)}</p>
-        <p className="text-xs text-slate-300">last sell</p>
+        <p className="text-sm text-fg-subtle">{fmtNative(lastSellPrice, holding.currency, true)}</p>
+        <p className="text-xs text-fg-disabled">last sell</p>
       </div>
     </DataTableCell>
   );
@@ -732,7 +730,7 @@ function ClosedHoldingDividendsCell({
   if (totalDividends <= 0) {
     return (
       <DataTableCell columnKey="dividends">
-        <p className="text-sm text-slate-300">—</p>
+        <p className="text-sm text-fg-disabled">—</p>
       </DataTableCell>
     );
   }
@@ -740,11 +738,11 @@ function ClosedHoldingDividendsCell({
   return (
     <DataTableCell columnKey="dividends">
       <div>
-        <p className="text-sm font-semibold text-slate-500">
+        <p className="text-sm font-semibold text-fg-subtle">
           +{fmtBase(convertToBase(totalDividends, holding.currency))}
         </p>
         {foreign && (
-          <p className="text-xs text-amber-600">
+          <p className="text-xs text-warning">
             +{fmtNative(totalDividends, holding.currency, true)}
           </p>
         )}
@@ -769,7 +767,7 @@ function ClosedHoldingRealizedCell({
   return (
     <DataTableCell
       columnKey="realized"
-      className={realizedGain >= 0 ? 'text-emerald-500' : 'text-rose-400'}
+      className={realizedGain >= 0 ? 'text-success-accent' : 'text-danger-muted'}
     >
       <div>
         <div className="flex items-center justify-end gap-0.5">
@@ -801,35 +799,35 @@ function ClosedHoldingAssetCell({
 
   return (
     <div className="col-span-5 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-xl bg-slate-200/80 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
+      <div className="w-9 h-9 rounded-xl bg-border-default/80 flex items-center justify-center text-xs font-bold text-fg-subtle flex-shrink-0">
         {holding.ticker.slice(0, 2)}
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="text-sm font-medium text-slate-500 truncate">{holding.name}</p>
-          <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded-full">
+          <p className="text-sm font-medium text-fg-subtle truncate">{holding.name}</p>
+          <span className="text-[10px] bg-border-default text-fg-subtle px-1.5 py-0.5 rounded-full">
             Closed
           </span>
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-xs text-slate-400">{holding.ticker}</span>
+          <span className="text-xs text-fg-faint">{holding.ticker}</span>
           {itemTypeLabel && (
-            <span className="text-[10px] bg-slate-100 text-slate-400 px-1.5 rounded-full">
+            <span className="text-[10px] bg-surface-muted text-fg-faint px-1.5 rounded-full">
               {itemTypeLabel}
             </span>
           )}
           {sectorLabel && sectorLabel !== itemTypeLabel && (
-            <span className="text-[10px] bg-slate-100 text-slate-400 px-1.5 rounded-full">
+            <span className="text-[10px] bg-surface-muted text-fg-faint px-1.5 rounded-full">
               {sectorLabel}
             </span>
           )}
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full ${isForeign ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}`}
+            className={`text-[10px] px-1.5 py-0.5 rounded-full ${isForeign ? 'bg-warning-soft text-warning' : 'bg-surface-muted text-fg-faint'}`}
           >
             {holding.currency}
           </span>
         </div>
-        <p className="text-[10px] text-slate-300 mt-0.5">{txnCount} transactions</p>
+        <p className="text-[10px] text-fg-disabled mt-0.5">{txnCount} transactions</p>
       </div>
     </div>
   );
@@ -846,14 +844,14 @@ function ClosedHoldingActionCell({
       <div className="flex items-center justify-end gap-0.5">
         <button
           onClick={() => onEditHolding(holding)}
-          className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-300 hover:text-slate-500 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-border-default text-fg-disabled hover:text-fg-subtle transition-colors"
           title="Edit holding"
         >
           <Edit3 size={13} />
         </button>
         <button
           onClick={() => onToggleExpanded(holding.id)}
-          className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-300 hover:text-slate-500 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-border-default text-fg-disabled hover:text-fg-subtle transition-colors"
           title={isExpanded ? 'Collapse' : 'View transactions'}
         >
           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -1039,20 +1037,20 @@ function ClosedHoldingsHeader({
   return (
     <button
       onClick={onToggleClosed}
-      className="w-full flex items-center gap-3 px-6 py-3.5 bg-slate-50/70 hover:bg-slate-50 transition-colors"
+      className="w-full flex items-center gap-3 px-6 py-3.5 bg-surface-sunken/70 hover:bg-surface-sunken transition-colors"
     >
-      <Archive size={14} className="text-slate-400 flex-shrink-0" />
-      <p className="text-sm font-semibold text-slate-500">Closed Holdings</p>
-      <span className="text-[11px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">
+      <Archive size={14} className="text-fg-faint flex-shrink-0" />
+      <p className="text-sm font-semibold text-fg-subtle">Closed Holdings</p>
+      <span className="text-[11px] bg-surface-muted text-fg-subtle px-2 py-0.5 rounded-full font-medium">
         {closedCount}
       </span>
-      <span className="text-xs text-slate-400">positions no longer held</span>
+      <span className="text-xs text-fg-faint">positions no longer held</span>
       <div className="flex-1" />
-      <span className="text-xs text-slate-400">{showClosed ? 'Hide' : 'Show'}</span>
+      <span className="text-xs text-fg-faint">{showClosed ? 'Hide' : 'Show'}</span>
       {showClosed ? (
-        <ChevronUp size={14} className="text-slate-400" />
+        <ChevronUp size={14} className="text-fg-faint" />
       ) : (
-        <ChevronDown size={14} className="text-slate-400" />
+        <ChevronDown size={14} className="text-fg-faint" />
       )}
     </button>
   );
@@ -1124,7 +1122,7 @@ function ClosedHoldingsTable({
       onSortChange={setSort}
       tableLayout="fixed"
       minWidth={900}
-      className="bg-slate-50/50"
+      className="bg-surface-sunken/50"
     >
       {sortedClosedHoldings.map((holding) => (
         <ClosedHoldingRow
@@ -1157,12 +1155,12 @@ function ClosedHoldingsFooter({
   summary: ClosedHoldingsSummary;
 }) {
   return (
-    <div className="flex items-center justify-between px-6 py-3 bg-slate-50/80 border-t border-slate-100">
-      <p className="text-xs text-slate-400">
+    <div className="flex items-center justify-between px-6 py-3 bg-surface-sunken/80 border-t border-border-subtle">
+      <p className="text-xs text-fg-faint">
         {closedCount} closed positions · total realized {summary.realized} · dividends{' '}
         {summary.dividends}
       </p>
-      <p className="text-xs text-slate-400">excluded from active portfolio totals</p>
+      <p className="text-xs text-fg-faint">excluded from active portfolio totals</p>
     </div>
   );
 }
@@ -1194,7 +1192,7 @@ function ClosedHoldingsSection({
   );
 
   return (
-    <div className="border-t-2 border-dashed border-slate-200">
+    <div className="border-t-2 border-dashed border-border-default">
       <ClosedHoldingsHeader
         closedCount={closedHoldings.length}
         showClosed={showClosed}
@@ -1249,18 +1247,18 @@ function BrokerageHeader({
     <>
       <div className="flex justify-between items-center px-6 pt-5 pb-3">
         <div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-fg-faint">
             {activeHoldingsCount} active holdings · click row to view & record transactions
           </p>
           {syncSummaryText && (
-            <p className="text-[11px] text-slate-500 mt-1">Last sync: {syncSummaryText}</p>
+            <p className="text-[11px] text-fg-subtle mt-1">Last sync: {syncSummaryText}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onSyncPrices}
             disabled={isSyncingPrices || activeHoldingsCount === 0}
-            className="flex items-center gap-2 text-sm bg-slate-100 hover:bg-slate-200 disabled:bg-slate-100 disabled:text-slate-400 text-slate-700 px-4 py-2 rounded-xl transition-colors"
+            className="flex items-center gap-2 text-sm bg-surface-muted hover:bg-border-default disabled:bg-surface-muted disabled:text-fg-faint text-fg-strong px-4 py-2 rounded-xl transition-colors"
             title={
               activeHoldingsCount === 0
                 ? 'No active holdings to sync'
@@ -1276,14 +1274,14 @@ function BrokerageHeader({
           </button>
           <button
             onClick={onAddHolding}
-            className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
+            className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover text-fg-inverted px-4 py-2 rounded-xl transition-colors"
           >
             <Plus size={15} /> Add Holding
           </button>
         </div>
       </div>
       {totalHoldingsCount > activeHoldingsCount && (
-        <p className="px-6 pb-2 text-[11px] text-slate-400">
+        <p className="px-6 pb-2 text-[11px] text-fg-faint">
           {totalHoldingsCount - activeHoldingsCount} closed holdings excluded from sync and active
           portfolio totals
         </p>

@@ -22,7 +22,9 @@ export function JointToggleField({ checked, onChange, hint, className }: JointTo
     <label
       className={cn(
         'flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
-        checked ? 'border-indigo-300 bg-indigo-50/60' : 'border-slate-200 hover:border-slate-300',
+        checked
+          ? 'border-brand-border bg-brand-soft/60'
+          : 'border-border-default hover:border-border-strong',
         className,
       )}
     >
@@ -30,14 +32,14 @@ export function JointToggleField({ checked, onChange, hint, className }: JointTo
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+        className="mt-0.5 h-4 w-4 rounded border-border-strong text-brand focus:ring-brand-accent"
       />
       <span className="min-w-0">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-slate-900">
-          <Users size={14} className="text-indigo-500" />
+        <span className="flex items-center gap-1.5 text-sm font-medium text-fg">
+          <Users size={14} className="text-brand-accent" />
           Joint with {partnerName}
         </span>
-        <span className="mt-0.5 block text-xs text-slate-500">
+        <span className="mt-0.5 block text-xs text-fg-subtle">
           {hint ?? 'Both of you can view and edit this, and it counts 50/50 in your dashboards.'}
         </span>
       </span>

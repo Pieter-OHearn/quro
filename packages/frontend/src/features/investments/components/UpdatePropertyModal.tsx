@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { ArchiveOrDeleteDialog, Modal, ModalFooter, FormField, TextInput } from '@/components/ui';
+import {
+  ArchiveOrDeleteDialog,
+  Modal,
+  ModalFooter,
+  FormField,
+  TextInput,
+  IconButton,
+} from '@/components/ui';
 import { JointToggleField } from '@/features/partner';
 import { formatFixedInputValue } from '@/lib/utils';
 import { formatPercent, type Property } from '@quro/shared';
@@ -31,18 +38,16 @@ function PropertyStatsPreview({
   fmtNative,
 }: PropertyStatsPreviewProps) {
   return (
-    <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+    <div className="bg-surface-sunken rounded-xl p-3 space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-500">Equity</span>
-        <span className={`font-semibold ${equity >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+        <span className="text-fg-subtle">Equity</span>
+        <span className={`font-semibold ${equity >= 0 ? 'text-success' : 'text-danger'}`}>
           {fmtNative(equity, currency)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-500">Appreciation</span>
-        <span
-          className={`font-semibold ${appreciation >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
-        >
+        <span className="text-fg-subtle">Appreciation</span>
+        <span className={`font-semibold ${appreciation >= 0 ? 'text-success' : 'text-danger'}`}>
           {appreciation >= 0 ? '+' : ''}
           {fmtNative(appreciation, currency)} ({appreciationPct >= 0 ? '+' : ''}
           {formatPercent(appreciationPct, 1)})
@@ -94,10 +99,10 @@ type MortgageBalanceFieldProps = {
 function MortgageBalanceField({ mortgageBalance, currency, fmtNative }: MortgageBalanceFieldProps) {
   return (
     <FormField label="Linked Mortgage Balance">
-      <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+      <div className="w-full rounded-xl border border-border-default bg-surface-sunken px-3 py-2.5 text-sm text-fg-strong">
         {mortgageBalance > 0 ? fmtNative(mortgageBalance, currency) : 'No mortgage linked yet'}
       </div>
-      <p className="text-xs text-slate-400 mt-1">
+      <p className="text-xs text-fg-faint mt-1">
         Manage property-mortgage links in the Mortgage section.
       </p>
     </FormField>
@@ -126,13 +131,14 @@ function buildDeleteButton(
 ): React.ReactNode {
   if (!onDelete) return undefined;
   return (
-    <button
+    <IconButton
+      icon={Trash2}
+      label="Remove property"
+      variant="danger"
+      size="lg"
+      className="border border-danger-border text-danger"
       onClick={onRequestConfirm}
-      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-      title="Remove property"
-    >
-      <Trash2 size={14} />
-    </button>
+    />
   );
 }
 
@@ -207,7 +213,7 @@ export function UpdatePropertyModal({
           onChange={form.handleValueChange}
           error={Boolean(form.errors.value)}
         />
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-fg-faint mt-1">
           Previously {fmtNative(property.currentValue, property.currency)}
         </p>
       </FormField>

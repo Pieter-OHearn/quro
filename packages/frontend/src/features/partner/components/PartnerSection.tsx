@@ -15,7 +15,7 @@ import {
 function SectionError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+    <div className="rounded-xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
       {message}
     </div>
   );
@@ -38,9 +38,9 @@ function InviteForm() {
   return (
     <div className="space-y-4">
       <SectionError message={error} />
-      <div className="rounded-xl border border-slate-200 p-5">
-        <p className="text-sm font-semibold text-slate-900">Invite your partner</p>
-        <p className="mt-1 text-sm text-slate-500">
+      <div className="rounded-xl border border-border-default p-5">
+        <p className="text-sm font-semibold text-fg">Invite your partner</p>
+        <p className="mt-1 text-sm text-fg-subtle">
           Enter the email of their Quro account on this server. Once they accept, you can mark
           savings accounts, your home, and mortgages as joint.
         </p>
@@ -76,12 +76,12 @@ function InviteForm() {
 function PartnerIdentity({ link }: { link: PartnerLink }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 to-indigo-500 text-base font-bold text-white">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-danger-muted to-brand-accent text-base font-bold text-fg-inverted">
         {getUserInitials(link.partner)}
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-900">{getUserDisplayName(link.partner)}</p>
-        <p className="text-xs text-slate-500">{link.partner.email}</p>
+        <p className="text-sm font-semibold text-fg">{getUserDisplayName(link.partner)}</p>
+        <p className="text-xs text-fg-subtle">{link.partner.email}</p>
       </div>
     </div>
   );
@@ -104,11 +104,11 @@ function IncomingInvite({ link }: { link: PartnerLink }) {
   return (
     <div className="space-y-4">
       <SectionError message={error} />
-      <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-5">
+      <div className="rounded-xl border border-brand-tint bg-brand-soft/50 p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <PartnerIdentity link={link} />
-            <p className="mt-3 text-sm text-slate-600">
+            <p className="mt-3 text-sm text-fg-muted">
               wants to link accounts with you to share joint assets.
             </p>
           </div>
@@ -158,7 +158,7 @@ function OutgoingInvite({ link }: { link: PartnerLink }) {
   return (
     <div className="space-y-4">
       <SectionError message={error} />
-      <div className="rounded-xl border border-slate-200 p-5">
+      <div className="rounded-xl border border-border-default p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <PartnerIdentity link={link} />
@@ -176,7 +176,7 @@ function OutgoingInvite({ link }: { link: PartnerLink }) {
             Cancel invite
           </Button>
         </div>
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-fg-subtle">
           Waiting for {getUserDisplayName(link.partner)} to accept in their Settings.
         </p>
       </div>
@@ -201,7 +201,7 @@ function LinkedPartner({ link }: { link: PartnerLink }) {
   return (
     <div className="space-y-4">
       <SectionError message={error} />
-      <div className="rounded-xl border border-slate-200 p-5">
+      <div className="rounded-xl border border-border-default p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <PartnerIdentity link={link} />
@@ -239,12 +239,12 @@ function LinkedPartner({ link }: { link: PartnerLink }) {
           )}
         </div>
         {confirming ? (
-          <p className="mt-3 text-sm text-rose-600">
+          <p className="mt-3 text-sm text-danger-hover">
             Unlinking removes the joint flag from every shared asset — each asset stays with whoever
             created it. This does not delete any data.
           </p>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">
+          <p className="mt-3 text-sm text-fg-subtle">
             You can mark savings accounts, properties, and mortgages as joint. Joint assets are
             visible and editable by both of you, and count 50/50 in each dashboard.
           </p>
@@ -270,14 +270,14 @@ export function PartnerSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-slate-900">Partner</h3>
-        <p className="mt-1 text-sm text-slate-500">
+        <h3 className="text-lg font-semibold text-fg">Partner</h3>
+        <p className="mt-1 text-sm text-fg-subtle">
           Link your account with your partner&apos;s to track joint assets together.
         </p>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12 text-sm text-slate-400">
+        <div className="flex items-center justify-center py-12 text-sm text-fg-faint">
           Loading...
         </div>
       ) : (

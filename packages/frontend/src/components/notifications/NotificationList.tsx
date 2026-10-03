@@ -13,7 +13,7 @@ export function NotificationList({
   onDismiss,
 }: Readonly<NotificationListProps>) {
   return (
-    <ul className="max-h-[420px] overflow-y-auto divide-y divide-slate-100">
+    <ul className="max-h-[420px] overflow-y-auto divide-y divide-border-subtle">
       {notifications.map((notification) => (
         <NotificationItem
           key={notification.id}

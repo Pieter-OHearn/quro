@@ -182,7 +182,7 @@ function DebtColorPicker({ form, errors, onChange }: Readonly<DebtFormFieldsProp
             type="button"
             onClick={() => onChange('color', color)}
             className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${
-              form.color === color ? 'border-slate-800' : 'border-transparent'
+              form.color === color ? 'border-fg-emphasis' : 'border-transparent'
             }`}
             style={{ backgroundColor: color }}
           />
@@ -227,7 +227,7 @@ function DebtFormModalShell({
           onClose={onClose}
           scrollable
           visual={
-            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/20 text-rose-200">
+            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-danger/20 text-danger-border">
               <Banknote size={18} />
             </div>
           }
@@ -243,7 +243,7 @@ function DebtFormModalShell({
             size="lg"
             loading={submitting}
             loadingLabel={editing ? 'Saving Changes...' : 'Adding Debt...'}
-            className="flex-1 bg-rose-600 hover:bg-rose-700"
+            className="flex-1 bg-danger-hover hover:bg-danger-fg"
           >
             {editing ? 'Save Changes' : 'Add Debt'}
           </Button>
@@ -320,7 +320,7 @@ export function DebtFormModal({ debt, onClose, onSubmit }: Readonly<DebtFormModa
       <DebtDateFields form={form} errors={errors} onChange={handleChange} />
       <DebtColorPicker form={form} errors={errors} onChange={handleChange} />
       <DebtNotesField form={form} errors={errors} onChange={handleChange} />
-      {errors.submit ? <p className="text-sm text-rose-500">{errors.submit}</p> : null}
+      {errors.submit ? <p className="text-sm text-danger">{errors.submit}</p> : null}
     </DebtFormModalShell>
   );
 }

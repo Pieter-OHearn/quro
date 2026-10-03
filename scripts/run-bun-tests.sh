@@ -5,7 +5,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT"
 
 echo "==> Shared tests"
-bun test packages/shared/test
+bun test packages/shared/test scripts/eslint
 
 echo "==> Backend tests"
 cd "$REPO_ROOT/packages/backend"

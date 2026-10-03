@@ -117,3 +117,123 @@ test('mortgage selection follows URL changes and preserves unrelated search para
     'true',
   );
 });
+
+const PENSION_POT = {
+  id: 7,
+  name: 'UI Retirement',
+  provider: 'Test Provider',
+  type: 'Workplace',
+  balance: 1234.56,
+  currency: 'EUR',
+  employeeMonthly: 100,
+  employerMonthly: 100,
+  investmentStrategy: null,
+  metadata: {},
+  color: '#6366f1',
+  emoji: '🏦',
+  notes: '',
+};
+
+async function mockPensionUi(page: Page) {
+  await mockSettingsApi(page);
+  await page.route('**/api/auth/me', (route) =>
+    route.fulfill({ json: { data: { ...USER, numberFormat: 'de-DE' } } }),
+  );
+  await page.route('**/api/pensions/pots*', (route) =>
+    route.fulfill({ json: { data: [PENSION_POT] } }),
+  );
+  await page.route('**/api/capabilities', (route) =>
+    route.fulfill({ json: { data: { pensionStatementImport: { enabled: true } } } }),
+  );
+  await page.goto('/pension');
+  await page.getByRole('button', { name: 'View transactions', exact: true }).click();
+}
+
+test('pension import traps keyboard focus, closes on Escape, and restores the trigger', async ({
+  page,
+}) => {
+  await mockPensionUi(page);
+  const trigger = page.getByRole('button', { name: 'Import Annual Statement PDF' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Import Annual Statement' });
+  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+  await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Upload & Process', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('archive warnings use the saved number format and keep deletion gated by the name', async ({
+  page,
+}) => {
+  await mockPensionUi(page);
+  await page.getByRole('button', { name: 'Remove Pot', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remove Pension pot' });
+  await expect(dialog.getByText(/still has a balance of/)).toContainText('1.234,56');
+  const remove = dialog.getByRole('button', { name: 'Delete', exact: true });
+  await expect(remove).toBeDisabled();
+  await dialog.getByPlaceholder('UI Retirement', { exact: true }).fill('UI Retirement');
+  await expect(remove).toBeEnabled();
+});
+
+test('wide pension review keeps compact fields editable and the footer visible on desktop and mobile', async ({
+  page,
+}, testInfo) => {
+  await mockPensionUi(page);
+  const job = { id: 11, potId: 7, status: 'ready_for_review', fileName: 'statement.pdf' };
+  const rows = Array.from({ length: 12 }, (_, index) => ({
+    id: index + 1,
+    importId: 11,
+    rowOrder: index,
+    type: 'contribution',
+    amount: 100,
+    taxAmount: 0,
+    date: '2026-01-01',
+    note: `Contribution ${index + 1}`,
+    isEmployer: false,
+    confidence: 1,
+    confidenceLabel: 'high',
+    evidence: [],
+    isDerived: false,
+    isDeleted: false,
+    collisionWarning: null,
+    committedTransactionId: null,
+    editedAt: null,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  }));
+  await page.route('**/api/pensions/imports', (route) => route.fulfill({ json: { data: job } }));
+  await page.route('**/api/pensions/imports/11', (route) => route.fulfill({ json: { data: job } }));
+  await page.route('**/api/pensions/imports/11/rows', (route) =>
+    route.fulfill({ json: { data: rows } }),
+  );
+  await page.getByRole('button', { name: 'Import Annual Statement PDF' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import Annual Statement' });
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'statement.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4\n%%EOF'),
+  });
+  await dialog.getByRole('button', { name: 'Upload & Process', exact: true }).click();
+  await expect(dialog.getByPlaceholder('Add note...')).toHaveCount(12);
+  await dialog.getByPlaceholder('Add note...').first().fill('Updated note');
+  await expect(dialog.getByPlaceholder('Add note...').first()).toHaveValue('Updated note');
+  await dialog.getByRole('combobox').first().selectOption('fee');
+  await expect(dialog.getByRole('combobox').first()).toHaveValue('fee');
+  await expect(dialog).toHaveClass(/max-w-3xl/);
+  await expect(
+    dialog.getByRole('button', { name: 'Commit Transactions', exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: testInfo.outputPath('import-desktop.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    dialog.getByRole('button', { name: 'Commit Transactions', exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: testInfo.outputPath('import-mobile.png') });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});

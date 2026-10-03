@@ -35,8 +35,8 @@ export function GoalsHeader({
         buttonClassName="px-5 font-semibold"
       />
       <div className="flex-1" />
-      <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-white border border-slate-200 rounded-xl px-3 py-2">
-        <Sparkles size={12} className="text-indigo-400" />
+      <div className="flex items-center gap-1.5 text-xs text-fg-faint bg-surface border border-border-default rounded-xl px-3 py-2">
+        <Sparkles size={12} className="text-brand-disabled" />
         {stats.total} goals - {stats.completed} completed - {stats.onTrack} on track
       </div>
     </div>

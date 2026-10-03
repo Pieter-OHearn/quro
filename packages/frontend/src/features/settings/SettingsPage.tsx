@@ -82,29 +82,29 @@ export function Settings() {
       <ContentSection>
         <Card
           padding="none"
-          className="overflow-hidden border-0 bg-gradient-to-r from-[#0a0f1e] via-[#172038] to-[#0f3b5f] text-white shadow-xl shadow-slate-300/40"
+          className="overflow-hidden border-0 bg-gradient-to-r from-surface-inverse via-surface-settings-middle to-surface-settings-end text-fg-inverted shadow-xl shadow-border-strong/40"
         >
           <div className="relative overflow-hidden px-6 py-7 lg:px-8">
-            <div className="absolute right-0 top-0 h-56 w-56 -translate-y-1/3 translate-x-1/5 rounded-full bg-white/8 blur-3xl" />
-            <div className="absolute bottom-0 left-24 h-40 w-40 translate-y-1/2 rounded-full bg-sky-400/10 blur-3xl" />
+            <div className="absolute right-0 top-0 h-56 w-56 -translate-y-1/3 translate-x-1/5 rounded-full bg-surface/8 blur-3xl" />
+            <div className="absolute bottom-0 left-24 h-40 w-40 translate-y-1/2 rounded-full bg-info-muted/10 blur-3xl" />
             <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-400 to-sky-500 text-xl font-bold text-white shadow-lg shadow-black/20">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-disabled to-info-accent text-xl font-bold text-fg-inverted shadow-lg shadow-overlay/20">
                   {initials}
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-info-border">
                     Account Settings
                   </p>
                   <h2 className="mt-1 text-3xl font-semibold tracking-tight">{fullName}</h2>
-                  <p className="mt-1 text-sm text-slate-300">
+                  <p className="mt-1 text-sm text-fg-disabled">
                     {user.email} · Age {user.age} · {user.location || 'Location not set'}
                   </p>
                 </div>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200 backdrop-blur">
-                <p className="font-medium text-white">{activeTabConfig.label}</p>
-                <p className="mt-1 text-xs text-slate-300">{activeTabConfig.subtitle}</p>
+              <div className="rounded-3xl border border-fg-inverted/10 bg-surface/5 px-4 py-3 text-sm text-border-default backdrop-blur">
+                <p className="font-medium text-fg-inverted">{activeTabConfig.label}</p>
+                <p className="mt-1 text-xs text-fg-disabled">{activeTabConfig.subtitle}</p>
               </div>
             </div>
           </div>
@@ -125,39 +125,44 @@ export function Settings() {
                     className={cn(
                       'flex w-full items-center gap-3 rounded-3xl border px-4 py-4 text-left transition-all',
                       isActive
-                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+                        ? 'border-brand bg-brand text-fg-inverted shadow-md shadow-brand-tint'
+                        : 'border-border-default bg-surface text-fg-muted hover:border-border-strong hover:bg-surface-sunken',
                     )}
                   >
                     <div
                       className={cn(
                         'flex h-10 w-10 items-center justify-center rounded-2xl',
-                        isActive ? 'bg-white/15' : 'bg-slate-100',
+                        isActive ? 'bg-surface/15' : 'bg-surface-muted',
                       )}
                     >
-                      <Icon size={16} className={isActive ? 'text-white' : 'text-slate-500'} />
+                      <Icon
+                        size={16}
+                        className={isActive ? 'text-fg-inverted' : 'text-fg-subtle'}
+                      />
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold">{label}</p>
                       <p
                         className={cn(
                           'truncate text-xs',
-                          isActive ? 'text-indigo-100' : 'text-slate-400',
+                          isActive ? 'text-brand-soft-strong' : 'text-fg-faint',
                         )}
                       >
                         {subtitle}
                       </p>
                     </div>
-                    {isActive ? <ChevronRight size={16} className="ml-auto text-white/70" /> : null}
+                    {isActive ? (
+                      <ChevronRight size={16} className="ml-auto text-fg-inverted/70" />
+                    ) : null}
                   </button>
                 );
               })}
 
-              <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">
+              <div className="mt-6 rounded-2xl border border-border-subtle bg-surface-sunken px-4 py-3">
+                <p className="mb-1 text-[10px] uppercase tracking-widest text-fg-faint">
                   App Version
                 </p>
-                <p className="font-mono text-sm font-semibold text-slate-700">{appVersion}</p>
+                <p className="font-mono text-sm font-semibold text-fg-strong">{appVersion}</p>
               </div>
             </nav>
 
@@ -170,8 +175,8 @@ export function Settings() {
                   className={cn(
                     'flex flex-shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium transition-colors',
                     activeTab === key
-                      ? 'border-indigo-600 bg-indigo-600 text-white'
-                      : 'border-slate-200 bg-white text-slate-600',
+                      ? 'border-brand bg-brand text-fg-inverted'
+                      : 'border-border-default bg-surface text-fg-muted',
                   )}
                 >
                   <Icon size={14} />

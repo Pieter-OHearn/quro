@@ -102,8 +102,8 @@ export function getPasswordStrength(password: string): StrengthState {
     return {
       score: 0,
       label: '',
-      textClassName: 'text-slate-400',
-      barClassName: 'bg-slate-200',
+      textClassName: 'text-fg-faint',
+      barClassName: 'bg-border-default',
     };
   }
 
@@ -118,8 +118,8 @@ export function getPasswordStrength(password: string): StrengthState {
     return {
       score,
       label: 'Weak',
-      textClassName: 'text-rose-500',
-      barClassName: 'bg-rose-400',
+      textClassName: 'text-danger',
+      barClassName: 'bg-danger-muted',
     };
   }
 
@@ -127,8 +127,8 @@ export function getPasswordStrength(password: string): StrengthState {
     return {
       score,
       label: 'Fair',
-      textClassName: 'text-amber-500',
-      barClassName: 'bg-amber-400',
+      textClassName: 'text-warning-accent',
+      barClassName: 'bg-warning-muted',
     };
   }
 
@@ -136,16 +136,16 @@ export function getPasswordStrength(password: string): StrengthState {
     return {
       score,
       label: 'Good',
-      textClassName: 'text-sky-500',
-      barClassName: 'bg-sky-400',
+      textClassName: 'text-info-accent',
+      barClassName: 'bg-info-muted',
     };
   }
 
   return {
     score,
     label: 'Strong',
-    textClassName: 'text-emerald-500',
-    barClassName: 'bg-emerald-400',
+    textClassName: 'text-success-accent',
+    barClassName: 'bg-success-muted',
   };
 }
 
@@ -178,8 +178,8 @@ export function useSavedState(durationMs = 2400) {
 export function SectionHeader({ title, subtitle }: Readonly<{ title: string; subtitle: string }>) {
   return (
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
-      <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      <h3 className="text-lg font-semibold text-fg-deep">{title}</h3>
+      <p className="mt-1 text-sm text-fg-subtle">{subtitle}</p>
     </div>
   );
 }
@@ -196,7 +196,7 @@ export function SaveActionButton({
       disabled={disabled}
       loading={loading}
       leadingIcon={saved ? <Check size={14} /> : <Save size={14} />}
-      className={cn(saved && 'bg-emerald-500 hover:bg-emerald-500')}
+      className={cn(saved && 'bg-success-accent hover:bg-success-accent')}
     >
       {saved ? 'Saved' : 'Save changes'}
     </Button>
@@ -214,7 +214,7 @@ export function IconTextInput({
     <div className="relative">
       <Icon
         size={16}
-        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-faint"
       />
       <TextInput {...props} value={value} onChange={onChange} className={cn('pl-10', className)} />
     </div>

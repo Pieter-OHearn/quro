@@ -31,8 +31,8 @@ export function FilterPills({ debts, value, onChange }: Readonly<FilterPillsProp
             onClick={() => onChange(option.key)}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
               isActive
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                ? 'border-fg bg-fg text-fg-inverted'
+                : 'border-border-default bg-surface text-fg-muted hover:border-border-strong hover:bg-surface-sunken'
             }`}
           >
             <Icon size={11} />
@@ -40,7 +40,7 @@ export function FilterPills({ debts, value, onChange }: Readonly<FilterPillsProp
             {option.key !== 'all' ? (
               <span
                 className={`rounded-full px-1 text-[9px] font-semibold ${
-                  isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                  isActive ? 'bg-surface/20 text-fg-inverted' : 'bg-surface-muted text-fg-subtle'
                 }`}
               >
                 {count}

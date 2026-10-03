@@ -39,12 +39,12 @@ function MappingRow({ mapping }: Readonly<{ mapping: CategoryMapping }>) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5 border-b border-slate-100 last:border-0">
-      <span className="text-xs font-mono text-slate-400 shrink-0">
+    <div className="flex items-center justify-between gap-4 py-2.5 border-b border-border-subtle last:border-0">
+      <span className="text-xs font-mono text-fg-faint shrink-0">
         {mapping.source.toUpperCase()} {mapping.sourceKey}
       </span>
       <input
-        className="flex-1 text-sm text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 focus:outline-none px-1 py-0.5 text-right transition-colors"
+        className="flex-1 text-sm text-fg-emphasis bg-transparent border-b border-transparent hover:border-border-default focus:border-brand-disabled focus:outline-none px-1 py-0.5 text-right transition-colors"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={save}
@@ -65,12 +65,12 @@ function CategoryMappingsSection() {
 
   return (
     <div>
-      <h4 className="text-sm font-semibold text-slate-900 mb-1">Bank category rules</h4>
-      <p className="text-xs text-slate-500 mb-3">
+      <h4 className="text-sm font-semibold text-fg mb-1">Bank category rules</h4>
+      <p className="text-xs text-fg-subtle mb-3">
         These rules map your bank's categories to Quro's budget categories. Changes apply to future
         syncs only.
       </p>
-      <div className="rounded-xl border border-slate-200 px-4 py-1">
+      <div className="rounded-xl border border-border-default px-4 py-1">
         {mappings.map((mapping) => (
           <MappingRow key={mapping.id} mapping={mapping} />
         ))}
@@ -111,42 +111,40 @@ export function ConnectionsSection() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12 text-sm text-slate-400">
-        Loading...
-      </div>
+      <div className="flex items-center justify-center py-12 text-sm text-fg-faint">Loading...</div>
     );
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-slate-900">Connected accounts</h3>
-        <p className="mt-1 text-sm text-slate-500">
+        <h3 className="text-lg font-semibold text-fg">Connected accounts</h3>
+        <p className="mt-1 text-sm text-fg-subtle">
           Link external bank accounts to sync your financial data automatically.
         </p>
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+        <div className="rounded-xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
           {error}
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-slate-200 p-5">
+      <div className="rounded-xl border border-border-default p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <img src="/bunq-icon.png" alt="bunq" className="h-10 w-10 rounded-lg" />
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-slate-900">Bunq</p>
+                <p className="text-sm font-semibold text-fg">Bunq</p>
                 {connection ? <Badge tone="success">Connected</Badge> : null}
               </div>
               {connection ? (
-                <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                <div className="mt-1 space-y-0.5 text-xs text-fg-subtle">
                   <p>Last synced: {formatSyncTime(connection.lastSyncAt)}</p>
                 </div>
               ) : (
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-fg-subtle">
                   Connect your Bunq account to automatically sync savings and budget transactions.
                 </p>
               )}
@@ -173,7 +171,7 @@ export function ConnectionsSection() {
                   size="sm"
                   leadingIcon={saved ? <Check size={14} /> : <Unlink size={14} />}
                   loading={disconnect.isPending}
-                  className={cn(saved && 'bg-emerald-500 hover:bg-emerald-500')}
+                  className={cn(saved && 'bg-success-accent hover:bg-success-accent')}
                   onClick={() => {
                     void handleDisconnect();
                   }}

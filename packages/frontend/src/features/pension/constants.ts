@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import { ArrowUpRight, CircleMinus, Landmark } from 'lucide-react';
 import type { PensionTxnType } from './types';
 
@@ -14,23 +15,23 @@ export const PENSION_TXN_META: Record<
   contribution: {
     label: 'Contribution',
     icon: ArrowUpRight,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    borderColor: 'border-emerald-300',
+    color: 'text-success',
+    bg: 'bg-success-soft',
+    borderColor: 'border-success-border-strong',
   },
   fee: {
     label: 'Fee',
     icon: CircleMinus,
-    color: 'text-rose-500',
-    bg: 'bg-rose-50',
-    borderColor: 'border-rose-300',
+    color: 'text-danger',
+    bg: 'bg-danger-soft',
+    borderColor: 'border-danger-border-strong',
   },
   annual_statement: {
     label: 'Annual Statement',
     icon: Landmark,
-    color: 'text-amber-700',
-    bg: 'bg-amber-50',
-    borderColor: 'border-amber-300',
+    color: 'text-warning-fg',
+    bg: 'bg-warning-soft',
+    borderColor: 'border-warning-border-strong',
   },
 };
 
@@ -42,13 +43,20 @@ export const PENSION_TYPES = [
 ] as const;
 
 export const TYPE_COLORS: Record<string, string> = {
-  'Workplace Pension': 'bg-indigo-100 text-indigo-700',
-  'Personal Pension': 'bg-sky-100 text-sky-700',
-  'State Pension': 'bg-amber-100 text-amber-700',
-  Other: 'bg-slate-100 text-slate-600',
+  'Workplace Pension': 'bg-brand-soft-strong text-brand-fg',
+  'Personal Pension': 'bg-info-soft-strong text-info-fg',
+  'State Pension': 'bg-warning-soft-strong text-warning-fg',
+  Other: 'bg-surface-muted text-fg-muted',
 };
 
-export const PALETTE = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#f97316', '#ec4899'];
+export const PALETTE = [
+  DATA_COLORS['primary'],
+  DATA_COLORS['cash'],
+  DATA_COLORS['income'],
+  DATA_COLORS['forecast'],
+  DATA_COLORS['property'],
+  DATA_COLORS['milestone'],
+];
 
 /** Annual growth rate assumption for pension projections (5%) */
 export const ANNUAL_GROWTH_RATE = 0.05;
