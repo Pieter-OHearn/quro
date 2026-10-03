@@ -111,15 +111,15 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
 
   return (
     <div className="grid grid-cols-2 gap-3 mb-3">
-      <div className="bg-slate-50 rounded-xl p-3">
-        <p className="text-[10px] text-slate-400 mb-0.5">
+      <div className="bg-surface-sunken rounded-xl p-3">
+        <p className="text-[10px] text-fg-faint mb-0.5">
           {isJoint ? 'Property Value (total)' : 'Current Value'}
         </p>
-        <p className="font-bold text-slate-900 text-sm">
+        <p className="font-bold text-fg text-sm">
           {fmtNative(property.currentValue, property.currency, true)}
         </p>
         <p
-          className={`text-[10px] mt-0.5 font-medium ${stats.appreciation >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+          className={`text-[10px] mt-0.5 font-medium ${stats.appreciation >= 0 ? 'text-success' : 'text-danger'}`}
         >
           {stats.appreciation >= 0 ? '+' : ''}
           {fmtNative(stats.appreciation, property.currency, true)} (
@@ -127,24 +127,24 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
           {formatPercent(stats.appreciationPct, 1)})
         </p>
       </div>
-      <div className="bg-slate-50 rounded-xl p-3">
-        <p className="text-[10px] text-slate-400 mb-0.5">{equityLabel}</p>
-        <p className="font-bold text-emerald-600 text-sm">
+      <div className="bg-surface-sunken rounded-xl p-3">
+        <p className="text-[10px] text-fg-faint mb-0.5">{equityLabel}</p>
+        <p className="font-bold text-success text-sm">
           {fmtNative(stats.equity, property.currency, true)}
         </p>
         {isJoint && (
-          <p className="text-[10px] text-slate-400 mt-0.5">
+          <p className="text-[10px] text-fg-faint mt-0.5">
             {fmtNative(stats.totalEquity, property.currency, true)} total equity
           </p>
         )}
         {linkedMortgage && (
-          <p className="text-[10px] text-slate-400 mt-0.5">
+          <p className="text-[10px] text-fg-faint mt-0.5">
             LTV{' '}
             <span
               className={
                 stats.ltv < HEALTHY_LTV_THRESHOLD
-                  ? 'text-emerald-600 font-medium'
-                  : 'text-amber-600 font-medium'
+                  ? 'text-success font-medium'
+                  : 'text-warning font-medium'
               }
             >
               {formatPercent(stats.ltv, 1)}
@@ -165,16 +165,16 @@ type MortgageLinkRowProps = {
 function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRowProps) {
   if (linkedMortgage) {
     return (
-      <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 mb-3">
+      <div className="flex items-center justify-between bg-surface-sunken border border-border-subtle rounded-xl px-3 py-2.5 mb-3">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-            <Building2 size={11} className="text-indigo-600" />
+          <div className="w-6 h-6 rounded-lg bg-brand-soft-strong flex items-center justify-center flex-shrink-0">
+            <Building2 size={11} className="text-brand" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] text-slate-400">
+            <p className="text-[10px] text-fg-faint">
               {property.isJoint ? 'Joint mortgage' : 'Linked mortgage'} · {linkedMortgage.lender}
             </p>
-            <p className="text-xs font-semibold text-slate-800 truncate">
+            <p className="text-xs font-semibold text-fg-emphasis truncate">
               {fmtNative(linkedMortgage.outstandingBalance, linkedMortgage.currency, true)}{' '}
               {property.isJoint ? 'total outstanding' : 'outstanding'} ·{' '}
               {formatPercent(linkedMortgage.interestRate, 2)}
@@ -183,7 +183,7 @@ function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRo
         </div>
         <Link
           to="/mortgage"
-          className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors flex-shrink-0"
+          className="flex items-center gap-1 text-[10px] font-semibold text-brand hover:text-brand-strong transition-colors flex-shrink-0"
         >
           View <ExternalLink size={10} />
         </Link>
@@ -193,19 +193,19 @@ function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRo
   return (
     <Link
       to="/mortgage"
-      className="flex items-center justify-between bg-slate-50 border border-dashed border-slate-200 rounded-xl px-3 py-2.5 mb-3 hover:border-indigo-300 hover:bg-indigo-50/40 transition-all group"
+      className="flex items-center justify-between bg-surface-sunken border border-dashed border-border-default rounded-xl px-3 py-2.5 mb-3 hover:border-brand-border hover:bg-brand-soft/40 transition-all group"
     >
       <div className="flex items-center gap-2 min-w-0">
-        <div className="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
-          <Building2 size={11} className="text-slate-400" />
+        <div className="w-6 h-6 rounded-lg bg-border-default flex items-center justify-center flex-shrink-0">
+          <Building2 size={11} className="text-fg-faint" />
         </div>
-        <p className="text-xs text-slate-400 truncate">
+        <p className="text-xs text-fg-faint truncate">
           No mortgage linked — add one on the Mortgage page
         </p>
       </div>
       <ExternalLink
         size={11}
-        className="text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0"
+        className="text-fg-disabled group-hover:text-brand-accent transition-colors flex-shrink-0"
       />
     </Link>
   );
@@ -222,32 +222,32 @@ function PropertyPLGrid({ property, stats, fmtNative }: PropertyPLGridProps) {
   return (
     <>
       <div className="grid grid-cols-3 gap-2 mb-3">
-        <div className="text-center bg-indigo-50 rounded-xl p-2.5">
-          <p className="text-[9px] text-indigo-500 font-medium uppercase tracking-wide mb-0.5">
+        <div className="text-center bg-brand-soft rounded-xl p-2.5">
+          <p className="text-[9px] text-brand-accent font-medium uppercase tracking-wide mb-0.5">
             Gross Rent
           </p>
-          <p className="text-xs font-bold text-indigo-700">
+          <p className="text-xs font-bold text-brand-fg">
             +{fmtNative(totalRent, property.currency, true)}
           </p>
         </div>
-        <div className="text-center bg-rose-50 rounded-xl p-2.5">
-          <p className="text-[9px] text-rose-500 font-medium uppercase tracking-wide mb-0.5">
+        <div className="text-center bg-danger-soft rounded-xl p-2.5">
+          <p className="text-[9px] text-danger font-medium uppercase tracking-wide mb-0.5">
             Expenses
           </p>
-          <p className="text-xs font-bold text-rose-600">
+          <p className="text-xs font-bold text-danger-hover">
             -{fmtNative(totalExpenses, property.currency, true)}
           </p>
         </div>
         <div
-          className={`text-center rounded-xl p-2.5 ${netDisplay >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}
+          className={`text-center rounded-xl p-2.5 ${netDisplay >= 0 ? 'bg-success-soft' : 'bg-danger-soft'}`}
         >
           <p
-            className={`text-[9px] font-medium uppercase tracking-wide mb-0.5 ${netDisplay >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+            className={`text-[9px] font-medium uppercase tracking-wide mb-0.5 ${netDisplay >= 0 ? 'text-success' : 'text-danger'}`}
           >
             Net Income
           </p>
           <p
-            className={`text-xs font-bold ${netDisplay >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}
+            className={`text-xs font-bold ${netDisplay >= 0 ? 'text-success-fg' : 'text-danger-hover'}`}
           >
             {netDisplay >= 0 ? '+' : '-'}
             {fmtNative(Math.abs(netDisplay), property.currency, true)}
@@ -267,11 +267,11 @@ type PropertyYieldBadgesProps = {
 function PropertyYieldBadges({ grossYield, netYield }: PropertyYieldBadgesProps) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">
+      <span className="text-[10px] bg-brand-soft text-brand-fg px-2.5 py-1 rounded-full font-semibold">
         Gross yield {formatPercent(grossYield, 2)}
       </span>
       <span
-        className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${netYield >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}
+        className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${netYield >= 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-hover'}`}
       >
         Net yield {formatPercent(netYield, 2)}
       </span>
@@ -314,35 +314,35 @@ function PropertyCardHeader({
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-2xl leading-none flex-shrink-0">{property.emoji}</span>
         <div className="min-w-0">
-          <p className="font-semibold text-slate-900 truncate">{property.address}</p>
+          <p className="font-semibold text-fg truncate">{property.address}</p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <JointBadge isJoint={property.isJoint} ownerUserId={property.userId} size="xs" />
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+            <span className="text-[10px] bg-surface-muted text-fg-muted px-2 py-0.5 rounded-full font-medium">
               {property.propertyType}
             </span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+            <span className="text-[10px] bg-brand-soft text-brand px-2 py-0.5 rounded-full font-medium">
               {property.currency}
             </span>
             {!linkedMortgage && (
-              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
+              <span className="text-[10px] bg-success-soft text-success px-2 py-0.5 rounded-full font-medium">
                 Unencumbered
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">{txnCount} transactions</p>
+          <p className="text-[11px] text-fg-faint mt-1">{txnCount} transactions</p>
         </div>
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
         <button
           onClick={() => onUpdateProperty(property)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-surface-muted text-fg-faint hover:text-fg-muted transition-colors"
           title="Edit property"
         >
           <Edit3 size={14} />
         </button>
         <button
           onClick={() => onToggleExpanded(property.id)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-surface-muted text-fg-faint hover:text-fg-muted transition-colors"
           title={isExpanded ? 'Collapse' : 'View transactions'}
         >
           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -361,9 +361,9 @@ function PropertyCard(props: PropertyCardProps) {
 
   return (
     <div
-      className={`border border-slate-100 rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${isExpanded ? 'shadow-md' : ''}`}
+      className={`border border-border-subtle rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${isExpanded ? 'shadow-md' : ''}`}
     >
-      <div className="p-5 bg-white">
+      <div className="p-5 bg-surface">
         <PropertyCardHeader
           property={property}
           linkedMortgage={linkedMortgage}
@@ -454,13 +454,13 @@ export function PropertyTab({
   return (
     <div>
       <div className="px-6 pt-5 pb-3 flex items-center justify-between">
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-fg-faint">
           {properties.length} {properties.length === 1 ? 'property' : 'properties'} · click a card
           to view transactions
         </p>
         <button
           onClick={onAddProperty}
-          className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition-colors"
+          className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover text-fg-inverted px-4 py-2 rounded-xl transition-colors"
         >
           <Plus size={15} /> Add Property
         </button>

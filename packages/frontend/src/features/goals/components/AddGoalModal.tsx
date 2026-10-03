@@ -1,3 +1,4 @@
+import { dataColorToken } from '@/lib/dataColors';
 import { Link2 } from 'lucide-react';
 import {
   FormField,
@@ -117,7 +118,7 @@ function SavingsSourceSelector({
           setField('currency', account ? account.currency : baseCurrency);
         }}
       />
-      <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+      <p className="text-[10px] text-fg-faint mt-1.5 flex items-center gap-1">
         <Link2 size={10} />
         {selectedSource
           ? `Progress will use ${selectedSource.name}'s latest balance.`
@@ -135,11 +136,11 @@ function LinkedCurrentAmountSummary({
   fmtNative: (amount: number, currency: string) => string;
 }>) {
   return (
-    <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
+    <div className="rounded-xl border border-brand-soft-strong bg-brand-soft/70 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-accent">
         Linked Current Amount
       </p>
-      <p className="mt-0.5 text-sm font-semibold text-slate-800">
+      <p className="mt-0.5 text-sm font-semibold text-fg-emphasis">
         {fmtNative(selectedSource.balance, selectedSource.currency)}
       </p>
     </div>
@@ -217,10 +218,10 @@ function AutoLinkedSourceSummary({
   fmtBase: AmountFieldsSavingsPortfolioProps['fmtBase'];
 }>) {
   return (
-    <div className="col-span-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold text-slate-800">{fmtBase(currentValue)}</p>
-      <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+    <div className="col-span-2 rounded-xl border border-brand-soft-strong bg-brand-soft/70 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-accent">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-fg-emphasis">{fmtBase(currentValue)}</p>
+      <p className="text-[10px] text-fg-faint mt-1 flex items-center gap-1">
         <Link2 size={10} /> {description}
       </p>
     </div>
@@ -307,7 +308,7 @@ function AmountFieldsSalary({
           value={form.target}
           onChange={(value) => setField('target', value)}
         />
-        <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+        <p className="text-[10px] text-fg-faint mt-1.5 flex items-center gap-1">
           <Link2 size={10} /> Current salary auto-linked from your Salary page
         </p>
       </FormField>
@@ -402,8 +403,8 @@ function AmountFieldsInvestHabit({
       <FormField label="End Month">
         <MonthInput value={deadlineToMonthString(form.deadline)} onChange={handleEndMonthChange} />
       </FormField>
-      <div className="col-span-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5">
-        <p className="text-[10px] text-slate-400 flex items-center gap-1">
+      <div className="col-span-2 rounded-xl border border-brand-soft-strong bg-brand-soft/70 px-3 py-2.5">
+        <p className="text-[10px] text-fg-faint flex items-center gap-1">
           <Link2 size={10} /> Monthly buy transactions auto-tracked from your investments.
           {rangeMonths > 0 && ` ${rangeMonths} month${rangeMonths > 1 ? 's' : ''} in range.`}
         </p>
@@ -489,15 +490,15 @@ function GoalColorPicker({
 }: Readonly<{ selected: string; onSelect: (color: string) => void }>) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-2">Colour</label>
+      <label className="block text-xs font-semibold text-fg-muted mb-2">Colour</label>
       <div className="flex flex-wrap gap-2">
         {COLORS.map((color) => (
           <button
             key={color}
             type="button"
             onClick={() => onSelect(color)}
-            className={`w-7 h-7 rounded-lg transition-all ${selected === color ? 'ring-2 ring-offset-2 ring-indigo-400 scale-110' : 'hover:scale-105'}`}
-            style={{ backgroundColor: color }}
+            className={`w-7 h-7 rounded-lg transition-all ${selected === color ? 'ring-2 ring-offset-2 ring-brand-disabled scale-110' : 'hover:scale-105'}`}
+            style={{ backgroundColor: dataColorToken(color) }}
           />
         ))}
       </div>
@@ -514,7 +515,7 @@ function GoalTypeStep({
   );
   return (
     <div className="p-6">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+      <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-3">
         Select goal type
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -524,7 +525,7 @@ function GoalTypeStep({
             <button
               key={goalType}
               onClick={() => onSelect(goalType)}
-              className="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-left group"
+              className="flex items-start gap-3 p-4 rounded-2xl border-2 border-border-subtle hover:border-brand-border hover:bg-brand-soft/50 transition-all text-left group"
             >
               <div
                 className={`w-9 h-9 rounded-xl ${bg} ${text} flex items-center justify-center flex-shrink-0 mt-0.5`}
@@ -532,10 +533,10 @@ function GoalTypeStep({
                 <Icon size={16} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-800 group-hover:text-indigo-700 leading-tight">
+                <p className="text-sm font-semibold text-fg-emphasis group-hover:text-brand-fg leading-tight">
                   {meta.label}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{meta.description}</p>
+                <p className="text-[10px] text-fg-faint mt-0.5 leading-snug">{meta.description}</p>
               </div>
             </button>
           );
@@ -576,7 +577,7 @@ export function GoalDetailsStep({
     <div className="p-6 space-y-4">
       <button
         onClick={onBack}
-        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 transition-colors"
+        className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-brand transition-colors"
       >
         {'<- Change type'}
         <span

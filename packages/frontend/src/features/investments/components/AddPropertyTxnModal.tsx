@@ -41,36 +41,36 @@ function PropertyTxnInfoBar({
   fmtNative,
 }: PropertyTxnInfoBarProps) {
   return (
-    <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-2.5 text-xs text-slate-600">
+    <div className="flex items-center gap-3 bg-surface-sunken rounded-xl px-4 py-2.5 text-xs text-fg-muted">
       {type === 'repayment' ? (
         <>
           <span>Current mortgage</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-semibold text-slate-800">
+          <span className="text-fg-disabled">·</span>
+          <span className="font-semibold text-fg-emphasis">
             {fmtNative(mortgageBalance, property.currency)}
           </span>
         </>
       ) : type === 'valuation' ? (
         <>
           <span>Current value</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-semibold text-slate-800">
+          <span className="text-fg-disabled">·</span>
+          <span className="font-semibold text-fg-emphasis">
             {fmtNative(property.currentValue, property.currency)}
           </span>
         </>
       ) : type === 'rent_income' ? (
         <>
           <span>Monthly rent target</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-semibold text-slate-800">
+          <span className="text-fg-disabled">·</span>
+          <span className="font-semibold text-fg-emphasis">
             {fmtNative(property.monthlyRent, property.currency)}
           </span>
         </>
       ) : (
         <>
           <span>Property value</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-semibold text-slate-800">
+          <span className="text-fg-disabled">·</span>
+          <span className="font-semibold text-fg-emphasis">
             {fmtNative(property.currentValue, property.currency)}
           </span>
         </>
@@ -111,26 +111,26 @@ function RepaymentPreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Total payment</span>
-        <span className="font-semibold text-slate-800">
+        <span className="text-fg-muted">Total payment</span>
+        <span className="font-semibold text-fg-emphasis">
           {fmtNative(parsedAmount, currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Interest (cost)</span>
-        <span className="font-semibold text-rose-500">
+        <span className="text-fg-muted">Interest (cost)</span>
+        <span className="font-semibold text-danger">
           {fmtNative(parsedInterest, currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Principal (reduces mortgage)</span>
-        <span className="font-semibold text-indigo-600">
+        <span className="text-fg-muted">Principal (reduces mortgage)</span>
+        <span className="font-semibold text-brand">
           -{fmtNative(derivedPrincipal, currency, true)}
         </span>
       </div>
-      <div className="flex justify-between text-xs border-t border-indigo-100 pt-1.5 mt-1">
-        <span className="text-slate-600">New mortgage balance</span>
-        <span className="font-semibold text-slate-800">
+      <div className="flex justify-between text-xs border-t border-brand-soft-strong pt-1.5 mt-1">
+        <span className="text-fg-muted">New mortgage balance</span>
+        <span className="font-semibold text-fg-emphasis">
           {fmtNative(Math.max(0, mortgageBalance - derivedPrincipal), currency, true)}
         </span>
       </div>
@@ -155,20 +155,20 @@ function ValuationPreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Previous value</span>
-        <span className="font-semibold text-slate-800">
+        <span className="text-fg-muted">Previous value</span>
+        <span className="font-semibold text-fg-emphasis">
           {fmtNative(currentValue, currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">New value</span>
-        <span className={`font-semibold ${isUp ? 'text-emerald-600' : 'text-rose-500'}`}>
+        <span className="text-fg-muted">New value</span>
+        <span className={`font-semibold ${isUp ? 'text-success' : 'text-danger'}`}>
           {fmtNative(parsedAmount, currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Change</span>
-        <span className={`font-semibold ${isUp ? 'text-emerald-600' : 'text-rose-500'}`}>
+        <span className="text-fg-muted">Change</span>
+        <span className={`font-semibold ${isUp ? 'text-success' : 'text-danger'}`}>
           {isUp ? '+' : ''}
           {fmtNative(parsedAmount - currentValue, currency, true)}
         </span>
@@ -197,14 +197,14 @@ function RentExpensePreview({
     return (
       <div className="space-y-1.5">
         <div className="flex justify-between text-xs">
-          <span className="text-slate-600">Income booked</span>
-          <span className="font-semibold text-sky-700">
+          <span className="text-fg-muted">Income booked</span>
+          <span className="font-semibold text-info-fg">
             +{fmtNative(parsedAmount, currency, true)}
           </span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-slate-600">Vs monthly target</span>
-          <span className={`font-semibold ${diff >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+          <span className="text-fg-muted">Vs monthly target</span>
+          <span className={`font-semibold ${diff >= 0 ? 'text-success' : 'text-warning'}`}>
             {diff >= 0 ? '+' : ''}
             {fmtNative(diff, currency, true)}
           </span>
@@ -216,14 +216,14 @@ function RentExpensePreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Expense booked</span>
-        <span className="font-semibold text-rose-600">
+        <span className="text-fg-muted">Expense booked</span>
+        <span className="font-semibold text-danger-hover">
           -{fmtNative(parsedAmount, currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Net vs monthly rent</span>
-        <span className={`font-semibold ${net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <span className="text-fg-muted">Net vs monthly rent</span>
+        <span className={`font-semibold ${net >= 0 ? 'text-success' : 'text-danger-hover'}`}>
           {net >= 0 ? '+' : ''}
           {fmtNative(net, currency, true)}
         </span>
@@ -323,16 +323,16 @@ function RepaymentField({
         onChange={onInterestChange}
         error={Boolean(error) && parsedInterest > parsedAmount}
       />
-      <div className="mt-2 flex gap-4 text-xs text-slate-500">
+      <div className="mt-2 flex gap-4 text-xs text-fg-subtle">
         <span>
           Interest:{' '}
-          <span className="font-semibold text-rose-500">
+          <span className="font-semibold text-danger">
             {fmtNative(parsedInterest, property.currency, true)}
           </span>
         </span>
         <span>
           Principal:{' '}
-          <span className="font-semibold text-indigo-600">
+          <span className="font-semibold text-brand">
             {fmtNative(derivedPrincipal, property.currency, true)}
           </span>
         </span>
@@ -446,7 +446,7 @@ function AmountAndRepaymentFields({ form, property, fmtNative }: AmountAndRepaym
           }}
         />
       )}
-      {error && parsedAmount > 0 && <p className="text-xs text-rose-500">{error}</p>}
+      {error && parsedAmount > 0 && <p className="text-xs text-danger">{error}</p>}
     </>
   );
 }

@@ -46,38 +46,38 @@ export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => 
     {
       label: 'Gross Pay',
       val: payslip.gross,
-      color: 'bg-slate-200',
-      tc: 'text-slate-700',
+      color: 'bg-border-default',
+      tc: 'text-fg-strong',
     },
     ...(payslip.bonus
       ? [
           {
             label: 'Bonus',
             val: payslip.bonus,
-            color: 'bg-amber-200',
-            tc: 'text-amber-700',
+            color: 'bg-warning-border',
+            tc: 'text-warning-fg',
           },
         ]
       : []),
     {
       label: 'Take-Home Pay',
       val: payslip.net,
-      color: 'bg-emerald-500',
-      tc: 'text-emerald-700',
+      color: 'bg-success-accent',
+      tc: 'text-success-fg',
       pct: percentageOfTotal(Math.abs(payslip.net), totalPay),
     },
     {
       label: hasTaxCorrection ? 'Tax Correction' : 'Income Tax',
       val: -payslip.tax,
-      color: hasTaxCorrection ? 'bg-emerald-300' : 'bg-rose-400',
-      tc: hasTaxCorrection ? 'text-emerald-700' : 'text-rose-600',
+      color: hasTaxCorrection ? 'bg-success-border-strong' : 'bg-danger-muted',
+      tc: hasTaxCorrection ? 'text-success-fg' : 'text-danger-hover',
       pct: percentageOfTotal(Math.abs(payslip.tax), totalPay),
     },
     {
       label: hasPensionCorrection ? 'Pension Correction' : 'Pension',
       val: -payslip.pension,
-      color: hasPensionCorrection ? 'bg-emerald-300' : 'bg-indigo-400',
-      tc: hasPensionCorrection ? 'text-emerald-700' : 'text-indigo-600',
+      color: hasPensionCorrection ? 'bg-success-border-strong' : 'bg-brand-disabled',
+      tc: hasPensionCorrection ? 'text-success-fg' : 'text-brand',
       pct: percentageOfTotal(Math.abs(payslip.pension), totalPay),
     },
   ];

@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import { ArchiveOrDeleteDialog, Modal, ModalFooter } from '@/components/ui';
+import {
+  ArchiveOrDeleteDialog,
+  Modal,
+  ModalFooter,
+  CurrencyInput,
+  TextInput,
+  FormField,
+  SelectInput,
+  IconButton,
+} from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   formatNumber,
@@ -57,27 +66,23 @@ type PropertySectionProps = { form: FormState; errors: Errors; setField: SetFiel
 function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
   return (
     <div className="grid grid-cols-3 gap-3">
-      <div className="col-span-2">
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Lender <span className="text-rose-500">*</span>
-        </label>
-        <input
-          className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.lender ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+      <FormField label="Lender" required error={errors.lender} className="col-span-2">
+        <TextInput
+          error={Boolean(errors.lender)}
           placeholder="e.g. ABN AMRO"
           value={form.lender}
-          onChange={(e) => setField('lender', e.target.value)}
+          onChange={(value) => setField('lender', value)}
         />
-        {errors.lender && <p className="text-xs text-rose-500 mt-1">{errors.lender}</p>}
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Currency</label>
-        <input
+      </FormField>
+      <FormField label="Currency">
+        <TextInput
           disabled
           readOnly
-          className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+          className="bg-surface-muted text-fg-subtle"
           value={form.currency}
+          onChange={() => undefined}
         />
-      </div>
+      </FormField>
     </div>
   );
 }
@@ -85,23 +90,19 @@ function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
 function PropertySection({ form, errors, setField }: PropertySectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-        Property
-      </p>
+      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">Property</p>
       <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Property Address
-          </label>
-          <input
+        <FormField label="Property Address">
+          <TextInput
             disabled
             readOnly
-            className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+            className="bg-surface-muted text-fg-subtle"
             placeholder="Select a property below"
             value={form.propertyAddress}
+            onChange={() => undefined}
           />
-          <p className="text-[10px] text-slate-400 mt-1">Taken from the linked property.</p>
-        </div>
+          <p className="text-[10px] text-fg-faint mt-1">Taken from the linked property.</p>
+        </FormField>
         <LenderCurrencyGrid form={form} errors={errors} setField={setField} />
       </div>
     </div>
@@ -127,34 +128,33 @@ function PropertyLinkSection({
 }: PropertyLinkSectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">
         Property Link
       </p>
-      <select
-        className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.linkedPropertyId ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-        value={form.linkedPropertyId}
-        onChange={(e) => setField('linkedPropertyId', e.target.value)}
-      >
-        <option value="">Select a property</option>
-        {availableProperties.map((property) => (
-          <option key={property.id} value={property.id.toString()}>
-            {property.emoji} {property.address} ({property.currency})
-          </option>
-        ))}
-      </select>
-      {errors.linkedPropertyId && (
-        <p className="text-xs text-rose-500 mt-1">{errors.linkedPropertyId}</p>
-      )}
-      <p className="text-[10px] text-slate-400 mt-1.5">
+      <FormField label="Linked Property" error={errors.linkedPropertyId}>
+        <SelectInput
+          error={Boolean(errors.linkedPropertyId)}
+          value={form.linkedPropertyId}
+          onChange={(value) => setField('linkedPropertyId', value)}
+          options={[
+            { value: '', label: 'Select a property' },
+            ...availableProperties.map((property) => ({
+              value: property.id.toString(),
+              label: `${property.emoji} ${property.address} (${property.currency})`,
+            })),
+          ]}
+        />
+      </FormField>
+      <p className="text-[10px] text-fg-faint mt-1.5">
         Add a property first, then link the mortgage here.
       </p>
       {selectedProperty && (
-        <p className="text-[10px] text-indigo-600 mt-1">
+        <p className="text-[10px] text-brand mt-1">
           Using linked property details: {selectedProperty.address} ({selectedProperty.currency}).
         </p>
       )}
       {availableProperties.length === 0 && !existing && (
-        <p className="text-xs text-amber-600 mt-2">
+        <p className="text-xs text-warning mt-2">
           No unlinked properties available. Add a property in Investments first.
         </p>
       )}
@@ -188,41 +188,28 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
   ];
   return (
     <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">
         Loan Financials
       </p>
       <div className="grid grid-cols-2 gap-3">
         {fields.map(({ field, label, placeholder, readOnly }) => (
-          <div key={field}>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              {label} {!readOnly && <span className="text-rose-500">*</span>}
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
-                {form.currency}
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                disabled={readOnly}
-                readOnly={readOnly}
-                className={`w-full rounded-xl border pl-12 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
-                  readOnly
-                    ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
-                    : errors[field]
-                      ? 'border-rose-300 bg-rose-50'
-                      : 'border-slate-200 bg-slate-50'
-                }`}
-                placeholder={placeholder}
-                value={form[field]}
-                onChange={readOnly ? undefined : (e) => setField(field, e.target.value)}
-              />
-            </div>
-            {!readOnly && errors[field] && (
-              <p className="text-xs text-rose-500 mt-1">{errors[field]}</p>
-            )}
-          </div>
+          <FormField
+            key={field}
+            label={label}
+            required={!readOnly}
+            error={!readOnly && errors[field]}
+          >
+            <CurrencyInput
+              currency={form.currency}
+              disabled={readOnly}
+              readOnly={readOnly}
+              error={!readOnly && Boolean(errors[field])}
+              className={readOnly ? 'bg-surface-muted text-fg-subtle pr-3' : 'pr-3'}
+              placeholder={placeholder}
+              value={form[field]}
+              onChange={(value) => setField(field, value)}
+            />
+          </FormField>
         ))}
       </div>
     </div>
@@ -233,112 +220,82 @@ type RateTermSectionProps = { form: FormState; errors: Errors; setField: SetFiel
 
 function InterestRateField({ form, errors, setField }: RateTermSectionProps) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        Interest Rate (%) <span className="text-rose-500">*</span>
-      </label>
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
-          %
-        </span>
-        <input
-          type="number"
-          step="0.01"
-          className={`w-full rounded-xl border pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.interestRate ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-          placeholder="4.25"
-          value={form.interestRate}
-          onChange={(e) => setField('interestRate', e.target.value)}
-        />
-      </div>
-      {errors.interestRate && <p className="text-xs text-rose-500 mt-1">{errors.interestRate}</p>}
-    </div>
+    <FormField label="Interest Rate (%)" required error={errors.interestRate}>
+      <CurrencyInput
+        currency="%"
+        className="pl-8 pr-3"
+        step="0.01"
+        placeholder="4.25"
+        value={form.interestRate}
+        error={Boolean(errors.interestRate)}
+        onChange={(value) => setField('interestRate', value)}
+      />
+    </FormField>
   );
 }
 
 function LoanTermField({ form, errors, setField }: RateTermSectionProps) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        Loan Term <span className="text-rose-500">*</span>
-      </label>
+    <FormField label="Loan Term" required error={errors.termYears}>
       <div className="relative">
-        <input
+        <TextInput
           type="number"
-          className={`w-full rounded-xl border pl-3 pr-14 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${errors.termYears ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+          className="pr-14"
+          error={Boolean(errors.termYears)}
           placeholder="25"
           value={form.termYears}
-          onChange={(e) => setField('termYears', e.target.value)}
+          onChange={(value) => setField('termYears', value)}
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-faint">
           years
         </span>
       </div>
-      {errors.termYears && <p className="text-xs text-rose-500 mt-1">{errors.termYears}</p>}
-    </div>
+    </FormField>
   );
 }
 
 function OverpaymentLimitField({ form, setField }: { form: FormState; setField: SetFieldFn }) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        Overpayment Limit (%)
-      </label>
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">
-          %
-        </span>
-        <input
-          type="number"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          placeholder="10"
-          value={form.overpaymentLimit}
-          onChange={(e) => setField('overpaymentLimit', e.target.value)}
-        />
-      </div>
-    </div>
+    <FormField label="Overpayment Limit (%)">
+      <CurrencyInput
+        currency="%"
+        className="pl-8 pr-3"
+        step="1"
+        placeholder="10"
+        value={form.overpaymentLimit}
+        onChange={(value) => setField('overpaymentLimit', value)}
+      />
+    </FormField>
   );
 }
 
 function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">
         Rate & Term
       </p>
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-            Repayment Method
-          </label>
-          <select
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        <FormField label="Repayment Method">
+          <SelectInput
             value={form.repaymentType}
-            onChange={(e) => setField('repaymentType', toMortgageRepaymentType(e.target.value))}
-          >
-            {REPAYMENT_TYPES.map((type) => (
-              <option key={type}>{type}</option>
-            ))}
-          </select>
-          <p className="text-[10px] text-slate-400 mt-1">
+            onChange={(value) => setField('repaymentType', toMortgageRepaymentType(value))}
+            options={REPAYMENT_TYPES}
+          />
+          <p className="text-[10px] text-fg-faint mt-1">
             {form.repaymentType === 'Linear'
               ? 'Fixed principal; the monthly payment declines over time.'
               : 'Fixed payment; the principal share increases over time.'}
           </p>
-        </div>
+        </FormField>
         <InterestRateField form={form} errors={errors} setField={setField} />
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Rate Type</label>
-          <select
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        <FormField label="Rate Type">
+          <SelectInput
             value={form.rateType}
-            onChange={(e) => setField('rateType', toMortgageRateType(e.target.value))}
-          >
-            {RATE_TYPES.map((type) => (
-              <option key={type}>{type}</option>
-            ))}
-          </select>
-        </div>
+            onChange={(value) => setField('rateType', toMortgageRateType(value))}
+            options={RATE_TYPES}
+          />
+        </FormField>
         <LoanTermField form={form} errors={errors} setField={setField} />
         <OverpaymentLimitField form={form} setField={setField} />
       </div>
@@ -351,36 +308,30 @@ type DatesSectionProps = { form: FormState; setField: SetFieldFn };
 function DatesSection({ form, setField }: DatesSectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Dates</p>
+      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">Dates</p>
       <div className="grid grid-cols-3 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Start Date</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        <FormField label="Start Date">
+          <TextInput
             placeholder="e.g. March 2022"
             value={form.startDate}
-            onChange={(e) => setField('startDate', e.target.value)}
+            onChange={(value) => setField('startDate', value)}
           />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">End Date</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        </FormField>
+        <FormField label="End Date">
+          <TextInput
             placeholder="e.g. March 2047"
             value={form.endDate}
-            onChange={(e) => setField('endDate', e.target.value)}
+            onChange={(value) => setField('endDate', value)}
           />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Fixed Until</label>
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50"
+        </FormField>
+        <FormField label="Fixed Until">
+          <TextInput
             placeholder={form.rateType === 'Fixed' ? 'e.g. March 2027' : 'N/A'}
             disabled={form.rateType !== 'Fixed'}
             value={form.rateType === 'Fixed' ? form.fixedUntil : ''}
-            onChange={(e) => setField('fixedUntil', e.target.value)}
+            onChange={(value) => setField('fixedUntil', value)}
           />
-        </div>
+        </FormField>
       </div>
     </div>
   );
@@ -388,10 +339,10 @@ function DatesSection({ form, setField }: DatesSectionProps) {
 
 function getLtvColor(ltv: number) {
   if (ltv < LOW_LTV_THRESHOLD)
-    return { border: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-600' };
+    return { border: 'bg-success-soft border-success-soft-strong', text: 'text-success' };
   if (ltv < MEDIUM_LTV_THRESHOLD)
-    return { border: 'bg-amber-50 border-amber-100', text: 'text-amber-600' };
-  return { border: 'bg-rose-50 border-rose-100', text: 'text-rose-500' };
+    return { border: 'bg-warning-soft border-warning-soft-strong', text: 'text-warning' };
+  return { border: 'bg-danger-soft border-danger-soft-strong', text: 'text-danger' };
 }
 
 type LtvPreviewProps = { ltvPreview: string; form: FormState };
@@ -403,8 +354,8 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
   return (
     <div className={`rounded-xl p-4 border flex items-center justify-between ${border}`}>
       <div>
-        <p className="text-xs font-semibold text-slate-700">Loan-to-Value Preview</p>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <p className="text-xs font-semibold text-fg-strong">Loan-to-Value Preview</p>
+        <p className="text-xs text-fg-subtle mt-0.5">
           {form.currency}{' '}
           {formatNumber(n(form.outstandingBalance), numberFormat, {
             minimumFractionDigits: 2,
@@ -419,7 +370,7 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
       </div>
       <div className="text-right">
         <p className={`font-black text-xl ${text}`}>{ltvPreview}%</p>
-        <p className="text-[10px] text-slate-400">LTV</p>
+        <p className="text-[10px] text-fg-faint">LTV</p>
       </div>
     </div>
   );
@@ -475,13 +426,14 @@ function buildMortgageDeleteButton(
 ): React.ReactNode {
   if (!existing || !onDelete) return undefined;
   return (
-    <button
+    <IconButton
+      icon={Trash2}
+      label="Remove mortgage"
+      variant="danger"
+      size="lg"
+      className="border border-danger-border text-danger"
       onClick={onRequestConfirm}
-      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-rose-200 text-rose-500 hover:bg-rose-50 text-sm transition-colors"
-      title="Remove mortgage"
-    >
-      <Trash2 size={14} />
-    </button>
+    />
   );
 }
 
@@ -563,7 +515,7 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
       onClose={onClose}
       maxWidth="xl"
       scrollable
-      backdropClassName="bg-black/50 backdrop-blur-sm"
+      backdropClassName="bg-overlay/50 backdrop-blur-sm"
       bodyClassName="p-0 space-y-0"
       footer={
         <ModalFooter

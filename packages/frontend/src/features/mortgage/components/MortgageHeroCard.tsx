@@ -55,10 +55,10 @@ export function MortgageHeroCard({
   const metrics = buildMortgageMetrics(mortgage, fmt, yearsRemaining, monthsRemaining);
 
   return (
-    <div className="bg-gradient-to-br from-[#0a0f1e] to-[#1a2040] rounded-2xl p-6 text-white">
+    <div className="bg-gradient-to-br from-surface-inverse to-surface-mortgage-end rounded-2xl p-6 text-fg-inverted">
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-surface/10 flex items-center justify-center flex-shrink-0">
             <Home size={22} />
           </div>
           <div>
@@ -66,7 +66,7 @@ export function MortgageHeroCard({
               <h2 className="font-bold text-lg">{mortgage.propertyAddress}</h2>
               <JointBadge isJoint={mortgage.isJoint} ownerUserId={mortgage.userId} />
             </div>
-            <p className="text-slate-400 text-sm">
+            <p className="text-fg-faint text-sm">
               {mortgage.lender} · {mortgage.repaymentType} · {mortgage.rateType} Rate · Fixed until{' '}
               {mortgage.fixedUntil}
             </p>
@@ -74,17 +74,17 @@ export function MortgageHeroCard({
         </div>
         <button
           onClick={onEdit}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white border border-white/20 hover:border-white/40 px-3 py-1.5 rounded-xl transition-all flex-shrink-0"
+          className="flex items-center gap-1.5 text-xs text-fg-faint hover:text-fg-inverted border border-fg-inverted/20 hover:border-fg-inverted/40 px-3 py-1.5 rounded-xl transition-all flex-shrink-0"
         >
           <Edit3 size={12} /> Edit
         </button>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {metrics.map(({ label, value, sub }) => (
-          <div key={label} className="bg-white/10 rounded-xl p-4">
-            <p className="text-xs text-slate-400 mb-1">{label}</p>
-            <p className="font-bold text-white">{value}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+          <div key={label} className="bg-surface/10 rounded-xl p-4">
+            <p className="text-xs text-fg-faint mb-1">{label}</p>
+            <p className="font-bold text-fg-inverted">{value}</p>
+            <p className="text-xs text-fg-faint mt-0.5">{sub}</p>
           </div>
         ))}
       </div>

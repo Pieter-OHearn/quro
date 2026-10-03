@@ -48,11 +48,11 @@ function RemainingCard({ remaining, fmt }: Readonly<{ remaining: number; fmt: Bu
     <StatCard
       label="Remaining"
       value={`${isPositive ? '+' : ''}${fmt(remaining)}`}
-      valueClassName={isPositive ? 'text-emerald-600' : 'text-rose-500'}
+      valueClassName={isPositive ? 'text-success' : 'text-danger'}
       subtitle={isPositive ? 'Under budget' : 'Over budget'}
       icon={isPositive ? CheckCircle2 : AlertTriangle}
       color={isPositive ? 'emerald' : 'rose'}
-      className={isPositive ? undefined : 'border-rose-200'}
+      className={isPositive ? undefined : 'border-danger-border'}
     />
   );
 }
@@ -62,7 +62,7 @@ function SavingsRateCard({ savingsRate }: Readonly<{ savingsRate: number }>) {
     <StatCard
       label="Savings Rate"
       value={formatPercent(savingsRate, 1)}
-      valueClassName="text-sky-600"
+      valueClassName="text-info"
       subtitle="of monthly budget"
       icon={CheckCircle2}
       color="sky"

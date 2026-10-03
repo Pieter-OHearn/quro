@@ -56,25 +56,25 @@ function BuyPreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Total cost</span>
-        <span className="font-semibold text-slate-800">
+        <span className="text-fg-muted">Total cost</span>
+        <span className="font-semibold text-fg-emphasis">
           {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">New avg cost</span>
-        <span className="font-semibold text-emerald-700">
+        <span className="text-fg-muted">New avg cost</span>
+        <span className="font-semibold text-success-fg">
           {fmtNative(newAvgCost, holding.currency, true)}
           {newAvgCost !== currentPosition.avgCost && currentPosition.shares > 0 && (
-            <span className="text-slate-400 font-normal ml-1">
+            <span className="text-fg-faint font-normal ml-1">
               (was {fmtNative(currentPosition.avgCost, holding.currency, true)})
             </span>
           )}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">New position</span>
-        <span className="font-semibold text-slate-800">
+        <span className="text-fg-muted">New position</span>
+        <span className="font-semibold text-fg-emphasis">
           {(currentPosition.shares + parsedShares).toFixed(4).replace(/\.?0+$/, '')} shares
         </span>
       </div>
@@ -103,23 +103,23 @@ function SellPreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Proceeds</span>
-        <span className="font-semibold text-slate-800">
+        <span className="text-fg-muted">Proceeds</span>
+        <span className="font-semibold text-fg-emphasis">
           {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Realized gain/loss</span>
+        <span className="text-fg-muted">Realized gain/loss</span>
         <span
-          className={`font-semibold ${realizedGain >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+          className={`font-semibold ${realizedGain >= 0 ? 'text-success' : 'text-danger-hover'}`}
         >
           {realizedGain >= 0 ? '+' : ''}
           {fmtNative(realizedGain, holding.currency, true)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Remaining shares</span>
-        <span className="font-semibold text-slate-800">
+        <span className="text-fg-muted">Remaining shares</span>
+        <span className="font-semibold text-fg-emphasis">
           {Math.max(0, currentPosition.shares - parsedShares)
             .toFixed(4)
             .replace(/\.?0+$/, '')}
@@ -139,8 +139,8 @@ type DividendPreviewProps = {
 function DividendPreview({ parsedPrice, holding, fmtNative, incomeLabel }: DividendPreviewProps) {
   return (
     <div className="flex justify-between text-xs">
-      <span className="text-indigo-700 font-medium">{incomeLabel} income</span>
-      <span className="font-bold text-indigo-700">
+      <span className="text-brand-fg font-medium">{incomeLabel} income</span>
+      <span className="font-bold text-brand-fg">
         +{fmtNative(parsedPrice, holding.currency, true)}
       </span>
     </div>
@@ -172,10 +172,10 @@ function TxnPreview({
 }: TxnPreviewProps) {
   const bgClass =
     type === 'sell'
-      ? 'bg-rose-50 border-rose-100'
+      ? 'bg-danger-soft border-danger-soft-strong'
       : type === 'dividend'
-        ? 'bg-indigo-50 border-indigo-100'
-        : 'bg-emerald-50 border-emerald-100';
+        ? 'bg-brand-soft border-brand-soft-strong'
+        : 'bg-success-soft border-success-soft-strong';
 
   return (
     <div className={`rounded-xl p-4 border ${bgClass}`}>
@@ -220,13 +220,13 @@ type PositionInfoBarProps = {
 function PositionInfoBar({ currentPosition, holding, fmtNative }: PositionInfoBarProps) {
   if (currentPosition.shares <= 0) return null;
   return (
-    <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-2.5 text-xs text-slate-600">
-      <span className="font-semibold text-slate-800">
+    <div className="flex items-center gap-3 bg-surface-sunken rounded-xl px-4 py-2.5 text-xs text-fg-muted">
+      <span className="font-semibold text-fg-emphasis">
         {currentPosition.shares.toFixed(4).replace(/\.?0+$/, '')} shares
       </span>
-      <span className="text-slate-300">·</span>
+      <span className="text-fg-disabled">·</span>
       <span>avg cost {fmtNative(currentPosition.avgCost, holding.currency, true)}</span>
-      <span className="text-slate-300">·</span>
+      <span className="text-fg-disabled">·</span>
       <span>current {fmtNative(holding.currentPrice, holding.currency, true)}</span>
     </div>
   );

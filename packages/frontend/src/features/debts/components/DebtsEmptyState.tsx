@@ -10,7 +10,7 @@ export function DebtsEmptyState({ onAdd }: Readonly<{ onAdd: () => void }>) {
       action={{
         label: 'Add your first debt',
         onClick: onAdd,
-        className: 'bg-rose-600 hover:bg-rose-700',
+        className: 'bg-danger-hover hover:bg-danger-fg',
       }}
     />
   );

@@ -18,9 +18,9 @@ function formatSignedAmount(
 }
 
 function resolveInvestmentResultColor(amount: number): string {
-  if (amount > 0) return 'text-amber-700';
-  if (amount < 0) return 'text-rose-500';
-  return 'text-slate-800';
+  if (amount > 0) return 'text-warning-fg';
+  if (amount < 0) return 'text-danger';
+  return 'text-fg-emphasis';
 }
 
 export function buildPensionTxnStats(
@@ -48,22 +48,22 @@ export function buildPensionTxnStats(
     {
       label: 'Total Contributions',
       value: `+${fmtNative(total, currency, true)}`,
-      color: 'text-emerald-600',
+      color: 'text-success',
     },
     {
       label: 'Employee',
       value: fmtNative(employeeContributions, currency, true),
-      color: 'text-slate-800',
+      color: 'text-fg-emphasis',
     },
     {
       label: 'Employer',
       value: fmtNative(employerContributions, currency, true),
-      color: 'text-indigo-600',
+      color: 'text-brand',
     },
     {
       label: 'Total Fees',
       value: `\u2212${fmtNative(fees, currency, true)}`,
-      color: 'text-rose-500',
+      color: 'text-danger',
     },
     {
       label: resolveInvestmentResultLabel(annualStatements),

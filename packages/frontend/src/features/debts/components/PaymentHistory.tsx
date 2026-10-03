@@ -44,7 +44,7 @@ const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'font-semibold text-slate-800',
+    cellClassName: 'font-semibold text-fg-emphasis',
   },
   {
     key: 'principal',
@@ -55,7 +55,7 @@ const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'font-medium text-emerald-600',
+    cellClassName: 'font-medium text-success',
   },
   {
     key: 'interest',
@@ -67,14 +67,14 @@ const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'text-rose-500',
+    cellClassName: 'text-danger',
   },
   { key: 'actions', header: '', priority: 'actions', width: 40 },
 ];
 
 function PaymentHistoryEmpty() {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-4 text-slate-400">
+    <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-sunken px-4 py-4 text-fg-faint">
       <Clock size={16} className="flex-shrink-0" />
       <span className="text-sm">No payments recorded yet.</span>
     </div>
@@ -98,13 +98,13 @@ function PaymentHistoryTable({
       columns={PAYMENT_COLUMNS}
       sort={sort}
       onSortChange={onSortChange}
-      className="rounded-xl border border-slate-100"
+      className="rounded-xl border border-border-subtle"
       tableClassName="text-xs"
       bodyClassName="md:overflow-hidden"
     >
       {sortedPayments.map((payment) => (
         <DataTableRow key={payment.id} interactive>
-          <DataTableCell columnKey="date" className="text-slate-600">
+          <DataTableCell columnKey="date" className="text-fg-muted">
             {formatDate(payment.date, { day: 'numeric', month: 'short' })}
           </DataTableCell>
           <DataTableCell columnKey="amount">
@@ -120,7 +120,7 @@ function PaymentHistoryTable({
             <button
               type="button"
               onClick={() => onDeletePayment(payment.id)}
-              className="rounded-md p-1 text-slate-300 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 max-md:opacity-100"
+              className="rounded-md p-1 text-fg-disabled opacity-0 transition-all hover:bg-danger-soft hover:text-danger group-hover:opacity-100 max-md:opacity-100"
             >
               <Trash2 size={12} />
             </button>
@@ -141,14 +141,14 @@ export function PaymentHistory({
   const sortedPayments = useSortedRows(payments, PAYMENT_COLUMNS, sort, newestFirst);
 
   return (
-    <div className="mt-4 border-t border-slate-100 pt-4">
+    <div className="mt-4 border-t border-border-subtle pt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-subtle">
           Payment History
         </p>
         <Button
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-success hover:bg-success-fg"
           leadingIcon={<Plus size={12} />}
           onClick={onLogPayment}
         >

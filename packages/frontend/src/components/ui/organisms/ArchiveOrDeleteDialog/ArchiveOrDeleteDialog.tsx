@@ -1,3 +1,4 @@
+import { useCurrency } from '@/lib/currencyContextValue';
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Modal } from '../Modal';
@@ -40,26 +41,13 @@ export type ArchiveOrDeleteDialogProps = {
 
 const NEAR_ZERO_THRESHOLD = 0.005;
 
-function formatBalance(value: number, currency: string | undefined): string {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: currency ?? 'EUR',
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return value.toFixed(2);
-  }
-}
-
 function buildSubtitle(
   hasNonZeroBalance: boolean,
   hideArchive: boolean,
   args: {
     entityLabel: string;
     balanceLabel: string;
-    balanceCurrency?: string;
-    balance: number;
+    formattedBalance: string;
     childrenLabel: string;
   },
 ): string {
@@ -69,10 +57,7 @@ function buildSubtitle(
     }. Your wealth history for past months will be recomputed without it.`;
   }
   if (hasNonZeroBalance) {
-    return `This ${args.entityLabel.toLowerCase()} still has a ${args.balanceLabel} of ${formatBalance(
-      args.balance,
-      args.balanceCurrency,
-    )}. Archiving will create a step in your wealth chart on today's date — delete permanently if you no longer own it.`;
+    return `This ${args.entityLabel.toLowerCase()} still has a ${args.balanceLabel} of ${args.formattedBalance}. Archiving will create a step in your wealth chart on today's date — delete permanently if you no longer own it.`;
   }
   return `Archive keeps ${args.childrenLabel} so your wealth history stays continuous. Delete permanently removes everything.`;
 }
@@ -136,14 +121,14 @@ export function ArchiveOrDeleteDialog({
   onCancel,
   isPending,
 }: Readonly<ArchiveOrDeleteDialogProps>) {
+  const { fmtNative } = useCurrency();
   const [confirmName, setConfirmName] = useState('');
   const nameMatches = confirmName.trim() === entityName.trim();
   const hasNonZeroBalance = balance != null && Math.abs(balance) >= NEAR_ZERO_THRESHOLD;
   const subtitle = buildSubtitle(hasNonZeroBalance, hideArchive, {
     entityLabel,
     balanceLabel,
-    balanceCurrency,
-    balance: balance ?? 0,
+    formattedBalance: fmtNative(balance ?? 0, balanceCurrency ?? 'EUR', true),
     childrenLabel,
   });
 

@@ -33,19 +33,17 @@ function PropertyEquityPreview({
   fmtNative,
 }: PropertyEquityPreviewProps) {
   return (
-    <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+    <div className="bg-surface-sunken rounded-xl p-3 space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-500">Equity</span>
-        <span className={`font-semibold ${equity >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+        <span className="text-fg-subtle">Equity</span>
+        <span className={`font-semibold ${equity >= 0 ? 'text-success' : 'text-danger'}`}>
           {fmtNative(equity, currency, true)}
         </span>
       </div>
       {purchasePrice > 0 && (
         <div className="flex justify-between text-xs">
-          <span className="text-slate-500">Appreciation</span>
-          <span
-            className={`font-semibold ${appreciation >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
-          >
+          <span className="text-fg-subtle">Appreciation</span>
+          <span className={`font-semibold ${appreciation >= 0 ? 'text-success' : 'text-danger'}`}>
             {appreciation >= 0 ? '+' : ''}
             {fmtNative(appreciation, currency, true)}
           </span>

@@ -10,6 +10,7 @@ import sonarjsPlugin from 'eslint-plugin-sonarjs';
 import unicornPlugin from 'eslint-plugin-unicorn';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import noRawPalette from './scripts/eslint/no-raw-palette.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -170,6 +171,7 @@ export default [
     plugins: {
       react: reactPlugin,
       'react-hooks': reactHooksPlugin,
+      'quro-ui': { rules: { 'no-raw-palette': noRawPalette } },
     },
     settings: {
       react: {
@@ -188,6 +190,7 @@ export default [
           ],
         },
       ],
+      'quro-ui/no-raw-palette': 'error',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'react/no-array-index-key': 'warn',

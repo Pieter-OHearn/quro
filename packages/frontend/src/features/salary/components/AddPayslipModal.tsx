@@ -17,6 +17,7 @@ import {
   PdfAttachmentField,
   SelectInput,
   TextInput,
+  IconButton,
 } from '@/components/ui';
 import {
   PdfAttachmentUploadError,
@@ -89,30 +90,30 @@ function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps
 
   return (
     <div
-      className={`rounded-xl p-4 border ${net >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}
+      className={`rounded-xl p-4 border ${net >= 0 ? 'bg-success-soft border-success-soft-strong' : 'bg-danger-soft border-danger-soft-strong'}`}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Info size={15} className={net >= 0 ? 'text-emerald-600' : 'text-rose-500'} />
-          <p className="text-sm font-semibold text-slate-700">Calculated Take-Home</p>
+          <Info size={15} className={net >= 0 ? 'text-success' : 'text-danger'} />
+          <p className="text-sm font-semibold text-fg-strong">Calculated Take-Home</p>
         </div>
-        <p className={`font-bold ${net >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+        <p className={`font-bold ${net >= 0 ? 'text-success' : 'text-danger'}`}>
           {net >= 0 ? formatCurrencyValue(net, payCurrency, true, numberFormat) : 'Check values'}
         </p>
       </div>
       {previewTotal > 0 && (
         <div className="flex h-2 rounded-full overflow-hidden gap-px">
           {[
-            { id: 'net', pct: (Math.abs(net) / previewTotal) * 100, color: 'bg-emerald-500' },
+            { id: 'net', pct: (Math.abs(net) / previewTotal) * 100, color: 'bg-success-accent' },
             {
               id: 'tax',
               pct: (Math.abs(tax) / previewTotal) * 100,
-              color: tax < 0 ? 'bg-emerald-300' : 'bg-rose-400',
+              color: tax < 0 ? 'bg-success-border-strong' : 'bg-danger-muted',
             },
             {
               id: 'pension',
               pct: (Math.abs(pension) / previewTotal) * 100,
-              color: pension < 0 ? 'bg-emerald-300' : 'bg-indigo-400',
+              color: pension < 0 ? 'bg-success-border-strong' : 'bg-brand-disabled',
             },
           ]
             .filter((segment) => segment.pct > 0)
@@ -125,7 +126,7 @@ function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps
             ))}
         </div>
       )}
-      <p className="text-xs text-slate-400 mt-1.5">Gross, bonus and deduction adjustments</p>
+      <p className="text-xs text-fg-faint mt-1.5">Gross, bonus and deduction adjustments</p>
     </div>
   );
 }
@@ -209,8 +210,8 @@ function PayslipDeductionsRow({ form, errors, set, disabled }: Readonly<PayslipF
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Deductions</p>
-        <div className="flex-1 h-px bg-slate-100" />
+        <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide">Deductions</p>
+        <div className="flex-1 h-px bg-surface-muted" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField label={`Income Tax (${form.currency})`} required error={errors.tax}>
@@ -302,18 +303,19 @@ function buildDeleteButton(
   if (!existing || !onDelete) return undefined;
 
   return (
-    <button
+    <IconButton
+      icon={Trash2}
+      label="Delete payslip"
+      variant="danger"
+      size="lg"
+      className="border border-danger-border text-danger"
       type="button"
       disabled={busy}
       onClick={() => {
         onDelete(existing.id);
         onClose();
       }}
-      className="flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2.5 text-sm text-rose-500 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-      title="Delete payslip"
-    >
-      <Trash2 size={14} />
-    </button>
+    />
   );
 }
 
@@ -405,12 +407,12 @@ function PayslipModalBody({
   return (
     <>
       {!isEdit && savedPayslipId !== null && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
           Payslip saved. Retry the PDF upload or close this modal to finish without an attachment.
         </div>
       )}
       {formError && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger-fg">
           {formError}
         </div>
       )}

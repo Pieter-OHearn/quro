@@ -14,7 +14,7 @@ export function MonthlySummary({
         >
           <span className="text-3xl">{item.icon}</span>
           <div>
-            <p className="text-xs text-slate-500 mb-0.5">{item.label}</p>
+            <p className="text-xs text-fg-subtle mb-0.5">{item.label}</p>
             <p className={`font-bold ${item.text}`}>{item.value}</p>
           </div>
         </div>

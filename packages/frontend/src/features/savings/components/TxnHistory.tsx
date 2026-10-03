@@ -64,7 +64,7 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
             date={t.date}
             badge={
               t.bunqTransactionId
-                ? { text: 'Bunq', className: 'bg-sky-100 text-sky-700' }
+                ? { text: 'Bunq', className: 'bg-info-soft-strong text-info-fg' }
                 : undefined
             }
             amount={

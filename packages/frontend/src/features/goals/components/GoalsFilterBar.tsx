@@ -30,7 +30,7 @@ function FilterCountBadge({
 
   return (
     <span
-      className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeFilter === filterKey ? 'bg-white/20' : 'bg-slate-100'}`}
+      className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeFilter === filterKey ? 'bg-surface/20' : 'bg-surface-muted'}`}
     >
       {count}
     </span>
@@ -84,7 +84,7 @@ export function GoalsFilterBar({
       <button
         type="button"
         onClick={handleAdd}
-        className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl transition-colors"
+        className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover text-fg-inverted px-4 py-2.5 rounded-xl transition-colors"
       >
         <Plus size={15} />
         {FILTER_HAS_SINGLE_TYPE.has(activeFilter)

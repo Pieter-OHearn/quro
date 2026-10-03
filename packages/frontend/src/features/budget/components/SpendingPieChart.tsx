@@ -8,9 +8,9 @@ type SpendingPieChartProps = {
 
 export function SpendingPieChart({ pieData, fmtDec }: Readonly<SpendingPieChartProps>) {
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
-      <h3 className="font-semibold text-slate-900 mb-1">Spending Breakdown</h3>
-      <p className="text-xs text-slate-400 mb-4">Current month</p>
+    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
+      <h3 className="font-semibold text-fg mb-1">Spending Breakdown</h3>
+      <p className="text-xs text-fg-faint mb-4">Current month</p>
       {pieData.length > 0 ? (
         <>
           <div className="flex justify-center">
@@ -42,15 +42,15 @@ export function SpendingPieChart({ pieData, fmtDec }: Readonly<SpendingPieChartP
                     className="w-2.5 h-2.5 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="text-xs text-slate-600">{item.name}</span>
+                  <span className="text-xs text-fg-muted">{item.name}</span>
                 </div>
-                <span className="text-xs font-semibold text-slate-800">{fmtDec(item.value)}</span>
+                <span className="text-xs font-semibold text-fg-emphasis">{fmtDec(item.value)}</span>
               </div>
             ))}
           </div>
         </>
       ) : (
-        <p className="text-sm text-slate-400 py-12 text-center">No spending data yet.</p>
+        <p className="text-sm text-fg-faint py-12 text-center">No spending data yet.</p>
       )}
     </div>
   );

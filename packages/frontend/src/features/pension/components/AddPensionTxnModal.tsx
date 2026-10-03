@@ -66,14 +66,14 @@ function EmployerToggle({
       <button
         type="button"
         onClick={() => setIsEmployer(true)}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${isEmployer ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${isEmployer ? 'bg-brand-soft border-brand-border text-brand-fg' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
       >
         Employer
       </button>
       <button
         type="button"
         onClick={() => setIsEmployer(false)}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-success-soft border-success-border-strong text-success-fg' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
       >
         Employee
       </button>
@@ -93,14 +93,14 @@ function AnnualStatementDirectionToggle({
       <button
         type="button"
         onClick={() => onChange('gain')}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'gain' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'gain' ? 'bg-success-soft border-success-border-strong text-success-fg' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
       >
         Gain
       </button>
       <button
         type="button"
         onClick={() => onChange('loss')}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'loss' ? 'bg-rose-50 border-rose-300 text-rose-600' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'loss' ? 'bg-danger-soft border-danger-border-strong text-danger-hover' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
       >
         Loss
       </button>
@@ -315,8 +315,8 @@ function resolvePreviewLabel(params: {
 
 function resolvePreviewTone(isDeduction: boolean): { colorClass: string; bgClass: string } {
   return isDeduction
-    ? { colorClass: 'text-rose-600', bgClass: 'bg-rose-50 border-rose-100' }
-    : { colorClass: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-100' };
+    ? { colorClass: 'text-danger-hover', bgClass: 'bg-danger-soft border-danger-soft-strong' }
+    : { colorClass: 'text-success-fg', bgClass: 'bg-success-soft border-success-soft-strong' };
 }
 
 function PreviewBanner({
@@ -356,7 +356,7 @@ function PreviewBanner({
         </span>
       </div>
       {type === 'contribution' && taxAmount > 0 && (
-        <p className="mt-2 text-[11px] text-slate-500">
+        <p className="mt-2 text-[11px] text-fg-subtle">
           Gross {fmtNative(amount, currency, true)} · Tax {fmtNative(taxAmount, currency, true)}
         </p>
       )}

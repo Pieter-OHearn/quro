@@ -9,17 +9,17 @@ export function SummaryBanner({ debts }: Readonly<{ debts: readonly Debt[] }>) {
   const overview = useMemo(() => buildDebtOverview(debts, convertToBase), [debts, convertToBase]);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0a0f1e] via-[#1a0a1e] to-[#1e0a14] p-6 text-white">
-      <div className="absolute -right-10 -top-14 h-64 w-64 rounded-full bg-rose-500/10" />
-      <div className="absolute bottom-0 left-20 h-44 w-44 translate-y-1/2 rounded-full bg-indigo-500/10" />
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-surface-inverse via-surface-debt-middle to-surface-debt-end p-6 text-fg-inverted">
+      <div className="absolute -right-10 -top-14 h-64 w-64 rounded-full bg-danger/10" />
+      <div className="absolute bottom-0 left-20 h-44 w-44 translate-y-1/2 rounded-full bg-brand-accent/10" />
       <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-rose-300">
-            <TrendingDown size={16} className="text-rose-400" />
+          <div className="mb-2 flex items-center gap-2 text-danger-border-strong">
+            <TrendingDown size={16} className="text-danger-muted" />
             <span className="text-sm font-medium">Liabilities Overview</span>
           </div>
           <p className="text-3xl font-bold">{fmtBase(overview.totalBalance)}</p>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-fg-faint">
             Total outstanding across {overview.debtCount} debt
             {overview.debtCount === 1 ? '' : 's'}
           </p>
@@ -40,11 +40,11 @@ export function SummaryBanner({ debts }: Readonly<{ debts: readonly Debt[] }>) {
           ].map((metric) => (
             <div
               key={metric.label}
-              className="rounded-xl bg-white/8 px-4 py-3 text-center backdrop-blur-sm"
+              className="rounded-xl bg-surface/8 px-4 py-3 text-center backdrop-blur-sm"
             >
               <p className="text-lg">{metric.icon}</p>
-              <p className="text-sm font-bold text-white">{metric.value}</p>
-              <p className="mt-0.5 text-[10px] text-slate-400">{metric.label}</p>
+              <p className="text-sm font-bold text-fg-inverted">{metric.value}</p>
+              <p className="mt-0.5 text-[10px] text-fg-faint">{metric.label}</p>
             </div>
           ))}
         </div>

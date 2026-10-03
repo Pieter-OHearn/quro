@@ -79,15 +79,13 @@ function ProfileForm({
         subtitle="How Quro identifies you and personalises your planning assumptions."
       />
 
-      <div className="mb-6 flex items-center gap-5 rounded-3xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-5">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-sky-500 text-xl font-bold text-white shadow-lg shadow-indigo-200">
+      <div className="mb-6 flex items-center gap-5 rounded-3xl border border-brand-soft-strong bg-gradient-to-r from-brand-soft via-surface to-info-soft p-5">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-accent to-info-accent text-xl font-bold text-fg-inverted shadow-lg shadow-brand-tint">
           {initials}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-slate-900">
-            {getUserDisplayName(user)}
-          </p>
-          <p className="truncate text-sm text-slate-500">{user.email}</p>
+          <p className="truncate text-base font-semibold text-fg">{getUserDisplayName(user)}</p>
+          <p className="truncate text-sm text-fg-subtle">{user.email}</p>
           <div className="mt-2">
             <Badge tone="brand" size="md">
               <ShieldCheck size={12} />
@@ -178,17 +176,17 @@ function ProfileForm({
 
       {yearsAway > 0 ? (
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-3xl bg-slate-950 px-4 py-4 text-center">
-            <p className="text-3xl font-semibold text-white">{yearsAway}</p>
-            <p className="mt-1 text-xs text-slate-400">Years remaining to retirement</p>
+          <div className="rounded-3xl bg-fg-deep px-4 py-4 text-center">
+            <p className="text-3xl font-semibold text-fg-inverted">{yearsAway}</p>
+            <p className="mt-1 text-xs text-fg-faint">Years remaining to retirement</p>
           </div>
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-center">
-            <p className="text-3xl font-semibold text-slate-950">{elapsedPercent}%</p>
-            <p className="mt-1 text-xs text-slate-500">Career timeline already elapsed</p>
+          <div className="rounded-3xl border border-border-default bg-surface-sunken px-4 py-4 text-center">
+            <p className="text-3xl font-semibold text-fg-deep">{elapsedPercent}%</p>
+            <p className="mt-1 text-xs text-fg-subtle">Career timeline already elapsed</p>
           </div>
-          <div className="rounded-3xl bg-indigo-600 px-4 py-4 text-center">
-            <p className="text-3xl font-semibold text-white">{remainingPercent}%</p>
-            <p className="mt-1 text-xs text-indigo-100">Runway left to keep contributing</p>
+          <div className="rounded-3xl bg-brand px-4 py-4 text-center">
+            <p className="text-3xl font-semibold text-fg-inverted">{remainingPercent}%</p>
+            <p className="mt-1 text-xs text-brand-soft-strong">Runway left to keep contributing</p>
           </div>
         </div>
       ) : null}
@@ -207,7 +205,7 @@ function ProfileForm({
       </div>
 
       {formError ? (
-        <p className="mb-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+        <p className="mb-4 rounded-2xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
           {formError}
         </p>
       ) : null}

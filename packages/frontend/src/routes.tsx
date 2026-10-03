@@ -13,8 +13,8 @@ function RequireAuth() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <div className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-surface-sunken">
+        <div className="w-8 h-8 border-3 border-brand-tint border-t-brand rounded-full animate-spin" />
       </div>
     );
   }
@@ -31,8 +31,8 @@ function PublicOnly() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0a0f1e]">
-        <div className="w-8 h-8 border-3 border-indigo-200/20 border-t-indigo-400 rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-surface-inverse">
+        <div className="w-8 h-8 border-3 border-brand-tint/20 border-t-brand-disabled rounded-full animate-spin" />
       </div>
     );
   }

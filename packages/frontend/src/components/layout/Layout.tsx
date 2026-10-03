@@ -73,12 +73,12 @@ function CurrencyDropdown({
   ratesUpdatedAt,
 }: CurrencyDropdownWithRatesProps) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
-      <div className="px-3 py-2.5 border-b border-slate-100">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+    <div className="absolute right-0 top-full mt-2 w-56 bg-surface rounded-2xl border border-border-default shadow-xl z-50 overflow-hidden">
+      <div className="px-3 py-2.5 border-b border-border-subtle">
+        <p className="text-[10px] font-semibold text-fg-faint uppercase tracking-widest">
           Base Currency
         </p>
-        <p className="text-xs text-slate-500 mt-0.5">All totals convert to this currency</p>
+        <p className="text-xs text-fg-subtle mt-0.5">All totals convert to this currency</p>
       </div>
       <div className="py-1.5 max-h-72 overflow-y-auto">
         {CURRENCY_CODES.map((code: CurrencyCode) => {
@@ -88,19 +88,19 @@ function CurrencyDropdown({
             <button
               key={code}
               onClick={() => onSelect(code)}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-slate-50 transition-colors ${isSelected ? 'text-indigo-600' : 'text-slate-700'}`}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-surface-sunken transition-colors ${isSelected ? 'text-brand' : 'text-fg-strong'}`}
             >
               <span className="text-base">{m.flag}</span>
               <span className="flex-1 text-left">
                 <span className="font-medium">{code}</span>
-                <span className="text-slate-400 ml-2 text-xs">{m.name}</span>
+                <span className="text-fg-faint ml-2 text-xs">{m.name}</span>
               </span>
-              {isSelected && <Check size={14} className="text-indigo-600" />}
+              {isSelected && <Check size={14} className="text-brand" />}
             </button>
           );
         })}
       </div>
-      <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400">
+      <div className="border-t border-border-subtle px-3 py-2 text-[11px] text-fg-faint">
         {formatRatesUpdatedAt(ratesUpdatedAt)}
       </div>
     </div>
@@ -125,13 +125,13 @@ function CurrencySelector() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border-default hover:bg-surface-sunken text-sm font-medium text-fg-strong transition-colors"
       >
         <span className="text-base leading-none">{meta.flag}</span>
         <span>{baseCurrency}</span>
         <ChevronDown
           size={13}
-          className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`text-fg-faint transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
       {open && (
@@ -156,7 +156,7 @@ function SidebarNav({ collapsed, pathname, onNavigate }: NavItemsProps) {
   return (
     <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
       {!collapsed && (
-        <p className="px-3 text-[10px] font-semibold tracking-widest text-slate-500 uppercase mb-2">
+        <p className="px-3 text-[10px] font-semibold tracking-widest text-fg-subtle uppercase mb-2">
           Menu
         </p>
       )}
@@ -168,13 +168,13 @@ function SidebarNav({ collapsed, pathname, onNavigate }: NavItemsProps) {
             to={path}
             onClick={onNavigate}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 relative group
-              ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/5 hover:text-white'}
+              ${isActive ? 'bg-brand text-fg-inverted shadow-lg shadow-brand-accent/30' : 'text-fg-faint hover:bg-surface/5 hover:text-fg-inverted'}
               ${collapsed ? 'justify-center' : ''}`}
           >
             <Icon size={18} className="flex-shrink-0" />
             {!collapsed && <span className="text-sm font-medium">{label}</span>}
             {collapsed && (
-              <div className="absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity shadow-lg">
+              <div className="absolute left-14 bg-fg-emphasis text-fg-inverted text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity shadow-lg">
                 {label}
               </div>
             )}
@@ -196,14 +196,14 @@ function SidebarBottom({ collapsed, pathname, onNavigate }: SidebarBottomProps) 
   const settingsActive = pathname.startsWith('/settings');
 
   return (
-    <div className="border-t border-white/10 px-2 py-3 space-y-1">
+    <div className="border-t border-fg-inverted/10 px-2 py-3 space-y-1">
       <NavLink
         to="/settings"
         onClick={onNavigate}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
           settingsActive
-            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
-            : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            ? 'bg-brand text-fg-inverted shadow-lg shadow-brand-accent/30'
+            : 'text-fg-faint hover:bg-surface/5 hover:text-fg-inverted'
         } ${collapsed ? 'justify-center' : ''}`}
       >
         <Settings size={18} />
@@ -213,7 +213,7 @@ function SidebarBottom({ collapsed, pathname, onNavigate }: SidebarBottomProps) 
         onClick={() => {
           void signOut();
         }}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:bg-white/5 hover:text-white transition-all ${collapsed ? 'justify-center' : ''}`}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-fg-faint hover:bg-surface/5 hover:text-fg-inverted transition-all ${collapsed ? 'justify-center' : ''}`}
       >
         <LogOut size={18} />
         {!collapsed && <span className="text-sm font-medium">Sign out</span>}
@@ -233,18 +233,18 @@ type SidebarProps = {
 function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen, pathname }: SidebarProps) {
   return (
     <aside
-      className={`fixed lg:relative z-50 h-full flex flex-col bg-[#0a0f1e] text-white transition-all duration-300
+      className={`fixed lg:relative z-50 h-full flex flex-col bg-surface-inverse text-fg-inverted transition-all duration-300
         ${collapsed ? 'w-[72px]' : 'w-64'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
     >
       <div
-        className={`flex items-center gap-3 px-4 py-5 border-b border-white/10 ${collapsed ? 'justify-center' : ''}`}
+        className={`flex items-center gap-3 px-4 py-5 border-b border-fg-inverted/10 ${collapsed ? 'justify-center' : ''}`}
       >
         <QuroLogo size={36} showBg={false} className="flex-shrink-0" />
         {!collapsed && (
           <div>
-            <span className="text-xl font-bold tracking-tight text-white">Quro</span>
-            <span className="block text-[10px] text-indigo-400 tracking-widest uppercase">
+            <span className="text-xl font-bold tracking-tight text-fg-inverted">Quro</span>
+            <span className="block text-[10px] text-brand-disabled tracking-widest uppercase">
               Finance
             </span>
           </div>
@@ -262,12 +262,12 @@ function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen, pathname 
       />
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-indigo-600 rounded-full items-center justify-center shadow-md hover:bg-indigo-500 transition-colors"
+        className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-brand rounded-full items-center justify-center shadow-md hover:bg-brand-accent transition-colors"
       >
         {collapsed ? (
-          <ChevronRight size={12} className="text-white" />
+          <ChevronRight size={12} className="text-fg-inverted" />
         ) : (
-          <ChevronLeft size={12} className="text-white" />
+          <ChevronLeft size={12} className="text-fg-inverted" />
         )}
       </button>
     </aside>
@@ -289,17 +289,17 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
   const userDisplayName = getUserDisplayName(user);
 
   return (
-    <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+    <header className="bg-surface border-b border-border-default px-6 py-4 flex items-center justify-between flex-shrink-0">
       <div className="flex items-center gap-3">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+          className="lg:hidden p-2 rounded-lg hover:bg-surface-muted text-fg-muted"
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div>
-          <h1 className="font-bold text-slate-900">{currentPageLabel}</h1>
-          <p className="text-xs text-slate-400">{today}</p>
+          <h1 className="font-bold text-fg">{currentPageLabel}</h1>
+          <p className="text-xs text-fg-faint">{today}</p>
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -310,17 +310,17 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
           onClick={() => {
             void navigate('/settings?tab=profile');
           }}
-          className="group flex items-center gap-2 rounded-xl border-l border-slate-200 pl-3 text-left transition-colors hover:bg-slate-50"
+          className="group flex items-center gap-2 rounded-xl border-l border-border-default pl-3 text-left transition-colors hover:bg-surface-sunken"
           aria-label="Open profile settings"
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-            <User size={14} className="text-white" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-accent to-accent-premium flex items-center justify-center">
+            <User size={14} className="text-fg-inverted" />
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-slate-800 transition-colors group-hover:text-indigo-600">
+            <p className="text-xs font-semibold text-fg-emphasis transition-colors group-hover:text-brand">
               {userDisplayName}
             </p>
-            <p className="text-[10px] text-slate-400 transition-colors group-hover:text-slate-500">
+            <p className="text-[10px] text-fg-faint transition-colors group-hover:text-fg-subtle">
               {user?.email}
             </p>
           </div>
@@ -351,10 +351,10 @@ export function Layout() {
     : (currentPage?.label ?? 'Dashboard');
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-surface-sunken overflow-hidden">
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-overlay/50 z-40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}

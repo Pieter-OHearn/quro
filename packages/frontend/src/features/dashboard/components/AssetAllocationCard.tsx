@@ -39,11 +39,11 @@ function AllocationLegend({
         <div key={item.key} className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-            <span className="text-xs text-slate-600">{item.name}</span>
+            <span className="text-xs text-fg-muted">{item.name}</span>
           </div>
           <div className="text-right">
-            <span className="text-xs font-semibold text-slate-800">{fmtBase(item.value)}</span>
-            <span className="text-[10px] text-slate-400 ml-1">
+            <span className="text-xs font-semibold text-fg-emphasis">{fmtBase(item.value)}</span>
+            <span className="text-[10px] text-fg-faint ml-1">
               {totalAlloc > 0 ? ((item.value / totalAlloc) * 100).toFixed(0) : 0}%
             </span>
           </div>
@@ -71,36 +71,36 @@ export function AssetAllocationCard({
   const hasAssets = allocationData.length > 0;
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm h-full">
-      <h3 className="font-semibold text-slate-900 mb-1">Asset Allocation</h3>
-      <p className="text-xs text-slate-400 mb-4">All values in {baseCurrency}</p>
+    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm h-full">
+      <h3 className="font-semibold text-fg mb-1">Asset Allocation</h3>
+      <p className="text-xs text-fg-faint mb-4">All values in {baseCurrency}</p>
       {hasAssets ? (
         <>
           <AllocationPieChart data={allocationData} />
           <AllocationLegend data={allocationData} totalAlloc={totalAlloc} fmtBase={fmtBase} />
         </>
       ) : (
-        <p className="py-12 text-center text-sm text-slate-400">No asset allocation data yet.</p>
+        <p className="py-12 text-center text-sm text-fg-faint">No asset allocation data yet.</p>
       )}
       {hasAssets || liabilitiesTotal > 0 ? (
         <div className="mt-4 space-y-2">
-          <div className="border-t border-slate-100" />
+          <div className="border-t border-border-subtle" />
           {liabilitiesTotal > 0 ? (
             <Link to="/debts" className="group flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-                <span className="text-xs text-rose-500 transition-colors group-hover:text-rose-700">
+                <div className="h-2.5 w-2.5 rounded-full bg-danger-muted" />
+                <span className="text-xs text-danger transition-colors group-hover:text-danger-fg">
                   Liabilities
                 </span>
               </div>
-              <span className="text-xs font-semibold text-rose-500">
+              <span className="text-xs font-semibold text-danger">
                 -{fmtBase(liabilitiesTotal)}
               </span>
             </Link>
           ) : null}
-          <div className="flex items-center justify-between border-t border-slate-100 pt-2">
-            <span className="text-xs font-semibold text-slate-700">Net Worth</span>
-            <span className="text-xs font-bold text-slate-900">{fmtBase(netWorth)}</span>
+          <div className="flex items-center justify-between border-t border-border-subtle pt-2">
+            <span className="text-xs font-semibold text-fg-strong">Net Worth</span>
+            <span className="text-xs font-bold text-fg">{fmtBase(netWorth)}</span>
           </div>
         </div>
       ) : null}

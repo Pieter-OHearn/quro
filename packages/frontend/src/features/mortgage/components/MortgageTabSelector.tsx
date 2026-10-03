@@ -35,7 +35,7 @@ export function MortgageTabSelector({
       <button
         type="button"
         onClick={onAddClick}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 text-sm font-medium transition-all"
+        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-border-strong text-fg-subtle hover:border-brand-disabled hover:text-brand text-sm font-medium transition-all"
       >
         <Plus size={14} /> {addLabel}
       </button>

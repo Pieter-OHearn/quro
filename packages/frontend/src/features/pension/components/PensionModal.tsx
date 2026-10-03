@@ -10,6 +10,7 @@ import {
   ModalFooter,
   SelectInput,
   TextInput,
+  Textarea,
 } from '@/components/ui';
 import { DEFAULT_EMOJI, type PensionPot } from '@quro/shared';
 import { PENSION_TYPES, PALETTE } from '../constants';
@@ -229,7 +230,7 @@ function PensionMetadataEditor({
             <button
               type="button"
               onClick={() => onRemoveEntry(index)}
-              className="rounded-lg border border-slate-200 px-2 text-xs text-slate-500 hover:bg-slate-100 transition-colors"
+              className="rounded-lg border border-border-default px-2 text-xs text-fg-subtle hover:bg-surface-muted transition-colors"
             >
               Remove
             </button>
@@ -238,7 +239,7 @@ function PensionMetadataEditor({
         <button
           type="button"
           onClick={onAddEntry}
-          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+          className="rounded-lg border border-border-default px-3 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-muted transition-colors"
         >
           Add metadata row
         </button>
@@ -253,12 +254,11 @@ function PensionNotesField({
 }: Readonly<{ value: string; onChange: (v: string) => void }>) {
   return (
     <FormField label="Notes" hint="optional">
-      <textarea
+      <Textarea
         rows={2}
-        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
         placeholder="Any notes about this pension pot..."
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
       />
     </FormField>
   );

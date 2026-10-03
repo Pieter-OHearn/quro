@@ -30,15 +30,15 @@ function UploadDropzone({ provider, onFileChange }: Readonly<UploadDropzoneProps
           fileRef.current?.click();
         }
       }}
-      className="relative border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center hover:border-indigo-300 hover:bg-indigo-50/20 transition-all cursor-pointer group"
+      className="relative border-2 border-dashed border-border-default rounded-2xl p-10 text-center hover:border-brand-border hover:bg-brand-soft/20 transition-all cursor-pointer group"
     >
-      <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-indigo-100 transition-colors">
-        <Upload size={22} className="text-indigo-500" />
+      <div className="w-14 h-14 bg-brand-soft rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-brand-soft-strong transition-colors">
+        <Upload size={22} className="text-brand-accent" />
       </div>
-      <p className="text-sm text-slate-700">
-        Drop your PDF here, or <span className="text-indigo-600 font-medium">browse files</span>
+      <p className="text-sm text-fg-strong">
+        Drop your PDF here, or <span className="text-brand font-medium">browse files</span>
       </p>
-      <p className="text-xs text-slate-400 mt-1.5">
+      <p className="text-xs text-fg-faint mt-1.5">
         Annual statement PDF from {provider} · Max 20 MB
       </p>
       <input
@@ -53,13 +53,13 @@ function UploadDropzone({ provider, onFileChange }: Readonly<UploadDropzoneProps
 }
 
 function UploadSelectedFile({ file }: Readonly<{ file: File | null }>) {
-  if (!file) return <p className="text-center text-xs text-slate-400 mt-3">No file chosen</p>;
+  if (!file) return <p className="text-center text-xs text-fg-faint mt-3">No file chosen</p>;
 
   return (
-    <div className="mt-3 flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
-      <FileText size={15} className="text-emerald-500 flex-shrink-0" />
-      <span className="text-sm text-emerald-700 font-medium flex-1 truncate">{file.name}</span>
-      <span className="text-[10px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+    <div className="mt-3 flex items-center gap-3 bg-success-soft border border-success-soft-strong rounded-xl px-4 py-3">
+      <FileText size={15} className="text-success-accent flex-shrink-0" />
+      <span className="text-sm text-success-fg font-medium flex-1 truncate">{file.name}</span>
+      <span className="text-[10px] bg-success-soft-strong text-success px-2 py-0.5 rounded-full font-medium flex-shrink-0">
         Ready
       </span>
     </div>
@@ -68,9 +68,9 @@ function UploadSelectedFile({ file }: Readonly<{ file: File | null }>) {
 
 function UploadInfoPanel() {
   return (
-    <div className="mt-4 flex items-start gap-2.5 bg-indigo-50/60 border border-indigo-100 rounded-xl px-4 py-3.5">
-      <Brain size={14} className="text-indigo-500 mt-0.5 flex-shrink-0" />
-      <p className="text-xs text-indigo-700 leading-relaxed">
+    <div className="mt-4 flex items-start gap-2.5 bg-brand-soft/60 border border-brand-soft-strong rounded-xl px-4 py-3.5">
+      <Brain size={14} className="text-brand-accent mt-0.5 flex-shrink-0" />
+      <p className="text-xs text-brand-fg leading-relaxed">
         Quro&apos;s AI will extract contributions, fees, and annual totals. You&apos;ll review every
         row in a staging area before anything is committed to your ledger.
       </p>
@@ -86,11 +86,11 @@ type UploadFooterProps = {
 
 function UploadFooter({ isUploading, onClose, onUpload }: Readonly<UploadFooterProps>) {
   return (
-    <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+    <div className="px-6 py-4 bg-surface-sunken border-t border-border-subtle flex gap-3">
       <button
         type="button"
         onClick={onClose}
-        className="flex-1 rounded-xl border border-slate-200 text-slate-600 py-2.5 text-sm hover:bg-white transition-colors font-medium"
+        className="flex-1 rounded-xl border border-border-default text-fg-muted py-2.5 text-sm hover:bg-surface transition-colors font-medium"
       >
         Cancel
       </button>
@@ -100,7 +100,7 @@ function UploadFooter({ isUploading, onClose, onUpload }: Readonly<UploadFooterP
           void onUpload();
         }}
         disabled={isUploading}
-        className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-80 disabled:cursor-not-allowed text-white py-2.5 text-sm transition-colors font-medium flex items-center justify-center gap-2 shadow-sm shadow-indigo-200"
+        className="flex-1 rounded-xl bg-brand hover:bg-brand-hover disabled:opacity-80 disabled:cursor-not-allowed text-fg-inverted py-2.5 text-sm transition-colors font-medium flex items-center justify-center gap-2 shadow-sm shadow-brand-tint"
       >
         {isUploading ? (
           <>
@@ -131,17 +131,17 @@ export function UploadStep({
   return (
     <>
       <div className="p-6">
-        <p className="text-sm text-slate-600 mb-5">
+        <p className="text-sm text-fg-muted mb-5">
           Upload one annual statement PDF for{' '}
-          <span className="font-semibold text-slate-900">{potName}</span>{' '}
-          <span className="text-slate-400">({provider})</span>.
+          <span className="font-semibold text-fg">{potName}</span>{' '}
+          <span className="text-fg-faint">({provider})</span>.
         </p>
         <UploadDropzone provider={provider} onFileChange={onFileChange} />
         <UploadSelectedFile file={file} />
         <UploadInfoPanel />
 
         {errorMessage && (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div className="mt-4 rounded-xl border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-fg">
             {errorMessage}
           </div>
         )}

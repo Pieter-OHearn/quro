@@ -1,12 +1,11 @@
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+  CurrencyContext,
+  type CurrencyContextType,
+  type CurrencyRatesStatus,
+} from './currencyContextValue';
+export { useCurrency } from './currencyContextValue';
+export type { CurrencyContextType, CurrencyRatesStatus } from './currencyContextValue';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   CURRENCY_CODES,
   CURRENCY_META,
@@ -30,22 +29,6 @@ import {
 
 export { CURRENCY_CODES, CURRENCY_META };
 export type { CurrencyCode };
-
-export type CurrencyRatesStatus = 'idle' | 'loading' | 'ready' | 'error';
-
-export type CurrencyContextType = {
-  baseCurrency: CurrencyCode;
-  numberFormat: NumberFormatPreference;
-  setBaseCurrency: (c: CurrencyCode) => void;
-  convertToBase: (amount: number, fromCurrency: string) => number;
-  fmtBase: (amount: number, fromCurrency?: string, decimals?: boolean) => string;
-  fmtNative: (amount: number, currency: string, decimals?: boolean) => string;
-  isForeign: (currency: string) => boolean;
-  ratesStatus: CurrencyRatesStatus;
-  ratesUpdatedAt: string | null;
-};
-
-const CurrencyContext = createContext<CurrencyContextType | null>(null);
 
 export type CurrencyRatesFailureMode = 'fx-unavailable' | 'app-error';
 
@@ -84,21 +67,19 @@ type CurrencyRatesFallbackProps = {
 
 function CurrencyRatesFallback({ detail, onRetry }: Readonly<CurrencyRatesFallbackProps>) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-xl rounded-3xl border border-amber-200 bg-white p-8 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-600">
+    <div className="min-h-screen bg-surface-sunken flex items-center justify-center p-6">
+      <div className="w-full max-w-xl rounded-3xl border border-warning-border bg-surface p-8 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-warning">
           Currency Rates Unavailable
         </p>
-        <h1 className="mt-3 text-2xl font-semibold text-slate-900">
-          Converted balances are paused
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
+        <h1 className="mt-3 text-2xl font-semibold text-fg">Converted balances are paused</h1>
+        <p className="mt-3 text-sm leading-6 text-fg-muted">
           Quro could not load the synced FX rates required to render converted totals safely. Native
           balances remain stored, but cross-currency views stay blocked until the rate source is
           available again.
         </p>
         {detail ? (
-          <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
+          <p className="mt-4 rounded-2xl bg-surface-sunken px-4 py-3 text-xs leading-5 text-fg-subtle">
             {detail}
           </p>
         ) : null}
@@ -270,12 +251,6 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   if (gate) return gate;
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
-}
-
-export function useCurrency() {
-  const ctx = useContext(CurrencyContext);
-  if (!ctx) throw new Error('useCurrency must be used within CurrencyProvider');
-  return ctx;
 }
 
 export type ConvertToBaseFn = CurrencyContextType['convertToBase'];

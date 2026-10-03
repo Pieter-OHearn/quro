@@ -24,9 +24,9 @@ const QUEUE_PHASE_CONNECTOR_WIDTH: Record<number, string> = {
 const QUEUE_BOUNCE_DOT_DELAYS_MS = [0, 120, 240] as const;
 
 function getQueuePhaseRingClass(phaseKey: JobPhase): string {
-  if (phaseKey === 'processing') return 'ring-indigo-100';
-  if (phaseKey === 'ready') return 'ring-emerald-100';
-  return 'ring-slate-100';
+  if (phaseKey === 'processing') return 'ring-brand-soft-strong';
+  if (phaseKey === 'ready') return 'ring-success-soft-strong';
+  return 'ring-border-subtle';
 }
 
 function getQueuePhaseCircleClass(params: {
@@ -40,13 +40,13 @@ function getQueuePhaseCircleClass(params: {
       params.phase.key,
     )}`;
   }
-  return 'bg-slate-100 text-slate-300';
+  return 'bg-surface-muted text-fg-disabled';
 }
 
 function getQueuePhaseLabelClass(isComplete: boolean, isActive: boolean): string {
-  if (isComplete) return 'text-slate-500';
-  if (isActive) return 'text-slate-800';
-  return 'text-slate-300';
+  if (isComplete) return 'text-fg-subtle';
+  if (isActive) return 'text-fg-emphasis';
+  return 'text-fg-disabled';
 }
 
 function QueuePhaseIcon({
@@ -66,13 +66,13 @@ function QueuePhaseIcon({
 
 function QueuedFileBanner({ fileName }: Readonly<{ fileName: string }>) {
   return (
-    <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
-      <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-        <CheckCircle2 size={14} className="text-emerald-600" />
+    <div className="flex items-center gap-3 bg-success-soft border border-success-soft-strong rounded-xl px-4 py-3">
+      <div className="w-7 h-7 rounded-lg bg-success-soft-strong flex items-center justify-center flex-shrink-0">
+        <CheckCircle2 size={14} className="text-success" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-emerald-700">PDF submitted successfully</p>
-        {fileName && <p className="text-[11px] text-emerald-600/70 truncate mt-0.5">{fileName}</p>}
+        <p className="text-xs font-semibold text-success-fg">PDF submitted successfully</p>
+        {fileName && <p className="text-[11px] text-success/70 truncate mt-0.5">{fileName}</p>}
       </div>
     </div>
   );
@@ -84,9 +84,9 @@ function QueuedPipeline({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
 
   return (
     <div className="flex items-start justify-between relative">
-      <div className="absolute top-[18px] left-[calc(16.67%+10px)] right-[calc(16.67%+10px)] h-[2px] bg-slate-100 z-0">
+      <div className="absolute top-[18px] left-[calc(16.67%+10px)] right-[calc(16.67%+10px)] h-[2px] bg-surface-muted z-0">
         <div
-          className="h-full bg-indigo-400 transition-all duration-700"
+          className="h-full bg-brand-disabled transition-all duration-700"
           style={{ width: connectorWidth }}
         />
       </div>
@@ -109,7 +109,10 @@ function QueuedPipeline({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
                 {phase.label}
               </p>
               <p
-                className={cn('text-[10px] mt-0.5', isActive ? 'text-slate-500' : 'text-slate-300')}
+                className={cn(
+                  'text-[10px] mt-0.5',
+                  isActive ? 'text-fg-subtle' : 'text-fg-disabled',
+                )}
               >
                 {phase.sublabel}
               </p>
@@ -122,9 +125,9 @@ function QueuedPipeline({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
 }
 
 function getQueueStatusCaptionClass(jobPhase: JobPhase): string {
-  if (jobPhase === 'queuing') return 'bg-slate-50 text-slate-500 border border-slate-100';
-  if (jobPhase === 'processing') return 'bg-indigo-50 text-indigo-600 border border-indigo-100';
-  return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+  if (jobPhase === 'queuing') return 'bg-surface-sunken text-fg-subtle border border-border-subtle';
+  if (jobPhase === 'processing') return 'bg-brand-soft text-brand border border-brand-soft-strong';
+  return 'bg-success-soft text-success-fg border border-success-soft-strong';
 }
 
 function QueuedStatusMessage({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
@@ -135,7 +138,7 @@ function QueuedStatusMessage({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
           {QUEUE_BOUNCE_DOT_DELAYS_MS.map((delay) => (
             <span
               key={delay}
-              className="w-1 h-1 bg-slate-400 rounded-full animate-bounce"
+              className="w-1 h-1 bg-fg-faint rounded-full animate-bounce"
               style={{ animationDelay: `${delay}ms` }}
             />
           ))}
@@ -147,14 +150,14 @@ function QueuedStatusMessage({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
   if (jobPhase === 'processing') {
     return (
       <span className="flex items-center justify-center gap-2">
-        <Loader2 size={11} className="animate-spin text-indigo-400" />
+        <Loader2 size={11} className="animate-spin text-brand-disabled" />
         AI is extracting contributions, fees and totals from your PDF
       </span>
     );
   }
   return (
     <span className="flex items-center justify-center gap-2">
-      <CheckCircle2 size={11} className="text-emerald-500" />
+      <CheckCircle2 size={11} className="text-success-accent" />
       <span>
         Transactions extracted - <strong>ready for your review</strong>
       </span>
@@ -179,7 +182,7 @@ function QueuedStatusCaption({
         <QueuedStatusMessage jobPhase={jobPhase} />
       </div>
       {modelCaption && (
-        <p className="text-[11px] text-slate-400 text-center mt-2">Processed with {modelCaption}</p>
+        <p className="text-[11px] text-fg-faint text-center mt-2">Processed with {modelCaption}</p>
       )}
     </>
   );
@@ -187,13 +190,13 @@ function QueuedStatusCaption({
 
 function QueuedInfoPanel() {
   return (
-    <div className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5">
-      <Bell size={13} className="text-slate-400 mt-px flex-shrink-0" />
-      <p className="text-xs text-slate-500 leading-relaxed">
+    <div className="flex items-start gap-3 bg-surface-sunken border border-border-default rounded-xl px-4 py-3.5">
+      <Bell size={13} className="text-fg-faint mt-px flex-shrink-0" />
+      <p className="text-xs text-fg-subtle leading-relaxed">
         You can leave this window at any time - the job runs in the background. Return to review
-        from the <span className="font-medium text-slate-600">notification bell</span> when
-        it&apos;s ready. To stop the job entirely, use{' '}
-        <span className="font-medium text-slate-600">Cancel Job</span>.
+        from the <span className="font-medium text-fg-muted">notification bell</span> when it&apos;s
+        ready. To stop the job entirely, use{' '}
+        <span className="font-medium text-fg-muted">Cancel Job</span>.
       </p>
     </div>
   );
@@ -213,12 +216,12 @@ function QueuedCancelConfirm({
   onClose,
 }: Readonly<QueuedCancelConfirmProps>) {
   return (
-    <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 space-y-3">
+    <div className="bg-danger-soft border border-danger-border rounded-xl px-4 py-3 space-y-3">
       <div className="flex items-start gap-2.5">
-        <XCircle size={14} className="text-rose-500 mt-0.5 flex-shrink-0" />
+        <XCircle size={14} className="text-danger mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-xs font-semibold text-rose-700">Cancel this import job?</p>
-          <p className="text-[11px] text-rose-500 mt-0.5 leading-relaxed">
+          <p className="text-xs font-semibold text-danger-fg">Cancel this import job?</p>
+          <p className="text-[11px] text-danger mt-0.5 leading-relaxed">
             Processing will stop and the job will be removed from your notification list. This
             can&apos;t be undone.
           </p>
@@ -228,7 +231,7 @@ function QueuedCancelConfirm({
         <button
           type="button"
           onClick={() => onSetConfirmMode('none')}
-          className="flex-1 rounded-xl border border-slate-200 bg-white text-slate-600 py-2 text-xs hover:bg-slate-50 transition-colors font-medium"
+          className="flex-1 rounded-xl border border-border-default bg-surface text-fg-muted py-2 text-xs hover:bg-surface-sunken transition-colors font-medium"
         >
           Keep Running
         </button>
@@ -241,7 +244,7 @@ function QueuedCancelConfirm({
             })();
           }}
           disabled={isCancelling}
-          className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white py-2 text-xs transition-colors font-medium flex items-center justify-center gap-1.5 disabled:opacity-70"
+          className="flex-1 rounded-xl bg-danger-hover hover:bg-danger-fg text-fg-inverted py-2 text-xs transition-colors font-medium flex items-center justify-center gap-1.5 disabled:opacity-70"
         >
           {isCancelling ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
           Confirm Cancel
@@ -263,7 +266,7 @@ function QueuedDefaultFooter({
       <button
         type="button"
         onClick={() => onSetConfirmMode('queued-cancel')}
-        className="flex items-center gap-1.5 px-4 rounded-xl border border-rose-200 text-rose-500 py-2.5 text-sm hover:bg-rose-50 transition-colors font-medium"
+        className="flex items-center gap-1.5 px-4 rounded-xl border border-danger-border text-danger py-2.5 text-sm hover:bg-danger-soft transition-colors font-medium"
       >
         <XCircle size={14} />
         Cancel Job
@@ -271,7 +274,7 @@ function QueuedDefaultFooter({
       <button
         type="button"
         onClick={onClose}
-        className="flex-1 rounded-xl text-white py-2.5 text-sm transition-colors font-medium flex items-center justify-center gap-2 shadow-sm bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200"
+        className="flex-1 rounded-xl text-fg-inverted py-2.5 text-sm transition-colors font-medium flex items-center justify-center gap-2 shadow-sm bg-brand hover:bg-brand-hover shadow-brand-tint"
       >
         Continue in Background
         <ArrowUpRight size={14} />
@@ -304,13 +307,13 @@ export function QueuedStep({
         <QueuedInfoPanel />
 
         {errorMessage && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div className="rounded-xl border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-fg">
             {errorMessage}
           </div>
         )}
       </div>
 
-      <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+      <div className="px-6 py-4 bg-surface-sunken border-t border-border-subtle">
         {confirmMode === 'queued-cancel' ? (
           <QueuedCancelConfirm
             isCancelling={isCancelling}

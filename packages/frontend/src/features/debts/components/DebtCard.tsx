@@ -51,13 +51,13 @@ function DebtCardHeader({ debt, onEdit, onDelete }: Readonly<DebtCardHeaderProps
           {debt.emoji}
         </div>
         <div className="min-w-0">
-          <p className="truncate font-semibold text-slate-900">{debt.name}</p>
+          <p className="truncate font-semibold text-fg">{debt.name}</p>
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
             <Badge size="xs" className={`border ${typeMeta.toneClassName}`}>
               <TypeIcon size={8} />
               {typeMeta.label}
             </Badge>
-            <span className="truncate text-[10px] text-slate-400">{debt.lender}</span>
+            <span className="truncate text-[10px] text-fg-faint">{debt.lender}</span>
           </div>
         </div>
       </div>
@@ -70,7 +70,7 @@ function DebtCardHeader({ debt, onEdit, onDelete }: Readonly<DebtCardHeaderProps
               label="Confirm delete debt"
               variant="subtle"
               size="md"
-              className="bg-rose-500 text-white hover:bg-rose-600 hover:text-white"
+              className="bg-danger text-fg-inverted hover:bg-danger-hover hover:text-fg-inverted"
               onClick={() => {
                 onDelete();
                 setConfirmDelete(false);
@@ -104,19 +104,19 @@ function DebtBalanceSummary({ debt }: Readonly<{ debt: Debt }>) {
   return (
     <div className="mb-3 flex items-end justify-between">
       <div>
-        <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">Remaining</p>
-        <p className="text-xl font-bold text-slate-900">
+        <p className="mb-0.5 text-[10px] uppercase tracking-wide text-fg-faint">Remaining</p>
+        <p className="text-xl font-bold text-fg">
           {fmtNative(debt.remainingBalance, debt.currency)}
         </p>
         {isForeign(debt.currency) ? (
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-fg-faint">
             ≈ {fmtBase(debt.remainingBalance, debt.currency)}
           </p>
         ) : null}
       </div>
       <div className="text-right">
-        <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">Original</p>
-        <p className="text-sm text-slate-500">{fmtNative(debt.originalAmount, debt.currency)}</p>
+        <p className="mb-0.5 text-[10px] uppercase tracking-wide text-fg-faint">Original</p>
+        <p className="text-sm text-fg-subtle">{fmtNative(debt.originalAmount, debt.currency)}</p>
       </div>
     </div>
   );
@@ -130,14 +130,14 @@ function DebtProgress({ debt }: Readonly<{ debt: Debt }>) {
   return (
     <div className="mb-4">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-fg-faint">
           {formatPercent(paidPercentage, 0)} paid off
         </span>
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-fg-faint">
           {fmtNative(paidAmount, debt.currency)} repaid
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${paidPercentage}%`, backgroundColor: debt.color }}
@@ -159,23 +159,23 @@ function DebtMetricGrid({ debt, highInterest }: Readonly<{ debt: Debt; highInter
           value: formatPercent(debt.interestRate, 2),
           icon: Percent,
           className: highInterest
-            ? 'bg-rose-50 border-rose-100 text-rose-600'
-            : 'bg-slate-50 border-slate-100 text-slate-700',
-          iconClassName: highInterest ? 'text-rose-400' : 'text-slate-400',
+            ? 'bg-danger-soft border-danger-soft-strong text-danger-hover'
+            : 'bg-surface-sunken border-border-subtle text-fg-strong',
+          iconClassName: highInterest ? 'text-danger-muted' : 'text-fg-faint',
         },
         {
           label: 'Monthly',
           value: fmtNative(debt.monthlyPayment, debt.currency),
           icon: Calendar,
-          className: 'bg-slate-50 border-slate-100 text-slate-700',
-          iconClassName: 'text-slate-400',
+          className: 'bg-surface-sunken border-border-subtle text-fg-strong',
+          iconClassName: 'text-fg-faint',
         },
         {
           label: 'Payoff',
           value: payoffLabel,
           icon: Target,
-          className: 'bg-slate-50 border-slate-100 text-slate-700',
-          iconClassName: 'text-slate-400',
+          className: 'bg-surface-sunken border-border-subtle text-fg-strong',
+          iconClassName: 'text-fg-faint',
         },
       ].map((item) => {
         const Icon = item.icon;
@@ -187,7 +187,7 @@ function DebtMetricGrid({ debt, highInterest }: Readonly<{ debt: Debt; highInter
           >
             <Icon size={11} className={`mx-auto mb-0.5 ${item.iconClassName}`} />
             <p className="text-[11px] font-semibold">{item.value}</p>
-            <p className="text-[9px] uppercase tracking-wide text-slate-400">{item.label}</p>
+            <p className="text-[9px] uppercase tracking-wide text-fg-faint">{item.label}</p>
           </div>
         );
       })}
@@ -202,9 +202,9 @@ function HighInterestNotice({ debt }: Readonly<{ debt: Debt }>) {
   if (remainingInterest == null) return null;
 
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2">
-      <AlertTriangle size={12} className="mt-0.5 flex-shrink-0 text-rose-500" />
-      <p className="text-[11px] text-rose-700">
+    <div className="mb-3 flex items-start gap-2 rounded-xl border border-danger-soft-strong bg-danger-soft px-3 py-2">
+      <AlertTriangle size={12} className="mt-0.5 flex-shrink-0 text-danger" />
+      <p className="text-[11px] text-danger-fg">
         High interest. Estimated remaining interest is{' '}
         <span className="font-semibold">{fmtNative(remainingInterest, debt.currency, true)}</span>.
       </p>
@@ -221,7 +221,7 @@ function HistoryToggle({
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center justify-center gap-1.5 py-1 text-xs text-slate-400 transition-colors hover:text-slate-700"
+      className="flex w-full items-center justify-center gap-1.5 py-1 text-xs text-fg-faint transition-colors hover:text-fg-strong"
     >
       {expanded ? (
         <>
@@ -254,7 +254,9 @@ export function DebtCard({
     <Card
       padding="none"
       className={`overflow-hidden border transition-all duration-200 ${
-        expanded ? 'border-slate-300 shadow-lg' : 'border-slate-100 shadow-sm hover:shadow-md'
+        expanded
+          ? 'border-border-strong shadow-lg'
+          : 'border-border-subtle shadow-sm hover:shadow-md'
       }`}
     >
       <div className="h-1 w-full" style={{ backgroundColor: debt.color }} />

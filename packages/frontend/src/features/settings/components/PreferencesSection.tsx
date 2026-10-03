@@ -82,8 +82,8 @@ function PreferencesForm({
       />
 
       <div className="mb-8">
-        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          <SlidersHorizontal size={14} className="text-indigo-500" />
+        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+          <SlidersHorizontal size={14} className="text-brand-accent" />
           Base Currency
         </p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -99,21 +99,21 @@ function PreferencesForm({
                 className={cn(
                   'flex items-center gap-3 rounded-2xl border px-4 py-4 text-left transition-all',
                   isSelected
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50',
+                    ? 'border-brand-border bg-brand-soft text-brand-fg shadow-sm shadow-brand-soft-strong'
+                    : 'border-border-default bg-surface text-fg-muted hover:border-brand-tint hover:bg-surface-sunken',
                 )}
               >
                 <span className="text-2xl leading-none">{currency.flag}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{code}</p>
-                  <p className="text-xs text-slate-400">{currency.name}</p>
+                  <p className="text-xs text-fg-faint">{currency.name}</p>
                 </div>
-                {isSelected ? <Check size={16} className="ml-auto text-indigo-600" /> : null}
+                {isSelected ? <Check size={16} className="ml-auto text-brand" /> : null}
               </button>
             );
           })}
         </div>
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-fg-subtle">
           Cross-currency balances and charts convert into this currency across the app.
         </p>
       </div>
@@ -159,9 +159,9 @@ function PreferencesForm({
         </p>
       </div>
 
-      <div className="mb-8 border-t border-slate-100 pt-6">
-        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          <SlidersHorizontal size={14} className="text-indigo-500" />
+      <div className="mb-8 border-t border-border-subtle pt-6">
+        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+          <SlidersHorizontal size={14} className="text-brand-accent" />
           Number Format
         </p>
         <div className="grid gap-3 md:grid-cols-2">
@@ -180,8 +180,8 @@ function PreferencesForm({
                 className={cn(
                   'rounded-2xl border px-4 py-4 text-left transition-all',
                   isSelected
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50',
+                    ? 'border-brand-border bg-brand-soft text-brand-fg shadow-sm shadow-brand-soft-strong'
+                    : 'border-border-default bg-surface text-fg-muted hover:border-brand-tint hover:bg-surface-sunken',
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -189,23 +189,23 @@ function PreferencesForm({
                     <p className="text-sm font-semibold">
                       {numberFormat === 'en-US' ? '1,000.00 style' : '1.000,00 style'}
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Example: <span className="font-semibold text-slate-600">{sample}</span>
+                    <p className="mt-1 text-xs text-fg-faint">
+                      Example: <span className="font-semibold text-fg-muted">{sample}</span>
                     </p>
                   </div>
-                  {isSelected ? <Check size={16} className="ml-auto text-indigo-600" /> : null}
+                  {isSelected ? <Check size={16} className="ml-auto text-brand" /> : null}
                 </div>
               </button>
             );
           })}
         </div>
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-fg-subtle">
           Controls decimal and thousands separators anywhere Quro formats amounts.
         </p>
       </div>
 
-      <div className="mb-8 border-t border-slate-100 pt-6">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+      <div className="mb-8 border-t border-border-subtle pt-6">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
           Coming Soon
         </p>
         <div className="space-y-2">
@@ -217,9 +217,9 @@ function PreferencesForm({
           ].map((item) => (
             <div
               key={item}
-              className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+              className="flex items-center justify-between rounded-2xl border border-border-subtle bg-surface-sunken px-4 py-3"
             >
-              <span className="text-sm text-slate-500">{item}</span>
+              <span className="text-sm text-fg-subtle">{item}</span>
               <Badge tone="muted">Soon</Badge>
             </div>
           ))}
@@ -227,7 +227,7 @@ function PreferencesForm({
       </div>
 
       {formError ? (
-        <p className="mb-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+        <p className="mb-4 rounded-2xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
           {formError}
         </p>
       ) : null}

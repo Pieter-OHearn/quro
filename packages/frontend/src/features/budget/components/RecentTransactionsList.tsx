@@ -15,6 +15,8 @@ import {
   RowActions,
   type DataTableColumn,
   type DataTableSortState,
+  FormField,
+  SelectInput,
 } from '@/components/ui';
 import type { BudgetCategory, BudgetFormatFn, RecentBudgetTx } from '../types';
 
@@ -37,7 +39,7 @@ const TRANSACTION_COLUMNS: readonly DataTableColumn<RecentBudgetTx>[] = [
     width: '16%',
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'whitespace-nowrap text-slate-500',
+    cellClassName: 'whitespace-nowrap text-fg-subtle',
   },
   {
     key: 'category',
@@ -57,7 +59,7 @@ const TRANSACTION_COLUMNS: readonly DataTableColumn<RecentBudgetTx>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'whitespace-nowrap font-semibold text-slate-800',
+    cellClassName: 'whitespace-nowrap font-semibold text-fg-emphasis',
   },
   { key: 'actions', header: '', priority: 'actions', width: 64 },
 ];
@@ -110,17 +112,16 @@ function EditTransactionModal({
         />
       }
     >
-      <select
-        value={categoryId ?? ''}
-        onChange={(e) => setCategoryId(Number(e.target.value))}
-        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-      >
-        {categories.map((cat) => (
-          <option key={cat.id} value={cat.id}>
-            {cat.emoji} {cat.name}
-          </option>
-        ))}
-      </select>
+      <FormField label="Category">
+        <SelectInput
+          value={String(categoryId ?? '')}
+          onChange={(value) => setCategoryId(Number(value))}
+          options={categories.map((cat) => ({
+            value: String(cat.id),
+            label: `${cat.emoji} ${cat.name}`,
+          }))}
+        />
+      </FormField>
     </Modal>
   );
 }
@@ -155,12 +156,12 @@ function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
           <span className="w-8 shrink-0 text-center text-xl">{transaction.emoji}</span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-sm font-medium text-slate-800">{transaction.name}</p>
+              <p className="truncate text-sm font-medium text-fg-emphasis">{transaction.name}</p>
               {isReadOnly && (
                 <Badge
                   tone="info"
                   size="sm"
-                  className="bg-blue-500 text-white"
+                  className="bg-accent-link-accent text-fg-inverted"
                   title={getBunqMetadataTitle(transaction)}
                 >
                   Bunq
@@ -183,11 +184,15 @@ function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
       <DataTableCell columnKey="date">{transaction.date}</DataTableCell>
       <DataTableCell columnKey="category">
         {transaction.category && transaction.color ? (
-          <Badge size="sm" className="text-white" style={{ backgroundColor: transaction.color }}>
+          <Badge
+            size="sm"
+            className="text-fg-inverted"
+            style={{ backgroundColor: transaction.color }}
+          >
             {transaction.category}
           </Badge>
         ) : (
-          <span className="text-slate-400">Uncategorized</span>
+          <span className="text-fg-faint">Uncategorized</span>
         )}
       </DataTableCell>
       <DataTableCell columnKey="amount">-{fmtDec(transaction.amount)}</DataTableCell>

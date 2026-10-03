@@ -50,15 +50,15 @@ function BalancePreview({
 
   return (
     <div
-      className={`rounded-xl p-4 border ${type === 'withdrawal' ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}
+      className={`rounded-xl p-4 border ${type === 'withdrawal' ? 'bg-danger-soft border-danger-soft-strong' : 'bg-success-soft border-success-soft-strong'}`}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-slate-600">Balance after transaction</span>
-        <span className={`font-bold ${newBalance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+        <span className="text-xs font-semibold text-fg-muted">Balance after transaction</span>
+        <span className={`font-bold ${newBalance < 0 ? 'text-danger-hover' : 'text-success-fg'}`}>
           {fmtNative(newBalance, currency, true)}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-xs text-slate-500">
+      <div className="flex items-center gap-2 text-xs text-fg-subtle">
         <span>{fmtNative(balanceBeforeTxn, currency, true)}</span>
         <span>{type === 'withdrawal' ? '\u2212' : '+'}</span>
         <span className={TXN_META[type].color}>{fmtNative(parsed, currency, true)}</span>

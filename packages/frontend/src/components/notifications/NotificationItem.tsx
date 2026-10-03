@@ -5,44 +5,44 @@ import type { NotificationItem as NotificationItemType } from './types';
 
 const STATUS_META = {
   queuing: {
-    bar: 'bg-slate-300',
+    bar: 'bg-border-strong',
     bgTint: '',
-    iconBg: 'bg-slate-100',
-    iconColor: 'text-slate-400',
+    iconBg: 'bg-surface-muted',
+    iconColor: 'text-fg-faint',
     label: 'In queue',
-    labelCls: 'bg-slate-100 text-slate-500',
+    labelCls: 'bg-surface-muted text-fg-subtle',
   },
   processing: {
-    bar: 'bg-indigo-400',
-    bgTint: 'bg-indigo-50/30',
-    iconBg: 'bg-indigo-50',
-    iconColor: 'text-indigo-500',
+    bar: 'bg-brand-disabled',
+    bgTint: 'bg-brand-soft/30',
+    iconBg: 'bg-brand-soft',
+    iconColor: 'text-brand-accent',
     label: 'Processing',
-    labelCls: 'bg-indigo-50 text-indigo-600 border border-indigo-100',
+    labelCls: 'bg-brand-soft text-brand border border-brand-soft-strong',
   },
   ready: {
-    bar: 'bg-amber-400',
-    bgTint: 'bg-amber-50/20',
-    iconBg: 'bg-amber-50',
-    iconColor: 'text-amber-600',
+    bar: 'bg-warning-muted',
+    bgTint: 'bg-warning-soft/20',
+    iconBg: 'bg-warning-soft',
+    iconColor: 'text-warning',
     label: 'Ready',
-    labelCls: 'bg-emerald-50 text-emerald-600 border border-emerald-100',
+    labelCls: 'bg-success-soft text-success border border-success-soft-strong',
   },
   failed: {
-    bar: 'bg-rose-400',
-    bgTint: 'bg-rose-50/30',
-    iconBg: 'bg-rose-50',
-    iconColor: 'text-rose-600',
+    bar: 'bg-danger-muted',
+    bgTint: 'bg-danger-soft/30',
+    iconBg: 'bg-danger-soft',
+    iconColor: 'text-danger-hover',
     label: 'Failed',
-    labelCls: 'bg-rose-50 text-rose-600 border border-rose-100',
+    labelCls: 'bg-danger-soft text-danger-hover border border-danger-soft-strong',
   },
   reminder: {
-    bar: 'bg-amber-400',
-    bgTint: 'bg-amber-50/20',
-    iconBg: 'bg-amber-50',
-    iconColor: 'text-amber-600',
+    bar: 'bg-warning-muted',
+    bgTint: 'bg-warning-soft/20',
+    iconBg: 'bg-warning-soft',
+    iconColor: 'text-warning',
     label: 'Reminder',
-    labelCls: 'bg-amber-50 text-amber-700 border border-amber-100',
+    labelCls: 'bg-warning-soft text-warning-fg border border-warning-soft-strong',
   },
 } as const;
 
@@ -75,7 +75,7 @@ function renderFooter(item: NotificationItemType) {
           {[0, 150, 300].map((delay) => (
             <span
               key={delay}
-              className="w-1 h-1 rounded-full bg-slate-400 animate-bounce"
+              className="w-1 h-1 rounded-full bg-fg-faint animate-bounce"
               style={{ animationDelay: `${delay}ms` }}
             />
           ))}
@@ -94,11 +94,11 @@ function renderFooter(item: NotificationItemType) {
             <Loader2 size={8} className="animate-spin" />
             {meta.label}
           </span>
-          <span className="text-[10px] text-slate-400">AI reading your PDF…</span>
+          <span className="text-[10px] text-fg-faint">AI reading your PDF…</span>
         </div>
-        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-1 bg-surface-muted rounded-full overflow-hidden">
           <div
-            className="h-full bg-indigo-400 rounded-full animate-pulse"
+            className="h-full bg-brand-disabled rounded-full animate-pulse"
             style={{ width: '62%' }}
           />
         </div>
@@ -108,7 +108,7 @@ function renderFooter(item: NotificationItemType) {
 
   if (item.status === 'failed') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[10px] bg-rose-600 text-white px-2.5 py-1 rounded-full font-medium">
+      <span className="inline-flex items-center gap-1.5 text-[10px] bg-danger-hover text-fg-inverted px-2.5 py-1 rounded-full font-medium">
         <AlertCircle size={9} />
         View error
         <ArrowRight size={9} />
@@ -118,7 +118,7 @@ function renderFooter(item: NotificationItemType) {
 
   if (item.status === 'reminder') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[10px] bg-amber-600 text-white px-2.5 py-1 rounded-full font-medium">
+      <span className="inline-flex items-center gap-1.5 text-[10px] bg-warning text-fg-inverted px-2.5 py-1 rounded-full font-medium">
         Review mortgage
         <ArrowRight size={9} />
       </span>
@@ -126,7 +126,7 @@ function renderFooter(item: NotificationItemType) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] bg-indigo-600 text-white px-2.5 py-1 rounded-full font-medium">
+    <span className="inline-flex items-center gap-1.5 text-[10px] bg-brand text-fg-inverted px-2.5 py-1 rounded-full font-medium">
       <Sparkles size={9} />
       Review now
       <ArrowRight size={9} />
@@ -148,7 +148,7 @@ export function NotificationItem({ item, onAction, onDismiss }: Readonly<Notific
       onClick={handleClick}
       className={`relative flex items-start gap-3 px-4 py-3.5 transition-colors select-none ${
         item.actionable ? 'cursor-pointer' : 'cursor-default'
-      } ${meta.bgTint || 'hover:bg-slate-50/60'}`}
+      } ${meta.bgTint || 'hover:bg-surface-sunken/60'}`}
     >
       <div
         className={`absolute left-0 inset-y-0 w-[3px] rounded-r-full ${meta.bar} ${
@@ -157,16 +157,16 @@ export function NotificationItem({ item, onAction, onDismiss }: Readonly<Notific
       />
 
       <div
-        className={`w-9 h-9 rounded-xl ${meta.iconBg} flex items-center justify-center flex-shrink-0 mt-0.5 border border-white/60`}
+        className={`w-9 h-9 rounded-xl ${meta.iconBg} flex items-center justify-center flex-shrink-0 mt-0.5 border border-fg-inverted/60`}
       >
         {renderStatusIcon(item)}
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-0.5">
-          <p className="text-xs leading-snug font-semibold text-slate-800">{item.title}</p>
+          <p className="text-xs leading-snug font-semibold text-fg-emphasis">{item.title}</p>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-[10px] text-slate-400 mt-px tabular-nums whitespace-nowrap">
+            <span className="text-[10px] text-fg-faint mt-px tabular-nums whitespace-nowrap">
               {item.timeLabel ?? toRelativeTime(item.updatedAt)}
             </span>
             {item.dismissible && (
@@ -177,7 +177,7 @@ export function NotificationItem({ item, onAction, onDismiss }: Readonly<Notific
                   event.stopPropagation();
                   onDismiss(item);
                 }}
-                className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-0.5 rounded text-fg-faint hover:text-fg-strong hover:bg-surface-muted"
               >
                 <X size={12} />
               </button>
@@ -185,7 +185,7 @@ export function NotificationItem({ item, onAction, onDismiss }: Readonly<Notific
           </div>
         </div>
 
-        <p className="text-[11px] text-slate-500 leading-relaxed truncate mb-2">{item.body}</p>
+        <p className="text-[11px] text-fg-subtle leading-relaxed truncate mb-2">{item.body}</p>
         {renderFooter(item)}
       </div>
     </li>

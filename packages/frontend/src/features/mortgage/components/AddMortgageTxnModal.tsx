@@ -1,4 +1,13 @@
-import { Modal, ModalFooter, ModalHeader } from '@/components/ui';
+import {
+  Modal,
+  ModalFooter,
+  ModalHeader,
+  CurrencyInput,
+  TextInput,
+  FormField,
+  TxnTypeSelector,
+  DateNoteRow,
+} from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   monthlyInterest,
@@ -31,43 +40,7 @@ function buildEffectiveMortgage(
   return { ...mortgage, outstandingBalance: mortgage.outstandingBalance + existingPrincipal };
 }
 
-// ─── Type Selector ────────────────────────────────────────────────────────────
-
-type TypeSelectorProps = {
-  type: MortgageTxnType;
-  onTypeChange: (t: MortgageTxnType) => void;
-};
-
-function TxnTypeSelector({ type, onTypeChange }: TypeSelectorProps) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-2">Transaction Type</label>
-      <div className="grid grid-cols-3 gap-2">
-        {MORTGAGE_TXN_TYPES.map((t) => {
-          const meta = TXN_META[t];
-          const Icon = meta.icon;
-          const active = type === t;
-          return (
-            <button
-              key={t}
-              onClick={() => onTypeChange(t)}
-              className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all ${
-                active
-                  ? `${meta.borderColor} ${meta.bg} ${meta.color}`
-                  : 'border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              <Icon size={15} />
-              <span className="text-[10px] font-semibold leading-tight text-center">
-                {meta.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+const TXN_TYPES = MORTGAGE_TXN_TYPES.map((key) => ({ key, ...TXN_META[key] }));
 
 // ─── Context Info Pill ────────────────────────────────────────────────────────
 
@@ -79,26 +52,26 @@ type ContextPillProps = {
 
 function ContextPill({ type, mortgage, fmt }: ContextPillProps) {
   return (
-    <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-2.5 text-xs text-slate-600">
+    <div className="flex items-center gap-3 bg-surface-sunken rounded-xl px-4 py-2.5 text-xs text-fg-muted">
       {type === 'repayment' && (
         <>
           <span>Current balance</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-semibold text-slate-800">{fmt(mortgage.outstandingBalance)}</span>
+          <span className="text-fg-disabled">·</span>
+          <span className="font-semibold text-fg-emphasis">{fmt(mortgage.outstandingBalance)}</span>
         </>
       )}
       {type === 'valuation' && (
         <>
           <span>Current value</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-semibold text-slate-800">{fmt(mortgage.propertyValue)}</span>
+          <span className="text-fg-disabled">·</span>
+          <span className="font-semibold text-fg-emphasis">{fmt(mortgage.propertyValue)}</span>
         </>
       )}
       {type === 'rate_change' && (
         <>
           <span>Current rate</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-semibold text-slate-800">{mortgage.interestRate}%</span>
+          <span className="text-fg-disabled">·</span>
+          <span className="font-semibold text-fg-emphasis">{mortgage.interestRate}%</span>
         </>
       )}
     </div>
@@ -127,20 +100,20 @@ function RepaymentPreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Total payment</span>
-        <span className="font-semibold text-slate-800">{fmt(parsedAmount)}</span>
+        <span className="text-fg-muted">Total payment</span>
+        <span className="font-semibold text-fg-emphasis">{fmt(parsedAmount)}</span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Interest (cost)</span>
-        <span className="font-semibold text-rose-500">{fmt(parsedInterest)}</span>
+        <span className="text-fg-muted">Interest (cost)</span>
+        <span className="font-semibold text-danger">{fmt(parsedInterest)}</span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Principal (reduces balance)</span>
-        <span className="font-semibold text-indigo-600">−{fmt(derivedPrincipal)}</span>
+        <span className="text-fg-muted">Principal (reduces balance)</span>
+        <span className="font-semibold text-brand">−{fmt(derivedPrincipal)}</span>
       </div>
-      <div className="flex justify-between text-xs border-t border-indigo-100 pt-1.5 mt-1">
-        <span className="text-slate-600">New balance</span>
-        <span className="font-semibold text-slate-800">
+      <div className="flex justify-between text-xs border-t border-brand-soft-strong pt-1.5 mt-1">
+        <span className="text-fg-muted">New balance</span>
+        <span className="font-semibold text-fg-emphasis">
           {fmt(Math.max(0, mortgage.outstandingBalance - derivedPrincipal))}
         </span>
       </div>
@@ -156,29 +129,29 @@ function ValuationPreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Previous value</span>
-        <span className="font-semibold text-slate-800">{fmt(mortgage.propertyValue)}</span>
+        <span className="text-fg-muted">Previous value</span>
+        <span className="font-semibold text-fg-emphasis">{fmt(mortgage.propertyValue)}</span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">New value</span>
+        <span className="text-fg-muted">New value</span>
         <span
-          className={`font-semibold ${parsedAmount >= mortgage.propertyValue ? 'text-emerald-600' : 'text-rose-500'}`}
+          className={`font-semibold ${parsedAmount >= mortgage.propertyValue ? 'text-success' : 'text-danger'}`}
         >
           {fmt(parsedAmount)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Change</span>
+        <span className="text-fg-muted">Change</span>
         <span
-          className={`font-semibold ${parsedAmount >= mortgage.propertyValue ? 'text-emerald-600' : 'text-rose-500'}`}
+          className={`font-semibold ${parsedAmount >= mortgage.propertyValue ? 'text-success' : 'text-danger'}`}
         >
           {parsedAmount >= mortgage.propertyValue ? '+' : ''}
           {fmt(parsedAmount - mortgage.propertyValue)}
         </span>
       </div>
-      <div className="flex justify-between text-xs border-t border-emerald-100 pt-1.5 mt-1">
-        <span className="text-slate-600">New LTV</span>
-        <span className="font-semibold text-slate-800">
+      <div className="flex justify-between text-xs border-t border-success-soft-strong pt-1.5 mt-1">
+        <span className="text-fg-muted">New LTV</span>
+        <span className="font-semibold text-fg-emphasis">
           {formatPercent((mortgage.outstandingBalance / parsedAmount) * 100, 1)}
         </span>
       </div>
@@ -195,27 +168,27 @@ function RateChangePreview({
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Previous rate</span>
-        <span className="font-semibold text-slate-800">{mortgage.interestRate}%</span>
+        <span className="text-fg-muted">Previous rate</span>
+        <span className="font-semibold text-fg-emphasis">{mortgage.interestRate}%</span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">New rate</span>
+        <span className="text-fg-muted">New rate</span>
         <span
-          className={`font-semibold ${parsedAmount <= mortgage.interestRate ? 'text-emerald-600' : 'text-rose-500'}`}
+          className={`font-semibold ${parsedAmount <= mortgage.interestRate ? 'text-success' : 'text-danger'}`}
         >
           {parsedAmount}%
         </span>
       </div>
       <div className="flex justify-between text-xs">
-        <span className="text-slate-600">Monthly interest est.</span>
-        <span className="font-semibold text-slate-800">
+        <span className="text-fg-muted">Monthly interest est.</span>
+        <span className="font-semibold text-fg-emphasis">
           {fmt(monthlyInterest(mortgage.outstandingBalance, parsedAmount))}
         </span>
       </div>
       {computedFixedUntil && (
-        <div className="flex justify-between text-xs border-t border-amber-100 pt-1.5 mt-1">
-          <span className="text-slate-600">Fixed until</span>
-          <span className="font-semibold text-amber-600">{computedFixedUntil}</span>
+        <div className="flex justify-between text-xs border-t border-warning-soft-strong pt-1.5 mt-1">
+          <span className="text-fg-muted">Fixed until</span>
+          <span className="font-semibold text-warning">{computedFixedUntil}</span>
         </div>
       )}
     </div>
@@ -227,10 +200,10 @@ function LivePreview(props: LivePreviewProps) {
   if (parsedAmount <= 0) return null;
   const bgClass =
     type === 'valuation'
-      ? 'bg-emerald-50 border-emerald-100'
+      ? 'bg-success-soft border-success-soft-strong'
       : type === 'rate_change'
-        ? 'bg-amber-50 border-amber-100'
-        : 'bg-indigo-50 border-indigo-100';
+        ? 'bg-warning-soft border-warning-soft-strong'
+        : 'bg-brand-soft border-brand-soft-strong';
   return (
     <div className={`rounded-xl p-4 border ${bgClass}`}>
       {type === 'repayment' && <RepaymentPreview {...props} />}
@@ -260,30 +233,24 @@ function TxnAmountField({
   setAmount,
   setError,
 }: TxnAmountFieldProps) {
+  const labels = {
+    repayment: `Total Repayment Amount (${mortgage.currency})`,
+    valuation: `New Estimated Value (${mortgage.currency})`,
+    rate_change: 'New Interest Rate (%)',
+  };
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        {type === 'repayment' && `Total Repayment Amount (${mortgage.currency})`}
-        {type === 'valuation' && `New Estimated Value (${mortgage.currency})`}
-        {type === 'rate_change' && 'New Interest Rate (%)'}
-      </label>
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium">
-          {type === 'rate_change' ? '%' : mortgage.currency}
-        </span>
-        <input
-          type="number"
-          step="0.01"
-          className={`w-full rounded-xl border pl-12 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${error ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-          placeholder={type === 'rate_change' ? '4.25' : '0.00'}
-          value={amount}
-          onChange={(e) => {
-            setAmount(e.target.value);
-            setError('');
-          }}
-        />
-      </div>
-    </div>
+    <FormField label={labels[type]}>
+      <CurrencyInput
+        currency={type === 'rate_change' ? '%' : mortgage.currency}
+        value={amount}
+        error={Boolean(error)}
+        placeholder={type === 'rate_change' ? '4.25' : '0.00'}
+        onChange={(value) => {
+          setAmount(value);
+          setError('');
+        }}
+      />
+    </FormField>
   );
 }
 
@@ -304,35 +271,32 @@ function RateChangeFields({
   setError,
 }: RateChangeFieldsProps) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        Fixed Period{' '}
-        <span className="text-slate-400 font-normal">— how long is this rate fixed for?</span>
-      </label>
+    <FormField label="Fixed Period" hint="— how long is this rate fixed for?">
       <div className="relative">
-        <input
+        <TextInput
           type="number"
           step="0.5"
           min="0.5"
           max="30"
-          className={`w-full rounded-xl border pl-4 pr-16 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${error && parsedFixedYears <= 0 ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
+          className="pl-4 pr-16"
+          error={Boolean(error && parsedFixedYears <= 0)}
           placeholder="e.g. 2"
           value={fixedYears}
-          onChange={(e) => {
-            setFixedYears(e.target.value);
+          onChange={(value) => {
+            setFixedYears(value);
             setError('');
           }}
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-faint text-xs font-medium">
           years
         </span>
       </div>
       {computedFixedUntil && (
-        <p className="mt-1.5 text-xs text-slate-500">
-          Fixed until <span className="font-semibold text-amber-600">{computedFixedUntil}</span>
+        <p className="mt-1.5 text-xs text-fg-subtle">
+          Fixed until <span className="font-semibold text-warning">{computedFixedUntil}</span>
         </p>
       )}
-    </div>
+    </FormField>
   );
 }
 
@@ -359,36 +323,28 @@ function RepaymentInterestField({
   setError,
 }: RepaymentInterestFieldProps) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        Interest Portion ({mortgage.currency}){' '}
-        <span className="text-slate-400 font-normal">— principal is auto-calculated</span>
-      </label>
-      <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium">
-          {mortgage.currency}
-        </span>
-        <input
-          type="number"
-          step="0.01"
-          className={`w-full rounded-xl border pl-12 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${error && parsedInterest > parsedAmount ? 'border-rose-300 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}
-          placeholder="0.00"
-          value={interest}
-          onChange={(e) => {
-            setInterest(e.target.value);
-            setError('');
-          }}
-        />
-      </div>
-      <div className="mt-2 flex gap-4 text-xs text-slate-500">
+    <FormField
+      label={`Interest Portion (${mortgage.currency})`}
+      hint="— principal is auto-calculated"
+    >
+      <CurrencyInput
+        currency={mortgage.currency}
+        value={interest}
+        error={Boolean(error && parsedInterest > parsedAmount)}
+        onChange={(value) => {
+          setInterest(value);
+          setError('');
+        }}
+      />
+      <div className="mt-2 flex gap-4 text-xs text-fg-subtle">
         <span>
-          Interest: <span className="font-semibold text-rose-500">{fmt(parsedInterest)}</span>
+          Interest: <span className="font-semibold text-danger">{fmt(parsedInterest)}</span>
         </span>
         <span>
-          Principal: <span className="font-semibold text-indigo-600">{fmt(derivedPrincipal)}</span>
+          Principal: <span className="font-semibold text-brand">{fmt(derivedPrincipal)}</span>
         </span>
       </div>
-    </div>
+    </FormField>
   );
 }
 
@@ -397,43 +353,6 @@ type TxnModalFormBodyProps = {
   mortgage: MortgageType;
   fmt: (n: number) => string;
 };
-function TxnDateNoteRow({
-  date,
-  note,
-  setDate,
-  setNote,
-}: Readonly<{
-  date: string;
-  note: string;
-  setDate: (v: string) => void;
-  setNote: (v: string) => void;
-}>) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Date</label>
-        <input
-          type="date"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-          Note <span className="text-slate-400 font-normal">optional</span>
-        </label>
-        <input
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          placeholder="e.g. Monthly repayment…"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </div>
-    </div>
-  );
-}
-
 function TxnConditionalFields({ state, mortgage, fmt }: TxnModalFormBodyProps) {
   const { type, error, parsedFixedYears, fixedYears, computedFixedUntil, setFixedYears, setError } =
     state;
@@ -470,7 +389,9 @@ function TxnConditionalFields({ state, mortgage, fmt }: TxnModalFormBodyProps) {
 function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
   return (
     <div className="p-6 space-y-5">
-      <TxnTypeSelector type={state.type} onTypeChange={state.handleTypeChange} />
+      <FormField label="Transaction Type" labelClassName="mb-2">
+        <TxnTypeSelector types={TXN_TYPES} value={state.type} onChange={state.handleTypeChange} />
+      </FormField>
       <ContextPill type={state.type} mortgage={mortgage} fmt={fmt} />
       <TxnAmountField
         type={state.type}
@@ -481,12 +402,13 @@ function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
         setError={state.setError}
       />
       <TxnConditionalFields state={state} mortgage={mortgage} fmt={fmt} />
-      {state.error && <p className="text-xs text-rose-500">{state.error}</p>}
-      <TxnDateNoteRow
+      {state.error && <p className="text-xs text-danger">{state.error}</p>}
+      <DateNoteRow
         date={state.date}
         note={state.note}
-        setDate={state.setDate}
-        setNote={state.setNote}
+        onDateChange={state.setDate}
+        onNoteChange={state.setNote}
+        notePlaceholder="e.g. Monthly repayment…"
       />
       <LivePreview
         type={state.type}

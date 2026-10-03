@@ -32,12 +32,12 @@ function HoldingTxnAmount({
     return (
       <div className="text-right flex-shrink-0">
         <p
-          className={`text-sm font-semibold ${transaction.type === 'buy' ? 'text-slate-700' : 'text-emerald-600'}`}
+          className={`text-sm font-semibold ${transaction.type === 'buy' ? 'text-fg-strong' : 'text-success'}`}
         >
           {transaction.type === 'buy' ? '-' : '+'}
           {fmtNative((transaction.shares ?? 0) * transaction.price, holding.currency, true)}
         </p>
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px] text-fg-faint">
           {transaction.shares ?? 0} @ {fmtNative(transaction.price, holding.currency, true)}
         </p>
       </div>
@@ -45,10 +45,10 @@ function HoldingTxnAmount({
   }
   return (
     <div className="text-right flex-shrink-0">
-      <p className="text-sm font-semibold text-indigo-600">
+      <p className="text-sm font-semibold text-brand">
         +{fmtNative(transaction.price, holding.currency, true)}
       </p>
-      <p className="text-[10px] text-slate-400">{incomeLowerLabel}</p>
+      <p className="text-[10px] text-fg-faint">{incomeLowerLabel}</p>
     </div>
   );
 }
@@ -63,17 +63,17 @@ function buildHoldingStats(
     {
       label: 'Avg Cost',
       value: fmtNative(position.avgCost, holding.currency, true),
-      color: 'text-slate-800',
+      color: 'text-fg-emphasis',
     },
     {
       label: totalIncomeLabel,
       value: `+${fmtNative(position.totalDividends, holding.currency, true)}`,
-      color: 'text-indigo-600',
+      color: 'text-brand',
     },
     {
       label: 'Realized Gain',
       value: `${position.realizedGain >= 0 ? '+' : ''}${fmtNative(position.realizedGain, holding.currency, true)}`,
-      color: position.realizedGain >= 0 ? 'text-emerald-600' : 'text-rose-500',
+      color: position.realizedGain >= 0 ? 'text-success' : 'text-danger',
     },
   ];
 }

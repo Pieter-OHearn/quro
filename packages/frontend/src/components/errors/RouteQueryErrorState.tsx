@@ -40,15 +40,15 @@ function RouteQueryActions({ failedQueries, retrying }: Readonly<RouteQueryActio
 
 function FailedRequestList({ failedLabels }: { failedLabels: readonly string[] }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <div className="rounded-2xl border border-border-default bg-surface-sunken p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-subtle">
         Failed requests
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {failedLabels.map((label) => (
           <span
             key={label}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-700"
+            className="rounded-full border border-border-default bg-surface px-3 py-1 text-sm text-fg-strong"
           >
             {label}
           </span>
@@ -76,14 +76,14 @@ function RouteQueryErrorDetails({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-600 transition-colors hover:bg-slate-50"
+        className="flex w-full items-center justify-between rounded-2xl border border-border-default bg-surface px-4 py-3 text-left text-sm text-fg-muted transition-colors hover:bg-surface-sunken"
       >
         <span>Technical details</span>
         {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
 
       {showDetails ? (
-        <pre className="mt-3 overflow-auto rounded-2xl border border-slate-800 bg-slate-950 p-4 text-xs leading-6 text-rose-200">
+        <pre className="mt-3 overflow-auto rounded-2xl border border-fg-emphasis bg-fg-deep p-4 text-xs leading-6 text-danger-border">
           {detail}
         </pre>
       ) : null}
@@ -104,9 +104,13 @@ export function RouteQueryErrorState({
   return (
     <PageStack as="main">
       <ContentSection>
-        <Card padding="none" className="overflow-hidden border-rose-100 shadow-sm" role="alert">
-          <div className="border-b border-rose-100 bg-gradient-to-r from-rose-50 via-white to-amber-50 px-6 py-4">
-            <span className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-600">
+        <Card
+          padding="none"
+          className="overflow-hidden border-danger-soft-strong shadow-sm"
+          role="alert"
+        >
+          <div className="border-b border-danger-soft-strong bg-gradient-to-r from-danger-soft via-surface to-warning-soft px-6 py-4">
+            <span className="inline-flex items-center gap-2 rounded-full border border-danger-border bg-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-danger-hover">
               <AlertTriangle size={14} />
               Route Data Unavailable
             </span>
@@ -115,14 +119,14 @@ export function RouteQueryErrorState({
           <div className="space-y-6 p-6 sm:p-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-danger-soft-strong text-danger-hover">
                   <AlertTriangle size={26} strokeWidth={1.8} />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-semibold text-slate-900">
+                  <h1 className="text-2xl font-semibold text-fg">
                     {routeName} data is temporarily unavailable
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-muted">
                     Quro paused this page because {failedSummary} could not be fetched safely. This
                     is not the same as an empty state, and retrying will refetch only the failed
                     requests.

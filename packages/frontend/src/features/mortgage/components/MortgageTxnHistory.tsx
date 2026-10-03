@@ -24,11 +24,11 @@ function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
   if (t.type === 'repayment') {
     return (
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-slate-700">-{fmt(t.amount)}</p>
-        <p className="text-[10px] text-slate-400">
-          <span className="text-rose-400">{fmt(t.interest ?? 0)} int</span>
+        <p className="text-sm font-semibold text-fg-strong">-{fmt(t.amount)}</p>
+        <p className="text-[10px] text-fg-faint">
+          <span className="text-danger-muted">{fmt(t.interest ?? 0)} int</span>
           {' · '}
-          <span className="text-indigo-500">{fmt(t.principal ?? 0)} prin</span>
+          <span className="text-brand-accent">{fmt(t.principal ?? 0)} prin</span>
         </p>
       </div>
     );
@@ -37,16 +37,16 @@ function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
   if (t.type === 'valuation') {
     return (
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-emerald-600">{fmt(t.amount)}</p>
-        <p className="text-[10px] text-slate-400">new value</p>
+        <p className="text-sm font-semibold text-success">{fmt(t.amount)}</p>
+        <p className="text-[10px] text-fg-faint">new value</p>
       </div>
     );
   }
 
   return (
     <div className="text-right flex-shrink-0">
-      <p className="text-sm font-semibold text-amber-600">{t.amount}%</p>
-      <p className="text-[10px] text-slate-400">
+      <p className="text-sm font-semibold text-warning">{t.amount}%</p>
+      <p className="text-[10px] text-fg-faint">
         {t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate'}
       </p>
     </div>
@@ -63,13 +63,13 @@ function MortgageTxnRow({ t, fmt, onEdit, onDelete }: MortgageTxnRowProps) {
       iconContainerClassName="w-9 h-9 rounded-xl"
       iconSize={14}
       label={t.note || m.label}
-      labelClassName="text-sm font-medium text-slate-700"
+      labelClassName="text-sm font-medium text-fg-strong"
       date={t.date}
-      dateClassName="text-xs text-slate-400"
+      dateClassName="text-xs text-fg-faint"
       amount={<MortgageTxnAmount t={t} fmt={fmt} />}
       onEdit={() => onEdit(t)}
       onDelete={() => onDelete(t.id)}
-      className="rounded-none border-0 bg-transparent px-5 py-3 hover:bg-slate-50/60"
+      className="rounded-none border-0 bg-transparent px-5 py-3 hover:bg-surface-sunken/60"
     />
   );
 }
@@ -85,10 +85,10 @@ function buildMortgageTxnStats({ transactions, fmt }: MortgageSummaryStatsProps)
   const totalInterest = repayments.reduce((s, t) => s + (t.interest ?? 0), 0);
   const rateChanges = transactions.filter((t) => t.type === 'rate_change').length;
   return [
-    { label: 'Total Repaid', value: fmt(totalRepaid), color: 'text-slate-800' },
-    { label: 'Principal Paid', value: fmt(totalPrincipal), color: 'text-indigo-600' },
-    { label: 'Interest Paid', value: fmt(totalInterest), color: 'text-rose-500' },
-    { label: 'Rate Changes', value: String(rateChanges), color: 'text-amber-600' },
+    { label: 'Total Repaid', value: fmt(totalRepaid), color: 'text-fg-emphasis' },
+    { label: 'Principal Paid', value: fmt(totalPrincipal), color: 'text-brand' },
+    { label: 'Interest Paid', value: fmt(totalInterest), color: 'text-danger' },
+    { label: 'Rate Changes', value: String(rateChanges), color: 'text-warning' },
   ];
 }
 

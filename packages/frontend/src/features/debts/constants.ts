@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import type { ElementType } from 'react';
 import type { DebtType } from '@quro/shared';
 import {
@@ -12,13 +13,13 @@ import {
 import type { DebtFilterValue, DebtFormState } from './types';
 
 export const DEBT_COLORS = [
-  '#6366f1',
-  '#0ea5e9',
-  '#ef4444',
-  '#f59e0b',
-  '#10b981',
-  '#ec4899',
-  '#8b5cf6',
+  DATA_COLORS['primary'],
+  DATA_COLORS['cash'],
+  DATA_COLORS['alert'],
+  DATA_COLORS['forecast'],
+  DATA_COLORS['income'],
+  DATA_COLORS['milestone'],
+  DATA_COLORS['portfolio'],
 ];
 
 export const DEFAULT_EMOJI_BY_TYPE: Record<DebtType, string> = {
@@ -41,32 +42,32 @@ export const DEBT_TYPE_META: Record<
   car_loan: {
     label: 'Car Loan',
     icon: Car,
-    toneClassName: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    toneClassName: 'bg-brand-soft text-brand-fg border-brand-tint',
   },
   student_loan: {
     label: 'Student Loan',
     icon: GraduationCap,
-    toneClassName: 'bg-sky-50 text-sky-700 border-sky-200',
+    toneClassName: 'bg-info-soft text-info-fg border-info-border',
   },
   personal_loan: {
     label: 'Personal Loan',
     icon: User,
-    toneClassName: 'bg-amber-50 text-amber-700 border-amber-200',
+    toneClassName: 'bg-warning-soft text-warning-fg border-warning-border',
   },
   credit_card: {
     label: 'Credit Card',
     icon: CreditCard,
-    toneClassName: 'bg-rose-50 text-rose-700 border-rose-200',
+    toneClassName: 'bg-danger-soft text-danger-fg border-danger-border',
   },
   overdraft: {
     label: 'Overdraft',
     icon: AlertTriangle,
-    toneClassName: 'bg-orange-50 text-orange-700 border-orange-200',
+    toneClassName: 'bg-accent-warm-soft text-accent-warm-fg border-accent-warm-border',
   },
   other: {
     label: 'Other',
     icon: MoreHorizontal,
-    toneClassName: 'bg-slate-100 text-slate-700 border-slate-200',
+    toneClassName: 'bg-surface-muted text-fg-strong border-border-default',
   },
 };
 

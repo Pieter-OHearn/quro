@@ -23,7 +23,7 @@ export type ModalProps = {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   onClose: () => void;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  maxWidth?: keyof typeof MAX_WIDTH_MAP;
   children: React.ReactNode;
   footer?: React.ReactNode;
   scrollable?: boolean;
@@ -39,6 +39,7 @@ const MAX_WIDTH_MAP = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-xl',
+  '3xl': 'max-w-3xl',
 } as const;
 
 const DEFAULT_CLOSE_ICON_SIZE = 18;
