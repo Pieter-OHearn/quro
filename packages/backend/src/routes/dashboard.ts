@@ -6,6 +6,9 @@ import {
   buildNetWorthHistory,
   loadNetWorthSourceData,
 } from '../lib/netWorthHistory';
+import { loadDashboardInsights } from '../lib/dashboardInsights';
+import { parseWholeNumber } from '../lib/requestValidation';
+import { HTTP_STATUS } from '../constants/http';
 import { loadActivity } from '../lib/activity';
 
 export { buildNetWorthHistory } from '../lib/netWorthHistory';
@@ -30,6 +33,15 @@ app.get('/net-worth', async (c) => {
 
 app.get('/allocations', async (c) => {
   const data = await buildDerivedAllocations(getAuthUser(c).id, getPartnerId(c));
+  return c.json({ data });
+});
+
+app.get('/insights', async (c) => {
+  const year = parseWholeNumber(c.req.query('year'));
+  if (year === null || year < 1000 || year > 9998) {
+    return c.json({ error: 'Invalid year' }, HTTP_STATUS.BAD_REQUEST);
+  }
+  const data = await loadDashboardInsights(getAuthUser(c).id, year);
   return c.json({ data });
 });
 

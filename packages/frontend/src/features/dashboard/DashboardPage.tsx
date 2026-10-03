@@ -4,10 +4,15 @@ import { ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
 import { useGoals } from '@/features/goals/hooks';
 import type { GoalProgressContext } from '@/features/goals/types';
 import { parseGoalYear } from '@/features/goals/utils/goal-utils';
-import { useHoldingTransactions } from '@/features/investments/hooks';
-import { usePayslips } from '@/features/salary/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
-import type { DashboardAllocationsSummary, HoldingTransaction } from '@quro/shared';
+import type {
+  DashboardAllocationsSummary,
+  DashboardInsights,
+  DashboardTransaction,
+  Goal,
+  NetWorthSnapshot,
+  SavingsAccount,
+} from '@quro/shared';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
@@ -31,7 +36,12 @@ import {
   normalizeNetWorthSnapshots,
 } from './utils/dashboard-data';
 import type { DashboardFormatFn } from './types';
-import { useAssetAllocations, useDashboardTransactions, useNetWorthSnapshots } from './hooks';
+import {
+  useAssetAllocations,
+  useDashboardTransactions,
+  useDashboardInsights,
+  useNetWorthSnapshots,
+} from './hooks';
 
 const DASHBOARD_GOAL_LIMIT = 4;
 const DASHBOARD_TXN_LIMIT = 6;
@@ -47,14 +57,14 @@ const EMPTY_ALLOCATIONS_SUMMARY: DashboardAllocationsSummary = {
   debtCount: 0,
 };
 
-const computeAnnualGross = (
-  payslips: ReadonlyArray<{ gross: number; date: string; currency: string }>,
-  convertToBase: (amount: number, currency: string) => number,
-): number => {
-  if (payslips.length === 0) return 0;
-  const latest = [...payslips].sort((a, b) => b.date.localeCompare(a.date))[0];
-  if (!latest) return 0;
-  return convertToBase(latest.gross * 12, latest.currency);
+const EMPTY_NET_WORTH: NetWorthSnapshot[] = [];
+const EMPTY_TRANSACTIONS: DashboardTransaction[] = [];
+const EMPTY_GOALS: Goal[] = [];
+const EMPTY_SAVINGS: SavingsAccount[] = [];
+const EMPTY_INSIGHTS: DashboardInsights = {
+  latestPayslip: null,
+  salaryMonths: [],
+  investHabitBuyMonths: [],
 };
 
 const buildAllocationsByKey = (allocationData: ReadonlyArray<{ key: string; value: number }>) =>
@@ -66,41 +76,20 @@ const buildAllocationsByKey = (allocationData: ReadonlyArray<{ key: string; valu
 const buildMonthKey = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(MONTH_KEY_PAD_LENGTH, '0')}`;
 
-function computeInvestHabitBuyMonths(
-  holdingTxns: readonly HoldingTransaction[],
-): ReadonlyMap<number, ReadonlySet<string>> {
-  const yearMap = new Map<number, Set<string>>();
-  for (const txn of holdingTxns) {
-    if (txn.type !== 'buy' || !txn.date) continue;
-    const date = new Date(txn.date + 'T00:00:00Z');
-    const year = date.getUTCFullYear();
-    const monthKey = `${year}-${String(date.getUTCMonth() + 1).padStart(MONTH_KEY_PAD_LENGTH, '0')}`;
-    let months = yearMap.get(year);
-    if (!months) {
-      months = new Set();
-      yearMap.set(year, months);
-    }
-    months.add(monthKey);
-  }
-  return yearMap;
-}
-
-function useDashboardQueries() {
+function useDashboardQueries(currentYear: number) {
   const netWorthQuery = useNetWorthSnapshots();
   const allocationsQuery = useAssetAllocations();
   const transactionsQuery = useDashboardTransactions();
   const goalsQuery = useGoals();
-  const payslipsQuery = usePayslips();
+  const insightsQuery = useDashboardInsights(currentYear);
   const savingsAccountsQuery = useSavingsAccounts();
-  const holdingTxnsQuery = useHoldingTransactions();
   const routeQueries = [
     { label: 'net worth history', ...netWorthQuery },
     { label: 'asset allocations', ...allocationsQuery },
     { label: 'recent dashboard activity', ...transactionsQuery },
     { label: 'goal progress', ...goalsQuery },
-    { label: 'payslips', ...payslipsQuery },
+    { label: 'salary and investing summaries', ...insightsQuery },
     { label: 'savings accounts', ...savingsAccountsQuery },
-    { label: 'holding transactions', ...holdingTxnsQuery },
   ];
 
   return {
@@ -108,9 +97,8 @@ function useDashboardQueries() {
     allocationsQuery,
     transactionsQuery,
     goalsQuery,
-    payslipsQuery,
+    insightsQuery,
     savingsAccountsQuery,
-    holdingTxnsQuery,
     isLoading: routeQueries.some((query) => query.isLoading),
     queryFailures: getFailedRouteQueries(routeQueries),
   };
@@ -120,13 +108,12 @@ type DashboardQueries = ReturnType<typeof useDashboardQueries>;
 
 function getDashboardQueryData(queries: DashboardQueries) {
   return {
-    netWorthData: queries.netWorthQuery.data ?? [],
+    netWorthData: queries.netWorthQuery.data ?? EMPTY_NET_WORTH,
     allocations: queries.allocationsQuery.data ?? EMPTY_ALLOCATIONS_SUMMARY,
-    transactions: queries.transactionsQuery.data ?? [],
-    goals: queries.goalsQuery.data ?? [],
-    payslips: queries.payslipsQuery.data ?? [],
-    savingsAccounts: queries.savingsAccountsQuery.data ?? [],
-    holdingTxns: queries.holdingTxnsQuery.data ?? [],
+    transactions: queries.transactionsQuery.data ?? EMPTY_TRANSACTIONS,
+    goals: queries.goalsQuery.data ?? EMPTY_GOALS,
+    insights: queries.insightsQuery.data ?? EMPTY_INSIGHTS,
+    savingsAccounts: queries.savingsAccountsQuery.data ?? EMPTY_SAVINGS,
   };
 }
 
@@ -134,13 +121,61 @@ function useDashboardData(
   fmtBase: DashboardFormatFn,
   convertToBase: (amount: number, currency: string) => number,
 ) {
-  const queries = useDashboardQueries();
-  const { netWorthData, allocations, transactions, goals, payslips, savingsAccounts, holdingTxns } =
-    getDashboardQueryData(queries);
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonthKey = buildMonthKey(today);
-  const annualGross = computeAnnualGross(payslips, convertToBase);
+  const queries = useDashboardQueries(currentYear);
+  const { netWorthData, allocations, transactions, goals, insights, savingsAccounts } =
+    getDashboardQueryData(queries);
+  const derived = useMemo(
+    () =>
+      deriveDashboardData({
+        netWorthData,
+        allocations,
+        transactions,
+        goals,
+        insights,
+        savingsAccounts,
+        currentYear,
+        currentMonthKey,
+        convertToBase,
+        fmtBase,
+      }),
+    [
+      netWorthData,
+      allocations,
+      transactions,
+      goals,
+      insights,
+      savingsAccounts,
+      currentYear,
+      currentMonthKey,
+      convertToBase,
+      fmtBase,
+    ],
+  );
+  return { ...derived, isLoading: queries.isLoading, queryFailures: queries.queryFailures };
+}
+
+function deriveDashboardData({
+  netWorthData,
+  allocations,
+  transactions,
+  goals,
+  insights,
+  savingsAccounts,
+  currentYear,
+  currentMonthKey,
+  convertToBase,
+  fmtBase,
+}: ReturnType<typeof getDashboardQueryData> & {
+  currentYear: number;
+  currentMonthKey: string;
+  convertToBase: GoalProgressContext['convertToBase'];
+  fmtBase: DashboardFormatFn;
+}) {
+  const latest = insights.latestPayslip;
+  const annualGross = latest ? convertToBase(latest.gross * 12, latest.currency) : 0;
   const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
   const convertedTransactions = normalizeDashboardTransactions(transactions, convertToBase);
   const currentMonthTransactions = convertedTransactions.filter((tx) =>
@@ -149,23 +184,15 @@ function useDashboardData(
   const chartData = normalizeNetWorthSnapshots(netWorthData, convertToBase);
   const allocationSummary = normalizeAssetAllocations(allocations, convertToBase);
   const allocationByKey = buildAllocationsByKey(allocationSummary.allocationData);
-  const investHabitBuyMonths = useMemo(
-    () => computeInvestHabitBuyMonths(holdingTxns),
-    [holdingTxns],
-  );
   const goalProgressContext: GoalProgressContext = {
     annualGross,
     savingsAccounts,
     portfolioTotal: allocationSummary.portfolioTotal,
     netWorth: allocationSummary.netWorth,
-    investHabitBuyMonths,
+    investHabitBuyMonths: new Map([[currentYear, new Set(insights.investHabitBuyMonths)]]),
     convertToBase,
   };
-
-  const { netWorth, monthChange, ytdPct, isEstimated } = computeNWMetrics(
-    chartData,
-    allocationSummary.netWorth,
-  );
+  const nwMetrics = computeNWMetrics(chartData, allocationSummary.netWorth, currentYear);
   const {
     monthlyCategoryChange,
     monthlySalaryValue,
@@ -173,11 +200,13 @@ function useDashboardData(
     totalIncome,
     totalExpenses,
     totalSavingsDeposited,
-  } = computeDashboardTxnStats(convertedTransactions, payslips, convertToBase);
-
+  } = computeDashboardTxnStats(
+    convertedTransactions,
+    insights.salaryMonths,
+    convertToBase,
+    currentMonthKey,
+  );
   return {
-    isLoading: queries.isLoading,
-    queryFailures: queries.queryFailures,
     chartData,
     allocationData: allocationSummary.allocationData,
     totalAssets: allocationSummary.totalAssets,
@@ -189,10 +218,7 @@ function useDashboardData(
     monthlyCategoryChange,
     salaryTrendChange,
     allocationByKey,
-    netWorth,
-    monthChange,
-    ytdPct,
-    isEstimated,
+    ...nwMetrics,
     annualGross,
     goalProgressContext,
     currentYear,

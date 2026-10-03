@@ -174,3 +174,17 @@ test('pension deletion refreshes import rows whose committed transaction referen
   expect(isInvalidated(client, keys.dashboard.summary)).toBe(true);
   client.clear();
 });
+
+test('salary and holding changes refresh dashboard insight variants, while document writes preserve them', async () => {
+  const client = new QueryClient();
+  const variants = [keys.dashboard.insightYear(2025), keys.dashboard.insightYear(2026)];
+  for (const domain of ['salary', 'holding', 'employment'] as const) {
+    seed(client, variants);
+    await invalidateDomain(client, domain);
+    for (const key of variants) expect(isInvalidated(client, key)).toBe(true);
+  }
+  seed(client, variants);
+  await invalidateDomain(client, 'salaryDocument');
+  for (const key of variants) expect(isInvalidated(client, key)).toBe(false);
+  client.clear();
+});

@@ -34,6 +34,7 @@ function buildLinkedPropertyMap(properties: Property[]): Map<number, Property> {
 }
 
 const EMPTY_PROPERTIES: Property[] = [];
+const EMPTY_TRANSACTIONS: MortgageTransaction[] = [];
 
 function parseRequestedMortgageId(raw: string | null): number | null {
   const value = Number(raw);
@@ -56,7 +57,7 @@ export function useMortgagePageState(): MortgagePageState {
 
   const mortgage = mortgages.find((entry) => entry.id === activeMortgageId) ?? mortgages[0];
   const transactionsQuery = useMortgageTransactions(mortgage?.id);
-  const txns = transactionsQuery.data ?? [];
+  const txns = transactionsQuery.data ?? EMPTY_TRANSACTIONS;
 
   const createMortgageMut = useCreateMortgage();
   const updateMortgageMut = useUpdateMortgage();

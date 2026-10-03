@@ -4,6 +4,8 @@ export const queryKeys = {
     all: ['dashboard'] as const,
     summary: ['dashboard', 'summary'] as const,
     transactions: ['dashboard', 'transactions'] as const,
+    insights: ['dashboard', 'insights'] as const,
+    insightYear: (year: number) => ['dashboard', 'insights', year] as const,
   },
   budget: {
     all: ['budget'] as const,

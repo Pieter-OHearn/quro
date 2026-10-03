@@ -903,6 +903,13 @@ export type CurrencyRate = {
   updatedAt: string;
 };
 
+/** Compact inputs for dashboard salary metrics and current-year investing goals. */
+export type DashboardInsights = {
+  latestPayslip: Pick<Payslip, 'date' | 'gross' | 'currency'> | null;
+  salaryMonths: Pick<Payslip, 'date' | 'net' | 'bonus' | 'currency'>[];
+  investHabitBuyMonths: string[];
+};
+
 export type DashboardTransaction = {
   id: number;
   name: string;

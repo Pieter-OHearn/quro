@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import type { Mortgage as MortgageType } from '@quro/shared';
+import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import { EmptyState, LoadingState } from '@/components/ui';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import {
@@ -63,6 +64,16 @@ type MortgageContentProps = {
   mortgage: MortgageType;
 };
 
+function useMortgageMetrics(mortgage: MortgageType, transactions: MortgageTransaction[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const currentDay = today.getTime();
+  return useMemo(
+    () => computeMortgageMetrics(mortgage, transactions, new Date(currentDay)),
+    [mortgage, transactions, currentDay],
+  );
+}
+
 function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
   const {
     ltv,
@@ -73,7 +84,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
     yearsRemaining,
     amortization,
     paymentBreakdown,
-  } = computeMortgageMetrics(mortgage, state.txns);
+  } = useMortgageMetrics(mortgage, state.txns);
 
   return (
     <div className="p-6 space-y-6">

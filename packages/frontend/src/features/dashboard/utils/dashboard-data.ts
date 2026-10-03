@@ -147,7 +147,7 @@ const getPayslipMonthlyAmount = (payslip: Pick<Payslip, 'net' | 'bonus'>) =>
   payslip.net + (payslip.bonus ?? 0);
 
 const computeSalaryMetrics = (
-  payslips: readonly Payslip[],
+  payslips: readonly Pick<Payslip, 'date' | 'net' | 'bonus' | 'currency'>[],
   convertToBase: (amount: number, currency: string) => number,
 ) => {
   if (payslips.length === 0) {
@@ -194,10 +194,10 @@ const computeSalaryMetrics = (
 export const computeNWMetrics = (
   chartData: readonly NetWorthMetricData[],
   fallbackNetWorth: number,
+  currentYear = new Date().getFullYear(),
 ) => {
   const currentNW = fallbackNetWorth;
   const prevNW = chartData.length > 1 ? chartData[chartData.length - 2].value : currentNW;
-  const currentYear = new Date().getFullYear();
   const firstCurrentYearPoint = chartData.find((point) => point.year === currentYear);
   const firstNW =
     firstCurrentYearPoint?.value ?? (chartData.length > 0 ? chartData[0].value : currentNW);
@@ -251,10 +251,10 @@ const weightedTxnAmount = (tx: DashboardTransaction): number =>
 
 export function computeDashboardTxnStats(
   transactions: readonly DashboardTransaction[],
-  payslips: readonly Payslip[],
+  payslips: readonly Pick<Payslip, 'date' | 'net' | 'bonus' | 'currency'>[],
   convertToBase: (amount: number, currency: string) => number,
+  currentKey = getMonthKey(new Date()),
 ): DashboardTxnStats {
-  const currentKey = getMonthKey(new Date());
   const monthTxns = transactions.filter((tx) => tx.date.startsWith(currentKey));
   const monthlyCategoryChange = (category: string) =>
     monthTxns

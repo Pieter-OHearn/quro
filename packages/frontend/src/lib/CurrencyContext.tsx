@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   CURRENCY_CODES,
   CURRENCY_META,
@@ -13,7 +21,7 @@ import {
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from './AuthContext';
 import { apiPut } from './api';
-import { convertCurrencyAmount } from './currencyRates';
+import { convertCurrencyAmount, type CurrencyRateTable } from './currencyRates';
 import {
   getCurrencyRatesErrorDetail,
   isCurrencyRatesUnavailableError,
@@ -144,6 +152,53 @@ function renderCurrencyRatesGate(
   return null;
 }
 
+function useCurrencyFormatters(
+  baseCurrency: CurrencyCode,
+  numberFormat: NumberFormatPreference,
+  hasUser: boolean,
+  table: CurrencyRateTable | undefined,
+) {
+  const convertToBase = useCallback(
+    (amount: number, fromCurrency: string): number => {
+      const safeCurrency = normalizeCurrency(fromCurrency);
+
+      if (!table) {
+        if (!hasUser || safeCurrency === baseCurrency) return amount;
+        throw new Error('Currency rates are not ready');
+      }
+
+      const converted = convertCurrencyAmount(amount, safeCurrency, baseCurrency, table);
+      if (converted === null) {
+        throw new Error(`Missing synced FX rate for ${safeCurrency} -> ${baseCurrency}`);
+      }
+
+      return converted;
+    },
+    [baseCurrency, hasUser, table],
+  );
+
+  const fmtBase = useCallback(
+    (amount: number, fromCurrency?: string, decimals = true): string => {
+      const converted = fromCurrency ? convertToBase(amount, fromCurrency) : amount;
+      return formatCurrency(converted, baseCurrency, decimals, numberFormat);
+    },
+    [baseCurrency, convertToBase, numberFormat],
+  );
+
+  const fmtNative = useCallback(
+    (amount: number, currency: string, decimals = true): string =>
+      formatCurrency(amount, currency, decimals, numberFormat),
+    [numberFormat],
+  );
+
+  const isForeign = useCallback(
+    (currency: string) => normalizeCurrency(currency) !== baseCurrency,
+    [baseCurrency],
+  );
+
+  return { convertToBase, fmtBase, fmtNative, isForeign };
+}
+
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, replaceUser } = useAuth();
   const ratesQuery = useCurrencyRates();
@@ -179,52 +234,42 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     [baseCurrency, replaceUser, user],
   );
 
+  const table = ratesQuery.data;
+  const { convertToBase, fmtBase, fmtNative, isForeign } = useCurrencyFormatters(
+    baseCurrency,
+    numberFormat,
+    hasUser,
+    table,
+  );
+  const ratesUpdatedAt = table?.latestUpdatedAt ?? null;
+  const value = useMemo<CurrencyContextType>(
+    () => ({
+      baseCurrency,
+      numberFormat,
+      setBaseCurrency,
+      convertToBase,
+      fmtBase,
+      fmtNative,
+      isForeign,
+      ratesStatus,
+      ratesUpdatedAt,
+    }),
+    [
+      baseCurrency,
+      numberFormat,
+      setBaseCurrency,
+      convertToBase,
+      fmtBase,
+      fmtNative,
+      isForeign,
+      ratesStatus,
+      ratesUpdatedAt,
+    ],
+  );
+
   if (gate) return gate;
 
-  const convertToBase = (amount: number, fromCurrency: string): number => {
-    const safeCurrency = normalizeCurrency(fromCurrency);
-    const table = ratesQuery.data;
-
-    if (!table) {
-      if (!hasUser || safeCurrency === baseCurrency) return amount;
-      throw new Error('Currency rates are not ready');
-    }
-
-    const converted = convertCurrencyAmount(amount, safeCurrency, baseCurrency, table);
-    if (converted === null) {
-      throw new Error(`Missing synced FX rate for ${safeCurrency} -> ${baseCurrency}`);
-    }
-
-    return converted;
-  };
-
-  const fmtBase = (amount: number, fromCurrency?: string, decimals = true): string => {
-    const converted = fromCurrency ? convertToBase(amount, fromCurrency) : amount;
-    return formatCurrency(converted, baseCurrency, decimals, numberFormat);
-  };
-
-  const fmtNative = (amount: number, currency: string, decimals = true): string =>
-    formatCurrency(amount, currency, decimals, numberFormat);
-
-  const isForeign = (currency: string) => normalizeCurrency(currency) !== baseCurrency;
-
-  return (
-    <CurrencyContext.Provider
-      value={{
-        baseCurrency,
-        numberFormat,
-        setBaseCurrency,
-        convertToBase,
-        fmtBase,
-        fmtNative,
-        isForeign,
-        ratesStatus,
-        ratesUpdatedAt: ratesQuery.data?.latestUpdatedAt ?? null,
-      }}
-    >
-      {children}
-    </CurrencyContext.Provider>
-  );
+  return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }
 
 export function useCurrency() {

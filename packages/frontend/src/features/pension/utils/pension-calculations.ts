@@ -90,29 +90,43 @@ export function computePensionGrowthData(
 
   if (datedTxns.length === 0) return [];
 
-  const currentYear = new Date().getUTCFullYear();
+  const now = Date.now();
+  const currentYear = new Date(now).getUTCFullYear();
   const earliestYear = new Date(
-    Math.min(...datedTxns.map((txn) => txn.timestamp)),
+    datedTxns.reduce((earliest, txn) => Math.min(earliest, txn.timestamp), Infinity),
   ).getUTCFullYear();
   const years = Array.from(
     { length: currentYear - earliestYear + 1 },
     (_, index) => earliestYear + index,
   );
 
-  return years.map((year) => {
-    const cutoff = year === currentYear ? Date.now() : yearEndUtc(year);
-
-    const total = pensions.reduce((sum, pot) => {
-      const currentBalance = Math.max(0, pot.balance);
-      const netAfterCutoff = datedTxns
-        .filter((txn) => txn.potId === pot.id && txn.timestamp > cutoff)
-        .reduce((acc, txn) => acc + pensionTxnDelta(txn), 0);
-
-      return sum + convertToBase(Math.max(0, currentBalance - netAfterCutoff), pot.currency);
-    }, 0);
-
-    return { year: String(year), value: total };
+  const grouped = new Map<number, DatedPensionTransaction[]>();
+  for (const txn of datedTxns) {
+    const group = grouped.get(txn.potId);
+    if (group) group.push(txn);
+    else grouped.set(txn.potId, [txn]);
+  }
+  const balances = pensions.map((pot) => {
+    const txns = (grouped.get(pot.id) ?? []).sort((a, b) => b.timestamp - a.timestamp);
+    return { pot, txns, index: 0, netAfterCutoff: 0 };
   });
+
+  // Move the cutoff backwards, consuming each pot's future deltas only once.
+  return years
+    .reverse()
+    .map((year) => {
+      const cutoff = year === currentYear ? now : yearEndUtc(year);
+      const total = balances.reduce((sum, state) => {
+        while (state.index < state.txns.length && state.txns[state.index].timestamp > cutoff) {
+          state.netAfterCutoff += pensionTxnDelta(state.txns[state.index]);
+          state.index += 1;
+        }
+        const balance = Math.max(0, Math.max(0, state.pot.balance) - state.netAfterCutoff);
+        return sum + convertToBase(balance, state.pot.currency);
+      }, 0);
+      return { year: String(year), value: total };
+    })
+    .reverse();
 }
 
 export function computePensionGrowthPercent(data: PensionGrowthPoint[]): number | null {

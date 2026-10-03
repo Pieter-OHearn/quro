@@ -1,7 +1,7 @@
 import type { HoldingTransaction } from '@quro/shared';
 import { ArchivedItemsSection } from '@/components/ui';
 import { useArchivedHoldings, useDeleteHolding, useUnarchiveHolding } from '../hooks';
-import { computePosition } from '../utils/position';
+import { useInvestmentPositions } from '../hooks/useInvestmentPositions';
 
 type HoldingsArchivedSectionProps = {
   holdingTxns: HoldingTransaction[];
@@ -12,6 +12,7 @@ export function HoldingsArchivedSection({ holdingTxns }: Readonly<HoldingsArchiv
   const unarchive = useUnarchiveHolding();
   const deleteHolding = useDeleteHolding();
   const archived = archivedQuery.data ?? [];
+  const positions = useInvestmentPositions(archived, holdingTxns);
 
   return (
     <ArchivedItemsSection
@@ -21,7 +22,7 @@ export function HoldingsArchivedSection({ holdingTxns }: Readonly<HoldingsArchiv
       items={archived}
       renderMeta={(holding) => holding.ticker.toUpperCase()}
       getBalance={(holding) => {
-        const position = computePosition(holding.id, holdingTxns);
+        const position = positions[holding.id];
         return {
           value: position.shares * holding.currentPrice,
           currency: holding.currency,

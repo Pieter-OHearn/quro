@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.6.4] - 2026-10-03
+
+- Split pages, charts, and the emoji picker into deferred frontend chunks.
+- Stabilize currency context helpers and memoize dashboard, mortgage, and brokerage calculations; group investment and pension history before computing totals.
+- Fetch compact dashboard salary and investment-habit summaries, and poll pension notifications only while imports are queued or processing.
+
 ## [v0.6.3] - 2026-10-02
 
 - Preserve the disconnected Bunq state by handling missing-connection responses before resolving the query.

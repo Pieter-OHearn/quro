@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+import type { EmojiClickData } from 'emoji-picker-react';
+
 import { cn } from '@/lib/utils';
+
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 export type EmojiPickerFieldProps = {
   label?: string;
@@ -91,15 +94,23 @@ function PickerPortal({
 }: PickerPortalProps) {
   return createPortal(
     <div ref={pickerRef} style={pickerStyle}>
-      <EmojiPicker
-        onEmojiClick={(data: EmojiClickData) => {
-          onChange(data.emoji);
-          onClose();
-        }}
-        height={pickerHeight}
-        width={pickerWidth}
-        previewConfig={{ showPreview: false }}
-      />
+      <Suspense
+        fallback={
+          <div role="status" className="rounded-xl bg-surface p-4 text-fg-muted">
+            Loading emojis…
+          </div>
+        }
+      >
+        <EmojiPicker
+          onEmojiClick={(data: EmojiClickData) => {
+            onChange(data.emoji);
+            onClose();
+          }}
+          height={pickerHeight}
+          width={pickerWidth}
+          previewConfig={{ showPreview: false }}
+        />
+      </Suspense>
     </div>,
     document.body,
   );

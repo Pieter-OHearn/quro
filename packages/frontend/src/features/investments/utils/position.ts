@@ -49,23 +49,44 @@ function applyTxn(state: PositionState, t: HoldingTransaction): void {
   }
 }
 
-export function computePosition(holdingId: number, txns: HoldingTransaction[]): Position {
-  const relevant = txns
-    .filter((t) => t.holdingId === holdingId)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
+function computeSortedPosition(txns: readonly HoldingTransaction[]): Position {
   const state: PositionState = { shares: 0, totalCost: 0, realizedGain: 0, totalDividends: 0 };
-
-  for (const t of relevant) {
-    applyTxn(state, t);
-  }
-
+  for (const txn of txns) applyTxn(state, txn);
   return {
     shares: state.shares,
     avgCost: state.shares > 0 ? state.totalCost / state.shares : 0,
     realizedGain: state.realizedGain,
     totalDividends: state.totalDividends,
   };
+}
+
+export function groupHoldingTransactions(txns: readonly HoldingTransaction[]) {
+  const grouped = new Map<number, HoldingTransaction[]>();
+  for (const txn of txns) {
+    const group = grouped.get(txn.holdingId);
+    if (group) group.push(txn);
+    else grouped.set(txn.holdingId, [txn]);
+  }
+  return grouped;
+}
+
+export function computePositions(
+  holdings: readonly { id: number }[],
+  txns: readonly HoldingTransaction[],
+): Record<number, Position> {
+  const grouped = groupHoldingTransactions(txns);
+  return Object.fromEntries(
+    holdings.map(({ id }) => [
+      id,
+      computeSortedPosition((grouped.get(id) ?? []).sort((a, b) => a.date.localeCompare(b.date))),
+    ]),
+  );
+}
+
+export function computePosition(holdingId: number, txns: readonly HoldingTransaction[]): Position {
+  return computeSortedPosition(
+    txns.filter((txn) => txn.holdingId === holdingId).sort((a, b) => a.date.localeCompare(b.date)),
+  );
 }
 
 export type DatedHoldingTransaction = HoldingTransaction & { timestamp: number };
