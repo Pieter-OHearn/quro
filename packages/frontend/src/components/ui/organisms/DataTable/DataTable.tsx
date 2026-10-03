@@ -60,7 +60,7 @@ const TABLE_VARIANT_CLASSES = {
   },
 } as const;
 
-export type DataTableColumn = {
+export type DataTableColumn<Row = never> = {
   key: string;
   header?: ReactNode;
   align?: keyof typeof ALIGNMENT_CLASSES;
@@ -69,6 +69,7 @@ export type DataTableColumn = {
   mobileLabel?: ReactNode;
   numeric?: boolean;
   sortable?: boolean;
+  sortValue?(row: Row): string | number;
   defaultSortDirection?: DataTableSortDirection;
   headerClassName?: string;
   cellClassName?: string;

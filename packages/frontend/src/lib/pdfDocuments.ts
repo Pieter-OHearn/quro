@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { PdfDocument } from '@quro/shared';
 import { buildApiUrl, resolveApiErrorMessage } from './api';
 
@@ -80,11 +80,14 @@ export function usePdfAttachmentState<TDocument extends PdfDocument>({
 }: UsePdfAttachmentStateArgs<TDocument>) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState('');
-  const [document, setDocument] = useState<TDocument | null>(initialDocument);
-
-  useEffect(() => {
-    setDocument(initialDocument);
-  }, [initialDocument]);
+  const [override, setOverride] = useState<{
+    source: TDocument | null;
+    document: TDocument | null;
+  } | null>(null);
+  const document = override?.source === initialDocument ? override.document : initialDocument;
+  if (override && override.source !== initialDocument) setOverride(null);
+  const setDocument = (next: TDocument | null) =>
+    setOverride({ source: initialDocument, document: next });
 
   const busy = isUploading || Boolean(isDeleting);
 

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useSortedRows, newestFirst } from '@/hooks/useSortedRows';
+import { useState } from 'react';
 import { CURRENCY_META, type Payslip } from '@quro/shared';
 import {
   Badge,
@@ -25,12 +26,10 @@ type PayslipTableProps = {
   onEdit: (payslip: Payslip) => void;
 };
 
-const SORT_ASCENDING = 1;
-const SORT_DESCENDING = -1;
-
-const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
+const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
   {
     key: 'month',
+    sortValue: (row) => row.date,
     header: 'Month',
     mobileLabel: 'Month',
     priority: 'primary',
@@ -40,6 +39,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
   },
   {
     key: 'gross',
+    sortValue: (row) => row.gross,
     header: 'Gross',
     align: 'right',
     mobileLabel: 'Gross',
@@ -51,6 +51,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
   },
   {
     key: 'tax',
+    sortValue: (row) => row.tax,
     header: 'Tax',
     align: 'right',
     mobileLabel: 'Tax',
@@ -63,6 +64,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
   },
   {
     key: 'pension',
+    sortValue: (row) => row.pension,
     header: 'Pension',
     align: 'right',
     mobileLabel: 'Pension',
@@ -75,6 +77,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn[] = [
   },
   {
     key: 'net',
+    sortValue: (row) => row.net,
     header: 'Net Pay',
     align: 'right',
     mobileLabel: 'Net pay',
@@ -187,24 +190,6 @@ function PayslipTableRow({
   );
 }
 
-function sortPayslips(payslips: readonly Payslip[], sort: DataTableSortState): Payslip[] {
-  const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
-
-  return [...payslips].sort((a, b) => {
-    const comparison = getPayslipSortComparison(a, b, sort.columnKey);
-
-    return comparison * direction || b.date.localeCompare(a.date) || b.id - a.id;
-  });
-}
-
-function getPayslipSortComparison(a: Payslip, b: Payslip, columnKey: string) {
-  if (columnKey === 'gross') return a.gross - b.gross;
-  if (columnKey === 'tax') return a.tax - b.tax;
-  if (columnKey === 'pension') return a.pension - b.pension;
-  if (columnKey === 'net') return a.net - b.net;
-  return a.date.localeCompare(b.date);
-}
-
 export function PayslipHistoryTable({
   payslips,
   selected,
@@ -214,7 +199,7 @@ export function PayslipHistoryTable({
   onEdit,
 }: Readonly<PayslipTableProps>) {
   const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'month', direction: 'desc' });
-  const sortedPayslips = useMemo(() => sortPayslips(payslips, sort), [payslips, sort]);
+  const sortedPayslips = useSortedRows(payslips, PAYSLIP_COLUMNS, sort, newestFirst);
 
   return (
     <DataTable

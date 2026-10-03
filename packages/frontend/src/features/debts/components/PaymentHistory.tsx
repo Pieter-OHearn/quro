@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useSortedRows, newestFirst } from '@/hooks/useSortedRows';
+import { useState } from 'react';
 import { type Debt, type DebtPayment } from '@quro/shared';
 import { Clock, Plus, Trash2 } from 'lucide-react';
 import {
@@ -7,6 +8,7 @@ import {
   DataTableCell,
   DataTableRow,
   type DataTableSortState,
+  type DataTableColumn,
 } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { formatDate } from '@/lib/utils';
@@ -18,18 +20,16 @@ type PaymentHistoryProps = {
   onDeletePayment: (id: number) => void;
 };
 
-const SORT_ASCENDING = 1;
-const SORT_DESCENDING = -1;
-
 type PaymentHistoryTableProps = Omit<PaymentHistoryProps, 'onLogPayment' | 'payments'> & {
   sortedPayments: DebtPayment[];
   sort: DataTableSortState;
   onSortChange: (sort: DataTableSortState) => void;
 };
 
-const PAYMENT_COLUMNS = [
+const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
   {
     key: 'date',
+    sortValue: (row) => row.date,
     header: 'Date',
     mobileLabel: 'Date',
     sortable: true,
@@ -37,6 +37,7 @@ const PAYMENT_COLUMNS = [
   },
   {
     key: 'amount',
+    sortValue: (row) => row.amount,
     header: 'Amount',
     align: 'right',
     mobileLabel: 'Amount',
@@ -47,6 +48,7 @@ const PAYMENT_COLUMNS = [
   },
   {
     key: 'principal',
+    sortValue: (row) => row.principal,
     header: 'Principal',
     align: 'right',
     mobileLabel: 'Principal',
@@ -57,6 +59,7 @@ const PAYMENT_COLUMNS = [
   },
   {
     key: 'interest',
+    sortValue: (row) => row.interest,
     header: 'Interest',
     align: 'right',
     mobileLabel: 'Interest',
@@ -67,7 +70,7 @@ const PAYMENT_COLUMNS = [
     cellClassName: 'text-rose-500',
   },
   { key: 'actions', header: '', priority: 'actions', width: 40 },
-] as const;
+];
 
 function PaymentHistoryEmpty() {
   return (
@@ -128,23 +131,6 @@ function PaymentHistoryTable({
   );
 }
 
-function sortDebtPayments(payments: readonly DebtPayment[], sort: DataTableSortState) {
-  const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
-
-  return [...payments].sort((left, right) => {
-    const comparison = getDebtPaymentSortComparison(left, right, sort.columnKey);
-
-    return comparison * direction || right.date.localeCompare(left.date) || right.id - left.id;
-  });
-}
-
-function getDebtPaymentSortComparison(left: DebtPayment, right: DebtPayment, columnKey: string) {
-  if (columnKey === 'amount') return left.amount - right.amount;
-  if (columnKey === 'principal') return left.principal - right.principal;
-  if (columnKey === 'interest') return left.interest - right.interest;
-  return left.date.localeCompare(right.date);
-}
-
 export function PaymentHistory({
   debt,
   payments,
@@ -152,7 +138,7 @@ export function PaymentHistory({
   onDeletePayment,
 }: Readonly<PaymentHistoryProps>) {
   const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'date', direction: 'desc' });
-  const sortedPayments = useMemo(() => sortDebtPayments(payments, sort), [payments, sort]);
+  const sortedPayments = useSortedRows(payments, PAYMENT_COLUMNS, sort, newestFirst);
 
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">

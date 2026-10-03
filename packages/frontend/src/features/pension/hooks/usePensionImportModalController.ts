@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { PENSION_IMPORT_STATUS, type JobPhase } from '../importStatus';
+export type { JobPhase } from '../importStatus';
+import { useMemo, useState } from 'react';
 import type { PensionImportStatus, PensionStatementImportRow } from '@quro/shared';
 import { formatFixedInputValue } from '@/lib/utils';
 import {
@@ -14,7 +16,7 @@ import { usePensionStatementImportRows } from './usePensionStatementImportRows';
 import type { UpdatePensionImportRowPayload } from '../types';
 import { validatePdfFile } from '../../../lib/pdfDocuments';
 
-type RowDraft = {
+export type RowDraft = {
   type: PensionStatementImportRow['type'];
   amount: string;
   taxAmount: string;
@@ -37,7 +39,6 @@ type ModalState = {
 };
 
 export type PensionImportModalStep = 'upload' | 'queued' | 'review' | 'failed' | 'unavailable';
-export type JobPhase = 'queuing' | 'processing' | 'ready';
 export type ConfirmMode = 'none' | 'queued-cancel' | 'review-cancel';
 
 type UsePensionImportModalControllerInput = {
@@ -45,7 +46,7 @@ type UsePensionImportModalControllerInput = {
   initialImportId?: number | null;
 };
 
-type UsePensionImportModalControllerResult = {
+export type PensionImportController = {
   step: PensionImportModalStep;
   selectedFile: File | null;
   fileName: string;
@@ -131,36 +132,12 @@ function toStep(params: {
   return 'unavailable';
 }
 
-function toJobPhase(status: PensionImportStatus | null): JobPhase {
-  if (status === 'processing') return 'processing';
-  if (status === 'ready_for_review' || status === 'committed') return 'ready';
-  return 'queuing';
-}
-
-function useImportModalState(potId: number, initialImportId?: number | null): ModalState {
+function useImportModalState(initialImportId?: number | null): ModalState {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importId, setImportId] = useState<number | null>(initialImportId ?? null);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>('none');
   const [drafts, setDrafts] = useState<Record<number, RowDraft>>({});
-  const resetRef = useRef({ potId, initialImportId: initialImportId ?? null });
-
-  useEffect(() => {
-    const next = { potId, initialImportId: initialImportId ?? null };
-    if (
-      resetRef.current.potId === next.potId &&
-      resetRef.current.initialImportId === next.initialImportId
-    ) {
-      return;
-    }
-
-    resetRef.current = next;
-    setSelectedFile(null);
-    setImportId(next.initialImportId);
-    setErrorMessage('');
-    setConfirmMode('none');
-    setDrafts({});
-  }, [initialImportId, potId]);
 
   return {
     selectedFile,
@@ -390,7 +367,7 @@ function useImportModalData(importId: number | null): ImportModalData {
     isImportLoading: importQuery.isLoading,
     isImportError: importQuery.isError,
   });
-  const jobPhase = toJobPhase(status);
+  const jobPhase = status ? PENSION_IMPORT_STATUS[status].phase : 'queuing';
 
   return { status, importQuery, rowsQuery, rows, rowsSummary, step, jobPhase };
 }
@@ -431,7 +408,7 @@ function buildControllerResult(params: {
   isCommitting: boolean;
   canCommit: boolean;
   reviewBusy: boolean;
-}): UsePensionImportModalControllerResult {
+}): PensionImportController {
   return {
     step: params.data.step,
     selectedFile: params.modalState.selectedFile,
@@ -472,8 +449,8 @@ function buildControllerResult(params: {
 export function usePensionImportModalController({
   potId,
   initialImportId,
-}: UsePensionImportModalControllerInput): UsePensionImportModalControllerResult {
-  const modalState = useImportModalState(potId, initialImportId);
+}: UsePensionImportModalControllerInput): PensionImportController {
+  const modalState = useImportModalState(initialImportId);
   const createImport = useCreatePensionStatementImport();
   const cancelImport = useCancelPensionStatementImport();
   const commitImport = useCommitPensionStatementImport();

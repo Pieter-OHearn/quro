@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useSortedRows, newestFirst } from '@/hooks/useSortedRows';
+import { usePagination } from '@/hooks/usePagination';
+import { useState } from 'react';
 import { Pencil } from 'lucide-react';
 import {
   Badge,
@@ -17,12 +19,11 @@ import {
 import type { BudgetCategory, BudgetFormatFn, RecentBudgetTx } from '../types';
 
 const PAGE_SIZE = 6;
-const SORT_ASCENDING = 1;
-const SORT_DESCENDING = -1;
 
-const TRANSACTION_COLUMNS: readonly DataTableColumn[] = [
+const TRANSACTION_COLUMNS: readonly DataTableColumn<RecentBudgetTx>[] = [
   {
     key: 'transaction',
+    sortValue: (row) => row.name,
     header: 'Transaction',
     mobileLabel: 'Transaction',
     width: '38%',
@@ -30,6 +31,7 @@ const TRANSACTION_COLUMNS: readonly DataTableColumn[] = [
   },
   {
     key: 'date',
+    sortValue: (row) => row.date,
     header: 'Date',
     mobileLabel: 'Date',
     width: '16%',
@@ -39,6 +41,7 @@ const TRANSACTION_COLUMNS: readonly DataTableColumn[] = [
   },
   {
     key: 'category',
+    sortValue: (row) => row.category ?? '',
     header: 'Category',
     mobileLabel: 'Category',
     width: '20%',
@@ -46,6 +49,7 @@ const TRANSACTION_COLUMNS: readonly DataTableColumn[] = [
   },
   {
     key: 'amount',
+    sortValue: (row) => row.amount,
     header: 'Amount',
     align: 'right',
     mobileLabel: 'Amount',
@@ -221,52 +225,20 @@ function useMonthlyTransactionPagination(
   selectedMonth: string,
   selectedYear: number,
 ) {
-  const [currentPage, setCurrentPage] = useState(1);
   const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'date', direction: 'desc' });
-  const sortedTransactions = useMemo(() => {
-    const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
-
-    return [...transactions].sort((a, b) => {
-      const comparison = getTransactionSortComparison(a, b, sort.columnKey);
-
-      return comparison * direction || b.date.localeCompare(a.date) || b.id - a.id;
-    });
-  }, [sort, transactions]);
-  const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / PAGE_SIZE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = (safeCurrentPage - 1) * PAGE_SIZE;
-  const paginatedTransactions = sortedTransactions.slice(pageStart, pageStart + PAGE_SIZE);
-  const rangeStart = sortedTransactions.length === 0 ? 0 : pageStart + 1;
-  const rangeEnd = pageStart + paginatedTransactions.length;
-  const handlePageChange = (page: number) =>
-    setCurrentPage(Math.max(1, Math.min(totalPages, page)));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedMonth, selectedYear, sort]);
-
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, totalPages));
-  }, [totalPages]);
-
-  return {
+  const sortedTransactions = useSortedRows(transactions, TRANSACTION_COLUMNS, sort, newestFirst);
+  const pagination = usePagination(
     sortedTransactions,
-    paginatedTransactions,
-    totalPages,
-    safeCurrentPage,
-    rangeStart,
-    rangeEnd,
+    PAGE_SIZE,
+    `${selectedYear}:${selectedMonth}:${sort.columnKey}:${sort.direction}`,
+  );
+  return {
+    ...pagination,
+    sortedTransactions,
+    paginatedTransactions: pagination.pageItems,
     sort,
     setSort,
-    handlePageChange,
   };
-}
-
-function getTransactionSortComparison(a: RecentBudgetTx, b: RecentBudgetTx, columnKey: string) {
-  if (columnKey === 'transaction') return a.name.localeCompare(b.name);
-  if (columnKey === 'category') return (a.category ?? '').localeCompare(b.category ?? '');
-  if (columnKey === 'amount') return a.amount - b.amount;
-  return a.date.localeCompare(b.date);
 }
 
 export function RecentTransactionsList({

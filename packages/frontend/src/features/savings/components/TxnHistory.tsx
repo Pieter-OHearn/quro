@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { usePagination } from '@/hooks/usePagination';
+import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { Pagination, TxnHistoryPanel, TxnRow } from '@/components/ui';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
@@ -18,27 +19,18 @@ const PAGE_SIZE = 6;
 export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: TxnHistoryProps) {
   const { fmtNative } = useCurrency();
   const [filter, setFilter] = useState<TxnType | 'all'>('all');
-  const [currentPage, setCurrentPage] = useState(1);
 
   const sorted = [...transactions]
     .filter((t) => t.accountId === account.id && (filter === 'all' || t.type === filter))
     .sort((a, b) => b.date.localeCompare(a.date));
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = (safeCurrentPage - 1) * PAGE_SIZE;
-  const paginatedTransactions = sorted.slice(pageStart, pageStart + PAGE_SIZE);
-  const rangeStart = sorted.length === 0 ? 0 : pageStart + 1;
-  const rangeEnd = pageStart + paginatedTransactions.length;
-  const handlePageChange = (page: number) =>
-    setCurrentPage(Math.max(1, Math.min(totalPages, page)));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter, account.id]);
-
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, totalPages));
-  }, [totalPages]);
+  const {
+    pageItems: paginatedTransactions,
+    totalPages,
+    safeCurrentPage,
+    rangeStart,
+    rangeEnd,
+    handlePageChange,
+  } = usePagination(sorted, PAGE_SIZE, `${account.id}:${filter}`);
 
   return (
     <TxnHistoryPanel

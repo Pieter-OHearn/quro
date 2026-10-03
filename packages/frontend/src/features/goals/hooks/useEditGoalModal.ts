@@ -1,12 +1,8 @@
-import { allocationTotals } from '@/lib/allocationTotals';
-import { useMemo, useState } from 'react';
-import { useCurrency } from '@/lib/CurrencyContext';
-import { useAssetAllocations } from '@/features/dashboard/hooks';
-import { useSavingsAccounts } from '@/features/savings/hooks';
-import { getMonthAbbreviationIndex, type Goal, type GoalType, DEFAULT_EMOJI } from '@quro/shared';
-import type { GoalFormField, GoalFormState, UpdateGoalInput } from '../types';
-import { GOAL_TYPE_META, COLORS } from '../utils/goals-constants';
-import { buildGoalPayload, normalizeGoalType } from '../utils/goal-utils';
+import { useGoalForm } from './useGoalForm';
+import { getMonthAbbreviationIndex, type Goal, DEFAULT_EMOJI } from '@quro/shared';
+import type { GoalFormState, UpdateGoalInput } from '../types';
+import { COLORS } from '../utils/goals-constants';
+import { normalizeGoalType } from '../utils/goal-utils';
 
 function deadlineToDateString(deadline: string): string {
   if (!deadline) return '';
@@ -55,68 +51,11 @@ export function useEditGoalModal(
   onUpdate: (input: UpdateGoalInput) => void,
   onClose: () => void,
 ) {
-  const { baseCurrency, convertToBase, fmtBase } = useCurrency();
-  const savingsAccountsQuery = useSavingsAccounts();
-  const allocationsQuery = useAssetAllocations();
-
-  const type = normalizeGoalType(goal);
-  const [form, setForm] = useState<GoalFormState>(() => goalToFormState(goal, baseCurrency));
-
-  const { portfolioTotal, netWorth } = useMemo(
-    () => allocationTotals(allocationsQuery.data, convertToBase),
-    [allocationsQuery.data, convertToBase],
+  return useGoalForm(
+    normalizeGoalType(goal),
+    (baseCurrency) => goalToFormState(goal, baseCurrency),
+    (payload) => onUpdate({ id: goal.id, ...payload }),
+    onClose,
+    goal,
   );
-
-  const setField = (key: GoalFormField, value: string) => {
-    setForm((previous) => ({ ...previous, [key]: value }));
-  };
-
-  const saveDisabled =
-    !form.name.trim() || (type === 'invest_habit' && (!form.monthlyTarget || !form.startMonth));
-
-  const handleSave = () => {
-    if (saveDisabled) return;
-
-    const base = {
-      type,
-      sourceType: goal.sourceType,
-      sourceId: goal.sourceId ?? null,
-      name: form.name.trim(),
-      emoji: form.emoji,
-      color: form.color,
-      notes: form.notes,
-      deadline: form.deadline,
-      year: Number.parseInt(form.year, 10) || new Date().getFullYear(),
-      currentAmount: 0,
-      targetAmount: 0,
-      monthlyContribution: 0,
-      monthlyTarget: null,
-      monthsCompleted: goal.monthsCompleted ?? null,
-      totalMonths: null,
-      unit: null,
-      category: GOAL_TYPE_META[type].label,
-      currency: (form.currency || baseCurrency) as Goal['currency'],
-      startMonth: null,
-      missedMonths: goal.missedMonths ?? null,
-    };
-
-    const payload = buildGoalPayload(type as GoalType, base as never, form);
-    onUpdate({ id: goal.id, ...payload });
-    onClose();
-  };
-
-  return {
-    baseCurrency,
-    convertToBase,
-    fmtBase,
-    savingsAccounts: savingsAccountsQuery.data ?? [],
-    loadingSavingsAccounts: savingsAccountsQuery.isLoading,
-    portfolioTotal,
-    netWorth,
-    type,
-    form,
-    setField,
-    handleSave,
-    saveDisabled,
-  };
 }
