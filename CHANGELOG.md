@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.6.5] - 2026-10-03
+
+- Share table sorting and pagination across frontend transaction histories while preserving default ordering and page resets.
+- Consolidate goal forms, investment transaction metadata, and pension import status mapping.
+- Split settings and pension import UI into section and step modules; derive URL and attachment state directly and reset forms by identity.
+
 ## [v0.6.4] - 2026-10-03
 
 - Split pages, charts, and the emoji picker into deferred frontend chunks.

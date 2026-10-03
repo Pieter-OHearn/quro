@@ -1,5 +1,5 @@
+import { PROPERTY_TXN_META, PROPERTY_TXN_FORM } from '../constants';
 import { useState } from 'react';
-import { CircleMinus, DollarSign, Home, Landmark } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { formatFixedInputValue } from '@/lib/utils';
 import {
@@ -10,7 +10,6 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import type { TxnTypeMeta } from '@/components/ui';
 import {
   todayIsoDate,
   type Property,
@@ -26,41 +25,6 @@ type AddPropertyTxnModalProps = {
   existing?: PropertyTransaction;
   onClose: () => void;
   onSave: (t: SavePropertyTxnInput) => void;
-};
-
-const PROPERTY_TXN_META: Record<PropertyTxnType, TxnTypeMeta> = {
-  repayment: {
-    key: 'repayment',
-    label: 'Repayment',
-    icon: Landmark,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-    borderColor: 'border-indigo-300',
-  },
-  valuation: {
-    key: 'valuation',
-    label: 'Valuation',
-    icon: Home,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    borderColor: 'border-emerald-300',
-  },
-  rent_income: {
-    key: 'rent_income',
-    label: 'Rent Income',
-    icon: DollarSign,
-    color: 'text-sky-600',
-    bg: 'bg-sky-50',
-    borderColor: 'border-sky-300',
-  },
-  expense: {
-    key: 'expense',
-    label: 'Expense',
-    icon: CircleMinus,
-    color: 'text-rose-500',
-    bg: 'bg-rose-50',
-    borderColor: 'border-rose-300',
-  },
 };
 
 type PropertyTxnInfoBarProps = {
@@ -268,13 +232,6 @@ function RentExpensePreview({
   );
 }
 
-function getPreviewBgClass(type: PropertyTxnType): string {
-  if (type === 'valuation') return 'bg-emerald-50 border-emerald-100';
-  if (type === 'rent_income') return 'bg-sky-50 border-sky-100';
-  if (type === 'expense') return 'bg-rose-50 border-rose-100';
-  return 'bg-indigo-50 border-indigo-100';
-}
-
 function PropertyTxnPreview({
   type,
   parsedAmount,
@@ -285,7 +242,7 @@ function PropertyTxnPreview({
   fmtNative,
 }: PropertyTxnPreviewProps) {
   return (
-    <div className={`rounded-xl p-4 border ${getPreviewBgClass(type)}`}>
+    <div className={`rounded-xl p-4 border ${PROPERTY_TXN_FORM[type].previewClass}`}>
       {type === 'repayment' && (
         <RepaymentPreview
           parsedAmount={parsedAmount}
@@ -318,16 +275,7 @@ function PropertyTxnPreview({
 }
 
 function getAmountLabel(type: PropertyTxnType, currency: string) {
-  if (type === 'valuation') return `New Estimated Value (${currency})`;
-  if (type === 'repayment') return `Total Repayment Amount (${currency})`;
-  if (type === 'rent_income') return `Rent Received (${currency})`;
-  return `Property Expense (${currency})`;
-}
-
-function getNotePlaceholder(type: PropertyTxnType) {
-  if (type === 'rent_income') return 'e.g. Monthly rent';
-  if (type === 'expense') return 'e.g. Repair invoice';
-  return 'e.g. Monthly repayment';
+  return `${PROPERTY_TXN_FORM[type].amountLabel} (${currency})`;
 }
 
 function validateRepayment(
@@ -531,7 +479,7 @@ function PropertyTxnFormBody({
         note={form.note}
         onDateChange={form.setDate}
         onNoteChange={form.setNote}
-        notePlaceholder={getNotePlaceholder(form.type)}
+        notePlaceholder={PROPERTY_TXN_FORM[form.type].notePlaceholder}
       />
       {form.parsedAmount > 0 && (
         <PropertyTxnPreview

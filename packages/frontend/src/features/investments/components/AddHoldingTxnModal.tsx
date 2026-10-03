@@ -1,5 +1,5 @@
+import { HOLDING_TXN_META as TXN_META } from '../constants';
 import { useMemo, useState } from 'react';
-import { ShoppingCart, Sparkles, Tag } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   Modal,
@@ -10,7 +10,6 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import type { TxnTypeMeta } from '@/components/ui';
 import { todayIsoDate, type Holding, type HoldingTransaction } from '@quro/shared';
 import type { SaveHoldingTxnInput } from '../types';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
@@ -30,33 +29,6 @@ type InitialHoldingTxnFormValues = {
   price: string;
   date: string;
   note: string;
-};
-
-const TXN_META: Record<HoldingTxnType, TxnTypeMeta> = {
-  buy: {
-    key: 'buy',
-    label: 'Buy',
-    icon: ShoppingCart,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    borderColor: 'border-emerald-300',
-  },
-  sell: {
-    key: 'sell',
-    label: 'Sell',
-    icon: Tag,
-    color: 'text-rose-500',
-    bg: 'bg-rose-50',
-    borderColor: 'border-rose-300',
-  },
-  dividend: {
-    key: 'dividend',
-    label: 'Dividend',
-    icon: Sparkles,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-    borderColor: 'border-indigo-300',
-  },
 };
 
 const TXN_TYPES = ['buy', 'sell', 'dividend'] as const satisfies HoldingTxnType[];

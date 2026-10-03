@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { usePagination } from '@/hooks/usePagination';
+import { useState } from 'react';
 import { Pagination, TxnHistoryPanel, TxnRow } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { PensionPot, PensionTransaction } from '@quro/shared';
@@ -83,28 +84,19 @@ export function PensionTxnHistory({
 }: PensionTxnHistoryProps) {
   const { fmtNative } = useCurrency();
   const [filter, setFilter] = useState<PensionTxnType | 'all'>('all');
-  const [currentPage, setCurrentPage] = useState(1);
 
   const potTxns = transactions.filter((transaction) => transaction.potId === pot.id);
   const sortedTransactions = potTxns
     .filter((transaction) => filter === 'all' || transaction.type === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
-  const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / PAGE_SIZE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = (safeCurrentPage - 1) * PAGE_SIZE;
-  const paginatedTransactions = sortedTransactions.slice(pageStart, pageStart + PAGE_SIZE);
-  const rangeStart = sortedTransactions.length === 0 ? 0 : pageStart + 1;
-  const rangeEnd = pageStart + paginatedTransactions.length;
-  const handlePageChange = (page: number) =>
-    setCurrentPage(Math.max(1, Math.min(totalPages, page)));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter, pot.id]);
-
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, totalPages));
-  }, [totalPages]);
+  const {
+    pageItems: paginatedTransactions,
+    totalPages,
+    safeCurrentPage,
+    rangeStart,
+    rangeEnd,
+    handlePageChange,
+  } = usePagination(sortedTransactions, PAGE_SIZE, `${pot.id}:${filter}`);
 
   const stats = buildPensionTxnStats(potTxns, pot.currency, fmtNative);
 

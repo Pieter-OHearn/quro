@@ -1,8 +1,7 @@
+import { HOLDING_TXN_META as TXN_META } from '../constants';
 import { useState } from 'react';
-import { ShoppingCart, Sparkles, Tag } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
-import type { TxnTypeMeta } from '@/components/ui';
 import type { Holding, HoldingTransaction } from '@quro/shared';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
@@ -14,36 +13,6 @@ type HoldingTxnHistoryProps = {
   onAdd: () => void;
   onEdit: (transaction: HoldingTransaction) => void;
   onDelete: (id: number) => void;
-};
-
-const TXN_META: Record<HoldingTxnType, TxnTypeMeta & { sign: string }> = {
-  buy: {
-    key: 'buy',
-    label: 'Buy',
-    icon: ShoppingCart,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    borderColor: 'border-emerald-300',
-    sign: '-',
-  },
-  sell: {
-    key: 'sell',
-    label: 'Sell',
-    icon: Tag,
-    color: 'text-rose-500',
-    bg: 'bg-rose-50',
-    borderColor: 'border-rose-300',
-    sign: '+',
-  },
-  dividend: {
-    key: 'dividend',
-    label: 'Dividend',
-    icon: Sparkles,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-    borderColor: 'border-indigo-300',
-    sign: '+',
-  },
 };
 
 type HoldingTxnAmountProps = {

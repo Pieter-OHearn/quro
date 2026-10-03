@@ -1,8 +1,7 @@
+import { PROPERTY_TXN_META } from '../constants';
 import { useState } from 'react';
-import { CircleMinus, DollarSign, Home, Landmark } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
-import type { TxnTypeMeta } from '@/components/ui';
 import type { Property, PropertyTransaction } from '@quro/shared';
 import { isInvestmentProperty, type PropertyTxnType } from '../utils/position';
 
@@ -12,41 +11,6 @@ type PropertyTxnHistoryProps = {
   onAdd: () => void;
   onEdit: (transaction: PropertyTransaction) => void;
   onDelete: (id: number) => void;
-};
-
-const PROPERTY_TXN_META: Record<PropertyTxnType, TxnTypeMeta> = {
-  repayment: {
-    key: 'repayment',
-    label: 'Repayment',
-    icon: Landmark,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50',
-    borderColor: 'border-indigo-300',
-  },
-  valuation: {
-    key: 'valuation',
-    label: 'Valuation',
-    icon: Home,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    borderColor: 'border-emerald-300',
-  },
-  rent_income: {
-    key: 'rent_income',
-    label: 'Rent Income',
-    icon: DollarSign,
-    color: 'text-sky-600',
-    bg: 'bg-sky-50',
-    borderColor: 'border-sky-300',
-  },
-  expense: {
-    key: 'expense',
-    label: 'Expense',
-    icon: CircleMinus,
-    color: 'text-rose-500',
-    bg: 'bg-rose-50',
-    borderColor: 'border-rose-300',
-  },
 };
 
 type PropertyTxnAmountProps = {

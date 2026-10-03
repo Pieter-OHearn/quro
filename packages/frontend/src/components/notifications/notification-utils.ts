@@ -1,3 +1,4 @@
+import { PENSION_IMPORT_STATUS } from '@/features/pension/importStatus';
 import { DEFAULT_EMOJI, type PensionStatementImportFeedItem } from '@quro/shared';
 import type {
   ImportNotificationItem,
@@ -9,10 +10,7 @@ import type {
 function toNotificationStatus(
   status: PensionStatementImportFeedItem['import']['status'],
 ): NotificationStatus {
-  if (status === 'queued') return 'queuing';
-  if (status === 'processing') return 'processing';
-  if (status === 'ready_for_review') return 'ready';
-  return 'failed';
+  return PENSION_IMPORT_STATUS[status].notification;
 }
 
 function toNotificationTitle(status: NotificationStatus): string {

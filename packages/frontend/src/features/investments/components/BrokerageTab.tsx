@@ -1,3 +1,4 @@
+import { useSortedRows } from '@/hooks/useSortedRows';
 import { useMemo, useState } from 'react';
 import {
   Archive,
@@ -54,9 +55,6 @@ type BrokerageTabProps = {
   syncSummary: HoldingPriceSyncResult | null;
 };
 
-const SORT_ASCENDING = 1;
-const SORT_DESCENDING = -1;
-
 type HoldingRowProps = {
   metrics: HoldingRowMetrics;
   holding: Holding;
@@ -83,10 +81,15 @@ type HoldingRowMetrics = {
   txnCount: number;
 };
 
-function buildBrokerageHoldingColumns(baseCurrency: string): readonly DataTableColumn[] {
+function buildBrokerageHoldingColumns(
+  baseCurrency: string,
+  positions: Record<number, Position>,
+  metricsById: Record<number, HoldingRowMetrics>,
+): readonly DataTableColumn<Holding>[] {
   return [
     {
       key: 'asset',
+      sortValue: (row) => row.name,
       header: 'Asset',
       mobileLabel: 'Asset',
       width: '25%',
@@ -95,6 +98,7 @@ function buildBrokerageHoldingColumns(baseCurrency: string): readonly DataTableC
     },
     {
       key: 'position',
+      sortValue: (row) => positions[row.id].shares,
       header: 'Position',
       align: 'right',
       mobileLabel: 'Position',
@@ -106,6 +110,7 @@ function buildBrokerageHoldingColumns(baseCurrency: string): readonly DataTableC
     },
     {
       key: 'current',
+      sortValue: (row) => getEffectivePrice(row),
       header: 'Current',
       align: 'right',
       mobileLabel: 'Current',
@@ -117,6 +122,7 @@ function buildBrokerageHoldingColumns(baseCurrency: string): readonly DataTableC
     },
     {
       key: 'value',
+      sortValue: (row) => metricsById[row.id].valueInBase,
       header: `Value (${baseCurrency})`,
       align: 'right',
       mobileLabel: 'Value',
@@ -128,6 +134,7 @@ function buildBrokerageHoldingColumns(baseCurrency: string): readonly DataTableC
     },
     {
       key: 'gain',
+      sortValue: (row) => metricsById[row.id].gain,
       header: 'Gain / Loss',
       align: 'right',
       mobileLabel: 'Gain / Loss',
@@ -147,56 +154,65 @@ function buildBrokerageHoldingColumns(baseCurrency: string): readonly DataTableC
   ];
 }
 
-const CLOSED_HOLDING_COLUMNS: readonly DataTableColumn[] = [
-  {
-    key: 'asset',
-    header: 'Asset',
-    mobileLabel: 'Asset',
-    width: '40%',
-    sortable: true,
-    cellClassName: 'px-6 py-3.5',
-  },
-  {
-    key: 'sold',
-    header: 'Sold Price',
-    align: 'right',
-    mobileLabel: 'Sold Price',
-    width: '18%',
-    numeric: true,
-    sortable: true,
-    defaultSortDirection: 'desc',
-    cellClassName: 'px-6 py-3.5',
-  },
-  {
-    key: 'dividends',
-    header: 'Dividends',
-    align: 'right',
-    mobileLabel: 'Dividends',
-    width: '18%',
-    numeric: true,
-    sortable: true,
-    defaultSortDirection: 'desc',
-    cellClassName: 'px-6 py-3.5',
-  },
-  {
-    key: 'realized',
-    header: 'Realized P&L',
-    align: 'right',
-    mobileLabel: 'Realized P&L',
-    width: '18%',
-    numeric: true,
-    sortable: true,
-    defaultSortDirection: 'desc',
-    cellClassName: 'px-6 py-3.5',
-  },
-  {
-    key: 'actions',
-    header: '',
-    priority: 'actions',
-    width: '6%',
-    cellClassName: 'px-6 py-3.5',
-  },
-];
+function buildClosedHoldingColumns(
+  positions: Record<number, Position>,
+  metricsById: Record<number, ClosedHoldingMetrics>,
+): readonly DataTableColumn<Holding>[] {
+  return [
+    {
+      key: 'asset',
+      sortValue: (row) => row.name,
+      header: 'Asset',
+      mobileLabel: 'Asset',
+      width: '40%',
+      sortable: true,
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'sold',
+      sortValue: (row) => metricsById[row.id].lastSellPrice ?? 0,
+      header: 'Sold Price',
+      align: 'right',
+      mobileLabel: 'Sold Price',
+      width: '18%',
+      numeric: true,
+      sortable: true,
+      defaultSortDirection: 'desc',
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'dividends',
+      sortValue: (row) => positions[row.id].totalDividends,
+      header: 'Dividends',
+      align: 'right',
+      mobileLabel: 'Dividends',
+      width: '18%',
+      numeric: true,
+      sortable: true,
+      defaultSortDirection: 'desc',
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'realized',
+      sortValue: (row) => positions[row.id].realizedGain,
+      header: 'Realized P&L',
+      align: 'right',
+      mobileLabel: 'Realized P&L',
+      width: '18%',
+      numeric: true,
+      sortable: true,
+      defaultSortDirection: 'desc',
+      cellClassName: 'px-6 py-3.5',
+    },
+    {
+      key: 'actions',
+      header: '',
+      priority: 'actions',
+      width: '6%',
+      cellClassName: 'px-6 py-3.5',
+    },
+  ];
+}
 
 function getEffectivePrice(holding: Holding): number {
   const manual = holding.manualPrice != null ? Number(holding.manualPrice) : null;
@@ -533,23 +549,8 @@ type BrokerageHoldingsListProps = {
   onDeleteTxn: (id: number) => void;
 };
 
-function getActiveHoldingSortValue(
-  holding: Holding,
-  position: Position,
-  metrics: HoldingRowMetrics,
-  columnKey: string,
-) {
-  if (columnKey === 'asset') return holding.name;
-  if (columnKey === 'position') return position.shares;
-  if (columnKey === 'current') return getEffectivePrice(holding);
-  if (columnKey === 'gain') return metrics.gain;
-  return metrics.valueInBase;
-}
-
-function compareSortValues(left: string | number, right: string | number): number {
-  return typeof left === 'string' && typeof right === 'string'
-    ? left.localeCompare(right)
-    : Number(left) - Number(right);
+function holdingNameOrder(left: Holding, right: Holding) {
+  return left.name.localeCompare(right.name) || left.id - right.id;
 }
 
 function useHoldingRowMetrics(
@@ -601,32 +602,17 @@ function BrokerageHoldingsList({
     convertToBase,
     isForeign,
   );
-  const sortedHoldings = useMemo(() => {
-    const values = new Map(
-      holdings.map((holding) => [
-        holding.id,
-        getActiveHoldingSortValue(
-          holding,
-          positions[holding.id],
-          metricsById[holding.id],
-          sort.columnKey,
-        ),
-      ]),
-    );
-    const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
-    return [...holdings].sort(
-      (left, right) =>
-        compareSortValues(values.get(left.id)!, values.get(right.id)!) * direction ||
-        left.name.localeCompare(right.name) ||
-        left.id - right.id,
-    );
-  }, [holdings, positions, metricsById, sort]);
+  const columns = useMemo(
+    () => buildBrokerageHoldingColumns(baseCurrency, positions, metricsById),
+    [baseCurrency, positions, metricsById],
+  );
+  const sortedHoldings = useSortedRows(holdings, columns, sort, holdingNameOrder);
 
   return (
     <DataTable
       variant="plain"
       tableVariant="expandable"
-      columns={buildBrokerageHoldingColumns(baseCurrency)}
+      columns={columns}
       sort={sort}
       onSortChange={setSort}
       tableLayout="fixed"
@@ -1123,18 +1109,17 @@ function ClosedHoldingsTable({
     direction: 'desc',
   });
   const metricsById = useClosedHoldingMetrics(closedHoldings, holdingTxns, positions);
-  const sortedClosedHoldings = useSortedClosedHoldings({
-    closedHoldings,
-    metricsById,
-    positions,
-    sort,
-  });
+  const columns = useMemo(
+    () => buildClosedHoldingColumns(positions, metricsById),
+    [positions, metricsById],
+  );
+  const sortedClosedHoldings = useSortedRows(closedHoldings, columns, sort, holdingNameOrder);
 
   return (
     <DataTable
       variant="plain"
       tableVariant="expandable"
-      columns={CLOSED_HOLDING_COLUMNS}
+      columns={columns}
       sort={sort}
       onSortChange={setSort}
       tableLayout="fixed"
@@ -1162,51 +1147,6 @@ function ClosedHoldingsTable({
       ))}
     </DataTable>
   );
-}
-
-function useSortedClosedHoldings({
-  closedHoldings,
-  metricsById,
-  positions,
-  sort,
-}: {
-  closedHoldings: readonly Holding[];
-  metricsById: Record<number, ClosedHoldingMetrics>;
-  positions: Record<number, Position>;
-  sort: DataTableSortState;
-}) {
-  return useMemo(() => {
-    const values = new Map(
-      closedHoldings.map((holding) => [
-        holding.id,
-        getClosedHoldingSortValue(
-          holding,
-          positions[holding.id],
-          metricsById[holding.id],
-          sort.columnKey,
-        ),
-      ]),
-    );
-    const direction = sort.direction === 'asc' ? SORT_ASCENDING : SORT_DESCENDING;
-    return [...closedHoldings].sort(
-      (left, right) =>
-        compareSortValues(values.get(left.id)!, values.get(right.id)!) * direction ||
-        left.name.localeCompare(right.name) ||
-        left.id - right.id,
-    );
-  }, [closedHoldings, metricsById, positions, sort]);
-}
-
-function getClosedHoldingSortValue(
-  holding: Holding,
-  position: Position,
-  metrics: ClosedHoldingMetrics,
-  columnKey: string,
-) {
-  if (columnKey === 'asset') return holding.name;
-  if (columnKey === 'dividends') return position.totalDividends;
-  if (columnKey === 'realized') return position.realizedGain;
-  return metrics.lastSellPrice ?? 0;
 }
 
 function ClosedHoldingsFooter({
