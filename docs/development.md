@@ -12,7 +12,7 @@ Then open `http://localhost:3000`. The bunq callback for the Docker setup is `ht
 
 ## Prerequisites
 
-- Bun 1.x
+- Bun 1.4.2 (pinned in `.bun-version`; the Dockerfiles must use the same version)
 - Python 3.11+
 - Docker Compose v2
 - Gitleaks for the checked-in pre-commit hook

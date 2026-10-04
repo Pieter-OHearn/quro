@@ -145,6 +145,7 @@ if [ "${QRO_PRECOMMIT:-0}" = "1" ]; then
   run_check "Secret scan" gitleaks git --pre-commit --redact --staged --verbose
 fi
 
+run_check "Bun version" bun run check:bun-version
 run_check "Format" bun run check:format
 run_check "Lint" bun run check:lint
 run_check "Typecheck" bun run check:typecheck
