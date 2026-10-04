@@ -15,6 +15,7 @@
     "smoke:backend": "bun run --filter '@quro/backend' db:migrate && bun run --filter '@quro/backend' db:seed-demo && bun run --filter '@quro/backend' start",
     "build": "bun run --filter '@quro/frontend' build && bun run --filter '@quro/backend' build",
     "typecheck": "bun run --filter '@quro/shared' typecheck && bun run --filter '@quro/frontend' typecheck && bun run --filter '@quro/backend' typecheck && tsc --noEmit -p tsconfig.scripts.json",
+    "check:bun-version": "bun scripts/check-bun-version.ts",
     "check:format": "prettier --check .",
     "check:lint": "bunx eslint packages scripts playwright.config.ts --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts",
     "check:typecheck": "bun run typecheck",

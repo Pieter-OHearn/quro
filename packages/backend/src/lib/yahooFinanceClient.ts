@@ -5,6 +5,7 @@ import {
   toDateOnly,
 } from '@quro/shared';
 import YahooFinance from 'yahoo-finance2';
+import { abortableRead, checkWorkDeadline, upstreamSignal } from './workDeadline';
 import type {
   EodLatestMap,
   EodLatestQuote,
@@ -121,18 +122,49 @@ function parseQuoteRow(
   };
 }
 
-export class YahooFinanceMarketDataClient implements MarketDataClient {
-  private readonly yf: InstanceType<typeof YahooFinance>;
+export function isCancellation(error: unknown): boolean {
+  return error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name);
+}
 
-  constructor() {
-    this.yf = new YahooFinance({
-      suppressNotices: ['yahooSurvey'],
-      validation: { logErrors: false },
-    });
+export function rethrowCancellation(error: unknown): void {
+  checkWorkDeadline();
+  if (isCancellation(error)) throw error;
+}
+
+export class YahooFinanceMarketDataClient implements MarketDataClient {
+  private client: InstanceType<typeof YahooFinance> | null = null;
+
+  private getClient(): InstanceType<typeof YahooFinance> {
+    this.client ??= this.createClient();
+    return this.client;
   }
 
+  private read<T>(
+    run: (client: InstanceType<typeof YahooFinance>, signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    const signal = upstreamSignal();
+    const client = this.getClient();
+    return abortableRead(signal, () => run(client, signal)).catch((error: unknown) => {
+      if (signal.aborted && this.client === client) this.client = null;
+      throw error;
+    });
+  }
+  constructor(
+    private readonly createClient: () => InstanceType<typeof YahooFinance> = () =>
+      new YahooFinance({
+        suppressNotices: ['yahooSurvey'],
+        validation: { logErrors: false },
+      }),
+  ) {}
+
   async lookupSymbol(symbol: string): Promise<TickerLookupProfile> {
-    const result = await this.yf.quoteSummary(symbol, { modules: ['price', 'assetProfile'] });
+    const result = await this.read((client, signal) =>
+      client.quoteSummary(
+        symbol,
+        { modules: ['price', 'assetProfile'] },
+        { fetchOptions: { signal } },
+      ),
+    );
     const price = result.price;
     if (!price) throw new Error(`Ticker not found: ${symbol}`);
     const { sector, industry } = extractProfileStrings(result.assetProfile);
@@ -154,9 +186,12 @@ export class YahooFinanceMarketDataClient implements MarketDataClient {
 
     let results: unknown[];
     try {
-      const raw = await this.yf.quote(unique);
+      const raw = await this.read((client, signal) =>
+        client.quote(unique, {}, { fetchOptions: { signal } }),
+      );
       results = Array.isArray(raw) ? raw : [raw];
-    } catch {
+    } catch (error) {
+      rethrowCancellation(error);
       return quotes;
     }
 

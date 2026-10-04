@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
 
+## [v0.7.0] - 2026-10-04
+
+- Make bunq linking optional and fail closed: Quro starts without bunq configured, the bunq start and callback endpoints return 503, and Settings explains the integration is unavailable. Partial bunq configuration now stops startup with a redacted error, and the `localhost:5173` redirect fallback is removed.
+- Bind bunq OAuth callbacks to a server-recorded, single-use, 10-minute attempt for the initiating user and destination (migration `0037`), replacing the empty-key signed state. The callback also requires the state cookie from the browser that started the flow, so a shared authorize link cannot attach someone else's bunq account.
+- Add cancellable timeouts to bunq and Yahoo requests, resume large bunq histories from per-page checkpoints, and bound scheduled runs with isolated database pools (migration `0036`). Job pools parse dates like the main pool, and a user price refresh records Yahoo timeouts per holding instead of failing.
+- Tighten request handling: return 400 for malformed JSON on auth, settings and partner routes, key rate limits on the real peer address (honouring forwarded headers only from `TRUSTED_PROXIES`, and resolving through chained proxies via `X-Forwarded-For`), and cascade sessions when a user is deleted (migration `0035`).
+- Enforce one partner link per user in the database (migration `0034`).
+- Fail the aggregate CI check when any upstream job fails, align the Bun version across CI, Dockerfiles and docs, and build images in CI.
+- Correct the README self-hosting instructions for v0.6.x releases.
+
 ## [v0.6.6] - 2026-10-03
 
 - Reuse shared form controls, delete actions, and savings stat cards across frontend features.

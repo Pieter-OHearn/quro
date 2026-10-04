@@ -9,7 +9,7 @@ import {
 import { and, eq, ne } from 'drizzle-orm';
 import { db } from '../db/client';
 import { sessions } from '../db/schema';
-import { createIntegrationHelpers, integrationPassword } from '../test/integration';
+import { createIntegrationHelpers, integrationPassword, randomTestIp } from '../test/integration';
 
 const integration = createIntegrationHelpers('settings.integration.quro.test');
 
@@ -373,7 +373,7 @@ describe('settings integration', () => {
   test('rate limits password change attempts', async () => {
     const owner = await integration.signUp('password-rate-limit');
     const previousNodeEnv = process.env.NODE_ENV;
-    const isolatedIp = `settings-rate-limit-${crypto.randomUUID()}`;
+    const isolatedIp = randomTestIp();
 
     try {
       process.env.NODE_ENV = 'development';
@@ -382,9 +382,7 @@ describe('settings integration', () => {
         const response = await integration.request('/api/settings/password', {
           method: 'PUT',
           cookie: owner.cookie,
-          headers: {
-            'x-real-ip': isolatedIp,
-          },
+          remoteAddress: isolatedIp,
           json: {
             currentPassword: 'wrong-current-password',
             nextPassword: 'valid-next-password',
@@ -397,9 +395,7 @@ describe('settings integration', () => {
       const limitedResponse = await integration.request('/api/settings/password', {
         method: 'PUT',
         cookie: owner.cookie,
-        headers: {
-          'x-real-ip': isolatedIp,
-        },
+        remoteAddress: isolatedIp,
         json: {
           currentPassword: 'wrong-current-password',
           nextPassword: 'valid-next-password',

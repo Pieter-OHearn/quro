@@ -77,13 +77,6 @@ load_storage_env() {
   export S3_SECRET_ACCESS_KEY="$app_secret"
 }
 
-load_optional_api_keys() {
-  hugging_face_token=$(read_optional_secret /run/secrets/hugging_face_hub_token || true)
-  if [ -n "${hugging_face_token:-}" ]; then
-    export HUGGING_FACE_HUB_TOKEN="$hugging_face_token"
-  fi
-}
-
 load_bunq_env() {
   bunq_client_id=$(read_optional_secret /run/secrets/bunq_client_id || true)
   if [ -n "${bunq_client_id:-}" ]; then

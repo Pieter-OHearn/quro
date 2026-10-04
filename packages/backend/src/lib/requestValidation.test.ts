@@ -142,8 +142,11 @@ describe('object field parsing', () => {
     count: (value: unknown) => parseIntegerField(value, 'count required', 0),
   };
 
-  test('allows declared fields and the implicit userId field', () => {
-    expect(rejectUnknownFields({ name: 'A', userId: 3 }, ['name'])).toEqual(ok(undefined));
+  test('allows declared fields and rejects a client-supplied userId', () => {
+    expect(rejectUnknownFields({ name: 'A' }, ['name'])).toEqual(ok(undefined));
+    expect(rejectUnknownFields({ name: 'A', userId: 3 }, ['name'])).toEqual(
+      err('Unknown field: userId'),
+    );
     expect(rejectUnknownFields({ extra: true }, ['name'])).toEqual(err('Unknown field: extra'));
   });
 

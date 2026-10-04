@@ -5,6 +5,7 @@ import { Button, Card, IconButton } from '@/components/ui';
 import { useBunqConnection } from '@/features/settings/hooks';
 import { buildApiUrl } from '@/lib/api';
 import { useAuth } from '@/lib/AuthContext';
+import { useBunqAvailability } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
 import {
   hasDismissedSavingsConnectionPrompt,
@@ -159,6 +160,7 @@ export function SavingsConnectionOutcome({
 export function SavingsConnectionPrompt({ className }: { className?: string }) {
   const { user } = useAuth();
   const { data: connection, isLoading, isError } = useBunqConnection();
+  const { unavailable: bunqUnavailable } = useBunqAvailability();
   const [searchParams, setSearchParams] = useSearchParams();
   const [dismissed, setDismissed] = useState<boolean | null>(null);
   const [oauthOutcome, setOAuthOutcome] = useState(() =>
@@ -211,7 +213,7 @@ export function SavingsConnectionPrompt({ className }: { className?: string }) {
         userId={user.id}
         isLoading={isLoading}
         isError={isError}
-        hasConnection={Boolean(connection)}
+        hasConnection={Boolean(connection) || bunqUnavailable}
         dismissed={dismissed}
         onConnect={handleConnect}
         onDismiss={handleDismiss}

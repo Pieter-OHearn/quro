@@ -138,9 +138,9 @@ The bunq integration is optional and runs inside the main backend process. There
 
 ### OAuth and connection routes
 
-The Settings page starts OAuth by sending the browser to `/api/bunq/oauth/start`. The backend creates an HMAC-signed state token, stores it in an HTTP-only `bunq_oauth_state` cookie for 10 minutes, and redirects to bunq's OAuth authorisation URL.
+The Settings page starts OAuth by sending the browser to `/api/bunq/oauth/start`. The backend records a single-use OAuth attempt for the user and destination in `bunq_oauth_attempts` (only a hash of the random state is stored), sets the state in an HTTP-only `bunq_oauth_state` cookie for 10 minutes, and redirects to bunq's OAuth authorisation URL.
 
-bunq redirects back to `/api/bunq/oauth/callback`. The backend validates the state cookie, exchanges the authorisation code with `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI`, then upserts a row in `bunq_connections` with the returned access token. The frontend reads connection status through `GET /api/bunq/connection` and disconnects with `DELETE /api/bunq/connection`.
+bunq redirects back to `/api/bunq/oauth/callback`. The backend requires the state cookie to match the returned state, atomically consumes the recorded attempt, exchanges the authorisation code with `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI`, then upserts a row in `bunq_connections` with the returned access token. The frontend reads connection status through `GET /api/bunq/connection` and disconnects with `DELETE /api/bunq/connection`.
 
 Manual sync endpoints are mounted under the same protected route group:
 
@@ -155,6 +155,8 @@ The sync services reuse the stored bunq access token to create or refresh a bunq
 Savings sync creates or updates local savings accounts for bunq savings accounts, imports payments into `savings_transactions`, and detaches local accounts whose bunq account ID no longer appears in the latest bunq account list. Budget sync imports bank payments into `budget_transactions`, skips self-transfers, maps merchant category codes through `category_mappings`, and stores bunq metadata for idempotency and review.
 
 ### Background sync scheduler
+
+For timeout limits and recovery steps, see [Troubleshoot provider timeouts](provider-timeouts.md).
 
 `src/index.ts` starts `startBunqSyncScheduler()` when the backend starts. The scheduler runs in-process once per hour, selects every user with a row in `bunq_connections`, and calls `syncBunqSavings(userId)` followed by `syncBunqBudget(userId)`. Failures are logged and written back to the connection's `sync_status` / `sync_error` fields; they do not stop the scheduler from trying later users or future hourly cycles.
 

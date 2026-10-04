@@ -42,7 +42,7 @@ export function rejectUnknownFields(
   body: Record<string, unknown>,
   allowed: ReadonlyArray<string>,
 ): ParseResult<void> {
-  const allowedKeys = new Set(['userId', ...allowed]);
+  const allowedKeys = new Set(allowed);
   for (const key of Object.keys(body)) {
     if (!allowedKeys.has(key)) {
       return err(`Unknown field: ${key}`);

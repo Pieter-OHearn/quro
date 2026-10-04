@@ -27,7 +27,7 @@ All API requests go to `/api/*`. In the Docker stack, Nginx proxies these to `ht
 
 ### Key Technologies
 
-- **Runtime / build:** Bun 1.x (backend, migrations, scripts), Vite 8 (frontend)
+- **Runtime / build:** Bun 1.4.2 (backend, migrations, scripts), Vite 8 (frontend)
 - **API framework:** Hono 4.7
 - **ORM:** Drizzle ORM with schema-first migrations
 - **Frontend state:** TanStack React Query (server state) + React Context (auth, currency preferences)

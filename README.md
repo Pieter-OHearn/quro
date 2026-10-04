@@ -9,7 +9,22 @@ Quro is a self-hosted personal finance app that brings budgeting, savings, inves
 
 ## Local Docker Dev
 
-If you want the app running locally with the least setup, use the Docker dev stack:
+The Docker dev stack requires Bun and Docker Compose v2. Clone the repository, then create the runtime configuration and secrets from the repository root:
+
+```bash
+git clone https://github.com/Pieter-OHearn/quro.git
+cd quro
+cp .env.example .env
+for file in secrets/*.example; do cp "$file" "${file%.example}"; done
+chmod 600 .env secrets/*.txt
+```
+
+Edit the copied files under `secrets/` to set your own passwords and keys before starting the stack.
+
+> [!WARNING]
+> The dev stack pins the same MinIO image as the release stack (`minio/minio:RELEASE.2025-09-07T16-13-09Z`). That image could not be pulled during the release test described below. On a host without a cached copy, the dev stack may also fail to start; no replacement image has been verified.
+
+Once the configuration and secrets are ready and the pinned images are available, start the stack:
 
 ```bash
 bun run dev:docker
@@ -76,55 +91,23 @@ The database and object storage are also published locally for tooling:
 
 ## Self-hosting
 
-Download the `docker-compose.release.yml` from the [latest release](https://github.com/Pieter-OHearn/quro/releases/latest) — no need to clone this repository.
+> [!WARNING]
+> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in [Epic E00: Immediate fixes](https://github.com/Pieter-OHearn/quro/issues/247). The [Docker dev stack](#local-docker-dev) includes storage bootstrap, but requires runtime configuration and secrets and is subject to the same MinIO image availability problem.
 
-1. Download the release files and navigate into the directory.
+The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
 
-2. Copy and configure the environment file and secrets:
+| Problem                   | What you see                                                                                                                                                        | Workaround                                                                      |
+| :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------ |
+| Compose file name         | The file is `docker-compose.release.yml`, so a bare `docker compose` command fails with `no configuration file provided`.                                           | Pass `-f docker-compose.release.yml` or set `COMPOSE_FILE`.                     |
+| Config file location      | `.env.template` and `secrets/*.example` aren't release assets. They're inside `auto-update-bundle-vX.Y.Z.tar.gz`.                                                   | Extract the bundle to get them.                                                 |
+| Missing storage bootstrap | The release has no `minio-init` service, so the `quro_app` storage user and the document bucket are never created. Document uploads fail with `InvalidAccessKeyId`. | None verified.                                                                  |
+| Missing `db-tools`        | The release has no `db-tools` service, so there are no backup and restore commands.                                                                                 | Stop the stack and copy `./data/postgres` and `./data/minio`. This is untested. |
+| Corrupted healthcheck     | The `db` healthcheck renders as `pg_isready -U "$" -d "$"`. The container still reports healthy because `pg_isready` falls back to defaults.                        | None needed.                                                                    |
+| MinIO image               | `docker compose pull` was denied for the pinned `minio/minio` image. The test host started MinIO only because it had a local copy.                                  | None verified.                                                                  |
 
-```bash
-cp .env.template .env
-for file in secrets/*.example; do cp "$file" "${file%.example}"; done
-```
+You don't need `docker login ghcr.io` for the core images. `quro-frontend` and `quro-backend` pull anonymously. The optional `quro-auto-updater` image doesn't, and the auto-updater is being retired.
 
-Edit each file under `secrets/` to set your own passwords and keys.
-
-> Market-data features (ticker lookup, holding price sync, and FX rate sync) use Yahoo Finance and do not require a separate API key. Native balances remain stored if Yahoo is unavailable, and converted cross-currency totals use the cached FX rate set as long as it is complete.
-
-> The bunq integration is optional. To connect a bunq account, register a bunq OAuth client with the callback URL `http://localhost:3000/api/bunq/oauth/callback`, then set `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI` in your release environment. The rest of the app works without it; savings and budget data can still be entered manually.
-
-3. Authenticate with the GitHub Container Registry and start the stack:
-
-```bash
-docker login ghcr.io
-docker compose pull
-docker compose up -d
-```
-
-4. Open `http://localhost:3000` and create your first account.
-
-Your data is stored locally in `./data` (PostgreSQL at `./data/postgres`, documents at `./data/minio`). Back up both together:
-
-```bash
-# Create a PostgreSQL dump
-docker compose run --rm db-tools backup
-
-# Back up document storage (pension PDFs, payslips)
-rsync -av ./data/minio/ /path/to/backup/minio/
-```
-
-Dumps are written to `./backups/db`. To restore:
-
-```bash
-docker compose stop backend
-docker compose run --rm \
-  -e QRO_RESTORE_CONFIRM=restore-db \
-  -e QRO_RESTORE_ALLOW_NON_EMPTY=1 \
-  db-tools restore /backups/db/<dump-file>.dump
-docker compose up -d backend
-```
-
-Restore MinIO by copying your `./data/minio` backup back in place before starting the backend. The DB dump and MinIO snapshot must be from the same point in time.
+The database, migrations, backend and frontend start from the release assets. The missing storage bootstrap and the unpullable MinIO image are why no complete install path exists.
 
 ## Contributing
 

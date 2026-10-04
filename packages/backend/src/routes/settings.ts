@@ -20,7 +20,13 @@ import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { publicUserColumns } from '../lib/users';
 import { changePasswordRateLimit } from '../middleware/rateLimit';
-import { err, ok, parseWholeNumber, type ParseResult } from '../lib/requestValidation';
+import {
+  err,
+  ok,
+  parseWholeNumber,
+  readJsonRecord,
+  type ParseResult,
+} from '../lib/requestValidation';
 
 const app = new Hono();
 
@@ -149,7 +155,9 @@ app.get('/', async (c) => {
 
 app.put('/profile', async (c) => {
   const authUser = getAuthUser(c);
-  const parsed = parseProfilePayload(await c.req.json());
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const parsed = parseProfilePayload(body.value);
 
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
@@ -186,7 +194,9 @@ app.put('/profile', async (c) => {
 
 app.put('/preferences', async (c) => {
   const authUser = getAuthUser(c);
-  const parsed = parsePreferencesPayload(await c.req.json());
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const parsed = parsePreferencesPayload(body.value);
 
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
@@ -213,7 +223,9 @@ app.put('/preferences', async (c) => {
 app.put('/password', changePasswordRateLimit, async (c) => {
   const authUser = getAuthUser(c);
   const currentSessionId = getCookie(c, 'session') ?? '';
-  const parsed = parsePasswordPayload(await c.req.json());
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const parsed = parsePasswordPayload(body.value);
 
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);

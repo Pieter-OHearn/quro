@@ -24,6 +24,7 @@ import {
   type WwWeeklyRequirementStatus,
   type EmploymentType,
 } from '@quro/shared';
+import { parseDriverNumeric } from './driverNumeric';
 
 export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
 
@@ -40,8 +41,7 @@ const numericAsNumber = customType<{
     return 'numeric';
   },
   fromDriver(value) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return parseDriverNumeric(value);
   },
   toDriver(value) {
     return String(value);
@@ -150,7 +150,7 @@ export const sessions = pgTable(
   {
     id: text('id').primaryKey(),
     userId: integer('user_id')
-      .references(() => users.id)
+      .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -186,6 +186,17 @@ export const partnerLinks = pgTable(
     ),
   }),
 );
+
+// One row per participant of a link. The primary key on user_id is what makes a
+// second pending or accepted link impossible for a user, whichever side they are on.
+export const partnerLinkMembers = pgTable('partner_link_members', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  linkId: integer('link_id')
+    .references(() => partnerLinks.id, { onDelete: 'cascade' })
+    .notNull(),
+});
 
 // ── Wealth planning ─────────────────────────────────────────────────────────
 
@@ -1029,6 +1040,31 @@ export const netWorthSnapshots = pgTable(
 
 // ── Bunq ─────────────────────────────────────────────────────────────────────
 
+// Server-recorded OAuth attempts. Only a hash of the state is stored; a callback must
+// consume a live attempt (single use, short lived) to be attributed to a user.
+export const bunqOauthAttempts = pgTable(
+  'bunq_oauth_attempts',
+  {
+    id: serial('id').primaryKey(),
+    stateHash: text('state_hash').notNull(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    destination: text('destination', { enum: ['savings', 'settings'] }).notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    consumedAt: timestamp('consumed_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    stateHashIdx: uniqueIndex('bunq_oauth_attempts_state_hash_idx').on(t.stateHash),
+    expiresAtIdx: index('bunq_oauth_attempts_expires_at_idx').on(t.expiresAt),
+    destinationCheck: check(
+      'bunq_oauth_attempts_destination_check',
+      sql`${t.destination} in ('savings', 'settings')`,
+    ),
+  }),
+);
+
 export const bunqConnections = pgTable(
   'bunq_connections',
   {
@@ -1050,4 +1086,27 @@ export const bunqConnections = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (t) => ({ userIdx: uniqueIndex('bunq_connections_user_id_idx').on(t.userId) }),
+);
+
+export const bunqPaymentProgress = pgTable(
+  'bunq_payment_progress',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    accountId: integer('account_id').notNull(),
+    kind: text('kind').notNull(),
+    newerThan: text('newer_than'),
+    nextPageUrl: text('next_page_url'),
+    complete: boolean('complete').notNull().default(false),
+    startedAt: timestamp('started_at').notNull(),
+  },
+  (t) => ({
+    accountKindUnique: uniqueIndex('bunq_payment_progress_account_kind_unique').on(
+      t.userId,
+      t.accountId,
+      t.kind,
+    ),
+  }),
 );

@@ -1,4 +1,16 @@
 import { createSign, generateKeyPairSync, randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+
+import {
+  abortableRead,
+  checkWorkDeadline,
+  currentWorkSignal,
+  upstreamSignal,
+} from './workDeadline';
+
+export const BUNQ_PAYMENT_PAGE_CAP = 100;
+
+import { requireBunqConfig } from './bunqConfig';
 
 const RATE_LIMIT_RETRY_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
@@ -13,9 +25,6 @@ const OAUTH_BASE_URL = isSandbox
 const OAUTH_AUTHORIZE_URL = isSandbox
   ? 'https://oauth.sandbox.bunq.com/auth'
   : 'https://oauth.bunq.com/auth';
-const CLIENT_ID = process.env.BUNQ_CLIENT_ID ?? '';
-const CLIENT_SECRET = process.env.BUNQ_CLIENT_SECRET ?? '';
-const REDIRECT_URI = process.env.BUNQ_REDIRECT_URI ?? '';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -135,7 +144,7 @@ function extractPagination(payload: unknown): BunqPagination | null {
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return delay(ms, undefined, { signal: currentWorkSignal() });
 }
 
 function signBody(body: string, privateKeyPem: string): string {
@@ -144,13 +153,33 @@ function signBody(body: string, privateKeyPem: string): string {
   return signer.sign(privateKeyPem, 'base64');
 }
 
+function performFetchOnce(
+  url: string,
+  init: RequestInit,
+): Promise<{ response: Response; payload: unknown }> {
+  checkWorkDeadline();
+  const signal = upstreamSignal();
+  return abortableRead(signal, async () => {
+    const response = await fetch(url, { ...init, signal });
+    // Consume the body under the same timeout as the socket.
+    const text = await response.text();
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      /* bunq may return an empty body */
+    }
+    return { response, payload };
+  });
+}
+
 async function performFetch(url: string, init: RequestInit): Promise<unknown> {
-  let response = await fetch(url, init);
-  if (response.status === RATE_LIMIT_STATUS) {
+  let result = await performFetchOnce(url, init);
+  if (result.response.status === RATE_LIMIT_STATUS) {
     await sleep(RATE_LIMIT_RETRY_MS);
-    response = await fetch(url, init);
+    result = await performFetchOnce(url, init);
   }
-  const payload: unknown = await response.json().catch(() => null);
+  const { response, payload } = result;
   if (!response.ok) {
     const msg = extractErrorMessage(payload);
     throw new Error(msg ?? `Bunq request failed (${response.status}): ${url}`);
@@ -160,6 +189,7 @@ async function performFetch(url: string, init: RequestInit): Promise<unknown> {
 
 function resolveApiUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  if (pathOrUrl.startsWith('/v1/')) return new URL(pathOrUrl, API_BASE_URL).toString();
   return `${API_BASE_URL}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
 }
 
@@ -319,22 +349,24 @@ export function generateKeyPair(): BunqKeyPair {
 }
 
 export function buildOAuthAuthorizeUrl(state: string): string {
+  const config = requireBunqConfig();
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
+    client_id: config.clientId,
+    redirect_uri: config.redirectUri,
     state,
   });
   return `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<BunqTokens> {
+  const config = requireBunqConfig();
   const payload = await oauthPost({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
+    redirect_uri: config.redirectUri,
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
   });
   return parseTokens(payload);
 }
@@ -401,38 +433,56 @@ export async function fetchMonetaryAccounts(
   return parseMonetaryAccounts(payload);
 }
 
+function filterPaymentPage(page: BunqPayment[], cutoffTime: number | null) {
+  const accepted: BunqPayment[] = [];
+  let reachedCutoff = false;
+  for (const payment of page) {
+    const createdTime = Date.parse(payment.created.replace(' ', 'T') + 'Z');
+    if (!Number.isFinite(createdTime)) continue;
+    if (cutoffTime !== null && createdTime <= cutoffTime) {
+      reachedCutoff = true;
+      continue;
+    }
+    accepted.push(payment);
+  }
+  return { accepted, reachedCutoff };
+}
+
+function parsePaymentCutoff(newerThan: string | undefined): number | null {
+  return newerThan ? Date.parse(newerThan) : null;
+}
+
 export async function fetchPayments(
   sessionToken: string,
   bunqUserId: string,
   accountId: number,
   newerThan?: string,
-): Promise<BunqPayment[]> {
-  const cutoffTime = newerThan ? Date.parse(newerThan) : null;
+  resumeUrl?: string,
+  pageCap = BUNQ_PAYMENT_PAGE_CAP,
+): Promise<{ payments: BunqPayment[]; nextPageUrl: string | null }> {
+  const cutoffTime = parsePaymentCutoff(newerThan);
   const payments: BunqPayment[] = [];
   const url = new URL(`${API_BASE_URL}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
   url.searchParams.set('count', '200');
 
-  let nextUrl: string | null = url.toString();
-  while (nextUrl) {
+  let nextUrl: string | null = resumeUrl ?? url.toString();
+  let pages = 0;
+  while (nextUrl && pages < pageCap) {
+    pages += 1;
     const payload = await apiGet(resolveApiUrl(nextUrl), sessionToken);
     const page = extractBunqItems(payload, 'Payment')
       .map(parsePayment)
       .filter((p): p is BunqPayment => p !== null);
-    let reachedCutoff = false;
-    for (const payment of page) {
-      const createdTime = Date.parse(payment.created.replace(' ', 'T') + 'Z');
-      if (!Number.isFinite(createdTime)) continue;
-      if (cutoffTime !== null && createdTime <= cutoffTime) {
-        reachedCutoff = true;
-        continue;
-      }
-      payments.push(payment);
+    const { accepted, reachedCutoff } = filterPaymentPage(page, cutoffTime);
+    payments.push(...accepted);
+    if (reachedCutoff) {
+      nextUrl = null;
+      break;
     }
-    if (reachedCutoff) break;
     nextUrl = extractPagination(payload)?.olderUrl ?? null;
   }
 
-  return payments;
+  return { payments, nextPageUrl: nextUrl };
 }
 
 export async function deleteSession(sessionToken: string, sessionId: number): Promise<void> {

@@ -8,14 +8,13 @@ import {
   currencyRates,
   mortgages,
   netWorthSnapshots,
-  partnerLinks,
   properties,
   savingsAccounts,
   savingsTransactions,
   users,
 } from '../db/schema';
 import { upsertCurrentNetWorthSnapshot } from '../lib/netWorth';
-import { createIntegrationHelpers, type AuthSession } from '../test/integration';
+import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
 
 const integration = createIntegrationHelpers('household-model.integration.quro.test');
 const rates = {
@@ -90,9 +89,7 @@ async function summary(session: AuthSession) {
 async function household() {
   const owner = await integration.signUp('owner');
   const partner = await integration.signUp('partner');
-  await db
-    .insert(partnerLinks)
-    .values({ requesterId: owner.user.id, addresseeId: partner.user.id, status: 'accepted' });
+  await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
   const property = await read<Property>(
     await integration.request('/api/investments/properties', {
       method: 'POST',

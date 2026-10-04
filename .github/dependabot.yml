@@ -39,3 +39,18 @@ updates:
       python-dependencies:
         patterns:
           - '*'
+
+  - package-ecosystem: 'docker'
+    directories:
+      - '/packages/backend'
+      - '/packages/frontend'
+      - '/services/pension-parser'
+      - '/deploy/auto-updater'
+      - '/docker/minio-init'
+      - '/docker/vllm'
+    schedule:
+      interval: 'weekly'
+    groups:
+      docker-base-images:
+        patterns:
+          - '*'

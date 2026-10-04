@@ -24,6 +24,7 @@ const updatedHolding = {
 };
 
 let snapshotWriteShouldFail = false;
+let quoteRequestTimesOut = false;
 
 const { db: realDb } = await import('../db/client');
 
@@ -57,14 +58,16 @@ await mock.module('../db/client', () => ({
 await mock.module('./marketDataClient', () => ({
   getMarketDataClient: () => ({
     getLatestEod: () =>
-      Promise.resolve({
-        'CBA.AX': {
-          close: 101.5,
-          priceCurrency: 'AUD',
-          eodDate: '2026-06-22',
-          tradeLast: '2026-06-22T10:00:00.000Z',
-        },
-      }),
+      quoteRequestTimesOut
+        ? Promise.reject(new DOMException('synthetic timeout', 'TimeoutError'))
+        : Promise.resolve({
+            'CBA.AX': {
+              close: 101.5,
+              priceCurrency: 'AUD',
+              eodDate: '2026-06-22',
+              tradeLast: '2026-06-22T10:00:00.000Z',
+            },
+          }),
   }),
 }));
 
@@ -92,5 +95,19 @@ describe('holding price sync', () => {
         reason: 'Price updated, but failed to persist history snapshot',
       },
     ]);
+  });
+
+  test('a user refresh records a quote timeout per holding instead of failing', async () => {
+    quoteRequestTimesOut = true;
+    try {
+      const outcome = await syncHoldingPricesForUser(holding.userId, { holdingIds: [holding.id] });
+
+      expect(outcome.updates).toHaveLength(0);
+      expect(outcome.summary.issues).toEqual([
+        expect.objectContaining({ holdingId: holding.id, reason: 'synthetic timeout' }),
+      ]);
+    } finally {
+      quoteRequestTimesOut = false;
+    }
   });
 });
