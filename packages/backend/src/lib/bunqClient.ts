@@ -1,5 +1,9 @@
 import { createSign, generateKeyPairSync, randomUUID } from 'node:crypto';
 
+import { abortableRead, checkWorkDeadline, upstreamSignal } from './workDeadline';
+
+export const BUNQ_PAYMENT_PAGE_CAP = 100;
+
 const RATE_LIMIT_RETRY_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
 
@@ -134,8 +138,20 @@ function extractPagination(payload: unknown): BunqPagination | null {
   return null;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function sleep(ms: number): Promise<void> {
+  const signal = upstreamSignal(ms + 1000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await abortableRead(
+      signal,
+      () =>
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, ms);
+        }),
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function signBody(body: string, privateKeyPem: string): string {
@@ -144,13 +160,33 @@ function signBody(body: string, privateKeyPem: string): string {
   return signer.sign(privateKeyPem, 'base64');
 }
 
+function performFetchOnce(
+  url: string,
+  init: RequestInit,
+): Promise<{ response: Response; payload: unknown }> {
+  checkWorkDeadline();
+  const signal = upstreamSignal();
+  return abortableRead(signal, async () => {
+    const response = await fetch(url, { ...init, signal });
+    // Consume the body under the same timeout as the socket.
+    const text = await response.text();
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      /* bunq may return an empty body */
+    }
+    return { response, payload };
+  });
+}
+
 async function performFetch(url: string, init: RequestInit): Promise<unknown> {
-  let response = await fetch(url, init);
-  if (response.status === RATE_LIMIT_STATUS) {
+  let result = await performFetchOnce(url, init);
+  if (result.response.status === RATE_LIMIT_STATUS) {
     await sleep(RATE_LIMIT_RETRY_MS);
-    response = await fetch(url, init);
+    result = await performFetchOnce(url, init);
   }
-  const payload: unknown = await response.json().catch(() => null);
+  const { response, payload } = result;
   if (!response.ok) {
     const msg = extractErrorMessage(payload);
     throw new Error(msg ?? `Bunq request failed (${response.status}): ${url}`);
@@ -401,6 +437,10 @@ export async function fetchMonetaryAccounts(
   return parseMonetaryAccounts(payload);
 }
 
+function checkPaymentPageCap(pages: number): void {
+  if (pages >= BUNQ_PAYMENT_PAGE_CAP) throw new Error('Bunq payment page cap exceeded');
+}
+
 export async function fetchPayments(
   sessionToken: string,
   bunqUserId: string,
@@ -413,7 +453,10 @@ export async function fetchPayments(
   url.searchParams.set('count', '200');
 
   let nextUrl: string | null = url.toString();
+  let pages = 0;
   while (nextUrl) {
+    checkPaymentPageCap(pages);
+    pages += 1;
     const payload = await apiGet(resolveApiUrl(nextUrl), sessionToken);
     const page = extractBunqItems(payload, 'Payment')
       .map(parsePayment)

@@ -156,6 +156,8 @@ Savings sync creates or updates local savings accounts for bunq savings accounts
 
 ### Background sync scheduler
 
+For timeout limits and recovery steps, see [Troubleshoot provider timeouts](provider-timeouts.md).
+
 `src/index.ts` starts `startBunqSyncScheduler()` when the backend starts. The scheduler runs in-process once per hour, selects every user with a row in `bunq_connections`, and calls `syncBunqSavings(userId)` followed by `syncBunqBudget(userId)`. Failures are logged and written back to the connection's `sync_status` / `sync_error` fields; they do not stop the scheduler from trying later users or future hourly cycles.
 
 ---

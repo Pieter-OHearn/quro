@@ -5,6 +5,7 @@ import {
   toDateOnly,
 } from '@quro/shared';
 import YahooFinance from 'yahoo-finance2';
+import { abortableRead, checkWorkDeadline, upstreamSignal } from './workDeadline';
 import type {
   EodLatestMap,
   EodLatestQuote,
@@ -122,17 +123,23 @@ function parseQuoteRow(
 }
 
 export class YahooFinanceMarketDataClient implements MarketDataClient {
-  private readonly yf: InstanceType<typeof YahooFinance>;
-
-  constructor() {
-    this.yf = new YahooFinance({
-      suppressNotices: ['yahooSurvey'],
-      validation: { logErrors: false },
-    });
-  }
+  constructor(
+    private readonly createClient: () => InstanceType<typeof YahooFinance> = () =>
+      new YahooFinance({
+        suppressNotices: ['yahooSurvey'],
+        validation: { logErrors: false },
+      }),
+  ) {}
 
   async lookupSymbol(symbol: string): Promise<TickerLookupProfile> {
-    const result = await this.yf.quoteSummary(symbol, { modules: ['price', 'assetProfile'] });
+    const signal = upstreamSignal();
+    const result = await abortableRead(signal, () =>
+      this.createClient().quoteSummary(
+        symbol,
+        { modules: ['price', 'assetProfile'] },
+        { fetchOptions: { signal } },
+      ),
+    );
     const price = result.price;
     if (!price) throw new Error(`Ticker not found: ${symbol}`);
     const { sector, industry } = extractProfileStrings(result.assetProfile);
@@ -154,9 +161,13 @@ export class YahooFinanceMarketDataClient implements MarketDataClient {
 
     let results: unknown[];
     try {
-      const raw = await this.yf.quote(unique);
+      const signal = upstreamSignal();
+      const raw = await abortableRead(signal, () =>
+        this.createClient().quote(unique, {}, { fetchOptions: { signal } }),
+      );
       results = Array.isArray(raw) ? raw : [raw];
     } catch {
+      checkWorkDeadline();
       return quotes;
     }
 

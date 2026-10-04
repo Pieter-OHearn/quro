@@ -1,6 +1,14 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 
-import { createSession, fetchMonetaryAccounts, fetchPayments, generateKeyPair } from './bunqClient';
+import {
+  BUNQ_PAYMENT_PAGE_CAP,
+  exchangeCodeForTokens,
+  createSession,
+  fetchMonetaryAccounts,
+  fetchPayments,
+  generateKeyPair,
+} from './bunqClient';
+import { withWorkDeadline } from './workDeadline';
 
 const originalFetch = globalThis.fetch;
 
@@ -13,6 +21,7 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  mock.restore();
 });
 
 describe('bunqClient', () => {
@@ -159,4 +168,70 @@ describe('bunqClient', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('count=200');
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('newer_than');
   });
+});
+
+test('bunq OAuth request aborts a hung socket at its request timeout', async () => {
+  const timeout = AbortSignal.timeout.bind(AbortSignal);
+  spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout(10));
+  let aborted = false;
+  globalThis.fetch = mock(
+    (_url: unknown, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => {
+            aborted = true;
+            reject(init.signal?.reason);
+          },
+          { once: true },
+        );
+      }),
+  ) as unknown as typeof fetch;
+  await expect(exchangeCodeForTokens('synthetic')).rejects.toThrow();
+  expect(aborted).toBe(true);
+});
+
+test('bunq deadline bounds a hanging response body', async () => {
+  let cancelled = false;
+  globalThis.fetch = mock((_url: unknown, init?: RequestInit) => {
+    const stream = new ReadableStream({
+      start(controller) {
+        init?.signal?.addEventListener(
+          'abort',
+          () => {
+            cancelled = true;
+            controller.error(init.signal?.reason);
+          },
+          { once: true },
+        );
+      },
+    });
+    return Promise.resolve(new Response(stream));
+  }) as unknown as typeof fetch;
+  await expect(
+    withWorkDeadline(10, () => fetchMonetaryAccounts('synthetic', '42')),
+  ).rejects.toThrow();
+  expect(cancelled).toBe(true);
+});
+
+test('bunq paging fails closed at the cap instead of returning partial history', async () => {
+  const fetchMock = mock(() =>
+    Promise.resolve(
+      jsonResponse({
+        Response: [{ Pagination: { older_url: '/user/42/payment?older_id=1' } }],
+      }),
+    ),
+  );
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  await expect(fetchPayments('synthetic', '42', 7)).rejects.toThrow('page cap exceeded');
+  expect(fetchMock).toHaveBeenCalledTimes(BUNQ_PAYMENT_PAGE_CAP);
+});
+
+test('bunq rate limit backoff stops at the job deadline without a retry', async () => {
+  const fetchMock = mock(() => Promise.resolve(jsonResponse({}, { status: 429 })));
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  await expect(
+    withWorkDeadline(10, () => fetchMonetaryAccounts('synthetic', '42')),
+  ).rejects.toThrow();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });
