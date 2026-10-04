@@ -415,7 +415,8 @@ export type PensionImportCollisionWarning = {
   reason: string;
 };
 
-export type AppCapabilityReason = 'worker_unavailable' | 'worker_stale' | 'parser_unhealthy';
+export type AppCapabilityReason =
+  'worker_unavailable' | 'worker_stale' | 'parser_unhealthy' | 'not_configured';
 
 export type AppCapabilityStatus = {
   enabled: boolean;
@@ -427,6 +428,7 @@ export type AppCapabilityStatus = {
 export type AppCapabilities = {
   ai: AppCapabilityStatus;
   pensionStatementImport: AppCapabilityStatus;
+  bunq: AppCapabilityStatus;
 };
 
 export type PensionStatementImport = {

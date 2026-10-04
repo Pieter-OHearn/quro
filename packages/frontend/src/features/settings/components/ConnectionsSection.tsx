@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Check, Link2, RefreshCw, Unlink } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import { buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
+import { useBunqAvailability } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
 import {
   useBunqConnection,
@@ -96,6 +97,8 @@ export function ConnectionsSection() {
     }
   };
 
+  const { unavailable: bunqUnavailable, disconnectedMessage } = useBunqAvailability();
+
   const handleConnect = () => {
     window.location.href = buildApiUrl('/api/bunq/oauth/start');
   };
@@ -144,9 +147,7 @@ export function ConnectionsSection() {
                   <p>Last synced: {formatSyncTime(connection.lastSyncAt)}</p>
                 </div>
               ) : (
-                <p className="mt-1 text-sm text-fg-subtle">
-                  Connect your Bunq account to automatically sync savings and budget transactions.
-                </p>
+                <p className="mt-1 text-sm text-fg-subtle">{disconnectedMessage}</p>
               )}
             </div>
           </div>
@@ -184,6 +185,7 @@ export function ConnectionsSection() {
                 variant="primary"
                 size="sm"
                 leadingIcon={<Link2 size={14} />}
+                disabled={bunqUnavailable}
                 onClick={handleConnect}
               >
                 Connect

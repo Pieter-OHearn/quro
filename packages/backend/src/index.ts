@@ -19,6 +19,7 @@ import capabilities from './routes/capabilities';
 import settings from './routes/settings';
 import partner from './routes/partner';
 import bunq from './routes/bunq';
+import { loadBunqConfig } from './lib/bunqConfig';
 import plan from './routes/plan';
 import employments from './routes/employments';
 import {
@@ -33,6 +34,9 @@ import { startHoldingPriceSyncScheduler } from './lib/holdingPriceSyncScheduler'
 import { startCurrencyRateSyncScheduler } from './lib/currencyRateSyncScheduler';
 import { startNetWorthSnapshotScheduler } from './lib/netWorthSnapshotScheduler';
 import { httpTracing } from './lib/tracing';
+
+// Fail fast on partial bunq configuration; unset leaves the integration disabled.
+loadBunqConfig();
 
 export const app = new Hono();
 

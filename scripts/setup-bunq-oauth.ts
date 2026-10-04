@@ -263,3 +263,6 @@ await chmod(OUTPUT_ENV_PATH, 0o600);
 
 console.log(`\n✅ Done! Wrote bunq OAuth env vars to ${OUTPUT_ENV_PATH}.`);
 console.log('Copy them into packages/backend/.env when ready.');
+console.log(
+  'Also set FRONTEND_ORIGIN (e.g. http://localhost:5173); the backend refuses to start with bunq enabled but FRONTEND_ORIGIN unset.',
+);

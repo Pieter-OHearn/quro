@@ -1,8 +1,9 @@
-import { afterAll, afterEach, beforeAll, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { bunqConnections, bunqPaymentProgress, workerHeartbeats } from '../db/schema';
-import { buildOAuthState } from '../routes/bunq';
+import { createOAuthAttempt } from './bunqOAuthAttempts';
+import { clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
@@ -16,7 +17,9 @@ const integration = createIntegrationHelpers('review-timeout.quro.test');
 const originalFetch = globalThis.fetch;
 beforeAll(() => integration.cleanup());
 afterAll(() => integration.cleanup());
+beforeEach(setBunqTestEnv);
 afterEach(() => {
+  clearBunqTestEnv();
   globalThis.fetch = originalFetch;
   mock.restore();
 });
@@ -311,7 +314,7 @@ test('reconnecting bunq discards checkpoints from the previous provider connecti
   globalThis.fetch = (() =>
     Promise.resolve(Response.json({ access_token: 'synthetic' }))) as unknown as typeof fetch;
   try {
-    const state = buildOAuthState(auth.user.id, 'synthetic');
+    const state = await createOAuthAttempt(auth.user.id, 'settings');
     const response = await integration.request(
       `/api/bunq/oauth/callback?code=synthetic&state=${encodeURIComponent(state)}`,
     );

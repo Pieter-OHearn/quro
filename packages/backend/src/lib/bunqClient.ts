@@ -10,6 +10,8 @@ import {
 
 export const BUNQ_PAYMENT_PAGE_CAP = 100;
 
+import { requireBunqConfig } from './bunqConfig';
+
 const RATE_LIMIT_RETRY_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
 
@@ -23,9 +25,6 @@ const OAUTH_BASE_URL = isSandbox
 const OAUTH_AUTHORIZE_URL = isSandbox
   ? 'https://oauth.sandbox.bunq.com/auth'
   : 'https://oauth.bunq.com/auth';
-const CLIENT_ID = process.env.BUNQ_CLIENT_ID ?? '';
-const CLIENT_SECRET = process.env.BUNQ_CLIENT_SECRET ?? '';
-const REDIRECT_URI = process.env.BUNQ_REDIRECT_URI ?? '';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -350,22 +349,24 @@ export function generateKeyPair(): BunqKeyPair {
 }
 
 export function buildOAuthAuthorizeUrl(state: string): string {
+  const config = requireBunqConfig();
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
+    client_id: config.clientId,
+    redirect_uri: config.redirectUri,
     state,
   });
   return `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<BunqTokens> {
+  const config = requireBunqConfig();
   const payload = await oauthPost({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
+    redirect_uri: config.redirectUri,
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
   });
   return parseTokens(payload);
 }

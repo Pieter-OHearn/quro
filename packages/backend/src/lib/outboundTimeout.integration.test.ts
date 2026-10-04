@@ -1,9 +1,10 @@
-import { afterAll, afterEach, beforeAll, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { bunqConnections, workerHeartbeats } from '../db/schema';
 import { createIntegrationHelpers } from '../test/integration';
-import { buildOAuthState } from '../routes/bunq';
+import { createOAuthAttempt } from './bunqOAuthAttempts';
+import { clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { fetchMonetaryAccounts } from './bunqClient';
 import { runScheduledJob } from './scheduledJob';
 import * as marketDataClient from './marketDataClient';
@@ -13,7 +14,9 @@ const integration = createIntegrationHelpers('outbound-timeout.quro.test');
 const originalFetch = globalThis.fetch;
 beforeAll(() => integration.cleanup());
 afterAll(() => integration.cleanup());
+beforeEach(setBunqTestEnv);
 afterEach(() => {
+  clearBunqTestEnv();
   globalThis.fetch = originalFetch;
   mock.restore();
 });
@@ -39,7 +42,7 @@ test('bunq OAuth request responds on timeout and a late token cannot create a co
   const auth = await integration.signUp('oauth-timeout');
   shortTimeout();
   const { signal, finish } = hangFetch();
-  const state = buildOAuthState(auth.user.id, 'synthetic');
+  const state = await createOAuthAttempt(auth.user.id, 'settings');
   const response = await integration.request(
     `/api/bunq/oauth/callback?code=synthetic&state=${encodeURIComponent(state)}`,
   );
