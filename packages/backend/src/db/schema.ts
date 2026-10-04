@@ -1062,3 +1062,26 @@ export const bunqConnections = pgTable(
   },
   (t) => ({ userIdx: uniqueIndex('bunq_connections_user_id_idx').on(t.userId) }),
 );
+
+export const bunqPaymentProgress = pgTable(
+  'bunq_payment_progress',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    accountId: integer('account_id').notNull(),
+    kind: text('kind').notNull(),
+    newerThan: text('newer_than'),
+    nextPageUrl: text('next_page_url'),
+    complete: boolean('complete').notNull().default(false),
+    startedAt: timestamp('started_at').notNull(),
+  },
+  (t) => ({
+    accountKindUnique: uniqueIndex('bunq_payment_progress_account_kind_unique').on(
+      t.userId,
+      t.accountId,
+      t.kind,
+    ),
+  }),
+);

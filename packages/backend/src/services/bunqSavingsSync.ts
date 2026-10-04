@@ -1,3 +1,4 @@
+import { registerDeadlineCleanup, runFailureCleanup } from '../lib/workDeadline';
 import { and, eq } from 'drizzle-orm';
 import { isCurrencyCode, type CurrencyCode, toIsoDate, DEFAULT_EMOJI } from '@quro/shared';
 import { db } from '../db/client';
@@ -6,13 +7,13 @@ import {
   createInstallation,
   createSession,
   fetchMonetaryAccounts,
-  fetchPayments,
   generateKeyPair,
   registerDevice,
   type BunqMonetaryAccount,
   type BunqPayment,
   type BunqSessionResult,
 } from '../lib/bunqClient';
+import { syncPaymentBatch } from '../lib/bunqPaymentProgress';
 import { toBunqNewerThanCursor } from '../lib/bunqSyncCursor';
 
 const DEFAULT_BUNQ_COLOR = '#3b82f6';
@@ -211,28 +212,39 @@ async function importPayment(
     });
 }
 
-async function syncAccountPayments(
+function syncAccountPayments(
   sessionToken: string,
   bunqUserId: string,
   userId: number,
   localAccountId: number,
   bunqAccountId: number,
   newerThan: string | undefined,
-): Promise<BunqSavingsSyncIssue[]> {
-  const payments = await fetchPayments(sessionToken, bunqUserId, bunqAccountId, newerThan);
-  const issues: BunqSavingsSyncIssue[] = [];
-  for (const payment of payments) {
-    try {
-      await importPayment(userId, localAccountId, payment);
-    } catch (error) {
-      issues.push({
-        accountId: bunqAccountId,
-        paymentId: String(payment.id),
-        message: error instanceof Error ? error.message : 'Savings payment import failed',
-      });
-    }
-  }
-  return issues;
+  lastSyncAt: Date | null,
+) {
+  return syncPaymentBatch({
+    sessionToken,
+    bunqUserId,
+    userId,
+    accountId: bunqAccountId,
+    kind: 'savings',
+    newerThan,
+    lastSyncAt,
+    importPayments: async (payments) => {
+      const issues: BunqSavingsSyncIssue[] = [];
+      for (const payment of payments) {
+        try {
+          await importPayment(userId, localAccountId, payment);
+        } catch (error) {
+          issues.push({
+            accountId: bunqAccountId,
+            paymentId: String(payment.id),
+            message: error instanceof Error ? error.message : 'Savings payment import failed',
+          });
+        }
+      }
+      return issues;
+    },
+  });
 }
 
 async function markSyncing(connectionId: number): Promise<void> {
@@ -292,40 +304,46 @@ export async function syncBunqSavings(
   const connection = await loadConnection(userId);
   if (!connection) return { status: 'skipped', syncedAt: null, issues: [] };
 
-  await markSyncing(connection.id);
+  const unregisterCleanup = registerDeadlineCleanup(() =>
+    markSyncFailed(connection.id, 'Scheduled job deadline exceeded'),
+  );
   const issues: BunqSavingsSyncIssue[] = [];
 
   try {
+    await markSyncing(connection.id);
     const session = await ensureSession(connection);
     const accounts = await fetchMonetaryAccounts(session.sessionToken, session.bunqUserId);
     const savingsOnly = accounts.filter((a) => a.type === 'SAVINGS');
     const activeBunqAccountIds = new Set(savingsOnly.map((a) => String(a.id)));
     const newerThan = newerThanOverride ?? toBunqNewerThanCursor(connection.lastSyncAt);
 
+    let syncedAt = new Date();
     for (const bunqAccount of savingsOnly) {
       const localAccount = await upsertSavingsAccount(userId, bunqAccount);
       if (!localAccount) continue;
-      issues.push(
-        ...(await syncAccountPayments(
-          session.sessionToken,
-          session.bunqUserId,
-          userId,
-          localAccount.id,
-          bunqAccount.id,
-          newerThan,
-        )),
+      const batch = await syncAccountPayments(
+        session.sessionToken,
+        session.bunqUserId,
+        userId,
+        localAccount.id,
+        bunqAccount.id,
+        newerThan,
+        connection.lastSyncAt,
       );
+      issues.push(...batch.issues);
+      syncedAt = new Date(Math.min(batch.syncedAt.getTime(), syncedAt.getTime()));
     }
     await detachOrphanedBunqSavingsAccounts(userId, activeBunqAccountIds);
 
-    const syncedAt = new Date();
     await (issues.length > 0
       ? markSyncFailed(connection.id, `${issues.length} Bunq savings payment(s) failed to import`)
       : markSyncSucceeded(connection.id, session.bunqUserId, syncedAt, !skipCursorUpdate));
     return { status: issues.length > 0 ? 'partial' : 'success', syncedAt, issues };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    await markSyncFailed(connection.id, message);
+    await runFailureCleanup(() => markSyncFailed(connection.id, message));
     throw error;
+  } finally {
+    unregisterCleanup();
   }
 }

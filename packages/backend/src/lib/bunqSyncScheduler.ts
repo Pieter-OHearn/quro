@@ -3,9 +3,11 @@ import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
+import { createRotatingWork } from './rotatingWork';
 import { startIntervalJob } from './intervalJob';
 
 const SYNC_INTERVAL_MS = HOUR_MS;
+const rotateUsers = createRotatingWork();
 
 export function startBunqSyncScheduler(): void {
   startIntervalJob({
@@ -45,7 +47,8 @@ async function runSync(): Promise<void> {
     })
     .from(bunqConnections);
 
-  for (const { userId } of connections) {
-    await syncUserAccounts(userId);
-  }
+  await rotateUsers(
+    connections.map(({ userId }) => userId),
+    syncUserAccounts,
+  );
 }
