@@ -43,12 +43,11 @@ test('Yahoo lookup request times out and passes cancellation to the provider', a
   expect(writes).toBe(0);
 });
 
-test('Yahoo quotes preserve the empty-quote fallback on request timeout', async () => {
+test('Yahoo quotes propagate request timeouts', async () => {
   const timeout = AbortSignal.timeout.bind(AbortSignal);
   spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout(10));
   const { client, signal } = hangingClient();
-  const quotes = await client.getLatestEod(['SYNTHETIC']);
-  expect(quotes.SYNTHETIC?.close).toBeNull();
+  await expect(client.getLatestEod(['SYNTHETIC'])).rejects.toThrow();
   expect(signal()?.aborted).toBe(true);
 });
 
@@ -130,4 +129,40 @@ test('Yahoo library forwards the signal to its initial cookie/crumb fetch', asyn
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('Yahoo reuses a healthy client and replaces it after cancellation', async () => {
+  const timeout = AbortSignal.timeout.bind(AbortSignal);
+  spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout(10));
+  let calls = 0;
+  let hang = false;
+  const factory = mock(
+    () =>
+      ({
+        quote: () => {
+          calls += 1;
+          return hang ? new Promise(() => {}) : Promise.resolve([]);
+        },
+      }) as unknown as InstanceType<typeof YahooFinance>,
+  );
+  const client = new YahooFinanceMarketDataClient(factory);
+  await client.getLatestEod(['ONE']);
+  await client.getLatestEod(['TWO']);
+  expect(factory).toHaveBeenCalledTimes(1);
+  hang = true;
+  await expect(client.getLatestEod(['THREE'])).rejects.toThrow();
+  hang = false;
+  await client.getLatestEod(['FOUR']);
+  expect(factory).toHaveBeenCalledTimes(2);
+  expect(calls).toBe(4);
+});
+
+test('Yahoo keeps empty quotes for ordinary provider errors', async () => {
+  const client = new YahooFinanceMarketDataClient(
+    () =>
+      ({
+        quote: () => Promise.reject(new Error('synthetic quote failure')),
+      }) as unknown as InstanceType<typeof YahooFinance>,
+  );
+  expect((await client.getLatestEod(['SYNTHETIC'])).SYNTHETIC.close).toBeNull();
 });

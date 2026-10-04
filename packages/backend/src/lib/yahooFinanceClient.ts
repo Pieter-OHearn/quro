@@ -122,7 +122,29 @@ function parseQuoteRow(
   };
 }
 
+export function rethrowCancellation(error: unknown): void {
+  checkWorkDeadline();
+  if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) throw error;
+}
+
 export class YahooFinanceMarketDataClient implements MarketDataClient {
+  private client: InstanceType<typeof YahooFinance> | null = null;
+
+  private getClient(): InstanceType<typeof YahooFinance> {
+    this.client ??= this.createClient();
+    return this.client;
+  }
+
+  private read<T>(
+    run: (client: InstanceType<typeof YahooFinance>, signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    const signal = upstreamSignal();
+    const client = this.getClient();
+    return abortableRead(signal, () => run(client, signal)).catch((error: unknown) => {
+      if (signal.aborted && this.client === client) this.client = null;
+      throw error;
+    });
+  }
   constructor(
     private readonly createClient: () => InstanceType<typeof YahooFinance> = () =>
       new YahooFinance({
@@ -132,9 +154,8 @@ export class YahooFinanceMarketDataClient implements MarketDataClient {
   ) {}
 
   async lookupSymbol(symbol: string): Promise<TickerLookupProfile> {
-    const signal = upstreamSignal();
-    const result = await abortableRead(signal, () =>
-      this.createClient().quoteSummary(
+    const result = await this.read((client, signal) =>
+      client.quoteSummary(
         symbol,
         { modules: ['price', 'assetProfile'] },
         { fetchOptions: { signal } },
@@ -161,13 +182,12 @@ export class YahooFinanceMarketDataClient implements MarketDataClient {
 
     let results: unknown[];
     try {
-      const signal = upstreamSignal();
-      const raw = await abortableRead(signal, () =>
-        this.createClient().quote(unique, {}, { fetchOptions: { signal } }),
+      const raw = await this.read((client, signal) =>
+        client.quote(unique, {}, { fetchOptions: { signal } }),
       );
       results = Array.isArray(raw) ? raw : [raw];
-    } catch {
-      checkWorkDeadline();
+    } catch (error) {
+      rethrowCancellation(error);
       return quotes;
     }
 

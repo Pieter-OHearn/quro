@@ -4,8 +4,43 @@ import { MINUTE_MS } from '../constants/time';
 export const UPSTREAM_TIMEOUT_MS = 15_000;
 const SCHEDULED_JOB_TIMEOUT_MINUTES = 5;
 export const SCHEDULED_JOB_TIMEOUT_MS = SCHEDULED_JOB_TIMEOUT_MINUTES * MINUTE_MS;
-type WorkScope = { signal: AbortSignal; pending: Set<Promise<unknown>> };
+export const DEADLINE_GRACE_MS = 30_000;
+export class HardDeadlineError extends Error {
+  constructor() {
+    super('Scheduled job cleanup grace period exceeded');
+  }
+}
+type WorkScope = {
+  signal: AbortSignal;
+  pending: Set<Promise<unknown>>;
+  database?: object;
+  cleanup: Set<() => Promise<void>>;
+};
+export function currentWorkDatabase(): object | undefined {
+  return workScope.getStore()?.database;
+}
 const workScope = new AsyncLocalStorage<WorkScope>();
+
+export function runFailureCleanup<T>(run: () => Promise<T>): Promise<T> {
+  const parent = workScope.getStore();
+  if (!parent?.signal.aborted) return run();
+  const cleanup: WorkScope = {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    database: parent.database,
+    pending: parent.pending,
+    cleanup: new Set(),
+  };
+  const pending = workScope.run(cleanup, run);
+  parent.pending.add(pending);
+  return pending.finally(() => parent.pending.delete(pending));
+}
+
+export function registerDeadlineCleanup(run: () => Promise<void>): () => void {
+  const scope = workScope.getStore();
+  if (!scope) return () => {};
+  scope.cleanup.add(run);
+  return () => scope.cleanup.delete(run);
+}
 
 export function trackWork<T>(pending: Promise<T>): Promise<T> {
   const scope = workScope.getStore();
@@ -46,27 +81,64 @@ export async function abortableRead<T>(signal: AbortSignal, read: () => Promise<
   }
 }
 
-export async function withWorkDeadline<T>(timeoutMs: number, run: () => Promise<T>): Promise<T> {
+type DeadlineOptions = {
+  graceMs?: number;
+  database?: object;
+  destroy?: () => Promise<void>;
+};
+
+export async function withWorkDeadline<T>(
+  timeoutMs: number,
+  run: () => Promise<T>,
+  options: DeadlineOptions = {},
+): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(new DOMException('Scheduled job deadline exceeded', 'TimeoutError')),
-    timeoutMs,
-  );
+  const scope: WorkScope = {
+    signal: controller.signal,
+    pending: new Set(),
+    database: options.database,
+    cleanup: new Set(),
+  };
+  let graceTimer: ReturnType<typeof setTimeout> | undefined;
+  let rejectHard: (error: unknown) => void = () => {};
+  const hardDeadline = new Promise<never>((_resolve, reject) => {
+    rejectHard = reject;
+  });
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException('Scheduled job deadline exceeded', 'TimeoutError'));
+    for (const cleanup of scope.cleanup) {
+      void workScope
+        .run(scope, () => runFailureCleanup(cleanup))
+        .catch((error: unknown) => {
+          console.error('[scheduler] Failed to record deadline status', error);
+        });
+    }
+    graceTimer = setTimeout(() => {
+      void (async () => {
+        try {
+          await options.destroy?.();
+        } catch (error) {
+          console.error('[scheduler] Failed to destroy expired job connections', error);
+        } finally {
+          rejectHard(new HardDeadlineError());
+        }
+      })();
+    }, options.graceMs ?? DEADLINE_GRACE_MS);
+  }, timeoutMs);
+  const work = workScope.run(scope, async () => {
+    try {
+      const result = await run();
+      checkWorkDeadline();
+      return result;
+    } finally {
+      controller.abort(new DOMException('Scheduled job scope closed', 'AbortError'));
+      await Promise.allSettled([...scope.pending]);
+    }
+  });
   try {
-    const scope: WorkScope = { signal: controller.signal, pending: new Set() };
-    return await workScope.run(scope, async () => {
-      try {
-        const result = await run();
-        checkWorkDeadline();
-        return result;
-      } finally {
-        // Close the scope before draining. Detached continuations cannot start
-        // new queries, and in-flight queries/transactions retain the job lease.
-        controller.abort(new DOMException('Scheduled job scope closed', 'AbortError'));
-        await Promise.allSettled([...scope.pending]);
-      }
-    });
+    return await Promise.race([work, hardDeadline]);
   } finally {
     clearTimeout(timer);
+    clearTimeout(graceTimer);
   }
 }

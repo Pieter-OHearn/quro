@@ -190,6 +190,7 @@ async function performFetch(url: string, init: RequestInit): Promise<unknown> {
 
 function resolveApiUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  if (pathOrUrl.startsWith('/v1/')) return new URL(pathOrUrl, API_BASE_URL).toString();
   return `${API_BASE_URL}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
 }
 
@@ -431,8 +432,23 @@ export async function fetchMonetaryAccounts(
   return parseMonetaryAccounts(payload);
 }
 
-function checkPaymentPageCap(pages: number): void {
-  if (pages >= BUNQ_PAYMENT_PAGE_CAP) throw new Error('Bunq payment page cap exceeded');
+function filterPaymentPage(page: BunqPayment[], cutoffTime: number | null) {
+  const accepted: BunqPayment[] = [];
+  let reachedCutoff = false;
+  for (const payment of page) {
+    const createdTime = Date.parse(payment.created.replace(' ', 'T') + 'Z');
+    if (!Number.isFinite(createdTime)) continue;
+    if (cutoffTime !== null && createdTime <= cutoffTime) {
+      reachedCutoff = true;
+      continue;
+    }
+    accepted.push(payment);
+  }
+  return { accepted, reachedCutoff };
+}
+
+function parsePaymentCutoff(newerThan: string | undefined): number | null {
+  return newerThan ? Date.parse(newerThan) : null;
 }
 
 export async function fetchPayments(
@@ -440,36 +456,32 @@ export async function fetchPayments(
   bunqUserId: string,
   accountId: number,
   newerThan?: string,
-): Promise<BunqPayment[]> {
-  const cutoffTime = newerThan ? Date.parse(newerThan) : null;
+  resumeUrl?: string,
+  pageCap = BUNQ_PAYMENT_PAGE_CAP,
+): Promise<{ payments: BunqPayment[]; nextPageUrl: string | null }> {
+  const cutoffTime = parsePaymentCutoff(newerThan);
   const payments: BunqPayment[] = [];
   const url = new URL(`${API_BASE_URL}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
   url.searchParams.set('count', '200');
 
-  let nextUrl: string | null = url.toString();
+  let nextUrl: string | null = resumeUrl ?? url.toString();
   let pages = 0;
-  while (nextUrl) {
-    checkPaymentPageCap(pages);
+  while (nextUrl && pages < pageCap) {
     pages += 1;
     const payload = await apiGet(resolveApiUrl(nextUrl), sessionToken);
     const page = extractBunqItems(payload, 'Payment')
       .map(parsePayment)
       .filter((p): p is BunqPayment => p !== null);
-    let reachedCutoff = false;
-    for (const payment of page) {
-      const createdTime = Date.parse(payment.created.replace(' ', 'T') + 'Z');
-      if (!Number.isFinite(createdTime)) continue;
-      if (cutoffTime !== null && createdTime <= cutoffTime) {
-        reachedCutoff = true;
-        continue;
-      }
-      payments.push(payment);
+    const { accepted, reachedCutoff } = filterPaymentPage(page, cutoffTime);
+    payments.push(...accepted);
+    if (reachedCutoff) {
+      nextUrl = null;
+      break;
     }
-    if (reachedCutoff) break;
     nextUrl = extractPagination(payload)?.olderUrl ?? null;
   }
 
-  return payments;
+  return { payments, nextPageUrl: nextUrl };
 }
 
 export async function deleteSession(sessionToken: string, sessionId: number): Promise<void> {

@@ -86,3 +86,52 @@ test('a lazy query created before expiry cannot execute after expiry', async () 
   ).rejects.toThrow('deadline exceeded');
   expect(queries).toBe(0);
 });
+
+test('tagged queries and transaction callbacks cannot write after scope closure', async () => {
+  let queries = 0;
+  const raw = Object.assign(
+    (_strings: TemplateStringsArray) => ({
+      then: (resolve: (value: never[]) => unknown) => {
+        queries += 1;
+        return Promise.resolve([]).then(resolve);
+      },
+    }),
+    {
+      begin: (run: (sql: typeof raw) => Promise<void>) => run(raw),
+    },
+  );
+  const guarded = deadlinePostgres(raw);
+  await expect(
+    withWorkDeadline(10, async () => {
+      await guarded`select 1`;
+      await Bun.sleep(20);
+      await guarded`late write`;
+    }),
+  ).rejects.toThrow();
+  expect(queries).toBe(1);
+});
+
+test('hard grace bounds non-cancellable callbacks and tracked database drains', async () => {
+  const { trackWork } = await import('./workDeadline');
+  let destroys = 0;
+  await expect(
+    withWorkDeadline(10, () => new Promise<void>(() => {}), {
+      graceMs: 10,
+      destroy: () => {
+        destroys += 1;
+        return Promise.resolve();
+      },
+    }),
+  ).rejects.toThrow('grace period exceeded');
+  await expect(
+    withWorkDeadline(
+      10,
+      async () => {
+        void trackWork(new Promise<void>(() => {}));
+        await Bun.sleep(20);
+      },
+      { graceMs: 10 },
+    ),
+  ).rejects.toThrow('grace period exceeded');
+  expect(destroys).toBe(1);
+});

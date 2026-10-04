@@ -1,3 +1,4 @@
+import { registerDeadlineCleanup, runFailureCleanup } from '../lib/workDeadline';
 import { normalizeBudgetTransactionMoney } from '../lib/budgetCurrency';
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
@@ -18,13 +19,13 @@ import {
   createInstallation,
   createSession,
   fetchMonetaryAccounts,
-  fetchPayments,
   generateKeyPair,
   registerDevice,
   type BunqMonetaryAccount,
   type BunqPayment,
   type BunqSessionResult,
 } from '../lib/bunqClient';
+import { syncPaymentBatch } from '../lib/bunqPaymentProgress';
 import { toBunqNewerThanCursor } from '../lib/bunqSyncCursor';
 import {
   CATEGORY_PRESETS,
@@ -862,27 +863,28 @@ async function markSyncFailed(connectionId: number, message: string): Promise<vo
     .where(eq(bunqConnections.id, connectionId));
 }
 
-async function importBudgetPaymentsForAccount(params: {
+function importBudgetPaymentsForAccount(params: {
   userId: number;
   account: BunqMonetaryAccount;
   sessionToken: string;
   bunqUserId: string;
   ownIbans: ReadonlySet<string>;
   newerThan: string | undefined;
-}): Promise<BunqSyncIssue[]> {
-  const payments = await fetchPayments(
-    params.sessionToken,
-    params.bunqUserId,
-    params.account.id,
-    params.newerThan,
-  );
-  return importBudgetPaymentBatch(
-    params.userId,
-    payments,
-    params.account,
-    params.ownIbans,
-    params.bunqUserId,
-  );
+  lastSyncAt: Date | null;
+}) {
+  return syncPaymentBatch({
+    ...params,
+    accountId: params.account.id,
+    kind: 'budget',
+    importPayments: (payments) =>
+      importBudgetPaymentBatch(
+        params.userId,
+        payments,
+        params.account,
+        params.ownIbans,
+        params.bunqUserId,
+      ),
+  });
 }
 
 async function finishBudgetSync(params: {
@@ -917,31 +919,35 @@ export async function syncBunqBudget(
   const connection = await loadConnection(userId);
   if (!connection) return { status: 'skipped', syncedAt: null, issues: [] };
 
-  await markSyncing(connection.id);
+  const unregisterCleanup = registerDeadlineCleanup(() =>
+    markSyncFailed(connection.id, 'Scheduled job deadline exceeded'),
+  );
   const issues: BunqSyncIssue[] = [];
 
   try {
+    await markSyncing(connection.id);
     const session = await ensureSession(connection);
     const accounts = await fetchMonetaryAccounts(session.sessionToken, session.bunqUserId);
     const ownIbans = collectOwnIbans(accounts);
     const bankAccounts = accounts.filter((a) => a.type === 'BANK' || a.type === 'JOINT');
     const newerThan = newerThanOverride ?? toBunqNewerThanCursor(connection.lastSyncAt);
 
+    let syncedAt = new Date();
     for (const account of bankAccounts) {
-      issues.push(
-        ...(await importBudgetPaymentsForAccount({
-          userId,
-          account,
-          sessionToken: session.sessionToken,
-          bunqUserId: session.bunqUserId,
-          ownIbans,
-          newerThan,
-        })),
-      );
+      const batch = await importBudgetPaymentsForAccount({
+        userId,
+        account,
+        sessionToken: session.sessionToken,
+        bunqUserId: session.bunqUserId,
+        ownIbans,
+        newerThan,
+        lastSyncAt: connection.lastSyncAt,
+      });
+      issues.push(...batch.issues);
+      syncedAt = new Date(Math.min(batch.syncedAt.getTime(), syncedAt.getTime()));
     }
 
-    const syncedAt = new Date();
-    return finishBudgetSync({
+    return await finishBudgetSync({
       connection,
       bunqUserId: session.bunqUserId,
       syncedAt,
@@ -950,7 +956,9 @@ export async function syncBunqBudget(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    await markSyncFailed(connection.id, message);
+    await runFailureCleanup(() => markSyncFailed(connection.id, message));
     throw error;
+  } finally {
+    unregisterCleanup();
   }
 }

@@ -163,7 +163,7 @@ describe('bunqClient', () => {
 
     const payments = await fetchPayments('session-token', '42', 7, '2026-01-02T00:00:00.000Z');
 
-    expect(payments.map((payment) => payment.id)).toEqual([9]);
+    expect(payments.payments.map((payment) => payment.id)).toEqual([9]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('count=200');
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('newer_than');
@@ -214,7 +214,7 @@ test('bunq deadline bounds a hanging response body', async () => {
   expect(cancelled).toBe(true);
 });
 
-test('bunq paging fails closed at the cap instead of returning partial history', async () => {
+test('bunq paging returns a bounded batch and durable resume URL', async () => {
   const fetchMock = mock(() =>
     Promise.resolve(
       jsonResponse({
@@ -223,7 +223,8 @@ test('bunq paging fails closed at the cap instead of returning partial history',
     ),
   );
   globalThis.fetch = fetchMock as unknown as typeof fetch;
-  await expect(fetchPayments('synthetic', '42', 7)).rejects.toThrow('page cap exceeded');
+  const batch = await fetchPayments('synthetic', '42', 7);
+  expect(batch.nextPageUrl).toBe('/user/42/payment?older_id=1');
   expect(fetchMock).toHaveBeenCalledTimes(BUNQ_PAYMENT_PAGE_CAP);
 });
 

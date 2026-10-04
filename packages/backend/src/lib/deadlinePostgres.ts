@@ -1,4 +1,9 @@
-import { checkWorkDeadline, currentWorkSignal, trackWork } from './workDeadline';
+import {
+  checkWorkDeadline,
+  currentWorkSignal,
+  currentWorkDatabase,
+  trackWork,
+} from './workDeadline';
 
 type PendingQuery = {
   cancel?: () => void;
@@ -32,15 +37,29 @@ type TransactionCallback = (sql: object) => unknown;
 
 // Reject new queries after a job deadline, including queries in error handlers.
 // Already-started queries/transactions drain before the scheduler unlocks.
-export function deadlinePostgres<T extends object>(sql: T): T {
+export function deadlinePostgres<T extends object>(sql: T, scopedRoot = false): T {
+  const activeTarget = () => (scopedRoot ? (currentWorkDatabase() ?? sql) : sql);
   return new Proxy(sql, {
+    apply(_target, thisArg, args) {
+      checkWorkDeadline();
+      const pending: unknown = Reflect.apply(
+        activeTarget() as (...args: unknown[]) => unknown,
+        thisArg,
+        args,
+      );
+      // Identifier/build helpers are not executable queries.
+      return pending && typeof (pending as PendingQuery).then === 'function'
+        ? guardQuery(pending)
+        : pending;
+    },
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);
       if (typeof value !== 'function') return value;
       if (property === 'unsafe') {
         return (...args: unknown[]) => {
           checkWorkDeadline();
-          return guardQuery(value.apply(target, args));
+          const active = activeTarget();
+          return guardQuery(Reflect.get(active, property).apply(active, args));
         };
       }
       if (property === 'begin' || property === 'savepoint') {
@@ -48,10 +67,17 @@ export function deadlinePostgres<T extends object>(sql: T): T {
           checkWorkDeadline();
           const wrapped = args.map((arg) =>
             typeof arg === 'function'
-              ? (transaction: object) => (arg as TransactionCallback)(deadlinePostgres(transaction))
+              ? async (transaction: object) => {
+                  const result = await (arg as TransactionCallback)(deadlinePostgres(transaction));
+                  checkWorkDeadline();
+                  return result;
+                }
               : arg,
           );
-          return trackWork(value.apply(target, wrapped) as Promise<unknown>);
+          const active = activeTarget();
+          return trackWork(
+            Reflect.get(active, property).apply(active, wrapped) as Promise<unknown>,
+          );
         };
       }
       return value.bind(target);

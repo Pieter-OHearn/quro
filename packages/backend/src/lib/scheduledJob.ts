@@ -1,8 +1,11 @@
 import { eq } from 'drizzle-orm';
-import { db, queryClient } from '../db/client';
+import { db, createQueryClient } from '../db/client';
+import { getRuntimeDatabaseUrl } from '../db/config';
 import { workerHeartbeats } from '../db/schema';
 import { runCoordinatedJob, type JobLease } from './coordinatedJob';
-import { SCHEDULED_JOB_TIMEOUT_MS } from './workDeadline';
+import { DEADLINE_GRACE_MS, UPSTREAM_TIMEOUT_MS, SCHEDULED_JOB_TIMEOUT_MS } from './workDeadline';
+
+const STATEMENT_TIMEOUT_GRACE_DIVISOR = 2;
 
 // A reserved connection holds a session lock across external I/O without a
 // long-running transaction. PostgreSQL releases it if the process dies.
@@ -11,14 +14,36 @@ export function runScheduledJob(
   intervalMs: number,
   run: () => Promise<void>,
   timeoutMs = SCHEDULED_JOB_TIMEOUT_MS,
+  graceMs = DEADLINE_GRACE_MS,
 ): Promise<void> {
-  return runCoordinatedJob(() => reserveLease(name), intervalMs, run, timeoutMs);
+  return runCoordinatedJob(() => reserveLease(name, graceMs), intervalMs, run, timeoutMs, graceMs);
 }
 
-async function reserveLease(name: string): Promise<JobLease> {
-  const connection = await queryClient.reserve();
+async function reserveLease(name: string, graceMs: number): Promise<JobLease> {
+  // All application queries in this scope use this disposable pool. Server
+  // statement timeouts fit inside the cleanup grace period even if cancel fails.
+  const pool = createQueryClient(getRuntimeDatabaseUrl(), {
+    connection: {
+      statement_timeout: Math.min(
+        UPSTREAM_TIMEOUT_MS,
+        Math.max(1, Math.floor(graceMs / STATEMENT_TIMEOUT_GRACE_DIVISOR)),
+      ),
+    },
+    connect_timeout: 10,
+    max: 5,
+  });
+  let connection;
+  try {
+    connection = await pool.reserve();
+  } catch (error) {
+    await pool.end({ timeout: 0 });
+    throw error;
+  }
   const key = `scheduler:${name}`;
   return {
+    database: pool,
+    destroy: () => pool.end({ timeout: 0 }),
+    close: () => pool.end({ timeout: 0 }),
     acquire: async () => {
       const [lock] = await connection<{ acquired: boolean }[]>`
         select pg_try_advisory_lock(hashtext(${key})) as acquired`;
