@@ -19,7 +19,8 @@ describe('numeric wire contract', () => {
   test('maps Drizzle numeric columns to JavaScript numbers at the schema boundary', () => {
     expect(schemaSource).toContain('const numericAsNumber = customType');
     expect(schemaSource).toContain('fromDriver(value)');
-    expect(schemaSource).toContain('return Number.isFinite(parsed) ? parsed : 0;');
+    expect(schemaSource).toContain('return parseDriverNumeric(value);');
+    expect(schemaSource).not.toContain('Number.isFinite(parsed) ? parsed : 0');
     expect(schemaSource).not.toMatch(/\bnumeric\s*,/);
     expect(schemaSource.match(/numericAsNumber\(/g)).toHaveLength(66);
   });

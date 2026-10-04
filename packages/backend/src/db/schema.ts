@@ -24,6 +24,7 @@ import {
   type WwWeeklyRequirementStatus,
   type EmploymentType,
 } from '@quro/shared';
+import { parseDriverNumeric } from './driverNumeric';
 
 export const currencyCodeEnum = pgEnum('currency_code', CURRENCY_CODES);
 
@@ -40,8 +41,7 @@ const numericAsNumber = customType<{
     return 'numeric';
   },
   fromDriver(value) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return parseDriverNumeric(value);
   },
   toDriver(value) {
     return String(value);
@@ -150,7 +150,7 @@ export const sessions = pgTable(
   {
     id: text('id').primaryKey(),
     userId: integer('user_id')
-      .references(() => users.id)
+      .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -186,6 +186,17 @@ export const partnerLinks = pgTable(
     ),
   }),
 );
+
+// One row per participant of a link. The primary key on user_id is what makes a
+// second pending or accepted link impossible for a user, whichever side they are on.
+export const partnerLinkMembers = pgTable('partner_link_members', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  linkId: integer('link_id')
+    .references(() => partnerLinks.id, { onDelete: 'cascade' })
+    .notNull(),
+});
 
 // ── Wealth planning ─────────────────────────────────────────────────────────
 

@@ -16,6 +16,23 @@ Runway's “count full joint balances” assumption applies to liquidity and der
 cashflow. Contractual payments and deposit-protection exposure retain the person's
 50% share. This preserves the existing planning semantics.
 
+## One partner link per user
+
+A user can belong to at most one link, as requester or addressee, whether it is
+pending or accepted. The `partner_link_members` table enforces this: each link has
+one row per participant, and `user_id` is its primary key. A second link for the
+same user fails with a unique violation, which the invite route maps to
+`409 Conflict`. Members are removed with their link through `ON DELETE CASCADE`.
+
+The unique indexes on `partner_links` alone cannot do this, because "A invites B"
+and "C invites A" touch different index entries and can both commit. Any code that
+inserts into `partner_links` must insert both member rows in the same transaction.
+
+Migration `0034` checks for existing duplicates before it backfills the members. If
+any user appears in more than one link, it aborts with the user and link IDs and no
+other data. Resolve those rows by hand and re-run the migration; it never repairs
+them automatically.
+
 ## Property debt
 
 `getPropertyDebt` resolves an active linked mortgage's outstanding balance. The

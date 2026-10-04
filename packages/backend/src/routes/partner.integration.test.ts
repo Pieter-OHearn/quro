@@ -36,7 +36,11 @@ await mock.module('../lib/marketDataClient', () => ({
   }),
 }));
 
-const { createIntegrationHelpers } = await import('../test/integration');
+const { createIntegrationHelpers, insertPartnerLink } = await import('../test/integration');
+const { db } = await import('../db/client');
+const { partnerLinks } = await import('../db/schema');
+const { isUniqueViolation } = await import('../lib/postgresErrors');
+const { inArray, or } = await import('drizzle-orm');
 
 const integration = createIntegrationHelpers('partner-it.quro.test');
 const PARTNER_INVITE_ALLOWED_ATTEMPTS = 10;
@@ -335,6 +339,60 @@ describe('partner link lifecycle', () => {
       },
     });
     expect(pendingResponse.status).toBe(400);
+  });
+});
+
+describe('partner link concurrency', () => {
+  beforeAll(async () => {
+    await integration.cleanup();
+  });
+
+  afterAll(async () => {
+    await integration.cleanup();
+  });
+
+  test('"A invites B" and "C invites A" in parallel leave exactly one link', async () => {
+    const a = await integration.signUp('race-a');
+    const b = await integration.signUp('race-b');
+    const c = await integration.signUp('race-c');
+
+    const responses = await Promise.all([
+      invitePartner(a, b.user.email),
+      invitePartner(c, a.user.email),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const rows = await db
+      .select({ id: partnerLinks.id })
+      .from(partnerLinks)
+      .where(
+        or(
+          inArray(partnerLinks.requesterId, [a.user.id, b.user.id, c.user.id]),
+          inArray(partnerLinks.addresseeId, [a.user.id, b.user.id, c.user.id]),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  test('the database rejects a second link for a user on either side', async () => {
+    const d = await integration.signUp('db-d');
+    const e = await integration.signUp('db-e');
+    const f = await integration.signUp('db-f');
+    await insertPartnerLink(d.user.id, e.user.id);
+
+    const attempts = [
+      [d.user.id, f.user.id],
+      [f.user.id, d.user.id],
+      [f.user.id, e.user.id],
+      [e.user.id, f.user.id],
+    ] as const;
+    for (const [requesterId, addresseeId] of attempts) {
+      const error = await insertPartnerLink(requesterId, addresseeId).then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+      expect(isUniqueViolation(error)).toBe(true);
+    }
   });
 });
 
