@@ -1,6 +1,7 @@
 import { like, inArray, or } from 'drizzle-orm';
 import { app } from '../index';
 import { db } from '../db/client';
+import { peerEnv } from './peer';
 import {
   budgetCategories,
   budgetTransactions,
@@ -24,6 +25,9 @@ import {
   sessions,
   users,
 } from '../db/schema';
+
+// A fixed, documentation-range peer: rate limiting is off under NODE_ENV=test, so one is enough.
+const DEFAULT_PEER_ADDRESS = '203.0.113.1';
 
 type RequestOptions = {
   method?: string;
@@ -77,11 +81,6 @@ function createRequestFunction() {
       body = options.body;
     }
 
-    // app.request has no socket, so expose the direct peer the way Bun's server does.
-    const env = options.remoteAddress
-      ? { requestIP: () => ({ address: options.remoteAddress, family: 'IPv4', port: 0 }) }
-      : undefined;
-
     return app.request(
       path,
       {
@@ -89,7 +88,7 @@ function createRequestFunction() {
         headers,
         body,
       },
-      env,
+      peerEnv(options.remoteAddress ?? DEFAULT_PEER_ADDRESS),
     );
   };
 }

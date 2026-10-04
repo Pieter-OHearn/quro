@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Hono } from 'hono';
+import { peerEnv } from '../test/peer';
 import { createRateLimitChecker, signinRateLimit } from './rateLimit';
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -32,11 +33,7 @@ describe('rate limiter client addressing', () => {
   function signinFrom(peer: string | undefined, headers: Record<string, string> = {}) {
     const app = new Hono();
     app.post('/signin', signinRateLimit, (c) => c.json({ ok: true }));
-    return app.request(
-      '/signin',
-      { method: 'POST', headers },
-      peer ? { requestIP: () => ({ address: peer, family: 'IPv4', port: 0 }) } : undefined,
-    );
+    return app.request('/signin', { method: 'POST', headers }, peer ? peerEnv(peer) : undefined);
   }
 
   it('does not let an untrusted client rotate X-Real-IP to dodge the limit', async () => {

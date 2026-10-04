@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { sessions, users } from '../db/schema';
-import { createIntegrationHelpers } from '../test/integration';
+import { createIntegrationHelpers, type AuthSession } from '../test/integration';
 
 const integration = createIntegrationHelpers('edge-hardening.integration.quro.test');
 const MALFORMED_JSON = '{not json';
@@ -16,18 +16,23 @@ afterAll(async () => {
 });
 
 describe('malformed JSON bodies', () => {
+  let owner: AuthSession;
+
+  beforeAll(async () => {
+    owner = await integration.signUp('malformed-json');
+  });
+
   test.each([
-    ['POST', '/api/auth/signup', false],
-    ['POST', '/api/auth/signin', false],
-    ['PUT', '/api/settings/profile', true],
-    ['PUT', '/api/settings/preferences', true],
-    ['PUT', '/api/settings/password', true],
-    ['POST', '/api/partner/invite', true],
-  ])('%s %s returns 400 instead of 500', async (method, path, authenticated) => {
-    const owner = authenticated ? await integration.signUp('malformed-json') : null;
+    ['POST', '/api/auth/signup'],
+    ['POST', '/api/auth/signin'],
+    ['PUT', '/api/settings/profile'],
+    ['PUT', '/api/settings/preferences'],
+    ['PUT', '/api/settings/password'],
+    ['POST', '/api/partner/invite'],
+  ])('%s %s returns 400 instead of 500', async (method, path) => {
     const response = await integration.request(path, {
       method,
-      cookie: owner?.cookie,
+      cookie: owner.cookie,
       body: MALFORMED_JSON,
     });
 

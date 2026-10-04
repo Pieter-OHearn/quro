@@ -13,14 +13,14 @@ function resolve(input: {
     peerAddress: input.peer,
     realIp: input.realIp,
     forwardedFor: input.forwardedFor,
-    proxies: input.trusted ?? proxies,
+    proxies: input.trusted === undefined ? proxies : input.trusted,
   });
 }
 
 describe('parseTrustedProxies', () => {
   test('returns no proxies when unset', () => {
-    expect(parseTrustedProxies(undefined)).toEqual([]);
-    expect(parseTrustedProxies('  ')).toEqual([]);
+    expect(parseTrustedProxies(undefined)).toBeNull();
+    expect(parseTrustedProxies('  ')).toBeNull();
   });
 
   test('rejects malformed entries instead of silently trusting nothing', () => {
@@ -37,7 +37,7 @@ describe('resolveClientAddress', () => {
   });
 
   test('ignores forwarded headers when no proxy is configured', () => {
-    expect(resolve({ peer: '172.18.0.2', realIp: '1.2.3.4', trusted: [] })).toBe('172.18.0.2');
+    expect(resolve({ peer: '172.18.0.2', realIp: '1.2.3.4', trusted: null })).toBe('172.18.0.2');
   });
 
   test('uses X-Real-IP from a trusted CIDR peer', () => {

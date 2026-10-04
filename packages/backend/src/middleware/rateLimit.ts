@@ -14,7 +14,7 @@ function peerAddressOf(c: Context): string | undefined {
   }
 }
 
-export function getClientAddress(c: Context): string | null {
+function getClientAddress(c: Context): string | null {
   return resolveClientAddress({
     peerAddress: peerAddressOf(c),
     realIp: c.req.header('x-real-ip'),
@@ -53,8 +53,6 @@ function createRateLimiter(windowMs: number, max: number) {
   const isRateLimited = createRateLimitChecker(windowMs, max);
 
   return createMiddleware(async (c, next) => {
-    if (process.env.NODE_ENV === 'test') return next();
-
     const ip = getClientAddress(c);
 
     // Never share one bucket between clients whose address is unknown: fail closed instead.
