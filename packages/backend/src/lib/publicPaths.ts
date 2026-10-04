@@ -7,6 +7,6 @@ export const PUBLIC_PATHS = new Set([
   '/api/health',
   '/api/readiness',
   '/api/readiness/pension-import',
-  // The signed OAuth state identifies the user even without a session cookie.
+  // A server-recorded, single-use OAuth attempt identifies the user without a session cookie.
   '/api/bunq/oauth/callback',
 ]);

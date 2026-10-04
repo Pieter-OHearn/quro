@@ -79,7 +79,7 @@ Frontend Vite defaults to same-origin `/api` in Docker-like environments. For sp
 
 This is the recommended path if you want the whole app running together with the fewest steps.
 
-1. Make sure the root `.env` exists and points the bunq redirect at the Docker origin:
+1. Make sure the root `.env` exists:
 
 ```bash
 # Create it if needed.
@@ -107,6 +107,23 @@ http://localhost:3000
 ```
 
 For Docker, the backend stays internal to the compose network and Nginx proxies `/api` to it. That means bunq OAuth should use `http://localhost:3000/api/bunq/oauth/callback`.
+
+## Optional Bunq Linking
+
+Bunq linking is optional. Quro starts without it, and the bunq start and callback endpoints return `503` while the UI shows the integration as unavailable.
+
+To enable it, set all four variables in the root `.env`:
+
+```bash
+FRONTEND_ORIGIN=http://localhost:3000
+BUNQ_CLIENT_ID=<client id>
+BUNQ_CLIENT_SECRET=<client secret>
+BUNQ_REDIRECT_URI=http://localhost:3000/api/bunq/oauth/callback
+```
+
+Setting any of `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET` or `BUNQ_REDIRECT_URI` without the rest stops the backend at startup. The error names the missing variables and never prints their values. There is no default for `FRONTEND_ORIGIN`.
+
+Each connect attempt is recorded on the server for the initiating user and destination. It expires after 10 minutes and works once; forged, expired and replayed callbacks are redirected to the error page without touching the stored connection.
 
 ## Optional Pension Import Development
 

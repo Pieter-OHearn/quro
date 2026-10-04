@@ -1,11 +1,17 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { BUNQ_UNAVAILABLE_MESSAGE, getBunqConfig } from '../lib/bunqConfig';
+import {
+  OAUTH_ATTEMPT_TTL_MS,
+  consumeOAuthAttempt,
+  createOAuthAttempt,
+  type BunqOAuthDestination,
+} from '../lib/bunqOAuthAttempts';
 import { buildOAuthAuthorizeUrl, deleteSession, exchangeCodeForTokens } from '../lib/bunqClient';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
@@ -13,73 +19,24 @@ import { syncBunqSavings } from '../services/bunqSavingsSync';
 const app = new Hono();
 
 const STATE_COOKIE = 'bunq_oauth_state';
-const STATE_MAX_AGE_SECONDS = 600;
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? '';
-const FRONTEND_BASE_URL = FRONTEND_ORIGIN || 'http://localhost:5173';
+const STATE_MAX_AGE_SECONDS = OAUTH_ATTEMPT_TTL_MS / 1000;
 
-const BUNQ_STATE_KEY = process.env.BUNQ_CLIENT_SECRET ?? '';
-
-type BunqOAuthDestination = 'savings' | 'settings';
 type BunqOAuthStatus = 'connected' | 'error';
-
-type ParsedOAuthState = {
-  userId: number;
-  destination: BunqOAuthDestination;
-};
 
 function resolveOAuthDestination(value: string | undefined): BunqOAuthDestination {
   return value === 'savings' ? 'savings' : 'settings';
 }
 
-function buildFrontendRedirect(destination: BunqOAuthDestination, status: BunqOAuthStatus): string {
-  return `${FRONTEND_BASE_URL}/${destination}?bunq=${status}`;
-}
-
-export function buildOAuthState(
-  userId: number,
-  nonce: string,
-  destination: BunqOAuthDestination = 'settings',
+function buildFrontendRedirect(
+  origin: string,
+  destination: BunqOAuthDestination,
+  status: BunqOAuthStatus,
 ): string {
-  const payload = `${userId}:${destination}:${nonce}`;
-  const sig = createHmac('sha256', BUNQ_STATE_KEY).update(payload).digest('hex');
-  return `${payload}.${sig}`;
+  return `${origin}/${destination}?bunq=${status}`;
 }
 
-// Verifies the HMAC signature on an OAuth `state` value and returns the user and
-// allow-listed destination it was issued for. This authenticates the callback
-// when it lands without a Quro session cookie.
-export function parseSignedOAuthState(state: string): ParsedOAuthState | null {
-  const dotIdx = state.lastIndexOf('.');
-  if (dotIdx === -1) return null;
-  const payload = state.slice(0, dotIdx);
-  const sig = state.slice(dotIdx + 1);
-  const expectedSig = createHmac('sha256', BUNQ_STATE_KEY).update(payload).digest('hex');
-  try {
-    const expectedBuf = Buffer.from(expectedSig, 'hex');
-    const actualBuf = Buffer.from(sig, 'hex');
-    if (expectedBuf.length !== actualBuf.length) return null;
-    if (!timingSafeEqual(expectedBuf, actualBuf)) return null;
-  } catch {
-    return null;
-  }
-  const colonIdx = payload.indexOf(':');
-  if (colonIdx === -1) return null;
-  const userId = parseInt(payload.slice(0, colonIdx), 10);
-  if (!Number.isInteger(userId)) return null;
-
-  const remainingPayload = payload.slice(colonIdx + 1);
-  const destinationEnd = remainingPayload.indexOf(':');
-  if (destinationEnd < 0) {
-    return { userId, destination: 'settings' };
-  }
-
-  const destination = remainingPayload.slice(0, destinationEnd);
-  if (destination !== 'savings' && destination !== 'settings') return null;
-  return { userId, destination };
-}
-
-export function parseSignedState(state: string): number | null {
-  return parseSignedOAuthState(state)?.userId ?? null;
+function unavailable(c: Context) {
+  return c.json({ error: BUNQ_UNAVAILABLE_MESSAGE }, HTTP_STATUS.SERVICE_UNAVAILABLE);
 }
 
 function logBunqError(label: string, error: unknown): void {
@@ -99,11 +56,12 @@ function mergeSyncResults(
   };
 }
 
-app.get('/oauth/start', (c) => {
+app.get('/oauth/start', async (c) => {
+  if (!getBunqConfig().enabled) return unavailable(c);
+
   const user = getAuthUser(c);
-  const nonce = randomBytes(32).toString('hex');
   const destination = resolveOAuthDestination(c.req.query('returnTo'));
-  const state = buildOAuthState(user.id, nonce, destination);
+  const state = await createOAuthAttempt(user.id, destination);
 
   setCookie(c, STATE_COOKIE, state, {
     httpOnly: true,
@@ -117,30 +75,27 @@ app.get('/oauth/start', (c) => {
 });
 
 app.get('/oauth/callback', async (c) => {
+  const config = getBunqConfig();
+  if (!config.enabled) return unavailable(c);
+
   const storedState = getCookie(c, STATE_COOKIE);
   const queryState = c.req.query('state');
   const code = c.req.query('code');
-  const parsedState = queryState ? parseSignedOAuthState(queryState) : null;
-  const errorRedirect = buildFrontendRedirect(parsedState?.destination ?? 'settings', 'error');
+  const fail = (destination: BunqOAuthDestination = 'settings') =>
+    c.redirect(buildFrontendRedirect(config.frontendOrigin, destination, 'error'));
 
   deleteCookie(c, STATE_COOKIE, { path: '/' });
 
-  if (!queryState || !code) {
-    return c.redirect(errorRedirect);
-  }
+  if (!queryState || !code) return fail();
 
-  // When the callback returns to the same browser that started the flow, enforce
-  // the double-submit cookie. Mobile/in-app browsers won't carry it, so we fall
-  // back to the signed state below, which cryptographically binds the request to
-  // a user without needing any cookie.
-  if (storedState && storedState !== queryState) {
-    return c.redirect(errorRedirect);
-  }
+  // When the callback returns to the browser that started the flow, the cookie must
+  // match. Mobile/in-app browsers may not carry it; the recorded attempt below still
+  // binds the callback to the initiating user and destination.
+  if (storedState && storedState !== queryState) return fail();
 
-  if (parsedState === null) {
-    return c.redirect(errorRedirect);
-  }
-  const { userId, destination } = parsedState;
+  const attempt = await consumeOAuthAttempt(queryState);
+  if (attempt === null) return fail();
+  const { userId, destination } = attempt;
 
   try {
     const tokens = await exchangeCodeForTokens(code);
@@ -167,10 +122,10 @@ app.get('/oauth/callback', async (c) => {
         },
       });
 
-    return c.redirect(buildFrontendRedirect(destination, 'connected'));
+    return c.redirect(buildFrontendRedirect(config.frontendOrigin, destination, 'connected'));
   } catch (e) {
     logBunqError('[bunq oauth callback error]', e);
-    return c.redirect(buildFrontendRedirect(destination, 'error'));
+    return fail(destination);
   }
 });
 

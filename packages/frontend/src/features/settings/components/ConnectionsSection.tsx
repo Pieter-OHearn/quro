@@ -1,10 +1,12 @@
 import { useSavedState } from './settingsForm';
 /* eslint-disable max-lines-per-function */
 import { useState } from 'react';
+import type { AppCapabilityStatus } from '@quro/shared';
 
 import { Check, Link2, RefreshCw, Unlink } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import { buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
+import { useAppCapabilities } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
 import {
   useBunqConnection,
@@ -23,6 +25,17 @@ function formatSyncTime(value: string | null): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+function useBunqAvailability() {
+  const { data: capabilities } = useAppCapabilities();
+  const bunq: AppCapabilityStatus | undefined = capabilities?.bunq;
+  const unavailable = bunq !== undefined && !bunq.enabled;
+  const disconnectedMessage =
+    unavailable && bunq
+      ? bunq.message
+      : 'Connect your Bunq account to automatically sync savings and budget transactions.';
+  return { unavailable, disconnectedMessage };
 }
 
 function MappingRow({ mapping }: Readonly<{ mapping: CategoryMapping }>) {
@@ -96,6 +109,8 @@ export function ConnectionsSection() {
     }
   };
 
+  const { unavailable: bunqUnavailable, disconnectedMessage } = useBunqAvailability();
+
   const handleConnect = () => {
     window.location.href = buildApiUrl('/api/bunq/oauth/start');
   };
@@ -144,9 +159,7 @@ export function ConnectionsSection() {
                   <p>Last synced: {formatSyncTime(connection.lastSyncAt)}</p>
                 </div>
               ) : (
-                <p className="mt-1 text-sm text-fg-subtle">
-                  Connect your Bunq account to automatically sync savings and budget transactions.
-                </p>
+                <p className="mt-1 text-sm text-fg-subtle">{disconnectedMessage}</p>
               )}
             </div>
           </div>
@@ -184,6 +197,7 @@ export function ConnectionsSection() {
                 variant="primary"
                 size="sm"
                 leadingIcon={<Link2 size={14} />}
+                disabled={bunqUnavailable}
                 onClick={handleConnect}
               >
                 Connect

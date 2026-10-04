@@ -3,7 +3,6 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings, sessions } from '../db/schema';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
-import { buildOAuthState } from './bunq';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
 const SIGNIN_ALLOWED_ATTEMPTS = 5;
@@ -289,21 +288,12 @@ describe('auth integration', () => {
       error: 'Authentication required',
     });
 
-    // The bunq callback is public but authenticates the user via the HMAC-signed
-    // `state` param. An unsigned/forged state is rejected with a redirect to the
-    // settings error page rather than processed.
+    // The bunq callback is public, but with bunq unconfigured it fails closed.
+    // Configured behaviour is covered in bunq.integration.test.ts.
     const bunqCallbackResponse = await integration.request(
       '/api/bunq/oauth/callback?state=state&code=code',
     );
-    expect(bunqCallbackResponse.status).toBe(302);
-    expect(bunqCallbackResponse.headers.get('location')).toContain('bunq=error');
-
-    const savingsState = buildOAuthState(123, 'savings-return-test', 'savings');
-    const savingsCallbackResponse = await integration.request(
-      `/api/bunq/oauth/callback?state=${encodeURIComponent(savingsState)}`,
-    );
-    expect(savingsCallbackResponse.status).toBe(302);
-    expect(savingsCallbackResponse.headers.get('location')).toContain('/savings?bunq=error');
+    expect(bunqCallbackResponse.status).toBe(503);
   });
 });
 

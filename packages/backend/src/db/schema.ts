@@ -1029,6 +1029,31 @@ export const netWorthSnapshots = pgTable(
 
 // ── Bunq ─────────────────────────────────────────────────────────────────────
 
+// Server-recorded OAuth attempts. Only a hash of the state is stored; a callback must
+// consume a live attempt (single use, short lived) to be attributed to a user.
+export const bunqOauthAttempts = pgTable(
+  'bunq_oauth_attempts',
+  {
+    id: serial('id').primaryKey(),
+    stateHash: text('state_hash').notNull(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    destination: text('destination').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    consumedAt: timestamp('consumed_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    stateHashIdx: uniqueIndex('bunq_oauth_attempts_state_hash_idx').on(t.stateHash),
+    expiresAtIdx: index('bunq_oauth_attempts_expires_at_idx').on(t.expiresAt),
+    destinationCheck: check(
+      'bunq_oauth_attempts_destination_check',
+      sql`${t.destination} in ('savings', 'settings')`,
+    ),
+  }),
+);
+
 export const bunqConnections = pgTable(
   'bunq_connections',
   {

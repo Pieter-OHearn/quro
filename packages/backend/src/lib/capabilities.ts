@@ -2,6 +2,7 @@ import type { AppCapabilities, AppCapabilityReason, AppCapabilityStatus } from '
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { workerHeartbeats } from '../db/schema';
+import { BUNQ_UNAVAILABLE_MESSAGE, getBunqConfig } from './bunqConfig';
 
 export const PENSION_IMPORT_WORKER_NAME = 'pension-import-worker';
 export const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
@@ -87,6 +88,13 @@ function toAiCapability(
   return buildCapability(false, AI_DISABLED_MESSAGE, now, pensionStatementImport.reason);
 }
 
+function getBunqCapability(now: Date): AppCapabilityStatus {
+  if (!getBunqConfig().enabled) {
+    return buildCapability(false, BUNQ_UNAVAILABLE_MESSAGE, now, 'not_configured');
+  }
+  return buildCapability(true, 'Bunq linking is available.', now);
+}
+
 export async function upsertWorkerHeartbeat(input: WorkerHeartbeatUpsertInput): Promise<void> {
   await db
     .insert(workerHeartbeats)
@@ -125,5 +133,6 @@ export async function getAppCapabilities(now = new Date()): Promise<AppCapabilit
   return {
     ai: toAiCapability(pensionStatementImport, now),
     pensionStatementImport,
+    bunq: getBunqCapability(now),
   };
 }

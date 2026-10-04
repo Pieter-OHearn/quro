@@ -34,7 +34,7 @@ Every protected request goes through the `requireAuth` middleware, which:
 3. Rejects the request if the session does not exist or `expires_at` is in the past.
 4. Loads the user row and attaches `{ id, email }` to the Hono context.
 
-All routes under `/api/*` require a valid session by default. The shared exact-path list in `src/lib/publicPaths.ts` allows signin, signup, signout, session discovery, health/readiness probes, and the signed Bunq OAuth callback. New routes under these prefixes are protected. The accepted partner id is available on the request context; personal rows remain owner-only and partner access requires a joint parent entity.
+All routes under `/api/*` require a valid session by default. The shared exact-path list in `src/lib/publicPaths.ts` allows signin, signup, signout, session discovery, health/readiness probes, and the Bunq OAuth callback, which is authenticated by a server-recorded, single-use, 10-minute OAuth attempt rather than a session cookie. New routes under these prefixes are protected. The accepted partner id is available on the request context; personal rows remain owner-only and partner access requires a joint parent entity.
 
 ### Session cleanup
 

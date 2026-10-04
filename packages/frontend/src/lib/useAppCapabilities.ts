@@ -18,6 +18,12 @@ export const DEFAULT_APP_CAPABILITIES: AppCapabilities = {
     message: 'AI import is unavailable. Start the pension import worker to use PDF import.',
     checkedAt: new Date(0).toISOString(),
   },
+  bunq: {
+    enabled: false,
+    reason: 'not_configured',
+    message: 'Bunq linking is unavailable because this Quro instance has not configured it.',
+    checkedAt: new Date(0).toISOString(),
+  },
 };
 
 export function useAppCapabilities() {

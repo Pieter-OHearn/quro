@@ -239,6 +239,13 @@
       "when": 1790956513644,
       "tag": "0033_retry_import_storage_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791113047664,
+      "tag": "0034_bunq_oauth_attempts",
+      "breakpoints": true
     }
   ]
 }

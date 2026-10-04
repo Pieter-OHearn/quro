@@ -13,6 +13,14 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  for (const name of [
+    'BUNQ_CLIENT_ID',
+    'BUNQ_CLIENT_SECRET',
+    'BUNQ_REDIRECT_URI',
+    'FRONTEND_ORIGIN',
+  ]) {
+    delete process.env[name];
+  }
 });
 
 describe('bunqClient', () => {
@@ -69,8 +77,22 @@ describe('bunqClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  test('OAuth helpers refuse to run when bunq is unconfigured', async () => {
+    const { buildOAuthAuthorizeUrl, exchangeCodeForTokens } = await import('./bunqClient');
+    const fetchMock = mock(() => Promise.resolve(jsonResponse({})));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    expect(() => buildOAuthAuthorizeUrl('state')).toThrow('unavailable');
+    await expect(exchangeCodeForTokens('code')).rejects.toThrow('unavailable');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   test('exchangeCodeForTokens surfaces oauth error_description failures', async () => {
     const { exchangeCodeForTokens } = await import('./bunqClient');
+    process.env.BUNQ_CLIENT_ID = 'client';
+    process.env.BUNQ_CLIENT_SECRET = 'secret';
+    process.env.BUNQ_REDIRECT_URI = 'https://quro.example/api/bunq/oauth/callback';
+    process.env.FRONTEND_ORIGIN = 'https://quro.example';
     globalThis.fetch = mock(() =>
       Promise.resolve(
         jsonResponse(
