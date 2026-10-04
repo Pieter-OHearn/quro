@@ -1,5 +1,5 @@
 {
-  "id": "dab16d6a-cbc4-470f-95df-92f23c1371d6",
+  "id": "300ca51b-3722-4496-a00c-f738600af3aa",
   "prevId": "f3486036-d691-4177-917e-6dfd27351f7a",
   "version": "7",
   "dialect": "postgresql",
@@ -2293,6 +2293,58 @@
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.partner_link_members": {
+      "name": "partner_link_members",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "link_id": {
+          "name": "link_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "partner_link_members_user_id_users_id_fk": {
+          "name": "partner_link_members_user_id_users_id_fk",
+          "tableFrom": "partner_link_members",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "partner_link_members_link_id_partner_links_id_fk": {
+          "name": "partner_link_members_link_id_partner_links_id_fk",
+          "tableFrom": "partner_link_members",
+          "tableTo": "partner_links",
+          "columnsFrom": [
+            "link_id"
           ],
           "columnsTo": [
             "id"

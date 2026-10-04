@@ -18,18 +18,18 @@ cashflow. Contractual payments and deposit-protection exposure retain the person
 
 ## One partner link per user
 
-A user can belong to at most one row in `partner_links`, as requester or addressee,
-whether the link is pending or accepted. The database enforces this with the
-`partner_links_one_link_per_user` trigger from migration `0034`. The trigger takes
-transaction-scoped advisory locks on both users in a fixed order, then rejects the
-write with a unique violation if either user already has another link. The invite
-route maps that violation to `409 Conflict`.
+A user can belong to at most one link, as requester or addressee, whether it is
+pending or accepted. The `partner_link_members` table enforces this: each link has
+one row per participant, and `user_id` is its primary key. A second link for the
+same user fails with a unique violation, which the invite route maps to
+`409 Conflict`. Members are removed with their link through `ON DELETE CASCADE`.
 
-The two per-column unique indexes alone cannot do this, because "A invites B" and
-"C invites A" touch different index entries and can both commit.
+The unique indexes on `partner_links` alone cannot do this, because "A invites B"
+and "C invites A" touch different index entries and can both commit. Any code that
+inserts into `partner_links` must insert both member rows in the same transaction.
 
-Before creating the trigger, the migration scans for existing duplicates. If any
-user appears in more than one link, it aborts with the user and link IDs and no
+Migration `0034` checks for existing duplicates before it backfills the members. If
+any user appears in more than one link, it aborts with the user and link IDs and no
 other data. Resolve those rows by hand and re-run the migration; it never repairs
 them automatically.
 

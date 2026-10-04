@@ -14,7 +14,7 @@ import { withLedgerWrite } from '../lib/ledgerWrite';
 import { PUBLIC_PATHS } from '../lib/publicPaths';
 import { requireAuth } from '../middleware/auth';
 import { requireCsrf } from '../middleware/csrf';
-import { createIntegrationHelpers, type AuthSession } from '../test/integration';
+import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
 
 const integration = createIntegrationHelpers('wp5.integration.quro.test');
 const SNAPSHOT_DATES = ['2026-02-28', '2026-03-31', '2026-04-30'];
@@ -31,11 +31,7 @@ async function createHousehold() {
   const owner = await integration.signUp('owner');
   const partner = await integration.signUp('partner');
   const outsider = await integration.signUp('outsider');
-  await db.insert(partnerLinks).values({
-    requesterId: owner.user.id,
-    addresseeId: partner.user.id,
-    status: 'accepted',
-  });
+  await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
   return { owner, partner, outsider };
 }
 

@@ -2,38 +2,42 @@ import { expect, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
 import { db } from './client';
 
-const MIGRATION = new URL('./migrations/0034_partner_link_one_per_user.sql', import.meta.url);
+const MIGRATION = new URL('./migrations/0034_partner_link_members.sql', import.meta.url);
+// The first statements create the table and foreign keys; the test shadows the tables instead.
+const SCHEMA_STATEMENT_COUNT = 3;
 
-async function runMigration(tx: Pick<typeof db, 'execute'>) {
-  const migration = await Bun.file(MIGRATION).text();
-  for (const statement of migration.split('--> statement-breakpoint')) {
-    await tx.execute(sql.raw(statement));
-  }
-}
+type Tx = Pick<typeof db, 'execute'>;
+
+class Rollback extends Error {}
 
 function rootCause(error: unknown): { code?: unknown; message?: unknown } {
   const cause = (error as { cause?: unknown }).cause;
   return (cause ?? error) as { code?: unknown; message?: unknown };
 }
 
-function errorText(error: unknown): string {
-  return String(rootCause(error).message);
+async function runDataStatements(tx: Tx) {
+  const migration = await Bun.file(MIGRATION).text();
+  for (const statement of migration
+    .split('--> statement-breakpoint')
+    .slice(SCHEMA_STATEMENT_COUNT)) {
+    await tx.execute(sql.raw(statement));
+  }
 }
 
-class Rollback extends Error {}
-
-async function inRolledBackTransaction(run: (tx: Pick<typeof db, 'execute'>) => Promise<void>) {
+async function withTempTables(links: string, run: (tx: Tx) => Promise<void>) {
   await db
     .transaction(async (tx) => {
-      // Temp tables shadow the real table on this connection only.
+      // Temp tables shadow the real ones on this connection only.
       await tx.execute(sql.raw('SET LOCAL search_path = pg_temp, public'));
       await tx.execute(
         sql.raw(`
           CREATE TEMP TABLE partner_links (
-            id serial PRIMARY KEY,
-            requester_id integer NOT NULL,
-            addressee_id integer NOT NULL
+            id serial PRIMARY KEY, requester_id integer NOT NULL, addressee_id integer NOT NULL
           ) ON COMMIT DROP;
+          CREATE TEMP TABLE partner_link_members (
+            user_id integer PRIMARY KEY, link_id integer NOT NULL
+          ) ON COMMIT DROP;
+          INSERT INTO partner_links (requester_id, addressee_id) VALUES ${links};
         `),
       );
       await run(tx);
@@ -44,40 +48,29 @@ async function inRolledBackTransaction(run: (tx: Pick<typeof db, 'execute'>) => 
     });
 }
 
-test('migration preflight refuses existing duplicates and reports ids only', async () => {
-  await inRolledBackTransaction(async (tx) => {
-    await tx.execute(
-      sql.raw(`INSERT INTO partner_links (requester_id, addressee_id) VALUES (1, 2), (3, 1)`),
+test('migration refuses existing duplicates and reports ids only', async () => {
+  await withTempTables('(1, 2), (3, 1)', async (tx) => {
+    const error = await runDataStatements(tx).then(
+      () => null,
+      (caught: unknown) => caught,
     );
-    await tx.execute(sql.raw('SAVEPOINT preflight'));
-    let message = '';
-    try {
-      await runMigration(tx);
-    } catch (error) {
-      message = errorText(error);
-    }
+    const message = String(rootCause(error).message);
     expect(message).toContain('user 1 in 2 links (ids 1,2)');
     expect(message).toContain('Resolve these rows manually');
-    await tx.execute(sql.raw('ROLLBACK TO SAVEPOINT preflight'));
   });
 });
 
-test('migration succeeds on clean data and then blocks a second link', async () => {
-  await inRolledBackTransaction(async (tx) => {
-    await tx.execute(
-      sql.raw(`INSERT INTO partner_links (requester_id, addressee_id) VALUES (1, 2)`),
+test('migration backfills both participants of each existing link', async () => {
+  await withTempTables('(1, 2), (3, 4)', async (tx) => {
+    await runDataStatements(tx);
+    const rows = await tx.execute(
+      sql.raw('SELECT user_id, link_id FROM partner_link_members ORDER BY user_id'),
     );
-    await runMigration(tx);
-    await tx.execute(sql.raw('SAVEPOINT second'));
-    let code = '';
-    try {
-      await tx.execute(
-        sql.raw(`INSERT INTO partner_links (requester_id, addressee_id) VALUES (3, 1)`),
-      );
-    } catch (error) {
-      code = String(rootCause(error).code);
-    }
-    expect(code).toBe('23505');
-    await tx.execute(sql.raw('ROLLBACK TO SAVEPOINT second'));
+    expect(rows.map((row) => [row.user_id, row.link_id])).toEqual([
+      [1, 1],
+      [2, 1],
+      [3, 2],
+      [4, 2],
+    ]);
   });
 });

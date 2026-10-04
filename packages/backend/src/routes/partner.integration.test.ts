@@ -36,11 +36,11 @@ await mock.module('../lib/marketDataClient', () => ({
   }),
 }));
 
-const { createIntegrationHelpers } = await import('../test/integration');
+const { createIntegrationHelpers, insertPartnerLink } = await import('../test/integration');
 const { db } = await import('../db/client');
 const { partnerLinks } = await import('../db/schema');
 const { isUniqueViolation } = await import('../lib/postgresErrors');
-const { eq, inArray, or } = await import('drizzle-orm');
+const { inArray, or } = await import('drizzle-orm');
 
 const integration = createIntegrationHelpers('partner-it.quro.test');
 const PARTNER_INVITE_ALLOWED_ATTEMPTS = 10;
@@ -378,36 +378,21 @@ describe('partner link concurrency', () => {
     const d = await integration.signUp('db-d');
     const e = await integration.signUp('db-e');
     const f = await integration.signUp('db-f');
-    const g = await integration.signUp('db-g');
-    await db.insert(partnerLinks).values({ requesterId: d.user.id, addresseeId: e.user.id });
+    await insertPartnerLink(d.user.id, e.user.id);
 
     const attempts = [
-      { requesterId: d.user.id, addresseeId: f.user.id },
-      { requesterId: f.user.id, addresseeId: d.user.id },
-      { requesterId: f.user.id, addresseeId: e.user.id },
-      { requesterId: e.user.id, addresseeId: f.user.id },
-    ];
-    for (const values of attempts) {
-      const error = await db
-        .insert(partnerLinks)
-        .values(values)
-        .then(
-          () => null,
-          (caught: unknown) => caught,
-        );
-      expect(isUniqueViolation(error)).toBe(true);
-    }
-
-    await db.insert(partnerLinks).values({ requesterId: f.user.id, addresseeId: g.user.id });
-    const repoint = await db
-      .update(partnerLinks)
-      .set({ addresseeId: d.user.id })
-      .where(eq(partnerLinks.requesterId, f.user.id))
-      .then(
+      [d.user.id, f.user.id],
+      [f.user.id, d.user.id],
+      [f.user.id, e.user.id],
+      [e.user.id, f.user.id],
+    ] as const;
+    for (const [requesterId, addresseeId] of attempts) {
+      const error = await insertPartnerLink(requesterId, addresseeId).then(
         () => null,
         (caught: unknown) => caught,
       );
-    expect(isUniqueViolation(repoint)).toBe(true);
+      expect(isUniqueViolation(error)).toBe(true);
+    }
   });
 });
 
