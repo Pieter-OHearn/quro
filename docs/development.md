@@ -162,10 +162,12 @@ QRO_RESTORE_CONFIRM=restore-db QRO_RESTORE_ALLOW_NON_EMPTY=1 bun run db:restore 
 
 `db:clear` and `db:restore` keep the current confirmation guards and automatic pre-destructive backups.
 
+Prefer the custom dump from `db:backup`: it restores in a single transaction, while a plain `.sql` restore is not atomic. A database dump does not include MinIO PDF objects, so back those up separately. After a restore, check pension import statuses and expiry dates before restarting the worker: overdue drafts may delete recovered PDFs, and restored processing jobs are not requeued automatically.
+
 ## Testing and Quality Checks
 
-Repository agent guidance starts at [AGENTS.md](../AGENTS.md); repository skills
-and their evaluations are described in [agent guidance](agent-guidance.md).
+Repository agent guidance starts at [AGENTS.md](../AGENTS.md); the repository
+skill and its maintenance are described in [agent guidance](agent-guidance.md).
 
 Set `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` to an isolated
 synthetic database before DB-backed checks. The explicit role URLs take precedence
@@ -175,20 +177,15 @@ backend setup applies migrations and seeds demo data. Never run these against th
 owner's live instance.
 
 ```bash
-bun run check:bun-version
-bun run format:check
-bun run lint
+bun run ci:check   # full suite, Python tooling and network audits required
 bun run typecheck
 bun run test       # shared/script, backend and frontend; migrated test DB required
 bun run test:ui    # all frontend Bun tests; no browser or DB
-bun run --filter '@quro/frontend' test:ui # shared static UI markup only
-bun run test:smoke # Playwright; isolated DB and browser required
-bun run build
-bun run ci:check   # full suite, Python tooling and network audits required
 ```
 
-The pre-commit mode skips DB-backed tests, so a passing hook alone does not prove
-the full suite passed. Report skipped checks with the reason.
+The [verification table](../AGENTS.md#verification) lists every check with its
+coverage and prerequisites. The pre-commit mode skips DB-backed tests, so a passing
+hook alone does not prove the full suite passed. Report skipped checks with the reason.
 
 Install the checked-in Git hook with `gitleaks` on your `PATH`:
 

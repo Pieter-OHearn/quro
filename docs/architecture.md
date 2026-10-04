@@ -298,11 +298,11 @@ Each feature lives in `src/features/<feature>/` and contains:
 - `components/` — feature-specific UI components
 - `hooks/index.ts` — TanStack Query hooks: `useQuery` hooks for reads and `useMutation` hooks for writes
 
-Mutations follow a fixed invalidation pattern: on success, they invalidate both the feature's own query key and the `['dashboard']` query key. This keeps the dashboard summary in sync without a page reload.
+Mutations use `useDomainMutation`, which invalidates the query keys declared for their domain in `src/lib/queryInvalidation.ts`. Each domain lists only the server readers it affects; for example, goals refresh only goals, while savings also refresh the dashboard and plan.
 
 ### Query key conventions
 
-Feature query keys are simple arrays like `['savings']`, `['pension']`, `['investments']`. The dashboard key is `['dashboard']`. Capabilities is `['app', 'capabilities']`.
+Query keys are defined centrally in `src/lib/queryKeys.ts` as hierarchical arrays, for example `queryKeys.dashboard.summary` is `['dashboard', 'summary']`. Use those constants instead of inline arrays.
 
 ---
 
@@ -310,7 +310,7 @@ Feature query keys are simple arrays like `['savings']`, `['pension']`, `['inves
 
 ### Currency and monetary precision
 
-All monetary columns use `numeric(19, 2)` (Drizzle: `numeric('col', { precision: 19, scale: 2 })`). Interest rate columns use `numeric(7, 4)`. This avoids floating-point rounding errors in financial calculations. Confidence scores in the import pipeline use `numeric(5, 4)`. Drizzle returns `numeric` columns as strings; route handlers convert them with a local `toNumber()` function before serialising to JSON.
+All monetary columns use `numeric(19, 2)` (Drizzle: the schema-local `numericAsNumber('col', { precision: 19, scale: 2 })`). Interest rate columns use `numeric(7, 4)`. This avoids floating-point rounding errors in financial calculations. Confidence scores in the import pipeline use `numeric(5, 4)`. `numericAsNumber` (`src/db/driverNumeric.ts`) maps driver strings to finite numbers and preserves nulls, so public JSON values stay numeric.
 
 ### Sessions
 

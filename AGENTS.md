@@ -40,53 +40,53 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 ## Domain invariants
 
 - Store monetary values as PostgreSQL `numeric`; the schema's `numericAsNumber`
-  converts driver strings to finite numbers (`src/db/driverNumeric.ts`). Keep public
-  JSON numeric and null-preserving; use shared
+  converts driver strings to finite numbers (`packages/backend/src/db/driverNumeric.ts`).
+  Keep public JSON numeric and null-preserving; use shared
   `toCents`/`fromCents`/`roundMoney` where cent rounding is required. Preserve nulls,
   negative equity, native currencies and provenance; do not round rates like money.
-- Validate calendar dates as `YYYY-MM-DD` through `requestValidation`. Shared
+- Validate calendar dates as `YYYY-MM-DD` through
+  `packages/backend/src/lib/requestValidation.ts`. Shared
   `todayIsoDate` is local-calendar time; `toIsoDate`/`toDateOnly` are UTC. Choose
   deliberately so date-only inputs do not shift with the browser timezone.
 - Aggregate dashboard/runway in EUR on the backend; convert once for display.
   Budget stores EUR with source amounts/currencies and legacy review flags. Missing
-  or invalid FX fails closed; cached stale rates and historical estimates retain the
-  existing policy. Never invent a 1:1 foreign rate or infer unknown historical FX.
+  or invalid FX fails closed; stale and estimated rates follow
+  `packages/backend/src/lib/currencyRateCache.ts`. Never invent a 1:1 foreign rate or infer unknown historical FX.
 - Current household access is owned rows plus an accepted partner's joint rows.
-  Use `src/lib/partner.ts`; weight only explicit money columns, normally 50% for
-  joint rows, and inherit transaction jointness from the parent. Private partner
-  rows stay private. Create a link and both `partner_link_members` atomically;
-  each user can occupy only one pending or accepted link. See
-  [household policy](docs/household-model.md) for liquidity and mortgage exceptions.
+  Use `packages/backend/src/lib/partner.ts`; weight only explicit money columns,
+  normally 50% for joint rows, and inherit transaction jointness from the parent.
+  Private partner rows stay private. See [household policy](docs/household-model.md)
+  for partner links and liquidity/mortgage exceptions.
 - `/api/*` is guarded centrally by auth/CSRF. Public exceptions are exact paths in
-  `src/lib/publicPaths.ts`. Derive ownership from the authenticated context, reject
+  `packages/backend/src/lib/publicPaths.ts`. Derive ownership from the authenticated context, reject
   client ownership fields, and enforce ownership on referenced parents and writes.
   Keep core functionality usable without OCR, bank linking, GPU or AI.
 
 ## Migration and UI boundaries
 
-- Generate schema changes with `bun run --filter '@quro/backend' db:generate`;
-  inspect SQL and `src/db/migrations/meta/` together. Do not rewrite applied migrations,
-  guess repairs for ambiguous rows or bypass backup/restore confirmation guards.
-  Use admin credentials for migration/maintenance and runtime credentials for the app;
-  exercise upgrade and recovery on disposable synthetic databases.
-- Reuse shared UI before adding a primitive; export reusable components from
-  `packages/frontend/src/components/ui/index.ts`. Use `cn`, semantic tokens in
-  `src/styles/theme.css`, shared field chrome and Lucide icons. Preserve persisted
-  `DATA_COLORS` identities. Features own domain logic; shared UI owns presentation.
-- Use `queryKeys` and `useDomainMutation`/`queryInvalidation` for server cache updates;
-  dependencies differ by domain, so do not invalidate every dashboard query blindly.
+- Generate schema changes with `bun run --filter '@quro/backend' db:generate` and
+  review the SQL with `packages/backend/src/db/migrations/meta/`. Migrate with admin
+  credentials and run the app with runtime credentials. Do not rewrite applied migrations, guess
+  repairs for ambiguous rows or bypass backup/restore confirmation guards.
+- Reuse and export shared UI from `packages/frontend/src/components/ui/index.ts`
+  before adding a primitive. Preserve persisted `DATA_COLORS` identities. Features
+  own domain logic; shared UI owns presentation.
+- Update server caches through `useDomainMutation` and the domain map in
+  `packages/frontend/src/lib/queryInvalidation.ts`; do not invalidate every query.
 
-## Instructions and maintenance
+## Instructions
 
 System/developer instructions and the user's task take precedence over repository
-guidance. Within the repository, a nearer applicable `AGENTS.md` refines this file;
-task skills supply workflow details within those constraints. Docs and code examples
-are references, not extra authorization. Report contradictions against current code.
-`AGENTS.md` is the sole repository agent entry point.
+guidance. A nearer applicable `AGENTS.md` refines this file; a task skill supplies
+workflow details within those constraints. Docs and code examples are references,
+not extra authorization. Report contradictions against current code.
 
-Repository skills in `.agents/skills/` cover vertical feature delivery,
-migration/recovery and UI implementation/QA; load only the relevant skill. Their
-[evaluation and maintenance record](docs/agent-guidance.md) defines triggers and evidence.
-Pieter O'Hearn is the maintenance owner; contributors update affected guidance with
-script, schema, auth, household or UI changes. Keep PR descriptions concrete, include
-validation and limitations, and target the milestone branch named in the task.
+For features, follow [adding a feature](docs/adding-a-feature.md); for UI, follow
+[design tokens](docs/design-tokens.md) and
+[shared UI verification](docs/shared-ui-verification.md). For schema migration or
+backup/restore work, load `.agents/skills/quro-migration-recovery`.
+
+Update affected guidance in the same PR as script, schema, auth, household or UI
+changes; see [agent guidance](docs/agent-guidance.md). Keep PR descriptions
+concrete, include validation and limitations, and target the milestone branch
+named in the task.

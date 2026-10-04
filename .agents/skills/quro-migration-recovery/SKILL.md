@@ -6,8 +6,7 @@ description: Change Quro PostgreSQL schema or rehearse database migration, backu
 # Migration and recovery
 
 Identify the source/target version and schema, isolated database, admin and runtime
-roles, and backup location before running maintenance commands. Root AGENTS.md
-safety rules apply; do not select resources from an inherited package .env.
+roles, and backup location before running maintenance commands.
 
 For schema changes:
 
@@ -26,8 +25,9 @@ For schema changes:
   `DATABASE_URL`; set all three to the intended isolated resources. Production
   migrations do not run under the restricted application role.
 
-For recovery rehearsals, inspect `packages/backend/src/db/backup.ts`, `restore.ts`, `pgTools.ts`,
-`maintenance.ts` and `runtimeRole.ts` before choosing commands:
+For recovery rehearsals, follow these steps. If one fails or behaves unexpectedly,
+inspect `packages/backend/src/db/backup.ts`, `restore.ts`, `pgTools.ts`,
+`maintenance.ts` and `runtimeRole.ts`:
 
 1. Back up synthetic source data with `bun run db:backup -- --output <absolute-dump-path>`.
    PostgreSQL client tools are required (`pg_dump`, `pg_restore`, `psql`); explicit
@@ -44,13 +44,13 @@ For recovery rehearsals, inspect `packages/backend/src/db/backup.ts`, `restore.t
    Before restarting the worker, inspect import statuses, expiry dates,
    `storage_deleted_at` and committed document references: overdue drafts may delete
    recovered PDFs, and restored processing jobs are not automatically requeued.
-   Inspect `packages/backend/src/routes/pension-imports.ts` and
-   `packages/backend/src/workers/pensionImportWorker.ts` for the current transitions.
+   The transitions live in `packages/backend/src/workers/pensionImportWorker.ts`
+   and `packages/backend/src/routes/pension-imports.ts`.
 
 Prefer the custom dump produced by `db:backup`: custom restore uses
 `--single-transaction`, while plain `.sql` uses `ON_ERROR_STOP` without atomicity.
 Include a corrupt-input failure check in a recovery rehearsal.
 
 Record commands, actual results, source/target state and cleanup. Distinguish SQL
-unit checks from a real dump/restore rehearsal. Keep operator/live execution outside
-this skill's synthetic testing scope unless explicitly authorized by the user.
+unit checks from a real dump/restore rehearsal. Live or operator execution is
+outside this skill unless the user explicitly authorizes it.

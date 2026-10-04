@@ -11,7 +11,7 @@ Lightweight verification path for shared frontend atoms and molecules under `pac
 - The suite lives at `packages/frontend/src/components/ui/shared-ui.smoke.test.tsx`.
 - It uses `bun:test` plus `react-dom/server` `renderToStaticMarkup` and asserts stable text, ARIA attributes, and key markup markers.
 - New shared atoms and molecules should add at least one smoke case before merge.
-- `EmojiPickerField` and `PdfAttachmentField` stay manual-only for now because they need richer DOM and file-input coverage than this ticket adds.
+- `EmojiPickerField` and `PdfAttachmentField` stay manual-only for now because they need richer DOM and file-input coverage than the static smoke suite provides.
 
 ## Manual checklist
 
@@ -29,4 +29,7 @@ authenticated routes, use the synthetic demo user. Do not seed the owner's insta
 ## PR expectation
 
 - UI refactor PRs should include the `bun run test:ui` result when shared atoms or molecules are touched.
-- PRs should also list the relevant manual checklist items that were exercised.
+- PRs should also list the relevant manual checklist items that were exercised,
+  including narrow and wide layouts and keyboard use when relevant.
+- Static markup tests do not prove browser interaction or visual layout; say which
+  checks actually ran.

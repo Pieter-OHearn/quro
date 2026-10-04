@@ -10,16 +10,14 @@ This replaces the stale v0.0.1 review; it is a source audit, not runtime proof.
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Agent instructions | Root [AGENTS.md](../AGENTS.md); the old vendor-specific entry point is removed                                                                                                                |
 | Runtime            | `.bun-version` pins 1.4.2; `bun run check:bun-version` checks Dockerfiles and docs                                                                                                            |
-| Backend            | `packages/backend/package.json`: Hono `^4.13.7`, Drizzle `^0.45.2`                                                                                                                            |
-| Frontend           | `packages/frontend/package.json`: React 19.3, Vite 8.3, React Router 8.4, Tailwind 4.3                                                                                                        |
 | Tests              | Root `test` runs shared/script, backend and frontend Bun tests; root `test:ui` runs all frontend tests; package `test:ui` isolates shared UI static markup; root `test:smoke` runs Playwright |
 | Numeric contract   | Schema `numericAsNumber` maps PostgreSQL strings to finite numbers; public JSON stays numeric and preserves nulls                                                                             |
 | API protection     | Global auth/CSRF middleware with exact public paths in `packages/backend/src/lib/publicPaths.ts`                                                                                              |
 | Client cache       | Central `queryKeys`, `useDomainMutation` and `queryInvalidation`; no blanket dashboard invalidation requirement                                                                               |
 | Optional services  | Core Bun/PostgreSQL app remains usable without bank linking or the pension parser/worker/AI stack                                                                                             |
 
-Dependency versions above describe this source revision; manifests and the lockfile
-remain authoritative. The old review referenced missing database-safety and webhook
+Framework versions are not repeated here; package manifests and the lockfile are
+authoritative. The old review referenced missing database-safety and webhook
 documents. Current maintained references are [development](development.md),
 [architecture](architecture.md), [security](security.md),
 [device auto-update](device-auto-update.md), [household policy](household-model.md),
@@ -29,13 +27,13 @@ documents. Current maintained references are [development](development.md),
 ## Scope and remaining work
 
 Issue #268 corrects the agent entry point, commands/framework facts, feature-guide
-examples and repository skills. The
-[evaluation record](agent-guidance.md) maps acceptance criteria to evidence.
-It does not certify operator installation, full object-store recovery or release
+examples and the repository skill. The [evaluation record](agent-guidance.md)
+holds skill triggers and retention trials; the issue's PR maps acceptance criteria to
+evidence. It does not certify operator installation, full object-store recovery or release
 qualification. Broader contributor/release documentation belongs to R02; current
 release workflow claims still need that separate audit.
 
-The M6 ticket [#310](https://github.com/Pieter-OHearn/quro/issues/310) still names the
-retired `CLAUDE.md`. Preserve the AGENTS-only direction when integrating it; the
-final merged-tree gate is [#359](https://github.com/Pieter-OHearn/quro/issues/359).
+The M6 ticket [#310](https://github.com/Pieter-OHearn/quro/issues/310) still names
+the former root instruction file. Preserve the AGENTS-only direction when
+integrating it; the final merged-tree gate is [#359](https://github.com/Pieter-OHearn/quro/issues/359).
 Those tickets are unchanged by this documentation migration.

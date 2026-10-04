@@ -2,10 +2,43 @@
 
 This guide walks through adding a new feature from scratch, following the exact patterns used in the existing codebase. The example used throughout is **recurring payments** — a feature that lets users track fixed recurring expenses (subscriptions, standing orders, etc.).
 
-The recurring-payments files below are illustrative, not existing source paths. For current
-patterns, use the repository skill in
-[quro-vertical-feature](../.agents/skills/quro-vertical-feature/SKILL.md) and
+The recurring-payments files below are illustrative, not existing source paths.
+Follow the existing feature nearest your change and the invariants in
 [AGENTS.md](../AGENTS.md); adapt the example to the actual domain dependencies.
+
+## Reference implementation
+
+Goals is the current reference for a user-owned resource:
+
+- **Contract:** `packages/shared/src/types/index.ts` or `types/payloads.ts`,
+  re-exported from `packages/shared/src/index.ts`.
+- **Validation and owned CRUD:** `packages/backend/src/routes/goals.ts`,
+  `packages/backend/src/lib/requestValidation.ts` and `packages/backend/src/lib/access.ts`.
+  Goals validates referenced records and validates PATCH requests against the merged
+  row (`mergeGoalPayload`), not just the incoming fields.
+- **Joint resources:** use `packages/backend/src/lib/partner.ts` and the relevant
+  parent/transaction route instead of the user-only pattern.
+- **Frontend:** `packages/frontend/src/features/goals/hooks/useGoals.ts` and
+  `hooks/mutations.ts`, with keys in `src/lib/queryKeys.ts` and cache dependencies in
+  `src/lib/queryInvalidation.ts`.
+
+Choose tests by the behavior you change:
+
+| Change                                    | Tests                                                                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Validation, money, dates, FX, attribution | Co-located Bun tests and shared utilities                                                                                           |
+| Auth, ownership, referenced parents, CRUD | Route integration tests with `packages/backend/src/test/integration.ts`, a distinct synthetic email domain and an isolated database |
+| Cache updates                             | `packages/frontend/src/lib/queryInvalidation.test.ts`; check affected and unrelated queries                                         |
+
+Focused examples from the repository root:
+
+```bash
+NODE_ENV=test bun test packages/backend/src/lib/requestValidation.test.ts packages/backend/src/routes/goals.test.ts
+bun run --filter '@quro/frontend' test src/lib/queryInvalidation.test.ts
+```
+
+For schema changes, also follow the migration steps in section 2 and
+[development](development.md#testing-and-quality-checks).
 
 ---
 
@@ -84,9 +117,8 @@ export const recurringPayments = pgTable(
 Use `currencyCodeEnum` (already defined in the schema file) for currency columns rather than plain `text`.
 
 After editing the schema, generate and review the SQL, journal and snapshots.
-Apply only to an isolated synthetic database with explicit `ADMIN_DATABASE_URL`,
-`APP_DATABASE_URL` and `DATABASE_URL`; package environment defaults may target an
-existing instance:
+Apply only to an isolated synthetic database selected as described in
+[Testing and Quality Checks](development.md#testing-and-quality-checks):
 
 ```bash
 # from packages/backend
@@ -301,7 +333,7 @@ Follow the same ordering convention as the existing entries — middleware regis
 
 **Directory:** `packages/frontend/src/features/recurring-payments/hooks/`
 
-Use typed `apiGet`, `apiPost`, `apiPatch` helpers from `src/lib/api.ts` and
+Use typed `apiGet`, `apiPost`, `apiPatch`, `apiDelete` helpers from `src/lib/api.ts` and
 central keys from `src/lib/queryKeys.ts`. Add a new key for this resource and
 register its mutation domain in `src/lib/queryInvalidation.ts` based on actual
 server readers. Current examples are `features/goals/hooks/useGoals.ts` and
@@ -311,7 +343,7 @@ server readers. Current examples are `features/goals/hooks/useGoals.ts` and
 // Assuming queryKeys.recurringPayments and a recurringPayment domain were added:
 import { useQuery } from '@tanstack/react-query';
 import type { RecurringPayment } from '@quro/shared';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPost } from '@/lib/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { useDomainMutation } from '@/lib/useDomainMutation';
 
@@ -327,13 +359,18 @@ export function useCreateRecurringPayment() {
     apiPost<RecurringPayment>('/api/recurring-payments', payload),
   );
 }
+
+export function useDeleteRecurringPayment() {
+  return useDomainMutation('recurringPayment', (id: number) =>
+    apiDelete<RecurringPayment>(`/api/recurring-payments/${id}`),
+  );
+}
 ```
 
-Do not maintain invalidation lists in individual hooks. `useDomainMutation`
-awaits the domain dependencies; goals only invalidates goals, while savings also
-refreshes dashboard and plan. If recurring payments become inputs to dashboard or
-runway, include those readers in the domain map and test them. Do not assume every
-mutation changes financial totals.
+Do not maintain invalidation lists in individual hooks. `useDomainMutation` awaits
+the dependencies declared for that domain in `src/lib/queryInvalidation.ts`. If
+recurring payments become inputs to dashboard or runway, include those readers in
+the domain map and test them. Do not assume every mutation changes financial totals.
 
 Export the feature hooks from a local `hooks/index.ts` barrel. The Axios client
 uses `VITE_API_URL` and credentials; pass API paths rather than hardcoded origins.
@@ -369,7 +406,8 @@ export function RecurringPaymentsPage() {
   }
 
   return (
-    <ContentSection title="Recurring Payments">
+    <ContentSection spacing="md">
+      <h2>Recurring Payments</h2>
       {payments.map((payment) => (
         <div key={payment.id}>
           {payment.emoji} {payment.name} — {payment.amount} {payment.currency}
@@ -395,13 +433,17 @@ The named export from `index.tsx` is what gets imported in `routes.tsx`, so keep
 
 **File:** `packages/frontend/src/routes.tsx`
 
-Add an import and a child route entry inside the `RequireAuth` block:
+Add a lazy child route entry inside the `RequireAuth` block, matching the other
+protected features:
 
 ```tsx
-import { RecurringPayments } from '@/features/recurring-payments';
-
 // inside the RequireAuth children array:
-{ path: 'recurring-payments', Component: RecurringPayments },
+{
+  path: 'recurring-payments',
+  lazy: async () => ({
+    Component: (await import('@/features/recurring-payments')).RecurringPayments,
+  }),
+},
 ```
 
 The path here becomes the URL the user navigates to. All protected feature routes are siblings under the `/` parent, which renders the `Layout` via `RequireAuth`. Do not add anything to the `PublicOnly` block.
@@ -453,8 +495,8 @@ describe('recurring payment payload validation', () => {
 ```
 
 Run with `NODE_ENV=test bun test src/routes/recurring-payments.test.ts` from
-`packages/backend`. Set explicit isolated DB URLs if imports initialize a client;
-do not run an unscoped backend suite against an existing instance.
+`packages/backend`. If imports initialize a database client, select an isolated
+database first.
 
 ### Integration (route-level) tests
 
@@ -516,11 +558,9 @@ Frontend tests use Bun. Shared UI smoke cases in
 feature pure-logic tests are co-located, and cache dependencies are tested in
 `src/lib/queryInvalidation.test.ts`.
 
-Run `bun run test:ui` for all frontend tests or
-`bun run --filter '@quro/frontend' test:ui` for shared UI markup only. Browser
-smoke tests run with `bun run test:smoke`; they migrate and seed a demo user, so
-explicitly select an isolated DB. Static rendering does not prove interactions or
-visual layout; use [shared UI verification](shared-ui-verification.md) for manual QA.
+See [shared UI verification](shared-ui-verification.md) for the frontend and
+Playwright commands and for manual QA; static rendering does not prove interactions
+or visual layout.
 
 ---
 
