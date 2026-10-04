@@ -14,6 +14,15 @@ permissions:
 jobs:
   # ── JavaScript / TypeScript ──────────────────────────────────────────────
 
+  bun-version:
+    name: Bun Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-bun-dependencies
+      - name: Check .bun-version, Dockerfiles and docs agree
+        run: bun run check:bun-version
+
   format:
     name: Prettier Format Check
     runs-on: ubuntu-latest
@@ -147,6 +156,42 @@ jobs:
       - name: Compile check
         run: python -m compileall services/pension-parser/app/
 
+  # ── Container images ─────────────────────────────────────────────────────
+
+  docker-build:
+    name: Build Image (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dockerfile: packages/backend/Dockerfile
+          - name: frontend
+            dockerfile: packages/frontend/Dockerfile
+          - name: pension-parser
+            dockerfile: services/pension-parser/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image without pushing
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: quro-${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Verify Bun version inside the image
+        if: matrix.name == 'backend'
+        run: |
+          expected="$(cat .bun-version)"
+          actual="$(docker run --rm --entrypoint bun quro-backend:ci --version)"
+          echo "expected=$expected actual=$actual"
+          test "$actual" = "$expected"
+
   # ── Security ─────────────────────────────────────────────────────────────
 
   security:
@@ -173,6 +218,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     needs:
+      - bun-version
       - format
       - lint
       - typecheck
@@ -182,6 +228,7 @@ jobs:
       - python-format
       - python-lint
       - build-worker
+      - docker-build
       - security
     steps:
       - uses: actions/checkout@v7

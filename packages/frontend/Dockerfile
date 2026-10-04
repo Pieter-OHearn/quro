@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.10 AS build
+FROM oven/bun:1.4.2 AS build
 WORKDIR /app
 
 COPY packages/shared/package.json packages/shared/
