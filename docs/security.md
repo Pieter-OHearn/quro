@@ -82,16 +82,34 @@ In the standard Docker deployment, the frontend Nginx container proxies `/api` t
 
 ## Rate Limiting
 
-Auth endpoints are rate-limited using an in-process sliding window counter keyed by the client IP address, resolved from `X-Real-IP` (set by Nginx) or `X-Forwarded-For`.
+Auth endpoints are rate-limited with an in-process sliding window counter. The key is the client IP address.
 
-| Endpoint                | Window     | Max requests |
-| ----------------------- | ---------- | ------------ |
-| `POST /api/auth/signin` | 1 minute   | 5            |
-| `POST /api/auth/signup` | 15 minutes | 3            |
+| Endpoint                     | Window     | Max requests | Key                |
+| ---------------------------- | ---------- | ------------ | ------------------ |
+| `POST /api/auth/signin`      | 1 minute   | 5            | Client IP          |
+| `POST /api/auth/signin`      | 15 minutes | 5            | Email address      |
+| `POST /api/auth/signup`      | 15 minutes | 3            | Client IP          |
+| `PUT /api/settings/password` | 15 minutes | 5            | Client IP          |
+| `POST /api/partner/invite`   | 15 minutes | 10           | Authenticated user |
 
-Requests over the limit receive a `429 Too Many Requests` response. The limiter state is in-memory and resets if the backend restarts.
+Requests over the limit receive a `429 Too Many Requests` response. The limiter state is in-memory and resets if the backend restarts. Rate limiting is disabled when `NODE_ENV=test`.
 
-Rate limiting is disabled when `NODE_ENV=test`.
+### Resolving the client address
+
+The backend reads the direct peer address from the Bun socket. It uses `X-Real-IP` or `X-Forwarded-For` only when that peer is listed in `TRUSTED_PROXIES`. Any other peer is keyed by its own address, so a client cannot dodge the limit by sending its own forwarded headers.
+
+| Setting           | Value                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| `TRUSTED_PROXIES` | Comma-separated IPs or IPv4 CIDRs, for example `172.18.0.0/16,10.0.0.5`. Unset trusts none. |
+
+- Compose defaults `TRUSTED_PROXIES` to the private ranges `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16`, because the Nginx container's address is not fixed. Narrow it to your Compose network subnet if other private hosts can reach the backend directly.
+- Behind a trusted proxy, `X-Real-IP` wins. Otherwise the right-most `X-Forwarded-For` hop that is not itself a trusted proxy is used. If neither header is usable, the proxy's own address is the key.
+- If the peer address cannot be determined, the request fails closed with `503`. There is no shared `unknown` bucket and no random fallback key, because either would let one client lock out everyone or skip limiting entirely.
+- Malformed `TRUSTED_PROXIES` entries stop the backend at startup.
+
+### Per-email lockout trade-off
+
+The sign-in email limiter stops an attacker who rotates source addresses from guessing one account's password. The cost is that anyone can fail five sign-ins for a known email and lock the owner out for up to 15 minutes. Quro accepts this for a self-hosted, low-user-count deployment. The lockout expires on its own and does not reveal whether the account exists.
 
 ## Nginx Security Headers
 

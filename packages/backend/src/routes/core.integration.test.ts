@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings, sessions } from '../db/schema';
-import { createIntegrationHelpers, integrationPassword } from '../test/integration';
+import { createIntegrationHelpers, integrationPassword, randomTestIp } from '../test/integration';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
 const SIGNIN_ALLOWED_ATTEMPTS = 5;
@@ -103,14 +103,14 @@ describe('auth integration', () => {
   test('rate limits repeated signin attempts', async () => {
     const owner = await integration.signUp('signin-rate-limit');
     const previousNodeEnv = process.env.NODE_ENV;
-    const isolatedIp = `signin-rate-limit-${crypto.randomUUID()}`;
+    const isolatedIp = randomTestIp();
 
     try {
       process.env.NODE_ENV = 'development';
       for (let attempt = 0; attempt < SIGNIN_ALLOWED_ATTEMPTS; attempt += 1) {
         const response = await integration.request('/api/auth/signin', {
           method: 'POST',
-          headers: { 'x-real-ip': isolatedIp },
+          remoteAddress: isolatedIp,
           json: { email: owner.user.email, password: 'wrong-password' },
         });
         expect(response.status).toBe(401);
@@ -118,7 +118,7 @@ describe('auth integration', () => {
 
       const limitedResponse = await integration.request('/api/auth/signin', {
         method: 'POST',
-        headers: { 'x-real-ip': isolatedIp },
+        remoteAddress: isolatedIp,
         json: { email: owner.user.email, password: 'wrong-password' },
       });
       expect(limitedResponse.status).toBe(429);
@@ -132,14 +132,14 @@ describe('auth integration', () => {
 
   test('rate limits repeated signup attempts', async () => {
     const previousNodeEnv = process.env.NODE_ENV;
-    const isolatedIp = `signup-rate-limit-${crypto.randomUUID()}`;
+    const isolatedIp = randomTestIp();
 
     try {
       process.env.NODE_ENV = 'development';
       for (let attempt = 0; attempt < SIGNUP_ALLOWED_ATTEMPTS; attempt += 1) {
         const response = await integration.request('/api/auth/signup', {
           method: 'POST',
-          headers: { 'x-real-ip': isolatedIp },
+          remoteAddress: isolatedIp,
           json: {
             firstName: 'Signup',
             lastName: 'Limiter',
@@ -154,7 +154,7 @@ describe('auth integration', () => {
 
       const limitedResponse = await integration.request('/api/auth/signup', {
         method: 'POST',
-        headers: { 'x-real-ip': isolatedIp },
+        remoteAddress: isolatedIp,
         json: {
           firstName: 'Signup',
           lastName: 'Limiter',
@@ -357,6 +357,17 @@ describe('savings integration', () => {
       secondaryAccount.data.id,
     ]);
 
+    const rejectedUserIdResponse = await integration.request(
+      `/api/savings/accounts/${primaryAccount.data.id}`,
+      {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: { name: 'Emergency Reserve', userId: owner.user.id + 999 },
+      },
+    );
+    expect(rejectedUserIdResponse.status).toBe(400);
+    expect(await rejectedUserIdResponse.json()).toEqual({ error: 'Unknown field: userId' });
+
     const updateAccountResponse = await integration.request(
       `/api/savings/accounts/${primaryAccount.data.id}`,
       {
@@ -365,7 +376,6 @@ describe('savings integration', () => {
         json: {
           name: 'Emergency Reserve',
           bank: 'Monzo Premium',
-          userId: owner.user.id + 999,
         },
       },
     );

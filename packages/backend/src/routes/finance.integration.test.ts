@@ -192,7 +192,6 @@ describe('finance integration', () => {
         cookie: owner.cookie,
         json: {
           bonus: 400,
-          userId: stranger.user.id,
         },
       },
     );
@@ -517,7 +516,6 @@ describe('finance integration', () => {
           shares: null,
           price: 42,
           note: 'Quarterly dividend',
-          userId: stranger.user.id,
         },
       },
     );
@@ -664,7 +662,6 @@ describe('finance integration', () => {
         json: {
           currentValue: 345000,
           monthlyRent: 1900,
-          userId: stranger.user.id,
         },
       },
     );
@@ -866,7 +863,6 @@ describe('finance integration', () => {
           outstandingBalance: 295000,
           monthlyPayment: 1600,
           repaymentType: 'annuity',
-          userId: stranger.user.id,
         },
       },
     );
@@ -956,7 +952,6 @@ describe('finance integration', () => {
           amount: 2.1,
           fixedYears: 5,
           note: 'Refixed term',
-          userId: stranger.user.id,
         },
       },
     );
@@ -1498,7 +1493,6 @@ describe('finance integration', () => {
         json: {
           notes: 'Updated pension notes',
           provider: 'Aegon UK',
-          userId: stranger.user.id,
         },
       },
     );

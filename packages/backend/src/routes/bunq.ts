@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
-import { bunqConnections } from '../db/schema';
+import { bunqConnections, bunqPaymentProgress } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { BUNQ_UNAVAILABLE_MESSAGE, loadBunqConfig } from '../lib/bunqConfig';
 import {
@@ -100,27 +100,31 @@ app.get('/oauth/callback', async (c) => {
   try {
     const tokens = await exchangeCodeForTokens(code);
 
-    await db
-      .insert(bunqConnections)
-      .values({
-        userId,
-        accessToken: tokens.accessToken,
-      })
-      .onConflictDoUpdate({
-        target: bunqConnections.userId,
-        set: {
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(bunqConnections)
+        .values({
+          userId,
           accessToken: tokens.accessToken,
-          privateKey: null,
-          installationToken: null,
-          serverPublicKey: null,
-          sessionToken: null,
-          sessionId: null,
-          sessionExpiresAt: null,
-          bunqUserId: null,
-          syncStatus: 'idle',
-          syncError: null,
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: bunqConnections.userId,
+          set: {
+            accessToken: tokens.accessToken,
+            privateKey: null,
+            installationToken: null,
+            serverPublicKey: null,
+            sessionToken: null,
+            sessionId: null,
+            sessionExpiresAt: null,
+            bunqUserId: null,
+            syncStatus: 'idle',
+            syncError: null,
+          },
+        });
+
+      await tx.delete(bunqPaymentProgress).where(eq(bunqPaymentProgress.userId, userId));
+    });
 
     return c.redirect(buildFrontendRedirect(config.frontendOrigin, destination, 'connected'));
   } catch (e) {
@@ -171,7 +175,10 @@ app.delete('/connection', async (c) => {
     }
   }
 
-  await db.delete(bunqConnections).where(eq(bunqConnections.userId, user.id));
+  await db.transaction(async (tx) => {
+    await tx.delete(bunqPaymentProgress).where(eq(bunqPaymentProgress.userId, user.id));
+    await tx.delete(bunqConnections).where(eq(bunqConnections.userId, user.id));
+  });
 
   return c.json({ data: { ok: true } }, HTTP_STATUS.OK);
 });
@@ -226,6 +233,10 @@ app.post('/sync/budget', async (c) => {
   }
 });
 
+function syncTime(syncedAt: Date | null): number {
+  return syncedAt?.getTime() ?? Date.now();
+}
+
 app.post('/sync', async (c) => {
   const user = getAuthUser(c);
 
@@ -244,7 +255,9 @@ app.post('/sync', async (c) => {
     const savingsResult = await syncBunqSavings(user.id, newerThan, true);
     const budgetResult = await syncBunqBudget(user.id, newerThan, true);
     const combined = mergeSyncResults(savingsResult, budgetResult);
-    const syncedAt = new Date();
+    const syncedAt = new Date(
+      Math.min(syncTime(savingsResult.syncedAt), syncTime(budgetResult.syncedAt)),
+    );
     if (combined.ok) {
       await db
         .update(bunqConnections)

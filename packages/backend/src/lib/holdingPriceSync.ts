@@ -8,7 +8,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { holdingPriceHistory, holdings } from '../db/schema';
 import { getMarketDataClient } from './marketDataClient';
-import { toYahooSymbol } from './yahooFinanceClient';
+import { rethrowCancellation, toYahooSymbol } from './yahooFinanceClient';
 
 const QUOTE_BATCH_SIZE = 50;
 
@@ -114,6 +114,7 @@ async function fetchQuotesBySymbol(symbols: string[]): Promise<{
       const latestQuotes = await marketClient.getLatestEod(symbolChunk);
       Object.assign(quotes, latestQuotes);
     } catch (error) {
+      rethrowCancellation(error);
       const reason = error instanceof Error ? error.message : 'Failed to fetch latest EOD data';
       for (const ticker of symbolChunk) symbolFetchErrors.set(ticker, reason);
     }

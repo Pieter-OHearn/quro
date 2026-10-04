@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from './schema';
 import { getRuntimeDatabaseUrl } from './config';
 import { instrumentPostgres, startTracing } from '../lib/tracing';
+import { deadlinePostgres } from '../lib/deadlinePostgres';
 
 export function createQueryClient(
   connectionString: string,
@@ -16,7 +17,7 @@ export function createDb(connectionString: string, options: Parameters<typeof po
   // With tracing on, every query gets a client span (see lib/tracing.ts).
   const tracedClient = startTracing() ? instrumentPostgres(queryClient) : queryClient;
   return {
-    db: drizzle(tracedClient, { schema }),
+    db: drizzle(deadlinePostgres(tracedClient, true), { schema }),
     queryClient,
   };
 }

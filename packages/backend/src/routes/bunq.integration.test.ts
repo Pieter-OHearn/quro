@@ -3,6 +3,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client';
 import { bunqConnections, bunqOauthAttempts } from '../db/schema';
 import { consumeOAuthAttempt, createOAuthAttempt } from '../lib/bunqOAuthAttempts';
+import { BUNQ_TEST_ORIGIN, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
 
 const integration = createIntegrationHelpers('bunq.integration.quro.test');
@@ -14,18 +15,7 @@ const ENV_NAMES = [
   'FRONTEND_ORIGIN',
 ] as const;
 const savedEnv = Object.fromEntries(ENV_NAMES.map((n) => [n, process.env[n]]));
-const ORIGIN = 'https://quro.example';
-
-function configureBunq() {
-  process.env.BUNQ_CLIENT_ID = 'test-client';
-  process.env.BUNQ_CLIENT_SECRET = 'test-secret';
-  process.env.BUNQ_REDIRECT_URI = `${ORIGIN}/api/bunq/oauth/callback`;
-  process.env.FRONTEND_ORIGIN = ORIGIN;
-}
-
-function clearBunqConfig() {
-  for (const name of ENV_NAMES) delete process.env[name];
-}
+const ORIGIN = BUNQ_TEST_ORIGIN;
 
 function mockTokenExchange() {
   const fetchMock = mock(() =>
@@ -72,7 +62,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  configureBunq();
+  setBunqTestEnv();
 });
 
 afterEach(() => {
@@ -93,7 +83,7 @@ afterAll(async () => {
 describe('bunq unconfigured', () => {
   test('start and callback fail closed and capabilities explain why', async () => {
     const user = await newUser('unconfigured');
-    clearBunqConfig();
+    clearBunqTestEnv();
     const fetchMock = mockTokenExchange();
 
     const start = await integration.request('/api/bunq/oauth/start', { cookie: user.cookie });
