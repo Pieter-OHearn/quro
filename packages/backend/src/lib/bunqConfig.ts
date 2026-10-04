@@ -22,7 +22,6 @@ export type BunqConfig =
       clientSecret: string;
       redirectUri: string;
       frontendOrigin: string;
-      sandbox: boolean;
     };
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -63,18 +62,13 @@ export function loadBunqConfig(env: Env = process.env): BunqConfig {
     clientSecret: values.BUNQ_CLIENT_SECRET,
     redirectUri: values.BUNQ_REDIRECT_URI,
     frontendOrigin: new URL(values.FRONTEND_ORIGIN).origin,
-    sandbox: readVariable(env, 'BUNQ_SANDBOX') === 'true',
   };
 }
 
-export function getBunqConfig(): BunqConfig {
-  return loadBunqConfig();
-}
-
-export type EnabledBunqConfig = Extract<BunqConfig, { enabled: true }>;
+type EnabledBunqConfig = Extract<BunqConfig, { enabled: true }>;
 
 export function requireBunqConfig(): EnabledBunqConfig {
-  const config = getBunqConfig();
+  const config = loadBunqConfig();
   if (!config.enabled) throw new Error(BUNQ_UNAVAILABLE_MESSAGE);
   return config;
 }

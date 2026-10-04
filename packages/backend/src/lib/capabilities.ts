@@ -2,7 +2,7 @@ import type { AppCapabilities, AppCapabilityReason, AppCapabilityStatus } from '
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { workerHeartbeats } from '../db/schema';
-import { BUNQ_UNAVAILABLE_MESSAGE, getBunqConfig } from './bunqConfig';
+import { BUNQ_UNAVAILABLE_MESSAGE, loadBunqConfig } from './bunqConfig';
 
 export const PENSION_IMPORT_WORKER_NAME = 'pension-import-worker';
 export const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
@@ -89,7 +89,7 @@ function toAiCapability(
 }
 
 function getBunqCapability(now: Date): AppCapabilityStatus {
-  if (!getBunqConfig().enabled) {
+  if (!loadBunqConfig().enabled) {
     return buildCapability(false, BUNQ_UNAVAILABLE_MESSAGE, now, 'not_configured');
   }
   return buildCapability(true, 'Bunq linking is available.', now);

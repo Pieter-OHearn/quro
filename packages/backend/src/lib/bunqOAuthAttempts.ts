@@ -16,10 +16,6 @@ function hashState(state: string): string {
   return createHash('sha256').update(state).digest('hex');
 }
 
-function isDestination(value: string): value is BunqOAuthDestination {
-  return value === 'savings' || value === 'settings';
-}
-
 // Records a short-lived attempt for the user and destination and returns the opaque
 // state to send to bunq. Only its hash is stored.
 export async function createOAuthAttempt(
@@ -61,6 +57,5 @@ export async function consumeOAuthAttempt(
       userId: bunqOauthAttempts.userId,
       destination: bunqOauthAttempts.destination,
     });
-  if (!row || !isDestination(row.destination)) return null;
-  return { userId: row.userId, destination: row.destination };
+  return row ?? null;
 }

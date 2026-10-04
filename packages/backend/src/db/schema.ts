@@ -1039,7 +1039,7 @@ export const bunqOauthAttempts = pgTable(
     userId: integer('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
-    destination: text('destination').notNull(),
+    destination: text('destination', { enum: ['savings', 'settings'] }).notNull(),
     expiresAt: timestamp('expires_at').notNull(),
     consumedAt: timestamp('consumed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),

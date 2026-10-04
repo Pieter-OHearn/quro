@@ -23,13 +23,12 @@ describe('loadBunqConfig', () => {
   });
 
   test('accepts a complete configuration and normalises the origin', () => {
-    expect(loadBunqConfig({ ...FULL_ENV, BUNQ_SANDBOX: 'true' })).toEqual({
+    expect(loadBunqConfig(FULL_ENV)).toEqual({
       enabled: true,
       clientId: 'client-id-value',
       clientSecret: 'client-secret-value',
       redirectUri: FULL_ENV.BUNQ_REDIRECT_URI,
       frontendOrigin: 'https://quro.example',
-      sandbox: true,
     });
   });
 

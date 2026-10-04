@@ -1,12 +1,11 @@
 import { useSavedState } from './settingsForm';
 /* eslint-disable max-lines-per-function */
 import { useState } from 'react';
-import type { AppCapabilityStatus } from '@quro/shared';
 
 import { Check, Link2, RefreshCw, Unlink } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import { buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
-import { useAppCapabilities } from '@/lib/useAppCapabilities';
+import { useBunqAvailability } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
 import {
   useBunqConnection,
@@ -25,17 +24,6 @@ function formatSyncTime(value: string | null): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
-}
-
-function useBunqAvailability() {
-  const { data: capabilities } = useAppCapabilities();
-  const bunq: AppCapabilityStatus | undefined = capabilities?.bunq;
-  const unavailable = bunq !== undefined && !bunq.enabled;
-  const disconnectedMessage =
-    unavailable && bunq
-      ? bunq.message
-      : 'Connect your Bunq account to automatically sync savings and budget transactions.';
-  return { unavailable, disconnectedMessage };
 }
 
 function MappingRow({ mapping }: Readonly<{ mapping: CategoryMapping }>) {

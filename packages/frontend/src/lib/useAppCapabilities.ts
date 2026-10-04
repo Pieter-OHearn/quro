@@ -1,7 +1,7 @@
 import { queryKeys } from './queryKeys';
 import { apiGet } from './api';
 import { useQuery } from '@tanstack/react-query';
-import type { AppCapabilities } from '@quro/shared';
+import type { AppCapabilities, AppCapabilityStatus } from '@quro/shared';
 
 export const APP_CAPABILITIES_QUERY_KEY = queryKeys.capabilities;
 
@@ -34,4 +34,15 @@ export function useAppCapabilities() {
     },
     refetchInterval: 15_000,
   });
+}
+
+export function useBunqAvailability() {
+  const { data: capabilities } = useAppCapabilities();
+  const bunq: AppCapabilityStatus | undefined = capabilities?.bunq;
+  const unavailable = bunq !== undefined && !bunq.enabled;
+  const disconnectedMessage =
+    unavailable && bunq
+      ? bunq.message
+      : 'Connect your Bunq account to automatically sync savings and budget transactions.';
+  return { unavailable, disconnectedMessage };
 }
