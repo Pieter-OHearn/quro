@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { createRateLimitChecker } from './rateLimit';
+import { Hono } from 'hono';
+import { createRateLimitChecker, signinRateLimit } from './rateLimit';
 
 const originalNodeEnv = process.env.NODE_ENV;
 
@@ -24,5 +25,32 @@ describe('createRateLimitChecker', () => {
 
     expect(isRateLimited('victim@example.com')).toBe(false);
     expect(isRateLimited('victim@example.com')).toBe(false);
+  });
+});
+
+describe('rate limiter client addressing', () => {
+  function signinFrom(peer: string | undefined, headers: Record<string, string> = {}) {
+    const app = new Hono();
+    app.post('/signin', signinRateLimit, (c) => c.json({ ok: true }));
+    return app.request(
+      '/signin',
+      { method: 'POST', headers },
+      peer ? { requestIP: () => ({ address: peer, family: 'IPv4', port: 0 }) } : undefined,
+    );
+  }
+
+  it('does not let an untrusted client rotate X-Real-IP to dodge the limit', async () => {
+    process.env.NODE_ENV = 'development';
+    const peer = '198.51.100.20';
+    for (let i = 0; i < 5; i += 1) {
+      expect((await signinFrom(peer, { 'x-real-ip': `192.0.2.${i}` })).status).toBe(200);
+    }
+    expect((await signinFrom(peer, { 'x-real-ip': '192.0.2.99' })).status).toBe(429);
+  });
+
+  it('fails closed instead of sharing a bucket when the peer is unknown', async () => {
+    process.env.NODE_ENV = 'development';
+    const response = await signinFrom(undefined, { 'x-real-ip': '192.0.2.1' });
+    expect(response.status).toBe(503);
   });
 });

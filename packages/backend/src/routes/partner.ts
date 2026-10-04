@@ -7,6 +7,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { partnerInviteRateLimit } from '../middleware/rateLimit';
 import { isUniqueViolation } from '../lib/postgresErrors';
+import { readJsonRecord } from '../lib/requestValidation';
 
 const app = new Hono();
 
@@ -71,7 +72,9 @@ app.post('/invite', async (c) => {
     );
   }
 
-  const payload = (await c.req.json()) as { email?: unknown };
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const payload = body.value;
   const email = typeof payload.email === 'string' ? payload.email.toLowerCase().trim() : '';
 
   if (!email || !EMAIL_PATTERN.test(email)) {

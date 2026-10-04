@@ -1,5 +1,27 @@
 import { createMiddleware } from 'hono/factory';
+import { getConnInfo } from 'hono/bun';
+import type { Context } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
+import { parseTrustedProxies, resolveClientAddress } from '../lib/clientAddress';
+
+const trustedProxies = parseTrustedProxies(process.env.TRUSTED_PROXIES);
+
+function peerAddressOf(c: Context): string | undefined {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getClientAddress(c: Context): string | null {
+  return resolveClientAddress({
+    peerAddress: peerAddressOf(c),
+    realIp: c.req.header('x-real-ip'),
+    forwardedFor: c.req.header('x-forwarded-for'),
+    proxies: trustedProxies,
+  });
+}
 
 export function createRateLimitChecker(windowMs: number, max: number) {
   const store = new Map<string, number[]>();
@@ -31,10 +53,17 @@ function createRateLimiter(windowMs: number, max: number) {
   const isRateLimited = createRateLimitChecker(windowMs, max);
 
   return createMiddleware(async (c, next) => {
-    const ip =
-      c.req.header('x-real-ip') ??
-      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
-      'unknown';
+    if (process.env.NODE_ENV === 'test') return next();
+
+    const ip = getClientAddress(c);
+
+    // Never share one bucket between clients whose address is unknown: fail closed instead.
+    if (!ip) {
+      return c.json(
+        { error: 'Unable to determine client address' },
+        HTTP_STATUS.SERVICE_UNAVAILABLE,
+      );
+    }
 
     if (isRateLimited(ip)) {
       return c.json(
@@ -58,7 +87,9 @@ const PARTNER_INVITE_MAX_ATTEMPTS = 10;
 export const signinRateLimit = createRateLimiter(ONE_MINUTE_MS, SIGNIN_MAX_ATTEMPTS);
 export const signupRateLimit = createRateLimiter(FIFTEEN_MINUTES_MS, SIGNUP_MAX_ATTEMPTS);
 // This complements the IP limiter so rotating source addresses cannot bypass the
-// attempt budget for one account. Like the other limiters, it is per process.
+// attempt budget for one account. Like the other limiters, it is per process. Trade-off: anyone
+// can burn an account's budget by failing sign-in for that email, locking the owner out until the
+// window ends. That is accepted over allowing unbounded distributed guessing.
 export const signinEmailRateLimit = createRateLimitChecker(
   FIFTEEN_MINUTES_MS,
   SIGNIN_EMAIL_MAX_ATTEMPTS,

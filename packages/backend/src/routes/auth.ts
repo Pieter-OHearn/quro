@@ -21,7 +21,7 @@ import {
   publicUserColumns,
 } from '../lib/users';
 import { isUniqueViolation } from '../lib/postgresErrors';
-import { parseWholeNumber } from '../lib/requestValidation';
+import { parseWholeNumber, readJsonRecord } from '../lib/requestValidation';
 
 const app = new Hono();
 
@@ -181,7 +181,9 @@ async function createSession(c: Context, userId: number) {
 // ── Sign Up ─────────────────────────────────────────────────────────────────
 
 app.post('/signup', signupRateLimit, async (c) => {
-  const rawBody = (await c.req.json()) as Record<string, unknown>;
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const rawBody = body.value;
   const validationResult = validateSignUpPayload(parseSignUpPayload(rawBody));
 
   if ('error' in validationResult) {
@@ -229,10 +231,18 @@ app.post('/signup', signupRateLimit, async (c) => {
 
 // ── Sign In ─────────────────────────────────────────────────────────────────
 
+function parseSigninCredentials(body: Record<string, unknown>) {
+  const { email, password } = body;
+  return {
+    email: typeof email === 'string' ? email.toLowerCase().trim() : '',
+    password: typeof password === 'string' ? password : '',
+  };
+}
+
 app.post('/signin', signinRateLimit, async (c) => {
-  const { email: rawEmail, password: rawPassword } = await c.req.json();
-  const email = typeof rawEmail === 'string' ? rawEmail.toLowerCase().trim() : '';
-  const password = typeof rawPassword === 'string' ? rawPassword : '';
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const { email, password } = parseSigninCredentials(body.value);
 
   if (!email || !password) {
     return c.json({ error: 'Email and password are required' }, HTTP_STATUS.BAD_REQUEST);

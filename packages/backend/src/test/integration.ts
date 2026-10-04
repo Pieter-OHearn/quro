@@ -31,6 +31,7 @@ type RequestOptions = {
   json?: unknown;
   headers?: HeadersInit;
   cookie?: string | null;
+  remoteAddress?: string;
 };
 
 type SignUpOverrides = Partial<{
@@ -76,11 +77,20 @@ function createRequestFunction() {
       body = options.body;
     }
 
-    return app.request(path, {
-      method: options.method ?? 'GET',
-      headers,
-      body,
-    });
+    // app.request has no socket, so expose the direct peer the way Bun's server does.
+    const env = options.remoteAddress
+      ? { requestIP: () => ({ address: options.remoteAddress, family: 'IPv4', port: 0 }) }
+      : undefined;
+
+    return app.request(
+      path,
+      {
+        method: options.method ?? 'GET',
+        headers,
+        body,
+      },
+      env,
+    );
   };
 }
 
@@ -217,6 +227,11 @@ export function createIntegrationHelpers(emailDomain: string) {
     signIn,
     signUp,
   };
+}
+
+export function randomTestIp(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(3));
+  return `203.${bytes[0]}.${bytes[1]}.${bytes[2]}`;
 }
 
 export const integrationPassword = DEFAULT_PASSWORD;
