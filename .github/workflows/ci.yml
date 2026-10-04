@@ -210,9 +210,32 @@ jobs:
       - name: Python security audit
         run: pip-audit -r services/pension-parser/requirements.txt
 
+  # Aggregate required check. `if: always()` keeps this job running when an
+  # upstream job fails or is cancelled; without it the job is skipped, and a
+  # skipped required check counts as passing. Keep `needs` listing every job.
   ci:
     name: CI
     runs-on: ubuntu-latest
-    needs: [bun-version, build, build-worker, docker-build, security]
+    if: always()
+    needs:
+      - bun-version
+      - format
+      - lint
+      - typecheck
+      - test
+      - smoke
+      - build
+      - python-format
+      - python-lint
+      - build-worker
+      - docker-build
+      - security
     steps:
-      - run: echo "All checks passed"
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/lib
+      - uses: oven-sh/setup-bun@v2
+      - name: Require every needed job to succeed
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: bun scripts/lib/ci-gate.ts
