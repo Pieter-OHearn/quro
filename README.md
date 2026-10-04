@@ -9,7 +9,22 @@ Quro is a self-hosted personal finance app that brings budgeting, savings, inves
 
 ## Local Docker Dev
 
-If you want the app running locally with the least setup, use the Docker dev stack:
+The Docker dev stack requires Bun and Docker Compose v2. Clone the repository, then create the runtime configuration and secrets from the repository root:
+
+```bash
+git clone https://github.com/Pieter-OHearn/quro.git
+cd quro
+cp .env.example .env
+for file in secrets/*.example; do cp "$file" "${file%.example}"; done
+chmod 600 .env secrets/*.txt
+```
+
+Edit the copied files under `secrets/` to set your own passwords and keys before starting the stack.
+
+> [!WARNING]
+> The dev stack pins the same MinIO image as the release stack (`minio/minio:RELEASE.2025-09-07T16-13-09Z`). That image could not be pulled during the release test described below. On a host without a cached copy, the dev stack may also fail to start; no replacement image has been verified.
+
+Once the configuration and secrets are ready and the pinned images are available, start the stack:
 
 ```bash
 bun run dev:docker
@@ -77,7 +92,7 @@ The database and object storage are also published locally for tooling:
 ## Self-hosting
 
 > [!WARNING]
-> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a quickstart. Follow progress in [Epic E00: Immediate fixes](https://github.com/Pieter-OHearn/quro/issues/247). To run Quro today, clone the repository and use the [Docker dev stack](#local-docker-dev).
+> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in [Epic E00: Immediate fixes](https://github.com/Pieter-OHearn/quro/issues/247). The [Docker dev stack](#local-docker-dev) includes storage bootstrap, but requires runtime configuration and secrets and is subject to the same MinIO image availability problem.
 
 The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
 
