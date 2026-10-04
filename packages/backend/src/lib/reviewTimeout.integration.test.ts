@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { bunqConnections, bunqPaymentProgress, workerHeartbeats } from '../db/schema';
 import { createOAuthAttempt } from './bunqOAuthAttempts';
-import { clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
+import { bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
@@ -167,6 +167,23 @@ test('hard grace destroys a stuck job pool and a later run can acquire its lock'
   }
 });
 
+test('job pools return date and time columns like the main pool, independent of process TZ', async () => {
+  const query = sql`select now()::timestamp as ts, current_date as day`;
+  const outside = await db.execute(query);
+  let inside: typeof outside | undefined;
+  const name = `job-parsers-${crypto.randomUUID()}`;
+  try {
+    await runScheduledJob(name, 60_000, async () => {
+      inside = await db.execute(query);
+    });
+  } finally {
+    await db.delete(workerHeartbeats).where(eq(workerHeartbeats.workerName, `scheduler:${name}`));
+  }
+  expect(typeof outside[0].ts).toBe('string');
+  expect(typeof inside?.[0].ts).toBe('string');
+  expect(typeof inside?.[0].day).toBe('string');
+});
+
 test('Yahoo per-call timeout escapes price-sync catches and leaves no successful heartbeat', async () => {
   const timeout = AbortSignal.timeout.bind(AbortSignal);
   spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout(20));
@@ -317,6 +334,7 @@ test('reconnecting bunq discards checkpoints from the previous provider connecti
     const state = await createOAuthAttempt(auth.user.id, 'settings');
     const response = await integration.request(
       `/api/bunq/oauth/callback?code=synthetic&state=${encodeURIComponent(state)}`,
+      { cookie: bunqStateCookie(state) },
     );
     expect(response.headers.get('location')).toContain('connected');
     expect(

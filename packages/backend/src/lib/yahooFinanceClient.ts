@@ -122,9 +122,13 @@ function parseQuoteRow(
   };
 }
 
+export function isCancellation(error: unknown): boolean {
+  return error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name);
+}
+
 export function rethrowCancellation(error: unknown): void {
   checkWorkDeadline();
-  if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) throw error;
+  if (isCancellation(error)) throw error;
 }
 
 export class YahooFinanceMarketDataClient implements MarketDataClient {

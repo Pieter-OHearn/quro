@@ -1,3 +1,5 @@
+import { STATE_COOKIE } from '../routes/bunq';
+
 export const BUNQ_TEST_ORIGIN = 'https://quro.example';
 
 const BUNQ_ENV_NAMES = [
@@ -16,4 +18,9 @@ export function setBunqTestEnv(): void {
 
 export function clearBunqTestEnv(): void {
   for (const name of BUNQ_ENV_NAMES) delete process.env[name];
+}
+
+// The callback only accepts a state that the initiating browser also carries as a cookie.
+export function bunqStateCookie(state: string): string {
+  return `${STATE_COOKIE}=${state}`;
 }

@@ -4,7 +4,7 @@ import { db } from '../db/client';
 import { bunqConnections, workerHeartbeats } from '../db/schema';
 import { createIntegrationHelpers } from '../test/integration';
 import { createOAuthAttempt } from './bunqOAuthAttempts';
-import { clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
+import { bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { fetchMonetaryAccounts } from './bunqClient';
 import { runScheduledJob } from './scheduledJob';
 import * as marketDataClient from './marketDataClient';
@@ -45,6 +45,7 @@ test('bunq OAuth request responds on timeout and a late token cannot create a co
   const state = await createOAuthAttempt(auth.user.id, 'settings');
   const response = await integration.request(
     `/api/bunq/oauth/callback?code=synthetic&state=${encodeURIComponent(state)}`,
+    { cookie: bunqStateCookie(state) },
   );
   expect(response.status).toBe(302);
   expect(response.headers.get('location')).toContain('error');

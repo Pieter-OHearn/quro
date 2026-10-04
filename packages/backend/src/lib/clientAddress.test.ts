@@ -54,6 +54,20 @@ describe('resolveClientAddress', () => {
     );
   });
 
+  test('prefers X-Forwarded-For over an X-Real-IP the client could have supplied', () => {
+    expect(
+      resolve({ peer: '172.18.0.2', realIp: '1.2.3.4', forwardedFor: '1.2.3.4, 198.51.100.7' }),
+    ).toBe('198.51.100.7');
+  });
+
+  test('looks past an X-Real-IP that is itself a trusted proxy', () => {
+    // An outer proxy in front of the bundled nginx: nginx's X-Real-IP is the outer proxy.
+    expect(
+      resolve({ peer: '172.18.0.2', realIp: '10.0.0.5', forwardedFor: '198.51.100.7, 10.0.0.5' }),
+    ).toBe('198.51.100.7');
+    expect(resolve({ peer: '172.18.0.2', realIp: '10.0.0.5' })).toBe('172.18.0.2');
+  });
+
   test('falls back to the proxy address when headers are missing or invalid', () => {
     expect(resolve({ peer: '172.18.0.2' })).toBe('172.18.0.2');
     expect(resolve({ peer: '172.18.0.2', realIp: 'garbage', forwardedFor: 'x, y' })).toBe(

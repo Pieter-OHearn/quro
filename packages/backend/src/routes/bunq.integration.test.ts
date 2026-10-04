@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, tes
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client';
 import { bunqConnections, bunqOauthAttempts } from '../db/schema';
-import { consumeOAuthAttempt, createOAuthAttempt } from '../lib/bunqOAuthAttempts';
-import { BUNQ_TEST_ORIGIN, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
+import { consumeOAuthAttempt } from '../lib/bunqOAuthAttempts';
+import { BUNQ_TEST_ORIGIN, bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
 
 const integration = createIntegrationHelpers('bunq.integration.quro.test');
@@ -38,11 +38,17 @@ async function startAttempt(cookie: string, returnTo?: string) {
   return state as string;
 }
 
-function callback(state: string | null, code: string | null = 'auth-code') {
+// Sends the state cookie the initiating browser holds, unless a different one is given.
+function callback(
+  state: string | null,
+  code: string | null = 'auth-code',
+  cookieState: string | null = state,
+) {
   const params = new URLSearchParams();
   if (state) params.set('state', state);
   if (code) params.set('code', code);
-  return integration.request(`/api/bunq/oauth/callback?${params.toString()}`);
+  const cookie = cookieState ? bunqStateCookie(cookieState) : null;
+  return integration.request(`/api/bunq/oauth/callback?${params.toString()}`, { cookie });
 }
 
 function connectionsFor(userId: number) {
@@ -205,6 +211,7 @@ describe('bunq OAuth attempts', () => {
     // A returnTo supplied at callback time cannot redirect elsewhere.
     const response = await integration.request(
       `/api/bunq/oauth/callback?state=${aliceState}&code=c&returnTo=https://evil.example`,
+      { cookie: bunqStateCookie(aliceState) },
     );
 
     expect(response.headers.get('location')).toBe(`${ORIGIN}/savings?bunq=connected`);
@@ -217,23 +224,36 @@ describe('bunq OAuth attempts', () => {
     const fetchMock = mockTokenExchange();
     const state = await startAttempt(user.cookie);
 
-    const response = await integration.request(`/api/bunq/oauth/callback?state=${state}&code=c`, {
-      headers: { Cookie: 'bunq_oauth_state=another-state' },
-    });
+    const response = await callback(state, 'c', 'another-state');
 
     expect(response.headers.get('location')).toContain('bunq=error');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  test('rejects a callback from a browser that did not start the attempt', async () => {
+    const attacker = await newUser('attacker');
+    const fetchMock = mockTokenExchange();
+    const state = await startAttempt(attacker.cookie);
+
+    // The victim's browser follows the attacker's link without the state cookie.
+    const response = await callback(state, 'victim-code', null);
+
+    expect(response.headers.get('location')).toContain('bunq=error');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await connectionsFor(attacker.user.id)).toHaveLength(0);
+    // The rejected callback must not burn the attempt for the real initiator.
+    expect(await consumeOAuthAttempt(state)).toMatchObject({ userId: attacker.user.id });
+  });
+
   test('starting a new attempt invalidates the previous one for that user', async () => {
     const user = await newUser('supersede');
-    const first = await createOAuthAttempt(user.user.id, 'settings');
-    const second = await createOAuthAttempt(user.user.id, 'savings');
+    mockTokenExchange();
+    const first = await startAttempt(user.cookie, 'settings');
+    const second = await startAttempt(user.cookie, 'savings');
 
-    expect(await consumeOAuthAttempt(first)).toBeNull();
-    expect(await consumeOAuthAttempt(second)).toEqual({
-      userId: user.user.id,
-      destination: 'savings',
-    });
+    expect((await callback(first)).headers.get('location')).toContain('bunq=error');
+    expect((await callback(second)).headers.get('location')).toBe(
+      `${ORIGIN}/savings?bunq=connected`,
+    );
   });
 });

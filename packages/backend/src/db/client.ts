@@ -24,6 +24,16 @@ export function createDb(connectionString: string, options: Parameters<typeof po
 
 const { db, queryClient } = createDb(getRuntimeDatabaseUrl());
 
+// A separate pool that `db` routes to inside a work scope. Drizzle installs passthrough
+// date/time parsers on the client it wraps, so copy them; postgres-js defaults would
+// parse `timestamp` columns in the process time zone.
+export function createScopedQueryClient(options: Parameters<typeof postgres>[1] = {}) {
+  const client = createQueryClient(getRuntimeDatabaseUrl(), options);
+  Object.assign(client.options.parsers, queryClient.options.parsers);
+  Object.assign(client.options.serializers, queryClient.options.serializers);
+  return client;
+}
+
 export { db, queryClient };
 
 export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];

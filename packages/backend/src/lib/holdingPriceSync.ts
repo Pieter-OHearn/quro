@@ -8,7 +8,8 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { holdingPriceHistory, holdings } from '../db/schema';
 import { getMarketDataClient } from './marketDataClient';
-import { rethrowCancellation, toYahooSymbol } from './yahooFinanceClient';
+import { currentWorkSignal } from './workDeadline';
+import { isCancellation, rethrowCancellation, toYahooSymbol } from './yahooFinanceClient';
 
 const QUOTE_BATCH_SIZE = 50;
 
@@ -101,6 +102,25 @@ function getUserHoldingsForSync(userId: number, holdingIds?: number[]): Promise<
     );
 }
 
+type ChunkFailure = { reason: string; timedOut: boolean };
+
+// Returns the error reason for a failed chunk. Inside a scheduled job a timeout is rethrown
+// so the job fails and retries; a user refresh records it and keeps earlier chunks.
+async function fetchQuoteChunk(
+  marketClient: ReturnType<typeof getMarketDataClient>,
+  symbolChunk: string[],
+  quotes: QuoteByTicker,
+): Promise<ChunkFailure | null> {
+  try {
+    Object.assign(quotes, await marketClient.getLatestEod(symbolChunk));
+    return null;
+  } catch (error) {
+    if (currentWorkSignal()) rethrowCancellation(error);
+    const reason = error instanceof Error ? error.message : 'Failed to fetch latest EOD data';
+    return { reason, timedOut: isCancellation(error) };
+  }
+}
+
 async function fetchQuotesBySymbol(symbols: string[]): Promise<{
   quotes: QuoteByTicker;
   symbolFetchErrors: Map<string, string>;
@@ -109,15 +129,15 @@ async function fetchQuotesBySymbol(symbols: string[]): Promise<{
   const quotes: QuoteByTicker = {};
   const symbolFetchErrors = new Map<string, string>();
 
+  // After a timeout, later chunks would most likely wait out the same timeout.
+  let timeoutReason: string | null = null;
   for (const symbolChunk of chunkSymbols(symbols)) {
-    try {
-      const latestQuotes = await marketClient.getLatestEod(symbolChunk);
-      Object.assign(quotes, latestQuotes);
-    } catch (error) {
-      rethrowCancellation(error);
-      const reason = error instanceof Error ? error.message : 'Failed to fetch latest EOD data';
-      for (const ticker of symbolChunk) symbolFetchErrors.set(ticker, reason);
-    }
+    const failure: ChunkFailure | null = timeoutReason
+      ? { reason: timeoutReason, timedOut: true }
+      : await fetchQuoteChunk(marketClient, symbolChunk, quotes);
+    if (!failure) continue;
+    for (const ticker of symbolChunk) symbolFetchErrors.set(ticker, failure.reason);
+    if (failure.timedOut) timeoutReason = failure.reason;
   }
 
   return { quotes, symbolFetchErrors };

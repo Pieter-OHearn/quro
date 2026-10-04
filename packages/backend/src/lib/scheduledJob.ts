@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { db, createQueryClient } from '../db/client';
-import { getRuntimeDatabaseUrl } from '../db/config';
+import { db, createScopedQueryClient } from '../db/client';
 import { workerHeartbeats } from '../db/schema';
 import { runCoordinatedJob, type JobLease } from './coordinatedJob';
 import { DEADLINE_GRACE_MS, UPSTREAM_TIMEOUT_MS, SCHEDULED_JOB_TIMEOUT_MS } from './workDeadline';
@@ -22,7 +21,7 @@ export function runScheduledJob(
 async function reserveLease(name: string, graceMs: number): Promise<JobLease> {
   // All application queries in this scope use this disposable pool. Server
   // statement timeouts fit inside the cleanup grace period even if cancel fails.
-  const pool = createQueryClient(getRuntimeDatabaseUrl(), {
+  const pool = createScopedQueryClient({
     connection: {
       statement_timeout: Math.min(
         UPSTREAM_TIMEOUT_MS,

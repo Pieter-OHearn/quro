@@ -138,9 +138,9 @@ The bunq integration is optional and runs inside the main backend process. There
 
 ### OAuth and connection routes
 
-The Settings page starts OAuth by sending the browser to `/api/bunq/oauth/start`. The backend creates an HMAC-signed state token, stores it in an HTTP-only `bunq_oauth_state` cookie for 10 minutes, and redirects to bunq's OAuth authorisation URL.
+The Settings page starts OAuth by sending the browser to `/api/bunq/oauth/start`. The backend records a single-use OAuth attempt for the user and destination in `bunq_oauth_attempts` (only a hash of the random state is stored), sets the state in an HTTP-only `bunq_oauth_state` cookie for 10 minutes, and redirects to bunq's OAuth authorisation URL.
 
-bunq redirects back to `/api/bunq/oauth/callback`. The backend validates the state cookie, exchanges the authorisation code with `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI`, then upserts a row in `bunq_connections` with the returned access token. The frontend reads connection status through `GET /api/bunq/connection` and disconnects with `DELETE /api/bunq/connection`.
+bunq redirects back to `/api/bunq/oauth/callback`. The backend requires the state cookie to match the returned state, atomically consumes the recorded attempt, exchanges the authorisation code with `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI`, then upserts a row in `bunq_connections` with the returned access token. The frontend reads connection status through `GET /api/bunq/connection` and disconnects with `DELETE /api/bunq/connection`.
 
 Manual sync endpoints are mounted under the same protected route group:
 

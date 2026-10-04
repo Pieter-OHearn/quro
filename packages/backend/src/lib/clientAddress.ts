@@ -52,16 +52,16 @@ function forwardedClient(
   forwardedFor: string | undefined,
   proxies: TrustedProxies,
 ): string | null {
-  const real = normalizeAddress(realIp);
-  if (real) return real;
-
+  // X-Forwarded-For keeps every hop, so it still finds the client behind a chain of trusted
+  // proxies. X-Real-IP holds one hop and is only a fallback when it is not a proxy itself.
   const hops = (forwardedFor ?? '').split(',');
   for (let i = hops.length - 1; i >= 0; i -= 1) {
     const hop = normalizeAddress(hops[i]);
-    if (!hop) return null;
+    if (!hop) break;
     if (!isTrustedProxy(hop, proxies)) return hop;
   }
-  return null;
+  const real = normalizeAddress(realIp);
+  return real && !isTrustedProxy(real, proxies) ? real : null;
 }
 
 /**

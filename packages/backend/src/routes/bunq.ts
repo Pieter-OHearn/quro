@@ -18,7 +18,7 @@ import { syncBunqSavings } from '../services/bunqSavingsSync';
 
 const app = new Hono();
 
-const STATE_COOKIE = 'bunq_oauth_state';
+export const STATE_COOKIE = 'bunq_oauth_state';
 const STATE_MAX_AGE_SECONDS = OAUTH_ATTEMPT_TTL_MS / 1000;
 
 type BunqOAuthStatus = 'connected' | 'error';
@@ -88,10 +88,10 @@ app.get('/oauth/callback', async (c) => {
 
   if (!queryState || !code) return fail();
 
-  // When the callback returns to the browser that started the flow, the cookie must
-  // match. Mobile/in-app browsers may not carry it; the recorded attempt below still
-  // binds the callback to the initiating user and destination.
-  if (storedState && storedState !== queryState) return fail();
+  // The callback must return to the browser that started the flow. Without this, an
+  // attacker could send their own authorize link to a victim and receive the victim's
+  // bunq token on the attacker's Quro account.
+  if (!storedState || storedState !== queryState) return fail();
 
   const attempt = await consumeOAuthAttempt(queryState);
   if (attempt === null) return fail();

@@ -34,7 +34,7 @@ Every protected request goes through the `requireAuth` middleware, which:
 3. Rejects the request if the session does not exist or `expires_at` is in the past.
 4. Loads the user row and attaches `{ id, email }` to the Hono context.
 
-All routes under `/api/*` require a valid session by default. The shared exact-path list in `src/lib/publicPaths.ts` allows signin, signup, signout, session discovery, health/readiness probes, and the Bunq OAuth callback, which is authenticated by a server-recorded, single-use, 10-minute OAuth attempt rather than a session cookie. New routes under these prefixes are protected. The accepted partner id is available on the request context; personal rows remain owner-only and partner access requires a joint parent entity.
+All routes under `/api/*` require a valid session by default. The shared exact-path list in `src/lib/publicPaths.ts` allows signin, signup, signout, session discovery, health/readiness probes, and the Bunq OAuth callback, which is authenticated by a server-recorded, single-use, 10-minute OAuth attempt plus a matching `bunq_oauth_state` cookie from the browser that started it, rather than a session cookie. New routes under these prefixes are protected. The accepted partner id is available on the request context; personal rows remain owner-only and partner access requires a joint parent entity.
 
 ### Session cleanup
 
@@ -103,7 +103,7 @@ The backend reads the direct peer address from the Bun socket. It uses `X-Real-I
 | `TRUSTED_PROXIES` | Comma-separated IPs or IPv4 CIDRs, for example `172.18.0.0/16,10.0.0.5`. Unset trusts none. |
 
 - Compose defaults `TRUSTED_PROXIES` to the private ranges `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16`, because the Nginx container's address is not fixed. Narrow it to your Compose network subnet if other private hosts can reach the backend directly.
-- Behind a trusted proxy, `X-Real-IP` wins. Otherwise the right-most `X-Forwarded-For` hop that is not itself a trusted proxy is used. If neither header is usable, the proxy's own address is the key.
+- Behind a trusted proxy, the right-most `X-Forwarded-For` hop that is not itself a trusted proxy is used, so a chain of proxies (for example a host reverse proxy in front of the bundled Nginx) still resolves to the client. `X-Real-IP` is used only when `X-Forwarded-For` has no usable hop and the `X-Real-IP` address is not itself a trusted proxy. If neither header is usable, the proxy's own address is the key.
 - If the peer address cannot be determined, the request fails closed with `503`. There is no shared `unknown` bucket and no random fallback key, because either would let one client lock out everyone or skip limiting entirely.
 - Malformed `TRUSTED_PROXIES` entries stop the backend at startup.
 
