@@ -5,7 +5,6 @@ set -eu
 
 load_runtime_database_env
 load_storage_env
-load_optional_api_keys
 load_bunq_env
 
 cd /app/packages/backend

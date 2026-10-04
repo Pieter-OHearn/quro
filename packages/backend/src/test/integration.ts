@@ -1,6 +1,7 @@
 import { like, inArray, or } from 'drizzle-orm';
 import { app } from '../index';
 import { db } from '../db/client';
+import { peerEnv } from './peer';
 import {
   budgetCategories,
   budgetTransactions,
@@ -26,12 +27,16 @@ import {
   users,
 } from '../db/schema';
 
+// A fixed, documentation-range peer: rate limiting is off under NODE_ENV=test, so one is enough.
+const DEFAULT_PEER_ADDRESS = '203.0.113.1';
+
 type RequestOptions = {
   method?: string;
   body?: BodyInit;
   json?: unknown;
   headers?: HeadersInit;
   cookie?: string | null;
+  remoteAddress?: string;
 };
 
 type SignUpOverrides = Partial<{
@@ -77,11 +82,15 @@ function createRequestFunction() {
       body = options.body;
     }
 
-    return app.request(path, {
-      method: options.method ?? 'GET',
-      headers,
-      body,
-    });
+    return app.request(
+      path,
+      {
+        method: options.method ?? 'GET',
+        headers,
+        body,
+      },
+      peerEnv(options.remoteAddress ?? DEFAULT_PEER_ADDRESS),
+    );
   };
 }
 
@@ -236,6 +245,11 @@ export function createIntegrationHelpers(emailDomain: string) {
     signIn,
     signUp,
   };
+}
+
+export function randomTestIp(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(3));
+  return `203.${bytes[0]}.${bytes[1]}.${bytes[2]}`;
 }
 
 export const integrationPassword = DEFAULT_PASSWORD;
