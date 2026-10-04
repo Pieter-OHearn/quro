@@ -164,12 +164,31 @@ QRO_RESTORE_CONFIRM=restore-db QRO_RESTORE_ALLOW_NON_EMPTY=1 bun run db:restore 
 
 ## Testing and Quality Checks
 
+Repository agent guidance starts at [AGENTS.md](../AGENTS.md); repository skills
+and their evaluations are described in [agent guidance](agent-guidance.md).
+
+Set `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` to an isolated
+synthetic database before DB-backed checks. The explicit role URLs take precedence
+over `DATABASE_URL` and package `.env` files may select an existing instance.
+`ci:check` applies migrations (and may start Compose's DB), while Playwright's
+backend setup applies migrations and seeds demo data. Never run these against the
+owner's live instance.
+
 ```bash
-bun run ci:check
+bun run check:bun-version
+bun run format:check
+bun run lint
 bun run typecheck
-bun run test
-bun run test:ui
+bun run test       # shared/script, backend and frontend; migrated test DB required
+bun run test:ui    # all frontend Bun tests; no browser or DB
+bun run --filter '@quro/frontend' test:ui # shared static UI markup only
+bun run test:smoke # Playwright; isolated DB and browser required
+bun run build
+bun run ci:check   # full suite, Python tooling and network audits required
 ```
+
+The pre-commit mode skips DB-backed tests, so a passing hook alone does not prove
+the full suite passed. Report skipped checks with the reason.
 
 Install the checked-in Git hook with `gitleaks` on your `PATH`:
 

@@ -4,7 +4,10 @@ Lightweight verification path for shared frontend atoms and molecules under `pac
 
 ## Automated smoke coverage
 
-- Run `bun run test:ui` from the repo root.
+- Run `bun run --filter '@quro/frontend' test:ui` from the repo root for shared UI
+  smoke cases only; `bun run test:ui` runs all frontend Bun tests.
+- Playwright is `bun run test:smoke`; it migrates and seeds the selected isolated
+  database and is a separate browser check.
 - The suite lives at `packages/frontend/src/components/ui/shared-ui.smoke.test.tsx`.
 - It uses `bun:test` plus `react-dom/server` `renderToStaticMarkup` and asserts stable text, ARIA attributes, and key markup markers.
 - New shared atoms and molecules should add at least one smoke case before merge.
@@ -12,7 +15,8 @@ Lightweight verification path for shared frontend atoms and molecules under `pac
 
 ## Manual checklist
 
-Assume local frontend and backend are running and, for authenticated routes, the seeded demo user is available.
+Use a disposable synthetic local instance with frontend and backend running; for
+authenticated routes, use the synthetic demo user. Do not seed the owner's instance.
 
 - `/welcome`: open `Sign in`, verify shared dialog chrome, labeled fields, password toggle button, primary submit button, and secondary actions still render correctly.
 - `/welcome`: switch to `Sign up`, verify the shared field and button styling still matches the current landing auth flow and the close button still dismisses the modal.
