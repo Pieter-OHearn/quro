@@ -37,6 +37,10 @@ await mock.module('../lib/marketDataClient', () => ({
 }));
 
 const { createIntegrationHelpers } = await import('../test/integration');
+const { db } = await import('../db/client');
+const { partnerLinks } = await import('../db/schema');
+const { isUniqueViolation } = await import('../lib/postgresErrors');
+const { eq, inArray, or } = await import('drizzle-orm');
 
 const integration = createIntegrationHelpers('partner-it.quro.test');
 const PARTNER_INVITE_ALLOWED_ATTEMPTS = 10;
@@ -335,6 +339,75 @@ describe('partner link lifecycle', () => {
       },
     });
     expect(pendingResponse.status).toBe(400);
+  });
+});
+
+describe('partner link concurrency', () => {
+  beforeAll(async () => {
+    await integration.cleanup();
+  });
+
+  afterAll(async () => {
+    await integration.cleanup();
+  });
+
+  test('"A invites B" and "C invites A" in parallel leave exactly one link', async () => {
+    const a = await integration.signUp('race-a');
+    const b = await integration.signUp('race-b');
+    const c = await integration.signUp('race-c');
+
+    const responses = await Promise.all([
+      invitePartner(a, b.user.email),
+      invitePartner(c, a.user.email),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const rows = await db
+      .select({ id: partnerLinks.id })
+      .from(partnerLinks)
+      .where(
+        or(
+          inArray(partnerLinks.requesterId, [a.user.id, b.user.id, c.user.id]),
+          inArray(partnerLinks.addresseeId, [a.user.id, b.user.id, c.user.id]),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  test('the database rejects a second link for a user on either side', async () => {
+    const d = await integration.signUp('db-d');
+    const e = await integration.signUp('db-e');
+    const f = await integration.signUp('db-f');
+    const g = await integration.signUp('db-g');
+    await db.insert(partnerLinks).values({ requesterId: d.user.id, addresseeId: e.user.id });
+
+    const attempts = [
+      { requesterId: d.user.id, addresseeId: f.user.id },
+      { requesterId: f.user.id, addresseeId: d.user.id },
+      { requesterId: f.user.id, addresseeId: e.user.id },
+      { requesterId: e.user.id, addresseeId: f.user.id },
+    ];
+    for (const values of attempts) {
+      const error = await db
+        .insert(partnerLinks)
+        .values(values)
+        .then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+      expect(isUniqueViolation(error)).toBe(true);
+    }
+
+    await db.insert(partnerLinks).values({ requesterId: f.user.id, addresseeId: g.user.id });
+    const repoint = await db
+      .update(partnerLinks)
+      .set({ addresseeId: d.user.id })
+      .where(eq(partnerLinks.requesterId, f.user.id))
+      .then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+    expect(isUniqueViolation(repoint)).toBe(true);
   });
 });
 
