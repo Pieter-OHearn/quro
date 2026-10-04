@@ -1,6 +1,12 @@
 import { createSign, generateKeyPairSync, randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
-import { abortableRead, checkWorkDeadline, upstreamSignal } from './workDeadline';
+import {
+  abortableRead,
+  checkWorkDeadline,
+  currentWorkSignal,
+  upstreamSignal,
+} from './workDeadline';
 
 export const BUNQ_PAYMENT_PAGE_CAP = 100;
 
@@ -138,20 +144,8 @@ function extractPagination(payload: unknown): BunqPagination | null {
   return null;
 }
 
-async function sleep(ms: number): Promise<void> {
-  const signal = upstreamSignal(ms + 1000);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await abortableRead(
-      signal,
-      () =>
-        new Promise<void>((resolve) => {
-          timer = setTimeout(resolve, ms);
-        }),
-    );
-  } finally {
-    clearTimeout(timer);
-  }
+function sleep(ms: number): Promise<void> {
+  return delay(ms, undefined, { signal: currentWorkSignal() });
 }
 
 function signBody(body: string, privateKeyPem: string): string {
