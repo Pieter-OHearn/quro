@@ -14,6 +14,7 @@ import {
   holdings,
   mortgageTransactions,
   mortgages,
+  partnerLinkMembers,
   partnerLinks,
   payslips,
   pensionPots,
@@ -193,6 +194,24 @@ async function cleanupTestUsers(emailPattern: string) {
     );
   await db.delete(sessions).where(inArray(sessions.userId, userIds));
   await db.delete(users).where(inArray(users.id, userIds));
+}
+
+export function insertPartnerLink(
+  requesterId: number,
+  addresseeId: number,
+  status: 'pending' | 'accepted' = 'pending',
+) {
+  return db.transaction(async (tx) => {
+    const [link] = await tx
+      .insert(partnerLinks)
+      .values({ requesterId, addresseeId, status })
+      .returning();
+    await tx.insert(partnerLinkMembers).values([
+      { userId: requesterId, linkId: link.id },
+      { userId: addresseeId, linkId: link.id },
+    ]);
+    return link;
+  });
 }
 
 export function createIntegrationHelpers(emailDomain: string) {

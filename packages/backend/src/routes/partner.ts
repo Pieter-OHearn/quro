@@ -2,7 +2,14 @@ import { Hono } from 'hono';
 import { and, eq, inArray, or } from 'drizzle-orm';
 import type { PartnerLink, PartnerProfile } from '@quro/shared';
 import { db } from '../db/client';
-import { mortgages, partnerLinks, properties, savingsAccounts, users } from '../db/schema';
+import {
+  mortgages,
+  partnerLinkMembers,
+  partnerLinks,
+  properties,
+  savingsAccounts,
+  users,
+} from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { partnerInviteRateLimit } from '../middleware/rateLimit';
@@ -108,11 +115,15 @@ app.post('/invite', async (c) => {
         .insert(partnerLinks)
         .values({ requesterId: user.id, addresseeId: target.id })
         .returning();
+      await tx.insert(partnerLinkMembers).values([
+        { userId: link.requesterId, linkId: link.id },
+        { userId: link.addresseeId, linkId: link.id },
+      ]);
       return { link } as const;
     });
   } catch (error) {
     // A concurrent invite can slip past the existence check at read-committed
-    // isolation; the unique indexes reject it, which is a conflict, not a 500.
+    // isolation; the member primary key rejects it, which is a conflict, not a 500.
     if (isUniqueViolation(error)) {
       return c.json({ error: 'A partner link already exists' }, HTTP_STATUS.CONFLICT);
     }

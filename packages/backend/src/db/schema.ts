@@ -187,6 +187,17 @@ export const partnerLinks = pgTable(
   }),
 );
 
+// One row per participant of a link. The primary key on user_id is what makes a
+// second pending or accepted link impossible for a user, whichever side they are on.
+export const partnerLinkMembers = pgTable('partner_link_members', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  linkId: integer('link_id')
+    .references(() => partnerLinks.id, { onDelete: 'cascade' })
+    .notNull(),
+});
+
 // ── Wealth planning ─────────────────────────────────────────────────────────
 
 export const employments = pgTable(
