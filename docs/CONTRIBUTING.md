@@ -41,7 +41,8 @@ The `release` GitHub workflow (triggered by merges to `main`) performs the follo
 Enable the following protections for `main` inside the GitHub repository settings:
 
 - Require pull request reviews before merging.
-- Require status checks to pass before merging (select all jobs from `.github/workflows/ci.yml`).
+- Require status checks to pass before merging. At minimum require the aggregate `CI` job; it runs with `if: always()` and fails unless every job it needs finished with `success` (a failed, cancelled or skipped upstream job fails it). Keep its `needs` list in sync with the other jobs in `.github/workflows/ci.yml`; `scripts/lib/ci-gate.test.ts` enforces this.
+- Apply the rules to administrators too ("Do not allow bypassing the above settings" / `enforce_admins`), so a failing gate cannot be merged around.
 - Require branches to be up to date before merging.
 - Disallow force pushes and direct pushes.
 
