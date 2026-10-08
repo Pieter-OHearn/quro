@@ -34,15 +34,17 @@ The file is a PostgreSQL custom-format dump. You can take a backup while the sta
 
 ## Back up uploaded documents
 
-PDFs are stored in the MinIO bucket named by `S3_BUCKET` (default `quro-documents`), whose data lives in `./data/minio`. To copy it consistently, stop the stack first:
+PDFs are stored in the MinIO bucket named by `S3_BUCKET` (default `quro-documents`), whose data lives in `./data/minio`. Rows in the database refer to these objects by key, so take the database backup and the document copy together, while nothing is writing:
 
 ```bash
-docker compose stop
+docker compose stop backend pension-import-worker
+docker compose --profile maintenance run --rm db-tools backup
+docker compose stop minio
 cp -a ./data/minio /path/to/safe/place/minio-$(date +%Y%m%d)
-docker compose start
+docker compose up -d
 ```
 
-Take the database backup and the copy of `./data/minio` at the same time. Rows in the database refer to objects by key, so a dump and a document copy from different days can disagree.
+A dump and a document copy taken on different days can disagree about which documents exist.
 
 The project has not rehearsed restoring this copy end to end. After you restore it, open a few documents in the app to confirm they download.
 
@@ -94,7 +96,7 @@ The restore command stops with an error, and changes nothing, in these cases:
 | The database already has data                | `Refusing to restore over a non-empty database.`     | Set `QRO_RESTORE_ALLOW_NON_EMPTY=1` if that is what you intend.  |
 | Another session is connected to the database | `Refusing to restore while other database sessions…` | Stop the backend, the worker and any SQL client, then try again. |
 
-A dump that is truncated or damaged fails with a `pg_restore` error. A `.dump` file is restored in a single transaction, so a failed restore leaves the database as it was. A plain `.sql` file is not restored atomically and can leave a half-restored database, so always restore the `.dump` files that `backup` creates.
+A dump that is truncated or damaged fails with a `pg_restore` error. A `.dump` file is restored in a single transaction (`pg_restore --single-transaction`), so a restore that fails part way is rolled back. A plain `.sql` file is not restored atomically and can leave a half-restored database, so always restore the `.dump` files that `backup` creates.
 
 ## Verify a restore
 

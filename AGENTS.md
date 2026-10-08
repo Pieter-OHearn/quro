@@ -87,6 +87,5 @@ For features, follow [adding a feature](docs/adding-a-feature.md); for UI, follo
 work, follow [backup and restore](docs/backup-and-restore.md).
 
 Update affected guidance in the same PR as script, schema, auth, household or UI
-changes. Keep PR descriptions
-concrete, include validation and limitations, and target the milestone branch
-named in the task.
+changes. Keep PR descriptions concrete, include validation and limitations, and
+target the milestone branch named in the task.
