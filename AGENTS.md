@@ -77,16 +77,16 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 ## Instructions
 
 System/developer instructions and the user's task take precedence over repository
-guidance. A nearer applicable `AGENTS.md` refines this file; a task skill supplies
-workflow details within those constraints. Docs and code examples are references,
-not extra authorization. Report contradictions against current code.
+guidance. A nearer applicable `AGENTS.md` refines this file. Docs and code
+examples are references, not extra authorization. Report contradictions against
+current code.
 
 For features, follow [adding a feature](docs/adding-a-feature.md); for UI, follow
 [design tokens](docs/design-tokens.md) and
-[shared UI verification](docs/shared-ui-verification.md). For schema migration or
-backup/restore work, load `.agents/skills/quro-migration-recovery`.
+[shared UI verification](docs/shared-ui-verification.md). For backup and restore
+work, follow [backup and restore](docs/backup-and-restore.md).
 
 Update affected guidance in the same PR as script, schema, auth, household or UI
-changes; see [agent guidance](docs/agent-guidance.md). Keep PR descriptions
+changes. Keep PR descriptions
 concrete, include validation and limitations, and target the milestone branch
 named in the task.

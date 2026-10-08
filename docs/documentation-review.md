@@ -26,10 +26,9 @@ documents. Current maintained references are [development](development.md),
 
 ## Scope and remaining work
 
-Issue #268 corrects the agent entry point, commands/framework facts, feature-guide
-examples and the repository skill. The [evaluation record](agent-guidance.md)
-holds skill triggers and retention trials; the issue's PR maps acceptance criteria to
-evidence. It does not certify operator installation, full object-store recovery or release
+Issue #268 corrects the agent entry point, commands/framework facts and
+feature-guide examples; the issue's PR maps acceptance criteria to evidence. It does
+not certify operator installation, full object-store recovery or release
 qualification. Broader contributor/release documentation belongs to R02; current
 release workflow claims still need that separate audit.
 
