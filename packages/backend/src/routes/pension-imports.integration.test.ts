@@ -6,6 +6,12 @@ const failedDeletionKeys = new Set<string>();
 const deletionRequests: string[][] = [];
 let pensionImportCapabilityEnabled = true;
 
+// mock.module replaces modules for the whole bun process; keep the real ones so
+// afterAll can put them back before later test files (e.g. bunq) run.
+const realS3 = { ...(await import('../lib/s3')) };
+const realCapabilities = { ...(await import('../lib/capabilities')) };
+const realPensionParserClient = { ...(await import('../lib/pensionParserClient')) };
+
 await mock.module('../lib/s3', () => ({
   S3ConfigurationError: class MockS3ConfigurationError extends Error {
     constructor(message: string) {
@@ -210,6 +216,9 @@ describe('pension imports integration', () => {
     s3Objects.clear();
     mock.clearAllMocks();
     mock.restore();
+    await mock.module('../lib/s3', () => realS3);
+    await mock.module('../lib/capabilities', () => realCapabilities);
+    await mock.module('../lib/pensionParserClient', () => realPensionParserClient);
     await integration.cleanup();
   });
 
