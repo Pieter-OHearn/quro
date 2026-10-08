@@ -7,25 +7,8 @@ Thanks for helping improve Quro! This document focuses on the workflow for propo
 1. **Branching** – create a feature branch from `main`. Direct pushes to `main` are blocked via branch protection.
 2. **Code + tests** – implement your changes and run `bun run ci:check` locally when possible.
 3. **Update the release notes** – edit `CHANGELOG.md` inside the relevant section, or add a new section if you are preparing a release.
-4. **Bump the version** – use the helper script to increment the semantic version stored in `VERSION`:
-
-   ```bash
-   bun scripts/bump-version.ts minor   # or major / patch / prerelease
-   ```
-
-   The script updates `VERSION` and prints the next value. Every PR merged into `main` must include a version bump that is greater than the previous release.
-
-5. **Open the PR** – target `main`, ensure all GitHub Actions checks (format, lint, tests, version guard, etc.) pass, and request a review.
-6. **Merge** – once approved, merge via the PR UI. The release workflow automatically tags the commit, publishes multi-architecture Docker images to GitHub Container Registry (GHCR), and attaches a deployment manifest to the GitHub Release.
-
-## Version Guard
-
-CI runs `scripts/verify-version-bump.ts` on every push/PR. It ensures:
-
-- `VERSION` follows `vX.Y.Z` SemVer format.
-- The proposed version differs from the base branch and is greater than the most recent tag.
-
-If the job fails, bump the version (see above) and re-run CI.
+4. **Open the PR** – target `main`, ensure all GitHub Actions checks (format, lint, tests, etc.) pass, and request a review.
+5. **Merge** – once approved, merge via the PR UI. The release workflow automatically tags the commit, publishes multi-architecture Docker images to GitHub Container Registry (GHCR), and attaches a deployment manifest to the GitHub Release.
 
 ## Release Artifacts
 
