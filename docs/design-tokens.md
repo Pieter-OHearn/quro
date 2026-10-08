@@ -92,6 +92,19 @@ transaction, or import row means, then pass the resulting rows and handlers into
 shared primitives. Do not move business rules into shared UI to avoid styling a
 feature component.
 
+### Building with shared primitives
+
+- Check `packages/frontend/src/components/ui/index.ts` before adding a component,
+  and export new reusable components from it.
+- Native wrappers pass through HTML props, accept `className` and merge it with
+  `cn`. Use existing variants and sizes, and Lucide icons.
+- Style form fields with `getFieldChrome` and aligned financial values with
+  `font-numeric`.
+- `Button` supports `loading` and disables itself while loading; use it instead of
+  a separate submitting-button pattern.
+- Keep loading, empty, error, disabled and submitting states, labels, keyboard
+  controls and focus behavior when replacing markup.
+
 ## Table and list decision rules
 
 Use `DataTable` for comparable records where columns carry meaning across rows:
