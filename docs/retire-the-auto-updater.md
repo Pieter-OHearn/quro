@@ -27,7 +27,7 @@ docker compose -f docker-compose.release.yml --profile auto-update stop auto-upd
 docker compose -f docker-compose.release.yml --profile auto-update rm -f auto-updater
 ```
 
-The first command lists the container, if there is one. If it prints nothing, skip to step 2. The other two stop and remove only that service. Use the Compose file name you started it with if it is not `docker-compose.release.yml`.
+The first command lists the container, if there is one. If it prints nothing, skip to step 2. The other two stop and remove only that service. Use the Compose file name you started it with if it is not `docker-compose.release.yml`. If you started the updater some other way, such as `docker run`, stop and remove it by the name the first command printed: `docker stop <name>` and `docker rm <name>`.
 
 ## 2. Stop scheduled jobs and listeners
 
@@ -66,7 +66,7 @@ Keep `docker-compose.release.yml`, `.env`, `secrets/` and `data/`. You can also 
 
 ```bash
 docker compose -f docker-compose.release.yml --profile auto-update ps -a
-docker compose -f docker-compose.release.yml --profile auto-update ps -q | xargs docker inspect --format '{{.Name}} {{range .Mounts}}{{.Source}} {{end}}' | grep docker.sock
+docker compose -f docker-compose.release.yml --profile auto-update ps -q | xargs -r docker inspect --format '{{.Name}} {{range .Mounts}}{{.Source}} {{end}}' | grep docker.sock
 ```
 
 The first command lists your stack without an `auto-updater` entry. The second prints nothing: no container in the stack mounts the Docker socket. Other containers on the host, such as a reverse proxy, may legitimately mount it; that is not part of Quro.
