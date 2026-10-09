@@ -33,6 +33,7 @@ describe('malformed JSON bodies', () => {
     const response = await integration.request(path, {
       method,
       cookie: owner.cookie,
+      headers: { 'Content-Type': 'application/json' },
       body: MALFORMED_JSON,
     });
 

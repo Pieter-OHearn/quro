@@ -27,6 +27,7 @@ export const CLEAR_TABLE_NAMES = [
   'payslips',
   'goals',
   'currency_rates',
+  'auth_codes',
   'sessions',
   'worker_heartbeats',
   'users',

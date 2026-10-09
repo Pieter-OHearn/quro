@@ -89,11 +89,13 @@ The Vite dev server runs on `:5173` and the Bun API server on `:3000`. The Axios
 
 ### Authentication
 
-Authentication is session-based. On login, the backend writes a random session ID to the `sessions` table and sets an HTTP-only cookie on the response. All subsequent requests carry the cookie. The `requireAuth` middleware reads the cookie, validates the session against the DB, and attaches `{ id, email }` and the accepted `partnerId` to the Hono context in one session query. Sessions have a 30-day TTL and are cleaned up by a background interval started in `index.ts` via `startSessionCleanup()`.
+Authentication is session-based (`src/lib/sessions.ts`). On sign-in, the backend generates a random token, stores only its SHA-256 digest in the `sessions` table and sets the token in an HTTP-only cookie. All subsequent requests carry the cookie. The `requireAuth` middleware hashes the cookie, validates the session against the DB, and attaches `{ id, email }`, the session id and the accepted `partnerId` to the Hono context in one session query. Sessions have a 30-day TTL and are cleaned up by a background interval started in `index.ts` via `startSessionCleanup()`.
+
+Sign-up follows `QRO_REGISTRATION_MODE` (`src/lib/registration.ts`): the first account always needs an operator-issued setup code, and later sign-ups need an invite code unless the operator opts in to open registration. Operators issue registration and password reset codes with the `quro` command in the backend image (`src/cli/`). See [the security model](security.md) for the deployment modes, registration policy and recovery.
 
 ### CSRF protection
 
-The backend applies a `requireCsrf` middleware globally to all routes (including public ones). It uses a cookie + request-header token pair. The Axios client injects the CSRF header on every mutating request. Read requests (GET) are not subject to CSRF checks.
+The backend applies a `requireCsrf` middleware globally to all routes. It uses a cookie + request-header token pair. The Axios client injects the CSRF header on every mutating request. Read requests (GET) are not subject to CSRF checks. Public auth endpoints run before a token exists, so their `POST` requests must be JSON instead; only sign-out may have no body.
 
 ---
 
@@ -118,7 +120,7 @@ graph TD
   Nginx --> Browser
 ```
 
-All `/api/*` routes require authentication by default. Exact public paths in `src/lib/publicPaths.ts` (signin, signup, signout, session discovery, health, readiness, and the signed Bunq OAuth callback) are shared by auth and CSRF middleware; new routes under these prefixes remain protected.
+All `/api/*` routes require authentication by default. Exact public paths in `src/lib/publicPaths.ts` (signin, signup, signout, session discovery, the registration policy, operator-code password reset, health, readiness, and the signed Bunq OAuth callback) are shared by auth and CSRF middleware; new routes under these prefixes remain protected.
 
 The global error handler (`src/middleware/errorHandler.ts`) catches any unhandled exception and returns `{ error: message }` JSON with an appropriate status code.
 
@@ -331,7 +333,7 @@ Arithmetic happens on JavaScript numbers. Where a result must be whole cents, us
 
 ### Sessions
 
-Sessions are stored in the `sessions` table with an `expires_at` timestamp (30-day TTL from login). The backend calls `startSessionCleanup()` on startup, which runs a background interval to delete expired rows. There is no Redis or external session store.
+Sessions are stored in the `sessions` table, keyed by the SHA-256 digest of the cookie token, with an `expires_at` timestamp (30-day TTL from login), the browser's user agent and a `last_used_at` time. Users list and revoke them in Settings; operators revoke them with `quro user revoke-sessions`. The backend calls `startSessionCleanup()` on startup, which runs a background interval to delete expired rows and old operator codes (`auth_codes`). There is no Redis or external session store.
 
 ### Two database roles
 

@@ -14,7 +14,8 @@
     "db:restore": "bun run src/db/restore.ts",
     "db:clear": "bun run src/db/clear.ts",
     "db:bootstrap-runtime-role": "bun run src/db/bootstrapRuntimeRole.ts",
-    "db:seed-demo": "bun run src/db/seedDemoUser.ts"
+    "db:seed-demo": "bun run src/db/seedDemoUser.ts",
+    "quro": "bun run src/cli/quro.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

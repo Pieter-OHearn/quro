@@ -2,7 +2,10 @@ import { like, inArray, or } from 'drizzle-orm';
 import { app } from '../index';
 import { db } from '../db/client';
 import { peerEnv } from './peer';
+import { issueRegistrationCode } from '../lib/authCodes';
+import { HOUR_MS } from '../constants/time';
 import {
+  authCodes,
   budgetCategories,
   budgetTransactions,
   categoryMappings,
@@ -46,6 +49,7 @@ type SignUpOverrides = Partial<{
   password: string;
   age: number;
   retirementAge: number;
+  inviteCode: string;
 }>;
 
 export type AuthSession = {
@@ -147,7 +151,7 @@ async function parseAuthSessionResponse(response: Response, email: string): Prom
   };
 }
 
-function createSignUpPayload(email: string, overrides: SignUpOverrides) {
+function createSignUpPayload(email: string, overrides: SignUpOverrides, inviteCode: string) {
   return {
     firstName: overrides.firstName ?? 'Integration',
     lastName: overrides.lastName ?? 'Tester',
@@ -155,7 +159,24 @@ function createSignUpPayload(email: string, overrides: SignUpOverrides) {
     password: overrides.password ?? DEFAULT_PASSWORD,
     age: overrides.age ?? DEFAULT_USER_AGE,
     retirementAge: overrides.retirementAge ?? DEFAULT_RETIREMENT_AGE,
+    inviteCode,
   };
+}
+
+// Codes issued for tests, removed by cleanup whether or not a sign-up used them.
+const issuedInviteCodeIds = new Set<number>();
+
+// Registration is invite-only by default, so tests sign up the way an invited user does.
+export async function issueInviteCode(): Promise<string> {
+  const issued = await issueRegistrationCode({ ttlMs: HOUR_MS });
+  issuedInviteCodeIds.add(issued.id);
+  return issued.code;
+}
+
+async function cleanupInviteCodes() {
+  if (issuedInviteCodeIds.size === 0) return;
+  await db.delete(authCodes).where(inArray(authCodes.id, [...issuedInviteCodeIds]));
+  issuedInviteCodeIds.clear();
 }
 
 async function cleanupTestUsers(emailPattern: string) {
@@ -193,6 +214,7 @@ async function cleanupTestUsers(emailPattern: string) {
       or(inArray(partnerLinks.requesterId, userIds), inArray(partnerLinks.addresseeId, userIds)),
     );
   await db.delete(sessions).where(inArray(sessions.userId, userIds));
+  await db.delete(authCodes).where(inArray(authCodes.consumedByUserId, userIds));
   await db.delete(users).where(inArray(users.id, userIds));
 }
 
@@ -221,9 +243,10 @@ export function createIntegrationHelpers(emailDomain: string) {
 
   const signUp = async (label: string, overrides: SignUpOverrides = {}): Promise<AuthSession> => {
     const email = overrides.email ?? buildScopedEmail(label);
+    const inviteCode = overrides.inviteCode ?? (await issueInviteCode());
     const response = await request('/api/auth/signup', {
       method: 'POST',
-      json: createSignUpPayload(email, overrides),
+      json: createSignUpPayload(email, overrides, inviteCode),
     });
 
     return parseAuthSessionResponse(response, email);
@@ -239,8 +262,12 @@ export function createIntegrationHelpers(emailDomain: string) {
   };
 
   return {
-    cleanup: () => cleanupTestUsers(emailPattern),
+    cleanup: async () => {
+      await cleanupInviteCodes();
+      await cleanupTestUsers(emailPattern);
+    },
     buildEmail: buildScopedEmail,
+    issueInviteCode,
     request,
     signIn,
     signUp,

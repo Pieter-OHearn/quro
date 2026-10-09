@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { FormField, Modal, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
 import { useSignInState } from '../hooks';
 import type { SignInState } from '../types';
+import { PasswordResetForm } from './PasswordResetForm';
 import { SubmitButton } from './SubmitButton';
 
 type SignInModalProps = {
@@ -12,9 +14,13 @@ type SignInModalProps = {
 type SignInFormProps = {
   state: SignInState;
   onSwitchToSignUp: () => void;
+  onForgotPassword: () => void;
 };
 
-function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
+function SignInFormFields({
+  state,
+  onForgotPassword,
+}: Readonly<{ state: SignInState; onForgotPassword: () => void }>) {
   const { email, setEmail, password, setPassword, showPw, toggleShowPw, errors, clearError } =
     state;
 
@@ -50,11 +56,20 @@ function SignInFormFields({ state }: Readonly<{ state: SignInState }>) {
           error={Boolean(errors.password)}
         />
       </FormField>
+      <div className="-mt-2 text-right">
+        <button
+          type="button"
+          onClick={onForgotPassword}
+          className="text-xs font-semibold text-brand transition-colors hover:text-brand-strong"
+        >
+          Forgot password?
+        </button>
+      </div>
     </>
   );
 }
 
-function SignInForm({ state, onSwitchToSignUp }: Readonly<SignInFormProps>) {
+function SignInForm({ state, onSwitchToSignUp, onForgotPassword }: Readonly<SignInFormProps>) {
   const { loading, handleSubmit } = state;
 
   return (
@@ -64,7 +79,7 @@ function SignInForm({ state, onSwitchToSignUp }: Readonly<SignInFormProps>) {
       }}
       className="space-y-4 px-8 py-7 text-fg"
     >
-      <SignInFormFields state={state} />
+      <SignInFormFields state={state} onForgotPassword={onForgotPassword} />
       <SubmitButton
         loading={loading}
         loadingText="Signing in…"
@@ -91,11 +106,12 @@ function SignInForm({ state, onSwitchToSignUp }: Readonly<SignInFormProps>) {
 
 export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalProps>) {
   const state = useSignInState();
+  const [resetting, setResetting] = useState(false);
 
   return (
     <Modal
-      title="Welcome back"
-      subtitle="Sign in to your Quro account"
+      title={resetting ? 'Reset your password' : 'Welcome back'}
+      subtitle={resetting ? 'Use the code from your Quro operator' : 'Sign in to your Quro account'}
       onClose={onClose}
       maxWidth="md"
       bodyClassName="space-y-0 p-0"
@@ -112,7 +128,15 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
         closeIconSize: 16,
       }}
     >
-      <SignInForm state={state} onSwitchToSignUp={onSwitchToSignUp} />
+      {resetting ? (
+        <PasswordResetForm onBackToSignIn={() => setResetting(false)} />
+      ) : (
+        <SignInForm
+          state={state}
+          onSwitchToSignUp={onSwitchToSignUp}
+          onForgotPassword={() => setResetting(true)}
+        />
+      )}
     </Modal>
   );
 }

@@ -51,6 +51,7 @@ export const domainQueryDependencies = {
     keys.plan.all,
   ],
   bunqConnection: [keys.bunqConnection],
+  sessions: [keys.sessions],
   bunqSync: [
     keys.bunqConnection,
     ...savings,

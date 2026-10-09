@@ -1,0 +1,14 @@
+#!/bin/sh
+# Operator command line, for example: docker compose exec backend quro user invite
+# `docker compose exec` does not run the image entrypoint, so build the runtime database
+# URL from the mounted secret here unless the deployment already provides one.
+set -eu
+
+. /app/docker/backend/common-env.sh
+
+if [ -z "${DATABASE_URL:-}" ] && [ -z "${APP_DATABASE_URL:-}" ]; then
+  load_runtime_database_env
+fi
+
+cd /app/packages/backend
+exec bun src/cli/quro.ts "$@"

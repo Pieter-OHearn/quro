@@ -188,3 +188,14 @@ test('salary and holding changes refresh dashboard insight variants, while docum
   for (const key of variants) expect(isInvalidated(client, key)).toBe(false);
   client.clear();
 });
+
+test('session revocations refresh the session list and nothing else', async () => {
+  const client = new QueryClient();
+  seed(client, [keys.sessions, keys.partner, keys.dashboard.summary, keys.registrationPolicy]);
+  await invalidateDomain(client, 'sessions');
+  expect(isInvalidated(client, keys.sessions)).toBe(true);
+  expect(isInvalidated(client, keys.partner)).toBe(false);
+  expect(isInvalidated(client, keys.dashboard.summary)).toBe(false);
+  expect(isInvalidated(client, keys.registrationPolicy)).toBe(false);
+  client.clear();
+});

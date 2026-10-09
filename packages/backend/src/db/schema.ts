@@ -148,16 +148,51 @@ export const users = pgTable(
 export const sessions = pgTable(
   'sessions',
   {
+    // SHA-256 hex digest of the cookie token. The raw token is never stored, and the
+    // check keeps a raw (base64url) token from being written here by mistake.
     id: text('id').primaryKey(),
     userId: integer('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
     expiresAt: timestamp('expires_at').notNull(),
+    lastUsedAt: timestamp('last_used_at').defaultNow().notNull(),
+    userAgent: text('user_agent'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => ({
     userIdx: index('sessions_user_id_idx').on(table.userId),
     expiresAtIdx: index('sessions_expires_at_idx').on(table.expiresAt),
+    idDigestCheck: check('sessions_id_digest_check', sql`${table.id} ~ '^[0-9a-f]{64}$'`),
+  }),
+);
+
+// One-time codes an operator issues from the CLI: registration invites (no user yet)
+// and password resets (bound to a user). Only a SHA-256 digest of the code is stored.
+export const authCodes = pgTable(
+  'auth_codes',
+  {
+    id: serial('id').primaryKey(),
+    codeHash: text('code_hash').notNull(),
+    purpose: text('purpose', { enum: ['registration', 'password_reset'] }).notNull(),
+    userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at').notNull(),
+    consumedAt: timestamp('consumed_at'),
+    consumedByUserId: integer('consumed_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    codeHashIdx: uniqueIndex('auth_codes_code_hash_idx').on(t.codeHash),
+    expiresAtIdx: index('auth_codes_expires_at_idx').on(t.expiresAt),
+    purposeCheck: check(
+      'auth_codes_purpose_check',
+      sql`${t.purpose} in ('registration', 'password_reset')`,
+    ),
+    userCheck: check(
+      'auth_codes_user_check',
+      sql`(${t.purpose} = 'password_reset') = (${t.userId} is not null)`,
+    ),
   }),
 );
 

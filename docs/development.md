@@ -109,7 +109,12 @@ cp .env.example .env
 bun run dev:docker
 ```
 
-3. Open `http://localhost:3000`.
+3. Open `http://localhost:3000`. To create the first account, issue a setup code and enter it in
+   the sign-up form:
+
+```bash
+docker compose exec backend quro user invite
+```
 
 The Docker stack publishes:
 
@@ -178,6 +183,14 @@ QRO_RESTORE_CONFIRM=restore-db QRO_RESTORE_ALLOW_NON_EMPTY=1 bun run db:restore 
 ```
 
 `db:clear` and `db:restore` keep the current confirmation guards and automatic pre-destructive backups.
+
+Accounts on a host-run backend are managed with the same operator commands as in Docker. Sign-up
+needs a code from `quro user invite`; `quro user --help` lists the others (password reset codes,
+session revocation). See [the security model](security.md#operator-recovery-without-email).
+
+```bash
+bun run --filter '@quro/backend' quro user invite
+```
 
 For the full backup and restore procedure, what a database dump does not include (uploaded PDFs) and how to verify a restore, see [backup and restore](backup-and-restore.md).
 

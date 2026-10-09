@@ -1,5 +1,4 @@
-import { Hono, type Context } from 'hono';
-import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import { Hono } from 'hono';
 import {
   MAX_RETIREMENT_AGE,
   MAX_USER_AGE,
@@ -11,8 +10,12 @@ import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { HTTP_STATUS } from '../constants/http';
-import { DAY_MS } from '../constants/time';
-import { signinEmailRateLimit, signinRateLimit, signupRateLimit } from '../middleware/rateLimit';
+import {
+  passwordResetRateLimit,
+  signinEmailRateLimit,
+  signinRateLimit,
+  signupRateLimit,
+} from '../middleware/rateLimit';
 import {
   DEFAULT_BASE_CURRENCY,
   DEFAULT_USER_NUMBER_FORMAT,
@@ -20,15 +23,26 @@ import {
   DEFAULT_USER_AGE,
   publicUserColumns,
 } from '../lib/users';
-import { isUniqueViolation } from '../lib/postgresErrors';
 import { parseWholeNumber, readJsonRecord } from '../lib/requestValidation';
+import { consumeAuthCode } from '../lib/authCodes';
+import { cookieTransportCheck } from '../middleware/cookieTransport';
+import {
+  getRegistrationMode,
+  getRegistrationPolicy,
+  registerAccount,
+  type RegistrationRejection,
+} from '../lib/registration';
+import {
+  clearSessionCookies,
+  createSession,
+  getSessionCookieHash,
+  revokeUserSessions,
+} from '../lib/sessions';
 
 const app = new Hono();
 
-const SESSION_ID_BYTES = 32;
-const HEX_RADIX = 16;
-const HEX_BYTE_LENGTH = 2;
-const SESSION_DURATION_DAYS = 30;
+app.use('*', cookieTransportCheck);
+
 const BCRYPT_COST = 10;
 const DUMMY_PASSWORD_HASH = await Bun.password.hash('quro-dummy-password', {
   algorithm: 'bcrypt',
@@ -42,6 +56,7 @@ type SignUpPayload = {
   password: string;
   age: number | null;
   retirementAge: number | null;
+  inviteCode: string | null;
 };
 
 type ValidSignUpPayload = {
@@ -51,17 +66,8 @@ type ValidSignUpPayload = {
   password: string;
   age: number;
   retirementAge: number;
+  inviteCode: string | null;
 };
-
-function generateSessionId() {
-  const bytes = crypto.getRandomValues(new Uint8Array(SESSION_ID_BYTES));
-  return Array.from(bytes, (b) => b.toString(HEX_RADIX).padStart(HEX_BYTE_LENGTH, '0')).join('');
-}
-
-function generateCsrfToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(SESSION_ID_BYTES));
-  return Array.from(bytes, (b) => b.toString(HEX_RADIX).padStart(HEX_BYTE_LENGTH, '0')).join('');
-}
 
 function normalizeString(rawValue: unknown, lowercase = false) {
   if (typeof rawValue !== 'string') {
@@ -81,8 +87,6 @@ function parseOptionalWholeNumber(rawValue: unknown, fallback: number) {
   return parsed !== null && parsed > 0 ? parsed : null;
 }
 
-const SESSION_MAX_AGE = SESSION_DURATION_DAYS * DAY_MS;
-
 function parseSignUpPayload(rawBody: Record<string, unknown>): SignUpPayload {
   return {
     firstName: normalizeString(rawBody.firstName),
@@ -91,6 +95,7 @@ function parseSignUpPayload(rawBody: Record<string, unknown>): SignUpPayload {
     password: typeof rawBody.password === 'string' ? rawBody.password : '',
     age: parseOptionalWholeNumber(rawBody.age, DEFAULT_USER_AGE),
     retirementAge: parseOptionalWholeNumber(rawBody.retirementAge, DEFAULT_RETIREMENT_AGE),
+    inviteCode: normalizeString(rawBody.inviteCode) || null,
   };
 }
 
@@ -148,35 +153,44 @@ function validateSignUpPayload(
       password: payload.password,
       age: payload.age!,
       retirementAge: payload.retirementAge!,
+      inviteCode: payload.inviteCode,
     },
   };
 }
 
-async function createSession(c: Context, userId: number) {
-  const sessionId = generateSessionId();
-  const csrfToken = generateCsrfToken();
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE);
-  const secureCookies = process.env.SECURE_COOKIES === 'true';
-  const cookieMaxAge = SESSION_MAX_AGE / 1000;
+const REGISTRATION_ERRORS = {
+  closed: {
+    status: HTTP_STATUS.FORBIDDEN,
+    error: 'Registration is closed on this Quro instance. Ask its operator for an account.',
+  },
+  code_required: {
+    status: HTTP_STATUS.FORBIDDEN,
+    error: 'An invite code from the operator of this Quro instance is required',
+  },
+  invalid_code: {
+    status: HTTP_STATUS.FORBIDDEN,
+    error: 'This code is invalid, expired or already used',
+  },
+  email_taken: {
+    status: HTTP_STATUS.CONFLICT,
+    error: 'An account with this email already exists',
+  },
+} as const satisfies Record<RegistrationRejection, { status: number; error: string }>;
 
-  await db.insert(sessions).values({ id: sessionId, userId, expiresAt });
+const SETUP_CODE_REQUIRED_ERROR =
+  'A setup code is required to create the first account. The operator issues one with `quro user invite` on the server.';
 
-  setCookie(c, 'session', sessionId, {
-    httpOnly: true,
-    secure: secureCookies,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: cookieMaxAge,
-  });
-
-  setCookie(c, 'csrf_token', csrfToken, {
-    httpOnly: false,
-    secure: secureCookies,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: cookieMaxAge,
-  });
+function registrationError(reason: RegistrationRejection, firstAccount: boolean) {
+  const { status, error } = REGISTRATION_ERRORS[reason];
+  return {
+    status,
+    error: reason === 'code_required' && firstAccount ? SETUP_CODE_REQUIRED_ERROR : error,
+  };
 }
+
+// ── Registration policy ─────────────────────────────────────────────────────
+
+app.get('/registration', async (c) => c.json({ data: await getRegistrationPolicy() }));
 
 // ── Sign Up ─────────────────────────────────────────────────────────────────
 
@@ -191,39 +205,33 @@ app.post('/signup', signupRateLimit, async (c) => {
   }
 
   const { data } = validationResult;
-  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, data.email));
-  if (existing.length > 0) {
-    return c.json({ error: 'An account with this email already exists' }, HTTP_STATUS.CONFLICT);
-  }
-
   const passwordHash = await Bun.password.hash(data.password, {
     algorithm: 'bcrypt',
     cost: BCRYPT_COST,
   });
 
-  let user;
-  try {
-    [user] = await db
-      .insert(users)
-      .values({
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        location: '',
-        age: data.age,
-        retirementAge: data.retirementAge,
-        baseCurrency: DEFAULT_BASE_CURRENCY,
-        numberFormat: DEFAULT_USER_NUMBER_FORMAT,
-        passwordHash,
-      })
-      .returning(publicUserColumns);
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      return c.json({ error: 'An account with this email already exists' }, HTTP_STATUS.CONFLICT);
-    }
-    throw error;
+  const result = await registerAccount({
+    mode: getRegistrationMode(),
+    code: data.inviteCode,
+    user: {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      location: '',
+      age: data.age,
+      retirementAge: data.retirementAge,
+      baseCurrency: DEFAULT_BASE_CURRENCY,
+      numberFormat: DEFAULT_USER_NUMBER_FORMAT,
+      passwordHash,
+    },
+  });
+
+  if (!result.ok) {
+    const { status, error } = registrationError(result.reason, result.firstAccount);
+    return c.json({ error }, status);
   }
 
+  const { user } = result;
   await createSession(c, user.id);
 
   return c.json({ data: user }, HTTP_STATUS.CREATED);
@@ -273,17 +281,64 @@ app.post('/signin', signinRateLimit, async (c) => {
   return c.json({ data: publicUser });
 });
 
+// ── Password reset (operator-issued code) ──────────────────────────────────
+
+function parsePasswordResetPayload(body: Record<string, unknown>) {
+  const code = typeof body.code === 'string' ? body.code.trim() : '';
+  const nextPassword = typeof body.nextPassword === 'string' ? body.nextPassword : '';
+  if (!code) return { error: 'Recovery code is required' } as const;
+  const passwordError = getPasswordError(nextPassword);
+  if (passwordError) return { error: passwordError } as const;
+  return { code, nextPassword } as const;
+}
+
+// Without SMTP, recovery goes through the operator: `quro user reset-password <email>` prints a
+// one-time code that the user redeems here. Every existing session of the account is revoked.
+app.post('/password-reset', passwordResetRateLimit, async (c) => {
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const payload = parsePasswordResetPayload(body.value);
+  if ('error' in payload) return c.json({ error: payload.error }, HTTP_STATUS.BAD_REQUEST);
+
+  const passwordHash = await Bun.password.hash(payload.nextPassword, {
+    algorithm: 'bcrypt',
+    cost: BCRYPT_COST,
+  });
+
+  const userId = await db.transaction(async (tx) => {
+    const consumed = await consumeAuthCode(tx, payload.code, 'password_reset');
+    if (!consumed?.userId) return null;
+    await tx
+      .update(users)
+      .set({ passwordHash, passwordUpdatedAt: new Date() })
+      .where(eq(users.id, consumed.userId));
+    await revokeUserSessions(consumed.userId, null, tx);
+    return consumed.userId;
+  });
+
+  if (userId === null) {
+    return c.json(
+      { error: 'This recovery code is invalid, expired or already used' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
+
+  await createSession(c, userId);
+  const [publicUser] = await db.select(publicUserColumns).from(users).where(eq(users.id, userId));
+  return c.json({ data: publicUser });
+});
+
 // ── Get current user ────────────────────────────────────────────────────────
 
 app.get('/me', async (c) => {
-  const sessionId = getCookie(c, 'session');
+  const sessionId = getSessionCookieHash(c);
   if (!sessionId) {
     return c.json({ data: null });
   }
 
   const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
   if (!session || session.expiresAt < new Date()) {
-    deleteCookie(c, 'session', { path: '/' });
+    clearSessionCookies(c);
     return c.json({ data: null });
   }
 
@@ -299,11 +354,10 @@ app.get('/me', async (c) => {
 // ── Sign Out ────────────────────────────────────────────────────────────────
 
 app.post('/signout', async (c) => {
-  const sessionId = getCookie(c, 'session');
+  const sessionId = getSessionCookieHash(c);
   if (sessionId) {
     await db.delete(sessions).where(eq(sessions.id, sessionId));
-    deleteCookie(c, 'session', { path: '/' });
-    deleteCookie(c, 'csrf_token', { path: '/' });
+    clearSessionCookies(c);
   }
   return c.json({ ok: true });
 });

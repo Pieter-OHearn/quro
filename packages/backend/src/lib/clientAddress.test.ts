@@ -80,3 +80,74 @@ describe('resolveClientAddress', () => {
     expect(resolve({ peer: null })).toBeNull();
   });
 });
+
+// Deployment modes from docs/security.md. The bundled nginx always appends its peer to
+// X-Forwarded-For and overwrites X-Real-IP, so the backend sees "<client-supplied>, <nginx peer>".
+describe('Compose proxy-trust defaults', () => {
+  const nginx = '172.18.0.3';
+  const lanClient = '192.168.1.50';
+
+  test('the former default treated LAN clients as proxies', () => {
+    const formerDefault = parseTrustedProxies('10.0.0.0/8,172.16.0.0/12,192.168.0.0/16');
+    for (const spoofed of ['1.2.3.4', '5.6.7.8']) {
+      expect(
+        resolve({
+          peer: nginx,
+          realIp: lanClient,
+          forwardedFor: `${spoofed}, ${lanClient}`,
+          trusted: formerDefault,
+        }),
+      ).toBe(spoofed);
+    }
+  });
+
+  const composeDefault = parseTrustedProxies('172.16.0.0/12');
+
+  test('HTTP behind the bundled nginx keys each LAN client by its own address', () => {
+    for (const client of [lanClient, '10.0.0.20']) {
+      expect(
+        resolve({
+          peer: nginx,
+          realIp: client,
+          forwardedFor: `1.2.3.4, ${client}`,
+          trusted: composeDefault,
+        }),
+      ).toBe(client);
+    }
+  });
+
+  test('a host TLS proxy reaching nginx through the Docker gateway still resolves the client', () => {
+    expect(
+      resolve({
+        peer: nginx,
+        realIp: '172.18.0.1',
+        forwardedFor: `9.9.9.9, ${lanClient}, 172.18.0.1`,
+        trusted: composeDefault,
+      }),
+    ).toBe(lanClient);
+  });
+
+  test('a TLS proxy on another host must be added to TRUSTED_PROXIES', () => {
+    const remoteProxy = '192.168.1.10';
+    const request = {
+      peer: nginx,
+      realIp: remoteProxy,
+      forwardedFor: `${lanClient}, ${remoteProxy}`,
+    };
+    expect(resolve({ ...request, trusted: composeDefault })).toBe(remoteProxy);
+    expect(
+      resolve({ ...request, trusted: parseTrustedProxies(`172.16.0.0/12,${remoteProxy}`) }),
+    ).toBe(lanClient);
+  });
+
+  test('direct access to the backend from outside the trusted range ignores forwarded headers', () => {
+    expect(
+      resolve({
+        peer: lanClient,
+        realIp: '1.2.3.4',
+        forwardedFor: '1.2.3.4',
+        trusted: composeDefault,
+      }),
+    ).toBe(lanClient);
+  });
+});

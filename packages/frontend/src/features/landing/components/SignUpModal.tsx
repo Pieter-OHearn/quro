@@ -2,6 +2,7 @@ import { CalendarDays, Sparkles, Target } from 'lucide-react';
 import { FormField, Modal, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
 import { useSignUpState } from '../hooks';
 import type { SignUpState } from '../types';
+import { InviteCodeField, RegistrationClosedNotice } from './RegistrationNotices';
 import { SubmitButton } from './SubmitButton';
 
 type SignUpModalProps = {
@@ -23,13 +24,18 @@ function normalizeDigits(value: string) {
   return value.replaceAll(/\D/g, '');
 }
 
-function NameFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) {
+function NameFields({
+  form,
+  setField,
+  errors,
+  autoFocus,
+}: Readonly<BaseSignUpFieldProps & { autoFocus: boolean }>) {
   return (
     <>
       <FormField label="First name" error={errors.firstName}>
         <TextInput
           type="text"
-          autoFocus
+          autoFocus={autoFocus}
           autoComplete="given-name"
           placeholder="John"
           error={Boolean(errors.firstName)}
@@ -151,9 +157,19 @@ function PasswordFields({
 }
 
 function SignUpFormFields({ state }: Readonly<{ state: SignUpState }>) {
+  const { policy, form, setField, errors } = state;
+  const showCode = policy?.signUp !== 'open';
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <NameFields {...state} />
+      {showCode ? (
+        <InviteCodeField
+          policy={policy}
+          value={form.inviteCode}
+          error={errors.inviteCode}
+          onChange={(value) => setField('inviteCode', value)}
+        />
+      ) : null}
+      <NameFields {...state} autoFocus={!showCode} />
       <EmailField {...state} />
       <AgeFields {...state} />
       <PasswordFields {...state} />
@@ -219,7 +235,11 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
         closeIconSize: 16,
       }}
     >
-      <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
+      {state.policy?.signUp === 'closed' ? (
+        <RegistrationClosedNotice onSwitchToSignIn={onSwitchToSignIn} />
+      ) : (
+        <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
+      )}
     </Modal>
   );
 }
