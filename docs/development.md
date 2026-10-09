@@ -12,19 +12,34 @@ Then open `http://localhost:3000`. The bunq callback for the Docker setup is `ht
 
 ## Prerequisites
 
-- Bun 1.4.2 (pinned in `.bun-version`; the Dockerfiles must use the same version)
-- Python 3.11+
-- Docker Compose v2
-- Gitleaks for the checked-in pre-commit hook
+| Tool                          | Version and source of truth                                                                                                          | Needed for                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Bun                           | Bun 1.4.2, pinned in `.bun-version`. CI, the Dockerfiles and these docs must match; `bun run check:bun-version` enforces it.         | Everything                                                           |
+| Python                        | 3.12, as in CI (`.github/workflows/ci.yml`), the parser image and `services/pension-parser/ruff.toml`. Newer 3.x versions also work. | `ci:check` (ruff, compile check, `pip-audit`) and the pension parser |
+| Docker with Compose v2 plugin | `docker compose version` reports v2 or later                                                                                         | The Docker dev stack and a throwaway test database                   |
+| Gitleaks                      | Any current release                                                                                                                  | The checked-in pre-commit hook                                       |
+
+Dependencies come from `bun.lock` and `services/pension-parser/requirements.txt`, both pinned. Install JavaScript dependencies with `bun install --frozen-lockfile`, as CI and the Dockerfiles do, so a stale lockfile fails instead of changing.
+
+## Checking your setup
+
+```bash
+bun run dev:doctor
+```
+
+`dev:doctor` checks this checkout: the Bun version against `.bun-version`, installed dependencies, Python, `ruff`, `pip-audit` (in `.venv/bin` or on `PATH`), Gitleaks, the Git hook, Docker Compose, and the exported `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL`. It exits non-zero only when something blocks development, such as the wrong Bun version, missing dependencies or a malformed database URL. Missing optional tools are warnings.
+
+It never connects to a database, never reads `.env` or `secrets/` files and never writes anything. For database URLs it prints only host, port and database name. It checks a development checkout, not a running Quro instance.
 
 ## Host Setup
 
-1. Install workspace dependencies and the pre-commit hook (requires Gitleaks):
+1. Install workspace dependencies and the pre-commit hook (requires Gitleaks), then check the result:
 
 ```bash
-bun install
+bun install --frozen-lockfile
 brew install gitleaks
 bun run hooks:install
+bun run dev:doctor
 ```
 
 2. Copy the Docker runtime config and secrets. The local Bun workflow reuses the same Postgres and MinIO credentials as the Docker stack:
@@ -133,7 +148,7 @@ Run the worker in a second terminal:
 bun run --filter '@quro/backend' worker:pension-imports
 ```
 
-Run the parser locally in a third terminal:
+Run the parser locally in a third terminal, with Python 3.12 as `python3`:
 
 ```bash
 python3 -m venv .venv
@@ -168,14 +183,8 @@ For the full backup and restore procedure, what a database dump does not include
 
 Repository agent guidance starts at [AGENTS.md](../AGENTS.md).
 
-Set `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` to an isolated
-synthetic database before DB-backed checks. The explicit role URLs take precedence
-over `DATABASE_URL` and package `.env` files may select an existing instance.
-`ci:check` applies migrations (and may start Compose's DB), while Playwright's
-backend setup applies migrations and seeds demo data. Never run these against the
-owner's live instance.
-
 ```bash
+bun run dev:doctor # prerequisites; no database, no .env files
 bun run ci:check   # full suite, Python tooling and network audits required
 bun run typecheck
 bun run test       # shared/script, backend and frontend; migrated test DB required
@@ -194,3 +203,65 @@ bun run hooks:install
 ```
 
 The pre-commit hook runs `gitleaks git --pre-commit --redact --staged --verbose` before `bun run ci:check`.
+
+### DB-backed tests
+
+`bun run test`, `bun run ci:check` and `bun run test:smoke` need a migrated PostgreSQL.
+`ci:check` applies migrations, and the Playwright backend applies migrations and seeds
+demo data. The supported way is a throwaway container whose data lives in memory and
+disappears when it stops. Never point these commands at the Compose `db` service, its
+`data/` directory or any database that holds real data.
+
+1. Start a throwaway PostgreSQL 16 on a free port (CI uses PostgreSQL 16):
+
+   ```bash
+   docker run -d --rm --name quro-test-db -e POSTGRES_PASSWORD=tmp -e POSTGRES_USER=quro -e POSTGRES_DB=quro -p 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data postgres:16.11-alpine3.23
+   ```
+
+2. Export all three database URLs in the same shell. Bun loads `packages/backend/.env`
+   for commands that run in that package, and the role URLs take precedence over
+   `DATABASE_URL`, so exporting only `DATABASE_URL` can leave a migration pointed elsewhere:
+
+   ```bash
+   export DATABASE_URL=postgres://quro:tmp@127.0.0.1:55432/quro ADMIN_DATABASE_URL=postgres://quro:tmp@127.0.0.1:55432/quro APP_DATABASE_URL=postgres://quro:tmp@127.0.0.1:55432/quro
+   ```
+
+3. Check the setup, migrate and run the checks. The first migration can fail while
+   PostgreSQL is still starting; run it again.
+
+   ```bash
+   bun run dev:doctor
+   bun run db:migrate
+   bun run test
+   ```
+
+4. Stop the container when you are done. Its data is discarded:
+
+   ```bash
+   docker stop quro-test-db
+   ```
+
+`bun run test`, `ci:check` and `test:smoke` refuse to run without `DATABASE_URL`, never
+fall back to a localhost default, never start a Compose service, and fill
+`ADMIN_DATABASE_URL` and `APP_DATABASE_URL` from `DATABASE_URL` when they are not set.
+
+### Synthetic data
+
+Tests and screenshots use synthetic data only. The demo seed
+(`bun run --filter '@quro/backend' db:seed-demo`, also run by `test:smoke`) is
+deterministic: it creates or resets the `demo@quro.local` user to a fixed profile and,
+when the currency-rate table is empty, adds a fixed set of approximate EUR rates dated
+on the seeding day so they count as fresh. Its values live in
+`packages/backend/src/db/demoSeed.ts`.
+
+## Packages and versions
+
+Quro is distributed as container images, not npm packages. The root package and the
+`@quro/backend`, `@quro/frontend` and `@quro/shared` workspaces are all
+`"private": true`, so a package manager refuses to publish them, and none of them
+needs publishing for Docker self-hosting.
+
+`VERSION` is the only release version. The workspace manifests carry no `version`
+field, so there is no second number to drift; `scripts/workspace-manifests.test.ts`
+enforces both rules. Feature pull requests do not change `VERSION`; the release pull
+request does (see [contributing](CONTRIBUTING.md#versioning)).

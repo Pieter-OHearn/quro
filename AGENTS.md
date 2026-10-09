@@ -19,6 +19,7 @@ run applicable checks before opening a PR and report commands, results and skipp
 
 | Command                                     | Coverage / prerequisites                                                                                                 |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `bun run dev:doctor`                        | Contributor prerequisites and exported DB URLs; no database connection, no `.env` reads                                  |
 | `bun run check:bun-version`                 | Runtime pin consistency                                                                                                  |
 | `bun run format:check`                      | Repository Prettier check; format only files you changed                                                                 |
 | `bun run lint`                              | TypeScript/JS lint                                                                                                       |
@@ -30,10 +31,11 @@ run applicable checks before opening a PR and report commands, results and skipp
 | `bun run build`                             | Frontend and backend builds                                                                                              |
 | `bun run ci:check`                          | Full suite, migrations, Python checks and dependency audits; isolated DB, Python tools and audit network access required |
 
-`ci:check` may start Compose's `db` service. Its pre-commit mode skips DB tests;
-a passing hook is not full CI evidence. Set `DATABASE_URL`, `ADMIN_DATABASE_URL` and
-`APP_DATABASE_URL` explicitly to isolated test resources before DB-backed checks;
-package `.env` files and localhost defaults can otherwise select the owner's instance.
+`ci:check`'s pre-commit mode skips DB tests; a passing hook is not full CI evidence.
+Run DB-backed checks as in [DB-backed tests](docs/development.md#db-backed-tests): a
+throwaway PostgreSQL with `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL`
+exported to it, since package `.env` files can otherwise select the owner's instance.
+`test`, `ci:check` and `test:smoke` refuse to run without `DATABASE_URL` and never start Compose.
 Never use real financial data, production secrets, live provider calls or the owner's
 database/object storage for tests, migrations, demo seeding, clearing or recovery trials.
 

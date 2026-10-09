@@ -11,6 +11,7 @@
     "dev:docker:logs": "docker compose -f docker-compose.yml -f docker-compose.development.yml logs -f backend frontend",
     "dev:frontend": "bun run --filter '@quro/frontend' dev",
     "dev:backend": "bun run --filter '@quro/backend' dev",
+    "dev:doctor": "bun --no-env-file scripts/dev-doctor.ts",
     "smoke:frontend": "bun run --filter '@quro/frontend' dev -- --host 127.0.0.1 --port 4273",
     "smoke:backend": "bun run --filter '@quro/backend' db:migrate && bun run --filter '@quro/backend' db:seed-demo && bun run --filter '@quro/backend' start",
     "build": "bun run --filter '@quro/frontend' build && bun run --filter '@quro/backend' build",

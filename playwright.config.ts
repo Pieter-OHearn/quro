@@ -2,9 +2,18 @@ import { defineConfig, devices } from '@playwright/test';
 
 const FRONTEND_ORIGIN = 'http://127.0.0.1:4273';
 const BACKEND_ORIGIN = 'http://127.0.0.1:3300';
-const DEFAULT_DATABASE_URL = 'postgres://quro:quro@127.0.0.1:5432/quro';
 const isCI = Boolean(process.env.CI);
 const useSystemChrome = !isCI && process.env.QRO_SMOKE_USE_SYSTEM_CHROME !== '0';
+
+// The smoke backend migrates and seeds demo data, so it only runs against an explicit,
+// throwaway database (see "DB-backed tests" in docs/development.md). The role URLs default
+// to it so packages/backend/.env cannot redirect the migration or the seed.
+const DATABASE_URL = process.env.DATABASE_URL?.trim();
+if (!DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL is not set. Point it at a throwaway PostgreSQL; see "DB-backed tests" in docs/development.md.',
+  );
+}
 
 export default defineConfig({
   testDir: './tests/smoke',
@@ -33,7 +42,9 @@ export default defineConfig({
       env: {
         ...process.env,
         PORT: '3300',
-        DATABASE_URL: process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
+        DATABASE_URL,
+        ADMIN_DATABASE_URL: process.env.ADMIN_DATABASE_URL || DATABASE_URL,
+        APP_DATABASE_URL: process.env.APP_DATABASE_URL || DATABASE_URL,
         CORS_ORIGIN: FRONTEND_ORIGIN,
       },
     },
