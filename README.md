@@ -92,7 +92,7 @@ The database and object storage are also published locally for tooling:
 ## Self-hosting
 
 > [!WARNING]
-> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in [Epic E00: Immediate fixes](https://github.com/Pieter-OHearn/quro/issues/247). The [Docker dev stack](#local-docker-dev) includes storage bootstrap, but requires runtime configuration and secrets and is subject to the same MinIO image availability problem.
+> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in the [roadmap](ROADMAP.md). The [Docker dev stack](#local-docker-dev) includes storage bootstrap, but requires runtime configuration and secrets and is subject to the same MinIO image availability problem.
 
 The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
 
@@ -119,6 +119,14 @@ Install the pre-commit hook before your first commit:
 brew install gitleaks
 bun run hooks:install
 ```
+
+## Support
+
+- **Questions and ideas:** [GitHub Discussions](https://github.com/Pieter-OHearn/quro/discussions).
+- **Bugs:** [open an issue](https://github.com/Pieter-OHearn/quro/issues/new/choose). Include your Quro version and how you run it.
+- **Security problems:** report them privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
+
+Quro has a single maintainer, and replies are best effort. The most useful ways to help are clear bug reports, testing a release on your own setup, and improving the documentation. Please read the [code of conduct](CODE_OF_CONDUCT.md) first.
 
 ## License
 
