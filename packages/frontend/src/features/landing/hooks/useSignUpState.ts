@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '@/lib/AuthContext';
 import type { LandingErrorMap, SignUpFormValues, SignUpState } from '../types';
-import { getAuthErrorMessage } from '../utils/auth-error';
+import { getAuthErrorMessage, signUpErrorField } from '../utils/auth-error';
 import { validateSignUp } from '../utils/validation';
+import { useRegistrationPolicy } from './useRegistrationPolicy';
 
 const initialForm: SignUpFormValues = {
   firstName: '',
@@ -13,11 +14,13 @@ const initialForm: SignUpFormValues = {
   retirementAge: '',
   password: '',
   confirm: '',
+  inviteCode: '',
 };
 
 export function useSignUpState(): SignUpState {
   const navigate = useNavigate();
   const { signUp } = useAuth();
+  const { data: policy } = useRegistrationPolicy();
   const [form, setForm] = useState(initialForm);
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -37,7 +40,7 @@ export function useSignUpState(): SignUpState {
   const handleSubmit: SignUpState['handleSubmit'] = async (event) => {
     event.preventDefault();
 
-    const validationErrors = validateSignUp(form);
+    const validationErrors = validateSignUp(form, { requireCode: policy?.signUp === 'code' });
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
@@ -53,16 +56,19 @@ export function useSignUpState(): SignUpState {
         password: form.password,
         age: Number(form.currentAge),
         retirementAge: Number(form.retirementAge),
+        inviteCode: form.inviteCode.trim() || undefined,
       });
       void navigate('/');
     } catch (error: unknown) {
-      setErrors({ email: getAuthErrorMessage(error, 'Sign up failed') });
+      const message = getAuthErrorMessage(error, 'Sign up failed');
+      setErrors({ [signUpErrorField(message)]: message });
     } finally {
       setLoading(false);
     }
   };
 
   return {
+    policy,
     form,
     setField,
     showPw,

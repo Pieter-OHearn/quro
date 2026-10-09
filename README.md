@@ -30,7 +30,13 @@ Once the configuration and secrets are ready and the pinned images are available
 bun run dev:docker
 ```
 
-Then open `http://localhost:3000`.
+Then open `http://localhost:3000`. A new instance has no accounts, so create the first one with a one-time setup code:
+
+```bash
+docker compose exec backend quro user invite
+```
+
+Enter the printed code in the sign-up form. Later accounts need an invite code from the same command, and a forgotten password is reset with `quro user reset-password` instead of email. See the [security model](docs/security.md#accounts-and-registration) for registration modes and the HTTPS setup.
 
 For bunq OAuth in this mode, the callback URL is:
 
@@ -93,6 +99,8 @@ The database and object storage are also published locally for tooling:
 
 > [!WARNING]
 > Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in the [roadmap](ROADMAP.md). The [Docker dev stack](#local-docker-dev) includes storage bootstrap, but requires runtime configuration and secrets and is subject to the same MinIO image availability problem.
+
+The [install contract](docs/install-contract.md) describes how installs will work from 0.8.0, which is not released yet: the images, the `quro` maintenance commands, settings, data locations and the move from existing Compose installs.
 
 The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
 

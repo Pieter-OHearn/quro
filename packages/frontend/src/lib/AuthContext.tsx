@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import type { User } from '@quro/shared';
+import type { ResetPasswordInput, User } from '@quro/shared';
 import { api, apiGet, apiPost, registerUnauthorizedHandler } from './api';
 import { clearAuthQueryCache, invalidateAuthSession } from './authCache';
 
@@ -11,6 +11,8 @@ type SignUpInput = {
   password: string;
   age?: number;
   retirementAge?: number;
+  /** Operator-issued code; required unless the instance allows open registration. */
+  inviteCode?: string;
 };
 
 type AuthState = {
@@ -18,6 +20,8 @@ type AuthState = {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<void>;
+  /** Redeems an operator-issued reset code; on success the user is signed in. */
+  resetPassword: (input: ResetPasswordInput) => Promise<void>;
   signOut: () => Promise<void>;
   replaceUser: (nextUser: User | null) => void;
 };
@@ -65,6 +69,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [replaceUser],
   );
 
+  const resetPassword = useCallback(
+    async (input: ResetPasswordInput) => {
+      const res = await apiPost<User>('/api/auth/password-reset', input);
+      clearAuthQueryCache();
+      replaceUser(res);
+    },
+    [replaceUser],
+  );
+
   const signOut = useCallback(async () => {
     await api.post('/api/auth/signout');
     clearAuthQueryCache();
@@ -72,7 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [replaceUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, replaceUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, signIn, signUp, resetPassword, signOut, replaceUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

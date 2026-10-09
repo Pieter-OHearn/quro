@@ -81,4 +81,6 @@ export const queryKeys = {
   bunqConnection: ['bunq', 'connection'] as const,
   currencyRates: ['currency', 'rates'] as const,
   capabilities: ['app', 'capabilities'] as const,
+  registrationPolicy: ['auth', 'registration'] as const,
+  sessions: ['settings', 'sessions'] as const,
 };

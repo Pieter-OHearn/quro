@@ -18,12 +18,26 @@ Thanks for helping improve Quro! This document focuses on the workflow for propo
 
 ## Release Artifacts
 
-The `Release` GitHub workflow runs only when a maintainer starts it manually (`workflow_dispatch`) with a branch or tag to release; merges to `main` do not trigger it. It performs the following:
+The `Release` GitHub workflow runs only when a maintainer starts it manually (`workflow_dispatch`) with a branch, tag or commit SHA to release; merges to `main` do not trigger it. It resolves that ref to one commit SHA and builds, tags and publishes exactly that commit, in three jobs:
 
-- Reads the `VERSION` file at that ref and creates and pushes a matching git tag. It stops if the tag already exists.
-- Builds and pushes multi-arch Docker images to `ghcr.io/<owner>/quro-backend`, `.../quro-frontend` and `.../quro-auto-updater`, tagging each with both the version and `latest`.
-- Extracts the CHANGELOG section for the version and uses it as the GitHub Release notes.
-- Generates a `docker-compose.release.yml` file pinned to the freshly published images and an auto-update bundle, and attaches both to the Release.
+1. **Verify** (token scopes `contents: read`, `checks: read`, `actions: read`) stops the release unless all of these hold:
+   - `VERSION` at the commit reads `vX.Y.Z` or `vX.Y.Z-rc.N`. It is validated as data and never interpolated into a shell command.
+   - The aggregate `CI` check succeeded on that exact commit in a `push` or manually started run of `.github/workflows/ci.yml`. A pull request run tests a merge with the base branch, so it does not count. The most recent such run decides, and a run that is still queued or in progress stops the release.
+   - No release for the version is published, and the version tag either does not exist or already points at the commit.
+   - `CHANGELOG.md` has a section for the version.
+2. **Build** (`contents: read`, `packages: write`) builds the multi-arch images and pushes them to `ghcr.io/<owner>/quro-backend`, `.../quro-frontend` and `.../quro-auto-updater` under a candidate tag, `sha-<commit>`. No git tag, version tag or `latest` tag exists yet.
+3. **Publish** (`contents: write`, `packages: write`) creates the git tag at the commit and adds the version tag to the candidate image digests without rebuilding them. It then creates a draft GitHub Release with the CHANGELOG section, a `docker-compose.release.yml` pinned to the version and an auto-update bundle, moves `latest` to the same digests when the version takes it (see below), and publishes the release as its last step.
+
+`latest`, both the image tag and the repository's latest GitHub Release, moves only for a stable version newer than every published stable release. A release candidate (`vX.Y.Z-rc.N`) is published as a prerelease, and neither a release candidate nor a patch for an older release line moves `latest`.
+
+To release a commit that is not on `main`, such as a hotfix branch, first start the `CI` workflow on that branch from the Actions tab and wait for it to pass.
+
+If a release fails:
+
+- Before the publish job, nothing has been tagged. Fix the cause and start the workflow again.
+- During the publish job, re-run the failed job or start the workflow again for the same commit. The workflow reuses the tag, replaces the draft release the failed run left, and applies the image tags again. To release a different commit under the same version instead, delete the tag and the draft release first.
+
+The workflow reads its release logic (`scripts/lib/release-gate.ts` and `scripts/lib/promote-images.sh`) from the branch it runs from, not from the commit being released. The verify job reads that commit, its `VERSION` and its `CHANGELOG.md` through the GitHub API and never checks it out, and no job runs a script from it. Every action in it is pinned to a reviewed commit SHA, and Dependabot proposes updates to those pins.
 
 ## Branch Protection
 

@@ -2,7 +2,11 @@ import { createMiddleware } from 'hono/factory';
 import { getConnInfo } from 'hono/bun';
 import type { Context } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
-import { parseTrustedProxies, resolveClientAddress } from '../lib/clientAddress';
+import {
+  parseTrustedProxies,
+  resolveClientAddress,
+  type TrustedProxies,
+} from '../lib/clientAddress';
 
 const trustedProxies = parseTrustedProxies(process.env.TRUSTED_PROXIES);
 
@@ -14,12 +18,13 @@ function peerAddressOf(c: Context): string | undefined {
   }
 }
 
-function getClientAddress(c: Context): string | null {
+/** The rate-limit key for a request: its peer, or the client a trusted proxy forwarded. */
+export function getClientAddress(c: Context, proxies: TrustedProxies = trustedProxies) {
   return resolveClientAddress({
     peerAddress: peerAddressOf(c),
     realIp: c.req.header('x-real-ip'),
     forwardedFor: c.req.header('x-forwarded-for'),
-    proxies: trustedProxies,
+    proxies,
   });
 }
 
@@ -79,6 +84,7 @@ const FIFTEEN_MINUTES_MS = 15 * ONE_MINUTE_MS;
 const SIGNIN_MAX_ATTEMPTS = 5;
 const SIGNUP_MAX_ATTEMPTS = 3;
 const CHANGE_PASSWORD_MAX_ATTEMPTS = 5;
+const PASSWORD_RESET_MAX_ATTEMPTS = 5;
 const SIGNIN_EMAIL_MAX_ATTEMPTS = 5;
 const PARTNER_INVITE_MAX_ATTEMPTS = 10;
 
@@ -99,4 +105,9 @@ export const partnerInviteRateLimit = createRateLimitChecker(
 export const changePasswordRateLimit = createRateLimiter(
   FIFTEEN_MINUTES_MS,
   CHANGE_PASSWORD_MAX_ATTEMPTS,
+);
+// Reset codes carry 120 bits and expire within the hour; this only stops bulk guessing.
+export const passwordResetRateLimit = createRateLimiter(
+  FIFTEEN_MINUTES_MS,
+  PASSWORD_RESET_MAX_ATTEMPTS,
 );

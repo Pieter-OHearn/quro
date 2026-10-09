@@ -106,6 +106,31 @@ export type UpdateUserPasswordInput = {
   nextPassword: string;
 };
 
+// Redeems a one-time code an operator issued with the backend `auth reset-password` command.
+export type ResetPasswordInput = {
+  code: string;
+  nextPassword: string;
+};
+
+export const REGISTRATION_MODES = ['closed', 'invite', 'open'] as const;
+export type RegistrationMode = (typeof REGISTRATION_MODES)[number];
+
+export type RegistrationPolicy = {
+  /** What a sign-up needs right now: an operator-issued code, nothing, or it is not offered. */
+  signUp: 'code' | 'open' | 'closed';
+  /** True until the first account exists; that account always needs an operator-issued code. */
+  setupRequired: boolean;
+};
+
+export type UserSession = {
+  id: string;
+  current: boolean;
+  userAgent: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+};
+
 export type PartnerLinkStatus = 'pending' | 'accepted';
 export type PartnerLinkRole = 'requester' | 'addressee';
 

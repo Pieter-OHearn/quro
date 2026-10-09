@@ -18,7 +18,8 @@ export ADMIN_DATABASE_URL APP_DATABASE_URL
 
 echo "==> Shared tests"
 bun test packages/shared/test scripts/eslint scripts/lib scripts/check-bun-version.test.ts \
-  scripts/dev-doctor.test.ts scripts/workspace-manifests.test.ts scripts/check-docs.test.ts
+  scripts/dev-doctor.test.ts scripts/workspace-manifests.test.ts scripts/check-docs.test.ts \
+  scripts/compose-topology.test.ts
 
 echo "==> Backend tests"
 cd "$REPO_ROOT/packages/backend"

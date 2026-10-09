@@ -15,6 +15,7 @@ import {
 import { buildOAuthAuthorizeUrl, deleteSession, exchangeCodeForTokens } from '../lib/bunqClient';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
+import { secureCookiesEnabled } from '../lib/sessions';
 
 const app = new Hono();
 
@@ -65,7 +66,7 @@ app.get('/oauth/start', async (c) => {
 
   setCookie(c, STATE_COOKIE, state, {
     httpOnly: true,
-    secure: process.env.SECURE_COOKIES === 'true',
+    secure: secureCookiesEnabled(),
     sameSite: 'Lax',
     path: '/',
     maxAge: STATE_MAX_AGE_SECONDS,

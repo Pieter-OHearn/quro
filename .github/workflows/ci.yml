@@ -9,6 +9,9 @@ on:
       - main
       # Long-lived V1 design branch: step PRs merge here before one release PR into main.
       - feature/m6-v1-design-update
+  # Runs CI on the exact head of any branch. The Release workflow accepts push and
+  # workflow_dispatch runs only, so this is how a commit outside main (a hotfix) gets one.
+  workflow_dispatch:
 
 permissions:
   contents: read

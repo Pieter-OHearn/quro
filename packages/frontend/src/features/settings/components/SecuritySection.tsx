@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 /* eslint-disable max-lines-per-function */
 import { useState } from 'react';
 import type { UpdateUserPasswordInput, User } from '@quro/shared';
@@ -6,6 +6,7 @@ import { MIN_PASSWORD_LENGTH } from '@quro/shared';
 import { AlertTriangle, Check, ShieldCheck } from 'lucide-react';
 import { FormField, PasswordInput } from '@/components/ui';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
+import { invalidateDomain } from '@/lib/queryInvalidation';
 import { cn } from '@/lib/utils';
 
 import {
@@ -19,6 +20,7 @@ import {
   SaveActionButton,
   DEFAULT_ERROR_MESSAGE,
 } from './settingsForm';
+import { SessionsPanel } from './SessionsPanel';
 export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) {
   const [form, setForm] = useState<PasswordFormState>(() => createEmptyPasswordForm());
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -26,6 +28,7 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
   const [showNextPassword, setShowNextPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { saved, showSaved } = useSavedState();
+  const queryClient = useQueryClient();
 
   const save = useMutation({
     mutationFn: (payload: UpdateUserPasswordInput) =>
@@ -34,6 +37,8 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
       replaceUser(response);
       setForm(createEmptyPasswordForm());
       showSaved();
+      // Changing the password signs out every other browser.
+      void invalidateDomain(queryClient, 'sessions');
     },
     onError: (error) => {
       const message = resolveApiErrorMessage(error, DEFAULT_ERROR_MESSAGE);
@@ -73,7 +78,7 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
     <div>
       <SectionHeader
         title="Security"
-        subtitle="Change your password and keep your account credentials current."
+        subtitle="Change your password and sign out browsers you no longer use."
       />
 
       <div className="mb-6 flex items-center gap-4 rounded-3xl border border-border-default bg-surface-sunken p-4">
@@ -200,6 +205,10 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
             void handleSave();
           }}
         />
+      </div>
+
+      <div className="mt-8 border-t border-border-default pt-6">
+        <SessionsPanel />
       </div>
     </div>
   );

@@ -122,9 +122,10 @@ describe('default-deny API middleware', () => {
     const app = new Hono();
     app.use('*', requireCsrf);
     app.post('*', (c) => c.json({ ok: true }));
+    const json = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
     for (const path of PUBLIC_PATHS) {
-      expect((await app.request(path, { method: 'POST' })).status).toBe(200);
-      expect((await app.request(`${path}/extra`, { method: 'POST' })).status).toBe(403);
+      expect((await app.request(path, json)).status).toBe(200);
+      expect((await app.request(`${path}/extra`, json)).status).toBe(403);
     }
   });
 

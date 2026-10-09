@@ -267,6 +267,13 @@
       "when": 1791115215007,
       "tag": "0037_bunq_oauth_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791490860374,
+      "tag": "0038_session_hashes_and_auth_codes",
+      "breakpoints": true
     }
   ]
 }

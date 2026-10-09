@@ -5,7 +5,12 @@ import {
   MIN_RETIREMENT_AGE,
   MIN_USER_AGE,
 } from '@quro/shared';
-import type { LandingErrorMap, SignInFormValues, SignUpFormValues } from '../types';
+import type {
+  LandingErrorMap,
+  PasswordResetFormValues,
+  SignInFormValues,
+  SignUpFormValues,
+} from '../types';
 
 const EMAIL_REGEX = /\S+@\S+\.\S+/;
 
@@ -93,7 +98,10 @@ export function validateSignIn(values: SignInFormValues): LandingErrorMap {
   return errors;
 }
 
-export function validateSignUp(values: SignUpFormValues): LandingErrorMap {
+export function validateSignUp(
+  values: SignUpFormValues,
+  { requireCode }: { requireCode: boolean } = { requireCode: false },
+): LandingErrorMap {
   const errors: LandingErrorMap = {};
   const currentAge = parseAge(values.currentAge);
   const retirementAge = parseAge(values.retirementAge);
@@ -105,6 +113,19 @@ export function validateSignUp(values: SignUpFormValues): LandingErrorMap {
   setError(errors, 'retirementAge', getRetirementAgeError(retirementAge, currentAge));
   setError(errors, 'password', getPasswordError(values.password));
   setError(errors, 'confirm', getConfirmPasswordError(values.confirm, values.password));
+  if (requireCode && !values.inviteCode.trim()) {
+    errors.inviteCode = 'Enter the code from your Quro operator';
+  }
 
+  return errors;
+}
+
+export function validatePasswordReset(values: PasswordResetFormValues): LandingErrorMap {
+  const errors: LandingErrorMap = {};
+  if (!values.code.trim()) errors.code = 'Enter the reset code from your Quro operator';
+  const passwordError = getPasswordError(values.nextPassword);
+  if (passwordError) errors.nextPassword = passwordError;
+  const confirmError = getConfirmPasswordError(values.confirm, values.nextPassword);
+  if (confirmError) errors.confirm = confirmError;
   return errors;
 }

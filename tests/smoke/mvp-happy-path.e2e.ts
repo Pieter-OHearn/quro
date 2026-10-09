@@ -1,7 +1,32 @@
+import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 
 const BACKEND_ORIGIN =
   process.env.QRO_SMOKE_BACKEND_ORIGIN ?? process.env.BACKEND_ORIGIN ?? 'http://127.0.0.1:3300';
+
+// Registration is invite-only, so the smoke user signs up the way an invited user does: with a
+// code from the operator command, run against the smoke database only. .env files are ignored
+// and the role URLs default to DATABASE_URL, like the smoke backend in playwright.config.ts.
+function issueInviteCode(): string {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error('DATABASE_URL is not set');
+  const output = execFileSync(
+    'bun',
+    ['--no-env-file', 'packages/backend/src/cli/quro.ts', 'user', 'invite', '--hours', '1'],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseUrl,
+        ADMIN_DATABASE_URL: process.env.ADMIN_DATABASE_URL || databaseUrl,
+        APP_DATABASE_URL: process.env.APP_DATABASE_URL || databaseUrl,
+      },
+    },
+  );
+  const code = output.match(/[0-9A-HJKMNP-TV-Z]{6}(?:-[0-9A-HJKMNP-TV-Z]{6}){3}/)?.[0];
+  if (!code) throw new Error('quro user invite printed no code');
+  return code;
+}
 
 function normalizeText(value: string | null): string {
   return value?.replace(/\s+/g, ' ').trim() ?? '';
@@ -26,6 +51,7 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
       password: smokePassword,
       age: 35,
       retirementAge: 67,
+      inviteCode: issueInviteCode(),
     },
   });
   expect(signupResponse.status()).toBe(201);

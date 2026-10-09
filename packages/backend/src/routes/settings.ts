@@ -13,12 +13,12 @@ import {
   type UpdateUserProfileInput,
 } from '@quro/shared';
 import { and, eq, ne } from 'drizzle-orm';
-import { getCookie } from 'hono/cookie';
 import { db } from '../db/client';
-import { sessions, users } from '../db/schema';
+import { users } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
-import { getAuthUser } from '../lib/authUser';
+import { getAuthUser, getSessionId } from '../lib/authUser';
 import { publicUserColumns } from '../lib/users';
+import { listUserSessions, revokeUserSession, revokeUserSessions } from '../lib/sessions';
 import { changePasswordRateLimit } from '../middleware/rateLimit';
 import {
   err,
@@ -222,7 +222,7 @@ app.put('/preferences', async (c) => {
 
 app.put('/password', changePasswordRateLimit, async (c) => {
   const authUser = getAuthUser(c);
-  const currentSessionId = getCookie(c, 'session') ?? '';
+  const currentSessionId = getSessionId(c);
   const body = await readJsonRecord(c.req, 'Invalid request body');
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
   const parsed = parsePasswordPayload(body.value);
@@ -253,24 +253,48 @@ app.put('/password', changePasswordRateLimit, async (c) => {
     cost: 10,
   });
 
-  const [data] = await db
-    .update(users)
-    .set({
-      passwordHash,
-      passwordUpdatedAt: new Date(),
-    })
-    .where(eq(users.id, authUser.id))
-    .returning(publicUserColumns);
+  // The new password and the sign-out of every other browser take effect together.
+  const data = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(users)
+      .set({
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+      })
+      .where(eq(users.id, authUser.id))
+      .returning(publicUserColumns);
+    if (updated) await revokeUserSessions(authUser.id, currentSessionId, tx);
+    return updated;
+  });
 
   if (!data) {
     return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
   }
 
-  await db
-    .delete(sessions)
-    .where(and(eq(sessions.userId, authUser.id), ne(sessions.id, currentSessionId)));
-
   return c.json({ data });
+});
+
+// ── Sessions ────────────────────────────────────────────────────────────────
+
+app.get('/sessions', async (c) => {
+  const authUser = getAuthUser(c);
+  return c.json({ data: await listUserSessions(authUser.id, getSessionId(c)) });
+});
+
+// Signs out every other browser of this account; the current session stays.
+app.delete('/sessions', async (c) => {
+  const authUser = getAuthUser(c);
+  const revoked = await revokeUserSessions(authUser.id, getSessionId(c));
+  return c.json({ data: { revoked } });
+});
+
+app.delete('/sessions/:id', async (c) => {
+  const authUser = getAuthUser(c);
+  const removed = await revokeUserSession(authUser.id, c.req.param('id'));
+  if (!removed) {
+    return c.json({ error: 'Session not found' }, HTTP_STATUS.NOT_FOUND);
+  }
+  return c.json({ data: null });
 });
 
 export default app;

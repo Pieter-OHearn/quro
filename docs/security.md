@@ -1,154 +1,378 @@
 # Security Model
 
-Quro is designed for home LAN deployment over plain HTTP. There is no public internet exposure and no TLS termination. The mitigations described here are appropriate for that threat model — a trusted local network where the primary concern is session integrity and accidental data exposure, not adversarial attackers on a public network.
+This document is Quro's threat model. It says which deployments are supported, what protects
+each of them, what the operator is trusted with, and which risks Quro accepts. It is a
+risk-selected baseline, not a claim of conformance with any standard. To report a weakness, follow
+[SECURITY.md](../SECURITY.md).
 
-## Authentication
+## Scope and trust
 
-### Session-based auth
+Quro holds a household's financial records: balances, transactions, payslips, pension statements
+and the documents attached to them, plus the credentials of any connected bank.
 
-Authentication uses server-side sessions stored in the `sessions` table in PostgreSQL, not JWTs or tokens managed by the client. On sign-in or sign-up, the backend generates a 64-character hex session ID (32 random bytes from `crypto.getRandomValues`) and inserts a row into `sessions` with a 30-day expiry.
+| Who                                              | Trusted with                                         | Quro protects against them?                                              |
+| ------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------ |
+| Account holders                                  | Their own rows, and an accepted partner's joint rows | Yes: access is checked per row on the backend                            |
+| Other devices on the network or the internet     | Nothing                                              | Yes: authentication, CSRF, rate limits, the modes below                  |
+| The instance operator (host, Docker, `quro` CLI) | Configuration, secrets, accounts and recovery        | No. The operator can read every row; see [Operator role](#operator-role) |
+| Host, database and object-storage administrators | Everything stored                                    | No                                                                       |
 
-Two cookies are set:
+Out of scope: a compromised host or container runtime, physical access to the server, malware or
+extensions in the user's browser, and anyone who holds the backups or the secret files. Image and
+dependency supply chain checks are tracked separately.
 
-| Cookie       | `httpOnly` | Purpose                                                  |
-| ------------ | ---------- | -------------------------------------------------------- |
-| `session`    | `true`     | Session ID — never readable by JavaScript                |
-| `csrf_token` | `false`    | CSRF token — readable by JavaScript for header injection |
+## Deployment modes
 
-Both cookies are set with `sameSite: Lax` and `path: /`. The `secure` flag is controlled by the `SECURE_COOKIES` environment variable, which defaults to `false` for the HTTP-only LAN deployment.
+Quro supports two deployment modes. Both use the bundled nginx (`packages/frontend/nginx.conf`) in
+front of the backend, and both are covered by
+`packages/backend/src/routes/deploymentModes.integration.test.ts`.
 
-On sign-out, the session row is deleted from the DB and both cookies are cleared.
+| Mode | Browsers connect to                                   | Transport                                | `SECURE_COOKIES` | `TRUSTED_PROXIES`                                              |
+| ---- | ----------------------------------------------------- | ---------------------------------------- | ---------------- | -------------------------------------------------------------- |
+| A    | The bundled nginx, on a private network               | Plain HTTP                               | `false`          | Compose default `172.16.0.0/12`                                |
+| B    | The operator's reverse proxy, which forwards to nginx | HTTPS to the proxy, HTTP inside the host | `true`           | The nginx network, plus the proxy's address if it is elsewhere |
 
-### Password hashing
+Mode A is the default for new installs. The app does not enforce TLS in either mode.
 
-Passwords are hashed with bcrypt via `Bun.password.hash` at cost 10. Verification uses `Bun.password.verify`. The hash is stored in `users.password_hash`; the plaintext password is never persisted.
+### Mode A: HTTP on a private network
 
-The minimum accepted password length is 8 characters, enforced at sign-up.
+Browsers on the home network open `http://<host>:3000` and talk to nginx directly. Traffic,
+including passwords and session cookies, is not encrypted, so anyone who can observe the network
+can take over a session. Use mode A only on a network where every device is trusted, and do not
+forward the port to the internet.
 
-### Session validation
+### Mode B: HTTPS behind your reverse proxy
 
-Every protected request goes through the `requireAuth` middleware, which:
+A reverse proxy you run (Caddy, Traefik, nginx or similar) terminates TLS and forwards to the
+bundled nginx, which proxies `/api` to the backend: browser → TLS proxy → nginx → backend.
 
-1. Reads the `session` cookie.
-2. Queries the `sessions` table by session ID, joining the user and accepted partner link.
-3. Rejects the request if the session does not exist or `expires_at` is in the past.
-4. Loads the user row and attaches `{ id, email }` to the Hono context.
+1. Set `SECURE_COOKIES=true`, so browsers only send the session cookie over HTTPS.
+2. Set `TRUSTED_PROXIES` so rate limits apply per browser. See [Proxy trust](#proxy-trust).
+3. Add HSTS and an HTTP-to-HTTPS redirect at your proxy. The bundled nginx serves plain HTTP and
+   cannot set them.
+4. Keep browsers from reaching nginx's published port directly, for example with a firewall rule,
+   or by publishing it on `127.0.0.1` when the proxy runs on the same host. Otherwise the instance
+   is also reachable over plain HTTP.
 
-All routes under `/api/*` require a valid session by default. The shared exact-path list in `src/lib/publicPaths.ts` allows signin, signup, signout, session discovery, health/readiness probes, and the Bunq OAuth callback, which is authenticated by a server-recorded, single-use, 10-minute OAuth attempt plus a matching `bunq_oauth_state` cookie from the browser that started it, rather than a session cookie. New routes under these prefixes are protected. The accepted partner id is available on the request context; personal rows remain owner-only and partner access requires a joint parent entity.
+### Configuration mistakes the backend reports
 
-### Session cleanup
+`SECURE_COOKIES` is configuration. The backend never derives it from `X-Forwarded-Proto` or any
+other header a client can send. Two mistakes would otherwise fail silently, so the backend logs a
+`[config]` warning, once per process, when it sees them:
 
-Expired sessions are rejected at validation time and deleted by a background job that the backend starts with `startSessionCleanup()` (`src/lib/sessionCleanup.ts`). It runs every 24 hours by default; set `SESSION_CLEANUP_INTERVAL_MS` to change the interval.
+- `SECURE_COOKIES=false` while browsers use HTTPS: session cookies lack the `Secure` flag.
+- `SECURE_COOKIES=true` while browsers use plain HTTP: browsers drop the cookie and sign-in does
+  not stick. Loopback addresses are exempt, because browsers keep `Secure` cookies there.
 
-## CSRF Protection
+The backend checks `FRONTEND_ORIGIN` at startup when it is set, and the `Origin` header of
+sign-in, sign-up and password reset requests. Browsers send `Origin` on every `POST` and proxies
+pass it through unchanged, so it shows the scheme the browser uses even behind two proxies.
+Any client can send an `Origin` header, though, so a warning based on one says so: confirm how
+browsers reach Quro before changing the setting. Unknown `SECURE_COOKIES` and `QRO_REGISTRATION_MODE`
+values stop the backend at startup.
 
-### How it works
+### Not supported
 
-The CSRF protection uses the double-submit cookie pattern. On sign-in or sign-up, the backend sets a `csrf_token` cookie (not `httpOnly`, so JavaScript can read it). For every state-changing request, the Axios client reads this cookie and injects its value as an `X-CSRF-Token` request header. The `requireCsrf` middleware then verifies that the cookie value and the header value are non-empty and equal.
+- Publishing the backend port, or routing a proxy to the backend without the bundled nginx. The
+  backend still enforces authentication, CSRF and rate limits (see
+  [Direct access to the backend](#direct-access-to-the-backend)), but nginx's security headers and
+  its 25 MB request limit no longer apply.
+- Plain HTTP over the internet.
+- Serving Quro under a path prefix, or on a hostname shared with another application. Browsers
+  send cookies to every port of a hostname, so another application there would receive Quro's
+  session cookie.
 
-A cross-origin attacker cannot read the `csrf_token` cookie value (due to the same-origin policy), so they cannot forge the matching header.
+## Cookies, CSRF and CORS
 
-### Exempt endpoints
+### Cookies
 
-Auth and CSRF middleware share the public path list. Its state-changing endpoints are:
+Sign-in, sign-up and password reset set two cookies, both with `SameSite=Lax`, `Path=/` and a
+30-day `Max-Age`:
 
-- `POST /api/auth/signin`
-- `POST /api/auth/signup`
-- `POST /api/auth/signout`
+| Cookie       | `HttpOnly` | Purpose                                                    |
+| ------------ | ---------- | ---------------------------------------------------------- |
+| `session`    | `true`     | 256-bit random session token, never readable by JavaScript |
+| `csrf_token` | `false`    | CSRF token, read by the frontend and echoed in a header    |
 
-Signin and signup are exempt because the CSRF token does not exist yet when these requests are made — they are the requests that create it. Signout is exempt because it carries no user data and the worst-case consequence of a forced sign-out is losing a session, not a data mutation.
+Both carry `Secure` when `SECURE_COOKIES=true` (mode B) and not otherwise (mode A). The bunq OAuth
+state cookie follows the same setting.
 
-### Safe methods
+### CSRF protection
 
-`GET`, `HEAD`, and `OPTIONS` requests are always exempt — these methods do not modify server state.
+State-changing requests use the double-submit pattern. The Axios client in
+`packages/frontend/src/lib/api.ts` copies the `csrf_token` cookie into an `X-CSRF-Token` header on
+every non-`GET` request, and `packages/backend/src/middleware/csrf.ts` rejects the request with
+`403` unless both are present and equal. Another site cannot read the cookie, so it cannot forge the
+header. `GET`, `HEAD` and `OPTIONS` requests are exempt and never change state.
 
-### Client injection
+The public auth endpoints run before a CSRF token exists:
 
-`/packages/frontend/src/lib/api.ts` installs an Axios request interceptor that reads the `csrf_token` cookie and sets `X-CSRF-Token` on every non-safe request. The interceptor is a no-op if the cookie is absent (e.g., before the first sign-in).
+- `POST /api/auth/signin`, `POST /api/auth/signup` and `POST /api/auth/password-reset` accept
+  only `Content-Type: application/json` and otherwise return `415`. A cross-site form can only
+  send form or text bodies, and a cross-site JSON request needs a CORS preflight that the backend
+  does not grant, so other sites cannot sign a browser in to an account of their choosing.
+- `POST /api/auth/signout` takes no body. A forced sign-out only loses a session.
 
-## CORS
+### CORS
 
-CORS is configured via the `CORS_ORIGIN` environment variable, which accepts a comma-separated list of allowed origins. The backend defaults to `http://localhost:3000` and `http://localhost:5173` if no value is set.
+In both modes the browser loads the app and calls `/api` on the same origin through nginx, so CORS
+is not used. `CORS_ORIGIN` lists origins for split-origin development (Vite on `:5173`, backend on
+`:3000`) and defaults to `http://localhost:3000,http://localhost:5173`. Responses to any other
+origin carry no `Access-Control-Allow-Origin`, so another site's script cannot read API responses
+or send credentialed requests with custom headers. A wildcard `CORS_ORIGIN=*` is rejected at
+startup in favour of the defaults, because credentials require explicit origins.
 
-Wildcard (`*`) origins are explicitly rejected at startup — using `*` with `credentials: true` is both unsafe and invalid per the Fetch spec. If `CORS_ORIGIN=*` is set, the backend logs a warning and falls back to the default list.
+### Proxy trust
 
-`credentials: true` is required because the session and CSRF cookies are sent as `HttpOnly`/`SameSite=Lax` cookies — the browser must include them on cross-origin requests to the backend in split-origin dev mode.
+Rate limits are keyed on the client address. The backend reads the direct peer from the socket and
+uses `X-Forwarded-For` or `X-Real-IP` only when that peer is listed in `TRUSTED_PROXIES`
+(comma-separated IPs or IPv4 CIDRs; unset trusts none). Behind trusted proxies it takes the
+right-most `X-Forwarded-For` hop that is not itself trusted, so a client cannot choose its own key
+by adding hops on the left. If the peer address is unknown, the request fails with `503`. Malformed
+entries stop the backend at startup.
 
-In the standard Docker deployment, the frontend Nginx container proxies `/api` to the backend, so all browser requests are same-origin and CORS headers are not exercised at runtime. CORS matters only in local development (`bun run dev`) where the frontend (`:5173`) and backend (`:3000`) are on different ports.
+The bundled nginx overwrites `X-Real-IP` with its peer and appends its peer to `X-Forwarded-For`:
+
+- **Mode A**: the backend's peer is nginx and nginx's peer is the browser. The Compose default
+  `172.16.0.0/12` is Docker's default network range, which covers nginx. If your home network
+  itself uses `172.16.0.0/12` addresses, set `TRUSTED_PROXIES` to the Compose network's subnet
+  instead (`docker network inspect` shows it). Releases up to 0.7.0 defaulted to every private
+  range; if you copied that value into your configuration, replace it.
+- **Mode B**: nginx's peer is your TLS proxy. If the proxy runs on the Docker host or in a Docker
+  network, nginx sees a `172.16.0.0/12` address and the default works. If it runs on another
+  machine, add its address, for example `TRUSTED_PROXIES=172.16.0.0/12,192.168.1.10`. If Docker
+  uses custom address pools, list those subnets instead. If you run your own Compose file,
+  `TRUSTED_PROXIES` has no default: set it, or every browser shares nginx's rate-limit bucket.
+
+`X-Forwarded-Proto` is informational. nginx sets it to its own scheme, `http`, in both modes.
+
+### Direct access to the backend
+
+Compose publishes only nginx; the backend has no host port and shares a network only with nginx.
+`scripts/compose-topology.test.ts` keeps it that way. If something does reach the backend
+directly:
+
+- Authentication, CSRF checks and per-row access checks run in the backend and do not depend on
+  nginx or on forwarded headers. Headers such as `X-Forwarded-User` are ignored.
+- Forwarded headers from a peer outside `TRUSTED_PROXIES` are ignored, so the client is keyed by
+  its own address.
+- `X-Forwarded-Proto: https` does not add `Secure` to cookies.
+- nginx's security headers and request size limit do not apply. The backend serves only JSON.
+
+## Accounts and registration
+
+### First account
+
+A new instance has no accounts and no default credentials. Creating the first account needs a
+one-time setup code from the operator, in every registration mode:
+
+```bash
+docker compose exec backend quro user invite
+```
+
+So whoever reaches a fresh instance first cannot claim it. Sign-ups are serialised with a
+PostgreSQL advisory lock, and a code is consumed in the same transaction that creates the account,
+so concurrent sign-ups cannot create two first accounts or use one code twice
+(`packages/backend/src/lib/registration.integration.test.ts`).
+
+### Registration modes
+
+`QRO_REGISTRATION_MODE` decides who may sign up once the first account exists:
+
+| Value              | Sign-up after the first account                                     |
+| ------------------ | ------------------------------------------------------------------- |
+| `invite` (default) | A single-use code from `quro user invite`, valid 7 days by default  |
+| `closed`           | Refused, even with a valid code                                     |
+| `open`             | Anyone who can reach the instance; opt in only on a trusted network |
+
+`GET /api/auth/registration` tells the sign-up form whether a code is needed and whether setup is
+pending. It reveals only that an instance has no accounts yet, which a visitor cannot use without a
+code.
+
+### Account enumeration
+
+Sign-in returns the same error, after the same password hashing work, whether or not the email
+exists. Sign-up checks the code before the email, so in the default `invite` mode only someone
+holding a valid code learns that an address is already registered, and the code stays unused. In
+`open` mode sign-up reveals it. Quro keeps that message because the household is small and the
+person signing up needs to know why it failed; the sign-up rate limit bounds probing.
+
+## Sessions
+
+- Session tokens are 256 random bits. The `sessions` table stores only their SHA-256 digest, so a
+  database dump or backup does not contain a usable cookie. A check constraint rejects anything
+  but a digest.
+- A session lasts 30 days from sign-in. There is no idle timeout. Expired rows are rejected on use
+  and purged daily by `startSessionCleanup()` in `packages/backend/src/lib/sessionCleanup.ts`
+  (`SESSION_CLEANUP_INTERVAL_MS` changes the interval).
+- Each session records the browser's user agent (truncated to 256 characters) and when it was
+  last used, refreshed at most every 5 minutes.
+- **Settings → Security** lists the account's sessions. The user can sign out one browser or every
+  other browser.
+- Changing the password signs out every other session. A password reset signs out all of them.
+- Sessions are deleted with their account.
+
+Upgrading from 0.7.0, migration `0038` replaces each stored token with its digest. Browsers stay
+signed in.
+
+## Operator recovery without email
+
+Quro sends no email. The operator recovers accounts with the `quro` command in the backend
+container, which uses the backend's database credentials:
+
+```bash
+docker compose exec backend quro user --help
+```
+
+| Command                           | Effect                                                                             |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| `quro user status`                | Registration mode, whether setup is pending, account and unused code counts        |
+| `quro user invite [--hours N]`    | Issues a registration code (7 days by default, at most 30)                         |
+| `quro user reset-password EMAIL`  | Issues a password reset code for the account (1 hour by default, at most 24 hours) |
+| `quro user revoke-sessions EMAIL` | Signs the account out of every browser                                             |
+| `quro user list`                  | Accounts with their creation time and active session count                         |
+| `quro user codes`                 | Issued codes and whether they were used; code values are never stored              |
+| `quro user revoke-code ID`        | Withdraws an unused code                                                           |
+
+Codes are 24 Crockford base32 characters (120 bits) in four groups of six, shown once and stored
+only as a SHA-256 digest. They are single-use, expire, and tolerate lowercase, spaces and the
+look-alikes `I`, `L` and `O`. A new reset code replaces the account's previous one. The user redeems
+a reset code with **Forgot password?** on the sign-in screen, which sets the new password, ends
+every session and signs them in. Used and expired codes are deleted after 30 days. Reset requests are
+rate limited per client address.
+
+For a local development backend, run the same commands with
+`bun run --filter '@quro/backend' quro user <command>`.
+
+### Operator role
+
+Quro has no in-app operator or administrator role. Instance operations (accounts, codes,
+sessions, and later diagnostics) are CLI-only. Operator authority comes from access to the host and
+the backend container, which already includes the database credentials, so an in-app role would
+add an attack surface without reducing what the operator can do. The CLI prints account metadata
+(email, creation time, session counts) and never household or financial data. Host and database
+administrators remain fully trusted.
+
+## Keys and credentials
+
+| Secret                                    | Stored in                                 | In a database dump? | If it is lost                                                        |
+| ----------------------------------------- | ----------------------------------------- | ------------------- | -------------------------------------------------------------------- |
+| PostgreSQL admin and app passwords        | `secrets/*.txt` (Docker secrets)          | No                  | Set new ones in the files and the database as the database superuser |
+| MinIO root and app keys                   | `secrets/*.txt`                           | No                  | Reset them in MinIO; documents are unaffected                        |
+| A MinIO encryption key, if you enable one | Your MinIO configuration                  | No                  | The stored documents cannot be read                                  |
+| bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                      | No                  | Issue a new one in bunq and update the configuration                 |
+| bunq access tokens and keys               | Database (`bunq_connections`)             | **Yes**             | Reconnect bunq in Settings                                           |
+| User passwords                            | Database, as bcrypt hashes                | Yes, as hashes      | `quro user reset-password`                                           |
+| Session tokens                            | Browser cookie; database holds the digest | Digest only         | Sign in again                                                        |
+| Registration and reset codes              | Shown once; database holds the digest     | Digest only         | Issue a new code                                                     |
+
+Rules that follow from this table:
+
+- A database dump contains bank tokens and financial records. Store it as carefully as the live
+  instance. See [backup and restore](backup-and-restore.md).
+- The secret files are not in a dump. Back them up separately, somewhere only the operator can
+  read, and not next to the dumps.
+- Restoring a dump restores the sessions that existed when it was taken. Run
+  `quro user revoke-sessions` for affected accounts if that matters.
+- Integration secrets are to be encrypted at rest with one operator-held key (see the
+  [roadmap](../ROADMAP.md)). Keep that key with the secret files, never inside a dump. Losing it
+  means reconnecting bunq; all other data stays intact.
+
+## OWASP ASVS 5.0 baseline
+
+A risk-selected subset of [ASVS 5.0](https://github.com/OWASP/ASVS/tree/master/5.0), mostly level
+1 with the level 2 controls a self-hosted finance app needs. "Gap" marks accepted or planned work.
+Passing tests and scanners is evidence for the listed controls only.
+
+| Requirement                                                | Status   | How Quro meets it, or why not                                                                                                                     |
+| ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.3.1 Secure cookie attribute                              | Partial  | Mode B sets `Secure`. Mode A is plain HTTP by design. No `__Host-` prefix yet                                                                     |
+| 3.3.2 SameSite, 3.3.4 HttpOnly                             | Met      | `SameSite=Lax` on both cookies; `HttpOnly` on the session cookie                                                                                  |
+| 3.4.1 HSTS                                                 | Operator | Mode B: set at the operator's TLS proxy                                                                                                           |
+| 3.5.1 Anti-forgery tokens                                  | Met      | Double-submit CSRF token on every state-changing request                                                                                          |
+| 3.5.2 Preflight for sensitive requests                     | Met      | Custom CSRF header and JSON-only public endpoints; no CORS grant to other origins                                                                 |
+| 3.5.3 Safe methods do not change state                     | Met      | Except the bunq OAuth redirects, which OAuth requires to be `GET`                                                                                 |
+| 6.1.1, 6.3.1 Brute-force controls documented               | Met      | [Rate limiting](#rate-limiting)                                                                                                                   |
+| 6.2.1 Minimum password length                              | Met      | 8 characters                                                                                                                                      |
+| 6.2.2, 6.2.3 Password change with current password         | Met      | Settings → Security                                                                                                                               |
+| 6.3.2 No default accounts                                  | Met      | First account needs an operator setup code                                                                                                        |
+| 6.3.8 No account enumeration (level 3)                     | Partial  | See [Account enumeration](#account-enumeration)                                                                                                   |
+| 6.4.1 Issued secrets expire and are single-use             | Met      | Registration codes 7 days, reset codes 1 hour, both single-use                                                                                    |
+| 6.4.2 No password hints or security questions              | Met      |                                                                                                                                                   |
+| 6.4.6 Admin-initiated reset without the password (level 3) | Met      | `quro user reset-password`                                                                                                                        |
+| 6.5.2 One-way hash only for secrets of 112+ bits           | Met      | Applied to session tokens (256 bits) and operator codes (120 bits), stored as SHA-256 digests; passwords use bcrypt                               |
+| 7.1.1 Session lifetime documented                          | Met      | [Sessions](#sessions)                                                                                                                             |
+| 7.2.1–7.2.3 Server-side, random 128+ bit tokens            | Met      | 256-bit reference tokens checked against the database                                                                                             |
+| 7.2.4 New token at authentication                          | Partial  | Every sign-in issues a new token and there is no pre-authentication session; earlier sessions stay listed in Settings until signed out or expired |
+| 7.3.1 Inactivity timeout                                   | Gap      | Accepted for a household app; 30-day absolute lifetime (7.3.2) is met                                                                             |
+| 7.4.1, 7.4.2 Terminated sessions stay dead                 | Met      | Sign-out deletes the row; account deletion cascades                                                                                               |
+| 7.4.3 End other sessions after a password change           | Met      | Automatic                                                                                                                                         |
+| 7.4.5 Administrators can end sessions                      | Met      | `quro user revoke-sessions`                                                                                                                       |
+| 7.5.2 View and end active sessions                         | Partial  | Settings → Security, without re-authentication                                                                                                    |
+| 13.2.2 Least-privilege database account                    | Met      | The backend uses an app role without DDL; see [Database role separation](#database-role-separation)                                               |
+| 13.2.3 No default service credentials                      | Met      | Every password is an operator-provided secret file                                                                                                |
+| 13.3.1 Secrets management                                  | Partial  | Docker secret files; no key vault                                                                                                                 |
 
 ## Rate Limiting
 
-Auth endpoints are rate-limited with an in-process sliding window counter. The key is the client IP address.
+Auth endpoints are rate-limited with an in-process sliding window counter, keyed as described in
+[Proxy trust](#proxy-trust).
 
-| Endpoint                     | Window     | Max requests | Key                |
-| ---------------------------- | ---------- | ------------ | ------------------ |
-| `POST /api/auth/signin`      | 1 minute   | 5            | Client IP          |
-| `POST /api/auth/signin`      | 15 minutes | 5            | Email address      |
-| `POST /api/auth/signup`      | 15 minutes | 3            | Client IP          |
-| `PUT /api/settings/password` | 15 minutes | 5            | Client IP          |
-| `POST /api/partner/invite`   | 15 minutes | 10           | Authenticated user |
+| Endpoint                        | Window     | Max requests | Key                |
+| ------------------------------- | ---------- | ------------ | ------------------ |
+| `POST /api/auth/signin`         | 1 minute   | 5            | Client IP          |
+| `POST /api/auth/signin`         | 15 minutes | 5            | Email address      |
+| `POST /api/auth/signup`         | 15 minutes | 3            | Client IP          |
+| `POST /api/auth/password-reset` | 15 minutes | 5            | Client IP          |
+| `PUT /api/settings/password`    | 15 minutes | 5            | Client IP          |
+| `POST /api/partner/invite`      | 15 minutes | 10           | Authenticated user |
 
-Requests over the limit receive a `429 Too Many Requests` response. The limiter state is in-memory and resets if the backend restarts. Rate limiting is disabled when `NODE_ENV=test`.
-
-### Resolving the client address
-
-The backend reads the direct peer address from the Bun socket. It uses `X-Real-IP` or `X-Forwarded-For` only when that peer is listed in `TRUSTED_PROXIES`. Any other peer is keyed by its own address, so a client cannot dodge the limit by sending its own forwarded headers.
-
-| Setting           | Value                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------- |
-| `TRUSTED_PROXIES` | Comma-separated IPs or IPv4 CIDRs, for example `172.18.0.0/16,10.0.0.5`. Unset trusts none. |
-
-- Compose defaults `TRUSTED_PROXIES` to the private ranges `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16`, because the Nginx container's address is not fixed. Narrow it to your Compose network subnet if other private hosts can reach the backend directly.
-- Behind a trusted proxy, the right-most `X-Forwarded-For` hop that is not itself a trusted proxy is used, so a chain of proxies (for example a host reverse proxy in front of the bundled Nginx) still resolves to the client. `X-Real-IP` is used only when `X-Forwarded-For` has no usable hop and the `X-Real-IP` address is not itself a trusted proxy. If neither header is usable, the proxy's own address is the key.
-- If the peer address cannot be determined, the request fails closed with `503`. There is no shared `unknown` bucket and no random fallback key, because either would let one client lock out everyone or skip limiting entirely.
-- Malformed `TRUSTED_PROXIES` entries stop the backend at startup.
+Requests over the limit receive `429 Too Many Requests`. The limiter state is in memory and resets
+when the backend restarts. Rate limiting is disabled when `NODE_ENV=test`.
 
 ### Per-email lockout trade-off
 
-The sign-in email limiter stops an attacker who rotates source addresses from guessing one account's password. The cost is that anyone can fail five sign-ins for a known email and lock the owner out for up to 15 minutes. Quro accepts this for a self-hosted, low-user-count deployment. The lockout expires on its own and does not reveal whether the account exists.
+The sign-in email limiter stops an attacker who rotates source addresses from guessing one
+account's password. The cost is that anyone can fail five sign-ins for a known email and lock the
+owner out for up to 15 minutes. Quro accepts this for a self-hosted, low-user-count deployment. The
+lockout expires on its own and does not reveal whether the account exists.
 
 ## Nginx Security Headers
 
-The Nginx frontend container sets the following response headers on all requests:
+The bundled nginx sets these headers on every response:
 
-**Content-Security-Policy**
-Restricts what resources the browser will load. The policy allows scripts, styles, fonts, and `connect` only from the same origin (`'self'`). Images may also come from `data:` URLs and `https://cdn.jsdelivr.net`. Inline styles are allowed (`'unsafe-inline'`) because Tailwind CSS 4 generates runtime styles. `frame-ancestors 'none'` prevents the app from being embedded in any iframe.
-
-**X-Frame-Options: SAMEORIGIN**
-Legacy framing control (complementary to the CSP `frame-ancestors` directive). Prevents the app from being embedded in an iframe on a different origin.
-
-**X-Content-Type-Options: nosniff**
-Tells the browser not to sniff the MIME type of responses. Prevents scripts from being executed if a response is served with an ambiguous content type.
-
-**Referrer-Policy: strict-origin-when-cross-origin**
-Sends the full URL as the `Referer` header on same-origin navigations, but only the origin (no path) on cross-origin requests. For a home app this is mostly a hygiene measure.
-
-**X-XSS-Protection: 1; mode=block**
-Enables the legacy XSS filter in older browsers. Modern browsers ignore this in favour of CSP, but it is harmless to include.
-
-**Permissions-Policy: camera=(), microphone=(), geolocation=()**
-Disables camera, microphone, and geolocation access for the page and any embedded frames. Quro does not use any of these browser APIs.
+- **Content-Security-Policy**: scripts, styles, fonts and `connect` from the same origin only.
+  Images may also come from `data:` URLs and `https://cdn.jsdelivr.net`. Inline styles are allowed
+  (`'unsafe-inline'`) because Tailwind CSS 4 generates runtime styles. `frame-ancestors 'none'`
+  prevents embedding.
+- **X-Frame-Options: SAMEORIGIN**: legacy framing control, alongside `frame-ancestors`.
+- **X-Content-Type-Options: nosniff**: no MIME type sniffing.
+- **Referrer-Policy: strict-origin-when-cross-origin**: cross-origin requests get only the origin.
+- **X-XSS-Protection: 1; mode=block**: ignored by modern browsers, harmless.
+- **Permissions-Policy: camera=(), microphone=(), geolocation=()**: Quro uses none of them.
 
 ## Database Role Separation
 
-Two PostgreSQL roles are used:
+| Role                 | Environment variable  | Capabilities                                                                    |
+| -------------------- | --------------------- | ------------------------------------------------------------------------------- |
+| Admin (`quro_admin`) | `POSTGRES_ADMIN_USER` | Full DDL, `TRUNCATE`, migrations, backup/restore                                |
+| App (`quro_app`)     | `POSTGRES_APP_USER`   | Table-level `SELECT`, `INSERT`, `UPDATE`, `DELETE`; no schema DDL or `TRUNCATE` |
 
-| Role                 | Environment variable  | Capabilities                                                                     |
-| -------------------- | --------------------- | -------------------------------------------------------------------------------- |
-| Admin (`quro_admin`) | `POSTGRES_ADMIN_USER` | Full DDL, `TRUNCATE`, migrations, backup/restore                                 |
-| App (`quro_app`)     | `POSTGRES_APP_USER`   | Table-level `SELECT`, `INSERT`, `UPDATE`, `DELETE` — no schema DDL or `TRUNCATE` |
-
-The `backend` and `pension-import-worker` containers connect as the app role. The admin role is used only by the `migrate` service (schema migrations and role bootstrap) and the `db-tools` service (backup, restore, manual SQL).
-
-This limits the blast radius of an application-layer bug — the app role cannot drop tables, run migrations, or truncate data. Note that the app role currently retains `DELETE` privileges for normal application flows (e.g., deleting a pension pot), so row-level security or narrower write APIs would be required for stricter isolation.
+The `backend` and `pension-import-worker` containers, and the `quro` command, connect as the app
+role. The admin role is used only by the `migrate` service (schema migrations and role bootstrap)
+and the `db-tools` service (backup, restore, manual SQL). An application bug therefore cannot drop
+tables or run migrations. The app role keeps `DELETE` for normal flows such as deleting a pension
+pot.
 
 ## Network Isolation
 
-The Docker Compose network topology isolates services:
+- The `frontend` container (nginx) is the only service with a host port (`3000` by default). It
+  sits on `frontend-net`.
+- The `backend` container sits on `frontend-net` (reachable by nginx) and `backend-net` (reachable
+  by the database and MinIO).
+- PostgreSQL (`db`) and MinIO are on `backend-net` only.
+- The optional AI services (`vllm`, `pension-parser`) are on `ai-net` with the
+  `pension-import-worker`. The main backend cannot reach them.
 
-- The `frontend` container (Nginx) is the only service with a host port binding (`3000` by default). It sits on `frontend-net`.
-- The `backend` container sits on both `frontend-net` (reachable by Nginx) and `backend-net` (reachable by DB and MinIO).
-- PostgreSQL (`db`) and MinIO are on `backend-net` only — they are not reachable from the host or from the frontend container.
-- The AI services (`vllm`, `pension-parser`) are on a separate `ai-net` alongside the `pension-import-worker`. The main backend cannot reach `vllm` or `pension-parser` directly.
-
-This means that even if the frontend container were compromised, it has no direct network path to the database or object store.
+A compromised frontend container therefore has no direct network path to the database or object
+store.
