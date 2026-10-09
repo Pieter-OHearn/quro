@@ -197,11 +197,11 @@
   --data-recurring: var(--viz-1);
   --data-sun: var(--viz-3);
 
-  /* Shadows. */
-  --shadow-card: none;
+  /* Shadows. An empty shadow, not `none`: `none` inside Tailwind's box-shadow list drops rings. */
+  --shadow-card: 0 0 transparent;
   --shadow-popover: 0 4px 12px rgb(15 20 18 / 0.12);
   --shadow-overlay: 0 16px 40px rgb(15 20 18 / 0.2);
-  --shadow-brand: none;
+  --shadow-brand: 0 0 transparent;
 
   /* Motion. */
   --motion-fast: 100ms;
