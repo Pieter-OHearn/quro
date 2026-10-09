@@ -8,7 +8,8 @@ setDefaultTimeout(60_000);
 const providers = await installProviderMocks();
 const { s3Objects } = providers;
 
-const { app } = await import('../index');
+const { createApp } = await import('../app');
+const { clearBunqTestEnv, setBunqTestEnv } = await import('../test/bunq');
 const { PUBLIC_PATHS } = await import('../lib/publicPaths');
 const { WORLD_EMAIL_DOMAIN, createWorld, destroyWorld, nonexistentRows, seedRows, snapshotWorld } =
   await import('../test/accessWorld');
@@ -151,11 +152,14 @@ function describeFailure(parts: string[]): string {
 // ── Setup ────────────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  // Bank routes are mounted only while the integration is configured; the matrix covers them.
+  setBunqTestEnv();
   await useFixtureCurrencyRates('access-matrix');
   world = await createWorld((key, bytes) => s3Objects.set(key, bytes));
 });
 
 afterAll(async () => {
+  clearBunqTestEnv();
   await providers.restore();
   await destroyWorld(createIntegrationHelpers(WORLD_EMAIL_DOMAIN));
 });
@@ -164,7 +168,7 @@ afterAll(async () => {
 
 function registeredRoutes(): string[] {
   const keys = new Set<string>();
-  for (const route of app.routes) {
+  for (const route of createApp().routes) {
     if (route.method === 'ALL') continue;
     keys.add(`${route.method} ${route.path}`);
   }
