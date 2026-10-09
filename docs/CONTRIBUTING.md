@@ -37,7 +37,7 @@ If a release fails:
 - Before the publish job, nothing has been tagged. Fix the cause and start the workflow again.
 - During the publish job, re-run the failed job or start the workflow again for the same commit. The workflow reuses the tag, replaces the draft release the failed run left, and applies the image tags again. To release a different commit under the same version instead, delete the tag and the draft release first.
 
-The workflow reads its release logic (`scripts/lib/release-gate.ts` and `scripts/lib/promote-images.sh`) from the branch it runs from, not from the commit being released. Every action in it is pinned to a reviewed commit SHA, and Dependabot proposes updates to those pins.
+The workflow reads its release logic (`scripts/lib/release-gate.ts` and `scripts/lib/promote-images.sh`) from the branch it runs from, not from the commit being released. The verify job reads that commit, its `VERSION` and its `CHANGELOG.md` through the GitHub API and never checks it out, and no job runs a script from it. Every action in it is pinned to a reviewed commit SHA, and Dependabot proposes updates to those pins.
 
 ## Branch Protection
 

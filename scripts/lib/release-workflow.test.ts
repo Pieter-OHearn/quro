@@ -69,6 +69,27 @@ describe('release.yml', () => {
     }
   });
 
+  test('never checks out or runs the ref being released before it is verified', () => {
+    for (const step of verify.steps) {
+      expect(step.with?.ref).toBeUndefined();
+      expect(step.with?.path).toBeUndefined();
+      expect(step['working-directory']).toBeUndefined();
+    }
+    const preflight = verify.steps[stepIndex(verify, /release-gate\.ts preflight/)];
+    expect(preflight.env?.RELEASE_REF).toBe('${{ inputs.ref }}');
+    expect(releaseText.match(/inputs\.ref/g)).toHaveLength(1);
+  });
+
+  test('never runs a script from the release commit', () => {
+    for (const job of [build, publish]) {
+      for (const step of job.steps.filter((entry) => entry['working-directory'] === 'release')) {
+        expect(step.run ?? '').not.toMatch(
+          /\bbun (run|x|scripts)|(^|[;&|]\s*)(bunx|npx|npm|node|(ba)?sh|\.\/)\b/m,
+        );
+      }
+    }
+  });
+
   test('runs one release at a time', () => {
     expect(release.concurrency).toEqual({ group: 'release', 'cancel-in-progress': false });
   });

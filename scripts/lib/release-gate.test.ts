@@ -8,12 +8,14 @@ import {
   type Release,
   type WorkflowRun,
   RELEASE_BOT_LOGIN,
+  changelogSection,
   compareVersions,
   createGitHub,
   draftsToReplace,
   evaluateRequiredChecks,
   parseReleaseVersion,
   planLatest,
+  parseRef,
   planTag,
   runCommand,
 } from './release-gate';
@@ -84,6 +86,47 @@ describe('parseReleaseVersion', () => {
     'v0.8.0`id`',
   ])('rejects %j', (raw) => {
     expect(() => parseReleaseVersion(raw)).toThrow('VERSION must look like');
+  });
+});
+
+describe('parseRef', () => {
+  test.each(['main', 'feature/h04-release-ci-gate', 'v0.8.0', 'a'.repeat(40)])(
+    'accepts %j',
+    (ref) => {
+      expect(parseRef(ref)).toBe(ref);
+    },
+  );
+
+  test.each([
+    '',
+    '-main',
+    '/main',
+    'main/',
+    'a..b',
+    'main branch',
+    '$(id)',
+    'main;id',
+    'main\nother',
+  ])('rejects %j', (ref) => {
+    expect(() => parseRef(ref)).toThrow('branch, tag or commit');
+  });
+});
+
+describe('changelogSection', () => {
+  const changelog =
+    '# Changelog\n\n## [v0.8.0] - 2026-10-20\n\n- New.\n\n## [v0.7.0]\n\n- Old.\n\n## [v0.6.0]\n';
+
+  test('returns the heading and body up to the next section', () => {
+    expect(changelogSection(changelog, 'v0.8.0')).toBe('## [v0.8.0] - 2026-10-20\n\n- New.\n');
+    expect(changelogSection(changelog, 'v0.7.0')).toBe('## [v0.7.0]\n\n- Old.\n');
+  });
+
+  test('fills an empty section and returns null for a missing one', () => {
+    expect(changelogSection(changelog, 'v0.6.0')).toBe(
+      '## [v0.6.0]\n\n_No additional notes supplied yet._\n',
+    );
+    expect(changelogSection(changelog, 'v0.9.0')).toBeNull();
+    expect(changelogSection(changelog, 'v0.8.00')).toBeNull();
   });
 });
 
@@ -358,6 +401,8 @@ type FakeState = {
   writes: string[];
   failUploads: number;
   onCreateRef?: () => void;
+  refs: Map<string, string>;
+  files: Map<string, string>;
 };
 
 const REPO = 'acme/quro';
@@ -375,26 +420,46 @@ function page<T>(items: T[], url: URL): T[] {
   return items.slice(start, start + perPage);
 }
 
-function apiRoutes(
-  method: string,
-  path: string,
-  url: URL,
-  request: Request,
-): Promise<Response> | Response {
+// Read-only commit routes: refs, file contents, check runs and workflow runs.
+function commitRoutes(path: string, url: URL): Response | null {
+  const commit = /^\/commits\/([^/]+)$/.exec(path);
+  if (commit) {
+    const ref = decodeURIComponent(commit[1]);
+    const sha = /^[0-9a-f]{40}$/.test(ref) ? ref : state.refs.get(ref);
+    return sha ? json({ sha }) : json({ message: 'No commit found' }, 422);
+  }
+  const contents = /^\/contents\/(.+)$/.exec(path);
+  if (contents) {
+    const text = state.files.get(`${url.searchParams.get('ref')}:${contents[1]}`);
+    if (text === undefined) return notFound();
+    const content = Buffer.from(text).toString('base64');
+    return json({ type: 'file', encoding: 'base64', content });
+  }
   const checkRuns = /^\/commits\/([0-9a-f]+)\/check-runs$/.exec(path);
-  if (method === 'GET' && checkRuns) {
+  if (checkRuns) {
     const name = url.searchParams.get('check_name');
     const runs = state.checkRuns.filter(
       (run) => run.head_sha === checkRuns[1] && run.name === name,
     );
     return json({ total_count: runs.length, check_runs: page(runs, url) });
   }
-  if (method === 'GET' && path === '/actions/runs') {
+  if (path === '/actions/runs') {
     const runs = state.workflowRuns.filter(
       (run) => run.head_sha === url.searchParams.get('head_sha'),
     );
     return json({ total_count: runs.length, workflow_runs: page(runs, url) });
   }
+  return null;
+}
+
+function apiRoutes(
+  method: string,
+  path: string,
+  url: URL,
+  request: Request,
+): Promise<Response> | Response {
+  const commitRoute = method === 'GET' ? commitRoutes(path, url) : null;
+  if (commitRoute) return commitRoute;
   const tagRef = /^\/git\/ref\/tags\/(.+)$/.exec(path);
   if (method === 'GET' && tagRef) {
     const object = state.tags.get(tagRef[1]);
@@ -499,11 +564,30 @@ const server = Bun.serve({
 afterAll(() => server.stop(true));
 
 const workDir = mkdtempSync(join(tmpdir(), 'quro-release-gate-'));
-const versionFile = join(workDir, 'VERSION');
-const notesFile = join(workDir, 'release-notes.md');
+const CHANGELOG = [
+  '# Changelog',
+  '',
+  '## [v1.0.0-rc.1] - 2026-12-01',
+  '',
+  '- Synthetic candidate notes.',
+  '',
+  '## [v0.8.0] - 2026-10-20',
+  '',
+  '- Synthetic notes.',
+  '',
+  '## [v0.7.0] - 2026-10-04',
+  '',
+  '- Older synthetic notes.',
+  '',
+].join('\n');
+const changelogFile = join(workDir, 'CHANGELOG.md');
 const assets = [join(workDir, 'docker-compose.release.yml'), join(workDir, 'bundle-v0.8.0.tar.gz')];
-writeFileSync(notesFile, '## [v0.8.0]\n\n- Synthetic notes.\n');
+writeFileSync(changelogFile, CHANGELOG);
 for (const asset of assets) writeFileSync(asset, 'synthetic asset\n');
+
+function setVersion(text: string): void {
+  state.files.set(`${SHA}:VERSION`, text);
+}
 
 function env(extra: Record<string, string> = {}): Record<string, string> {
   return {
@@ -512,8 +596,8 @@ function env(extra: Record<string, string> = {}): Record<string, string> {
     GITHUB_TOKEN: TOKEN,
     RELEASE_SHA: SHA,
     RELEASE_VERSION: 'v0.8.0',
-    RELEASE_VERSION_FILE: versionFile,
-    RELEASE_NOTES_FILE: notesFile,
+    RELEASE_REF: 'main',
+    RELEASE_CHANGELOG_FILE: changelogFile,
     ...extra,
   };
 }
@@ -566,13 +650,12 @@ const PUBLISHED = [
   {
     draft: false,
     assets: ['bundle-v0.8.0.tar.gz', 'docker-compose.release.yml'],
-    body: '## [v0.8.0]\n\n- Synthetic notes.\n',
+    body: '## [v0.8.0] - 2026-10-20\n\n- Synthetic notes.\n',
   },
 ];
 
 describe('release-gate CLI', () => {
   beforeEach(() => {
-    writeFileSync(versionFile, 'v0.8.0\n');
     state = {
       checkRuns: [],
       workflowRuns: [],
@@ -581,7 +664,10 @@ describe('release-gate CLI', () => {
       releases: [],
       writes: [],
       failUploads: 0,
+      refs: new Map([['main', SHA]]),
+      files: new Map([[`${SHA}:CHANGELOG.md`, CHANGELOG]]),
     };
+    setVersion('v0.8.0\n');
   });
 
   test('preflight refuses a commit whose CI failed, before any write', async () => {
@@ -605,7 +691,7 @@ describe('release-gate CLI', () => {
 
   test('preflight treats VERSION as data', async () => {
     passCi();
-    writeFileSync(versionFile, 'v0.8.0"; touch pwned; echo "\n');
+    setVersion('v0.8.0"; touch pwned; echo "\n');
     const result = await run(['preflight']);
     expect(result.code).toBe(1);
     expect(result.error).toContain('VERSION must look like');
@@ -742,7 +828,7 @@ describe('release-gate CLI', () => {
 
   test('publishes a release candidate as a prerelease without moving latest', async () => {
     passCi();
-    writeFileSync(versionFile, 'v1.0.0-rc.1\n');
+    setVersion('v1.0.0-rc.1\n');
     expect((await run(['preflight'])).log).toContain('is a release candidate');
 
     state.tags.set('v1.0.0-rc.1', { type: 'commit', sha: SHA });
@@ -787,6 +873,29 @@ describe('release-gate CLI', () => {
     expect((await run(['preflight'])).log).toContain('v0.8.0 becomes latest');
     expect(await releaseAfterBuild()).toEqual([0, 0, 0]);
     expect(state.releases[0]).toMatchObject({ prerelease: false, make_latest: 'true' });
+  });
+
+  test('preflight resolves a branch, tag or SHA to the exact commit through the API', async () => {
+    passCi();
+    state.refs.set('feature/hotfix', SHA);
+    for (const ref of ['main', 'feature/hotfix', SHA]) {
+      const result = await run(['preflight'], { RELEASE_REF: ref });
+      expect(result.outputs).toEqual({ sha: SHA, version: 'v0.8.0' });
+      expect(result.log).toContain(`from ${ref} at ${SHA}`);
+    }
+    expect((await run(['preflight'], { RELEASE_REF: 'missing' })).error).toContain('422');
+    expect((await run(['preflight'], { RELEASE_REF: '-x' })).error).toContain(
+      'branch, tag or commit',
+    );
+  });
+
+  test('preflight refuses a version without a changelog section or a missing VERSION', async () => {
+    passCi();
+    setVersion('v0.9.0\n');
+    expect((await run(['preflight'])).error).toContain('CHANGELOG.md has no section for v0.9.0');
+    state.files.delete(`${SHA}:VERSION`);
+    expect((await run(['preflight'])).error).toContain(`VERSION does not exist at ${SHA}`);
+    expect(state.writes).toEqual([]);
   });
 
   test('runs as a script and writes outputs to GITHUB_OUTPUT', async () => {

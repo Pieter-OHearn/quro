@@ -1,7 +1,8 @@
 name: Release
 
 # Releases one commit that passed CI. The ref is resolved to a commit SHA once and every
-# later job uses that SHA. Images are pushed under a candidate tag before the git tag
+# later job uses that SHA. The verify job reads that commit through the API and never
+# checks it out or runs it. Images are pushed under a candidate tag before the git tag
 # exists, so a failed build leaves nothing that blocks a retry. The release logic is read
 # from this workflow's commit, not from the commit being released. See "Release Artifacts"
 # in docs/CONTRIBUTING.md.
@@ -32,7 +33,7 @@ jobs:
     name: Verify Release Commit
     runs-on: ubuntu-latest
     permissions:
-      contents: read # check out the commit, read its tag and release
+      contents: read # resolve the ref, read VERSION, CHANGELOG.md, the tag and releases
       checks: read # read the check runs on the commit
       actions: read # match check runs to CI workflow runs and their events
     outputs:
@@ -44,30 +45,15 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: scripts/lib
-      - name: Check out the ref to release
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.ref }}
-          path: release
-          persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
-      - name: Resolve the ref to a commit
-        id: commit
-        run: echo "sha=$(git -C release rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Check CI, VERSION, tag and release
+      - name: Check the ref, CI, VERSION, changelog, tag and release
         id: preflight
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_SHA: ${{ steps.commit.outputs.sha }}
-          RELEASE_VERSION_FILE: release/VERSION
+          RELEASE_REF: ${{ inputs.ref }}
         run: bun scripts/lib/release-gate.ts preflight
-      - name: Check the changelog has a section for the version
-        working-directory: release
-        env:
-          RELEASE_VERSION: ${{ steps.preflight.outputs.version }}
-        run: bun scripts/read-changelog-section.ts "$RELEASE_VERSION" > /dev/null
 
   build-images:
     name: Build Candidate Images
@@ -158,10 +144,7 @@ jobs:
           OWNER_LC=$(printf '%s' "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
           echo "REGISTRY=ghcr.io/$OWNER_LC" >> "$GITHUB_ENV"
       # Prepare every asset before the tag exists, so these steps cannot strand a tag. They
-      # run code from the release commit, so they run before any credential is in reach.
-      - name: Extract release notes
-        working-directory: release
-        run: bun scripts/read-changelog-section.ts "$RELEASE_VERSION" > release-notes.md
+      # work in the release commit's files, so they run before any credential is in reach.
       - name: Install envsubst
         run: sudo apt-get update && sudo apt-get install -y gettext-base
       - name: Generate release manifest
@@ -206,7 +189,7 @@ jobs:
         id: draft
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_NOTES_FILE: release/release-notes.md
+          RELEASE_CHANGELOG_FILE: release/CHANGELOG.md
         run: |
           bun scripts/lib/release-gate.ts stage-release \
             release/docker-compose.release.yml \

@@ -5,8 +5,10 @@ import { basename } from 'node:path';
 // environment variables (never from interpolated shell), validates them as data and talks
 // to the GitHub REST API with the job's token. Nothing here prints the token.
 //
-//   preflight        before any build: VERSION is valid, the required checks passed on the
-//                    exact commit, and the tag and release do not block this commit
+//   preflight        before any build: resolve the ref to a commit and read its VERSION and
+//                    CHANGELOG.md through the API (the commit is never checked out or run),
+//                    check the required checks passed on that exact commit, and that the tag
+//                    and release do not block it
 //   create-tag       after the images are built: create the tag, or confirm a tag left by an
 //                    earlier run points at the same commit
 //   stage-release    replace any draft an earlier run left, upload the assets to a new draft
@@ -18,6 +20,8 @@ export const RELEASE_VERSION_PATTERN =
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const RELEASE_ID_PATTERN = /^[1-9]\d*$/;
+// Branch, tag or commit SHA: no leading dash or slash, no "..", no shell or URL syntax.
+const REF_PATTERN = /^(?![-/])(?!.*\.\.)(?!.*\/$)[\w./-]{1,200}$/;
 const GITHUB_ACTIONS_APP = 'github-actions';
 const GITHUB_API_ORIGIN = 'https://api.github.com';
 const GITHUB_UPLOADS_ORIGIN = 'https://uploads.github.com';
@@ -52,6 +56,31 @@ export function parseCommitSha(raw: string): string {
     throw new ReleaseGateError('The release commit must be a full 40-character commit SHA');
   }
   return sha;
+}
+
+export function parseRef(raw: string): string {
+  const ref = raw.trim();
+  if (!REF_PATTERN.test(ref)) {
+    throw new ReleaseGateError('The ref to release must be a branch, tag or commit SHA');
+  }
+  return ref;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// The CHANGELOG.md section for a version, as the release notes: its heading, then its body
+// up to the next "## [" heading. Null when the changelog has no heading for the version.
+export function changelogSection(changelog: string, version: string): string | null {
+  const heading = new RegExp(`^##\\s*\\[?${escapeRegExp(version)}\\]?[^\\n]*$`, 'm').exec(
+    changelog,
+  );
+  if (!heading) return null;
+  const rest = changelog.slice(heading.index + heading[0].length);
+  const next = rest.search(/^##\s*\[/m);
+  const body = (next < 0 ? rest : rest.slice(0, next)).trim();
+  return `${heading[0].trim()}\n\n${body || '_No additional notes supplied yet._'}\n`;
 }
 
 export function parseCheckNames(raw: string | undefined): string[] {
@@ -419,6 +448,28 @@ export async function getTagCommit(gh: GitHub, version: string): Promise<string 
   return object.sha;
 }
 
+export async function resolveCommit(gh: GitHub, ref: string): Promise<string> {
+  const commit = await gh.request<{ sha: string }>('GET', `/commits/${encodeURIComponent(ref)}`, {
+    allowNotFound: true,
+  });
+  if (!commit) throw new ReleaseGateError(`No branch, tag or commit named ${ref} exists`);
+  return parseCommitSha(commit.sha);
+}
+
+// Reads a file at a commit as data, through the API.
+export async function readFileAt(gh: GitHub, sha: string, path: string): Promise<string> {
+  const file = await gh.request<{ type?: string; encoding?: string; content?: string }>(
+    'GET',
+    `/contents/${path}?ref=${sha}`,
+    { allowNotFound: true },
+  );
+  if (!file) throw new ReleaseGateError(`${path} does not exist at ${sha}`);
+  if (file.type !== 'file' || file.encoding !== 'base64' || file.content === undefined) {
+    throw new ReleaseGateError(`${path} at ${sha} cannot be read through the contents API`);
+  }
+  return Buffer.from(file.content, 'base64').toString('utf8');
+}
+
 async function isPublished(gh: GitHub, version: string): Promise<boolean> {
   const release = await gh.request('GET', `/releases/tags/${version}`, { allowNotFound: true });
   return release !== null;
@@ -437,11 +488,13 @@ function assertNoProblems(problems: string[]): void {
 }
 
 export async function preflight(env: Env, gh: GitHub, out: Output): Promise<void> {
-  const sha = parseCommitSha(required(env, 'RELEASE_SHA'));
-  const version = parseReleaseVersion(readFileSync(required(env, 'RELEASE_VERSION_FILE'), 'utf8'));
+  const ref = parseRef(required(env, 'RELEASE_REF'));
   const requiredChecks = parseCheckNames(env.REQUIRED_CHECKS);
   const workflowPath = env.CI_WORKFLOW_PATH?.trim() || DEFAULT_CI_WORKFLOW_PATH;
-  out.log(`Release ${version} from ${sha}`);
+  const sha = await resolveCommit(gh, ref);
+  const version = parseReleaseVersion(await readFileAt(gh, sha, 'VERSION'));
+  out.log(`Release ${version} from ${ref} at ${sha}`);
+  const changelog = changelogSection(await readFileAt(gh, sha, 'CHANGELOG.md'), version);
 
   const checkRuns = (
     await Promise.all(requiredChecks.map((name) => listCheckRuns(gh, sha, name)))
@@ -462,7 +515,8 @@ export async function preflight(env: Env, gh: GitHub, out: Output): Promise<void
     tagCommit: await getTagCommit(gh, version),
     published: await isPublished(gh, version),
   });
-  assertNoProblems([...gate.problems, ...plan.problems]);
+  const changelogProblems = changelog ? [] : [`CHANGELOG.md has no section for ${version}.`];
+  assertNoProblems([...gate.problems, ...plan.problems, ...changelogProblems]);
   const published = await listPages(gh, '/releases', (body) => body as Release[]);
   out.log(planLatest(version, published).reason);
   out.log(
@@ -525,7 +579,11 @@ export async function stageRelease(
   const { sha, version } = releaseInputs(env);
   if (assets.length === 0)
     throw new ReleaseGateError('stage-release needs at least one asset file');
-  const notes = readFileSync(required(env, 'RELEASE_NOTES_FILE'), 'utf8');
+  const notes = changelogSection(
+    readFileSync(required(env, 'RELEASE_CHANGELOG_FILE'), 'utf8'),
+    version,
+  );
+  if (!notes) throw new ReleaseGateError(`CHANGELOG.md has no section for ${version}.`);
   await requireTagAt(gh, sha, version);
 
   const releases = await listPages(gh, '/releases', (body) => body as Release[]);
