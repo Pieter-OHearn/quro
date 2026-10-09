@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import {
   DEFAULT_THEME_PREFERENCE,
   SYSTEM_DARK_QUERY,
+  THEME_STORAGE_KEY,
   applyTheme,
   getStoredTheme,
   storeTheme,
@@ -13,10 +14,24 @@ import {
 const listeners = new Set<() => void>();
 let currentPreference: ThemePreference | undefined;
 
+function notify(preference: ThemePreference): void {
+  currentPreference = preference;
+  for (const listener of listeners) listener();
+}
+
+// Another tab changed (or cleared) the stored choice: follow it here too.
+function onStorage(event: StorageEvent): void {
+  if (event.key !== null && event.key !== THEME_STORAGE_KEY) return;
+  const stored = getStoredTheme();
+  if (stored !== currentPreference) notify(stored);
+}
+
 function subscribe(listener: () => void): () => void {
+  if (listeners.size === 0) window.addEventListener('storage', onStorage);
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+    if (listeners.size === 0) window.removeEventListener('storage', onStorage);
   };
 }
 
@@ -31,13 +46,12 @@ function getServerSnapshot(): ThemePreference {
 
 function setPreference(preference: ThemePreference): void {
   storeTheme(preference);
-  currentPreference = preference;
-  for (const listener of listeners) listener();
+  notify(preference);
 }
 
 /**
- * The theme preference and its setter. Applies the theme to the document and, while the
- * preference is `system`, follows changes of the OS setting live.
+ * The theme preference and its setter. Applies the theme to the document, follows a choice made
+ * in another tab and, while the preference is `system`, follows changes of the OS setting live.
  */
 export function useTheme(): {
   preference: ThemePreference;

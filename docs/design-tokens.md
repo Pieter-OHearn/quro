@@ -94,7 +94,7 @@ so several identities share one colour until the swatch picker is redesigned.
 
 Settings → Preferences → Appearance offers Light, Dark and System; System is the default and
 follows the operating system live. The choice is kept in the browser (`localStorage` key
-`quro-theme`), not in the account, so each device can differ.
+`quro-theme`), not in the account, so each device can differ; other open tabs follow it at once.
 
 - `theme.css` redefines every raw colour and the popover and overlay shadows in a `.dark { … }`
   block with the "Dark" values of [V1 design](design-v1.md). Aliases (`var(--…)`) follow on their
@@ -105,6 +105,8 @@ follows the operating system live. The choice is kept in the browser (`localStor
   only. After start-up `applyTheme` in `packages/frontend/src/lib/theme.ts` and the `useTheme`
   hook keep the class and the `theme-color` meta in step. The init script and `theme.ts` share
   their test cases in `packages/frontend/src/lib/theme.test.ts`; change both together.
+- `packages/frontend/src/styles/theme.test.ts` fails when a literal colour on `:root` has no dark
+  value or a dark value differs from the "Dark" column of [V1 design](design-v1.md).
 - Tailwind's `dark:` variant follows the class (`@custom-variant dark` in `theme.css`), not
   `prefers-color-scheme`. Prefer a token over a `dark:` override.
 
