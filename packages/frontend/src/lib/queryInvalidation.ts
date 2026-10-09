@@ -70,6 +70,14 @@ export async function invalidateDomain(client: QueryClient, domain: MutationDoma
   );
 }
 
+// For changes after which the old rows must not be shown while the new ones load, such as the end
+// of a partner link: the cached data is dropped, not just marked stale. Active queries refetch.
+export async function resetDomain(client: QueryClient, domain: MutationDomain): Promise<void> {
+  await Promise.all(
+    domainQueryDependencies[domain].map((queryKey) => client.resetQueries({ queryKey })),
+  );
+}
+
 export async function invalidatePensionImport(
   client: QueryClient,
   importId: number,
