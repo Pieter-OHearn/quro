@@ -3,7 +3,7 @@ import {
   normalizeBudgetTransactionMoney,
 } from '../lib/budgetCurrency';
 import { findOwnedRow } from '../lib/access';
-import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   EXPENSE_CLASSES,
@@ -18,6 +18,7 @@ import { db, type DbTransaction } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { isForeignKeyViolation } from '../lib/postgresErrors';
+import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import { CATEGORY_PRESETS } from '../services/bunqCategoryRules';
 import {
   err,
@@ -40,7 +41,6 @@ import {
 const app = new Hono();
 const MIN_BUDGET_YEAR = 2000;
 const MAX_BUDGET_YEAR = 9999;
-const DEFAULT_TRANSACTION_LIMIT = 100;
 const BUDGET_CATEGORY_FIELDS = [
   'currency',
   'name',
@@ -358,7 +358,8 @@ app.get('/categories', async (c) => {
   const data = await db
     .select()
     .from(budgetCategories)
-    .where(and(...conditions));
+    .where(and(...conditions))
+    .orderBy(asc(budgetCategories.id));
   return c.json({ data });
 });
 
@@ -473,18 +474,23 @@ app.get('/transactions', async (c) => {
     conditions.push(gte(budgetTransactions.date, start));
     conditions.push(lt(budgetTransactions.date, end));
   }
+  const pageRequest = parseListPageQuery(c.req, 'date');
+  if (!pageRequest.ok) return c.json({ error: pageRequest.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const query = db
-    .select()
-    .from(budgetTransactions)
-    .where(and(...conditions));
-  const data =
-    filter || categoryId
-      ? await query
-      : await query
-          .orderBy(desc(budgetTransactions.date), desc(budgetTransactions.id))
-          .limit(DEFAULT_TRANSACTION_LIMIT);
-  return c.json({ data });
+  // Newest first: an unfiltered first page is the most recent activity.
+  const page = await readListPage(
+    pageRequest.value,
+    ledgerOrder(budgetTransactions, 'desc'),
+    (window) =>
+      db
+        .select()
+        .from(budgetTransactions)
+        .where(and(...conditions, window.where))
+        .orderBy(...window.orderBy)
+        .limit(window.limit),
+    ledgerPosition,
+  );
+  return c.json(page);
 });
 
 app.get('/transactions/:id', async (c) => {
@@ -600,7 +606,11 @@ app.delete('/transactions/:id', async (c) => {
 
 app.get('/category-mappings', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(categoryMappings).where(eq(categoryMappings.userId, user.id));
+  const data = await db
+    .select()
+    .from(categoryMappings)
+    .where(eq(categoryMappings.userId, user.id))
+    .orderBy(asc(categoryMappings.id));
   return c.json({ data });
 });
 

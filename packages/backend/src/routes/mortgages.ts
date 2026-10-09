@@ -19,7 +19,7 @@ import {
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { applyRepayment, MORTGAGE_BALANCE, reverseRepayment } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
@@ -649,7 +649,8 @@ app.get('/', async (c) => {
   const data = await db
     .select()
     .from(mortgages)
-    .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(mortgages.archivedAt)));
+    .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(mortgages.archivedAt)))
+    .orderBy(asc(mortgages.id));
   return c.json({ data });
 });
 

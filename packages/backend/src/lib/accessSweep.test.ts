@@ -46,7 +46,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
   'middleware/auth.ts': { sessions: 1 },
   'routes/budget.ts': { budgetCategories: 6, budgetTransactions: 4, categoryMappings: 2 },
   'routes/bunq.ts': { bunqConnections: 4, bunqPaymentProgress: 2 },
-  'routes/debts.ts': { debtPayments: 4, debts: 5 },
+  'routes/debts.ts': { debtPayments: 3, debts: 5 },
   'routes/employments.ts': { employments: 9 },
   'routes/goals.ts': { goals: 3, savingsAccounts: 1 },
   'routes/holdings.ts': { holdingPriceHistory: 1, holdingTransactions: 2, holdings: 5 },

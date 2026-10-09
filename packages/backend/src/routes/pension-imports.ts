@@ -13,6 +13,7 @@ import {
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { withLedgerWrite } from '../lib/ledgerWrite';
+import { parseListPageQuery, readListPage, type KeysetOrder } from '../lib/listPage';
 import { getPensionStatementImportCapability } from '../lib/capabilities';
 import {
   parsePensionStatement,
@@ -66,6 +67,13 @@ const LIST_IMPORT_DEFAULT_STATUSES = [
   'failed',
 ] as const;
 const DEFAULT_LANGUAGE_HINTS = ['en', 'nl'];
+// Statement order, as extracted; the id keeps rows with one position in a stable order.
+const IMPORT_ROW_ORDER: KeysetOrder = {
+  key: pensionStatementImportRows.rowOrder,
+  keyType: 'integer',
+  tie: pensionStatementImportRows.id,
+  direction: 'asc',
+};
 const IMPORT_LIST_DEFAULT_LIMIT = 30;
 const IMPORT_LIST_MAX_LIMIT = 100;
 
@@ -845,16 +853,29 @@ app.get('/:id/rows', async (c) => {
   const importId = parseId(c.req.param('id'));
   if (importId === null) return c.json({ error: 'Invalid import id' }, HTTP_STATUS.BAD_REQUEST);
 
+  const pageRequest = parseListPageQuery(c.req, IMPORT_ROW_ORDER.keyType);
+  if (!pageRequest.ok) return c.json({ error: pageRequest.error }, HTTP_STATUS.BAD_REQUEST);
+
   const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const rows = await db
-    .select()
-    .from(pensionStatementImportRows)
-    .where(eq(pensionStatementImportRows.importId, importId))
-    .orderBy(asc(pensionStatementImportRows.rowOrder));
+  const page = await readListPage(
+    pageRequest.value,
+    IMPORT_ROW_ORDER,
+    (window) =>
+      db
+        .select()
+        .from(pensionStatementImportRows)
+        .where(and(eq(pensionStatementImportRows.importId, importId), window.where))
+        .orderBy(...window.orderBy)
+        .limit(window.limit),
+    (row) => ({ key: row.rowOrder, tie: row.id }),
+  );
 
-  return c.json({ data: rows.map((row) => normalizeImportRowResponse(row)) });
+  return c.json({
+    data: page.data.map((row) => normalizeImportRowResponse(row)),
+    nextCursor: page.nextCursor,
+  });
 });
 
 app.patch('/:id/rows/:rowId', async (c) => {

@@ -1,7 +1,7 @@
 import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
 import { registerArchivableResource } from '../lib/archivableResource';
 import { findAccessible, findAccessibleChild } from '../lib/access';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   SAVINGS_ACCOUNT_TYPES,
@@ -417,7 +417,8 @@ app.get('/accounts', async (c) => {
     .from(savingsAccounts)
     .where(
       includeArchived ? accessPredicate : and(accessPredicate, isNull(savingsAccounts.archivedAt)),
-    );
+    )
+    .orderBy(asc(savingsAccounts.id));
   return c.json({ data });
 });
 

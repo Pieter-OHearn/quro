@@ -8,6 +8,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { earliestDate } from '../lib/netWorth';
 import { withLedgerWrite } from '../lib/ledgerWrite';
+import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import {
   asFile,
   buildPdfStorageKey,
@@ -186,8 +187,21 @@ async function uploadPayslipDocumentForUser(params: {
 
 app.get('/payslips', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(payslips).where(eq(payslips.userId, user.id));
-  return c.json({ data: data.map(formatPayslipResponse) });
+  const pageRequest = parseListPageQuery(c.req, 'date');
+  if (!pageRequest.ok) return c.json({ error: pageRequest.error }, HTTP_STATUS.BAD_REQUEST);
+  const page = await readListPage(
+    pageRequest.value,
+    ledgerOrder(payslips),
+    (window) =>
+      db
+        .select()
+        .from(payslips)
+        .where(and(eq(payslips.userId, user.id), window.where))
+        .orderBy(...window.orderBy)
+        .limit(window.limit),
+    ledgerPosition,
+  );
+  return c.json({ data: page.data.map(formatPayslipResponse), nextCursor: page.nextCursor });
 });
 
 app.get('/payslips/:id', async (c) => {
