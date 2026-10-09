@@ -45,7 +45,7 @@ export function InviteCodeField({
         autoComplete="one-time-code"
         autoCapitalize="characters"
         spellCheck={false}
-        placeholder="XXXXX-XXXXX-XXXXX-XXXXX"
+        placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX"
         error={Boolean(error)}
         value={value}
         onChange={onChange}

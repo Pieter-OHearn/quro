@@ -70,11 +70,11 @@ describe('session tokens', () => {
 });
 
 describe('operator codes', () => {
-  test('are four groups of five Crockford base32 characters', () => {
+  test('are four groups of six Crockford base32 characters, 120 bits', () => {
     const codes = new Set(Array.from({ length: 50 }, generateAuthCode));
     expect(codes.size).toBe(50);
     for (const code of codes) {
-      expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
+      expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{6}(-[0-9A-HJKMNP-TV-Z]{6}){3}$/);
     }
   });
 

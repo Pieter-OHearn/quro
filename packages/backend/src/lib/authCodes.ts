@@ -15,8 +15,10 @@ const AUTH_CODE_RETENTION_MS = AUTH_CODE_RETENTION_DAYS * DAY_MS;
 
 // Crockford base32: no I, L, O or U, so codes survive being read aloud or retyped.
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-const CODE_LENGTH = 20; // 100 bits
-const GROUP_LENGTH = 5;
+// 24 characters of 5 bits each: 120 bits, above the 112 bits from which ASVS 6.5.2 allows a
+// one-way hash instead of a password hash.
+const CODE_LENGTH = 24;
+const GROUP_LENGTH = 6;
 const MAX_INPUT_LENGTH = 64;
 const ALPHABET_MASK = ALPHABET.length - 1;
 
@@ -56,6 +58,11 @@ export function normalizeAuthCode(input: string): string {
     .replaceAll('O', '0');
 }
 
+/**
+ * Codes are random, single-use and longer than 112 bits, so a one-way hash is enough: unlike a
+ * password, a code cannot be guessed from a dictionary, and salting or stretching would add no
+ * meaningful protection.
+ */
 export function hashAuthCode(code: string): string {
   return createHash('sha256').update(normalizeAuthCode(code)).digest('hex');
 }

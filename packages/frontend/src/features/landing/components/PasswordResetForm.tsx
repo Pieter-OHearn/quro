@@ -39,7 +39,7 @@ function PasswordResetFields({ state }: Readonly<{ state: PasswordResetState }>)
           autoComplete="one-time-code"
           autoCapitalize="characters"
           spellCheck={false}
-          placeholder="XXXXX-XXXXX-XXXXX-XXXXX"
+          placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX"
           error={Boolean(errors.code)}
           value={form.code}
           onChange={(value) => setField('code', value)}

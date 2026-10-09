@@ -234,11 +234,11 @@ docker compose exec backend quro user --help
 | `quro user codes`                 | Issued codes and whether they were used; code values are never stored              |
 | `quro user revoke-code ID`        | Withdraws an unused code                                                           |
 
-Codes are 20 Crockford base32 characters (100 bits) in four groups, shown once and stored only as
-a SHA-256 digest. They are single-use, expire, and tolerate lowercase, spaces and the look-alikes
-`I`, `L` and `O`. A new reset code replaces the account's previous one. The user redeems a reset
-code with **Forgot password?** on the sign-in screen, which sets the new password, ends every
-session and signs them in. Used and expired codes are deleted after 30 days. Reset requests are
+Codes are 24 Crockford base32 characters (120 bits) in four groups of six, shown once and stored
+only as a SHA-256 digest. They are single-use, expire, and tolerate lowercase, spaces and the
+look-alikes `I`, `L` and `O`. A new reset code replaces the account's previous one. The user redeems
+a reset code with **Forgot password?** on the sign-in screen, which sets the new password, ends
+every session and signs them in. Used and expired codes are deleted after 30 days. Reset requests are
 rate limited per client address.
 
 For a local development backend, run the same commands with
@@ -300,6 +300,7 @@ Passing tests and scanners is evidence for the listed controls only.
 | 6.4.1 Issued secrets expire and are single-use             | Met      | Registration codes 7 days, reset codes 1 hour, both single-use                                                                                    |
 | 6.4.2 No password hints or security questions              | Met      |                                                                                                                                                   |
 | 6.4.6 Admin-initiated reset without the password (level 3) | Met      | `quro user reset-password`                                                                                                                        |
+| 6.5.2 One-way hash only for secrets of 112+ bits           | Met      | Applied to session tokens (256 bits) and operator codes (120 bits), stored as SHA-256 digests; passwords use bcrypt                               |
 | 7.1.1 Session lifetime documented                          | Met      | [Sessions](#sessions)                                                                                                                             |
 | 7.2.1–7.2.3 Server-side, random 128+ bit tokens            | Met      | 256-bit reference tokens checked against the database                                                                                             |
 | 7.2.4 New token at authentication                          | Partial  | Every sign-in issues a new token and there is no pre-authentication session; earlier sessions stay listed in Settings until signed out or expired |
