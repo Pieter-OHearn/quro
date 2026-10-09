@@ -1,3 +1,5 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { resetDomain } from '@/lib/queryInvalidation';
 import { useDomainMutation } from '@/lib/useDomainMutation';
 import { apiPost, api } from '@/lib/api';
 import type { PartnerLink } from '@quro/shared';
@@ -21,7 +23,12 @@ export function useDeclinePartner() {
 }
 
 export function useUnlinkPartner() {
-  return useDomainMutation('household', async (): Promise<void> => {
-    await api.delete('/api/partner');
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<void> => {
+      await api.delete('/api/partner');
+    },
+    // The former partner's joint rows must not stay on screen while the lists refetch.
+    onSuccess: () => resetDomain(queryClient, 'household'),
   });
 }
