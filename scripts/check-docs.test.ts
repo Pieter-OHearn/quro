@@ -67,6 +67,14 @@ describe('headingSlugs', () => {
     expect(parsed.headings).toEqual(['After']);
   });
 
+  test('collects setext headings and skips YAML front matter', () => {
+    const parsed = parseMarkdown(
+      '---\nname: Template\n---\n\nTitle\n=====\n\nSection\n-------\n\ntext\n\n---\n- item\n---\n',
+    );
+    expect(parsed.headings).toEqual(['Title', 'Section']);
+    expect(parsed.prose.some(({ text }) => text.startsWith('name:'))).toBe(false);
+  });
+
   test('ignores headings inside fenced code', () => {
     expect(parseMarkdown('# Real\n\n```bash\n# not a heading\n```\n').headings).toEqual(['Real']);
   });
@@ -94,6 +102,18 @@ describe('checkDocs links', () => {
       '1: link missing.md points to a missing file',
       '2: link guide.md#nope has no matching heading',
       '3: link ../../outside.md points outside the repository',
+    ]);
+  });
+
+  test('checks HTML image and anchor targets', () => {
+    expect(
+      messages({
+        'docs/a.md':
+          '<img src="guide.md" alt="ok" />\n<img src="shots/missing.png"\n  alt="x" />\n<a href="guide.md#nope">x</a>\n',
+      }),
+    ).toEqual([
+      '2: link shots/missing.png points to a missing file',
+      '4: link guide.md#nope has no matching heading',
     ]);
   });
 
@@ -142,6 +162,7 @@ describe('checkDocs commands and config', () => {
           "bun run --filter '@quro/backend' start",
           "bun run --filter '@quro/backend' nope",
           "bun run --filter '@quro/missing' start",
+          "bun run --filter '@quro/*' anything",
           'bun run scripts/tool.ts',
           '# bun run commented-out',
           '```',
@@ -152,7 +173,7 @@ describe('checkDocs commands and config', () => {
       '3: bun run nope: no such script in the root package.json',
       '5: bun run nope: no such script in @quro/backend',
       '6: bun run --filter @quro/missing: no such workspace',
-      '10: bun run missing-inline: no such script in the root package.json',
+      '11: bun run missing-inline: no such script in the root package.json',
     ]);
   });
 

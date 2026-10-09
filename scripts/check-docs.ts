@@ -52,15 +52,30 @@ export type ParsedMarkdown = {
   headings: string[];
 };
 
+const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)\s*$/;
+// Lines that cannot be the text of a setext heading: blank, list items, tables, quotes, headings.
+const NOT_SETEXT_TEXT_RE = /^\s*$|^\s*([-*+]|\d+[.)])\s|^\s*[|>#]/;
+
+/** Number of leading lines taken by YAML front matter (`---` ... `---`), or 0. */
+function frontMatterLength(lines: readonly string[]): number {
+  if (lines[0]?.trim() !== '---') return 0;
+  const end = lines.findIndex((text, index) => index > 0 && text.trim() === '---');
+  return end < 0 ? 0 : end + 1;
+}
+
 export function parseMarkdown(content: string): ParsedMarkdown {
   const prose: Line[] = [];
   const blocks: CodeBlock[] = [];
   const headings: string[] = [];
   let block: CodeBlock | null = null;
   let fence = '';
+  let previousProse: string | null = null;
 
-  content.split('\n').forEach((text, index) => {
+  const lines = content.split('\n');
+  const skip = frontMatterLength(lines);
+  lines.forEach((text, index) => {
     const line = index + 1;
+    if (index < skip) return;
     if (block) {
       // A closing fence uses the same character, is at least as long and has no info string.
       const closing = /^\s*(`{3,}|~{3,})\s*$/.exec(text)?.[1];
@@ -77,11 +92,20 @@ export function parseMarkdown(content: string): ParsedMarkdown {
       const [, marker, lang] = opening;
       fence = marker;
       block = { lang: lang.toLowerCase(), lines: [] };
+      previousProse = null;
       return;
     }
     prose.push({ text, line });
     const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(text);
     if (heading) headings.push(heading[1]);
+    else if (
+      previousProse !== null &&
+      SETEXT_UNDERLINE_RE.test(text) &&
+      !NOT_SETEXT_TEXT_RE.test(previousProse)
+    ) {
+      headings.push(previousProse.trim());
+    }
+    previousProse = text;
   });
   if (block) blocks.push(block);
   return { prose, blocks, headings };
@@ -116,6 +140,11 @@ function linkTargets(text: string): string[] {
     targets.push(match[1]);
   }
   for (const match of text.matchAll(/^\s*\[[^\]]+\]:\s*<?(\S+?)>?(?:\s|$)/g)) {
+    targets.push(match[1]);
+  }
+  for (const match of stripInlineCode(text).matchAll(
+    /<(?:a|img)\b[^>]*?\b(?:href|src)\s*=\s*["']([^"']+)["']/gi,
+  )) {
     targets.push(match[1]);
   }
   return targets;
@@ -228,6 +257,33 @@ function blockPackageDir(block: CodeBlock, repo: DocsRepo): string | null {
   return null;
 }
 
+/** Returns a problem message for one `bun run` invocation, or null when the script exists. */
+function checkScriptName(
+  flags: string,
+  script: string,
+  repo: DocsRepo,
+  contextDir: string | null,
+): string | null {
+  const filter = FILTER_RE.exec(flags);
+  if (filter) {
+    const [, singleQuoted, doubleQuoted, bare] = filter;
+    const name = singleQuoted ?? doubleQuoted ?? bare;
+    // Globs such as '@quro/*' select several workspaces; the script name is not checked.
+    if (/[*!?]/.test(name)) return null;
+    const dir = repo.packageDirs.get(name);
+    if (!dir) return `bun run --filter ${name}: no such workspace`;
+    return repo.scripts.get(dir)?.has(script)
+      ? null
+      : `bun run ${script}: no such script in ${name}`;
+  }
+  const known =
+    repo.scripts.get('.')?.has(script) ||
+    (contextDir !== null && repo.scripts.get(contextDir)?.has(script));
+  if (known) return null;
+  const where = contextDir ? `the root or ${contextDir}` : 'the root package.json';
+  return `bun run ${script}: no such script in ${where}`;
+}
+
 function checkBunRun(
   file: string,
   text: string,
@@ -235,31 +291,12 @@ function checkBunRun(
   repo: DocsRepo,
   contextDir: string | null,
 ): DocsProblem[] {
-  const problems: DocsProblem[] = [];
-  for (const match of text.matchAll(BUN_RUN_RE)) {
-    const [, flags, script] = match;
-    if (script.startsWith('-') || script.includes('/') || /\.[cm]?[jt]sx?$/.test(script)) continue;
-    const filter = FILTER_RE.exec(flags);
-    if (filter) {
-      const [, singleQuoted, doubleQuoted, bare] = filter;
-      const name = singleQuoted ?? doubleQuoted ?? bare;
-      const dir = repo.packageDirs.get(name);
-      if (!dir) {
-        problems.push({ file, line, message: `bun run --filter ${name}: no such workspace` });
-      } else if (!repo.scripts.get(dir)?.has(script)) {
-        problems.push({ file, line, message: `bun run ${script}: no such script in ${name}` });
-      }
-      continue;
-    }
-    const known =
-      repo.scripts.get('.')?.has(script) ||
-      (contextDir !== null && repo.scripts.get(contextDir)?.has(script));
-    if (!known) {
-      const where = contextDir ? `the root or ${contextDir}` : 'the root package.json';
-      problems.push({ file, line, message: `bun run ${script}: no such script in ${where}` });
-    }
-  }
-  return problems;
+  return [...text.matchAll(BUN_RUN_RE)]
+    .filter(([, , script]) => !script.startsWith('-') && !script.includes('/'))
+    .filter(([, , script]) => !/\.[cm]?[jt]sx?$/.test(script))
+    .map(([, flags, script]) => checkScriptName(flags, script, repo, contextDir))
+    .filter((message): message is string => message !== null)
+    .map((message) => ({ file, line, message }));
 }
 
 function checkShellBlocks(
