@@ -8,7 +8,7 @@ import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from './io';
 import { runQuro } from './quro';
 
 const integration = createIntegrationHelpers('operator-cli.integration.quro.test');
-const CODE_PATTERN = /\b[0-9A-HJKMNP-TV-Z]{5}(?:-[0-9A-HJKMNP-TV-Z]{5}){3}\b/;
+const CODE_PATTERN = /\b[0-9A-HJKMNP-TV-Z]{6}(?:-[0-9A-HJKMNP-TV-Z]{6}){3}\b/;
 const NEW_PASSWORD = 'operator-reset-pass-789';
 
 async function quro(...args: string[]) {

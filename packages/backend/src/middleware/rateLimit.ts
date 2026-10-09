@@ -106,7 +106,7 @@ export const changePasswordRateLimit = createRateLimiter(
   FIFTEEN_MINUTES_MS,
   CHANGE_PASSWORD_MAX_ATTEMPTS,
 );
-// Reset codes carry 100 bits and expire within the hour; this only stops bulk guessing.
+// Reset codes carry 120 bits and expire within the hour; this only stops bulk guessing.
 export const passwordResetRateLimit = createRateLimiter(
   FIFTEEN_MINUTES_MS,
   PASSWORD_RESET_MAX_ATTEMPTS,

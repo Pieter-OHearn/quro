@@ -23,7 +23,7 @@ function issueInviteCode(): string {
       },
     },
   );
-  const code = output.match(/[0-9A-HJKMNP-TV-Z]{5}(?:-[0-9A-HJKMNP-TV-Z]{5}){3}/)?.[0];
+  const code = output.match(/[0-9A-HJKMNP-TV-Z]{6}(?:-[0-9A-HJKMNP-TV-Z]{6}){3}/)?.[0];
   if (!code) throw new Error('quro user invite printed no code');
   return code;
 }
