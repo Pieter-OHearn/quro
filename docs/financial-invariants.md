@@ -151,8 +151,10 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
 - **Moves conserve.** Moving a transaction to another account or pot removes its effect from the
   old parent and adds it to the new one.
 - **Concurrent writes serialise.** An edit or delete locks the ledger row before reversing it, so a
-  second edit or delete of the same row waits for the first and works from its result. A row that
-  moved to another parent in the meantime is refused with `409`.
+  second edit or delete of the same row waits for the first and works from its result. Savings,
+  mortgage and property rows are reached through their parent, so one that moved to another
+  parent in the meantime is refused with `409`; budget, pension and debt rows are reached through
+  their owner and need no such check.
 - **Imports apply once.** bunq payments are keyed by `(user, bunqTransactionId)`; a repeated
   import adds nothing. A reviewed pension statement is claimed by its commit, so a second commit
   of the same import is refused and its rows reach the ledger once.

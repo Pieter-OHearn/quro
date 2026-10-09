@@ -763,9 +763,6 @@ app.patch('/property-transactions/:id', async (c) => {
     return c.json({ error: 'No property transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  const merged = mergePropertyTransactionPayload(body.value, existing);
-  if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
-
   const result = await answerRejectedEdit<
     { data: typeof propertyTransactions.$inferSelect },
     LedgerRejection

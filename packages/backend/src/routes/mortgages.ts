@@ -839,9 +839,6 @@ app.patch('/transactions/:id', async (c) => {
     return c.json({ error: 'No mortgage transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  const merged = mergeMortgageTransactionPayload(body.value, existing);
-  if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
-
   const result = await answerRejectedEdit<
     { data: typeof mortgageTransactions.$inferSelect },
     LedgerRejection

@@ -40,6 +40,15 @@ function seededRandom(seed: number) {
     pick: <T>(items: readonly T[]): T => items[Math.floor(next() * items.length)]!,
     // A positive amount with whole cents, the precision the forms send.
     cents: (max: number) => (1 + Math.floor(next() * (max * 100 - 1))) / 100,
+    // Fisher-Yates over a copy, driven by the same seed.
+    shuffle: <T>(items: readonly T[]): T[] => {
+      const copy = [...items];
+      for (let index = copy.length - 1; index > 0; index -= 1) {
+        const swap = Math.floor(next() * (index + 1));
+        [copy[index], copy[swap]] = [copy[swap]!, copy[index]!];
+      }
+      return copy;
+    },
   };
 }
 
@@ -286,7 +295,7 @@ describe('metamorphic: an edit and its inverse, or a write and its deletion, cha
       payments.push(created.id);
     }
     // Delete in a shuffled order: the restorations commute.
-    for (const id of [...payments].sort(() => random.cents(1) - 0.5)) {
+    for (const id of random.shuffle(payments)) {
       await read(await send(owner, 'DELETE', `/api/debts/payments/${id}`));
     }
     const [row] = await db

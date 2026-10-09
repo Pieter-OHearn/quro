@@ -255,11 +255,14 @@ async function pageTotals(session: AuthSession): Promise<Components> {
 async function databaseTotals(userId: number, partnerId: number): Promise<Components> {
   const rates = sql`(select from_currency::text as currency, rate from currency_rates
     where to_currency = 'EUR' union all select 'EUR', 1)`;
-  const visible = (alias: string) =>
-    sql.raw(`(${alias}.user_id = ${userId} or (${alias}.user_id = ${partnerId} and ${alias}.is_joint))
-      and ${alias}.archived_at is null`);
-  const jointShare = (alias: string) =>
-    sql.raw(`(case when ${alias}.is_joint then 0.5 else 1 end)`);
+  // Only the fixed table aliases are raw; the user ids are bound parameters.
+  const visible = (alias: 's' | 'p') => {
+    const table = sql.raw(alias);
+    return sql`(${table}.user_id = ${userId} or (${table}.user_id = ${partnerId} and ${table}.is_joint))
+      and ${table}.archived_at is null`;
+  };
+  const jointShare = (alias: 's' | 'p' | 'm') =>
+    sql`(case when ${sql.raw(alias)}.is_joint then 0.5 else 1 end)`;
   const [row] = (await db.execute(sql`
     select
       (select coalesce(sum(s.balance * ${jointShare('s')} * r.rate), 0) from savings_accounts s
