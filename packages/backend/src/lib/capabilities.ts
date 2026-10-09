@@ -2,7 +2,7 @@ import type { AppCapabilities, AppCapabilityReason, AppCapabilityStatus } from '
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { workerHeartbeats } from '../db/schema';
-import { BUNQ_UNAVAILABLE_MESSAGE, loadBunqConfig } from './bunqConfig';
+import { evaluateCapability } from './capabilityRegistry';
 
 export const PENSION_IMPORT_WORKER_NAME = 'pension-import-worker';
 export const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
@@ -11,6 +11,8 @@ const WORKER_HEARTBEAT_STALE_AFTER_MS = 15_000;
 const AI_AVAILABLE_MESSAGE = 'AI features are available.';
 const AI_DISABLED_MESSAGE =
   'AI features are unavailable. Start the pension import worker to enable AI.';
+const AI_DISABLED_NOT_CONFIGURED_MESSAGE =
+  'AI features are unavailable because this Quro instance has not configured them.';
 const AI_DISABLED_PARSER_MESSAGE =
   'AI features are unavailable because the parser service is unhealthy.';
 const PENSION_IMPORT_AVAILABLE_MESSAGE = 'AI import is available.';
@@ -81,6 +83,10 @@ function toAiCapability(
     return buildCapability(true, AI_AVAILABLE_MESSAGE, now);
   }
 
+  if (pensionStatementImport.reason === 'not_configured') {
+    return buildCapability(false, AI_DISABLED_NOT_CONFIGURED_MESSAGE, now, 'not_configured');
+  }
+
   if (pensionStatementImport.reason === 'parser_unhealthy') {
     return buildCapability(false, AI_DISABLED_PARSER_MESSAGE, now, pensionStatementImport.reason);
   }
@@ -88,11 +94,9 @@ function toAiCapability(
   return buildCapability(false, AI_DISABLED_MESSAGE, now, pensionStatementImport.reason);
 }
 
-function getBunqCapability(now: Date): AppCapabilityStatus {
-  if (!loadBunqConfig().enabled) {
-    return buildCapability(false, BUNQ_UNAVAILABLE_MESSAGE, now, 'not_configured');
-  }
-  return buildCapability(true, 'Bunq linking is available.', now);
+function getConfiguredCapability(id: 'bunq' | 'documents', now: Date): AppCapabilityStatus {
+  const { enabled, message, reason } = evaluateCapability(id);
+  return buildCapability(enabled, message, now, reason);
 }
 
 export async function upsertWorkerHeartbeat(input: WorkerHeartbeatUpsertInput): Promise<void> {
@@ -124,6 +128,10 @@ export async function upsertWorkerHeartbeat(input: WorkerHeartbeatUpsertInput): 
 export async function getPensionStatementImportCapability(
   now = new Date(),
 ): Promise<AppCapabilityStatus> {
+  const configured = evaluateCapability('pensionImport');
+  if (!configured.enabled) {
+    return buildCapability(false, configured.message, now, 'not_configured');
+  }
   const heartbeat = await getWorkerHeartbeat(PENSION_IMPORT_WORKER_NAME);
   return resolvePensionImportCapabilityFromHeartbeat(heartbeat, now);
 }
@@ -133,6 +141,7 @@ export async function getAppCapabilities(now = new Date()): Promise<AppCapabilit
   return {
     ai: toAiCapability(pensionStatementImport, now),
     pensionStatementImport,
-    bunq: getBunqCapability(now),
+    bunq: getConfiguredCapability('bunq', now),
+    documents: getConfiguredCapability('documents', now),
   };
 }

@@ -570,20 +570,21 @@ or visual layout.
 
 ### What it is
 
-The capabilities system exposes a set of boolean flags to the frontend describing whether optional backend features are available at runtime. It is backed by `packages/backend/src/lib/capabilities.ts` and served from `GET /api/capabilities` (requires auth).
+The capabilities system describes which optional backend features are available. Two layers answer the question:
 
-Currently there are three capabilities:
+- The **capability registry** (`packages/backend/src/lib/capabilityRegistry.ts`) decides from configuration alone whether a feature is switched on. It is the single source of truth: routes, schedulers, `GET /api/capabilities` and diagnostics all read it.
+- **Runtime state**, where a feature has some (for example the pension import worker's heartbeat), is checked on top in `packages/backend/src/lib/capabilities.ts`, which serves `GET /api/capabilities` (requires auth).
 
-| Key                      | What it tracks                                                                     |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| `ai`                     | Whether AI features are operational (derived from the pension import worker state) |
-| `pensionStatementImport` | Whether the pension import worker is running and healthy                           |
-| `bunq`                   | Whether the complete optional bunq OAuth configuration is available                |
+Currently there are four keys in the response:
 
-The AI and pension-import statuses depend on the worker heartbeat and parser
-readiness. `bunq` is enabled by complete OAuth configuration; it is independent of
-the pension worker. These statuses keep optional infrastructure from blocking core
-features.
+| Key                      | What it tracks                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `ai`                     | Whether AI features are operational (derived from the pension import worker state)  |
+| `pensionStatementImport` | Whether statement import is configured and the import worker is running and healthy |
+| `bunq`                   | Whether the complete optional bunq OAuth configuration is available                 |
+| `documents`              | Whether the S3 document storage settings are complete                               |
+
+`app.ts` mounts the routes of a capability only when it is enabled (`bunq` and `pensionImport` today), and `schedulers.ts` starts a capability's scheduler only then. A request to a disabled capability's path therefore gets the usual 404, and the core never depends on an optional service.
 
 The frontend fetches capabilities on mount and re-polls every 15 seconds via `useAppCapabilities()` in `packages/frontend/src/lib/useAppCapabilities.ts`. Capabilities that are disabled are used to conditionally show or hide UI affordances (e.g. the PDF import button in the pensions feature).
 
@@ -599,46 +600,33 @@ Use a capability flag when:
 
 ### How to add a new capability flag
 
-**Step 1** — Add the key to the `AppCapabilities` type in `packages/shared/src/types/index.ts`:
+**Step 1** — Declare its settings in `packages/backend/src/config/settings.ts` (a row in `SETTINGS` for each, and an entry in `FEATURES` that lists the settings that switch it on and the ones it then requires), and build its section in `config/load.ts`. A feature with settings is all or nothing: partial configuration is a startup error that names what is missing.
+
+**Step 2** — Register it in `capabilityRegistry.ts` with an `evaluate(config)` that returns the configured state:
 
 ```ts
-export type AppCapabilities = {
-  ai: AppCapabilityStatus;
-  pensionStatementImport: AppCapabilityStatus;
-  bunq: AppCapabilityStatus;
-  myNewFeature: AppCapabilityStatus; // add here
-};
+{
+  id: 'myNewFeature',
+  label: 'My new feature',
+  evaluate: ({ myNewFeature }) =>
+    myNewFeature.enabled ? { ...ENABLED, message: 'My new feature is configured.' } : disabled('My new feature is not configured.'),
+},
 ```
 
-**Step 2** — Implement the capability check in `packages/backend/src/lib/capabilities.ts`. Model it on `getPensionStatementImportCapability` for a worker-backed feature, or on `getBunqCapability` for one that depends only on configuration. Add your check function, then include the result in the object returned by `getAppCapabilities`:
+**Step 3** — Mount what belongs to it only when it is enabled: routes in `app.ts` (`if (enabled.has('myNewFeature')) app.route(...)`) and schedulers as an entry with `capability: 'myNewFeature'` in `schedulers.ts`.
+
+**Step 4** — Add the key to the `AppCapabilities` type in `packages/shared/src/types/index.ts`, return it from `getAppCapabilities` in `lib/capabilities.ts` (use `getConfiguredCapability` for a feature that depends only on configuration, or add a runtime check on top as `getPensionStatementImportCapability` does), and add the default to `DEFAULT_APP_CAPABILITIES` in `packages/frontend/src/lib/useAppCapabilities.ts`:
 
 ```ts
-export async function getAppCapabilities(now = new Date()): Promise<AppCapabilities> {
-  const pensionStatementImport = await getPensionStatementImportCapability(now);
-  return {
-    ai: toAiCapability(pensionStatementImport, now),
-    pensionStatementImport,
-    bunq: getBunqCapability(now),
-    myNewFeature: await getMyNewFeatureCapability(now),
-  };
-}
+myNewFeature: {
+  enabled: false,
+  reason: 'not_configured',
+  message: 'My new feature is not configured.',
+  checkedAt: new Date(0).toISOString(),
+},
 ```
 
-**Step 3** — Update the frontend default value in `packages/frontend/src/lib/useAppCapabilities.ts`:
-
-```ts
-export const DEFAULT_APP_CAPABILITIES: AppCapabilities = {
-  // existing entries...
-  myNewFeature: {
-    enabled: false,
-    reason: 'worker_unavailable',
-    message: 'My new feature is unavailable.',
-    checkedAt: new Date(0).toISOString(),
-  },
-};
-```
-
-**Step 4** — Consume the flag in the frontend:
+**Step 5** — Consume the flag in the frontend:
 
 ```ts
 const { data: capabilities } = useAppCapabilities();

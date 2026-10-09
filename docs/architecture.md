@@ -242,10 +242,21 @@ Exactly one `annual_statement` row must be present; the commit is rejected other
 
 **7. Capabilities system**
 
-`GET /api/capabilities` (authenticated) returns an `AppCapabilities` object with three fields: `ai`, `pensionStatementImport` and `bunq`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, and `checkedAt`. The first two come from the `worker_heartbeats` table; `bunq` is enabled only when the complete bunq OAuth configuration is set (`reason: 'not_configured'` otherwise).
+`GET /api/capabilities` (authenticated) returns an `AppCapabilities` object with four fields: `ai`, `pensionStatementImport`, `bunq` and `documents`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, and `checkedAt`.
+
+Whether a feature is switched on comes from configuration alone and is decided by the capability registry (`lib/capabilityRegistry.ts`), the single source of truth for optional features:
+
+| Capability      | Enabled when                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| `bunq`          | the complete bunq OAuth settings are present                                                         |
+| `documents`     | the complete `S3_*` document storage settings are present                                            |
+| `pensionImport` | `PENSION_PARSER_URL` and document storage are both configured (reported as `pensionStatementImport`) |
+
+`app.ts` mounts the routes of a capability (`/api/bunq`, `/api/pensions/imports`) only when it is enabled, and `schedulers.ts` starts the bunq sync only then, so an instance without bunq has no bunq endpoints and runs no bunq job. A capability that is not configured reports `reason: 'not_configured'`. For `pensionStatementImport`, the worker's runtime state is checked on top of that.
 
 The `pensionStatementImport` capability is disabled when:
 
+- It is not configured (`reason: 'not_configured'`)
 - No heartbeat row exists or the worker status is not `idle`/`processing` (`reason: 'worker_unavailable'`)
 - The last heartbeat is more than 15 s old (`reason: 'worker_stale'`)
 - The parser health check failed (`reason: 'parser_unhealthy'`)
@@ -335,6 +346,18 @@ Arithmetic happens on JavaScript numbers. Where a result must be whole cents, us
 
 Sessions are stored in the `sessions` table, keyed by the SHA-256 digest of the cookie token, with an `expires_at` timestamp (30-day TTL from login), the browser's user agent and a `last_used_at` time. Users list and revoke them in Settings; operators revoke them with `quro user revoke-sessions`. The backend calls `startSessionCleanup()` on startup, which runs a background interval to delete expired rows and old operator codes (`auth_codes`). There is no Redis or external session store.
 
+### Configuration
+
+Every setting the backend reads is declared once, in `packages/backend/src/config/settings.ts`: its name, type, default, whether it is secret, and when it is required. `loadConfig` in `config/load.ts` parses the environment and the secret files it points at a single time, collects every problem instead of stopping at the first, and returns a frozen, typed `Config`. Nothing outside `src/config` reads `process.env` (a lint rule enforces it); code calls `getConfig()`.
+
+- **Fail fast, in full.** A process validates the sections it needs when it starts (`bootConfig('server')` for the API, `'worker'`, `'migrate'`, `'backup'` and `'maintenance'` for the database commands) and exits with code 2 and one list of problems. The list names settings and never their values. A migration job does not need bunq, so its profile does not check it; a section that is invalid throws only when something reads it.
+- **Secrets are files.** Database and S3 secrets are read from the files named by `*_FILE` settings (defaults under `/run/secrets/`); a trailing newline is ignored and an empty file is an error. Values are wrapped in `Secret`, which prints as `[redacted]` and needs `.reveal()` to read, so logging the configuration cannot leak a credential.
+- **Optional features are all or nothing.** A feature such as S3 storage or bunq stays off until one of its settings is present, and then needs all of them; a half-configured feature stops startup instead of mounting half-working routes.
+- **Retired settings are not read.** Names from earlier releases are reported with the setting that replaces them (`config.notices`) and never used as a fallback.
+- **The schema is the manifest.** `settingsManifest()` in `config/manifest.ts` lists every setting with its type, default, secrecy and requirement, generated from the same table; the installer and the configuration reference use it, and a test keeps the Compose files, the example files and the docs in step with it.
+
+To add a setting, add it to `SETTINGS`, read it in the section builder that owns it, and mention it in an example file or a doc. Tests that change settings use `applyTestSettings` (`src/test/config.ts`), which re-parses the configuration.
+
 ### Two database roles
 
 | Role                                 | Purpose                                                                       |
@@ -342,7 +365,7 @@ Sessions are stored in the `sessions` table, keyed by the SHA-256 digest of the 
 | `quro_admin` (default: `quro_admin`) | DDL and migrations only; used by the `migrate` one-shot container             |
 | `quro_app` (default: `quro_app`)     | Runtime queries from `backend` and `pension-import-worker`; no DDL privileges |
 
-Credentials are supplied as Docker secrets (files in `./secrets/`), not as Compose environment entries, and are not baked into images. At container start the entrypoint scripts in `docker/backend/` read the secret files and export the connection settings (for example `DATABASE_URL`) into the process environment.
+Credentials are supplied as Docker secrets (files in `./secrets/`), not as Compose environment entries, and are not baked into images. The backend reads the password files itself when it starts (`POSTGRES_APP_PASSWORD_FILE`, `POSTGRES_ADMIN_PASSWORD_FILE`, see [Configuration](#configuration)) and builds the connection strings from `POSTGRES_HOST` and the other `POSTGRES_*` settings; the shell wrappers in `docker/backend/` only run the commands in order.
 
 ### Schema highlights
 

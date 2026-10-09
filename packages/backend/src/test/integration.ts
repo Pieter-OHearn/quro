@@ -1,5 +1,6 @@
 import { like, inArray, or } from 'drizzle-orm';
-import { app } from '../index';
+import { createApp } from '../app';
+import { applyTestSettings, documentAndImportSettings } from './config';
 import { db } from '../db/client';
 import { peerEnv } from './peer';
 import { issueRegistrationCode } from '../lib/authCodes';
@@ -65,6 +66,10 @@ const DEFAULT_PASSWORD = 'strongpass123';
 const DEFAULT_USER_AGE = 32;
 const DEFAULT_RETIREMENT_AGE = 67;
 
+// Optional services are on by default in integration tests (their clients are mocked); tests of an
+// unconfigured instance turn them off with `applyTestSettings`.
+applyTestSettings(documentAndImportSettings());
+
 function createRequestFunction() {
   return (path: string, options: RequestOptions = {}) => {
     const headers = new Headers(options.headers);
@@ -86,7 +91,9 @@ function createRequestFunction() {
       body = options.body;
     }
 
-    return app.request(
+    // Built per request from the current configuration, so a test that changes settings sees
+    // exactly the routes that configuration mounts.
+    return createApp().request(
       path,
       {
         method: options.method ?? 'GET',

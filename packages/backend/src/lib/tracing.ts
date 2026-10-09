@@ -19,13 +19,13 @@ import {
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
 import type { MiddlewareHandler } from 'hono';
 import { routePath } from 'hono/route';
+import { getConfig, type TracingConfig } from '../config';
 import { HTTP_STATUS } from '../constants/http';
 
 // OpenTelemetry tracing: HTTP server spans for every request and a client span
 // for every Postgres query, exported over OTLP/HTTP. Off unless
-// OTEL_EXPORTER_OTLP_ENDPOINT (or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT) is set.
-// The exporter reads the standard OTEL_EXPORTER_OTLP_* variables; the service
-// name defaults to `quro-backend` (OTEL_SERVICE_NAME overrides it).
+// OTEL_EXPORTER_OTLP_ENDPOINT (or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT) is set
+// (see src/config). The service name defaults to `quro-backend` (OTEL_SERVICE_NAME overrides it).
 
 const TRACER_NAME = 'quro-backend';
 // routePath() index of the last matched route: the handler, not a middleware.
@@ -34,11 +34,8 @@ const MAX_QUERY_TEXT_LENGTH = 2048;
 
 let provider: BasicTracerProvider | undefined;
 
-export function tracingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (env.OTEL_SDK_DISABLED === 'true') {
-    return false;
-  }
-  return Boolean(env.OTEL_EXPORTER_OTLP_ENDPOINT || env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT);
+export function tracingEnabled(config: TracingConfig = getConfig().tracing): boolean {
+  return config.enabled;
 }
 
 /**
@@ -47,17 +44,20 @@ export function tracingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
  * their own span processor instead of the OTLP exporter.
  */
 export function startTracing(
-  env: NodeJS.ProcessEnv = process.env,
+  config: TracingConfig = getConfig().tracing,
   spanProcessor?: SpanProcessor,
 ): boolean {
-  if (provider || (!spanProcessor && !tracingEnabled(env))) {
+  if (provider || (!spanProcessor && !tracingEnabled(config))) {
     return Boolean(provider);
   }
   provider = new BasicTracerProvider({
     resource: resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: env.OTEL_SERVICE_NAME || TRACER_NAME,
+      [ATTR_SERVICE_NAME]: config.serviceName || TRACER_NAME,
     }),
-    spanProcessors: [spanProcessor ?? new BatchSpanProcessor(new OTLPTraceExporter())],
+    spanProcessors: [
+      spanProcessor ??
+        new BatchSpanProcessor(new OTLPTraceExporter({ url: config.tracesUrl ?? undefined })),
+    ],
   });
   trace.setGlobalTracerProvider(provider);
   context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());

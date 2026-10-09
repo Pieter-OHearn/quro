@@ -7,27 +7,8 @@ import {
   HeadBucketCommand,
 } from '@aws-sdk/client-s3';
 import type { Readable } from 'node:stream';
+import { getConfig } from '../config';
 import { deleteObjectsInBatches, type ObjectDeletionResult } from './s3Deletes';
-
-type S3Config = {
-  endpoint: string;
-  region: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  forcePathStyle: boolean;
-};
-
-const REQUIRED_ENV_KEYS = [
-  'S3_ENDPOINT',
-  'S3_REGION',
-  'S3_BUCKET',
-  'S3_ACCESS_KEY_ID',
-  'S3_SECRET_ACCESS_KEY',
-] as const;
-
-let cachedConfig: S3Config | null = null;
-let cachedClient: S3Client | null = null;
 
 export class S3ConfigurationError extends Error {
   constructor(message: string) {
@@ -36,47 +17,33 @@ export class S3ConfigurationError extends Error {
   }
 }
 
-function parseBooleanEnv(value: string | undefined, defaultValue: boolean): boolean {
-  if (value === undefined) return defaultValue;
-  const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
-}
-
-function loadS3Config(): S3Config {
-  if (cachedConfig) return cachedConfig;
-
-  const missing = REQUIRED_ENV_KEYS.filter((key) => !process.env[key]?.trim());
-  if (missing.length > 0) {
-    throw new S3ConfigurationError(
-      `Missing required S3 environment variables: ${missing.join(', ')}`,
-    );
+// The settings are validated at startup (src/config); an unconfigured store only fails here, when
+// something actually tries to use it.
+function loadS3Config() {
+  const { documents } = getConfig();
+  if (!documents.enabled) {
+    throw new S3ConfigurationError('S3 document storage is not configured');
   }
-
-  cachedConfig = {
-    endpoint: process.env.S3_ENDPOINT!.trim(),
-    region: process.env.S3_REGION!.trim(),
-    bucket: process.env.S3_BUCKET!.trim(),
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!.trim(),
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!.trim(),
-    forcePathStyle: parseBooleanEnv(process.env.S3_FORCE_PATH_STYLE, true),
-  };
-
-  return cachedConfig;
+  return documents;
 }
+
+let cachedClient: S3Client | null = null;
+let cachedClientFor: ReturnType<typeof loadS3Config> | null = null;
 
 function getS3Client(): S3Client {
-  if (cachedClient) return cachedClient;
   const config = loadS3Config();
+  if (cachedClient && cachedClientFor === config) return cachedClient;
 
   cachedClient = new S3Client({
     endpoint: config.endpoint,
     region: config.region,
     credentials: {
       accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
+      secretAccessKey: config.secretAccessKey.reveal(),
     },
     forcePathStyle: config.forcePathStyle,
   });
+  cachedClientFor = config;
 
   return cachedClient;
 }

@@ -20,6 +20,5 @@ RUN chmod +x /app/docker/backend/*.sh /app/docker/backend/quro && \
     ln -s /app/docker/backend/quro /usr/local/bin/quro
 
 WORKDIR /app/packages/backend
-ENTRYPOINT ["/bin/sh", "/app/docker/backend/with-runtime-env.sh"]
 CMD ["bun", "run", "start"]
 EXPOSE 3000

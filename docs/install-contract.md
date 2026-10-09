@@ -381,7 +381,7 @@ Use `-f docker-compose.yml` for an install from a checkout, and your own user an
 | Area                     | 0.7.0                                                                                | Contract                                                        |
 | ------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | Entry point              | Shell wrappers in `docker/backend/` around `bun run` scripts                         | `quro <command>`                                                |
-| Database endpoint        | Host `db` and port 5432 fixed in `docker/backend/common-env.sh`                      | `POSTGRES_HOST` (required), `POSTGRES_PORT`, `POSTGRES_SSLMODE` |
+| Database endpoint        | Host `db` and port 5432 fixed in the shell wrappers in `docker/backend/`             | `POSTGRES_HOST` (required), `POSTGRES_PORT`, `POSTGRES_SSLMODE` |
 | Secrets per command      | The default entry point requires the storage secret for every command run through it | Each command reads only what it needs                           |
 | Frontend upstream        | `backend:3000` fixed in nginx                                                        | `QRO_API_URL` (required)                                        |
 | Container user           | root                                                                                 | UID 1000; any UID works                                         |

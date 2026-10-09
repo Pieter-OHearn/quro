@@ -1,4 +1,5 @@
 import { STATE_COOKIE } from '../routes/bunq';
+import { reloadConfig } from '../config';
 
 export const BUNQ_TEST_ORIGIN = 'https://quro.example';
 
@@ -14,10 +15,12 @@ export function setBunqTestEnv(): void {
   process.env.BUNQ_CLIENT_SECRET = 'test-secret';
   process.env.BUNQ_REDIRECT_URI = `${BUNQ_TEST_ORIGIN}/api/bunq/oauth/callback`;
   process.env.FRONTEND_ORIGIN = BUNQ_TEST_ORIGIN;
+  reloadConfig();
 }
 
 export function clearBunqTestEnv(): void {
   for (const name of BUNQ_ENV_NAMES) delete process.env[name];
+  reloadConfig();
 }
 
 // The callback only accepts a state that the initiating browser also carries as a cookie.

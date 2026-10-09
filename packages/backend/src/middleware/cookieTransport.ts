@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { getConfig } from '../config';
 import { secureCookiesEnabled } from '../lib/sessions';
 
 // SECURE_COOKIES is configuration and is never inferred from a request. These checks only log
@@ -57,8 +58,9 @@ export function createCookieTransportWarner(warn: (message: string) => void = co
 const warnOnce = createCookieTransportWarner();
 
 /** Startup check against the configured public origin, when the deployment sets one. */
-export function checkConfiguredCookieTransport(env: NodeJS.ProcessEnv = process.env): void {
-  warnOnce(secureCookiesEnabled(), env.FRONTEND_ORIGIN?.trim(), 'configuration');
+export function checkConfiguredCookieTransport(): void {
+  const { secureCookies, frontendOrigin } = getConfig().web;
+  warnOnce(secureCookies, frontendOrigin, 'configuration');
 }
 
 /**

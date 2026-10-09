@@ -1,4 +1,5 @@
 import { dirname, extname, resolve } from 'node:path';
+import { childProcessEnv, getConfig } from '../config';
 import {
   backupDirectory,
   ensureDirectory,
@@ -25,11 +26,17 @@ const APP_NAME_BY_TOOL: Record<PgToolName, string> = {
   psql: 'quro-db-restore',
 };
 
-const OVERRIDE_ENV_BY_TOOL: Record<PgToolName, string> = {
+const OVERRIDE_SETTING_BY_TOOL: Record<PgToolName, string> = {
   pg_dump: 'QRO_PG_DUMP_BIN',
   pg_restore: 'QRO_PG_RESTORE_BIN',
   psql: 'QRO_PSQL_BIN',
 };
+
+const OVERRIDE_KEY_BY_TOOL = {
+  pg_dump: 'pgDump',
+  pg_restore: 'pgRestore',
+  psql: 'psql',
+} as const;
 
 export async function createDatabaseBackup({ connectionString, label, outputPath }: BackupOptions) {
   const resolvedOutputPath = outputPath ?? buildBackupPath(connectionString, label);
@@ -86,7 +93,7 @@ function buildBackupPath(connectionString: string, label?: string) {
 function buildPgEnv(connectionString: string, appName: string) {
   const connection = parseConnectionString(connectionString);
   const env = {
-    ...process.env,
+    ...childProcessEnv(),
     PGAPPNAME: appName,
     PGDATABASE: connection.database,
     PGHOST: connection.host,
@@ -103,7 +110,7 @@ function buildPgEnv(connectionString: string, appName: string) {
 }
 
 function resolvePgTool(toolName: PgToolName) {
-  const override = process.env[OVERRIDE_ENV_BY_TOOL[toolName]];
+  const override = getConfig().tools[OVERRIDE_KEY_BY_TOOL[toolName]];
   if (override) {
     return override;
   }
@@ -114,11 +121,11 @@ function resolvePgTool(toolName: PgToolName) {
   }
 
   throw new Error(
-    `Missing ${toolName}. Install PostgreSQL client tools or set ${OVERRIDE_ENV_BY_TOOL[toolName]} to the executable path.`,
+    `Missing ${toolName}. Install PostgreSQL client tools or set ${OVERRIDE_SETTING_BY_TOOL[toolName]} to the executable path.`,
   );
 }
 
-async function runPgTool(command: string, args: string[], env: Record<string, string>) {
+function spawnPgTool(command: string, args: string[], env: Record<string, string>) {
   const processHandle = Bun.spawn([command, ...args], {
     env,
     stderr: 'inherit',
@@ -126,8 +133,17 @@ async function runPgTool(command: string, args: string[], env: Record<string, st
     stdout: 'inherit',
   });
 
-  const exitCode = await processHandle.exited;
+  return processHandle.exited;
+}
+
+async function runPgTool(command: string, args: string[], env: Record<string, string>) {
+  const exitCode = await spawnPgTool(command, args, env);
   if (exitCode !== 0) {
     throw new Error(`${command} exited with status ${exitCode}`);
   }
+}
+
+/** Runs `psql` against the connection string, passing the credentials through the environment. */
+export function runPsql(connectionString: string, args: string[]) {
+  return spawnPgTool(resolvePgTool('psql'), args, buildPgEnv(connectionString, 'quro-db-psql'));
 }
