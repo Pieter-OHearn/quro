@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { expect, test } from 'bun:test';
 import { QueryClient, QueryObserver, type QueryKey } from '@tanstack/react-query';
-import { invalidateDomain, invalidatePensionImport } from './queryInvalidation';
+import { invalidateDomain, invalidatePensionImport, resetDomain } from './queryInvalidation';
 import { queryKeys as keys } from './queryKeys';
 
 function seed(client: QueryClient, queryKeys: readonly QueryKey[]) {
@@ -197,5 +197,34 @@ test('session revocations refresh the session list and nothing else', async () =
   expect(isInvalidated(client, keys.partner)).toBe(false);
   expect(isInvalidated(client, keys.dashboard.summary)).toBe(false);
   expect(isInvalidated(client, keys.registrationPolicy)).toBe(false);
+  client.clear();
+});
+
+test('ending a partner link drops cached household data instead of keeping it stale', async () => {
+  const client = new QueryClient();
+  const household = [
+    keys.partner,
+    keys.savings.accountList(false),
+    keys.savings.transactionList(7),
+    keys.investments.properties,
+    keys.mortgages.all,
+    keys.dashboard.summary,
+    keys.plan.runway,
+  ];
+  const unrelated = [keys.goals, keys.budget.categories, keys.pensions.pots, keys.salary.payslips];
+  seed(client, [...household, ...unrelated]);
+
+  await resetDomain(client, 'household');
+
+  for (const key of household) expect(client.getQueryData(key)).toBeUndefined();
+  for (const key of unrelated) expect(client.getQueryData(key)).toBe('cached');
+  client.clear();
+});
+
+test('invalidating the household domain alone would keep the old rows readable', async () => {
+  const client = new QueryClient();
+  seed(client, [keys.savings.accountList(false)]);
+  await invalidateDomain(client, 'household');
+  expect(client.getQueryData(keys.savings.accountList(false))).toBe('cached');
   client.clear();
 });
