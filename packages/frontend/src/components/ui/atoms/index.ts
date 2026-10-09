@@ -1,6 +1,7 @@
 export * from './Badge';
 export * from './Button';
 export * from './Card';
+export * from './Change';
 export * from './CurrencyInput';
 export * from './DateInput';
 export * from './MonthInput';
