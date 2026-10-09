@@ -23,6 +23,7 @@ await mock.module('../services/bunqBudgetSync', () => ({
 }));
 
 const { createIntegrationHelpers } = await import('../test/integration');
+const { clearBunqTestEnv, setBunqTestEnv } = await import('../test/bunq');
 const { db } = await import('../db/client');
 const { bunqConnections } = await import('../db/schema');
 const { eq } = await import('drizzle-orm');
@@ -32,6 +33,8 @@ const integration = createIntegrationHelpers('bunq-sync-errors.integration.quro.
 let owner: Awaited<ReturnType<typeof integration.signUp>>;
 
 beforeAll(async () => {
+  // The bank routes exist only while the integration is configured.
+  setBunqTestEnv();
   await integration.cleanup();
   owner = await integration.signUp('owner');
   await db
@@ -43,6 +46,7 @@ afterAll(async () => {
   await db.delete(bunqConnections).where(eq(bunqConnections.userId, owner.user.id));
   await mock.module('../services/bunqSavingsSync', () => realSavings);
   await mock.module('../services/bunqBudgetSync', () => realBudget);
+  clearBunqTestEnv();
   await integration.cleanup();
 });
 
