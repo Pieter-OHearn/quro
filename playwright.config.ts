@@ -37,11 +37,15 @@ export default defineConfig({
     {
       command: 'bun run smoke:backend',
       url: `${BACKEND_ORIGIN}/api/health`,
-      reuseExistingServer: !isCI,
+      // Never reuse a backend already on this port: it would bypass the explicit DATABASE_URL and
+      // QRO_DISABLE_SCHEDULERS below. Stop it and rerun instead.
+      reuseExistingServer: false,
       timeout: 120_000,
       env: {
         ...process.env,
         PORT: '3300',
+        // No interval schedulers, so the smoke backend never calls bunq or a price provider.
+        QRO_DISABLE_SCHEDULERS: 'true',
         DATABASE_URL,
         ADMIN_DATABASE_URL: process.env.ADMIN_DATABASE_URL || DATABASE_URL,
         APP_DATABASE_URL: process.env.APP_DATABASE_URL || DATABASE_URL,

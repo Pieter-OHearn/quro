@@ -249,6 +249,13 @@ disappears when it stops. Never point these commands at the Compose `db` service
 fall back to a localhost default, never start a Compose service, and fill
 `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` from `DATABASE_URL` when they are not set.
 
+`test:smoke` starts its own backend on port 3300, never reusing one already running there, with
+`QRO_DISABLE_SCHEDULERS=true`. The interval jobs (session cleanup, bunq sync, holding prices,
+currency rates, net-worth snapshots) then do not run, so the backend makes no provider calls on
+its own; only endpoints a test calls directly, such as a price refresh, could. Set the same
+variable for any other local backend that must not run background jobs; leave it unset in
+production.
+
 ### Synthetic data
 
 Tests and screenshots use synthetic data only. The demo seed
@@ -269,3 +276,8 @@ needs publishing for Docker self-hosting.
 field, so there is no second number to drift; `scripts/workspace-manifests.test.ts`
 enforces both rules. Feature pull requests do not change `VERSION`; the release pull
 request does (see [contributing](CONTRIBUTING.md#versioning)).
+
+The workspaces typecheck with TypeScript 7, the native compiler. The root `package.json`
+stays on TypeScript 6 because it also serves ESLint: typescript-eslint needs TypeScript's
+JavaScript API, which TypeScript 7 does not ship, and stops with "typescript-eslint does not
+support TS 7.0". Move the root to 7 once typescript-eslint supports it.
