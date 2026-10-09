@@ -223,9 +223,9 @@
 
 @theme inline {
   /*
-   * One family (docs/design-v1.md, section 3): the stack fonts.css gives `body`.
-   * Preflight sets `code`, `kbd`, `samp` and `pre` in the default mono family; point it
-   * at the same stack, because V1 has no monospace.
+   * One family (docs/design-v1.md, section 3), the only font stack: preflight sets it on
+   * `html` and everything inherits it. Preflight sets `code`, `kbd`, `samp` and `pre` in
+   * the default mono family; point it at the same stack, because V1 has no monospace.
    */
   --font-sans: 'Geist Variable', system-ui, -apple-system, sans-serif;
   --default-mono-font-family: var(--font-sans);
