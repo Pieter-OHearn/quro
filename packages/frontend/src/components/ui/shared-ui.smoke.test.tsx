@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowDownUp, PiggyBank, Plus } from 'lucide-react';
 import { Badge } from './atoms/Badge';
 import { Button } from './atoms/Button';
 import { Card } from './atoms/Card';
+import { Change } from './atoms/Change';
 import { CurrencyInput } from './atoms/CurrencyInput';
 import { DateInput } from './atoms/DateInput';
 import { LoadingSpinner } from './atoms/LoadingSpinner';
@@ -65,6 +66,17 @@ const smokeCases: readonly SmokeCase[] = [
       </Card>
     ),
     includes: ['data-smoke="card"', 'Card body'],
+  },
+  {
+    name: 'Change renders a signed loss chip with a hidden arrow',
+    element: <Change value={-612.75} format="amount" variant="chip" />,
+    includes: [
+      '<span aria-hidden="true">\u25BC</span>',
+      '<span class="sr-only">down </span>',
+      '\u2212612.75',
+      'text-loss',
+      'bg-loss-soft',
+    ],
   },
   {
     name: 'Spinner renders accessible svg markup',

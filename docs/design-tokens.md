@@ -118,6 +118,9 @@ feature component.
   `cn`. Use existing variants and sizes, and Lucide icons.
 - Style form fields with `getFieldChrome` and aligned financial values with
   `font-numeric`.
+- Render an amount or percentage that went up, down or did not change with `Change`
+  instead of hand-written signs and colours. It applies the sign, arrow, `gain` / `loss` /
+  `flat` colour and zero rule from [V1 design](design-v1.md#7-content-rules).
 - `Button` supports `loading` and disables itself while loading; use it instead of
   a separate submitting-button pattern.
 - Keep loading, empty, error, disabled and submitting states, labels, keyboard
