@@ -70,25 +70,25 @@ The pension statement parser and its model server stay behind the `pension-impor
 | Any S3-compatible service                 | Optional document store. The project does not pin or ship one        | Operator's choice            |
 | `ghcr.io/pieter-ohearn/quro-auto-updater` | Retired. Existing tags stay published; no new releases               | –                            |
 
-Pin images by version tag and record the digest. The core images pull without a registry account. The pension parser and model server images are not published; the OCR profile builds them from a checkout.
+Pin images by version tag and record the digest. The core images must pull without a registry account; the 0.7.0 images did on arm64 in the measurements below. The pension parser and model server images are not published; the OCR profile builds them from a checkout.
 
 ## Commands
 
 The image's entry point is `quro`; its default command is `serve`.
 
-| Command                          | What it does                                                                                                                                               | Changes                            | Secrets it reads                    |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------- |
-| `quro serve`                     | Runs the API server. Does not migrate.                                                                                                                     | Application data                   | Runtime database, storage           |
-| `quro worker pension-imports`    | Runs the optional pension import worker.                                                                                                                   | Application data                   | Runtime database, storage           |
-| `quro init [--dir <path>]`       | Writes a settings file and generated secret files into a mounted directory (default `/config`). Creates only missing files; never changes an existing one. | New files only                     | None                                |
-| `quro migrate [--dry-run]`       | Applies pending schema migrations as the owner role, then creates or updates the runtime role and its grants.                                              | Schema, runtime role               | Admin and runtime database          |
-| `quro doctor [--json]`           | Read-only checks: settings, database reachability for both roles, schema against the image, backup tool version, document store access.                    | Nothing                            | All configured                      |
-| `quro backup [--output <dir>]`   | Writes one archive: database dump, documents (filesystem) or an object manifest (S3), and a manifest with versions and checksums.                          | A new file in the backup directory | Admin database, storage             |
-| `quro restore <archive>`         | Restores an archive into the configured database and document store, behind the confirmation guards in [Backup and restore](backup-and-restore.md).        | Database, documents                | Admin and runtime database, storage |
-| `quro user <command>`            | Account administration: registration invite codes, password reset codes, session revocation. Shows account metadata only, never financial data.            | Accounts and sessions              | Runtime database                    |
-| `quro documents migrate-from-s3` | Copies every referenced object from S3 into the filesystem store, verifies checksums, and only then switches references. Resumable. Never deletes from S3. | Documents directory                | Runtime database, storage           |
-| `quro health`                    | Exits 0 when the local server reports ready. For container health checks.                                                                                  | Nothing                            | None                                |
-| `quro version [--json]`          | Prints the application version, the newest bundled migration and the image revision.                                                                       | Nothing                            | None                                |
+| Command                          | What it does                                                                                                                                                                                                                         | Changes                            | Secrets it reads                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ----------------------------------- |
+| `quro serve`                     | Runs the API server. Does not migrate.                                                                                                                                                                                               | Application data                   | Runtime database, storage           |
+| `quro worker pension-imports`    | Runs the optional pension import worker.                                                                                                                                                                                             | Application data                   | Runtime database, storage           |
+| `quro init [--dir <path>]`       | Writes a settings file and generated secret files into a mounted directory (default `/config`). Creates only missing files; never changes an existing one.                                                                           | New files only                     | None                                |
+| `quro migrate [--dry-run]`       | Applies pending schema migrations as the owner role, then creates or updates the runtime role and its grants.                                                                                                                        | Schema, runtime role               | Admin and runtime database          |
+| `quro doctor [--json]`           | Read-only checks: settings, database reachability for both roles, schema against the image, backup tool version, document store access.                                                                                              | Nothing                            | All configured                      |
+| `quro backup [--output <dir>]`   | Writes one archive: database dump, documents (filesystem) or an object manifest (S3), and a manifest with versions and checksums.                                                                                                    | A new file in the backup directory | Admin database, storage             |
+| `quro restore <archive>`         | Restores an archive into the configured database and document store, behind the confirmation guards in [Backup and restore](backup-and-restore.md).                                                                                  | Database, documents                | Admin and runtime database, storage |
+| `quro user <command>`            | Account administration: registration invite codes, password reset codes, session revocation. Shows account metadata only, never financial data.                                                                                      | Accounts and sessions              | Runtime database                    |
+| `quro documents migrate-from-s3` | Copies every referenced object from S3 into the filesystem store under the same key and verifies checksums. Resumable. Changes no database rows and never deletes from S3; the operator then sets `QRO_DOCUMENT_STORAGE=filesystem`. | Documents directory                | Runtime database, storage           |
+| `quro health`                    | Exits 0 when the local server reports ready. For container health checks.                                                                                                                                                            | Nothing                            | None                                |
+| `quro version [--json]`          | Prints the application version, the newest bundled migration and the image revision.                                                                                                                                                 | Nothing                            | None                                |
 
 Rules for every command:
 
@@ -138,16 +138,16 @@ Settings are environment variables, usually kept in one file passed with `env_fi
 
 ### Document storage
 
-| Setting                     | Default                             | Notes                                                                                                                                                 |
-| --------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `QRO_DOCUMENT_STORAGE`      | see notes                           | New. `filesystem` or `s3`. When unset: `s3` if `S3_BUCKET` is set (an existing install), otherwise `filesystem`. `quro doctor` warns until it is set. |
-| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | New. Filesystem driver only.                                                                                                                          |
-| `S3_ENDPOINT`               | none                                | S3 driver only. **0.7.0:** defaults to `http://minio:9000`.                                                                                           |
-| `S3_REGION`                 | none                                | Required by the S3 driver. **0.7.0:** the Compose files set `eu-west-1`.                                                                              |
-| `S3_BUCKET`                 | none                                | Created by the operator.                                                                                                                              |
-| `S3_FORCE_PATH_STYLE`       | `true`                              |                                                                                                                                                       |
-| `S3_ACCESS_KEY_ID`          | none                                | **0.7.0:** taken from `MINIO_APP_USER`, which stays accepted as an alias.                                                                             |
-| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/minio_app_secret_key` | New name for the existing secret file.                                                                                                                |
+| Setting                     | Default                             | Notes                                                                                                                                                                                                                                    |
+| --------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QRO_DOCUMENT_STORAGE`      | see notes                           | New. `filesystem` or `s3`. When unset: `s3` if `S3_BUCKET` is set (an existing install), otherwise `filesystem`. `quro doctor` warns until it is set. `quro init` and the example settings set it explicitly and do not set `S3_BUCKET`. |
+| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | New. Filesystem driver only.                                                                                                                                                                                                             |
+| `S3_ENDPOINT`               | none                                | S3 driver only. **0.7.0:** defaults to `http://minio:9000`.                                                                                                                                                                              |
+| `S3_REGION`                 | none                                | Required by the S3 driver. **0.7.0:** the Compose files set `eu-west-1`.                                                                                                                                                                 |
+| `S3_BUCKET`                 | none                                | Created by the operator.                                                                                                                                                                                                                 |
+| `S3_FORCE_PATH_STYLE`       | `true`                              |                                                                                                                                                                                                                                          |
+| `S3_ACCESS_KEY_ID`          | none                                | **0.7.0:** taken from `MINIO_APP_USER`, which stays accepted as an alias.                                                                                                                                                                |
+| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/minio_app_secret_key` | New name for the existing secret file.                                                                                                                                                                                                   |
 
 ### Backups
 
@@ -260,13 +260,13 @@ The current procedure is in [Backup and restore](backup-and-restore.md); it chan
 
 Prerequisites, which count toward install time:
 
-| Prerequisite                                        | Notes                                                                                                      |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| A host with Docker Engine and the Compose v2 plugin | amd64 or arm64. Docker itself is not timed below. Tested with Engine 29.5 and 29.8, Compose v5.1 and v5.5. |
-| Network access to Docker Hub and `ghcr.io`          | About 1.7 GB of images once unpacked (measured below). No registry account.                                |
-| About 2 GB of disk and 512 MB of free memory        | Idle use measured below; add room for data and backups.                                                    |
-| Not needed                                          | A GPU, a model, a bank account, an email server, an object store, a registry account.                      |
-| Optional                                            | A reverse proxy for HTTPS, an S3-compatible store, a GPU for statement OCR.                                |
+| Prerequisite                                        | Notes                                                                                                                                                                             |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A host with Docker Engine and the Compose v2 plugin | amd64 or arm64. Docker itself is not timed below. The measurements used Engine 29.5.3 with Compose v5.1.4, and Engine 29.8.1 with Compose v5.5.1 for the Linux permission checks. |
+| Network access to Docker Hub and `ghcr.io`          | About 1.7 GB of disk for images in a clean engine (measured below). No registry account.                                                                                          |
+| About 2 GB of disk and 512 MB of free memory        | Idle use measured below; add room for data and backups.                                                                                                                           |
+| Not needed                                          | A GPU, a model, a bank account, an email server, an object store, a registry account.                                                                                             |
+| Optional                                            | A reverse proxy for HTTPS, an S3-compatible store, a GPU for statement OCR.                                                                                                       |
 
 Steps: create a directory, copy the example Compose file, run `quro init`, review the settings file, `docker compose up -d`, open the app and create the first owner account.
 
@@ -279,6 +279,8 @@ Point `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB` and the two roles at your 
 Set `QRO_DOCUMENT_STORAGE=s3` and the `S3_` settings. Create the bucket and the access key first; `quro doctor` checks that it can write, read and delete an object.
 
 ### Upgrade
+
+These steps apply from 0.8.0 on. Images up to 0.7.0 have no `quro` command; for those, follow [Transition from Compose installs](#transition-from-compose-installs).
 
 1. Read the upgrade notes for every version you skip.
 2. Run `quro backup` with the old image.
@@ -318,7 +320,7 @@ Result: the filesystem is the better default for a single-host self-hosted insta
 
 ## Transition from Compose installs
 
-This covers installs made from a 0.6.x or 0.7.0 checkout or release, which share one shape: a Compose file with `db`, `minio`, `migrate` and `backend` services, a `.env` file, secrets in `secrets/*.txt`, and data in `./data/postgres` and `./data/minio`.
+This covers installs made from any checkout or release up to and including 0.7.0. All of them share one layout: a Compose file with `db` (PostgreSQL 16.11), `minio` and `backend` services, a `.env` file, secrets in `secrets/*.txt`, and data in `./data/postgres` and `./data/minio`. Releases from 0.0.2 on also have a `migrate` service; the 0.0.1 release file does not.
 
 ### Known defects in those releases
 
@@ -335,7 +337,8 @@ This covers installs made from a 0.6.x or 0.7.0 checkout or release, which share
 ### Rules
 
 - Nothing is deleted or replaced. `./data/postgres`, `./data/minio`, `.env`, `secrets/` and earlier backups stay where they are until the operator removes them.
-- `quro init` only creates missing files and never edits an existing one. The old secret file names under `/run/secrets/` remain the defaults, so an existing `secrets/` directory keeps working.
+- `quro init` only creates missing files and never edits an existing one. The old secret file names under `/run/secrets/` remain the defaults, so an existing `secrets/` directory can be reused.
+- The old images run as root; the new backend does not. On Linux, existing `secrets/*.txt` files (`chmod 600`, owned by the operator) are unreadable to UID 1000 unless the operator's UID is 1000, and files that `db-tools` wrote under `./backups` are owned by root. Before starting the new backend, either set its `user:` to the UID that owns those files or change their ownership as described in [File ownership](#file-ownership). `quro doctor` reports an unreadable secret or an unwritable directory before anything starts.
 - An install with `S3_BUCKET` set keeps using S3 until `QRO_DOCUMENT_STORAGE` says otherwise, so documents never disappear behind an empty filesystem store.
 - MinIO keeps running until `quro documents migrate-from-s3` has copied and verified every object. Removing the MinIO service and its data afterwards is the operator's decision.
 - A PostgreSQL 16 or 17 data directory is never reused for 18; the new major gets a new directory and the old one stays until deleted by hand.
@@ -375,13 +378,13 @@ A throwaway prototype of the `quro` entry point (a shell dispatcher over the exi
 
 Host: Apple silicon (arm64), Docker Desktop with Engine 29.5.3 and Compose v5.1.4. This is a clean Docker engine, not a clean virtual machine.
 
-Cold image pulls into an empty engine (`docker:29-dind`, Engine 29.8.1, no registry credentials):
+Cold image pulls into an empty engine (`docker:29-dind`, Engine 29.8.1, no registry credentials). Disk used is the engine's own report, which includes the downloaded layers as well as the unpacked files:
 
-| Image                                        | Time | Size unpacked | Digest                                                                    |
-| -------------------------------------------- | ---- | ------------- | ------------------------------------------------------------------------- |
-| `postgres:18-alpine`                         | 7 s  | 424 MB        | `sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873` |
-| `ghcr.io/pieter-ohearn/quro-backend:v0.7.0`  | 28 s | 1,191 MB      | `sha256:54fe1e7b485c83b8ca448faa843619c3e2e6e566491f0d929a970323bad2923d` |
-| `ghcr.io/pieter-ohearn/quro-frontend:v0.7.0` | 4 s  | 94 MB         | `sha256:362710fd5d1e328a69f14446010d3af8cf7c6db22dfa62900114dfafad239d52` |
+| Image                                        | Time | Disk used | Digest                                                                    |
+| -------------------------------------------- | ---- | --------- | ------------------------------------------------------------------------- |
+| `postgres:18-alpine`                         | 7 s  | 424 MB    | `sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873` |
+| `ghcr.io/pieter-ohearn/quro-backend:v0.7.0`  | 28 s | 1,191 MB  | `sha256:54fe1e7b485c83b8ca448faa843619c3e2e6e566491f0d929a970323bad2923d` |
+| `ghcr.io/pieter-ohearn/quro-frontend:v0.7.0` | 4 s  | 94 MB     | `sha256:362710fd5d1e328a69f14446010d3af8cf7c6db22dfa62900114dfafad239d52` |
 
 Fresh install with images present, from an empty directory (elapsed time since the start):
 
@@ -401,7 +404,7 @@ What the prototype showed:
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Commands without Compose, database host not named `db`                                | `init`, `migrate`, `doctor`, `restore` and `serve` worked                                                                                        |
 | Backend as UID 1000 with a read-only root filesystem and `/tmp` as tmpfs              | Worked; also as UID 12345 with no passwd entry                                                                                                   |
-| `quro init` run twice                                                                 | Second run changed nothing                                                                                                                       |
+| `quro init` run twice                                                                 | Second run changed nothing (the prototype exited 3; the contract makes a complete directory exit 0)                                              |
 | `quro migrate` run twice                                                              | Second run changed nothing                                                                                                                       |
 | Two `quro migrate` runs at once on an empty database                                  | One succeeded, the other failed with a duplicate key on `pg_namespace`; 38 migrations recorded                                                   |
 | Owner role with `CREATEROLE`, not superuser                                           | Migrations and runtime role succeeded                                                                                                            |
