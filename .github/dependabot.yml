@@ -53,3 +53,19 @@ updates:
       docker-base-images:
         patterns:
           - '*'
+    ignore:
+      # The pension-parser Python version moves with its toolchain and docs, see the contributor docs
+      - dependency-name: 'python'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+      # vLLM runtime upgrades are tested by hand with the OCR profile
+      - dependency-name: 'vllm/vllm-openai'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+      # Odd nginx minors are mainline; move to the next even stable line by hand
+      - dependency-name: 'nginx'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
