@@ -102,6 +102,8 @@ The database and object storage are also published locally for tooling:
 
 The [install contract](docs/install-contract.md) describes how installs will work from 0.8.0, which is not released yet: the images, the `quro` maintenance commands, settings, data locations and the move from existing Compose installs.
 
+The Compose stack in this repository runs PostgreSQL 18 from `./data/postgres-18`. An install that still has a PostgreSQL 16 database in `./data/postgres` moves over by dump and restore; see [PostgreSQL 18 and the upgrade from 16](docs/postgresql-upgrade.md).
+
 The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
 
 | Problem                   | What you see                                                                                                                                                        | Workaround                                                                      |
@@ -113,7 +115,7 @@ The v0.6.6 release has these known problems. They were verified on 2026-10-04 in
 | Corrupted healthcheck     | The `db` healthcheck renders as `pg_isready -U "$" -d "$"`. The container still reports healthy because `pg_isready` falls back to defaults.                        | None needed.                                                                    |
 | MinIO image               | `docker compose pull` was denied for the pinned `minio/minio` image. The test host started MinIO only because it had a local copy.                                  | None verified.                                                                  |
 
-You don't need `docker login ghcr.io` for the core images. `quro-frontend` and `quro-backend` pull anonymously. The optional `quro-auto-updater` image doesn't, and the auto-updater is being retired.
+You don't need `docker login ghcr.io` for the core images. `quro-frontend` and `quro-backend` pull anonymously. The auto-updater is retired: if you run it, follow [Retire the auto-updater](docs/retire-the-auto-updater.md).
 
 The database, migrations, backend and frontend start from the release assets. The missing storage bootstrap and the unpullable MinIO image are why no complete install path exists.
 

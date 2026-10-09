@@ -230,11 +230,15 @@ demo data. The supported way is a throwaway container whose data lives in memory
 disappears when it stops. Never point these commands at the Compose `db` service, its
 `data/` directory or any database that holds real data.
 
-1. Start a throwaway PostgreSQL 16 on a free port (CI uses PostgreSQL 16):
+1. Start a throwaway PostgreSQL 18 on a free port (18 is the baseline; CI runs the suite on 16 and 18, so use
+   `postgres:16.11-alpine3.23` with `--tmpfs /var/lib/postgresql/data` to check a change against 16):
 
    ```bash
-   docker run -d --rm --name quro-test-db -e POSTGRES_PASSWORD=tmp -e POSTGRES_USER=quro -e POSTGRES_DB=quro -p 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data postgres:16.11-alpine3.23
+   docker run -d --rm --name quro-test-db -e POSTGRES_PASSWORD=tmp -e POSTGRES_USER=quro -e POSTGRES_DB=quro -p 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql postgres:18.6-alpine3.23
    ```
+
+   The 18 image keeps its cluster below `/var/lib/postgresql`; the 16 and 17 images use
+   `/var/lib/postgresql/data`.
 
 2. Export all three database URLs in the same shell. Bun loads `packages/backend/.env`
    for commands that run in that package, and the role URLs take precedence over

@@ -38,7 +38,7 @@ Alternatives considered:
 
 The project publishes one Docker Compose file, `docs/compose.example.yaml`, as an example that operators copy and own. CI starts it from empty volumes on every change, so it stays correct. It is a plain file: no placeholders and no template step.
 
-Releases no longer attach `docker-compose.release.yml` or the auto-update bundle. The template they were rendered from, `deploy/docker-compose.release.template.yml`, is removed together with the auto-updater.
+Releases no longer attach `docker-compose.release.yml` or the auto-update bundle. The template they were rendered from is removed together with the auto-updater.
 
 ### Operators own orchestration
 
@@ -336,7 +336,7 @@ This covers installs made from any checkout or release up to and including 0.7.0
 | Corrupted database health check          | The release workflow renders the template with unrestricted `envsubst`, turning `$$POSTGRES_USER` into `$`. The published check is `pg_isready -U "$" -d "$"`. It still passes, because `pg_isready` only asks whether the server accepts connections (reproduced on 18.6, exit 0). | Do not copy that line forward. The new example uses literal values and nothing is rendered.                                                                  |
 | Backup tools older than the server       | The backend image ships PostgreSQL 17 client tools. Against a PostgreSQL 18 server, `pg_dump` stops with `server version mismatch`.                                                                                                                                                 | Use the database container's `pg_dump`, which always matches its server.                                                                                     |
 | Passwords that start with `-`            | The image's entry point URL-encodes passwords by passing them to `bun -e` as an argument, so a value starting with `-` is read as an option and the connection URL is corrupted.                                                                                                    | `quro init` generates hexadecimal values, and the new entry point passes values through the environment. Existing passwords keep working.                    |
-| Auto-updater                             | The optional updater container mounts the Docker socket and the stack directory.                                                                                                                                                                                                    | Stop and remove it before upgrading; the upgrade notes give the steps.                                                                                       |
+| Auto-updater                             | The optional updater container mounts the Docker socket and the stack directory.                                                                                                                                                                                                    | Stop and remove it before upgrading, following [Retire the auto-updater](retire-the-auto-updater.md).                                                        |
 
 ### Rules
 
@@ -374,7 +374,7 @@ docker compose -f docker-compose.release.yml exec -T db \
   pg_dump -U quro_admin -d quro --format=custom > quro-before-upgrade.dump
 ```
 
-Use `-f docker-compose.yml` for an install from a checkout, and your own user and database names if you changed them. `-T` matters: without it Compose attaches a terminal, which can corrupt the binary dump. Then stop the stack and copy `./data/minio`, `.env` and `secrets/` next to the dump. The full procedure, including the PostgreSQL major upgrade, is in the 0.8.0 upgrade notes.
+Use `-f docker-compose.yml` for an install from a checkout, and your own user and database names if you changed them. `-T` matters: without it Compose attaches a terminal, which can corrupt the binary dump. Then stop the stack and copy `./data/minio`, `.env` and `secrets/` next to the dump. The full procedure, including the PostgreSQL major upgrade, is in the 0.8.0 upgrade notes; the tested 16 to 18 steps for a Compose install are in [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md).
 
 ## Gaps between 0.7.0 and this contract
 

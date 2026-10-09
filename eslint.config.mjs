@@ -131,7 +131,6 @@ export default [
             'playwright.config.ts',
             'scripts/*.ts',
             'scripts/lib/*.ts',
-            'scripts/auto-update/*.ts',
           ],
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 24,
         },
