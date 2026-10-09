@@ -115,7 +115,7 @@ The v0.6.6 release has these known problems. They were verified on 2026-10-04 in
 | Corrupted healthcheck     | The `db` healthcheck renders as `pg_isready -U "$" -d "$"`. The container still reports healthy because `pg_isready` falls back to defaults.                        | None needed.                                                                    |
 | MinIO image               | `docker compose pull` was denied for the pinned `minio/minio` image. The test host started MinIO only because it had a local copy.                                  | None verified.                                                                  |
 
-You don't need `docker login ghcr.io` for the core images. `quro-frontend` and `quro-backend` pull anonymously. The optional `quro-auto-updater` image doesn't, and the auto-updater is being retired.
+You don't need `docker login ghcr.io` for the core images. `quro-frontend` and `quro-backend` pull anonymously. The auto-updater is retired: if you run it, follow [Retire the auto-updater](docs/retire-the-auto-updater.md).
 
 The database, migrations, backend and frontend start from the release assets. The missing storage bootstrap and the unpullable MinIO image are why no complete install path exists.
 

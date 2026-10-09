@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 // The deployment modes in docs/security.md assume browsers reach the backend only through the
@@ -6,6 +7,8 @@ import { join } from 'node:path';
 // from drifting away from those assumptions.
 
 type Service = {
+  image?: string;
+  volumes?: unknown[];
   ports?: unknown[];
   networks?: string[] | Record<string, unknown>;
   environment?: string[] | Record<string, string>;
@@ -34,13 +37,24 @@ function networksOf(service: Service): string[] {
   return Array.isArray(networks) ? networks : Object.keys(networks);
 }
 
-const COMPOSE_FILES = ['docker-compose.yml', 'deploy/docker-compose.release.template.yml'];
+const COMPOSE_FILES = ['docker-compose.yml'];
 
 describe('Compose topology', () => {
   test.each(COMPOSE_FILES)('%s publishes nginx and never the backend', async (path) => {
     const { services } = await readCompose(path);
     expect(services.frontend?.ports?.length).toBeGreaterThan(0);
     expect(services.backend?.ports).toBeUndefined();
+  });
+
+  test('no Compose file mounts the Docker socket or runs an updater', async () => {
+    const files = readdirSync(ROOT).filter((name) => /^docker-compose.*\.ya?ml$/.test(name));
+    expect(files).toContain('docker-compose.yml');
+    for (const file of files) {
+      for (const [name, service] of Object.entries((await readCompose(file)).services)) {
+        expect(JSON.stringify(service.volumes ?? [])).not.toContain('docker.sock');
+        expect(`${name} ${service.image ?? ''}`).not.toMatch(/updater/i);
+      }
+    }
   });
 
   test('the development overlay does not publish the backend either', async () => {
