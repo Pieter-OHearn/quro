@@ -21,3 +21,23 @@ export function isUniqueViolation(error: unknown): boolean {
 export function isForeignKeyViolation(error: unknown): boolean {
   return hasPostgresErrorCode(error, PG_FOREIGN_KEY_VIOLATION);
 }
+
+// SQLSTATE class 22 means the database refused a value it was given: a number outside the
+// column range, text with a NUL character, an impossible date. The request, not the server, is
+// at fault.
+const PG_DATA_EXCEPTION_CODE = /^22[0-9A-Z]{3}$/;
+
+export function isDataException(error: unknown): boolean {
+  const visited = new Set<object>();
+  let current = error;
+
+  while (typeof current === 'object' && current !== null && !visited.has(current)) {
+    visited.add(current);
+    if ('code' in current && typeof current.code === 'string') {
+      if (PG_DATA_EXCEPTION_CODE.test(current.code)) return true;
+    }
+    current = 'cause' in current ? current.cause : null;
+  }
+
+  return false;
+}
