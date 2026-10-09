@@ -78,4 +78,21 @@ describe('Compose topology', () => {
     // Docker's default network range: the bundled nginx, not LAN clients in 10/8 or 192.168/16.
     expect(env.TRUSTED_PROXIES).toBe('${TRUSTED_PROXIES:-172.16.0.0/12}');
   });
+
+  test('documents are stored on the filesystem with no object storage service', async () => {
+    const files = readdirSync(ROOT).filter((name) => /^docker-compose.*\.ya?ml$/.test(name));
+    for (const file of files) {
+      const text = await Bun.file(join(ROOT, file)).text();
+      expect(text).not.toMatch(/minio/i);
+    }
+
+    const { services } = await readCompose('docker-compose.yml');
+    for (const name of ['backend', 'pension-import-worker']) {
+      expect(services[name]?.volumes).toContain('./data/documents:/var/lib/quro/documents');
+      // Unset means filesystem; an old .env with S3 settings then stops the backend (exit 2).
+      expect(environmentOf(services[name]!).QRO_DOCUMENT_STORAGE).toBe('${QRO_DOCUMENT_STORAGE:-}');
+    }
+    // Backups read the documents; they never write to them.
+    expect(services['db-tools']?.volumes).toContain('./data/documents:/var/lib/quro/documents:ro');
+  });
 });

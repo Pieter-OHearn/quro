@@ -94,7 +94,11 @@ function toAiCapability(
   return buildCapability(false, AI_DISABLED_MESSAGE, now, pensionStatementImport.reason);
 }
 
-function getConfiguredCapability(id: 'bunq' | 'documents', now: Date): AppCapabilityStatus {
+// Document storage is part of the core: the filesystem store needs no configuration, and the
+// S3 store is checked at startup. Readiness reports whether the configured store is usable.
+const DOCUMENTS_AVAILABLE_MESSAGE = 'Document storage is available.';
+
+function getConfiguredCapability(id: 'bunq', now: Date): AppCapabilityStatus {
   const { enabled, message, reason } = evaluateCapability(id);
   return buildCapability(enabled, message, now, reason);
 }
@@ -142,6 +146,6 @@ export async function getAppCapabilities(now = new Date()): Promise<AppCapabilit
     ai: toAiCapability(pensionStatementImport, now),
     pensionStatementImport,
     bunq: getConfiguredCapability('bunq', now),
-    documents: getConfiguredCapability('documents', now),
+    documents: buildCapability(true, DOCUMENTS_AVAILABLE_MESSAGE, now),
   };
 }

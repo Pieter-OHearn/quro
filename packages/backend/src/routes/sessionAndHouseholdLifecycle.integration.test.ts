@@ -432,7 +432,10 @@ describe('background jobs', () => {
         employerMonthly: 0,
       })
       .returning();
-    providers.s3Objects.set('s04/job/queued.pdf', new TextEncoder().encode('%PDF-1.4\n%fixture\n'));
+    providers.storedDocuments.set(
+      's04/job/queued.pdf',
+      new TextEncoder().encode('%PDF-1.4\n%fixture\n'),
+    );
     const [queued] = await db
       .insert(pensionStatementImports)
       .values({

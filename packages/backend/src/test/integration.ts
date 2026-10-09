@@ -66,8 +66,9 @@ const DEFAULT_PASSWORD = 'strongpass123';
 const DEFAULT_USER_AGE = 32;
 const DEFAULT_RETIREMENT_AGE = 67;
 
-// Optional services are on by default in integration tests (their clients are mocked); tests of an
-// unconfigured instance turn them off with `applyTestSettings`.
+// Optional services are on by default in integration tests (their clients are mocked) and documents
+// go to a temporary directory; tests of an unconfigured instance turn them off with
+// `applyTestSettings`.
 applyTestSettings(documentAndImportSettings());
 
 function createRequestFunction() {

@@ -6,13 +6,14 @@ Run every `docker compose` command below from the repository checkout that holds
 
 ## What a backup contains
 
-| Data                                                             | Where it lives                    | Covered by the database backup |
-| ---------------------------------------------------------------- | --------------------------------- | ------------------------------ |
-| Accounts, balances, transactions, settings, sessions, bank links | PostgreSQL (`./data/postgres-18`) | Yes                            |
-| Uploaded pension statement PDFs                                  | Object storage (`./data/minio`)   | **No**                         |
-| `.env` and `secrets/*.txt`                                       | Files in your checkout            | **No**                         |
+| Data                                                             | Where it lives                                                          | Covered by `backup`                       |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------- |
+| Accounts, balances, transactions, settings, sessions, bank links | PostgreSQL (`./data/postgres-18`)                                       | Yes, as `<name>.dump`                     |
+| Uploaded PDFs (payslips, pension statements, statement imports)  | `./data/documents` ([filesystem storage](document-storage.md), default) | Yes, as `<name>.documents.tar` next to it |
+| Uploaded PDFs with S3 storage (`QRO_DOCUMENT_STORAGE=s3`)        | Your S3 bucket                                                          | **No**                                    |
+| `.env` and `secrets/*.txt`                                       | Files in your checkout                                                  | **No**                                    |
 
-Keep all three. A database dump restores your records but not the PDFs they point to, and it does not restore your passwords and keys.
+Keep all of them. A database dump restores your records but not the PDFs they point to, and it does not restore your passwords and keys.
 
 Treat every dump as sensitive. It holds your financial records and the tokens of any connected bank account. Store it somewhere only you can read, and do not commit it or share it.
 
@@ -24,7 +25,7 @@ The `db-tools` service lives in the `maintenance` profile, so it only runs when 
 docker compose --profile maintenance run --rm db-tools backup
 ```
 
-The dump is written to `./backups/db/<database>-<timestamp>.dump` on the host. For example, `quro-20261009-001322.dump`. To add a label to the file name:
+The dump is written to `./backups/db/<database>-<timestamp>.dump` on the host. For example, `quro-20261009-001322.dump`. With filesystem storage, the command then archives `./data/documents` (mounted read-only into `db-tools`) into `quro-20261009-001322.documents.tar` in the same directory. The archive is written under a temporary name and renamed when it is complete, and only its owner can read it. To add a label to the file names:
 
 ```bash
 docker compose --profile maintenance run --rm db-tools backup --label before-upgrade
@@ -34,19 +35,21 @@ The file is a PostgreSQL custom-format dump. You can take a backup while the sta
 
 ## Back up uploaded documents
 
-PDFs are stored in the MinIO bucket named by `S3_BUCKET` (default `quro-documents`), whose data lives in `./data/minio`. Rows in the database refer to these objects by key, so take the database backup and the document copy together, while nothing is writing:
+Rows in the database refer to documents by key, so the dump and the documents belong together.
+
+With filesystem storage (the default), `backup` already writes the documents archive next to the dump. It takes the dump first: an upload stores its file before it adds the row, so the archive holds every document the dump refers to, unless one is deleted between the two steps. For a backup that is consistent for certain, stop the services that write first:
 
 ```bash
 docker compose stop backend pension-import-worker
 docker compose --profile maintenance run --rm db-tools backup
-docker compose stop minio
-cp -a ./data/minio /path/to/safe/place/minio-$(date +%Y%m%d)
 docker compose up -d
 ```
 
-A dump and a document copy taken on different days can disagree about which documents exist.
+If the documents directory is missing, the command writes the dump, reports that the documents are not in the backup, and exits with status 1.
 
-The project has not rehearsed restoring this copy end to end. After you restore it, open a few documents in the app to confirm they download.
+With S3 storage, `backup` says that the documents are not included. Copy the bucket with your store's own tools at the same time as the dump. A store that encrypts at rest (for example MinIO with a KMS key) cannot be backed up by copying its data directory; read the objects through the S3 API instead.
+
+A dump and a document copy taken on different days can disagree about which documents exist.
 
 ## Restore the database
 
@@ -84,7 +87,16 @@ A restore replaces the contents of the database with the contents of the dump.
 
    Before it overwrites a non-empty database, the command writes a safety backup named `<database>-<timestamp>-pre-restore.dump` into `./backups/db`. Keep it until you have verified the restore.
 
-4. Check the result (next section) before you start the application again.
+4. With filesystem storage, restore the documents from the archive with the same name as the dump. The backend writes as root in the current image, so on Linux run `tar` with `sudo` if `./data/documents` is owned by root:
+
+   ```bash
+   mkdir -p ./data/documents
+   tar -xf backups/db/<dump-file>.documents.tar -C ./data/documents
+   ```
+
+   This adds the archived files and keeps any file uploaded after the backup; the restored database does not refer to those. With S3 storage, restore the bucket with your store's tools.
+
+5. Check the result (next section) before you start the application again.
 
 ### Safety checks
 
@@ -139,4 +151,4 @@ Restore into a copy of the stack on another machine, or in a separate checkout w
 
 ## Running the commands without Compose
 
-If you run the backend directly from a checkout, the same scripts are available as `bun run db:backup` and `bun run db:restore -- <dump-file>`. They need the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) on the machine. To use binaries in a non-standard location, set `QRO_PG_DUMP_BIN`, `QRO_PG_RESTORE_BIN` and `QRO_PSQL_BIN` to their full paths. Use the same confirmation variables as above, and point `DATABASE_URL` and `ADMIN_DATABASE_URL` at the database you mean to change.
+If you run the backend directly from a checkout, the same scripts are available as `bun run db:backup` and `bun run db:restore -- <dump-file>`. They need the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) on the machine, and `db:backup` needs `tar` and `QRO_DOCUMENTS_DIR` to archive documents stored on the filesystem. To use binaries in a non-standard location, set `QRO_PG_DUMP_BIN`, `QRO_PG_RESTORE_BIN` and `QRO_PSQL_BIN` to their full paths. Use the same confirmation variables as above, and point `DATABASE_URL` and `ADMIN_DATABASE_URL` at the database you mean to change.

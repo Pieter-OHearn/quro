@@ -1,3 +1,4 @@
+import { assertConfig, ConfigError, formatProblems } from '../config';
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, UsageError, type CommandIo } from './io';
 
 // `quro` is the operator command line inside the backend image (`docker compose exec backend
@@ -6,7 +7,8 @@ import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, UsageError, type CommandIo } from '.
 export const QURO_USAGE = `Usage: quro <command> [options]
 
 Commands:
-  user    Accounts, registration codes, password resets and sessions (quro user --help)`;
+  user        Accounts, registration codes, password resets and sessions (quro user --help)
+  documents   Document storage: copy documents out of S3 (quro documents --help)`;
 
 type CommandGroup = {
   usage: () => Promise<string>;
@@ -20,11 +22,36 @@ const GROUPS: Record<string, CommandGroup> = {
   user: {
     usage: async () => (await import('./user')).USER_USAGE,
     run: async (args, io) => {
+      assertConfig('cli');
       usesDatabase = true;
       return (await import('./user')).runUserCommand(args, io);
     },
   },
+  documents: {
+    usage: async () => (await import('./documents')).DOCUMENTS_USAGE,
+    run: async (args, io) => {
+      usesDatabase = true;
+      return (await import('./documents')).runDocumentsCommand(args, io);
+    },
+  },
 };
+
+/** Exit code for a settings or usage mistake; anything else is not handled here. */
+async function reportCommandError(
+  error: unknown,
+  group: CommandGroup,
+  io: CommandIo,
+): Promise<number> {
+  // Invalid settings: the full list, which names settings and never their values (exit code 2).
+  if (error instanceof ConfigError) {
+    io.err(formatProblems(error.problems));
+    return error.exitCode;
+  }
+  if (!(error instanceof UsageError)) throw error;
+  io.err(error.message);
+  io.err(await group.usage());
+  return EXIT_USAGE;
+}
 
 export async function runQuro(args: readonly string[], io: CommandIo): Promise<number> {
   const [name, ...rest] = args;
@@ -41,10 +68,7 @@ export async function runQuro(args: readonly string[], io: CommandIo): Promise<n
   try {
     return await group.run(rest, io);
   } catch (error) {
-    if (!(error instanceof UsageError)) throw error;
-    io.err(error.message);
-    io.err(await group.usage());
-    return EXIT_USAGE;
+    return reportCommandError(error, group, io);
   }
 }
 

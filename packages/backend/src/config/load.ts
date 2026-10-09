@@ -6,8 +6,10 @@ import {
   DEFAULT_CORS_ORIGINS,
   FEATURES,
   RETIRED_SETTINGS,
+  S3_SELECTION_SIGNALS,
   SETTINGS,
   SettingValueError,
+  type DocumentStorageDriver,
   type FeatureName,
   type NodeEnvironment,
   type SettingName,
@@ -54,17 +56,34 @@ export type AdminDatabase = DatabaseRole & {
   bootstrapUrl: Secret;
 };
 
+export type { DocumentStorageDriver };
+
+/** Connection to an S3-compatible store. */
+export type S3Connection = {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: Secret;
+  forcePathStyle: boolean;
+};
+
+/**
+ * Which store holds documents and where the filesystem store lives. Reads no secret, so every
+ * command can check it: S3 settings without QRO_DOCUMENT_STORAGE must stop all of them.
+ */
+export type DocumentStorageConfig = {
+  driver: DocumentStorageDriver;
+  /** The filesystem store's directory; also the destination of `migrate-from-s3`. */
+  directory: string;
+};
+
+/** What the server and the worker need to read and write documents. */
 export type DocumentsConfig =
-  | { enabled: false }
-  | {
-      enabled: true;
-      endpoint: string;
-      region: string;
-      bucket: string;
-      accessKeyId: string;
-      secretAccessKey: Secret;
-      forcePathStyle: boolean;
-    };
+  { driver: 'filesystem'; directory: string } | { driver: 's3'; s3: S3Connection };
+
+/** The S3 settings on their own, whatever the driver: the source of `migrate-from-s3`. */
+export type S3SourceConfig = { enabled: false } | ({ enabled: true } & S3Connection);
 
 export type BunqConfig =
   | { enabled: false }
@@ -134,7 +153,9 @@ export type Config = {
   readonly web: WebConfig;
   readonly runtimeDatabase: DatabaseRole;
   readonly adminDatabase: AdminDatabase;
+  readonly documentStorage: DocumentStorageConfig;
   readonly documents: DocumentsConfig;
+  readonly s3: S3SourceConfig;
   readonly bunq: BunqConfig;
   readonly pensionImport: PensionImportConfig;
   readonly tracing: TracingConfig;
@@ -180,6 +201,11 @@ class Reader {
   raw(name: SettingName): string | undefined {
     const value = this.env[name]?.trim();
     return value ? value : undefined;
+  }
+
+  /** Whether the environment holds a value for a name, including retired ones. */
+  hasValue(name: string): boolean {
+    return Boolean(this.env[name]?.trim());
   }
 
   fail(setting: string, message: string): void {
@@ -397,10 +423,40 @@ function presentSettings(r: Reader, names: readonly SettingName[]): Set<SettingN
   return new Set(names.filter((name) => r.isSet(name)));
 }
 
-function buildDocuments(r: Reader): DocumentsConfig {
-  if (!r.featureConfigured('documents')) return { enabled: false };
+/**
+ * The selected driver. An unset QRO_DOCUMENT_STORAGE means `filesystem`, unless settings show the
+ * install used S3: then nothing is guessed and the setting is reported as required.
+ */
+function readDocumentDriver(r: Reader): DocumentStorageDriver | undefined {
+  if (r.raw('QRO_DOCUMENT_STORAGE') === undefined) {
+    const signals = S3_SELECTION_SIGNALS.filter((name) => r.hasValue(name));
+    if (signals.length > 0) {
+      const verb = signals.length === 1 ? 'is' : 'are';
+      r.fail(
+        'QRO_DOCUMENT_STORAGE',
+        `required because ${signals.join(', ')} ${verb} set: use s3 to keep the existing store, or filesystem once \`quro documents migrate-from-s3\` has copied its documents`,
+      );
+      return undefined;
+    }
+  }
+  return r.get('QRO_DOCUMENT_STORAGE');
+}
+
+function buildDocumentStorage(r: Reader): DocumentStorageConfig | undefined {
+  const driver = readDocumentDriver(r);
+  const directory = r.get('QRO_DOCUMENTS_DIR');
+  if (driver === undefined || directory === undefined) return undefined;
+  return { driver, directory };
+}
+
+/**
+ * The S3 settings. `null` when none is present and the store is not selected; otherwise every
+ * setting is required, and a missing one is recorded as a problem.
+ */
+function buildS3Connection(r: Reader, selected: boolean): S3Connection | null | undefined {
+  if (!selected && !r.featureConfigured('s3Storage')) return null;
   const secretAccessKey = r.needSecretFile('S3_SECRET_ACCESS_KEY_FILE');
-  const present = presentSettings(r, FEATURES.documents.requires);
+  const present = presentSettings(r, FEATURES.s3Storage.requires);
   if (secretAccessKey !== undefined) present.add('S3_SECRET_ACCESS_KEY_FILE');
   const settings = {
     endpoint: r.get('S3_ENDPOINT'),
@@ -408,9 +464,8 @@ function buildDocuments(r: Reader): DocumentsConfig {
     bucket: r.get('S3_BUCKET'),
     accessKeyId: r.get('S3_ACCESS_KEY_ID'),
   };
-  if (!r.requireFeatureSettings('documents', present)) return { enabled: false };
+  if (!r.requireFeatureSettings('s3Storage', present)) return undefined;
   return {
-    enabled: true,
     endpoint: settings.endpoint!,
     region: settings.region!,
     bucket: settings.bucket!,
@@ -418,6 +473,26 @@ function buildDocuments(r: Reader): DocumentsConfig {
     secretAccessKey: secretAccessKey!,
     forcePathStyle: r.must('S3_FORCE_PATH_STYLE'),
   };
+}
+
+function buildDocuments(r: Reader): DocumentsConfig | undefined {
+  const driver = readDocumentDriver(r);
+  if (driver === 'filesystem') {
+    const directory = r.get('QRO_DOCUMENTS_DIR');
+    return directory === undefined ? undefined : { driver, directory };
+  }
+  if (driver === 's3') {
+    // With the S3 driver the filesystem directory is not used, so the server never reads it.
+    const s3 = buildS3Connection(r, true);
+    return s3 ? { driver, s3 } : undefined;
+  }
+  return undefined;
+}
+
+function buildS3Source(r: Reader): S3SourceConfig | undefined {
+  const s3 = buildS3Connection(r, false);
+  if (s3 === null) return { enabled: false };
+  return s3 && { enabled: true, ...s3 };
 }
 
 function buildBunq(r: Reader): BunqConfig {
@@ -500,7 +575,9 @@ const BUILDERS: SectionBuilders = {
   web: buildWeb,
   runtimeDatabase: (r) => buildRole(r, ROLES.runtime),
   adminDatabase: buildAdminDatabase,
+  documentStorage: buildDocumentStorage,
   documents: buildDocuments,
+  s3: buildS3Source,
   bunq: buildBunq,
   pensionImport: buildPensionImport,
   tracing: buildTracing,

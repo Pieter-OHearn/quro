@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { reloadConfig } from '../config';
@@ -37,14 +37,26 @@ export function applyTestSettings(settings: Settings): () => void {
   return () => write(previous);
 }
 
-/** Synthetic S3 and parser settings: document storage and statement import count as configured. */
+let documentsDirectory: string | undefined;
+
+/** A temporary documents directory for the filesystem store, removed when the process exits. */
+export function testDocumentsDirectory(): string {
+  if (!documentsDirectory) {
+    const directory = mkdtempSync(join(tmpdir(), 'quro-test-documents-'));
+    process.on('exit', () => rmSync(directory, { recursive: true, force: true }));
+    documentsDirectory = directory;
+  }
+  return documentsDirectory;
+}
+
+/**
+ * Documents in a temporary directory and a synthetic parser address, so statement import counts
+ * as configured. Tests that inspect stored objects replace the store (see providerMocks.ts).
+ */
 export function documentAndImportSettings(): Settings {
   return {
-    S3_ENDPOINT: 'http://s3.test.invalid:9000',
-    S3_REGION: 'test-region',
-    S3_BUCKET: 'quro-test-documents',
-    S3_ACCESS_KEY_ID: 'test-access-key',
-    S3_SECRET_ACCESS_KEY_FILE: writeTestSecret('s3_secret_access_key', 'test-secret-key'),
+    QRO_DOCUMENT_STORAGE: 'filesystem',
+    QRO_DOCUMENTS_DIR: testDocumentsDirectory(),
     PENSION_PARSER_URL: 'http://parser.test.invalid:8080',
   };
 }

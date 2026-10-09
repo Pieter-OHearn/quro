@@ -21,10 +21,7 @@ chmod 600 .env secrets/*.txt
 
 Edit the copied files under `secrets/` to set your own passwords and keys before starting the stack.
 
-> [!WARNING]
-> The dev stack pins the same MinIO image as the release stack (`minio/minio:RELEASE.2025-09-07T16-13-09Z`). That image could not be pulled during the release test described below. On a host without a cached copy, the dev stack may also fail to start; no replacement image has been verified.
-
-Once the configuration and secrets are ready and the pinned images are available, start the stack:
+Once the configuration and secrets are ready, start the stack:
 
 ```bash
 bun run dev:docker
@@ -44,11 +41,7 @@ For bunq OAuth in this mode, the callback URL is:
 http://localhost:3000/api/bunq/oauth/callback
 ```
 
-The database and object storage are also published locally for tooling:
-
-- Postgres: `127.0.0.1:5432`
-- MinIO API: `127.0.0.1:9000`
-- MinIO console: `127.0.0.1:9001`
+The database is also published locally for tooling, on `127.0.0.1:5432`. Uploaded documents are stored in `./data/documents`; an S3-compatible store is optional (see [document storage](docs/document-storage.md)).
 
 ## Screenshots
 
@@ -98,7 +91,7 @@ The database and object storage are also published locally for tooling:
 ## Self-hosting
 
 > [!WARNING]
-> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in the [roadmap](ROADMAP.md). The [Docker dev stack](#local-docker-dev) includes storage bootstrap, but requires runtime configuration and secrets and is subject to the same MinIO image availability problem.
+> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in the [roadmap](ROADMAP.md). The [Docker dev stack](#local-docker-dev) stores documents on the filesystem and needs no object storage service, but it requires runtime configuration and secrets.
 
 The [install contract](docs/install-contract.md) describes how installs will work from 0.8.0, which is not released yet: the images, the `quro` maintenance commands, settings, data locations and the move from existing Compose installs.
 

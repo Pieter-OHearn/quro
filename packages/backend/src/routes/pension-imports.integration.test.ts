@@ -1,45 +1,21 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
 import { eq, inArray } from 'drizzle-orm';
 
-const s3Objects = new Map<string, Uint8Array>();
-const failedDeletionKeys = new Set<string>();
-const deletionRequests: string[][] = [];
+import { createMemoryDocumentStore } from '../test/memoryDocumentStore';
+
+const documents = createMemoryDocumentStore();
+const { objects: storedDocuments, failedDeletionKeys, deletionRequests } = documents;
 let pensionImportCapabilityEnabled = true;
 
 // mock.module replaces modules for the whole bun process; keep the real ones so
 // afterAll can put them back before later test files (e.g. bunq) run.
-const realS3 = { ...(await import('../lib/s3')) };
+const realDocumentStorage = { ...(await import('../lib/documentStorage')) };
 const realCapabilities = { ...(await import('../lib/capabilities')) };
 const realPensionParserClient = { ...(await import('../lib/pensionParserClient')) };
 
-await mock.module('../lib/s3', () => ({
-  S3ConfigurationError: class MockS3ConfigurationError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = 'S3ConfigurationError';
-    }
-  },
-  getS3BucketName: () => 'pension-imports-test-bucket',
-  checkS3Readiness: () => Promise.resolve(),
-  uploadS3Object: ({ key, body }: { key: string; body: Buffer }) => {
-    s3Objects.set(key, new Uint8Array(body));
-  },
-  getS3ObjectBytes: ({ key }: { key: string }) => {
-    const existing = s3Objects.get(key);
-    return existing ? Buffer.from(existing) : null;
-  },
-  deleteS3Object: ({ key }: { key: string }) => {
-    s3Objects.delete(key);
-  },
-  deleteS3Objects: (keys: readonly string[]) => {
-    deletionRequests.push([...keys]);
-    const deletedKeys = keys.filter((key) => !failedDeletionKeys.has(key));
-    for (const key of deletedKeys) s3Objects.delete(key);
-    return Promise.resolve({
-      deletedKeys,
-      failedKeys: keys.filter((key) => failedDeletionKeys.has(key)),
-    });
-  },
+await mock.module('../lib/documentStorage', () => ({
+  ...realDocumentStorage,
+  getDocumentStore: () => documents.store,
 }));
 
 await mock.module('../lib/capabilities', () => {
@@ -213,10 +189,10 @@ describe('pension imports integration', () => {
   });
 
   afterAll(async () => {
-    s3Objects.clear();
+    storedDocuments.clear();
     mock.clearAllMocks();
     mock.restore();
-    await mock.module('../lib/s3', () => realS3);
+    await mock.module('../lib/documentStorage', () => realDocumentStorage);
     await mock.module('../lib/capabilities', () => realCapabilities);
     await mock.module('../lib/pensionParserClient', () => realPensionParserClient);
     await integration.cleanup();
@@ -404,7 +380,7 @@ describe('pension imports integration', () => {
         })),
       )
       .returning();
-    for (const row of rows) s3Objects.set(row.storageKey, new Uint8Array([1]));
+    for (const row of rows) storedDocuments.set(row.storageKey, new Uint8Array([1]));
     await runPensionImportWorkerTick();
     const updated = await db
       .select()
@@ -412,7 +388,8 @@ describe('pension imports integration', () => {
       .where(eq(pensionStatementImports.userId, owner.user.id));
     expect(updated.filter((row) => row.status === 'expired')).toHaveLength(3);
     expect(updated.filter((row) => row.status === 'committed')).toHaveLength(1);
-    for (const row of rows) expect(s3Objects.has(row.storageKey)).toBe(row.status === 'committed');
+    for (const row of rows)
+      expect(storedDocuments.has(row.storageKey)).toBe(row.status === 'committed');
   });
 
   test('retries failed deletions on later ticks and skips completed cleanup', async () => {
@@ -436,7 +413,7 @@ describe('pension imports integration', () => {
       .returning();
     const failed = rows[0];
     const successful = rows[1];
-    for (const row of rows) s3Objects.set(row.storageKey, new Uint8Array([1]));
+    for (const row of rows) storedDocuments.set(row.storageKey, new Uint8Array([1]));
     failedDeletionKeys.add(failed.storageKey);
     deletionRequests.length = 0;
     try {
@@ -450,8 +427,8 @@ describe('pension imports integration', () => {
         storageDeletedAt: null,
       });
       expect(first.find((row) => row.id === successful.id)?.storageDeletedAt).toBeInstanceOf(Date);
-      expect(s3Objects.has(failed.storageKey)).toBe(true);
-      expect(s3Objects.has(successful.storageKey)).toBe(false);
+      expect(storedDocuments.has(failed.storageKey)).toBe(true);
+      expect(storedDocuments.has(successful.storageKey)).toBe(false);
       failedDeletionKeys.clear();
       deletionRequests.length = 0;
       await runPensionImportWorkerTick();
@@ -462,7 +439,7 @@ describe('pension imports integration', () => {
         .from(pensionStatementImports)
         .where(eq(pensionStatementImports.id, failed.id));
       expect(retried.storageDeletedAt).toBeInstanceOf(Date);
-      expect(s3Objects.has(failed.storageKey)).toBe(false);
+      expect(storedDocuments.has(failed.storageKey)).toBe(false);
       deletionRequests.length = 0;
       await runPensionImportWorkerTick();
       expect(deletionRequests.flat()).not.toContain(failed.storageKey);
