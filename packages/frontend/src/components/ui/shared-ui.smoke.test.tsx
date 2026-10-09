@@ -7,10 +7,12 @@ import { AlertTriangle, ArrowDownUp, PiggyBank, Plus } from 'lucide-react';
 import { Badge } from './atoms/Badge';
 import { Button } from './atoms/Button';
 import { Card } from './atoms/Card';
+import { Change } from './atoms/Change';
 import { CurrencyInput } from './atoms/CurrencyInput';
 import { DateInput } from './atoms/DateInput';
 import { LoadingSpinner } from './atoms/LoadingSpinner';
 import { PasswordInput } from './atoms/PasswordInput';
+import { QuroLogo } from './atoms/QuroLogo';
 import { SelectInput } from './atoms/SelectInput';
 import { Spinner } from './atoms/Spinner';
 import { Textarea } from './atoms/Textarea';
@@ -64,6 +66,17 @@ const smokeCases: readonly SmokeCase[] = [
       </Card>
     ),
     includes: ['data-smoke="card"', 'Card body'],
+  },
+  {
+    name: 'Change renders a signed loss chip with a hidden arrow',
+    element: <Change value={-612.75} format="amount" variant="chip" />,
+    includes: [
+      '<span aria-hidden="true">\u25BC</span>',
+      '<span class="sr-only">down </span>',
+      '\u2212612.75',
+      'text-loss',
+      'bg-loss-soft',
+    ],
   },
   {
     name: 'Spinner renders accessible svg markup',
@@ -128,6 +141,26 @@ const smokeCases: readonly SmokeCase[] = [
     name: 'PasswordInput renders toggle button and masked input',
     element: <PasswordInput value="password123" show={false} onChange={noop} onToggle={noop} />,
     includes: ['type="password"', 'value="password123"', 'aria-label="Show password"'],
+  },
+  {
+    name: 'QuroLogo renders the one-colour V1 mark in text-brand',
+    element: <QuroLogo />,
+    includes: [
+      'width="36"',
+      'viewBox="0 0 32 32"',
+      'class="text-brand"',
+      'role="img"',
+      'aria-label="Quro logo mark"',
+      '<rect x="9" y="8" width="13" height="13" rx="4.5" stroke="currentColor" stroke-width="3">',
+      '<path d="M18 17 L25 24" stroke="currentColor" stroke-width="3" stroke-linecap="round">',
+    ],
+    excludes: ['linearGradient', 'url(#', '<circle', '<stop', 'fill="#', 'stroke="#'],
+  },
+  {
+    name: 'QuroLogo takes its colour from a caller text class',
+    element: <QuroLogo size={20} className="text-fg-inverted shrink-0" />,
+    includes: ['width="20"', 'height="20"', 'class="text-fg-inverted shrink-0"'],
+    excludes: ['text-brand'],
   },
   {
     name: 'FormField renders label, hint, and error copy',

@@ -41,7 +41,7 @@ function MappingRow({ mapping }: Readonly<{ mapping: CategoryMapping }>) {
 
   return (
     <div className="flex items-center justify-between gap-4 py-2.5 border-b border-border-subtle last:border-0">
-      <span className="text-xs font-mono text-fg-faint shrink-0">
+      <span className="text-xs text-fg-faint shrink-0">
         {mapping.source.toUpperCase()} {mapping.sourceKey}
       </span>
       <input
