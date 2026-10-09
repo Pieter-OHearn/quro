@@ -1,3 +1,4 @@
+import { describeSyncFailure } from '../lib/syncFailure';
 import { registerDeadlineCleanup, runFailureCleanup } from '../lib/workDeadline';
 import { and, eq } from 'drizzle-orm';
 import { isCurrencyCode, type CurrencyCode, toIsoDate, DEFAULT_EMOJI } from '@quro/shared';
@@ -238,7 +239,7 @@ function syncAccountPayments(
           issues.push({
             accountId: bunqAccountId,
             paymentId: String(payment.id),
-            message: error instanceof Error ? error.message : 'Savings payment import failed',
+            message: describeSyncFailure(error, 'Savings payment import failed'),
           });
         }
       }
@@ -340,7 +341,7 @@ export async function syncBunqSavings(
       : markSyncSucceeded(connection.id, session.bunqUserId, syncedAt, !skipCursorUpdate));
     return { status: issues.length > 0 ? 'partial' : 'success', syncedAt, issues };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const message = describeSyncFailure(error, 'Unknown error');
     await runFailureCleanup(() => markSyncFailed(connection.id, message));
     throw error;
   } finally {
