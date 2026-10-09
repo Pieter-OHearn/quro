@@ -64,11 +64,9 @@ export type ChangeProps = ChangeBaseProps &
 
 type ChangeVariant = NonNullable<ChangeProps['variant']>;
 
-type ChangeInput = {
-  value: number;
+type ChangeInput = Pick<ChangeBaseProps, 'value' | 'showArrow'> & {
   format: ChangeProps['format'];
   currency?: string;
-  showArrow?: boolean;
 };
 
 type ChangeDisplay = {
@@ -94,9 +92,9 @@ function formatMagnitude(
   return formatNumber(magnitude, numberFormat, TWO_DECIMALS);
 }
 
-function resolveDirection(value: number, magnitude: string): ChangeDirection {
-  // The sign follows the displayed digits, so a value that rounds to 0.00 reads as no change.
-  if (!/[1-9]/.test(magnitude)) return 'flat';
+function resolveDirection(value: number, magnitude: string, zero: string): ChangeDirection {
+  // The sign follows the displayed figure, so a value that rounds to 0.00 reads as no change.
+  if (magnitude === zero) return 'flat';
   return value > 0 ? 'gain' : 'loss';
 }
 
@@ -109,7 +107,8 @@ function describeChange(
   }
 
   const magnitude = formatMagnitude(Math.abs(value), format, currency, numberFormat);
-  const direction = resolveDirection(value, magnitude);
+  const zero = formatMagnitude(0, format, currency, numberFormat);
+  const direction = resolveDirection(value, magnitude, zero);
   const { sign, arrow } = DIRECTIONS[direction];
   return {
     direction,
