@@ -27,17 +27,22 @@ export function isForeignKeyViolation(error: unknown): boolean {
 // at fault.
 const PG_DATA_EXCEPTION_CODE = /^22[0-9A-Z]{3}$/;
 
-export function isDataException(error: unknown): boolean {
+/** The SQLSTATE of the data exception in an error chain, or null. */
+export function findDataExceptionCode(error: unknown): string | null {
   const visited = new Set<object>();
   let current = error;
 
   while (typeof current === 'object' && current !== null && !visited.has(current)) {
     visited.add(current);
     if ('code' in current && typeof current.code === 'string') {
-      if (PG_DATA_EXCEPTION_CODE.test(current.code)) return true;
+      if (PG_DATA_EXCEPTION_CODE.test(current.code)) return current.code;
     }
     current = 'cause' in current ? current.cause : null;
   }
 
-  return false;
+  return null;
+}
+
+export function isDataException(error: unknown): boolean {
+  return findDataExceptionCode(error) !== null;
 }
