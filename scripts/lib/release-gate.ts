@@ -18,6 +18,8 @@ const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const REPOSITORY_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const RELEASE_ID_PATTERN = /^[1-9]\d*$/;
 const GITHUB_ACTIONS_APP = 'github-actions';
+const GITHUB_API_ORIGIN = 'https://api.github.com';
+const GITHUB_UPLOADS_ORIGIN = 'https://uploads.github.com';
 export const RELEASE_BOT_LOGIN = 'github-actions[bot]';
 // CI runs for these events check out the commit itself. A pull_request run tests a merge
 // of the pull request into its base branch, so it does not prove the commit on its own.
@@ -265,7 +267,11 @@ export function createGitHub(env: Env, fetchImpl: typeof fetch = fetch): GitHub 
   if (!REPOSITORY_PATTERN.test(repository)) {
     throw new ReleaseGateError('GITHUB_REPOSITORY must look like owner/name');
   }
-  const apiUrl = (env.GITHUB_API_URL?.trim() || 'https://api.github.com').replace(/\/+$/, '');
+  const apiUrl = (env.GITHUB_API_URL?.trim() || GITHUB_API_ORIGIN).replace(/\/+$/, '');
+  const apiOrigin = new URL(apiUrl).origin;
+  const uploadOrigins = new Set(
+    apiOrigin === GITHUB_API_ORIGIN ? [apiOrigin, GITHUB_UPLOADS_ORIGIN] : [apiOrigin],
+  );
   const headers = {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${required(env, 'GITHUB_TOKEN')}`,
@@ -288,6 +294,10 @@ export function createGitHub(env: Env, fetchImpl: typeof fetch = fetch): GitHub 
     },
     async upload(uploadUrl: string, file: string) {
       const url = new URL(uploadUrl.replace(/\{[^}]*\}$/, ''));
+      // The token goes only to the API host, or to GitHub's upload host for api.github.com.
+      if (!uploadOrigins.has(url.origin)) {
+        throw new ReleaseGateError(`Refusing to upload release assets to ${url.origin}`);
+      }
       url.searchParams.set('name', basename(file));
       const response = await fetchImpl(url, {
         method: 'POST',

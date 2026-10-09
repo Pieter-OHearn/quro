@@ -8,6 +8,7 @@ import {
   type Release,
   type WorkflowRun,
   RELEASE_BOT_LOGIN,
+  createGitHub,
   draftsToReplace,
   evaluateRequiredChecks,
   parseReleaseVersion,
@@ -239,6 +240,48 @@ describe('draftsToReplace', () => {
   });
 });
 
+describe('createGitHub uploads', () => {
+  const calls: string[] = [];
+  const fakeFetch = ((input: string | URL | Request) => {
+    calls.push(String(input));
+    return Promise.resolve(new Response('{}', { status: 201 }));
+  }) as typeof fetch;
+  const file = join(mkdtempSync(join(tmpdir(), 'quro-release-upload-')), 'asset.yml');
+  writeFileSync(file, 'synthetic\n');
+  const gh = (apiUrl?: string) =>
+    createGitHub(
+      { GITHUB_REPOSITORY: 'acme/quro', GITHUB_TOKEN: 'token', GITHUB_API_URL: apiUrl },
+      fakeFetch,
+    );
+
+  test('sends the token only to the API host or GitHub uploads', async () => {
+    calls.length = 0;
+    await gh().upload(
+      'https://uploads.github.com/repos/acme/quro/releases/1/assets{?name,label}',
+      file,
+    );
+    await gh('https://git.example/api/v3').upload(
+      'https://git.example/api/uploads/repos/acme/quro/releases/1/assets{?name,label}',
+      file,
+    );
+    expect(calls).toEqual([
+      'https://uploads.github.com/repos/acme/quro/releases/1/assets?name=asset.yml',
+      'https://git.example/api/uploads/repos/acme/quro/releases/1/assets?name=asset.yml',
+    ]);
+  });
+
+  test('refuses any other upload host', async () => {
+    calls.length = 0;
+    await expect(
+      gh().upload('https://elsewhere.example/assets{?name,label}', file),
+    ).rejects.toThrow('Refusing to upload');
+    await expect(
+      gh('https://git.example/api/v3').upload('https://uploads.github.com/assets', file),
+    ).rejects.toThrow('Refusing to upload');
+    expect(calls).toEqual([]);
+  });
+});
+
 // ── CLI against a fake GitHub API ────────────────────────────────────────────
 
 type FakeRelease = Release & { name: string; body: string; assets: string[] };
@@ -262,6 +305,13 @@ let releaseIds = 0;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const notFound = () => json({ message: 'Not Found' }, 404);
 
+// Pages like GitHub: per_page entries from page (1-based).
+function page<T>(items: T[], url: URL): T[] {
+  const perPage = Number(url.searchParams.get('per_page') ?? 30);
+  const start = (Number(url.searchParams.get('page') ?? 1) - 1) * perPage;
+  return items.slice(start, start + perPage);
+}
+
 function apiRoutes(
   method: string,
   path: string,
@@ -274,13 +324,13 @@ function apiRoutes(
     const runs = state.checkRuns.filter(
       (run) => run.head_sha === checkRuns[1] && run.name === name,
     );
-    return json({ total_count: runs.length, check_runs: runs });
+    return json({ total_count: runs.length, check_runs: page(runs, url) });
   }
   if (method === 'GET' && path === '/actions/runs') {
     const runs = state.workflowRuns.filter(
       (run) => run.head_sha === url.searchParams.get('head_sha'),
     );
-    return json({ total_count: runs.length, workflow_runs: runs });
+    return json({ total_count: runs.length, workflow_runs: page(runs, url) });
   }
   const tagRef = /^\/git\/ref\/tags\/(.+)$/.exec(path);
   if (method === 'GET' && tagRef) {
@@ -293,7 +343,7 @@ function apiRoutes(
     return commit ? json({ object: { type: 'commit', sha: commit } }) : notFound();
   }
   if (method === 'POST' && path === '/git/refs') return createRef(request);
-  return releaseRoutes(method, path, request);
+  return releaseRoutes(method, path, url, request);
 }
 
 async function createRef(request: Request): Promise<Response> {
@@ -306,13 +356,18 @@ async function createRef(request: Request): Promise<Response> {
   return json({ ref: body.ref, object: { type: 'commit', sha: body.sha } }, 201);
 }
 
-async function releaseRoutes(method: string, path: string, request: Request): Promise<Response> {
+async function releaseRoutes(
+  method: string,
+  path: string,
+  url: URL,
+  request: Request,
+): Promise<Response> {
   const byTag = /^\/releases\/tags\/(.+)$/.exec(path);
   if (method === 'GET' && byTag) {
     const release = state.releases.find((entry) => entry.tag_name === byTag[1] && !entry.draft);
     return release ? json(release) : notFound();
   }
-  if (method === 'GET' && path === '/releases') return json(state.releases);
+  if (method === 'GET' && path === '/releases') return json(page(state.releases, url));
   if (method === 'POST' && path === '/releases') {
     const body = (await request.json()) as {
       tag_name: string;
@@ -581,6 +636,33 @@ describe('release-gate CLI', () => {
     );
     expect((await run(['create-tag'], { GITHUB_TOKEN: 'wrong' })).error).toContain('401');
     expect(state.writes).toEqual([]);
+  });
+
+  test('reads every page of check runs and releases', async () => {
+    for (let index = 0; index < 120; index += 1) {
+      const [check, workflowRun] = pair({ event: 'pull_request' });
+      state.checkRuns.push(check);
+      state.workflowRuns.push(workflowRun);
+    }
+    passCi();
+    expect((await run(['preflight'])).code).toBe(0);
+
+    for (let index = 0; index < 150; index += 1) {
+      state.releases.push({
+        id: 10_000 + index,
+        tag_name: `v0.0.${index}`,
+        name: `v0.0.${index}`,
+        body: '',
+        draft: false,
+        upload_url: '',
+        author: { login: RELEASE_BOT_LOGIN },
+        assets: [],
+      });
+    }
+    state.failUploads = 1;
+    expect(await releaseAfterBuild()).toEqual([0, 1]);
+    expect(await releaseAfterBuild()).toEqual([0, 0, 0]);
+    expect(releasesFor('v0.8.0')).toEqual(PUBLISHED);
   });
 
   test('runs as a script and writes outputs to GITHUB_OUTPUT', async () => {
