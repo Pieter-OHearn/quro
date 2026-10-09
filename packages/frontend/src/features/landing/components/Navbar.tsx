@@ -57,7 +57,7 @@ export function Navbar({ onSignIn, onSignUp }: Readonly<NavbarProps>) {
     <nav className="sticky top-0 z-40 border-b border-fg-inverted/10 bg-surface-inverse/90 backdrop-blur-md">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <QuroLogo size={32} showBg={false} />
+          <QuroLogo size={32} />
           <span className="font-black text-fg-inverted text-lg tracking-tight">Quro</span>
         </div>
         <div className="hidden md:flex items-center gap-6 text-sm text-fg-faint">

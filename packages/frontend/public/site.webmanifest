@@ -4,8 +4,8 @@
   "description": "Personal finance dashboard for budgeting, goals, investing, pensions, mortgages, and savings.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d1627",
-  "theme_color": "#0d1627",
+  "background_color": "#F6F5F1",
+  "theme_color": "#17503A",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

@@ -40,7 +40,7 @@ function AppPreviewWindow() {
         <div className="w-2.5 h-2.5 rounded-full bg-warning-muted/70" />
         <div className="w-2.5 h-2.5 rounded-full bg-success-accent/70" />
         <div className="flex-1 flex items-center justify-center gap-2 ml-2">
-          <QuroLogo size={14} showBg={false} />
+          <QuroLogo size={14} />
           <span className="text-[10px] font-bold text-fg-inverted/60">Quro · Dashboard</span>
         </div>
       </div>
