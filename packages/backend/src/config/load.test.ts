@@ -479,9 +479,11 @@ describe('malformed settings', () => {
     }
   });
 
-  test('NODE_ENV and BUN_ENV decide the test environment; other values count as development', () => {
+  test('NODE_ENV decides the test environment; other values count as development', () => {
     expect(load({ ...DATABASE_ENV, NODE_ENV: 'test' }).config.runtime.environment).toBe('test');
-    expect(load({ ...DATABASE_ENV, BUN_ENV: 'test' }).config.runtime.environment).toBe('test');
+    expect(load({ ...DATABASE_ENV, BUN_ENV: 'test' }).config.runtime.environment).toBe(
+      'development',
+    );
     expect(load({ ...DATABASE_ENV, NODE_ENV: 'production' }).config.runtime.environment).toBe(
       'production',
     );
@@ -570,5 +572,30 @@ describe('secrets cannot leak by accident', () => {
     ].join('\n');
     expect(rendered).not.toContain(CANARY);
     expect(rendered).toContain('[redacted]');
+  });
+});
+
+describe('least privilege', () => {
+  test('a section is only built, and its secret files only opened, when it is read', () => {
+    const opened: string[] = [];
+    const { config } = loadConfig(DATABASE_ENV, (path) => {
+      opened.push(path);
+      return files(SECRETS)(path);
+    });
+    expect(config.runtimeDatabase.user).toBe('quro_app');
+    expect(opened).toEqual(['/run/secrets/postgres_app_password']);
+    expect(config.runtime.port).toBe(3000);
+    expect(opened).toEqual(['/run/secrets/postgres_app_password']);
+  });
+
+  test('a host with a port or path is rejected', () => {
+    for (const host of ['db:5432/x', 'db/x', 'user@db', 'db name']) {
+      expect(problemsOf({ POSTGRES_HOST: host }, 'runtimeDatabase')).toEqual([
+        {
+          setting: 'POSTGRES_HOST',
+          message: 'must be a host name or IP address, without a port or path',
+        },
+      ]);
+    }
   });
 });

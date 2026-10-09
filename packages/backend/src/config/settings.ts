@@ -216,15 +216,10 @@ export const SETTINGS = defineSettings({
       group: 'Runtime',
       audience: 'development',
       description:
-        'Runtime mode. Only `test` changes behaviour (no rate limiting, no schedulers); any other value counts as development.',
+        'Runtime mode. Only `test` changes behaviour (no rate limiting, no schedulers); any other value counts as development. Bun sets it to `test` when it runs tests.',
       default: 'development',
     },
   ),
-  BUN_ENV: text({
-    group: 'Runtime',
-    audience: 'development',
-    description: 'Bun sets `test` when it runs tests; it has the same effect as `NODE_ENV=test`.',
-  }),
 
   // ── Web and sessions ─────────────────────────────────────────────────────
   SECURE_COOKIES: strictFlag({
@@ -285,13 +280,22 @@ export const SETTINGS = defineSettings({
   }),
 
   // ── Database ─────────────────────────────────────────────────────────────
-  POSTGRES_HOST: text({
-    group: 'Database',
-    audience: 'operator',
-    description: 'PostgreSQL host. There is no default: Quro never assumes a service name.',
-    requirement: { kind: 'unlessUrl', note: DATABASE_URL_NOTE },
-    example: 'db',
-  }),
+  POSTGRES_HOST: define(
+    'host name or address',
+    (raw) => {
+      if (!/^[\w.:[\]-]+$/.test(raw)) {
+        throw new SettingValueError('must be a host name or IP address, without a port or path');
+      }
+      return raw;
+    },
+    {
+      group: 'Database',
+      audience: 'operator',
+      description: 'PostgreSQL host. There is no default: Quro never assumes a service name.',
+      requirement: { kind: 'unlessUrl', note: DATABASE_URL_NOTE },
+      example: 'db',
+    },
+  ),
   POSTGRES_PORT: integer({
     group: 'Database',
     audience: 'operator',

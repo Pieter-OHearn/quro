@@ -286,7 +286,7 @@ function withRetiredHint(env: Environment, setting: string, message: string): st
 
 function buildRuntime(r: Reader): RuntimeConfig {
   const nodeEnv = r.must('NODE_ENV');
-  const environment = nodeEnv === 'test' || r.raw('BUN_ENV') === 'test' ? 'test' : nodeEnv;
+  const environment = nodeEnv;
   return {
     environment,
     port: r.must('PORT'),
@@ -357,7 +357,7 @@ function parsePostgresUrl(r: Reader, name: SettingName): DatabaseRole | undefine
 
 function buildRoleFromSettings(r: Reader, role: RoleSettings): DatabaseRole | undefined {
   const host = r.get('POSTGRES_HOST');
-  if (host === undefined) {
+  if (host === undefined && r.raw('POSTGRES_HOST') === undefined) {
     r.fail('POSTGRES_HOST', 'required, and there is no default (set DATABASE_URL for development)');
   }
   const port = r.must('POSTGRES_PORT');
@@ -528,35 +528,57 @@ function findRetired(env: Environment): ConfigNotice[] {
     }));
 }
 
+type Built = { value: unknown; problems: readonly ConfigProblem[] };
+
 /**
  * Parses the environment and the secret files it points at. Pure apart from reading those files:
  * it does not touch `process.env`, so tests pass their own environment.
+ *
+ * Sections are built the first time they are read, so a process never opens the secret files of
+ * a section it does not use (the server does not load the owner role's password).
  */
 export function loadConfig(
   env: Environment,
   readFile: ReadFile = (path) => readFileSync(path, 'utf8'),
 ): LoadedConfig {
-  const notices = findRetired(env);
+  const retired = findRetired(env);
+  const observed: ConfigNotice[] = [];
+  const built = new Map<SectionName, Built>();
+
+  const build = (name: SectionName): Built => {
+    let result = built.get(name);
+    if (!result) {
+      const reader = new Reader(env, readFile);
+      const value = BUILDERS[name](reader, observed);
+      result = {
+        value: reader.problems.length > 0 ? undefined : deepFreeze(value),
+        problems: reader.problems,
+      };
+      built.set(name, result);
+    }
+    return result;
+  };
+
   const config = {} as Record<string, unknown>;
   const problems = {} as Record<SectionName, readonly ConfigProblem[]>;
-
   for (const name of SECTION_NAMES) {
-    const reader = new Reader(env, readFile);
-    const value = BUILDERS[name](reader, notices);
-    problems[name] = reader.problems;
-    if (reader.problems.length > 0) {
-      const error = new ConfigError(reader.problems);
-      Object.defineProperty(config, name, {
-        enumerable: true,
-        get() {
-          throw error;
-        },
-      });
-    } else {
-      Object.defineProperty(config, name, { enumerable: true, value: deepFreeze(value) });
-    }
+    Object.defineProperty(problems, name, { enumerable: true, get: () => build(name).problems });
+    Object.defineProperty(config, name, {
+      enumerable: true,
+      get() {
+        const { value, problems: sectionProblems } = build(name);
+        if (sectionProblems.length > 0) throw new ConfigError(sectionProblems);
+        return value;
+      },
+    });
   }
-  Object.defineProperty(config, 'notices', { enumerable: true, value: deepFreeze(notices) });
+  Object.defineProperty(config, 'notices', {
+    enumerable: true,
+    get: () => {
+      build('web');
+      return deepFreeze([...retired, ...observed]);
+    },
+  });
 
-  return { config: Object.freeze(config) as Config, problems };
+  return { config: Object.freeze(config) as Config, problems: Object.freeze(problems) };
 }
