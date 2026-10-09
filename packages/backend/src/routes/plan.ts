@@ -477,10 +477,11 @@ function buildEurRunwayResponse(
     ? calculateServiceDuration(primaryEmployment.serviceStartDate, asOf)
     : null;
   const missingFields = getMissingEmploymentFields(data.primaryEmployment);
+  const jurisdictionMetadata = resolveJurisdictionMetadata(jurisdiction, asOf);
   return {
     baseCurrency: FX_BASE_CURRENCY,
     asOf,
-    jurisdiction: resolveJurisdictionMetadata(jurisdiction, asOf),
+    jurisdiction: jurisdictionMetadata,
     employment: {
       primary: primaryEmployment,
       derived: service ? { asOf, ...service } : null,
@@ -512,13 +513,26 @@ function buildEurRunwayResponse(
       })),
       convertToEur,
     ),
-    budgetCurrencyNeedsReview:
-      data.categories.some((row) => row.currencyNeedsReview) ||
-      data.budgetTxns.some((row) => row.currencyNeedsReview),
     setupComplete: missingFields.length === 0,
+    ...runwayEstimateFlags(data, incomeSupport, jurisdictionMetadata),
+  };
+}
+
+// Any input that is unreviewed, a fallback, unknown or a rule carried past its published or
+// reviewed period makes the whole runway an estimate; the specific flags say which.
+function runwayEstimateFlags(
+  data: Pick<RunwayData, 'categories' | 'budgetTxns'>,
+  incomeSupport: RunwayResponse['incomeSupport'],
+  jurisdiction: RunwayResponse['jurisdiction'],
+): Pick<RunwayResponse, 'budgetCurrencyNeedsReview' | 'isEstimated'> {
+  const budgetCurrencyNeedsReview =
+    data.categories.some((row) => row.currencyNeedsReview) ||
+    data.budgetTxns.some((row) => row.currencyNeedsReview);
+  return {
+    budgetCurrencyNeedsReview,
     isEstimated:
-      data.categories.some((row) => row.currencyNeedsReview) ||
-      data.budgetTxns.some((row) => row.currencyNeedsReview) ||
+      budgetCurrencyNeedsReview ||
+      jurisdiction.isExtrapolated ||
       incomeSupport.salaryBasis.status === 'unlinked_fallback' ||
       incomeSupport.unemployment.status === 'unknown',
   };
@@ -570,5 +584,5 @@ app.put('/assumptions', async (c) => {
   return c.json({ data });
 });
 
-export { buildRunwayResponse };
+export { buildRunwayResponse, runwayEstimateFlags };
 export default app;
