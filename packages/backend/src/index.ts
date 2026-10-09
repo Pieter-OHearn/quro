@@ -20,6 +20,9 @@ import settings from './routes/settings';
 import partner from './routes/partner';
 import bunq from './routes/bunq';
 import { loadBunqConfig } from './lib/bunqConfig';
+import { parseRegistrationMode } from './lib/registration';
+import { parseSecureCookies } from './lib/sessions';
+import { checkConfiguredCookieTransport } from './middleware/cookieTransport';
 import plan from './routes/plan';
 import employments from './routes/employments';
 import {
@@ -38,6 +41,10 @@ import { httpTracing } from './lib/tracing';
 
 // Fail fast on partial bunq configuration; unset leaves the integration disabled.
 loadBunqConfig();
+// Fail fast on auth settings a typo could weaken. Both are read again per request.
+parseSecureCookies(process.env.SECURE_COOKIES);
+parseRegistrationMode(process.env.REGISTRATION_MODE);
+checkConfiguredCookieTransport();
 
 export const app = new Hono();
 

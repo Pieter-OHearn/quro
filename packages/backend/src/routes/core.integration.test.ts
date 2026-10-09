@@ -89,6 +89,7 @@ describe('auth integration', () => {
         password: integrationPassword,
         age: 31,
         retirementAge: 67,
+        inviteCode: await integration.issueInviteCode(),
       },
     });
     expect(signupResponse.status).toBe(201);
@@ -147,6 +148,7 @@ describe('auth integration', () => {
             password: integrationPassword,
             age: 31,
             retirementAge: 67,
+            inviteCode: await integration.issueInviteCode(),
           },
         });
         expect(response.status).toBe(201);
@@ -162,6 +164,7 @@ describe('auth integration', () => {
           password: integrationPassword,
           age: 31,
           retirementAge: 67,
+          inviteCode: await integration.issueInviteCode(),
         },
       });
       expect(limitedResponse.status).toBe(429);
@@ -184,6 +187,7 @@ describe('auth integration', () => {
         password: integrationPassword,
         age: 31,
         retirementAge: 67,
+        inviteCode: await integration.issueInviteCode(),
       },
     });
 
@@ -242,7 +246,7 @@ describe('auth integration', () => {
 
   test('returns conflict instead of an unhandled error for concurrent duplicate signup', async () => {
     const email = integration.buildEmail('concurrent-signup');
-    const signup = () =>
+    const signup = (inviteCode: string) =>
       integration.request('/api/auth/signup', {
         method: 'POST',
         json: {
@@ -252,10 +256,15 @@ describe('auth integration', () => {
           password: integrationPassword,
           age: 31,
           retirementAge: 67,
+          inviteCode,
         },
       });
 
-    const responses = await Promise.all([signup(), signup()]);
+    const [firstCode, secondCode] = [
+      await integration.issueInviteCode(),
+      await integration.issueInviteCode(),
+    ];
+    const responses = await Promise.all([signup(firstCode), signup(secondCode)]);
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
 
     const conflict = responses.find((response) => response.status === 409);

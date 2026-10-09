@@ -64,6 +64,11 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   `packages/backend/src/lib/publicPaths.ts`. Derive ownership from the authenticated context, reject
   client ownership fields, and enforce ownership on referenced parents and writes.
   Keep core functionality usable without OCR, bank linking, GPU or AI.
+- Sessions and operator codes are stored only as SHA-256 digests
+  (`packages/backend/src/lib/sessions.ts`, `packages/backend/src/lib/authCodes.ts`); never store or
+  log a raw token. Instance operations are `quro` CLI commands (`packages/backend/src/cli/`), not
+  an in-app role, and print no household data. Cookie flags come from `SECURE_COOKIES`, never from
+  request headers. Deployment modes and registration: [security model](docs/security.md).
 
 ## Migration and UI boundaries
 

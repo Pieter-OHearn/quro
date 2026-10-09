@@ -16,7 +16,8 @@ COPY packages/shared packages/shared
 COPY packages/backend packages/backend
 COPY docker/backend docker/backend
 
-RUN chmod +x /app/docker/backend/*.sh
+RUN chmod +x /app/docker/backend/*.sh /app/docker/backend/quro && \
+    ln -s /app/docker/backend/quro /usr/local/bin/quro
 
 WORKDIR /app/packages/backend
 ENTRYPOINT ["/bin/sh", "/app/docker/backend/with-runtime-env.sh"]

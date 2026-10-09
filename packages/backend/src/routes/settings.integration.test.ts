@@ -9,6 +9,7 @@ import {
 import { and, eq, ne } from 'drizzle-orm';
 import { db } from '../db/client';
 import { sessions } from '../db/schema';
+import { hashSessionToken } from '../lib/sessions';
 import { createIntegrationHelpers, integrationPassword, randomTestIp } from '../test/integration';
 
 const integration = createIntegrationHelpers('settings.integration.quro.test');
@@ -31,8 +32,10 @@ type PublicUser = {
 
 const changedPassword = 'new-strong-pass-456';
 
+// Sessions are stored by the SHA-256 digest of the cookie token, never the token itself.
 function getSessionId(cookie: string) {
-  return cookie.match(/(?:^|;\s*)session=([^;]+)/)?.[1] ?? null;
+  const token = cookie.match(/(?:^|;\s*)session=([^;]+)/)?.[1];
+  return token ? hashSessionToken(token) : null;
 }
 
 async function parseJson<T>(response: Response, expectedStatus: number): Promise<T> {

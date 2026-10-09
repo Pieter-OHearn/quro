@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import type { RegistrationPolicy } from '@quro/shared';
 
 export type ModalType = 'signin' | 'signup' | null;
 
@@ -18,6 +19,13 @@ export type SignUpFormValues = {
   retirementAge: string;
   password: string;
   confirm: string;
+  inviteCode: string;
+};
+
+export type PasswordResetFormValues = {
+  code: string;
+  nextPassword: string;
+  confirm: string;
 };
 
 export type SignInState = {
@@ -34,12 +42,24 @@ export type SignInState = {
 };
 
 export type SignUpState = {
+  /** Undefined while loading or when the policy could not be read; the server still decides. */
+  policy: RegistrationPolicy | undefined;
   form: SignUpFormValues;
   setField: (field: keyof SignUpFormValues, value: string) => void;
   showPw: boolean;
   toggleShowPw: () => void;
   showConfirm: boolean;
   toggleShowConfirm: () => void;
+  loading: boolean;
+  errors: LandingErrorMap;
+  handleSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+};
+
+export type PasswordResetState = {
+  form: PasswordResetFormValues;
+  setField: (field: keyof PasswordResetFormValues, value: string) => void;
+  showPw: boolean;
+  toggleShowPw: () => void;
   loading: boolean;
   errors: LandingErrorMap;
   handleSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;

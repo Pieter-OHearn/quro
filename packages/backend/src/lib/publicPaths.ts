@@ -4,6 +4,9 @@ export const PUBLIC_PATHS = new Set([
   '/api/auth/signup',
   '/api/auth/signout',
   '/api/auth/me',
+  '/api/auth/registration',
+  // An operator-issued, single-use recovery code identifies the account.
+  '/api/auth/password-reset',
   '/api/health',
   '/api/readiness',
   '/api/readiness/pension-import',

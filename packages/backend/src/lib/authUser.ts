@@ -12,3 +12,8 @@ export function getAuthUser(c: Context): AuthUser {
 export function getPartnerId(c: Context): number | null {
   return (c.get('partnerId') as number | null | undefined) ?? null;
 }
+
+/** Digest id of the session that authenticated this request. */
+export function getSessionId(c: Context): string {
+  return c.get('sessionId') as string;
+}

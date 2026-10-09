@@ -2,6 +2,7 @@ import { CalendarDays, Sparkles, Target } from 'lucide-react';
 import { FormField, Modal, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
 import { useSignUpState } from '../hooks';
 import type { SignUpState } from '../types';
+import { InviteCodeField, RegistrationClosedNotice } from './RegistrationNotices';
 import { SubmitButton } from './SubmitButton';
 
 type SignUpModalProps = {
@@ -151,8 +152,17 @@ function PasswordFields({
 }
 
 function SignUpFormFields({ state }: Readonly<{ state: SignUpState }>) {
+  const { policy, form, setField, errors } = state;
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {policy?.signUp === 'open' ? null : (
+        <InviteCodeField
+          policy={policy}
+          value={form.inviteCode}
+          error={errors.inviteCode}
+          onChange={(value) => setField('inviteCode', value)}
+        />
+      )}
       <NameFields {...state} />
       <EmailField {...state} />
       <AgeFields {...state} />
@@ -219,7 +229,11 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
         closeIconSize: 16,
       }}
     >
-      <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
+      {state.policy?.signUp === 'closed' ? (
+        <RegistrationClosedNotice onSwitchToSignIn={onSwitchToSignIn} />
+      ) : (
+        <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
+      )}
     </Modal>
   );
 }

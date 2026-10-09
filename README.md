@@ -30,7 +30,13 @@ Once the configuration and secrets are ready and the pinned images are available
 bun run dev:docker
 ```
 
-Then open `http://localhost:3000`.
+Then open `http://localhost:3000`. A new instance has no accounts, so create the first one with a one-time setup code:
+
+```bash
+docker compose exec backend quro user invite
+```
+
+Enter the printed code in the sign-up form. Later accounts need an invite code from the same command, and a forgotten password is reset with `quro user reset-password` instead of email. See the [security model](docs/security.md#accounts-and-registration) for registration modes and the HTTPS setup.
 
 For bunq OAuth in this mode, the callback URL is:
 
