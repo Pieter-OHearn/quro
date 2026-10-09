@@ -24,7 +24,7 @@ import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { applyRepayment, MORTGAGE_BALANCE, reverseRepayment } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate } from '../lib/netWorth';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { answerRejectedEdit, LedgerEditRejected, withLedgerWrite } from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
@@ -836,33 +836,45 @@ app.patch('/transactions/:id', async (c) => {
   const merged = mergeMortgageTransactionPayload(body.value, existing);
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const result = await db.transaction(async (tx) => {
-    // Undo the old transaction's balance effect, then apply the edited one
-    // against the freshly-restored balance.
-    const oldMortgage = await getAccessibleMortgage(user.id, partnerId, existing.mortgageId, tx);
-    if (oldMortgage) await reverseMortgageTxnEffect(tx, oldMortgage, existing);
+  const result = await answerRejectedEdit<
+    { data: typeof mortgageTransactions.$inferSelect },
+    { error: string; status: typeof HTTP_STATUS.BAD_REQUEST | typeof HTTP_STATUS.NOT_FOUND }
+  >(() =>
+    db.transaction(async (tx) => {
+      // Undo the old transaction's balance effect, then apply the edited one against the
+      // freshly-restored balance. Once the old effect is undone, a refusal must roll it back.
+      const oldMortgage = await getAccessibleMortgage(user.id, partnerId, existing.mortgageId, tx);
+      if (oldMortgage) await reverseMortgageTxnEffect(tx, oldMortgage, existing);
 
-    const mortgage = await getAccessibleMortgage(user.id, partnerId, merged.value.mortgageId, tx);
-    if (!mortgage) return { error: 'Mortgage not found', status: HTTP_STATUS.NOT_FOUND } as const;
+      const mortgage = await getAccessibleMortgage(user.id, partnerId, merged.value.mortgageId, tx);
+      if (!mortgage) {
+        throw new LedgerEditRejected({
+          error: 'Mortgage not found',
+          status: HTTP_STATUS.NOT_FOUND,
+        });
+      }
 
-    const effectError = await applyMortgageTxnEffect(tx, mortgage, merged.value);
-    if (effectError) return { error: effectError, status: HTTP_STATUS.BAD_REQUEST } as const;
+      const effectError = await applyMortgageTxnEffect(tx, mortgage, merged.value);
+      if (effectError) {
+        throw new LedgerEditRejected({ error: effectError, status: HTTP_STATUS.BAD_REQUEST });
+      }
 
-    const [updated] = await tx
-      .update(mortgageTransactions)
-      .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
-      .where(eq(mortgageTransactions.id, id))
-      .returning();
-    await withLedgerWrite(
-      tx,
-      [
-        { table: mortgages, id: existing.mortgageId, partnerId, actorId: user.id },
-        { table: mortgages, id: merged.value.mortgageId, partnerId, actorId: user.id },
-      ],
-      earliestDate(existing.date, merged.value.date),
-    );
-    return { data: updated } as const;
-  });
+      const [updated] = await tx
+        .update(mortgageTransactions)
+        .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
+        .where(eq(mortgageTransactions.id, id))
+        .returning();
+      await withLedgerWrite(
+        tx,
+        [
+          { table: mortgages, id: existing.mortgageId, partnerId, actorId: user.id },
+          { table: mortgages, id: merged.value.mortgageId, partnerId, actorId: user.id },
+        ],
+        earliestDate(existing.date, merged.value.date),
+      );
+      return { data: updated };
+    }),
+  );
   if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data });
 });
