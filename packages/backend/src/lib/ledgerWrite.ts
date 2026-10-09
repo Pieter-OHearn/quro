@@ -46,3 +46,24 @@ export async function withLedgerWrite(
       ),
     );
 }
+
+/**
+ * Thrown inside a ledger transaction to undo every statement run so far. Returning an error
+ * object from `db.transaction` commits them, which would keep an edit's reversal of the old
+ * balance effect even though the edit was refused.
+ */
+export class LedgerEditRejected<T> extends Error {
+  constructor(readonly rejection: T) {
+    super('Ledger edit rejected');
+  }
+}
+
+/** Runs a transaction and answers with the rejection when it threw `LedgerEditRejected`. */
+export async function answerRejectedEdit<T, R>(run: () => Promise<T>): Promise<T | R> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof LedgerEditRejected) return error.rejection as R;
+    throw error;
+  }
+}

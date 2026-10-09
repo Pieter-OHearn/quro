@@ -23,7 +23,7 @@ import {
 } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate } from '../lib/netWorth';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { answerRejectedEdit, LedgerEditRejected, withLedgerWrite } from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
@@ -748,48 +748,67 @@ app.patch('/property-transactions/:id', async (c) => {
   const merged = mergePropertyTransactionPayload(body.value, existing);
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const result = await db.transaction(async (tx) => {
-    // Undo the old repayment's balance effect, then apply the edited one.
-    if (existing.type === 'repayment') {
-      const oldProperty = await getAccessibleProperty(user.id, partnerId, existing.propertyId, tx);
-      if (oldProperty)
-        await reversePropertyRepaymentEffect(tx, oldProperty, existing.principal ?? 0);
-    }
+  const result = await answerRejectedEdit<
+    { data: typeof propertyTransactions.$inferSelect },
+    { error: string; status: typeof HTTP_STATUS.BAD_REQUEST | typeof HTTP_STATUS.NOT_FOUND }
+  >(() =>
+    db.transaction(async (tx) => {
+      // Undo the old repayment's balance effect, then apply the edited one. Once the old
+      // effect is undone, a refusal must roll it back.
+      if (existing.type === 'repayment') {
+        const oldProperty = await getAccessibleProperty(
+          user.id,
+          partnerId,
+          existing.propertyId,
+          tx,
+        );
+        if (oldProperty)
+          await reversePropertyRepaymentEffect(tx, oldProperty, existing.principal ?? 0);
+      }
 
-    const property = await getAccessibleProperty(user.id, partnerId, merged.value.propertyId, tx);
-    if (!property) return { error: 'Property not found', status: HTTP_STATUS.NOT_FOUND } as const;
+      const property = await getAccessibleProperty(user.id, partnerId, merged.value.propertyId, tx);
+      if (!property) {
+        throw new LedgerEditRejected({
+          error: 'Property not found',
+          status: HTTP_STATUS.NOT_FOUND,
+        });
+      }
 
-    const validationError = validatePropertyTransactionPayload(merged.value, property);
-    if (validationError)
-      return { error: validationError, status: HTTP_STATUS.BAD_REQUEST } as const;
+      const validationError = validatePropertyTransactionPayload(merged.value, property);
+      if (validationError) {
+        throw new LedgerEditRejected({ error: validationError, status: HTTP_STATUS.BAD_REQUEST });
+      }
 
-    if (merged.value.type === 'repayment') {
-      const effectError = await applyPropertyRepaymentEffect(
+      if (merged.value.type === 'repayment') {
+        const effectError = await applyPropertyRepaymentEffect(
+          tx,
+          property,
+          merged.value.principal ?? 0,
+        );
+        if (effectError) {
+          throw new LedgerEditRejected({ error: effectError, status: HTTP_STATUS.BAD_REQUEST });
+        }
+      }
+
+      const [updated] = await tx
+        .update(propertyTransactions)
+        .set({
+          ...toPropertyTransactionUpdateValues(merged.value),
+          userId: property.userId ?? user.id,
+        })
+        .where(eq(propertyTransactions.id, id))
+        .returning();
+      await withLedgerWrite(
         tx,
-        property,
-        merged.value.principal ?? 0,
+        [
+          { table: properties, id: existing.propertyId, partnerId, actorId: user.id },
+          { table: properties, id: merged.value.propertyId, partnerId, actorId: user.id },
+        ],
+        earliestDate(existing.date, merged.value.date),
       );
-      if (effectError) return { error: effectError, status: HTTP_STATUS.BAD_REQUEST } as const;
-    }
-
-    const [updated] = await tx
-      .update(propertyTransactions)
-      .set({
-        ...toPropertyTransactionUpdateValues(merged.value),
-        userId: property.userId ?? user.id,
-      })
-      .where(eq(propertyTransactions.id, id))
-      .returning();
-    await withLedgerWrite(
-      tx,
-      [
-        { table: properties, id: existing.propertyId, partnerId, actorId: user.id },
-        { table: properties, id: merged.value.propertyId, partnerId, actorId: user.id },
-      ],
-      earliestDate(existing.date, merged.value.date),
-    );
-    return { data: updated } as const;
-  });
+      return { data: updated };
+    }),
+  );
   if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data });
 });
