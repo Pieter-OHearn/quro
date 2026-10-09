@@ -62,42 +62,41 @@ wait_for_postgres() {
   return 1
 }
 
-STARTED_DOCKER_DB=0
 SKIP_DB_CHECKS=0
 
 if [ "${QRO_PRECOMMIT:-0}" = "1" ]; then
   SKIP_DB_CHECKS=1
 fi
 
-cleanup_started_postgres() {
-  if [ "$STARTED_DOCKER_DB" -eq 1 ]; then
-    docker compose stop db >/dev/null 2>&1 || true
-  fi
-}
-
+# DB-backed checks run only against an explicit, throwaway database: no localhost default
+# and no Compose service is started (see "DB-backed tests" in docs/development.md).
 ensure_postgres() {
-  if postgres_is_ready; then
-    return 0
-  fi
-
-  if [ -n "${DATABASE_URL:-}" ] && [ "$DATABASE_HOST" != "127.0.0.1" ] && [ "$DATABASE_HOST" != "localhost" ]; then
-    echo "Postgres is not reachable at $DATABASE_HOST:$DATABASE_PORT from DATABASE_URL." >&2
-    echo "Ensure the CI database service is running and reachable, then rerun ci:check." >&2
+  if [ -z "${DATABASE_URL:-}" ]; then
+    echo "DATABASE_URL is not set. Point it at a throwaway PostgreSQL before running ci:check;" >&2
+    echo "see \"DB-backed tests\" in docs/development.md." >&2
     exit 1
   fi
 
-  if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
-    echo "Postgres is not reachable at $DATABASE_HOST:$DATABASE_PORT and docker compose is unavailable." >&2
-    echo "Start Postgres manually or install Docker Desktop, then rerun ci:check." >&2
+  if ! DATABASE_TARGET=$(
+    bun --no-env-file -e "const url = new URL(process.env.DATABASE_URL);
+if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname) process.exit(1);
+process.stdout.write(\`\${url.hostname}|\${url.port || '5432'}\`);" 2>/dev/null
+  ); then
+    echo "DATABASE_URL is not a postgres:// URL with a host (value not shown)." >&2
     exit 1
   fi
+  QRO_DB_HOST=${DATABASE_TARGET%|*}
+  QRO_DB_PORT=${DATABASE_TARGET#*|}
+  export QRO_DB_HOST QRO_DB_PORT
 
-  echo "Postgres is not reachable at $DATABASE_HOST:$DATABASE_PORT. Starting docker compose service 'db'..." >&2
-  docker compose up -d db
-  STARTED_DOCKER_DB=1
+  # Keep packages/backend/.env from redirecting admin or runtime connections.
+  ADMIN_DATABASE_URL=${ADMIN_DATABASE_URL:-$DATABASE_URL}
+  APP_DATABASE_URL=${APP_DATABASE_URL:-$DATABASE_URL}
+  export ADMIN_DATABASE_URL APP_DATABASE_URL
 
   if ! wait_for_postgres; then
-    echo "Postgres did not become ready after starting docker compose service 'db'." >&2
+    echo "Postgres is not reachable at $QRO_DB_HOST:$QRO_DB_PORT from DATABASE_URL." >&2
+    echo "Start the throwaway database, then rerun ci:check." >&2
     exit 1
   fi
 }
@@ -125,20 +124,6 @@ skip_python_check() {
 }
 
 require_command bun
-
-DATABASE_TARGET=$(
-  bun -e "const connectionString = process.env.DATABASE_URL || 'postgres://quro:quro@127.0.0.1:5432/quro';
-const url = new URL(connectionString);
-const host = url.hostname || '127.0.0.1';
-const port = url.port || '5432';
-process.stdout.write(\`\${host}|\${port}\`);"
-)
-DATABASE_HOST=${DATABASE_TARGET%|*}
-DATABASE_PORT=${DATABASE_TARGET#*|}
-export QRO_DB_HOST="$DATABASE_HOST"
-export QRO_DB_PORT="$DATABASE_PORT"
-
-trap cleanup_started_postgres EXIT INT TERM
 
 if [ "${QRO_PRECOMMIT:-0}" = "1" ]; then
   require_command gitleaks

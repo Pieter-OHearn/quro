@@ -12,6 +12,7 @@ playwright-report/
 *.tsbuildinfo
 __pycache__/
 *.pyc
+.venv/
 
 # Logs
 *.log

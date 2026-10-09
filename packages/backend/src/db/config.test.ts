@@ -95,6 +95,7 @@ describe('database config', () => {
   });
 
   test('DATABASE_URL overrides host-derived config for admin URLs', () => {
+    delete process.env.ADMIN_DATABASE_URL;
     process.env.DATABASE_URL = 'postgres://shared:pw@db:5432/shared';
     process.env.POSTGRES_HOST = 'ignored-host';
     process.env.POSTGRES_ADMIN_PASSWORD_FILE = createSecretFile(
