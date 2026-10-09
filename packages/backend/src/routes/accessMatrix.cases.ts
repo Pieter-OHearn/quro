@@ -237,14 +237,15 @@ export const ACCESS_CASES: AccessCase[] = [
     kind: 'list',
     route: 'GET /api/investments/holding-price-history',
     scope: 'owner',
-    build: () => get('/api/investments/holding-price-history'),
+    build: () => get('/api/investments/holding-price-history?from=2000-01-01'),
   },
   {
     kind: 'row',
     route: 'GET /api/investments/holding-price-history',
     scope: 'owner',
     denied: 'empty',
-    build: (r) => get(`/api/investments/holding-price-history?holdingIds=${r.holding}`),
+    build: (r) =>
+      get(`/api/investments/holding-price-history?holdingIds=${r.holding}&from=2000-01-01`),
   },
   {
     kind: 'row',

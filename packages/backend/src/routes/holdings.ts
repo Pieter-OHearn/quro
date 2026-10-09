@@ -23,6 +23,7 @@ import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
 import { earliestDate } from '../lib/netWorth';
 import { withLedgerWrite } from '../lib/ledgerWrite';
+import { parseListPageQuery, readListPage, type KeysetOrder } from '../lib/listPage';
 import {
   err,
   type FieldParsers,
@@ -97,8 +98,16 @@ function parseHoldingIdsParam(value: string | null): number[] | null {
 
 type HoldingPriceHistoryQuery = {
   holdingIds: number[];
-  from: string | null;
+  from: string;
   to: string | null;
+};
+
+// (holding, day) is unique, so the holding id orders prices that share a day.
+const PRICE_HISTORY_ORDER: KeysetOrder = {
+  key: holdingPriceHistory.eodDate,
+  keyType: 'date',
+  tie: holdingPriceHistory.holdingId,
+  direction: 'asc',
 };
 
 function parseHoldingPriceHistoryQuery(input: {
@@ -111,11 +120,12 @@ function parseHoldingPriceHistoryQuery(input: {
     return { error: 'Invalid holdingIds query parameter. Use comma-separated positive integers.' };
   }
 
+  if (!input.rawFrom) return { error: 'A from date is required. Use YYYY-MM-DD format.' };
   const from = parseDateOnly(input.rawFrom);
   const to = parseDateOnly(input.rawTo);
-  if (input.rawFrom && !from) return { error: 'Invalid from date. Use YYYY-MM-DD format.' };
+  if (!from) return { error: 'Invalid from date. Use YYYY-MM-DD format.' };
   if (input.rawTo && !to) return { error: 'Invalid to date. Use YYYY-MM-DD format.' };
-  if (from && to && from > to) return { error: '`from` must be less than or equal to `to`.' };
+  if (to && from > to) return { error: '`from` must be less than or equal to `to`.' };
 
   return {
     value: {
@@ -429,7 +439,8 @@ app.get('/holdings', async (c) => {
       includeArchived
         ? eq(holdings.userId, user.id)
         : and(eq(holdings.userId, user.id), isNull(holdings.archivedAt)),
-    );
+    )
+    .orderBy(asc(holdings.id));
   return c.json({ data });
 });
 
@@ -521,18 +532,29 @@ app.get('/holding-price-history', async (c) => {
   });
   if ('error' in parsedQuery) return c.json({ error: parsedQuery.error }, HTTP_STATUS.BAD_REQUEST);
   const { holdingIds, from, to } = parsedQuery.value;
+  const pageRequest = parseListPageQuery(c.req, PRICE_HISTORY_ORDER.keyType);
+  if (!pageRequest.ok) return c.json({ error: pageRequest.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const conditions = [eq(holdingPriceHistory.userId, user.id)];
+  const conditions = [
+    eq(holdingPriceHistory.userId, user.id),
+    gte(holdingPriceHistory.eodDate, from),
+  ];
   if (holdingIds.length > 0) conditions.push(inArray(holdingPriceHistory.holdingId, holdingIds));
-  if (from) conditions.push(gte(holdingPriceHistory.eodDate, from));
   if (to) conditions.push(lte(holdingPriceHistory.eodDate, to));
 
-  const data = await db
-    .select()
-    .from(holdingPriceHistory)
-    .where(and(...conditions))
-    .orderBy(asc(holdingPriceHistory.eodDate), asc(holdingPriceHistory.holdingId));
-  return c.json({ data });
+  const page = await readListPage(
+    pageRequest.value,
+    PRICE_HISTORY_ORDER,
+    (window) =>
+      db
+        .select()
+        .from(holdingPriceHistory)
+        .where(and(...conditions, window.where))
+        .orderBy(...window.orderBy)
+        .limit(window.limit),
+    (row) => ({ key: row.eodDate, tie: row.holdingId }),
+  );
+  return c.json(page);
 });
 
 // ── Ticker Lookup ────────────────────────────────────────────────────────────

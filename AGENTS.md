@@ -64,6 +64,10 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   `packages/backend/src/lib/publicPaths.ts`. Derive ownership from the authenticated context, reject
   client ownership fields, and enforce ownership on referenced parents and writes.
   Keep core functionality usable without OCR, bank linking, GPU or AI.
+- Documents go through `getDocumentStore()` (`packages/backend/src/lib/documentStorage.ts`):
+  the filesystem by default, S3 only with `QRO_DOCUMENT_STORAGE=s3`. Keys are relative paths that
+  both drivers share; build them on the server, never from client input. See
+  [document storage](docs/document-storage.md).
 - Sessions and operator codes are stored only as SHA-256 digests
   (`packages/backend/src/lib/sessions.ts`, `packages/backend/src/lib/authCodes.ts`); never store or
   log a raw token. Instance operations are `quro` CLI commands (`packages/backend/src/cli/`), not

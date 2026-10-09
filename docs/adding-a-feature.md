@@ -601,7 +601,7 @@ Currently there are four keys in the response:
 | `ai`                     | Whether AI features are operational (derived from the pension import worker state)  |
 | `pensionStatementImport` | Whether statement import is configured and the import worker is running and healthy |
 | `bunq`                   | Whether the complete optional bunq OAuth configuration is available                 |
-| `documents`              | Whether the S3 document storage settings are complete                               |
+| `documents`              | Always enabled: documents are stored on the filesystem or in a configured S3 store  |
 
 `app.ts` mounts the routes of a capability only when it is enabled (`bunq` and `pensionImport` today), and `schedulers.ts` starts a capability's scheduler only then. A request to a disabled capability's path therefore gets the usual 404, and the core never depends on an optional service.
 

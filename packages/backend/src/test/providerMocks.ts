@@ -1,41 +1,22 @@
 import { mock } from 'bun:test';
+import { createMemoryDocumentStore } from './memoryDocumentStore';
 
 /**
- * Replaces object storage, market data and the import capability for the whole bun process so
+ * Replaces document storage, market data and the import capability for the whole bun process so
  * that routes which would call a provider run offline. Call `restore` in `afterAll`: module
  * mocks outlive the file that installs them.
  */
 export async function installProviderMocks() {
-  const s3Objects = new Map<string, Uint8Array>();
+  const documents = createMemoryDocumentStore();
   const real = {
-    s3: { ...(await import('../lib/s3')) },
+    documentStorage: { ...(await import('../lib/documentStorage')) },
     capabilities: { ...(await import('../lib/capabilities')) },
     marketData: { ...(await import('../lib/marketDataClient')) },
   };
 
-  await mock.module('../lib/s3', () => ({
-    S3ConfigurationError: class MockS3ConfigurationError extends Error {
-      constructor(message: string) {
-        super(message);
-        this.name = 'S3ConfigurationError';
-      }
-    },
-    getS3BucketName: () => 'provider-mocks-test-bucket',
-    checkS3Readiness: () => Promise.resolve(),
-    uploadS3Object: ({ key, body }: { key: string; body: Buffer }) => {
-      s3Objects.set(key, new Uint8Array(body));
-    },
-    getS3ObjectBytes: ({ key }: { key: string }) => {
-      const existing = s3Objects.get(key);
-      return existing ? Buffer.from(existing) : null;
-    },
-    deleteS3Object: ({ key }: { key: string }) => {
-      s3Objects.delete(key);
-    },
-    deleteS3Objects: (keys: readonly string[]) => {
-      for (const key of keys) s3Objects.delete(key);
-      return Promise.resolve({ deletedKeys: [...keys], failedKeys: [] });
-    },
+  await mock.module('../lib/documentStorage', () => ({
+    ...real.documentStorage,
+    getDocumentStore: () => documents.store,
   }));
 
   await mock.module('../lib/capabilities', () => {
@@ -80,10 +61,10 @@ export async function installProviderMocks() {
   }));
 
   return {
-    s3Objects,
+    storedDocuments: documents.objects,
     restore: async () => {
-      s3Objects.clear();
-      await mock.module('../lib/s3', () => real.s3);
+      documents.objects.clear();
+      await mock.module('../lib/documentStorage', () => real.documentStorage);
       await mock.module('../lib/capabilities', () => real.capabilities);
       await mock.module('../lib/marketDataClient', () => real.marketData);
     },

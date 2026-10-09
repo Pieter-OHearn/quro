@@ -36,7 +36,7 @@ beforeAll(async () => {
     marker: 's04-owner-private',
     isJoint: false,
     includeSingletons: true,
-    storeDocument: (key, bytes) => providers.s3Objects.set(key, bytes),
+    storeDocument: (key, bytes) => providers.storedDocuments.set(key, bytes),
     extraSessionId: 'a'.repeat(64),
   });
 });

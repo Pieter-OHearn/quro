@@ -6,7 +6,7 @@ import { installProviderMocks } from '../test/providerMocks';
 setDefaultTimeout(60_000);
 
 const providers = await installProviderMocks();
-const { s3Objects } = providers;
+const { storedDocuments } = providers;
 
 const { createApp } = await import('../app');
 const { clearBunqTestEnv, setBunqTestEnv } = await import('../test/bunq');
@@ -155,7 +155,7 @@ beforeAll(async () => {
   // Bank routes are mounted only while the integration is configured; the matrix covers them.
   setBunqTestEnv();
   await useFixtureCurrencyRates('access-matrix');
-  world = await createWorld((key, bytes) => s3Objects.set(key, bytes));
+  world = await createWorld((key, bytes) => storedDocuments.set(key, bytes));
 });
 
 afterAll(async () => {
@@ -469,7 +469,7 @@ async function controlRows(kind: 'private' | 'joint', fresh: boolean): Promise<R
       marker: `s04-control-${kind}-${controlCounter}`,
       isJoint: kind === 'joint',
       includeSingletons: false,
-      storeDocument: (key, bytes) => s3Objects.set(key, bytes),
+      storeDocument: (key, bytes) => storedDocuments.set(key, bytes),
       extraSessionId: hashSessionToken(sessionRow.cookie.match(/session=([^;]+)/)![1]!),
     });
   };

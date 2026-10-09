@@ -25,7 +25,18 @@ export function getClientAddress(c: Context, proxies: TrustedProxies = trustedPr
   });
 }
 
-export function createRateLimitChecker(windowMs: number, max: number) {
+/** An attempt counted against a key's budget. `refund` gives it back, once. */
+export type AttemptReservation = { refund: () => void };
+
+const UNCOUNTED_ATTEMPT: AttemptReservation = { refund: () => {} };
+
+/**
+ * A sliding-window budget of `max` attempts per key. `reserve` counts an attempt and returns it, or
+ * returns null when the key has no attempts left in the window. Reserving before the outcome is
+ * known and refunding the attempts that should not count keeps concurrent requests within the
+ * budget: each one holds its attempt while it runs.
+ */
+export function createAttemptLimiter(windowMs: number, max: number) {
   const store = new Map<string, number[]>();
 
   const cleanup = setInterval(() => {
@@ -37,18 +48,43 @@ export function createRateLimitChecker(windowMs: number, max: number) {
 
   if (cleanup.unref) cleanup.unref();
 
-  return (key: string): boolean => {
-    if (isTestEnvironment()) return false;
+  function release(key: string, stamp: number) {
+    const hits = store.get(key);
+    if (!hits) return;
+    // Attempts with the same timestamp are interchangeable, so removing any one of them is exact.
+    const index = hits.lastIndexOf(stamp);
+    if (index < 0) return;
+    hits.splice(index, 1);
+    if (hits.length === 0) store.delete(key);
+  }
 
-    const now = Date.now();
-    const hits = (store.get(key) ?? []).filter((t) => t > now - windowMs);
+  return {
+    reserve(key: string): AttemptReservation | null {
+      if (isTestEnvironment()) return UNCOUNTED_ATTEMPT;
 
-    if (hits.length >= max) return true;
+      const now = Date.now();
+      const hits = (store.get(key) ?? []).filter((t) => t > now - windowMs);
 
-    hits.push(now);
-    store.set(key, hits);
-    return false;
+      if (hits.length >= max) return null;
+
+      hits.push(now);
+      store.set(key, hits);
+
+      let refunded = false;
+      return {
+        refund: () => {
+          if (refunded) return;
+          refunded = true;
+          release(key, now);
+        },
+      };
+    },
   };
+}
+
+export function createRateLimitChecker(windowMs: number, max: number) {
+  const limiter = createAttemptLimiter(windowMs, max);
+  return (key: string): boolean => limiter.reserve(key) === null;
 }
 
 function createRateLimiter(windowMs: number, max: number) {
@@ -87,11 +123,13 @@ const PARTNER_INVITE_MAX_ATTEMPTS = 10;
 
 export const signinRateLimit = createRateLimiter(ONE_MINUTE_MS, SIGNIN_MAX_ATTEMPTS);
 export const signupRateLimit = createRateLimiter(FIFTEEN_MINUTES_MS, SIGNUP_MAX_ATTEMPTS);
-// This complements the IP limiter so rotating source addresses cannot bypass the
-// attempt budget for one account. Like the other limiters, it is per process. Trade-off: anyone
-// can burn an account's budget by failing sign-in for that email, locking the owner out until the
-// window ends. That is accepted over allowing unbounded distributed guessing.
-export const signinEmailRateLimit = createRateLimitChecker(
+// This complements the IP limiter so rotating source addresses cannot bypass the attempt budget
+// for one account. Sign-in reserves an attempt before checking the password and refunds it only
+// when the sign-in succeeds, so only failed attempts use up the budget. Like the other limiters, it
+// is per process. Trade-off: anyone can burn an account's budget by failing sign-in for that email,
+// locking the owner out until the window ends. That is accepted over allowing unbounded
+// distributed guessing.
+export const signinEmailRateLimit = createAttemptLimiter(
   FIFTEEN_MINUTES_MS,
   SIGNIN_EMAIL_MAX_ATTEMPTS,
 );

@@ -1,24 +1,19 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { createMemoryDocumentStore } from '../test/memoryDocumentStore';
 
-const objects = new Map<string, Uint8Array>();
-const realS3 = await import('./s3');
+const documents = createMemoryDocumentStore();
+const objects = documents.objects;
+const realDocumentStorage = { ...(await import('./documentStorage')) };
 
-await mock.module('./s3', () => ({
-  ...realS3,
-  uploadS3Object: ({ key, body }: { key: string; body: Buffer }) => {
-    objects.set(key, new Uint8Array(body));
-    return Promise.resolve();
-  },
-  deleteS3Object: ({ key }: { key: string }) => {
-    objects.delete(key);
-    return Promise.resolve();
-  },
+await mock.module('./documentStorage', () => ({
+  ...realDocumentStorage,
+  getDocumentStore: () => documents.store,
 }));
 
 const { replaceStoredPdfDocument } = await import('./pdfDocuments');
 
 afterAll(async () => {
-  await mock.module('./s3', () => realS3);
+  await mock.module('./documentStorage', () => realDocumentStorage);
   mock.restore();
 });
 
