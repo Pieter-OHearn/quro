@@ -13,7 +13,7 @@ import {
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, properties, propertyTransactions } from '../db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { getAuthUser, getPartnerId } from '../lib/authUser';
 import {
   applyRepayment,
@@ -526,7 +526,8 @@ app.get('/properties', async (c) => {
   const data = await db
     .select()
     .from(properties)
-    .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(properties.archivedAt)));
+    .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(properties.archivedAt)))
+    .orderBy(asc(properties.id));
   return c.json({ data: await resolvePropertyDebts(data) });
 });
 
