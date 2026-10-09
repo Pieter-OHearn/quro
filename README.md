@@ -126,7 +126,7 @@ bun run hooks:install
 - **Bugs:** [open an issue](https://github.com/Pieter-OHearn/quro/issues/new/choose). Include your Quro version and how you run it.
 - **Security problems:** report them privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
 
-Quro has a single maintainer, and replies are best effort. The most useful ways to help are clear bug reports, testing a release on your own setup, and improving the documentation. Please read the [code of conduct](CODE_OF_CONDUCT.md) first.
+Quro has a single maintainer, and replies are best effort. The most useful ways to help are clear bug reports, testing a release on your own setup, and improving the documentation.
 
 ## License
 
