@@ -111,15 +111,23 @@ export function parseMarkdown(content: string): ParsedMarkdown {
   return { prose, blocks, headings };
 }
 
+/** Removes inline HTML tags, repeating until stable so nested fragments such as `<<b>b>` go too. */
+function stripTags(text: string): string {
+  let previous: string;
+  let current = text;
+  do {
+    previous = current;
+    current = current.replace(/<[^<>]*>/g, '');
+  } while (current !== previous);
+  return current;
+}
+
 /** GitHub heading anchors: lower case, punctuation removed, spaces to hyphens, duplicates numbered. */
 export function headingSlugs(headings: readonly string[]): Set<string> {
   const counts = new Map<string, number>();
   const slugs = new Set<string>();
   for (const heading of headings) {
-    const text = heading
-      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/<[^>]+>/g, '')
-      .toLowerCase();
+    const text = stripTags(heading.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')).toLowerCase();
     const base = text.replace(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu, '').replace(/ /g, '-');
     const seen = counts.get(base) ?? 0;
     counts.set(base, seen + 1);

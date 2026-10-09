@@ -75,6 +75,13 @@ describe('headingSlugs', () => {
     expect(parsed.prose.some(({ text }) => text.startsWith('name:'))).toBe(false);
   });
 
+  test('strips inline HTML from headings, including nested fragments', () => {
+    expect([...headingSlugs(['Use <code>docs:check</code>', 'Odd <<b>b>tag'])]).toEqual([
+      'use-docscheck',
+      'odd-tag',
+    ]);
+  });
+
   test('ignores headings inside fenced code', () => {
     expect(parseMarkdown('# Real\n\n```bash\n# not a heading\n```\n').headings).toEqual(['Real']);
   });
