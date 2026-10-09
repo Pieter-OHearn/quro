@@ -113,22 +113,28 @@ describe('release.yml', () => {
   });
 
   test('publishes in a retry-safe order', () => {
-    const lastReleaseCode = Math.max(
-      ...publish.steps.flatMap((step, index) =>
-        step['working-directory'] === 'release' ? [index] : [],
-      ),
-    );
     const login = stepIndex(publish, /^docker\/login-action@/);
     const tag = stepIndex(publish, /release-gate\.ts create-tag/);
     const version = stepIndex(publish, /promote-images\.sh "\$RELEASE_VERSION"/);
     const stage = stepIndex(publish, /release-gate\.ts stage-release/);
     const latest = stepIndex(publish, /promote-images\.sh latest/);
     const published = stepIndex(publish, /release-gate\.ts publish-release/);
-    expect(lastReleaseCode).toBeLessThan(login);
     expect([login, tag, version, stage, latest, published]).toEqual(
       [login, tag, version, stage, latest, published].sort((a, b) => a - b),
     );
     expect(published).toBe(publish.steps.length - 1);
+  });
+
+  test('publishes the two core images and attaches no release assets', () => {
+    const promote = readFileSync(`${import.meta.dir}/promote-images.sh`, 'utf8');
+    for (const text of [releaseText, promote]) {
+      expect(text).not.toMatch(/auto[-_]?updat|docker\.sock|envsubst/i);
+      expect(text).not.toContain('docker-compose.release');
+    }
+    const stage = publish.steps[stepIndex(publish, /release-gate\.ts stage-release/)];
+    expect(stage.run).toBe('bun scripts/lib/release-gate.ts stage-release');
+    // Nothing is built from the release commit's files, so it is only ever read as data.
+    expect(publish.steps.filter((step) => step['working-directory'] === 'release')).toEqual([]);
   });
 
   test('moves latest only when the staged release takes it', () => {
