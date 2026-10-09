@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
-import { setBunqTestEnv } from '../test/bunq';
+import { clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 
 import {
   BUNQ_PAYMENT_PAGE_CAP,
@@ -22,14 +22,7 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  for (const name of [
-    'BUNQ_CLIENT_ID',
-    'BUNQ_CLIENT_SECRET',
-    'BUNQ_REDIRECT_URI',
-    'FRONTEND_ORIGIN',
-  ]) {
-    delete process.env[name];
-  }
+  clearBunqTestEnv();
   mock.restore();
 });
 
@@ -99,10 +92,7 @@ describe('bunqClient', () => {
 
   test('exchangeCodeForTokens surfaces oauth error_description failures', async () => {
     const { exchangeCodeForTokens } = await import('./bunqClient');
-    process.env.BUNQ_CLIENT_ID = 'client';
-    process.env.BUNQ_CLIENT_SECRET = 'secret';
-    process.env.BUNQ_REDIRECT_URI = 'https://quro.example/api/bunq/oauth/callback';
-    process.env.FRONTEND_ORIGIN = 'https://quro.example';
+    setBunqTestEnv();
     globalThis.fetch = mock(() =>
       Promise.resolve(
         jsonResponse(

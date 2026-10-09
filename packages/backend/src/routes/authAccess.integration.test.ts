@@ -5,13 +5,13 @@ import { db } from '../db/client';
 import { sessions } from '../db/schema';
 import { hashSessionToken } from '../lib/sessions';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
+import { applyTestSettings } from '../test/config';
 
 const integration = createIntegrationHelpers('auth-access.integration.quro.test');
 const originalMode = process.env.QRO_REGISTRATION_MODE;
 
 function setRegistrationMode(mode: string | undefined) {
-  if (mode === undefined) delete process.env.QRO_REGISTRATION_MODE;
-  else process.env.QRO_REGISTRATION_MODE = mode;
+  applyTestSettings({ QRO_REGISTRATION_MODE: mode });
 }
 
 function signUp(label: string, inviteCode?: string) {

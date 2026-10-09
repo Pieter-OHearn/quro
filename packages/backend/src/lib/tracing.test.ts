@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { Hono } from 'hono';
+import { loadConfig } from '../config';
 import {
   httpTracing,
   instrumentPostgres,
@@ -11,9 +12,10 @@ import {
 } from './tracing';
 
 const exporter = new InMemorySpanExporter();
+const TRACING_OFF = { enabled: false, tracesUrl: null, serviceName: 'quro-backend' };
 
 beforeAll(() => {
-  startTracing({}, new SimpleSpanProcessor(exporter));
+  startTracing(TRACING_OFF, new SimpleSpanProcessor(exporter));
 });
 
 afterAll(async () => {
@@ -50,17 +52,26 @@ function fakeClient(error?: Error): FakeClient {
 }
 
 describe('tracingEnabled', () => {
+  const tracingFor = (env: Record<string, string>) =>
+    loadConfig({ DATABASE_URL: 'postgres://u:p@h/db', ...env }).config.tracing;
+
   test('is on only with an OTLP endpoint and not disabled', () => {
-    expect(tracingEnabled({})).toBe(false);
-    expect(tracingEnabled({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318' })).toBe(true);
+    expect(tracingEnabled(tracingFor({}))).toBe(false);
     expect(
-      tracingEnabled({ OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://collector:4318/v1/traces' }),
+      tracingEnabled(tracingFor({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318' })),
     ).toBe(true);
     expect(
-      tracingEnabled({
-        OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318',
-        OTEL_SDK_DISABLED: 'true',
-      }),
+      tracingEnabled(
+        tracingFor({ OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://collector:4318/v1/traces' }),
+      ),
+    ).toBe(true);
+    expect(
+      tracingEnabled(
+        tracingFor({
+          OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318',
+          OTEL_SDK_DISABLED: 'true',
+        }),
+      ),
     ).toBe(false);
   });
 });
