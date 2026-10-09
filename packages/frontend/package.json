@@ -11,7 +11,7 @@
     "test:ui": "bun test src/components/ui/shared-ui.smoke.test.tsx"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/geist": "^5.3.0",
     "@quro/shared": "workspace:*",
     "@tanstack/react-query": "^5.67.0",
     "axios": "^1.20.0",

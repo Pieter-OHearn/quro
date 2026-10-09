@@ -1,8 +1,8 @@
-@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/geist/wght.css';
 
 body {
   font-family:
-    'Inter Variable',
+    'Geist Variable',
     system-ui,
     -apple-system,
     sans-serif;
