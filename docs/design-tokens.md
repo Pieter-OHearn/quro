@@ -2,8 +2,10 @@
 
 The V1 design values (color tokens, type, density, shape and motion) are defined in
 [V1 design](design-v1.md). Moving `theme.css` and the shared UI to them is tracked in milestone
-M6 (V1 design update) and lands on the `feature/m6-v1-design-update` branch; until a value has
-moved, `theme.css` and this page describe what the app renders today.
+M6 (V1 design update) and lands on the `feature/m6-v1-design-update` branch. `theme.css` carries
+the V1 light colour tokens, shadows and motion; dark mode, radius, type and the shared UI follow
+in later steps, and until a value has moved `theme.css` and this page describe what the app
+renders today.
 
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
@@ -18,18 +20,21 @@ the table/list patterns feature work should follow.
 
 ## Token groups
 
-| Group          | Tokens                                                                                       | Use for                                                                 |
-| -------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| **Brand**      | `brand`, `brand-hover`, `brand-disabled`, `brand-border`, `brand-soft*`, `brand-fg`          | Primary actions, selected rows, active tabs, and brand-tinted surfaces  |
-| **Surface**    | `surface`, `surface-sunken`, `surface-muted`, `surface-inverse*`                             | Page, card, table header, panel, hover, and inverse backgrounds         |
-| **Border**     | `border-subtle`, `border-default`, `border-strong`                                           | Dividers, card borders, table row borders, and control outlines         |
-| **Foreground** | `fg`, `fg-strong`, `fg-muted`, `fg-subtle`, `fg-faint`, `fg-disabled`, `fg-inverted`         | Text and icon hierarchy                                                 |
-| **Status**     | `success`, `warning`, `danger`, `info` (each with `-fg`, `-soft`, `-soft-strong`, `-border`) | Badges, alerts, validation, and positive/negative financial state       |
-| **Focus**      | `focus-ring`, `focus-ring-width`                                                             | `focus:ring-focus-ring` and visible focus outlines on interactive items |
-| **Shadow**     | `shadow-card`, `shadow-popover`, `shadow-overlay`, `shadow-brand`                            | Elevation tiers for cards, popovers, overlays, and focused brand action |
-| **Motion**     | `duration-fast` / `-base` / `-slow`, `ease-standard`, `ease-emphasized`                      | `transition-*`, `duration-*`, and easing utilities                      |
-| **Radius**     | `radius-sm`, `radius-md`, `radius-lg`, `radius-xl`                                           | Shared control, card, modal, and table-card rounding                    |
-| **Numeric**    | `font-numeric` utility class                                                                 | Money, rates, quantities, and other values that align across rows       |
+| Group          | Tokens                                                                                                | Use for                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **Brand**      | `brand`, `brand-hover`, `brand-disabled`, `brand-border`, `brand-soft*`, `brand-fg`                   | Primary actions, selected rows, active tabs, and brand-tinted surfaces  |
+| **Secondary**  | `secondary`, `secondary-soft`                                                                         | Goals, projections, and highlights; never a button or a chart series    |
+| **Surface**    | `surface`, `surface-sunken`, `surface-muted`, `surface-nav`, `surface-inverse*`, `scrim`              | Page, card, sidebar, hover, tooltip, and the layer behind dialogs       |
+| **Border**     | `border-subtle`, `border-default`, `border-control`, `border-strong`                                  | Dividers, card borders, table row borders, and control outlines         |
+| **Foreground** | `fg`, `fg-strong`, `fg-muted`, `fg-subtle`, `fg-faint`, `fg-disabled`, `fg-inverted`, `fg-on-inverse` | Text and icon hierarchy                                                 |
+| **Change**     | `gain`, `loss`, `flat` (`gain-soft`, `loss-soft`)                                                     | Amounts that went up, down, or did not change                           |
+| **Status**     | `success`, `warning`, `danger`, `info` (each with `-fg`, `-soft`, `-soft-strong`, `-border`)          | Badges, alerts, validation, and notices                                 |
+| **Chart**      | `viz-1` to `viz-6`, `chart-grid`, `chart-axis`                                                        | One colour per asset class, gridlines, and axis labels                  |
+| **Focus**      | `focus-ring`, `focus-ring-width`                                                                      | `focus:ring-focus-ring` and visible focus outlines on interactive items |
+| **Shadow**     | `shadow-card`, `shadow-popover`, `shadow-overlay`, `shadow-brand`                                     | Elevation tiers for cards, popovers, overlays, and focused brand action |
+| **Motion**     | `duration-fast` / `-base` / `-slow`, `ease-standard`, `ease-emphasized`                               | `transition-*`, `duration-*`, and easing utilities                      |
+| **Radius**     | `radius-sm`, `radius-md`, `radius-lg`, `radius-xl`                                                    | Shared control, card, modal, and table-card rounding                    |
+| **Numeric**    | `font-numeric` utility class                                                                          | Money, rates, quantities, and other values that align across rows       |
 
 ## Rules
 
@@ -41,9 +46,9 @@ the table/list patterns feature work should follow.
    and template strings, including variants and opacity modifiers.
 3. **Need a color that isn't covered?** Add a token to `theme.css` first, then
    use it. Don't reach for an ad-hoc Tailwind class.
-4. **Visual baseline:** the current Quro look is the baseline. Token values map
-   to the existing palette — they do not redesign the app. Designers can tune
-   values later in `theme.css` without code changes.
+4. **Visual baseline:** the V1 design in [design-v1.md](design-v1.md) is the
+   baseline. Token values change in `theme.css` without component code changes;
+   variable names stay stable.
 5. **Border naming:** raw variables are named `--border-*`, but Tailwind color
    utilities include the utility prefix, so use classes like
    `border-border-default` and `border-border-subtle`.
@@ -61,11 +66,18 @@ the table/list patterns feature work should follow.
 ## Extended tones and data colors
 
 The status and brand families also expose `-accent`, `-muted`, `-border-strong`,
-and `-strong` where feature surfaces need a distinct intensity. `fg-emphasis`
-retains the intermediate heading tone between `fg-strong` and `fg`.
-Named accent families (`accent-warm`, `accent-secondary`, `accent-creative`,
-`accent-highlight`, `accent-premium`, and `accent-cool`) distinguish domain badges.
-Inverse surface tokens preserve existing hero, authentication, and tooltip gradients.
+and `-strong`; the named accent families (`accent-warm`, `accent-secondary`,
+`accent-creative`, `accent-highlight`, `accent-premium`, and `accent-cool`), the
+gradient surfaces (`surface-*-end`, `surface-*-middle`), the inverse and code
+surfaces, `fg-deep` and `overlay` also remain. These are legacy aliases: each is a
+`var()` reference to a V1 token (brand tones to `brand`, `brand-hover` or
+`brand-soft`, status tones to their base or `-soft`, `overlay` to `scrim`, inverse
+surfaces to `surface-inverse`), so no screen keeps its old colour. Do not use them in
+new code; they are deleted once the screens that use them are migrated.
+
+The `--data-*` variables are display colours for the persisted `DATA_COLORS`
+identities. They point at the `--viz-*` chart colours (expense and alert at `loss`),
+so several identities share one colour until the swatch picker is redesigned.
 
 ## Adding a new token
 

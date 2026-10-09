@@ -9,7 +9,7 @@
  *
  * Prefer semantic tokens (bg-brand, text-fg-muted, border-border-subtle, etc.)
  * in shared primitives. Do not introduce raw Tailwind palette values
- * (bg-indigo-600, text-slate-500, …) when a token already covers the use case.
+ * (bg-blue-600, text-slate-500, …) when a token already covers the use case.
  *
  * Dark mode is not wired up — when it lands, add a `.dark { … }` block here
  * that overrides the same raw variables.
@@ -21,161 +21,193 @@
   --font-weight-normal: 400;
   --font-weight-medium: 500;
 
-  /* Brand (indigo). */
-  --brand: #4f46e5;
-  --brand-hover: #4338ca;
-  --brand-disabled: #818cf8;
-  --brand-border: #a5b4fc;
-  --brand-soft: #eef2ff;
-  --brand-soft-strong: #e0e7ff;
-  /* Matches brand-hover today, but names text-on-tint intent separately from interaction state. */
-  --brand-fg: #4338ca;
+  /* Brand (evergreen). */
+  --brand: #17503a;
+  --brand-hover: #0f3d2b;
+  --brand-fg: var(--brand-hover);
+  --brand-soft: #e3f0e9;
+  --brand-disabled: var(--surface-muted);
+  --brand-border: var(--border-default);
+  --brand-soft-strong: var(--brand-soft);
+
+  /* Secondary (lilac): goals, projections, highlights. */
+  --secondary: #6b4fd8;
+  --secondary-soft: #ece8fc;
 
   /* Surface (page, card, and hover backgrounds). */
   --surface: #ffffff;
-  --surface-sunken: #f8fafc;
-  --surface-muted: #f1f5f9;
-  --surface-inverse: #0a0f1e;
-  --surface-inverse-raised: #1b2550;
+  --surface-sunken: #f6f5f1;
+  --surface-muted: #eeede7;
+  --surface-nav: #fbfaf7;
+  --surface-inverse: var(--fg);
+  --surface-inverse-raised: var(--surface-inverse);
+  --scrim: #15201b66;
 
   /* Border. */
-  --border-subtle: #f1f5f9;
-  --border-default: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --border-subtle: #e9e7e0;
+  --border-default: #dad7ce;
+  --border-control: #8f8c82;
+  --border-strong: #7a8078;
 
   /* Foreground / text. */
-  --fg: #0f172a;
-  --fg-strong: #334155;
-  --fg-muted: #475569;
-  --fg-subtle: #64748b;
-  --fg-faint: #94a3b8;
-  --fg-disabled: #cbd5e1;
+  --fg: #15201b;
+  --fg-muted: #535c56;
+  --fg-subtle: #667069;
+  --fg-faint: #879089;
   --fg-inverted: #ffffff;
+  --fg-on-inverse: var(--surface-sunken);
+  --fg-strong: var(--fg);
+  --fg-emphasis: var(--fg);
+  --fg-disabled: var(--fg-faint);
 
-  /* Status — success. */
-  --success: #059669;
-  --success-fg: #047857;
-  --success-soft: #ecfdf5;
-  --success-soft-strong: #d1fae5;
-  --success-border: #a7f3d0;
+  /* Change: gain, loss, flat. */
+  --gain: #167242;
+  --gain-soft: #e1f3e8;
+  --loss: #c2372b;
+  --loss-soft: #fbe7e4;
+  --flat: var(--fg-muted);
+
+  /* Status — success (the gain colour). */
+  --success: var(--gain);
+  --success-soft: var(--gain-soft);
+  --success-fg: var(--success);
+  --success-border: var(--success);
+  --success-soft-strong: var(--success-soft);
 
   /* Status — warning. */
-  --warning: #d97706;
-  --warning-fg: #b45309;
-  --warning-soft: #fffbeb;
-  --warning-soft-strong: #fef3c7;
-  --warning-border: #fde68a;
+  --warning: #8a5300;
+  --warning-soft: #fbf0d9;
+  --warning-fg: var(--warning);
+  --warning-border: var(--warning);
+  --warning-soft-strong: var(--warning-soft);
 
-  /* Status — danger. */
-  --danger: #f43f5e;
-  --danger-fg: #be123c;
-  --danger-soft: #fff1f2;
-  --danger-soft-strong: #ffe4e6;
-  --danger-border: #fecdd3;
+  /* Status — danger (the loss colour). */
+  --danger: var(--loss);
+  --danger-soft: var(--loss-soft);
+  --danger-fg: var(--danger);
+  --danger-border: var(--danger);
+  --danger-soft-strong: var(--danger-soft);
 
   /* Status — info. */
-  --info: #0284c7;
-  --info-fg: #0369a1;
-  --info-soft: #f0f9ff;
-  --info-soft-strong: #e0f2fe;
-  --info-border: #bae6fd;
-
-  /* Extended semantic tones preserve feature contrast and category identity. */
-  --accent-cool-fg: #0e7490;
-  --accent-cool-soft: #ecfeff;
-  --accent-creative: #7c3aed;
-  --accent-creative-border: #ddd6fe;
-  --accent-creative-muted: #a78bfa;
-  --accent-creative-soft: #f5f3ff;
-  --accent-highlight: #db2777;
-  --accent-highlight-fg: #be185d;
-  --accent-highlight-soft: #fdf2f8;
-  --accent-link-accent: #3b82f6;
-  --accent-premium: #9333ea;
-  --accent-premium-accent: #a855f7;
-  --accent-premium-fg: #7e22ce;
-  --accent-premium-muted: #c084fc;
-  --accent-secondary: #0d9488;
-  --accent-secondary-border: #99f6e4;
-  --accent-secondary-fg: #0f766e;
-  --accent-secondary-soft: #f0fdfa;
-  --accent-warm: #ea580c;
-  --accent-warm-border: #fed7aa;
-  --accent-warm-fg: #c2410c;
-  --accent-warm-soft: #fff7ed;
-  --brand-accent: #6366f1;
-  --brand-deep: #312e81;
-  --brand-strong: #3730a3;
-  --brand-tint: #c7d2fe;
-  --danger-border-strong: #fda4af;
-  --danger-hover: #e11d48;
-  --danger-muted: #fb7185;
-  --danger-strong: #9f1239;
-  --data-alert: #ef4444;
-  --data-cash: #0ea5e9;
-  --data-expense: #f43f5e;
-  --data-expense-muted: #fb7185;
-  --data-forecast: #f59e0b;
-  --data-growth: #22c55e;
-  --data-income: #10b981;
-  --data-link: #3b82f6;
-  --data-liquidity: #06b6d4;
-  --data-milestone: #ec4899;
-  --data-neutral: #94a3b8;
-  --data-portfolio: #8b5cf6;
-  --data-portfolio-muted: #a78bfa;
-  --data-premium: #a855f7;
-  --data-primary: #6366f1;
-  --data-property: #f97316;
-  --data-recurring: #14b8a6;
-  --data-sun: #eab308;
-  --fg-deep: #020617;
-  --fg-emphasis: #1e293b;
-  --info-accent: #0ea5e9;
-  --info-border-strong: #7dd3fc;
-  --info-muted: #38bdf8;
-  --overlay: #000000;
-  --success-accent: #10b981;
-  --success-border-strong: #6ee7b7;
-  --success-muted: #34d399;
-  --success-strong: #065f46;
-  --surface-auth-end: #1a2550;
-  --surface-code: #0d1117;
-  --surface-code-header: #161b22;
-  --surface-debt-end: #1e0a14;
-  --surface-debt-middle: #1a0a1e;
-  --surface-footer: #060b17;
-  --surface-inverse-hover: #131825;
-  --surface-inverse-panel: #1a1f3e;
-  --surface-inverse-panel-hover: #252b50;
-  --surface-mortgage-end: #1a2040;
-  --surface-pension-end: #1a1448;
-  --surface-pension-middle: #16213e;
-  --surface-preview: #0e1729;
-  --surface-settings-end: #0f3b5f;
-  --surface-settings-middle: #172038;
-  --surface-tooltip: #0a1430;
-  --surface-welcome-end: #1e1448;
-  --warning-accent: #f59e0b;
-  --warning-border-strong: #fcd34d;
-  --warning-muted: #fbbf24;
-  --warning-strong: #92400e;
+  --info: #23618e;
+  --info-soft: #e6f0f8;
+  --info-fg: var(--info);
+  --info-border: var(--info);
+  --info-soft-strong: var(--info-soft);
 
   /* Focus ring. */
-  --focus-ring: #a5b4fc;
+  --focus-ring: var(--brand);
   --focus-ring-width: 2px;
 
+  /* Charts: one colour per asset class, plus grid and axis. */
+  --viz-1: #2e8b62;
+  --viz-2: #2f7fb8;
+  --viz-3: #b87a1a;
+  --viz-4: #b2583a;
+  --viz-5: #8e4a8a;
+  --viz-6: #8a9189;
+  --chart-grid: var(--border-subtle);
+  --chart-axis: var(--fg-subtle);
+
+  /*
+   * Legacy tones. Aliases of the tokens above so existing utilities keep compiling
+   * until the screens that use them are migrated; deleted with the other legacy aliases.
+   */
+  --accent-cool-fg: var(--info);
+  --accent-cool-soft: var(--info-soft);
+  --accent-creative: var(--secondary);
+  --accent-creative-border: var(--secondary);
+  --accent-creative-muted: var(--secondary);
+  --accent-creative-soft: var(--secondary-soft);
+  --accent-highlight: var(--secondary);
+  --accent-highlight-fg: var(--secondary);
+  --accent-highlight-soft: var(--secondary-soft);
+  --accent-link-accent: var(--info);
+  --accent-premium: var(--secondary);
+  --accent-premium-accent: var(--secondary);
+  --accent-premium-fg: var(--secondary);
+  --accent-premium-muted: var(--secondary);
+  --accent-secondary: var(--brand);
+  --accent-secondary-border: var(--brand);
+  --accent-secondary-fg: var(--brand);
+  --accent-secondary-soft: var(--brand-soft);
+  --accent-warm: var(--warning);
+  --accent-warm-border: var(--warning);
+  --accent-warm-fg: var(--warning);
+  --accent-warm-soft: var(--warning-soft);
+  --brand-accent: var(--brand);
+  --brand-deep: var(--brand-hover);
+  --brand-strong: var(--brand-hover);
+  --brand-tint: var(--brand-soft);
+  --danger-border-strong: var(--danger);
+  --danger-hover: var(--danger);
+  --danger-muted: var(--danger);
+  --danger-strong: var(--danger);
+  --fg-deep: var(--fg);
+  --info-accent: var(--info);
+  --info-border-strong: var(--info);
+  --info-muted: var(--info);
+  --overlay: var(--scrim);
+  --success-accent: var(--success);
+  --success-border-strong: var(--success);
+  --success-muted: var(--success);
+  --success-strong: var(--success);
+  --surface-auth-end: var(--surface-inverse);
+  --surface-code: var(--surface-inverse);
+  --surface-code-header: var(--surface-inverse);
+  --surface-debt-end: var(--surface-inverse);
+  --surface-debt-middle: var(--surface-inverse);
+  --surface-footer: var(--surface-inverse);
+  --surface-inverse-hover: var(--surface-inverse);
+  --surface-inverse-panel: var(--surface-inverse);
+  --surface-inverse-panel-hover: var(--surface-inverse);
+  --surface-mortgage-end: var(--surface-inverse);
+  --surface-pension-end: var(--surface-inverse);
+  --surface-pension-middle: var(--surface-inverse);
+  --surface-preview: var(--surface-inverse);
+  --surface-settings-end: var(--surface-inverse);
+  --surface-settings-middle: var(--surface-inverse);
+  --surface-tooltip: var(--surface-inverse);
+  --surface-welcome-end: var(--surface-inverse);
+  --warning-accent: var(--warning);
+  --warning-border-strong: var(--warning);
+  --warning-muted: var(--warning);
+  --warning-strong: var(--warning);
+
+  /*
+   * Display colours for the persisted DATA_COLORS identities (see lib/dataColors.ts).
+   * The stored hex values never change; only what they render as does.
+   */
+  --data-alert: var(--loss);
+  --data-cash: var(--viz-1);
+  --data-expense: var(--loss);
+  --data-expense-muted: var(--viz-4);
+  --data-forecast: var(--viz-3);
+  --data-growth: var(--viz-1);
+  --data-income: var(--viz-1);
+  --data-link: var(--viz-2);
+  --data-liquidity: var(--viz-1);
+  --data-milestone: var(--viz-5);
+  --data-neutral: var(--viz-6);
+  --data-portfolio: var(--viz-2);
+  --data-portfolio-muted: var(--viz-5);
+  --data-premium: var(--viz-2);
+  --data-primary: var(--viz-2);
+  --data-property: var(--viz-4);
+  --data-recurring: var(--viz-1);
+  --data-sun: var(--viz-3);
+
   /* Shadows. */
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-popover: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
-  --shadow-brand: 0 4px 6px -1px rgb(79 70 229 / 0.2);
+  --shadow-card: none;
+  --shadow-popover: 0 4px 12px rgb(15 20 18 / 0.12);
+  --shadow-overlay: 0 16px 40px rgb(15 20 18 / 0.2);
+  --shadow-brand: none;
 
   /* Motion. */
-  --motion-fast: 120ms;
-  --motion-base: 200ms;
+  --motion-fast: 100ms;
+  --motion-base: 160ms;
   --motion-slow: 300ms;
-  --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 
   /*
@@ -197,15 +229,20 @@
   --color-brand-soft: var(--brand-soft);
   --color-brand-soft-strong: var(--brand-soft-strong);
   --color-brand-fg: var(--brand-fg);
+  --color-secondary: var(--secondary);
+  --color-secondary-soft: var(--secondary-soft);
 
   --color-surface: var(--surface);
   --color-surface-sunken: var(--surface-sunken);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-nav: var(--surface-nav);
   --color-surface-inverse: var(--surface-inverse);
   --color-surface-inverse-raised: var(--surface-inverse-raised);
+  --color-scrim: var(--scrim);
 
   --color-border-subtle: var(--border-subtle);
   --color-border-default: var(--border-default);
+  --color-border-control: var(--border-control);
   --color-border-strong: var(--border-strong);
 
   --color-fg: var(--fg);
@@ -215,6 +252,13 @@
   --color-fg-faint: var(--fg-faint);
   --color-fg-disabled: var(--fg-disabled);
   --color-fg-inverted: var(--fg-inverted);
+  --color-fg-on-inverse: var(--fg-on-inverse);
+
+  --color-gain: var(--gain);
+  --color-gain-soft: var(--gain-soft);
+  --color-loss: var(--loss);
+  --color-loss-soft: var(--loss-soft);
+  --color-flat: var(--flat);
 
   --color-success: var(--success);
   --color-success-fg: var(--success-fg);
@@ -322,6 +366,15 @@
 
   --color-focus-ring: var(--focus-ring);
 
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
+  --color-viz-3: var(--viz-3);
+  --color-viz-4: var(--viz-4);
+  --color-viz-5: var(--viz-5);
+  --color-viz-6: var(--viz-6);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-axis: var(--chart-axis);
+
   --shadow-card: var(--shadow-card);
   --shadow-popover: var(--shadow-popover);
   --shadow-overlay: var(--shadow-overlay);
@@ -364,7 +417,7 @@
   }
 
   body {
-    @apply bg-surface text-fg;
+    @apply bg-surface-sunken text-fg;
     margin: 0;
     min-height: 100dvh;
   }
