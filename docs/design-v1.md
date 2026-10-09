@@ -4,9 +4,10 @@ This page specifies the V1 design: principles, colour tokens, type, density, sha
 content rules and the logo. It is the source of truth for the redesign. Later changes implement
 these values; they do not round or rename them.
 
-Until the migration is complete, [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
-holds the values the app renders today. See [design tokens](design-tokens.md) for how tokens become
-Tailwind utilities and the rules for using them.
+Until the migration is complete,
+[`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css) holds the
+values the app renders today. See [design tokens](design-tokens.md) for how tokens become Tailwind
+utilities and the rules for using them.
 
 ## 1. Principles
 

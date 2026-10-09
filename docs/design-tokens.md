@@ -1,9 +1,9 @@
 # Design Tokens
 
-The V1 design values (colour tokens, type, density, shape and motion) are defined in
+The V1 design values (color tokens, type, density, shape and motion) are defined in
 [V1 design](design-v1.md). Moving `theme.css` and the shared UI to them is tracked in milestone
-M6 (V1 design update); until a value has moved, `theme.css` and this page describe what the app
-renders today.
+M6 (V1 design update) and lands on the `feature/m6-v1-design-update` branch; until a value has
+moved, `theme.css` and this page describe what the app renders today.
 
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
