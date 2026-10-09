@@ -6,11 +6,11 @@ Run every `docker compose` command below from the repository checkout that holds
 
 ## What a backup contains
 
-| Data                                                             | Where it lives                  | Covered by the database backup |
-| ---------------------------------------------------------------- | ------------------------------- | ------------------------------ |
-| Accounts, balances, transactions, settings, sessions, bank links | PostgreSQL (`./data/postgres`)  | Yes                            |
-| Uploaded pension statement PDFs                                  | Object storage (`./data/minio`) | **No**                         |
-| `.env` and `secrets/*.txt`                                       | Files in your checkout          | **No**                         |
+| Data                                                             | Where it lives                    | Covered by the database backup |
+| ---------------------------------------------------------------- | --------------------------------- | ------------------------------ |
+| Accounts, balances, transactions, settings, sessions, bank links | PostgreSQL (`./data/postgres-18`) | Yes                            |
+| Uploaded pension statement PDFs                                  | Object storage (`./data/minio`)   | **No**                         |
+| `.env` and `secrets/*.txt`                                       | Files in your checkout            | **No**                         |
 
 Keep all three. A database dump restores your records but not the PDFs they point to, and it does not restore your passwords and keys.
 
@@ -30,7 +30,7 @@ The dump is written to `./backups/db/<database>-<timestamp>.dump` on the host. F
 docker compose --profile maintenance run --rm db-tools backup --label before-upgrade
 ```
 
-The file is a PostgreSQL custom-format dump. You can take a backup while the stack is running. Copy the file off the machine as well, because a backup on the same disk does not protect you from losing the disk.
+The file is a PostgreSQL custom-format dump. You can take a backup while the stack is running. The backend image ships PostgreSQL 18 client tools, and the command refuses to run, before writing anything, when its `pg_dump` is older than the database server. Installs that still run a PostgreSQL 16 database in `./data/postgres` move to 18 by following [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md). Copy the file off the machine as well, because a backup on the same disk does not protect you from losing the disk.
 
 ## Back up uploaded documents
 
@@ -90,11 +90,12 @@ A restore replaces the contents of the database with the contents of the dump.
 
 The restore command stops with an error, and changes nothing, in these cases:
 
-| Situation                                    | Message starts with                                  | What to do                                                       |
-| -------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------- |
-| `QRO_RESTORE_CONFIRM=restore-db` is not set  | `Refusing to restore the local database.`            | Set it, after checking the target and the dump.                  |
-| The database already has data                | `Refusing to restore over a non-empty database.`     | Set `QRO_RESTORE_ALLOW_NON_EMPTY=1` if that is what you intend.  |
-| Another session is connected to the database | `Refusing to restore while other database sessions…` | Stop the backend, the worker and any SQL client, then try again. |
+| Situation                                    | Message starts with                                                                            | What to do                                                                                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `QRO_RESTORE_CONFIRM=restore-db` is not set  | `Refusing to restore the local database.`                                                      | Set it, after checking the target and the dump.                                                                                            |
+| The database already has data                | `Refusing to restore over a non-empty database.`                                               | Set `QRO_RESTORE_ALLOW_NON_EMPTY=1` if that is what you intend.                                                                            |
+| Another session is connected to the database | `Refusing to restore while other database sessions…`                                           | Stop the backend, the worker and any SQL client, then try again.                                                                           |
+| The client tool is older than the server     | `pg_restore is PostgreSQL 17 but the database server is PostgreSQL 18.` (or `pg_dump`, `psql`) | Run the command from the backend image of this release, or point `QRO_PG_RESTORE_BIN` (`QRO_PG_DUMP_BIN`, `QRO_PSQL_BIN`) at a newer tool. |
 
 A dump that is truncated or damaged fails with a `pg_restore` error. A `.dump` file is restored in a single transaction (`pg_restore --single-transaction`), so a restore that fails part way is rolled back. A plain `.sql` file is not restored atomically and can leave a half-restored database, so always restore the `.dump` files that `backup` creates.
 

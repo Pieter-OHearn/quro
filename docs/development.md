@@ -68,8 +68,9 @@ In `packages/frontend/.env`, uncomment `VITE_API_URL=http://localhost:3000`. The
 
 - `ADMIN_DATABASE_URL` should point at your admin Postgres user on `127.0.0.1:5432`
 - `APP_DATABASE_URL` should point at your runtime Postgres user on `127.0.0.1:5432`
-- `S3_ENDPOINT` should point at `http://127.0.0.1:9000` only if you temporarily expose MinIO for contributor work; the public Docker path keeps it internal
-- `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` should match the MinIO bucket/app user created by `minio-init`
+- Leave the `S3_*` settings commented out unless you need document storage. Then set all of `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY_FILE`, matching the MinIO bucket and app user created by `minio-init`; `S3_ENDPOINT` should point at `http://127.0.0.1:9000` only if you temporarily expose MinIO for contributor work (the public Docker path keeps it internal). The secret is read from a file, so point `S3_SECRET_ACCESS_KEY_FILE` at `secrets/minio_app_secret_key.txt`. Setting only some of them stops the backend at startup with the full list of what is missing.
+
+The backend validates every setting once at startup (see [Configuration](architecture.md#configuration)). Names that earlier releases accepted (`DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY`) are no longer read; if one is still in your `.env`, the backend prints which setting replaces it. To run the demo seed with a password of your own, set `DEMO_USER_PASSWORD`. The test scripts set `NODE_ENV=test`, which turns off rate limiting and the background jobs.
 
 5. Start the infrastructure containers you need. The development override exposes Postgres and MinIO back to `127.0.0.1` for host-side Bun and Python processes without changing the public default compose file:
 
@@ -132,7 +133,7 @@ For Docker, the backend stays internal to the compose network and Nginx proxies 
 
 ## Optional Bunq Linking
 
-Bunq linking is optional. Quro starts without it, and the bunq start and callback endpoints return `503` while the UI shows the integration as unavailable.
+Bunq linking is optional. Quro starts without it. The bunq endpoints are not mounted and the bunq sync job does not run, and the UI shows the integration as unavailable.
 
 To enable it, set all four variables in the root `.env`:
 
@@ -143,7 +144,7 @@ BUNQ_CLIENT_SECRET=<client secret>
 BUNQ_REDIRECT_URI=http://localhost:3000/api/bunq/oauth/callback
 ```
 
-Setting any of `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET` or `BUNQ_REDIRECT_URI` without the rest stops the backend at startup. The error names the missing variables and never prints their values. There is no default for `FRONTEND_ORIGIN`.
+Setting any of `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET` or `BUNQ_REDIRECT_URI` without the rest stops the backend at startup. The error names every missing variable and never prints their values. There is no default for `FRONTEND_ORIGIN`. The client id and secret can also come from files named by `BUNQ_CLIENT_ID_FILE` and `BUNQ_CLIENT_SECRET_FILE` (defaults `/run/secrets/bunq_client_id` and `/run/secrets/bunq_client_secret`); a variable wins over its file. `BUNQ_SANDBOX=true` talks to the bunq sandbox instead of the production API.
 
 Each connect attempt is recorded on the server for the initiating user and destination. It expires after 10 minutes and works once; forged, expired and replayed callbacks are redirected to the error page without touching the stored connection.
 
@@ -229,11 +230,15 @@ demo data. The supported way is a throwaway container whose data lives in memory
 disappears when it stops. Never point these commands at the Compose `db` service, its
 `data/` directory or any database that holds real data.
 
-1. Start a throwaway PostgreSQL 16 on a free port (CI uses PostgreSQL 16):
+1. Start a throwaway PostgreSQL 18 on a free port (18 is the baseline; CI runs the suite on 16 and 18, so use
+   `postgres:16.11-alpine3.23` with `--tmpfs /var/lib/postgresql/data` to check a change against 16):
 
    ```bash
-   docker run -d --rm --name quro-test-db -e POSTGRES_PASSWORD=tmp -e POSTGRES_USER=quro -e POSTGRES_DB=quro -p 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data postgres:16.11-alpine3.23
+   docker run -d --rm --name quro-test-db -e POSTGRES_PASSWORD=tmp -e POSTGRES_USER=quro -e POSTGRES_DB=quro -p 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql postgres:18.6-alpine3.23
    ```
+
+   The 18 image keeps its cluster below `/var/lib/postgresql`; the 16 and 17 images use
+   `/var/lib/postgresql/data`.
 
 2. Export all three database URLs in the same shell. Bun loads `packages/backend/.env`
    for commands that run in that package, and the role URLs take precedence over

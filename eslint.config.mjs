@@ -131,7 +131,6 @@ export default [
             'playwright.config.ts',
             'scripts/*.ts',
             'scripts/lib/*.ts',
-            'scripts/auto-update/*.ts',
           ],
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 24,
         },
@@ -202,6 +201,31 @@ export default [
     rules: {
       'require-await': 'error',
       'unicorn/prefer-node-protocol': 'error',
+    },
+  },
+  {
+    // The configuration module is the only place that reads the environment; everything else asks
+    // for the parsed, validated `Config` (packages/backend/src/config).
+    files: ['packages/backend/src/**/*.ts'],
+    ignores: [
+      'packages/backend/src/config/**',
+      'packages/backend/src/test/**',
+      'packages/backend/src/**/*.test.ts',
+    ],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'process',
+          property: 'env',
+          message: 'Read settings through getConfig() from src/config; add new ones to its schema.',
+        },
+        {
+          object: 'Bun',
+          property: 'env',
+          message: 'Read settings through getConfig() from src/config; add new ones to its schema.',
+        },
+      ],
     },
   },
   {

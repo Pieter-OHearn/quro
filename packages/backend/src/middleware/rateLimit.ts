@@ -2,13 +2,10 @@ import { createMiddleware } from 'hono/factory';
 import { getConnInfo } from 'hono/bun';
 import type { Context } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
-import {
-  parseTrustedProxies,
-  resolveClientAddress,
-  type TrustedProxies,
-} from '../lib/clientAddress';
+import { getConfig, isTestEnvironment } from '../config';
+import { resolveClientAddress, type TrustedProxies } from '../lib/clientAddress';
 
-const trustedProxies = parseTrustedProxies(process.env.TRUSTED_PROXIES);
+const trustedProxies = getConfig().web.trustedProxies;
 
 function peerAddressOf(c: Context): string | undefined {
   try {
@@ -41,7 +38,7 @@ export function createRateLimitChecker(windowMs: number, max: number) {
   if (cleanup.unref) cleanup.unref();
 
   return (key: string): boolean => {
-    if (process.env.NODE_ENV === 'test') return false;
+    if (isTestEnvironment()) return false;
 
     const now = Date.now();
     const hits = (store.get(key) ?? []).filter((t) => t > now - windowMs);

@@ -5,7 +5,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { bunqConnections, bunqPaymentProgress } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { BUNQ_UNAVAILABLE_MESSAGE, loadBunqConfig } from '../lib/bunqConfig';
+import { BUNQ_UNAVAILABLE_MESSAGE, getBunqConfig } from '../lib/bunqConfig';
 import {
   OAUTH_ATTEMPT_TTL_MS,
   consumeOAuthAttempt,
@@ -13,6 +13,7 @@ import {
   type BunqOAuthDestination,
 } from '../lib/bunqOAuthAttempts';
 import { buildOAuthAuthorizeUrl, deleteSession, exchangeCodeForTokens } from '../lib/bunqClient';
+import { describeSyncFailure } from '../lib/syncFailure';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { secureCookiesEnabled } from '../lib/sessions';
@@ -58,7 +59,7 @@ function mergeSyncResults(
 }
 
 app.get('/oauth/start', async (c) => {
-  if (!loadBunqConfig().enabled) return unavailable(c);
+  if (!getBunqConfig().enabled) return unavailable(c);
 
   const user = getAuthUser(c);
   const destination = resolveOAuthDestination(c.req.query('returnTo'));
@@ -76,7 +77,7 @@ app.get('/oauth/start', async (c) => {
 });
 
 app.get('/oauth/callback', async (c) => {
-  const config = loadBunqConfig();
+  const config = getBunqConfig();
   if (!config.enabled) return unavailable(c);
 
   const storedState = getCookie(c, STATE_COOKIE);
@@ -204,7 +205,7 @@ app.post('/sync/savings', async (c) => {
     );
   } catch (e) {
     logBunqError('[bunq savings sync error]', e);
-    const message = e instanceof Error ? e.message : 'Bunq savings sync failed';
+    const message = describeSyncFailure(e, 'Bunq savings sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });
@@ -229,7 +230,7 @@ app.post('/sync/budget', async (c) => {
     );
   } catch (e) {
     logBunqError('[bunq budget sync error]', e);
-    const message = e instanceof Error ? e.message : 'Bunq budget sync failed';
+    const message = describeSyncFailure(e, 'Bunq budget sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });
@@ -271,7 +272,7 @@ app.post('/sync', async (c) => {
     );
   } catch (e) {
     logBunqError('[bunq sync error]', e);
-    const message = e instanceof Error ? e.message : 'Bunq sync failed';
+    const message = describeSyncFailure(e, 'Bunq sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });

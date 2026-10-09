@@ -2,6 +2,7 @@ import { findOwnedRow } from '../lib/access';
 import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
+import { getConfig } from '../config';
 import { db } from '../db/client';
 import { HTTP_STATUS } from '../constants/http';
 import {
@@ -65,7 +66,6 @@ const LIST_IMPORT_DEFAULT_STATUSES = [
   'failed',
 ] as const;
 const DEFAULT_LANGUAGE_HINTS = ['en', 'nl'];
-const IMPORT_TTL_DAYS_DEFAULT = 7;
 const IMPORT_LIST_DEFAULT_LIMIT = 30;
 const IMPORT_LIST_MAX_LIMIT = 100;
 
@@ -124,12 +124,6 @@ function parseEditableImportRowPatch(body: unknown): ParseResult<Record<string, 
   return ok(patch);
 }
 
-function parseImportTtlDays(): number {
-  const parsed = Number.parseInt(process.env.IMPORT_DRAFT_TTL_DAYS ?? '', 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return IMPORT_TTL_DAYS_DEFAULT;
-  return parsed;
-}
-
 function parseImportListLimit(value: string | undefined): number {
   if (!value) return IMPORT_LIST_DEFAULT_LIMIT;
   const parsed = Number.parseInt(value, 10);
@@ -173,7 +167,7 @@ function parseImportStatuses(
 
 function getImportExpiryDate(now = new Date()): Date {
   const expiresAt = new Date(now);
-  expiresAt.setDate(expiresAt.getDate() + parseImportTtlDays());
+  expiresAt.setDate(expiresAt.getDate() + getConfig().pensionImport.draftTtlDays);
   return expiresAt;
 }
 

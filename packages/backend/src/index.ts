@@ -1,104 +1,20 @@
-import { Hono } from 'hono';
-import { corsMiddleware } from './middleware/cors';
-import { errorHandler } from './middleware/errorHandler';
-import { requireAuth } from './middleware/auth';
-import { requireCsrf } from './middleware/csrf';
-import auth from './routes/auth';
-import savings from './routes/savings';
-import investments from './routes/investments';
-import pensions from './routes/pensions';
-import pensionImports from './routes/pension-imports';
-import mortgages from './routes/mortgages';
-import debts from './routes/debts';
-import salary from './routes/salary';
-import goals from './routes/goals';
-import budget from './routes/budget';
-import dashboard from './routes/dashboard';
-import currency from './routes/currency';
-import capabilities from './routes/capabilities';
-import settings from './routes/settings';
-import partner from './routes/partner';
-import bunq from './routes/bunq';
-import { loadBunqConfig } from './lib/bunqConfig';
-import { parseRegistrationMode } from './lib/registration';
-import { parseSecureCookies } from './lib/sessions';
+import './config/bootServer';
+import { getConfig } from './config';
+import { createApp } from './app';
 import { checkConfiguredCookieTransport } from './middleware/cookieTransport';
-import plan from './routes/plan';
-import employments from './routes/employments';
-import {
-  getCoreReadinessReport,
-  getHealthReport,
-  getPensionImportReadinessReport,
-  getReadinessStatusCode,
-} from './lib/readiness';
-import { startSessionCleanup } from './lib/sessionCleanup';
-import { startBunqSyncScheduler } from './lib/bunqSyncScheduler';
-import { startHoldingPriceSyncScheduler } from './lib/holdingPriceSyncScheduler';
-import { startCurrencyRateSyncScheduler } from './lib/currencyRateSyncScheduler';
-import { startNetWorthSnapshotScheduler } from './lib/netWorthSnapshotScheduler';
-import { schedulersDisabled } from './lib/schedulerSwitch';
-import { httpTracing } from './lib/tracing';
+import { startSchedulers } from './schedulers';
 
-// Fail fast on partial bunq configuration; unset leaves the integration disabled.
-loadBunqConfig();
-// Fail fast on auth settings a typo could weaken. Both are read again per request.
-parseSecureCookies(process.env.SECURE_COOKIES);
-parseRegistrationMode(process.env.QRO_REGISTRATION_MODE);
+const config = getConfig();
+
+// Warn when SECURE_COOKIES disagrees with the configured public origin.
 checkConfiguredCookieTransport();
 
-export const app = new Hono();
+export const app = createApp(config);
 
-app.use('*', httpTracing);
-app.use('*', corsMiddleware);
-app.use('*', requireCsrf);
-app.use('/api/*', requireAuth);
-app.onError(errorHandler);
-
-// Public routes
-app.route('/api/auth', auth);
-app.get('/api/health', (c) => c.json(getHealthReport()));
-app.get('/api/readiness', async (c) => {
-  const report = await getCoreReadinessReport();
-  return c.json(report, getReadinessStatusCode(report));
-});
-app.get('/api/readiness/pension-import', async (c) => {
-  const report = await getPensionImportReadinessReport();
-  return c.json(report, getReadinessStatusCode(report));
-});
-
-// Protected routes
-app.route('/api/savings', savings);
-app.route('/api/investments', investments);
-app.route('/api/pensions/imports', pensionImports);
-app.route('/api/pensions', pensions);
-app.route('/api/mortgages', mortgages);
-app.route('/api/debts', debts);
-app.route('/api/salary', salary);
-app.route('/api/goals', goals);
-app.route('/api/budget', budget);
-app.route('/api/dashboard', dashboard);
-app.route('/api/currency', currency);
-app.route('/api/capabilities', capabilities);
-app.route('/api/settings', settings);
-app.route('/api/partner', partner);
-app.route('/api/bunq', bunq);
-app.route('/api/plan', plan);
-app.route('/api/employments', employments);
-
-if (process.env.NODE_ENV !== 'test') {
-  if (schedulersDisabled()) {
-    console.log('[schedulers] QRO_DISABLE_SCHEDULERS is set; background jobs are off');
-  } else {
-    startSessionCleanup();
-    startBunqSyncScheduler();
-    startHoldingPriceSyncScheduler();
-    startCurrencyRateSyncScheduler();
-    startNetWorthSnapshotScheduler();
-  }
-}
+startSchedulers(config);
 
 export default {
-  port: parseInt(process.env.PORT || '3000'),
-  hostname: process.env.HOST ?? '0.0.0.0',
+  port: config.runtime.port,
+  hostname: config.runtime.host,
   fetch: app.fetch,
 };

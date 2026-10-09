@@ -1,6 +1,9 @@
 services:
   db:
-    image: postgres:16.11-alpine3.23
+    # PostgreSQL 18 keeps its cluster in a versioned directory under /var/lib/postgresql and
+    # refuses to start on data written by 16 or 17. The data lives in ./data/postgres-18, never
+    # in the ./data/postgres of earlier releases; see docs/postgresql-upgrade.md.
+    image: postgres:18.6-alpine3.23
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
@@ -9,7 +12,7 @@ services:
     secrets:
       - postgres_admin_password
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres-18:/var/lib/postgresql
     networks:
       - backend-net
     healthcheck:
@@ -70,6 +73,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      POSTGRES_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
@@ -86,9 +90,9 @@ services:
       dockerfile: packages/backend/Dockerfile
     restart: unless-stopped
     environment:
+      POSTGRES_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
-      MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
       PORT: '3000'
       SECURE_COOKIES: ${SECURE_COOKIES:-false}
       QRO_REGISTRATION_MODE: ${QRO_REGISTRATION_MODE:-invite}
@@ -96,6 +100,8 @@ services:
       S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}
+      S3_ACCESS_KEY_ID: ${MINIO_APP_USER:-quro_app}
+      S3_SECRET_ACCESS_KEY_FILE: /run/secrets/minio_app_secret_key
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
       PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-300000}
@@ -117,7 +123,6 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-    entrypoint: ['/bin/sh', '/app/docker/backend/with-runtime-env.sh']
     command: ['bun', 'run', 'start']
     networks:
       - frontend-net
@@ -130,12 +135,14 @@ services:
     profiles: ['pension-import']
     restart: unless-stopped
     environment:
+      POSTGRES_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
-      MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
       S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
       S3_REGION: ${S3_REGION:-eu-west-1}
       S3_BUCKET: ${S3_BUCKET:-quro-documents}
+      S3_ACCESS_KEY_ID: ${MINIO_APP_USER:-quro_app}
+      S3_SECRET_ACCESS_KEY_FILE: /run/secrets/minio_app_secret_key
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
       PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-300000}
@@ -153,7 +160,6 @@ services:
         condition: service_completed_successfully
       pension-parser:
         condition: service_started
-    entrypoint: ['/bin/sh', '/app/docker/backend/with-runtime-env.sh']
     command: ['bun', 'run', 'worker:pension-imports']
     networks:
       - backend-net
@@ -168,6 +174,7 @@ services:
     stdin_open: true
     tty: true
     environment:
+      POSTGRES_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}

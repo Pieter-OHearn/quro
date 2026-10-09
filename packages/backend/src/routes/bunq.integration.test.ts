@@ -5,6 +5,7 @@ import { bunqConnections, bunqOauthAttempts } from '../db/schema';
 import { consumeOAuthAttempt } from '../lib/bunqOAuthAttempts';
 import { BUNQ_TEST_ORIGIN, bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
+import { applyTestSettings } from '../test/config';
 
 const integration = createIntegrationHelpers('bunq.integration.quro.test');
 const originalFetch = globalThis.fetch;
@@ -76,10 +77,7 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  for (const name of ENV_NAMES) {
-    if (savedEnv[name] === undefined) delete process.env[name];
-    else process.env[name] = savedEnv[name];
-  }
+  applyTestSettings(savedEnv);
   if (userIds.length > 0) {
     await db.delete(bunqConnections).where(inArray(bunqConnections.userId, userIds));
   }
@@ -87,15 +85,16 @@ afterAll(async () => {
 });
 
 describe('bunq unconfigured', () => {
-  test('start and callback fail closed and capabilities explain why', async () => {
+  test('has no bunq routes and the capabilities explain why', async () => {
     const user = await newUser('unconfigured');
     clearBunqTestEnv();
     const fetchMock = mockTokenExchange();
 
+    // Nothing is mounted for an integration that is not configured.
     const start = await integration.request('/api/bunq/oauth/start', { cookie: user.cookie });
-    expect(start.status).toBe(503);
+    expect(start.status).toBe(404);
     const callbackResponse = await callback('anything');
-    expect(callbackResponse.status).toBe(503);
+    expect(callbackResponse.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(await connectionsFor(user.user.id)).toHaveLength(0);
 

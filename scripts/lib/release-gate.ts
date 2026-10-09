@@ -11,8 +11,9 @@ import { basename } from 'node:path';
 //                    and release do not block it
 //   create-tag       after the images are built: create the tag, or confirm a tag left by an
 //                    earlier run points at the same commit
-//   stage-release    replace any draft an earlier run left, upload the assets to a new draft
-//                    and decide whether this release moves latest
+//   stage-release    replace any draft an earlier run left, create a new draft, upload any
+//                    asset files named on the command line to it and decide whether this
+//                    release moves latest
 //   publish-release  publish that draft
 
 export const RELEASE_VERSION_PATTERN =
@@ -577,8 +578,6 @@ export async function stageRelease(
   assets: string[],
 ): Promise<void> {
   const { sha, version } = releaseInputs(env);
-  if (assets.length === 0)
-    throw new ReleaseGateError('stage-release needs at least one asset file');
   const notes = changelogSection(
     readFileSync(required(env, 'RELEASE_CHANGELOG_FILE'), 'utf8'),
     version,
@@ -664,7 +663,7 @@ export async function runCommand(
     else if (command === 'publish-release') await publishRelease(env, gh, out);
     else
       throw new ReleaseGateError(
-        'Usage: release-gate.ts preflight|create-tag|stage-release <asset...>|publish-release',
+        'Usage: release-gate.ts preflight|create-tag|stage-release [asset...]|publish-release',
       );
     return 0;
   } catch (error) {

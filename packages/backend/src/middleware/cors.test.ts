@@ -1,41 +1,38 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
+import { loadConfig } from '../config';
 import { createCorsMiddleware, DEFAULT_CORS_ORIGINS, resolveCorsOrigin } from './cors';
+
+function corsOriginsFor(value: string | undefined) {
+  const { config } = loadConfig({ DATABASE_URL: 'postgres://u:p@h/db', CORS_ORIGIN: value });
+  return config.web.corsOrigins;
+}
 
 describe('resolveCorsOrigin', () => {
   test('defaults to the documented Docker and Vite localhost origins', () => {
-    const originalCorsOrigin = process.env.CORS_ORIGIN;
-    delete process.env.CORS_ORIGIN;
-
-    try {
-      expect(resolveCorsOrigin()).toEqual([...DEFAULT_CORS_ORIGINS]);
-    } finally {
-      if (originalCorsOrigin === undefined) {
-        delete process.env.CORS_ORIGIN;
-      } else {
-        process.env.CORS_ORIGIN = originalCorsOrigin;
-      }
-    }
-
-    expect(resolveCorsOrigin('')).toEqual([...DEFAULT_CORS_ORIGINS]);
+    expect(resolveCorsOrigin(corsOriginsFor(undefined))).toEqual([...DEFAULT_CORS_ORIGINS]);
+    expect(resolveCorsOrigin(corsOriginsFor(''))).toEqual([...DEFAULT_CORS_ORIGINS]);
   });
 
   test('parses comma-separated origin overrides', () => {
-    expect(resolveCorsOrigin(' http://localhost:3000 , http://preview.quro.test ')).toEqual([
-      'http://localhost:3000',
-      'http://preview.quro.test',
-    ]);
+    expect(
+      resolveCorsOrigin(corsOriginsFor(' http://localhost:3000 , http://preview.quro.test ')),
+    ).toEqual(['http://localhost:3000', 'http://preview.quro.test']);
   });
 
   test('rejects wildcard overrides and falls back to defaults', () => {
-    expect(resolveCorsOrigin('*')).toEqual([...DEFAULT_CORS_ORIGINS]);
+    expect(resolveCorsOrigin(corsOriginsFor('*'))).toEqual([...DEFAULT_CORS_ORIGINS]);
+  });
+
+  test('a single origin is passed through as a string', () => {
+    expect(resolveCorsOrigin(['https://quro.example'])).toBe('https://quro.example');
   });
 });
 
 describe('createCorsMiddleware', () => {
   test('allows the Docker frontend origin through preflight requests', async () => {
     const app = new Hono();
-    app.use('*', createCorsMiddleware(''));
+    app.use('*', createCorsMiddleware(corsOriginsFor('')));
     app.get('/api/health', (c) => c.json({ status: 'ok' }));
 
     const response = await app.request('http://localhost:3000/api/health', {
@@ -53,7 +50,7 @@ describe('createCorsMiddleware', () => {
 
   test('does not allow unlisted origins', async () => {
     const app = new Hono();
-    app.use('*', createCorsMiddleware('http://localhost:3000,http://localhost:5173'));
+    app.use('*', createCorsMiddleware(['http://localhost:3000', 'http://localhost:5173']));
     app.get('/api/health', (c) => c.json({ status: 'ok' }));
 
     const response = await app.request('http://localhost:3000/api/health', {

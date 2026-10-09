@@ -1,9 +1,11 @@
 import { parseArgs } from 'node:util';
 import { resolve } from 'node:path';
+import { bootConfig } from '../config';
 import { getAdminDatabaseUrl, redactDatabaseUrl } from './config';
 import { createDatabaseBackup } from './pgTools';
 
 async function main() {
+  bootConfig('backup');
   const { values } = parseArgs({
     options: {
       label: { type: 'string' },

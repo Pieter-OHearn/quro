@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util';
+import { bootConfig } from '../config';
 import { createQueryClient } from './client';
 import { getAdminDatabaseUrl, redactDatabaseUrl } from './config';
 import {
@@ -10,13 +11,14 @@ import {
   sumTableCounts,
 } from './maintenance';
 import { createDatabaseBackup, restoreDatabaseBackup } from './pgTools';
-import { ensureRuntimeRole, getRuntimeRoleConfigFromEnv } from './runtimeRole';
+import { ensureRuntimeRole, getRuntimeRoleConfig } from './runtimeRole';
 
 type ConnectionCountRow = {
   count: number;
 };
 
 async function main() {
+  const { maintenance } = bootConfig('maintenance');
   const { positionals } = parseArgs({
     allowPositionals: true,
     options: {},
@@ -28,7 +30,12 @@ async function main() {
     throw new Error('Missing backup path. Usage: bun run db:restore -- <path-to-dump>');
   }
 
-  assertConfirmation('QRO_RESTORE_CONFIRM', 'restore-db', 'restore the local database');
+  assertConfirmation(
+    'QRO_RESTORE_CONFIRM',
+    maintenance.restoreConfirm,
+    'restore-db',
+    'restore the local database',
+  );
 
   const backupPath = await resolvePathFromCwdOrRepo(inputArgument);
   const connectionString = getAdminDatabaseUrl();
@@ -41,7 +48,7 @@ async function main() {
     logDatabaseSummary(summary, 'Pre-restore summary');
 
     const existingRows = sumTableCounts(summary.tableCounts);
-    if (existingRows > 0 && process.env.QRO_RESTORE_ALLOW_NON_EMPTY !== '1') {
+    if (existingRows > 0 && !maintenance.restoreAllowNonEmpty) {
       throw new Error(
         'Refusing to restore over a non-empty database. Set QRO_RESTORE_ALLOW_NON_EMPTY=1 after verifying the target database and latest backup.',
       );
@@ -75,7 +82,7 @@ async function main() {
   await restoreDatabaseBackup({ connectionString, inputPath: backupPath });
   console.log('Restore completed successfully.');
 
-  const runtimeRoleConfig = getRuntimeRoleConfigFromEnv();
+  const runtimeRoleConfig = getRuntimeRoleConfig();
   if (runtimeRoleConfig) {
     const grantsClient = createQueryClient(connectionString, { max: 1 });
     try {

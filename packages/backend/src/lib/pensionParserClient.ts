@@ -1,6 +1,6 @@
+import { getConfig } from '../config';
 import { toNumberOrZero } from './numbers';
 
-const DEFAULT_PARSER_TIMEOUT_MS = 300_000;
 const DEFAULT_PARSER_HEALTH_TIMEOUT_MS = 4_000;
 
 export type PensionParserEvidence = {
@@ -38,8 +38,10 @@ type ParsePensionStatementInput = {
 };
 
 function getParserBaseUrl(): string {
-  const value = process.env.PENSION_PARSER_URL?.trim();
-  return value || 'http://pension-parser:8080';
+  const { parserUrl } = getConfig().pensionImport;
+  if (parserUrl === null)
+    throw new Error('The statement parser is not configured (PENSION_PARSER_URL)');
+  return parserUrl;
 }
 
 export type ParserHealthCheckResult = {
@@ -102,8 +104,7 @@ export async function parsePensionStatement(
   input: ParsePensionStatementInput,
 ): Promise<PensionParserResult> {
   const controller = new AbortController();
-  const timeout = Number.parseInt(process.env.PENSION_PARSER_TIMEOUT_MS ?? '', 10);
-  const timeoutMs = Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_PARSER_TIMEOUT_MS;
+  const timeoutMs = getConfig().pensionImport.parserTimeoutMs;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {

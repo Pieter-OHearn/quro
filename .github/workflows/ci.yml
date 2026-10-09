@@ -64,12 +64,17 @@ jobs:
       - name: Run typecheck
         run: bun run check:typecheck
 
+  # 18 is the baseline; 16 stays a supported server until the baseline moves (D12).
   test:
-    name: Tests
+    name: Tests (PostgreSQL ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '18']
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:${{ matrix.postgres }}-alpine
         env:
           POSTGRES_USER: quro
           POSTGRES_PASSWORD: quro
@@ -96,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: quro
           POSTGRES_PASSWORD: quro
@@ -205,6 +210,39 @@ jobs:
           actual="$(docker run --rm --entrypoint bun quro-backend:ci --version)"
           echo "expected=$expected actual=$actual"
           test "$actual" = "$expected"
+      # Backup and restore refuse client tools older than the server, so the image must ship
+      # tools of the major the Compose database runs.
+      - name: Verify PostgreSQL client tools inside the image
+        if: matrix.name == 'backend'
+        run: |
+          expected="$(sed -n 's/^ *image: *postgres:\([0-9]*\)\..*/\1/p' docker-compose.yml | head -n 1)"
+          test -n "$expected"
+          for tool in pg_dump pg_restore psql; do
+            actual="$(docker run --rm --entrypoint "$tool" quro-backend:ci --version | sed -n 's/.*(PostgreSQL) \([0-9]*\).*/\1/p')"
+            echo "$tool expected=$expected actual=$actual"
+            test "$actual" = "$expected"
+          done
+
+  # Rehearses the documented PostgreSQL 16 to 18 upgrade with the image's own tools: dump on 16,
+  # restore on 18 in a new data directory, compare, and round-trip on 18. The synthetic 0.7.0
+  # fixture from O05 replaces the demo seed here when it exists.
+  pg-upgrade:
+    name: PostgreSQL Upgrade Rehearsal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          push: false
+          load: true
+          tags: quro-backend:ci
+          cache-from: type=gha,scope=backend
+      - name: Rehearse the 16 to 18 upgrade
+        run: sh scripts/rehearse-pg-upgrade.sh
 
   # ── Security ─────────────────────────────────────────────────────────────
 
@@ -244,6 +282,7 @@ jobs:
       - python-lint
       - build-worker
       - docker-build
+      - pg-upgrade
       - security
     steps:
       - uses: actions/checkout@v7

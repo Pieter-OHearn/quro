@@ -1,3 +1,4 @@
+import { bootConfig } from '../config';
 import { createQueryClient } from './client';
 import { getAdminDatabaseUrl, redactDatabaseUrl } from './config';
 import {
@@ -12,7 +13,13 @@ import {
 import { createDatabaseBackup } from './pgTools';
 
 async function main() {
-  assertConfirmation('QRO_CLEAR_CONFIRM', 'clear-all-data', 'clear local application data');
+  const { maintenance } = bootConfig('maintenance');
+  assertConfirmation(
+    'QRO_CLEAR_CONFIRM',
+    maintenance.clearConfirm,
+    'clear-all-data',
+    'clear local application data',
+  );
 
   const connectionString = getAdminDatabaseUrl();
   console.log(`Preparing clear against ${redactDatabaseUrl(connectionString)}`);
@@ -23,7 +30,7 @@ async function main() {
     logDatabaseSummary(summary, 'Pre-clear summary');
 
     const existingRows = sumTableCounts(summary.tableCounts);
-    if (existingRows > 0 && process.env.QRO_CLEAR_ALLOW_NON_EMPTY !== '1') {
+    if (existingRows > 0 && !maintenance.clearAllowNonEmpty) {
       throw new Error(
         'Refusing to clear a non-empty database. Set QRO_CLEAR_ALLOW_NON_EMPTY=1 after verifying the target database and latest backup.',
       );

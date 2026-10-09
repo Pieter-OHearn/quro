@@ -1,3 +1,4 @@
+import { describeSyncFailure } from '../lib/syncFailure';
 import { registerDeadlineCleanup, runFailureCleanup } from '../lib/workDeadline';
 import { normalizeBudgetTransactionMoney } from '../lib/budgetCurrency';
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
@@ -520,7 +521,7 @@ async function prepareBudgetPayments(
       issues.push({
         accountId: account.id,
         paymentId: String(payment.id),
-        message: error instanceof Error ? error.message : 'Budget payment import failed',
+        message: describeSyncFailure(error, 'Budget payment import failed'),
       });
     }
   }
@@ -799,7 +800,7 @@ async function importBudgetBatchIndividually(
       issues.push({
         accountId: account.id,
         paymentId: String(payment.id),
-        message: error instanceof Error ? error.message : 'Budget payment import failed',
+        message: describeSyncFailure(error, 'Budget payment import failed'),
       });
     }
   }
@@ -955,7 +956,7 @@ export async function syncBunqBudget(
       updateCursor: !skipCursorUpdate,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const message = describeSyncFailure(error, 'Unknown error');
     await runFailureCleanup(() => markSyncFailed(connection.id, message));
     throw error;
   } finally {
