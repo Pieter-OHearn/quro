@@ -38,11 +38,7 @@ All routes under `/api/*` require a valid session by default. The shared exact-p
 
 ### Session cleanup
 
-Expired sessions accumulate in the `sessions` table until cleaned up. The application does not auto-purge sessions on a schedule in the current implementation; remove them manually with:
-
-```sql
-DELETE FROM sessions WHERE expires_at < NOW();
-```
+Expired sessions are rejected at validation time and deleted by a background job that the backend starts with `startSessionCleanup()` (`src/lib/sessionCleanup.ts`). It runs every 24 hours by default; set `SESSION_CLEANUP_INTERVAL_MS` to change the interval.
 
 ## CSRF Protection
 
@@ -116,7 +112,7 @@ The sign-in email limiter stops an attacker who rotates source addresses from gu
 The Nginx frontend container sets the following response headers on all requests:
 
 **Content-Security-Policy**
-Restricts what resources the browser will load. The policy allows scripts, styles, images, fonts, and `connect` only from the same origin (`'self'`). Inline styles are allowed (`'unsafe-inline'`) because Tailwind CSS 4 generates runtime styles. `frame-ancestors 'none'` prevents the app from being embedded in any iframe.
+Restricts what resources the browser will load. The policy allows scripts, styles, fonts, and `connect` only from the same origin (`'self'`). Images may also come from `data:` URLs and `https://cdn.jsdelivr.net`. Inline styles are allowed (`'unsafe-inline'`) because Tailwind CSS 4 generates runtime styles. `frame-ancestors 'none'` prevents the app from being embedded in any iframe.
 
 **X-Frame-Options: SAMEORIGIN**
 Legacy framing control (complementary to the CSP `frame-ancestors` directive). Prevents the app from being embedded in an iframe on a different origin.

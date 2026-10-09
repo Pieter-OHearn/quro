@@ -132,6 +132,7 @@ fi
 
 run_check "Bun version" bun run check:bun-version
 run_check "Format" bun run check:format
+run_check "Docs" bun run check:docs
 run_check "Lint" bun run check:lint
 run_check "Typecheck" bun run check:typecheck
 if [ "$SKIP_DB_CHECKS" -eq 1 ]; then

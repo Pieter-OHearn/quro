@@ -3,6 +3,8 @@
 This guide walks through adding a new feature from scratch, following the exact patterns used in the existing codebase. The example used throughout is **recurring payments** — a feature that lets users track fixed recurring expenses (subscriptions, standing orders, etc.).
 
 The recurring-payments files below are illustrative, not existing source paths.
+<!-- docs:check skip-paths: packages/backend/src/routes/recurring-payments, packages/frontend/src/features/recurring-payments/ -->
+
 Follow the existing feature nearest your change and the invariants in
 [AGENTS.md](../AGENTS.md); adapt the example to the actual domain dependencies.
 
@@ -603,11 +605,12 @@ Use a capability flag when:
 export type AppCapabilities = {
   ai: AppCapabilityStatus;
   pensionStatementImport: AppCapabilityStatus;
+  bunq: AppCapabilityStatus;
   myNewFeature: AppCapabilityStatus; // add here
 };
 ```
 
-**Step 2** — Implement the capability check in `packages/backend/src/lib/capabilities.ts`. Model it on `getPensionStatementImportCapability`. Add your check function, then include the result in the object returned by `getAppCapabilities`:
+**Step 2** — Implement the capability check in `packages/backend/src/lib/capabilities.ts`. Model it on `getPensionStatementImportCapability` for a worker-backed feature, or on `getBunqCapability` for one that depends only on configuration. Add your check function, then include the result in the object returned by `getAppCapabilities`:
 
 ```ts
 export async function getAppCapabilities(now = new Date()): Promise<AppCapabilities> {
@@ -615,6 +618,7 @@ export async function getAppCapabilities(now = new Date()): Promise<AppCapabilit
   return {
     ai: toAiCapability(pensionStatementImport, now),
     pensionStatementImport,
+    bunq: getBunqCapability(now),
     myNewFeature: await getMyNewFeatureCapability(now),
   };
 }

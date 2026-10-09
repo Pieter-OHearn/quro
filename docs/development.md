@@ -62,6 +62,8 @@ cp packages/backend/.env.example packages/backend/.env
 cp packages/frontend/.env.example packages/frontend/.env
 ```
 
+In `packages/frontend/.env`, uncomment `VITE_API_URL=http://localhost:3000`. The Vite dev server has no `/api` proxy, so without it the frontend on `:5173` cannot reach the backend on `:3000`.
+
 4. Fill in `packages/backend/.env` so it matches your local Docker credentials and endpoints:
 
 - `ADMIN_DATABASE_URL` should point at your admin Postgres user on `127.0.0.1:5432`
@@ -88,7 +90,7 @@ bun run db:bootstrap-runtime-role
 bun run dev
 ```
 
-Frontend Vite defaults to same-origin `/api` in Docker-like environments. For split frontend/backend development on different origins, set `VITE_API_URL=http://localhost:3000` in `packages/frontend/.env`.
+Open `http://localhost:5173`. Leave `VITE_API_URL` unset for the Docker stack and production builds, where Nginx serves the frontend and proxies `/api` on the same origin. Leave the `BUNQ_*` variables in `packages/backend/.env` empty unless you configure all of them; a partial bunq configuration stops the backend at startup (see [optional bunq linking](#optional-bunq-linking)).
 
 ## Docker Setup
 
@@ -187,8 +189,10 @@ Repository agent guidance starts at [AGENTS.md](../AGENTS.md).
 bun run dev:doctor # prerequisites; no database, no .env files
 bun run ci:check   # full suite, Python tooling and network audits required
 bun run typecheck
+bun run docs:check # Markdown links, paths, script names and config variables; offline
 bun run test       # shared/script, backend and frontend; migrated test DB required
 bun run test:ui    # all frontend Bun tests; no browser or DB
+bun run test:smoke # Playwright browser tests; migrates and seeds the test DB
 ```
 
 The [verification table](../AGENTS.md#verification) lists every check with its
