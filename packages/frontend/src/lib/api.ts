@@ -76,6 +76,24 @@ export async function apiGet<T>(path: string, config?: AxiosRequestConfig): Prom
   return response.data.data;
 }
 
+function rowId(row: unknown): unknown {
+  return typeof row === 'object' && row !== null ? (row as { id?: unknown }).id : undefined;
+}
+
+// Pages are separate reads, so a row edited to a later position between two of them comes back
+// twice; the later copy is the current one.
+function keepLatestCopies<T>(rows: readonly T[]): T[] {
+  const lastIndex = new Map<unknown, number>();
+  rows.forEach((row, index) => {
+    const id = rowId(row);
+    if (id !== undefined) lastIndex.set(id, index);
+  });
+  return rows.filter((row, index) => {
+    const id = rowId(row);
+    return id === undefined || lastIndex.get(id) === index;
+  });
+}
+
 /**
  * Reads every page of a paged list endpoint, following `nextCursor` until the server reports
  * the last page. Each request is bounded by the server's hard cap; the caller receives the
@@ -99,7 +117,7 @@ export async function apiGetAllPages<T>(path: string, config?: AxiosRequestConfi
       seenCursors.add(cursor);
     }
   } while (cursor !== null);
-  return rows;
+  return keepLatestCopies(rows);
 }
 
 export async function apiPost<T>(

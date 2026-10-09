@@ -23,7 +23,7 @@ import {
   savingsTransactions,
 } from '../db/schema';
 import { encodeListCursor } from '../lib/listPage';
-import { createIntegrationHelpers, type AuthSession } from '../test/integration';
+import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
 
 const integration = createIntegrationHelpers('list-pagination.integration.quro.test');
 // Seeding twelve ledgers past the hard cap and one of 10k rows takes longer than the default.
@@ -781,5 +781,58 @@ describe('totals cover the whole ledger, not the visible page', () => {
     expect(new Set(ids).size).toBe(10_000);
     expect(ids.length).toBe(Number(stored!.count));
     expect(total).toBe(Number(stored!.cents));
+  });
+});
+
+describe('a partner pages through joint rows only', () => {
+  test("joint ledger rows page completely; the owner's private ledger stays hidden", async () => {
+    // Runs last: linking a partner widens what the owner's own lists contain.
+    const partner = await integration.signUp('partner');
+    await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
+    const [joint] = await db
+      .insert(savingsAccounts)
+      .values({
+        userId: owner.user.id,
+        name: 'Joint paged savings',
+        bank: 'Synthetic Bank',
+        balance: 0,
+        currency: 'EUR',
+        interestRate: 0,
+        accountType: 'Easy Access',
+        isJoint: true,
+      })
+      .returning();
+    const rows = await db
+      .insert(savingsTransactions)
+      .values(
+        range(LIST_PAGE_MAX_LIMIT + 20).map((index) => ({
+          userId: owner.user.id,
+          accountId: joint!.id,
+          type: 'deposit',
+          amount: 1,
+          date: dateFor(index),
+        })),
+      )
+      .returning();
+    const expected = expectedIds({
+      direction: 'asc',
+      rows: rows.map((row) => ({ id: row.id, key: row.date, tie: row.id })),
+    });
+
+    const byAccount = await traverse(
+      partner,
+      `/api/savings/transactions?accountId=${joint!.id}`,
+      300,
+    );
+    expect(byAccount.ids).toEqual(expected);
+    // Without a parent filter the partner sees the joint account's rows and nothing private.
+    const all = await traverse(partner, '/api/savings/transactions', 300);
+    expect(all.ids).toEqual(expected);
+
+    const privateAccount = await getPage(
+      partner,
+      `/api/savings/transactions?accountId=${owned.savingsAccountId}`,
+    );
+    expect(privateAccount.status).toBe(404);
   });
 });

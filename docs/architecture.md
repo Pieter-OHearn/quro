@@ -316,7 +316,7 @@ Each feature lives in `src/features/<feature>/` and contains:
 - `components/` — feature-specific UI components
 - `hooks/index.ts` — TanStack Query hooks: `useQuery` hooks for reads and `useMutation` hooks for writes
 
-Hooks that read a paged ledger call `apiGetAllPages` from `src/lib/api.ts`. It requests the hard cap per page and follows `nextCursor` to the last page, so totals the browser computes from a ledger still cover every row; budget transactions are windowed by month and price history by its date range.
+Hooks that read a paged ledger call `apiGetAllPages` from `src/lib/api.ts`. It requests the hard cap per page and follows `nextCursor` to the last page, so totals the browser computes from a ledger still cover every row; budget transactions are windowed by month and price history by its date range. The pages are separate reads, not one snapshot: a row edited to a later position between two pages is kept once, in its newer form, and a row written behind the cursor appears on the next refetch (a ledger mutation made in the app triggers one through its domain).
 
 Mutations use `useDomainMutation`, which invalidates the query keys declared for their domain in `src/lib/queryInvalidation.ts`. Each domain lists only the server readers it affects; for example, goals refresh only goals, while savings also refresh the dashboard and plan.
 

@@ -241,3 +241,39 @@ test('apiGetAllPages propagates a failed page instead of returning a partial led
     }),
   ).rejects.toBe(failure);
 });
+
+test('apiGetAllPages keeps the current copy of a row edited between two pages', async () => {
+  const { apiGetAllPages } = await import('./api');
+  const pages = [
+    {
+      data: [
+        { id: 1, date: '2025-01-01' },
+        { id: 2, date: '2025-01-02' },
+      ],
+      nextCursor: 'a',
+    },
+    // Row 1 moved to a later date after the first page was read.
+    {
+      data: [
+        { id: 3, date: '2025-01-03' },
+        { id: 1, date: '2025-01-04' },
+      ],
+      nextCursor: null,
+    },
+  ];
+  let call = 0;
+  const rows = await apiGetAllPages<{ id: number; date: string }>('/api/example', {
+    adapter: async (request: PagedRequest) => ({
+      data: pages[call++],
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: request,
+    }),
+  });
+  expect(rows).toEqual([
+    { id: 2, date: '2025-01-02' },
+    { id: 3, date: '2025-01-03' },
+    { id: 1, date: '2025-01-04' },
+  ]);
+});
