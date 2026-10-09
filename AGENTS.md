@@ -47,6 +47,8 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   Keep public JSON numeric and null-preserving; use shared
   `toCents`/`fromCents`/`roundMoney` where cent rounding is required. Preserve nulls,
   negative equity, native currencies and provenance; do not round rates like money.
+  Rounding points, ledger invariants and indicators: [financial invariants](docs/financial-invariants.md).
+  Edits and deletes reverse a ledger row's effect from the row locked inside their transaction.
 - Validate calendar dates as `YYYY-MM-DD` through
   `packages/backend/src/lib/requestValidation.ts`. Shared
   `todayIsoDate` is local-calendar time; `toIsoDate`/`toDateOnly` are UTC. Choose
