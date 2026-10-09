@@ -4,6 +4,7 @@ import { expect, test } from 'bun:test';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AlertTriangle, ArrowDownUp, PiggyBank, Plus } from 'lucide-react';
+import { MemoryRouter } from 'react-router';
 import { Badge } from './atoms/Badge';
 import { Button } from './atoms/Button';
 import { Card } from './atoms/Card';
@@ -28,6 +29,7 @@ import { SegmentedControl } from './molecules/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
 import { DataTable, DataTableCell, DataTableRow } from './organisms/DataTable';
 import { Modal } from './organisms/Modal';
+import { StatCard } from './organisms/StatCard';
 import { ContentSection, PageStack } from './templates';
 
 type SmokeCase = {
@@ -47,7 +49,8 @@ const smokeCases: readonly SmokeCase[] = [
         Pending
       </Badge>
     ),
-    includes: ['data-smoke="badge"', 'Pending'],
+    includes: ['data-smoke="badge"', 'Pending', 'rounded-sm'],
+    excludes: ['rounded-full'],
   },
   {
     name: 'Button renders loading state markup',
@@ -56,7 +59,7 @@ const smokeCases: readonly SmokeCase[] = [
         Save
       </Button>
     ),
-    includes: ['aria-busy="true"', 'Saving item'],
+    includes: ['aria-busy="true"', 'Saving item', 'rounded-md'],
   },
   {
     name: 'Card renders wrapper and children',
@@ -65,7 +68,30 @@ const smokeCases: readonly SmokeCase[] = [
         Card body
       </Card>
     ),
-    includes: ['data-smoke="card"', 'Card body'],
+    includes: ['data-smoke="card"', 'Card body', 'rounded-lg border border-border-subtle'],
+    excludes: ['shadow-'],
+  },
+  {
+    name: 'StatCard link renders a bordered card without a shadow',
+    element: (
+      <MemoryRouter>
+        <StatCard
+          label="Total savings"
+          value="EUR 1,250.00"
+          icon={PiggyBank}
+          color="emerald"
+          href="/savings"
+          testId="smoke-stat-card"
+        />
+      </MemoryRouter>
+    ),
+    includes: [
+      'data-testid="smoke-stat-card"',
+      'href="/savings"',
+      'rounded-lg p-5 border border-border-subtle',
+      'Total savings',
+    ],
+    excludes: ['shadow-'],
   },
   {
     name: 'Change renders a signed loss chip with a hidden arrow',
@@ -313,9 +339,11 @@ const smokeCases: readonly SmokeCase[] = [
       'data-priority="secondary"',
       'data-mobile-label="Note"',
       'max-md:hidden',
+      'max-md:rounded-lg',
       'Checking',
       'Hidden on mobile',
     ],
+    excludes: ['shadow-'],
   },
   {
     name: 'DataTable applies column cell metadata',
@@ -353,7 +381,7 @@ const smokeCases: readonly SmokeCase[] = [
       </DataTable>
     ),
     includes: ['colSpan="1"', 'p-0', 'Expanded panel'],
-    excludes: ['max-md:shadow-card'],
+    excludes: ['max-md:rounded-lg'],
   },
   {
     name: 'DataTable renders toolbar and filter slots',

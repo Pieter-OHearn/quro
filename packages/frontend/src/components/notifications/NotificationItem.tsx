@@ -68,7 +68,7 @@ function renderFooter(item: NotificationItemType) {
   if (item.status === 'queuing') {
     return (
       <div className="flex items-center gap-2">
-        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${meta.labelCls}`}>
+        <span className={`text-[10px] px-2 py-0.5 rounded-sm font-medium ${meta.labelCls}`}>
           {meta.label}
         </span>
         <div className="flex items-center gap-0.5">
@@ -89,7 +89,7 @@ function renderFooter(item: NotificationItemType) {
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 ${meta.labelCls}`}
+            className={`text-[10px] px-2 py-0.5 rounded-sm font-medium inline-flex items-center gap-1 ${meta.labelCls}`}
           >
             <Loader2 size={8} className="animate-spin" />
             {meta.label}
@@ -108,7 +108,7 @@ function renderFooter(item: NotificationItemType) {
 
   if (item.status === 'failed') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[10px] bg-danger-hover text-fg-inverted px-2.5 py-1 rounded-full font-medium">
+      <span className="inline-flex items-center gap-1.5 text-[10px] bg-danger-hover text-fg-inverted px-2.5 py-1 rounded-md font-medium">
         <AlertCircle size={9} />
         View error
         <ArrowRight size={9} />
@@ -118,7 +118,7 @@ function renderFooter(item: NotificationItemType) {
 
   if (item.status === 'reminder') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[10px] bg-warning text-fg-inverted px-2.5 py-1 rounded-full font-medium">
+      <span className="inline-flex items-center gap-1.5 text-[10px] bg-warning text-fg-inverted px-2.5 py-1 rounded-md font-medium">
         Review mortgage
         <ArrowRight size={9} />
       </span>
@@ -126,7 +126,7 @@ function renderFooter(item: NotificationItemType) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] bg-brand text-fg-inverted px-2.5 py-1 rounded-full font-medium">
+    <span className="inline-flex items-center gap-1.5 text-[10px] bg-brand text-fg-inverted px-2.5 py-1 rounded-md font-medium">
       <Sparkles size={9} />
       Review now
       <ArrowRight size={9} />
@@ -157,7 +157,7 @@ export function NotificationItem({ item, onAction, onDismiss }: Readonly<Notific
       />
 
       <div
-        className={`w-9 h-9 rounded-xl ${meta.iconBg} flex items-center justify-center flex-shrink-0 mt-0.5 border border-fg-inverted/60`}
+        className={`w-9 h-9 rounded-lg ${meta.iconBg} flex items-center justify-center flex-shrink-0 mt-0.5 border border-fg-inverted/60`}
       >
         {renderStatusIcon(item)}
       </div>
@@ -177,7 +177,7 @@ export function NotificationItem({ item, onAction, onDismiss }: Readonly<Notific
                   event.stopPropagation();
                   onDismiss(item);
                 }}
-                className="p-0.5 rounded text-fg-faint hover:text-fg-strong hover:bg-surface-muted"
+                className="p-0.5 rounded-md text-fg-faint hover:text-fg-strong hover:bg-surface-muted"
               >
                 <X size={12} />
               </button>

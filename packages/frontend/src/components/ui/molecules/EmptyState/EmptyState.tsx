@@ -103,7 +103,7 @@ export function EmptyState({
     >
       <div
         className={cn(
-          'flex items-center justify-center rounded-2xl',
+          'flex items-center justify-center rounded-lg',
           compact ? 'mb-3 h-12 w-12' : 'mb-4 h-16 w-16',
           tones.iconWrapper,
         )}

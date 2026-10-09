@@ -10,8 +10,8 @@ const VARIANT_CLASSES = {
 
 const SIZE_CLASSES = {
   sm: 'h-6 w-6 rounded-md',
-  md: 'h-8 w-8 rounded-lg',
-  lg: 'h-11 w-11 rounded-xl',
+  md: 'h-8 w-8 rounded-md',
+  lg: 'h-11 w-11 rounded-md',
 } as const;
 
 const ICON_SIZES = {

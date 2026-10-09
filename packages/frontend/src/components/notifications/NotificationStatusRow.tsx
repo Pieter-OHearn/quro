@@ -29,7 +29,7 @@ export function NotificationStatusRow({ counts }: Readonly<NotificationStatusRow
             />
             <span className="text-[10px] text-fg-subtle">{statusMeta.label}</span>
             {count > 0 && (
-              <span className="text-[9px] bg-border-default text-fg-subtle min-w-3.5 h-3.5 rounded-full px-1 inline-flex items-center justify-center font-medium">
+              <span className="text-[9px] bg-border-default text-fg-subtle min-w-3.5 h-3.5 rounded-sm px-1 inline-flex items-center justify-center font-medium">
                 {count}
               </span>
             )}

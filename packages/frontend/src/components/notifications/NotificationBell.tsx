@@ -71,7 +71,7 @@ function BellButton({
     <button
       type="button"
       onClick={onToggle}
-      className={`relative p-2 rounded-xl transition-colors ${
+      className={`relative p-2 rounded-md transition-colors ${
         open
           ? 'bg-surface-muted text-fg-strong'
           : 'hover:bg-surface-muted text-fg-subtle hover:text-fg-strong'
@@ -81,7 +81,7 @@ function BellButton({
       <Bell size={18} className={ring ? 'animate-bounce' : ''} />
 
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-danger rounded-full flex items-center justify-center text-[9px] font-bold text-fg-inverted border-2 border-fg-inverted px-0.5 tabular-nums">
+        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-danger rounded-sm flex items-center justify-center text-[9px] font-bold text-fg-inverted border-2 border-fg-inverted px-0.5 tabular-nums">
           {unreadCount > BADGE_OVERFLOW_LIMIT ? '9+' : unreadCount}
         </span>
       )}
@@ -115,7 +115,7 @@ function Dropdown({
   onRetry,
 }: Readonly<DropdownProps>) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-[360px] max-w-[92vw] bg-surface rounded-2xl border border-border-default shadow-2xl z-50 overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-[360px] max-w-[92vw] bg-surface rounded-lg border border-border-default shadow-popover z-50 overflow-hidden">
       <NotificationPanelHeader totalCount={notifications.length} isFetching={isFetching} />
       <NotificationStatusRow counts={counts} />
 

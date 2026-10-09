@@ -228,7 +228,7 @@ export function DataTableRow({
       className={cn(
         'group border-b border-border-subtle transition-colors max-md:block',
         mobileCard &&
-          'max-md:rounded-lg max-md:border max-md:border-border-subtle max-md:bg-surface max-md:p-3 max-md:shadow-card',
+          'max-md:rounded-lg max-md:border max-md:border-border-subtle max-md:bg-surface max-md:p-3',
         TABLE_VARIANT_CLASSES[tableVariant].row,
         interactive && 'cursor-pointer hover:bg-surface-sunken',
         selected && 'bg-brand-soft',
