@@ -3,10 +3,10 @@
 The V1 design values (color tokens, type, density, shape and motion) are defined in
 [V1 design](design-v1.md). Moving `theme.css` and the shared UI to them is tracked in milestone
 M6 (V1 design update) and lands on the `feature/m6-v1-design-update` branch. `theme.css` carries
-the V1 light colour tokens, type scale, shadows, motion and radius scale, and `src/components/`
-uses that radius scale without resting shadows; dark mode and the rest of the shared UI follow in
-later steps, and until a value has moved `theme.css` and this page describe what the app renders
-today.
+the V1 light and dark colour tokens, type scale, shadows, motion and radius scale, and
+`src/components/` uses that radius scale without resting shadows; the rest of the shared UI
+follows in later steps, and until a value has moved `theme.css` and this page describe what the
+app renders today.
 
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
@@ -84,18 +84,33 @@ so several identities share one colour until the swatch picker is redesigned.
 ## Adding a new token
 
 1. Add the raw variable on `:root` in `theme.css`.
-2. Map it inside the `@theme inline` block under the right namespace
+2. If its value is a colour or shadow rather than a `var()` alias, add its dark value to the
+   `.dark` block as well. Aliases are not repeated there.
+3. Map it inside the `@theme inline` block under the right namespace
    (`--color-*` for colors, `--shadow-*` for shadows, `--duration-*` /
    `--ease-*` for motion, `--radius-*` for radius) so it becomes a Tailwind
    utility.
-3. Use it from primitives and update this doc if it introduces a new group.
+4. Use it from primitives and update this doc if it introduces a new group.
 
 ## Dark mode
 
-Quro does not have a dark mode today. When it is added, override the same raw
-variables under a `.dark { … }` block in `theme.css` and toggle the class on
-the document root — every token automatically picks up the new value at
-runtime, so no component code has to change.
+Settings → Preferences → Appearance offers Light, Dark and System; System is the default and
+follows the operating system live. The choice is kept in the browser (`localStorage` key
+`quro-theme`), not in the account, so each device can differ; other open tabs follow it at once.
+
+- `theme.css` redefines every raw colour and the popover and overlay shadows in a `.dark { … }`
+  block with the "Dark" values of [V1 design](design-v1.md). Aliases (`var(--…)`) follow on their
+  own, so components use the same utilities in both themes and need no `dark:` variants.
+- The `dark` class sits on `<html>`. `packages/frontend/public/theme-init.js` sets it before the
+  first paint, so a reload never flashes the other theme; it is a same-origin file rather than an
+  inline script because the bundled nginx Content-Security-Policy allows scripts from `'self'`
+  only. After start-up `applyTheme` in `packages/frontend/src/lib/theme.ts` and the `useTheme`
+  hook keep the class and the `theme-color` meta in step. The init script and `theme.ts` share
+  their test cases in `packages/frontend/src/lib/theme.test.ts`; change both together.
+- `packages/frontend/src/styles/theme.test.ts` fails when a literal colour on `:root` has no dark
+  value or a dark value differs from the "Dark" column of [V1 design](design-v1.md).
+- Tailwind's `dark:` variant follows the class (`@custom-variant dark` in `theme.css`), not
+  `prefers-color-scheme`. Prefer a token over a `dark:` override.
 
 ## Ownership boundaries
 

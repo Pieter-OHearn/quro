@@ -7,8 +7,8 @@ Later changes implement these values; they do not round or rename them. It was r
 zero change, scrim and status tokens).
 
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css) holds the
-light colour values, shadows and motion (VD03) and radius (VD05) of this page; until the dark
-theme, type and shared UI steps land, it also holds the values the app renders today for those. See
+light and dark colour values, type scale, radius, shadows and motion of this page; until the
+shared UI and page migrations land, some components still render the values they used before. See
 [design tokens](design-tokens.md) for how tokens become Tailwind utilities and the rules for
 using them.
 
