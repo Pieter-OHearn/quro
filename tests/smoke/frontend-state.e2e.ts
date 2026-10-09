@@ -208,8 +208,9 @@ test('wide pension review keeps compact fields editable and the footer visible o
   }));
   await page.route('**/api/pensions/imports', (route) => route.fulfill({ json: { data: job } }));
   await page.route('**/api/pensions/imports/11', (route) => route.fulfill({ json: { data: job } }));
-  await page.route('**/api/pensions/imports/11/rows', (route) =>
-    route.fulfill({ json: { data: rows } }),
+  // The rows hook pages through the list, so the request carries `limit` (and `cursor`).
+  await page.route('**/api/pensions/imports/11/rows*', (route) =>
+    route.fulfill({ json: { data: rows, nextCursor: null } }),
   );
   await page.getByRole('button', { name: 'Import Annual Statement PDF' }).click();
   const dialog = page.getByRole('dialog', { name: 'Import Annual Statement' });

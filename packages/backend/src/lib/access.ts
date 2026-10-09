@@ -63,6 +63,8 @@ export async function listChildRows<T extends OwnedTable>(
     id?: number;
     parentId?: number;
     where?: SQL;
+    orderBy?: SQL[];
+    limit?: number;
     executor?: DbExecutor;
     scopeByChildOwner?: boolean;
   } = {},
@@ -76,7 +78,7 @@ export async function listChildRows<T extends OwnedTable>(
   const scopedQuery = options.scopeByChildOwner
     ? query
     : query.innerJoin(parent, eq(parentId, parent.id));
-  const rows = await scopedQuery.where(
+  const filtered = scopedQuery.where(
     and(
       options.scopeByChildOwner ? eq(table.userId, scope.userId) : accessPredicate(parent, scope),
       options.id === undefined ? undefined : eq(table.id, options.id),
@@ -84,6 +86,8 @@ export async function listChildRows<T extends OwnedTable>(
       options.where,
     ),
   );
+  const ordered = options.orderBy ? filtered.orderBy(...options.orderBy) : filtered;
+  const rows = await (options.limit === undefined ? ordered : ordered.limit(options.limit));
   return rows as T['$inferSelect'][];
 }
 

@@ -1,5 +1,5 @@
 import { findOwnedRow } from '../lib/access';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { GOAL_SOURCE_TYPES, GOAL_TYPES, type GoalSourceType, type GoalType } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
@@ -353,7 +353,11 @@ function didPatchGoalSource(patch: Partial<GoalPayload>): boolean {
 
 app.get('/', async (c) => {
   const user = getAuthUser(c);
-  const data = await db.select().from(goals).where(eq(goals.userId, user.id));
+  const data = await db
+    .select()
+    .from(goals)
+    .where(eq(goals.userId, user.id))
+    .orderBy(asc(goals.id));
   return c.json({ data });
 });
 

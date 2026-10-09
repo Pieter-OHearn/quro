@@ -1,6 +1,6 @@
 import { registerArchivableResource } from '../lib/archivableResource';
 import { findOwnedRow } from '../lib/access';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   DEBT_TYPES,
@@ -17,6 +17,7 @@ import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { applyRepayment, DEBT_BALANCE, reverseRepayment } from '../lib/balance';
 import { withLedgerWrite } from '../lib/ledgerWrite';
+import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import {
   err,
   type FieldParsers,
@@ -294,23 +295,31 @@ function deleteDebtPayment(params: {
 app.get('/payments', async (c) => {
   const user = getAuthUser(c);
   const debtIdParam = c.req.query('debtId');
-  if (!debtIdParam) {
-    const data = await db.select().from(debtPayments).where(eq(debtPayments.userId, user.id));
-    return c.json({ data });
+  const debtId = debtIdParam ? parseId(debtIdParam) : undefined;
+  if (debtId === null) return c.json({ error: 'Invalid debt id' }, HTTP_STATUS.BAD_REQUEST);
+  const pageRequest = parseListPageQuery(c.req, 'date');
+  if (!pageRequest.ok) return c.json({ error: pageRequest.error }, HTTP_STATUS.BAD_REQUEST);
+
+  let debtFilter: SQL | undefined;
+  if (debtId !== undefined) {
+    const debt = await getDebtById(db, user.id, debtId);
+    if (!debt) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
+    debtFilter = eq(debtPayments.debtId, debtId);
   }
 
-  const debtId = parseId(debtIdParam);
-  if (debtId == null) return c.json({ error: 'Invalid debt id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const debt = await getDebtById(db, user.id, debtId);
-  if (!debt) return c.json({ error: 'Debt not found' }, HTTP_STATUS.NOT_FOUND);
-
-  const data = await db
-    .select()
-    .from(debtPayments)
-    .where(and(eq(debtPayments.userId, user.id), eq(debtPayments.debtId, debtId)));
-
-  return c.json({ data });
+  const page = await readListPage(
+    pageRequest.value,
+    ledgerOrder(debtPayments),
+    (window) =>
+      db
+        .select()
+        .from(debtPayments)
+        .where(and(eq(debtPayments.userId, user.id), debtFilter, window.where))
+        .orderBy(...window.orderBy)
+        .limit(window.limit),
+    ledgerPosition,
+  );
+  return c.json(page);
 });
 
 app.post('/payments', async (c) => {
@@ -343,7 +352,8 @@ app.get('/', async (c) => {
       includeArchived
         ? eq(debts.userId, user.id)
         : and(eq(debts.userId, user.id), isNull(debts.archivedAt)),
-    );
+    )
+    .orderBy(asc(debts.id));
   return c.json({ data });
 });
 

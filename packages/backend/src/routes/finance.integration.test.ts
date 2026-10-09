@@ -442,7 +442,7 @@ describe('finance integration', () => {
     );
 
     const initialHistoryResponse = await integration.request(
-      `/api/investments/holding-price-history?holdingIds=${createHoldingBody.data.id}`,
+      `/api/investments/holding-price-history?holdingIds=${createHoldingBody.data.id}&from=2026-01-01`,
       {
         cookie: owner.cookie,
       },

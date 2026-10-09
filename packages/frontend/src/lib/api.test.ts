@@ -137,3 +137,107 @@ test('shared API error extraction handles server errors, ordinary errors and unk
     expect(resolveApiErrorMessage(error, 'Fallback')).toBe('Fallback');
   }
 });
+
+type PagedRequest = import('axios').InternalAxiosRequestConfig;
+
+function pagedAdapter(total: number, requests: Array<Record<string, unknown>>) {
+  return async (request: PagedRequest) => {
+    const params = { ...(request.params as Record<string, unknown>) };
+    requests.push(params);
+    const limit = Number(params.limit);
+    const start = params.cursor === undefined ? 0 : Number(atob(String(params.cursor)));
+    const data = Array.from({ length: Math.max(0, Math.min(limit, total - start)) }, (_, i) => ({
+      id: start + i + 1,
+      amount: (start + i) % 7,
+    }));
+    const end = start + data.length;
+    return {
+      data: { data, nextCursor: end < total ? btoa(String(end)) : null },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: request,
+    };
+  };
+}
+
+test('apiGetAllPages follows cursors through a 10k-row ledger in capped pages', async () => {
+  const { apiGetAllPages } = await import('./api');
+  const { LIST_PAGE_MAX_LIMIT } = await import('@quro/shared');
+  const requests: Array<Record<string, unknown>> = [];
+  const rows = await apiGetAllPages<{ id: number; amount: number }>('/api/savings/transactions', {
+    params: { accountId: 4 },
+    adapter: pagedAdapter(10_000, requests),
+  });
+
+  expect(rows).toHaveLength(10_000);
+  expect(rows.map((row) => row.id)).toEqual(Array.from({ length: 10_000 }, (_, i) => i + 1));
+  // Totals computed from the result cover every page, not just the first one.
+  expect(rows.reduce((sum, row) => sum + row.amount, 0)).toBe(
+    Array.from({ length: 10_000 }, (_, i) => i % 7).reduce((sum, value) => sum + value, 0),
+  );
+  expect(requests).toHaveLength(10_000 / LIST_PAGE_MAX_LIMIT);
+  expect(requests[0]).toEqual({ accountId: 4, limit: LIST_PAGE_MAX_LIMIT });
+  expect(requests.every((params) => params.accountId === 4)).toBe(true);
+  expect(requests.slice(1).every((params) => typeof params.cursor === 'string')).toBe(true);
+});
+
+test('apiGetAllPages reads an unpaged response as a single page', async () => {
+  const { apiGetAllPages } = await import('./api');
+  let calls = 0;
+  const rows = await apiGetAllPages<{ id: number }>('/api/example', {
+    adapter: async (request: PagedRequest) => {
+      calls += 1;
+      return {
+        data: { data: [{ id: 1 }] },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: request,
+      };
+    },
+  });
+  expect(rows).toEqual([{ id: 1 }]);
+  expect(calls).toBe(1);
+});
+
+test('apiGetAllPages stops instead of looping on a cursor that does not advance', async () => {
+  const { apiGetAllPages } = await import('./api');
+  let calls = 0;
+  await expect(
+    apiGetAllPages<{ id: number }>('/api/example', {
+      adapter: async (request: PagedRequest) => {
+        calls += 1;
+        return {
+          data: { data: [{ id: calls }], nextCursor: 'same' },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config: request,
+        };
+      },
+    }),
+  ).rejects.toThrow('List pagination did not advance for /api/example');
+  expect(calls).toBe(2);
+});
+
+test('apiGetAllPages propagates a failed page instead of returning a partial ledger', async () => {
+  const { apiGetAllPages } = await import('./api');
+  const failure = new Error('Network unavailable');
+  let calls = 0;
+  await expect(
+    apiGetAllPages<{ id: number }>('/api/example', {
+      adapter: async (request: PagedRequest) => {
+        calls += 1;
+        if (calls === 2) throw failure;
+        return {
+          data: { data: [{ id: calls }], nextCursor: 'next' },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config: request,
+        };
+      },
+    }),
+  ).rejects.toBe(failure);
+});

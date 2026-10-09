@@ -1,5 +1,5 @@
 import { queryKeys } from '@/lib/queryKeys';
-import { apiGet } from '@/lib/api';
+import { apiGetAllPages } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import type { PensionImportStatus, PensionStatementImportRow } from '@quro/shared';
 import { normalizePensionStatementImportRow } from '../utils/pension-api-normalizers';
@@ -12,9 +12,10 @@ export function usePensionStatementImportRows(
   return useQuery({
     queryKey: queryKeys.pensions.importRows(importId),
     enabled: Number.isInteger(importId) && (importId ?? 0) > 0,
-    queryFn: async (): Promise<PensionStatementImportRow[]> => {
-      const payload = await apiGet<ApiPensionStatementImportRow[]>(
+    queryFn: async ({ signal }): Promise<PensionStatementImportRow[]> => {
+      const payload = await apiGetAllPages<ApiPensionStatementImportRow>(
         `/api/pensions/imports/${importId}/rows`,
+        { signal },
       );
       return payload.map(normalizePensionStatementImportRow);
     },

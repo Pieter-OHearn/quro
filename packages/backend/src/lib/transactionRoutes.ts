@@ -1,10 +1,12 @@
 import type { Hono } from 'hono';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import { HTTP_STATUS } from '../constants/http';
-import { findAccessible, listChildRows, type ChildResource } from './access';
+import { findAccessible, listChildRows, type ChildResource, type OwnedTable } from './access';
 import { getAuthUser, getPartnerId } from './authUser';
+import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from './listPage';
 import { parseId } from './requestValidation';
 
-type TransactionReadOptions = ChildResource & {
+type TransactionReadOptions = ChildResource<OwnedTable & { date: PgColumn }> & {
   path: string;
   parentQuery: string;
   parentLabel: string;
@@ -27,16 +29,25 @@ export function registerTransactionReadRoutes(
     if (parentId === null) {
       return c.json({ error: `Invalid ${options.parentIdLabel} id` }, HTTP_STATUS.BAD_REQUEST);
     }
+    const pageRequest = parseListPageQuery(c.req, 'date');
+    if (!pageRequest.ok) return c.json({ error: pageRequest.error }, HTTP_STATUS.BAD_REQUEST);
     if (parentId !== undefined && options.checkParent) {
       const parent = await findAccessible(options.parent, parentId, scope);
       if (!parent)
         return c.json({ error: `${options.parentLabel} not found` }, HTTP_STATUS.NOT_FOUND);
     }
-    const data = await listChildRows(options, scope, {
-      parentId,
-      scopeByChildOwner: options.scopeByChildOwner,
-    });
-    return c.json({ data });
+    const page = await readListPage(
+      pageRequest.value,
+      ledgerOrder(options.table),
+      (window) =>
+        listChildRows(options, scope, {
+          parentId,
+          scopeByChildOwner: options.scopeByChildOwner,
+          ...window,
+        }),
+      ledgerPosition,
+    );
+    return c.json(page);
   });
   app.get(`${options.path}/:id`, async (c) => {
     const id = parseId(c.req.param('id'));
