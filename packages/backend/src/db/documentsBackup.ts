@@ -6,6 +6,8 @@ import { open, rename, rm, stat } from 'node:fs/promises';
 
 const DUMP_EXTENSION = '.dump';
 const ARCHIVE_SUFFIX = '.documents.tar';
+/** Owner read and write only: the archive holds financial documents. */
+const ARCHIVE_MODE = 0o600;
 
 /** `quro-20261009-001322.dump` → `quro-20261009-001322.documents.tar`. */
 export function documentsArchivePath(dumpPath: string): string {
@@ -41,7 +43,7 @@ export async function archiveDocumentsDirectory(
   const partialPath = `${archivePath}.partial`;
   // Created first so the archive never exists with wider permissions, even while it is written.
   await rm(partialPath, { force: true });
-  await (await open(partialPath, 'wx', 0o600)).close();
+  await (await open(partialPath, 'wx', ARCHIVE_MODE)).close();
   try {
     const processHandle = Bun.spawn([tar, '-cf', partialPath, '-C', directory, '.'], {
       stdin: 'ignore',
