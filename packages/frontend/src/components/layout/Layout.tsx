@@ -240,7 +240,7 @@ function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen, pathname 
       <div
         className={`flex items-center gap-3 px-4 py-5 border-b border-fg-inverted/10 ${collapsed ? 'justify-center' : ''}`}
       >
-        <QuroLogo size={36} showBg={false} className="flex-shrink-0" />
+        <QuroLogo size={36} className="flex-shrink-0" />
         {!collapsed && (
           <div>
             <span className="text-xl font-bold tracking-tight text-fg-inverted">Quro</span>

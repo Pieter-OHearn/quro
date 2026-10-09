@@ -15,7 +15,7 @@ export function CtaSection({ onSignUp, onSignIn }: Readonly<CtaSectionProps>) {
       </div>
       <div className="relative max-w-3xl mx-auto px-6 text-center">
         <div className="flex justify-center mb-8">
-          <QuroLogo size={64} showBg />
+          <QuroLogo size={64} />
         </div>
         <h2 className="font-black text-4xl lg:text-5xl tracking-tight mb-5">
           Take control of your{' '}

@@ -5,7 +5,7 @@ export function LandingFooter() {
     <footer className="bg-surface-footer border-t border-fg-inverted/5 py-10">
       <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
-          <QuroLogo size={24} showBg={false} />
+          <QuroLogo size={24} />
           <span className="font-bold text-fg-inverted text-sm">Quro</span>
           <span className="text-fg-muted text-sm">· Personal Finance</span>
         </div>
