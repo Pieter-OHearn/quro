@@ -1,140 +1,179 @@
 name: Release
 
+# Releases one commit that passed CI. The ref is resolved to a commit SHA once and every
+# later job uses that SHA. Images are pushed under a candidate tag before the git tag
+# exists, so a failed build leaves nothing that blocks a retry. The release logic is read
+# from this workflow's commit, not from the commit being released. See "Release Artifacts"
+# in docs/CONTRIBUTING.md.
+
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch or tag to release'
+        description: 'Branch, tag or commit SHA to release (CI must have passed on it)'
         required: true
         default: 'main'
 
-permissions:
-  contents: read
+# One release at a time, so two runs cannot race for the same tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  # Checks that must have succeeded on the exact commit, in a push or workflow_dispatch run
+  # of the CI workflow. Pull request runs test a merge commit and do not count.
+  REQUIRED_CHECKS: CI
+  CI_WORKFLOW_PATH: .github/workflows/ci.yml
 
 jobs:
-  prepare:
-    name: Prepare Tag
+  verify:
+    name: Verify Release Commit
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-    env:
-      RELEASE_REF: ${{ inputs.ref || 'main' }}
+      contents: read # check out the commit, read its tag and release
+      checks: read # read the check runs on the commit
+      actions: read # match check runs to CI workflow runs and their events
     outputs:
-      version: ${{ steps.version.outputs.value }}
-      sha: ${{ steps.commit.outputs.sha }}
+      sha: ${{ steps.preflight.outputs.sha }}
+      version: ${{ steps.preflight.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Check out the release tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_REF }}
-          fetch-depth: 0
-      - name: Capture release commit
+          persist-credentials: false
+          sparse-checkout: scripts/lib
+      - name: Check out the ref to release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          path: release
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - name: Resolve the ref to a commit
         id: commit
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Read version
-        id: version
-        run: |
-          VERSION=$(cat VERSION | tr -d ' \n')
-          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-      - name: Ensure tag is unique
-        run: |
-          if git rev-parse --verify --quiet ${{ steps.version.outputs.value }}; then
-            echo "Tag ${{ steps.version.outputs.value }} already exists" >&2
-            exit 1
-          fi
-      - name: Create git tag
-        run: |
-          git tag ${{ steps.version.outputs.value }}
-          git push origin ${{ steps.version.outputs.value }}
+        run: echo "sha=$(git -C release rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Check CI, VERSION, tag and release
+        id: preflight
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.commit.outputs.sha }}
+          RELEASE_VERSION_FILE: release/VERSION
+        run: bun scripts/lib/release-gate.ts preflight
+      - name: Check the changelog has a section for the version
+        working-directory: release
+        env:
+          RELEASE_VERSION: ${{ steps.preflight.outputs.version }}
+        run: bun scripts/read-changelog-section.ts "$RELEASE_VERSION" > /dev/null
 
   build-images:
-    name: Build & Push Images
+    name: Build Candidate Images
     runs-on: ubuntu-latest
-    needs: prepare
+    needs: verify
     permissions:
-      contents: read
-      packages: write
+      contents: read # check out the release commit
+      packages: write # push candidate images
     env:
-      VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_SHA: ${{ needs.verify.outputs.sha }}
       REGISTRY_OWNER: ${{ github.repository_owner }}
+    outputs:
+      backend: ${{ steps.build.outputs.backend }}
+      frontend: ${{ steps.build.outputs.frontend }}
+      auto-updater: ${{ steps.build.outputs.auto_updater }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.prepare.outputs.sha }}
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
       - name: Normalize registry owner
         run: |
           OWNER_LC=$(printf '%s' "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
-          {
-            echo "REGISTRY_OWNER_LC=$OWNER_LC"
-            echo "REGISTRY=ghcr.io/$OWNER_LC"
-          } >> "$GITHUB_ENV"
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4.6.0
+          echo "REGISTRY=ghcr.io/$OWNER_LC" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build backend image
+      # Candidate tags only. The publish job adds the version and latest tags to these
+      # exact digests once the git tag exists.
+      - name: Build and push candidate images
+        id: build
         run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --file packages/backend/Dockerfile \
-            --tag "$REGISTRY/quro-backend:$VERSION" \
-            --tag "$REGISTRY/quro-backend:latest" \
-            --push .
-      - name: Build frontend image
-        run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --file packages/frontend/Dockerfile \
-            --tag "$REGISTRY/quro-frontend:$VERSION" \
-            --tag "$REGISTRY/quro-frontend:latest" \
-            --push .
-      - name: Build auto-updater image
-        run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --file deploy/auto-updater/Dockerfile \
-            --tag "$REGISTRY/quro-auto-updater:$VERSION" \
-            --tag "$REGISTRY/quro-auto-updater:latest" \
-            --push .
+          build() {
+            output=$1 image=$2 dockerfile=$3
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --file "$dockerfile" \
+              --tag "$REGISTRY/$image:sha-$RELEASE_SHA" \
+              --metadata-file "$RUNNER_TEMP/$image.json" \
+              --push .
+            digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/$image.json")
+            if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "No image digest for $image" >&2
+              exit 1
+            fi
+            echo "$REGISTRY/$image@$digest"
+            echo "$output=$digest" >> "$GITHUB_OUTPUT"
+          }
+          build backend quro-backend packages/backend/Dockerfile
+          build frontend quro-frontend packages/frontend/Dockerfile
+          build auto_updater quro-auto-updater deploy/auto-updater/Dockerfile
 
-  publish-release:
-    name: Publish Release
+  publish:
+    name: Tag and Publish Release
     runs-on: ubuntu-latest
-    needs: [prepare, build-images]
+    needs: [verify, build-images]
     permissions:
-      contents: write
+      contents: write # create the tag and the release
+      packages: write # add the version and latest tags to the candidate images
     env:
-      VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_SHA: ${{ needs.verify.outputs.sha }}
+      RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+      BACKEND_DIGEST: ${{ needs.build-images.outputs.backend }}
+      FRONTEND_DIGEST: ${{ needs.build-images.outputs.frontend }}
+      AUTO_UPDATER_DIGEST: ${{ needs.build-images.outputs.auto-updater }}
       REGISTRY_OWNER: ${{ github.repository_owner }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Check out the release tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+          sparse-checkout: scripts/lib
+      - name: Check out the release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          path: release
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
       - name: Normalize registry owner
         run: |
           OWNER_LC=$(printf '%s' "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
-          {
-            echo "REGISTRY_OWNER_LC=$OWNER_LC"
-            echo "REGISTRY=ghcr.io/$OWNER_LC"
-          } >> "$GITHUB_ENV"
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
+          echo "REGISTRY=ghcr.io/$OWNER_LC" >> "$GITHUB_ENV"
+      # Prepare every asset before the tag exists, so these steps cannot strand a tag. They
+      # run code from the release commit, so they run before any credential is in reach.
       - name: Extract release notes
-        run: |
-          bun scripts/read-changelog-section.ts "$VERSION" > release-notes.md
+        working-directory: release
+        run: bun scripts/read-changelog-section.ts "$RELEASE_VERSION" > release-notes.md
       - name: Install envsubst
         run: sudo apt-get update && sudo apt-get install -y gettext-base
       - name: Generate release manifest
+        working-directory: release
         run: |
           FRONTEND_IMAGE="$REGISTRY/quro-frontend" \
           BACKEND_IMAGE="$REGISTRY/quro-backend" \
           AUTO_UPDATER_IMAGE="$REGISTRY/quro-auto-updater" \
-          VERSION="$VERSION" \
+          VERSION="$RELEASE_VERSION" \
           envsubst < deploy/docker-compose.release.template.yml > docker-compose.release.yml
       - name: Build auto-update bundle
+        working-directory: release
         run: |
           bun build scripts/auto-update/fetch-release.ts \
             --outfile scripts/auto-update/fetch-release.js \
@@ -150,13 +189,33 @@ jobs:
           cp docs/device-auto-update.md "$BUNDLE_DIR/README.md"
           cp .env.example "$BUNDLE_DIR/.env.template"
           cp secrets/*.example "$BUNDLE_DIR/secrets/" || true
-          tar -czf "auto-update-bundle-${VERSION}.tar.gz" -C "$BUNDLE_DIR" .
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v3
+          tar -czf "auto-update-bundle-${RELEASE_VERSION}.tar.gz" -C "$BUNDLE_DIR" .
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
-          tag_name: ${{ env.VERSION }}
-          name: ${{ env.VERSION }}
-          body_path: release-notes.md
-          files: |
-            docker-compose.release.yml
-            auto-update-bundle-${{ env.VERSION }}.tar.gz
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create the git tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun scripts/lib/release-gate.ts create-tag
+      - name: Tag the candidate images with the version
+        run: sh scripts/lib/promote-images.sh "$RELEASE_VERSION"
+      - name: Stage the draft release
+        id: draft
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_NOTES_FILE: release/release-notes.md
+        run: |
+          bun scripts/lib/release-gate.ts stage-release \
+            release/docker-compose.release.yml \
+            "release/auto-update-bundle-${RELEASE_VERSION}.tar.gz"
+      # latest moves only once the draft holds every asset; publishing is the last step.
+      - name: Move latest to the release images
+        run: sh scripts/lib/promote-images.sh latest
+      - name: Publish the release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.draft.outputs.release_id }}
+        run: bun scripts/lib/release-gate.ts publish-release
