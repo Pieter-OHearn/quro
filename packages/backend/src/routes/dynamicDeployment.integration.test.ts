@@ -272,6 +272,120 @@ describe('brute-force limits', () => {
   });
 });
 
+describe('per-account sign-in budget', () => {
+  // Each request comes from its own forwarded address (the benchmarking range, unused elsewhere in
+  // this file), so the per-address limiter stays out of the way unless a test pins the address.
+  let nextAddress = 0;
+  function freshAddress() {
+    nextAddress += 1;
+    return `198.18.${Math.floor(nextAddress / 250)}.${(nextAddress % 250) + 1}`;
+  }
+
+  async function signInStatuses(email: string, passwords: string[]): Promise<number[]> {
+    const statuses: number[] = [];
+    for (const password of passwords) {
+      const response = await signIn(behindProxy, email, password, { 'X-Real-IP': freshAddress() });
+      statuses.push(response.status);
+    }
+    return statuses;
+  }
+
+  const WRONG = 'wrong-password';
+  const RIGHT = integrationPassword;
+
+  test('successful sign-ins do not use up the budget for failed ones', async () => {
+    const user = await signUp(behindProxy, 'budget-successes');
+    expect(await signInStatuses(user.email, Array(6).fill(RIGHT))).toEqual(Array(6).fill(200));
+    // The whole budget of five failures is still there.
+    expect(await signInStatuses(user.email, Array(5).fill(WRONG))).toEqual(Array(5).fill(401));
+    expect(await signInStatuses(user.email, [WRONG, RIGHT])).toEqual([429, 429]);
+  });
+
+  test('five failures block a sixth attempt, wrong or right', async () => {
+    for (const sixth of [WRONG, RIGHT]) {
+      const user = await signUp(behindProxy, `budget-sixth-${sixth === RIGHT ? 'right' : 'wrong'}`);
+      expect(await signInStatuses(user.email, Array(5).fill(WRONG))).toEqual(Array(5).fill(401));
+      const blocked = await signIn(behindProxy, user.email, sixth, {
+        'X-Real-IP': freshAddress(),
+      });
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers.getSetCookie()).toEqual([]);
+    }
+  });
+
+  test('a mix of failures and successes counts only the failures, without forgiving them', async () => {
+    const user = await signUp(behindProxy, 'budget-mix');
+    const mixed = [WRONG, RIGHT, WRONG, RIGHT, WRONG, RIGHT, WRONG, RIGHT, WRONG];
+    expect(await signInStatuses(user.email, mixed)).toEqual([
+      401, 200, 401, 200, 401, 200, 401, 200, 401,
+    ]);
+    // Five failures with four successes in between: a success did not reset the count.
+    expect(await signInStatuses(user.email, [RIGHT, WRONG])).toEqual([429, 429]);
+  });
+
+  test('concurrent wrong guesses cannot exceed the budget', async () => {
+    const user = await signUp(behindProxy, 'budget-concurrent');
+    const responses = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        signIn(behindProxy, user.email, WRONG, { 'X-Real-IP': freshAddress() }),
+      ),
+    );
+    const statuses = responses.map((response) => response.status).sort((a, b) => a - b);
+    expect(statuses).toEqual([...Array(5).fill(401), ...Array(7).fill(429)]);
+    expect(await signInStatuses(user.email, [RIGHT])).toEqual([429]);
+  });
+
+  test('concurrent successes give their places back and let no extra failure through', async () => {
+    const user = await signUp(behindProxy, 'budget-concurrent-mix');
+    const passwords = [...Array(5).fill(RIGHT), ...Array(10).fill(WRONG)];
+    const responses = await Promise.all(
+      passwords.map((password) =>
+        signIn(behindProxy, user.email, password, { 'X-Real-IP': freshAddress() }),
+      ),
+    );
+    // A right password may be refused while guesses hold every place; that is the cost of
+    // reserving before the check.
+    const statuses = responses.map((response) => response.status);
+    expect(statuses.every((status) => [200, 401, 429].includes(status))).toBe(true);
+    const failed = statuses.filter((status) => status === 401).length;
+    expect(failed).toBeLessThanOrEqual(5);
+
+    // Every place a success held is free again, and every failure is still counted: exactly
+    // 5 - failed further guesses are answered before the account is blocked.
+    const remaining = await signInStatuses(user.email, Array(6 - failed).fill(WRONG));
+    expect(remaining).toEqual([...Array(5 - failed).fill(401), 429]);
+  });
+
+  test('unknown emails are counted and answered like known ones', async () => {
+    const known = await signUp(behindProxy, 'budget-known');
+    const unknownEmail = integration.buildEmail('budget-unknown');
+    const answers = async (email: string) => {
+      const results: Array<{ status: number; body: string }> = [];
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const response = await signIn(behindProxy, email, WRONG, { 'X-Real-IP': freshAddress() });
+        results.push({ status: response.status, body: await response.text() });
+      }
+      return results;
+    };
+    const knownAnswers = await answers(known.email);
+    expect(knownAnswers.map((answer) => answer.status)).toEqual([401, 401, 401, 401, 401, 429]);
+    expect(await answers(unknownEmail)).toEqual(knownAnswers);
+  });
+
+  test('the per-address limit still counts successful sign-ins', async () => {
+    const user = await signUp(behindProxy, 'budget-per-address');
+    const address = freshAddress();
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await signIn(behindProxy, user.email, RIGHT, { 'X-Real-IP': address });
+      statuses.push(response.status);
+    }
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
+    // The account itself is not blocked: the same password works from another address.
+    expect(await signInStatuses(user.email, [RIGHT])).toEqual([200]);
+  });
+});
+
 describe('CSRF and cross-origin requests', () => {
   let user: Session;
 

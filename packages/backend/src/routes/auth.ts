@@ -256,7 +256,10 @@ app.post('/signin', signinRateLimit, async (c) => {
     return c.json({ error: 'Email and password are required' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  if (signinEmailRateLimit(email)) {
+  // Every attempt holds a place in the account's budget while it runs, so concurrent guesses
+  // cannot exceed it. Unknown emails take the same path and keep their attempt.
+  const attempt = signinEmailRateLimit.reserve(email);
+  if (!attempt) {
     return c.json(
       { error: 'Too many requests, please try again later' },
       HTTP_STATUS.TOO_MANY_REQUESTS,
@@ -275,6 +278,9 @@ app.post('/signin', signinRateLimit, async (c) => {
     return c.json({ error: 'Invalid email or password' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
+  // Only failed attempts count toward the account's budget; earlier failures stay counted. The
+  // credentials were right, so the attempt is refunded even if creating the session fails below.
+  attempt.refund();
   await createSession(c, user.id);
 
   const [publicUser] = await db.select(publicUserColumns).from(users).where(eq(users.id, user.id));

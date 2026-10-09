@@ -401,7 +401,7 @@ Auth endpoints are rate-limited with an in-process sliding window counter, keyed
 | Endpoint                        | Window     | Max requests | Key                |
 | ------------------------------- | ---------- | ------------ | ------------------ |
 | `POST /api/auth/signin`         | 1 minute   | 5            | Client IP          |
-| `POST /api/auth/signin`         | 15 minutes | 5            | Email address      |
+| `POST /api/auth/signin`         | 15 minutes | 5 failed     | Email address      |
 | `POST /api/auth/signup`         | 15 minutes | 3            | Client IP          |
 | `POST /api/auth/password-reset` | 15 minutes | 5            | Client IP          |
 | `PUT /api/settings/password`    | 15 minutes | 5            | Client IP          |
@@ -410,10 +410,18 @@ Auth endpoints are rate-limited with an in-process sliding window counter, keyed
 Requests over the limit receive `429 Too Many Requests`. The limiter state is in memory and resets
 when the backend restarts. Rate limiting is disabled when `NODE_ENV=test`.
 
+The per-email sign-in limit counts failed attempts only, whether or not the email has an account.
+Each attempt takes a place in the email's budget before the password is checked and gives it back
+when the sign-in succeeds, so simultaneous guesses cannot exceed the budget and a success does not
+clear earlier failures. While attempts that are still being checked hold the remaining places,
+another attempt is refused even if its password is right. The per-address limit counts every
+attempt, successful or not.
+
 ### Per-email lockout trade-off
 
 The sign-in email limiter stops an attacker who rotates source addresses from guessing one
-account's password. The cost is that anyone can fail five sign-ins for a known email and lock the
+account's password. Successful sign-ins do not count, so signing in on several devices does not
+lock an account. The cost is that anyone can fail five sign-ins for a known email and lock the
 owner out for up to 15 minutes. Quro accepts this for a self-hosted, low-user-count deployment. The
 lockout expires on its own and does not reveal whether the account exists.
 
