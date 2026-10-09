@@ -14,7 +14,7 @@ COPY packages/frontend packages/frontend
 WORKDIR /app/packages/frontend
 RUN bun run build
 
-FROM nginx:1.28.2-alpine3.23
+FROM nginx:1.30.3-alpine3.23
 COPY --from=build /app/packages/frontend/dist /usr/share/nginx/html
 COPY packages/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
