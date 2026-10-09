@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Hono } from 'hono';
 import { peerEnv } from '../test/peer';
-import { createRateLimitChecker, signinRateLimit } from './rateLimit';
+import { createAttemptLimiter, createRateLimitChecker, signinRateLimit } from './rateLimit';
 import { applyTestSettings } from '../test/config';
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -27,6 +27,56 @@ describe('createRateLimitChecker', () => {
 
     expect(isRateLimited('victim@example.com')).toBe(false);
     expect(isRateLimited('victim@example.com')).toBe(false);
+  });
+});
+
+describe('createAttemptLimiter', () => {
+  it('refuses a reservation once the budget is used, per key', () => {
+    applyTestSettings({ NODE_ENV: 'development' });
+    const limiter = createAttemptLimiter(60_000, 2);
+
+    expect(limiter.reserve('victim@example.com')).not.toBeNull();
+    expect(limiter.reserve('victim@example.com')).not.toBeNull();
+    expect(limiter.reserve('victim@example.com')).toBeNull();
+    expect(limiter.reserve('other@example.com')).not.toBeNull();
+  });
+
+  it('gives a refunded attempt back without forgiving the others', () => {
+    applyTestSettings({ NODE_ENV: 'development' });
+    const limiter = createAttemptLimiter(60_000, 2);
+
+    const failed = limiter.reserve('victim@example.com');
+    const succeeded = limiter.reserve('victim@example.com');
+    expect(failed).not.toBeNull();
+    expect(limiter.reserve('victim@example.com')).toBeNull();
+
+    succeeded!.refund();
+    // A second refund of the same attempt must not release another one.
+    succeeded!.refund();
+    expect(limiter.reserve('victim@example.com')).not.toBeNull();
+    expect(limiter.reserve('victim@example.com')).toBeNull();
+  });
+
+  it('keeps attempts that are still running inside the budget', () => {
+    applyTestSettings({ NODE_ENV: 'development' });
+    const limiter = createAttemptLimiter(60_000, 3);
+
+    // Reservations made before any outcome is known, typically within one millisecond.
+    const running = Array.from({ length: 5 }, () => limiter.reserve('victim@example.com'));
+    expect(running.filter(Boolean)).toHaveLength(3);
+
+    // Refunding one in-flight attempt frees exactly one place.
+    running[0]!.refund();
+    expect(limiter.reserve('victim@example.com')).not.toBeNull();
+    expect(limiter.reserve('victim@example.com')).toBeNull();
+  });
+
+  it('counts nothing in the test environment', () => {
+    applyTestSettings({ NODE_ENV: 'test' });
+    const limiter = createAttemptLimiter(60_000, 1);
+
+    expect(limiter.reserve('victim@example.com')).not.toBeNull();
+    expect(limiter.reserve('victim@example.com')).not.toBeNull();
   });
 });
 
