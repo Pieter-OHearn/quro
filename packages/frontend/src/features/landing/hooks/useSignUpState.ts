@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '@/lib/AuthContext';
 import type { LandingErrorMap, SignUpFormValues, SignUpState } from '../types';
-import { getAuthErrorMessage } from '../utils/auth-error';
+import { getAuthErrorMessage, signUpErrorField } from '../utils/auth-error';
 import { validateSignUp } from '../utils/validation';
 import { useRegistrationPolicy } from './useRegistrationPolicy';
 
@@ -16,11 +16,6 @@ const initialForm: SignUpFormValues = {
   confirm: '',
   inviteCode: '',
 };
-
-// Code problems belong next to the code field; everything else is about the account details.
-function errorField(message: string): keyof SignUpFormValues {
-  return /\bcode\b|registration is closed/i.test(message) ? 'inviteCode' : 'email';
-}
 
 export function useSignUpState(): SignUpState {
   const navigate = useNavigate();
@@ -66,7 +61,7 @@ export function useSignUpState(): SignUpState {
       void navigate('/');
     } catch (error: unknown) {
       const message = getAuthErrorMessage(error, 'Sign up failed');
-      setErrors({ [errorField(message)]: message });
+      setErrors({ [signUpErrorField(message)]: message });
     } finally {
       setLoading(false);
     }

@@ -19,13 +19,14 @@ function SessionRow({
   revoking,
   onRevoke,
 }: Readonly<{ session: UserSession; revoking: boolean; onRevoke: (id: string) => void }>) {
+  const browser = describeUserAgent(session.userAgent);
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
         <Monitor size={16} className="flex-shrink-0 text-fg-faint" />
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-fg">
-            {describeUserAgent(session.userAgent)}
+            {browser}
             {session.current ? <Badge tone="success">This browser</Badge> : null}
           </p>
           <p className="text-xs text-fg-subtle">
@@ -39,6 +40,7 @@ function SessionRow({
           variant="ghost"
           size="sm"
           className="flex-shrink-0 whitespace-nowrap"
+          aria-label={`Sign out ${browser}, last active ${formatSessionTime(session.lastUsedAt)}`}
           loading={revoking}
           onClick={() => onRevoke(session.id)}
         >

@@ -1,4 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { and, eq, isNull } from 'drizzle-orm';
+import { db } from '../db/client';
+import { authCodes } from '../db/schema';
+import { issuePasswordResetCode } from '../lib/authCodes';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from './io';
 import { runQuro } from './quro';
@@ -102,6 +106,16 @@ describe('quro user', () => {
       json: { code: second, nextPassword: NEW_PASSWORD },
     });
     expect(withSecond.status).toBe(200);
+  });
+
+  test('concurrent reset codes for one account leave exactly one usable code', async () => {
+    const owner = await integration.signUp('reset-race');
+    await Promise.all(Array.from({ length: 5 }, () => issuePasswordResetCode(owner.user.id)));
+    const unused = await db
+      .select({ id: authCodes.id })
+      .from(authCodes)
+      .where(and(eq(authCodes.userId, owner.user.id), isNull(authCodes.consumedAt)));
+    expect(unused).toHaveLength(1);
   });
 
   test('revoke-sessions signs an account out of every browser', async () => {

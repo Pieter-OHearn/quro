@@ -96,6 +96,8 @@ export function issuePasswordResetCode(
   executor: DbExecutor = db,
 ): Promise<IssuedAuthCode> {
   return executor.transaction(async (tx) => {
+    // Serialise per account so concurrent issues cannot leave two valid codes behind.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('quro:password-reset'), ${userId})`);
     await tx
       .delete(authCodes)
       .where(

@@ -30,13 +30,27 @@ export function detectCookieTransportMismatch(
   return null;
 }
 
+// Where the scheme came from. Only configuration is trustworthy: any client can send an Origin
+// header, so a warning based on one asks the operator to confirm before changing anything.
+export type CookieTransportSource = 'configuration' | 'request';
+
+const SOURCE_NOTES: Record<CookieTransportSource, string> = {
+  configuration: 'Detected from FRONTEND_ORIGIN.',
+  request:
+    'Detected from the Origin header of a sign-in request, which any client can set: confirm how browsers reach Quro before changing the setting.',
+};
+
 export function createCookieTransportWarner(warn: (message: string) => void = console.warn) {
   const reported = new Set<CookieTransportMismatch>();
-  return (secureCookies: boolean, origin: string | null | undefined, source: string) => {
+  return (
+    secureCookies: boolean,
+    origin: string | null | undefined,
+    source: CookieTransportSource,
+  ) => {
     const mismatch = detectCookieTransportMismatch(secureCookies, origin);
     if (!mismatch || reported.has(mismatch)) return;
     reported.add(mismatch);
-    warn(`[config] ${MESSAGES[mismatch]} Detected from ${source}.`);
+    warn(`[config] ${MESSAGES[mismatch]} ${SOURCE_NOTES[source]}`);
   };
 }
 
@@ -44,17 +58,17 @@ const warnOnce = createCookieTransportWarner();
 
 /** Startup check against the configured public origin, when the deployment sets one. */
 export function checkConfiguredCookieTransport(env: NodeJS.ProcessEnv = process.env): void {
-  warnOnce(secureCookiesEnabled(), env.FRONTEND_ORIGIN?.trim(), 'FRONTEND_ORIGIN');
+  warnOnce(secureCookiesEnabled(), env.FRONTEND_ORIGIN?.trim(), 'configuration');
 }
 
 /**
  * Checks the Origin header of requests that set session cookies. Browsers send it on every POST
- * and proxies pass it through unchanged, so it shows the scheme the browser really uses even
- * behind a chain of proxies. A forged header can only produce one log line per process.
+ * and proxies pass it through unchanged, so it shows the scheme the browser uses even behind a
+ * chain of proxies. A forged header can only produce one cautious log line per process.
  */
 export const cookieTransportCheck = createMiddleware(async (c, next) => {
   if (c.req.method === 'POST') {
-    warnOnce(secureCookiesEnabled(), c.req.header('Origin'), 'the Origin of a sign-in request');
+    warnOnce(secureCookiesEnabled(), c.req.header('Origin'), 'request');
   }
   await next();
 });

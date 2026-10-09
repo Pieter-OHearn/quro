@@ -41,6 +41,7 @@ export function InviteCodeField({
       <TextInput
         data-testid="signup-invite-code-input"
         type="text"
+        autoFocus
         autoComplete="one-time-code"
         autoCapitalize="characters"
         spellCheck={false}

@@ -38,6 +38,8 @@ describe('SessionsList', () => {
     expect(markup).toContain('Unknown browser');
     expect(markup).toContain('Firefox on Linux');
     expect(markup.match(/>Sign out</g)).toHaveLength(1);
+    // Screen readers can tell several sign-out buttons apart.
+    expect(markup).toContain('aria-label="Sign out Firefox on Linux, last active');
     expect(markup).toContain('Sign out all other browsers');
   });
 

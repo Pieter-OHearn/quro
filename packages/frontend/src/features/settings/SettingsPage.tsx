@@ -25,7 +25,7 @@ type TabKey = 'profile' | 'security' | 'preferences' | 'partner' | 'connections'
 
 const TABS: ReadonlyArray<{ key: TabKey; label: string; icon: ElementType; subtitle: string }> = [
   { key: 'profile', label: 'Profile', icon: UserIcon, subtitle: 'Name, age, and location' },
-  { key: 'security', label: 'Security', icon: Lock, subtitle: 'Password and signed-in browsers' },
+  { key: 'security', label: 'Security', icon: Lock, subtitle: 'Password and sessions' },
   {
     key: 'preferences',
     label: 'Preferences',

@@ -37,16 +37,19 @@ describe('createCookieTransportWarner', () => {
     const lines: string[] = [];
     const warn = createCookieTransportWarner((line) => lines.push(line));
 
-    warn(false, 'https://quro.example.com', 'FRONTEND_ORIGIN');
-    warn(false, 'https://quro.example.com', 'the Origin of a sign-in request');
-    warn(true, 'http://quro.local', 'the Origin of a sign-in request');
-    warn(true, 'http://quro.local', 'the Origin of a sign-in request');
-    warn(false, 'http://quro.local', 'the Origin of a sign-in request');
+    warn(false, 'https://quro.example.com', 'configuration');
+    warn(false, 'https://quro.example.com', 'request');
+    warn(true, 'http://quro.local', 'request');
+    warn(true, 'http://quro.local', 'request');
+    warn(false, 'http://quro.local', 'request');
 
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain('SECURE_COOKIES is false');
     expect(lines[0]).toContain('Detected from FRONTEND_ORIGIN.');
     expect(lines[1]).toContain('SECURE_COOKIES is true');
+    // A client can forge Origin, so request-based warnings ask for confirmation first.
+    expect(lines[0]).not.toContain('any client can set');
+    expect(lines[1]).toContain('any client can set: confirm how browsers reach Quro');
     // Only the scheme matters; the host name stays out of the log.
     expect(lines.join('\n')).not.toContain('quro.example.com');
     expect(lines.join('\n')).not.toContain('quro.local');

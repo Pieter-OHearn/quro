@@ -253,20 +253,23 @@ app.put('/password', changePasswordRateLimit, async (c) => {
     cost: 10,
   });
 
-  const [data] = await db
-    .update(users)
-    .set({
-      passwordHash,
-      passwordUpdatedAt: new Date(),
-    })
-    .where(eq(users.id, authUser.id))
-    .returning(publicUserColumns);
+  // The new password and the sign-out of every other browser take effect together.
+  const data = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(users)
+      .set({
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+      })
+      .where(eq(users.id, authUser.id))
+      .returning(publicUserColumns);
+    if (updated) await revokeUserSessions(authUser.id, currentSessionId, tx);
+    return updated;
+  });
 
   if (!data) {
     return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
   }
-
-  await revokeUserSessions(authUser.id, currentSessionId);
 
   return c.json({ data });
 });

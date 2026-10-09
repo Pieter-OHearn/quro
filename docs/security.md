@@ -67,7 +67,9 @@ other header a client can send. Two mistakes would otherwise fail silently, so t
 The backend checks `FRONTEND_ORIGIN` at startup when it is set, and the `Origin` header of
 sign-in, sign-up and password reset requests. Browsers send `Origin` on every `POST` and proxies
 pass it through unchanged, so it shows the scheme the browser uses even behind two proxies.
-Unknown `SECURE_COOKIES` and `REGISTRATION_MODE` values stop the backend at startup.
+Any client can send an `Origin` header, though, so a warning based on one says so: confirm how
+browsers reach Quro before changing the setting. Unknown `SECURE_COOKIES` and `REGISTRATION_MODE`
+values stop the backend at startup.
 
 ### Not supported
 
