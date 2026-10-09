@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, setSystemTime } from 'bun:test';
 import { Hono } from 'hono';
 import { peerEnv } from '../test/peer';
 import { createAttemptLimiter, createRateLimitChecker, signinRateLimit } from './rateLimit';
@@ -8,6 +8,7 @@ const originalNodeEnv = process.env.NODE_ENV;
 
 afterEach(() => {
   applyTestSettings({ NODE_ENV: originalNodeEnv });
+  setSystemTime();
 });
 
 describe('createRateLimitChecker', () => {
@@ -68,6 +69,20 @@ describe('createAttemptLimiter', () => {
     // Refunding one in-flight attempt frees exactly one place.
     running[0]!.refund();
     expect(limiter.reserve('victim@example.com')).not.toBeNull();
+    expect(limiter.reserve('victim@example.com')).toBeNull();
+  });
+
+  it('ignores a refund that arrives after its attempt left the window', () => {
+    applyTestSettings({ NODE_ENV: 'development' });
+    const limiter = createAttemptLimiter(60_000, 1);
+
+    setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    const slow = limiter.reserve('victim@example.com');
+    setSystemTime(new Date('2026-01-01T00:01:01Z'));
+    expect(limiter.reserve('victim@example.com')).not.toBeNull();
+
+    // The late refund must not give back the newer attempt.
+    slow!.refund();
     expect(limiter.reserve('victim@example.com')).toBeNull();
   });
 

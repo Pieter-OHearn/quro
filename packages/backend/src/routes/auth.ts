@@ -278,7 +278,8 @@ app.post('/signin', signinRateLimit, async (c) => {
     return c.json({ error: 'Invalid email or password' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
-  // Only failed attempts count toward the account's budget; earlier failures stay counted.
+  // Only failed attempts count toward the account's budget; earlier failures stay counted. The
+  // credentials were right, so the attempt is refunded even if creating the session fails below.
   attempt.refund();
   await createSession(c, user.id);
 

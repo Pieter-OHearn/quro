@@ -330,7 +330,7 @@ describe('per-account sign-in budget', () => {
         signIn(behindProxy, user.email, WRONG, { 'X-Real-IP': freshAddress() }),
       ),
     );
-    const statuses = responses.map((response) => response.status).sort();
+    const statuses = responses.map((response) => response.status).sort((a, b) => a - b);
     expect(statuses).toEqual([...Array(5).fill(401), ...Array(7).fill(429)]);
     expect(await signInStatuses(user.email, [RIGHT])).toEqual([429]);
   });

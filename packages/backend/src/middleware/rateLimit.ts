@@ -25,7 +25,7 @@ export function getClientAddress(c: Context, proxies: TrustedProxies = trustedPr
   });
 }
 
-/** An attempt counted against a key's budget. `refund` takes it back; calling it again does nothing. */
+/** An attempt counted against a key's budget. `refund` gives it back, once. */
 export type AttemptReservation = { refund: () => void };
 
 const UNCOUNTED_ATTEMPT: AttemptReservation = { refund: () => {} };
