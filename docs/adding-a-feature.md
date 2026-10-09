@@ -553,6 +553,25 @@ describe('recurring payments integration', () => {
 
 The `integration` helper comes from `src/test/integration.ts`. It wraps `app.request` (the Hono test client, no actual HTTP port needed), handles CSRF token forwarding automatically based on the cookie string, and exposes `integration.signUp(label)` to create an isolated test user. Each `describe` block should call `integration.cleanup()` in `beforeAll` and `afterAll` to remove any users created under the test's email domain. Use a distinct synthetic test domain and an isolated migrated database: cleanup is destructive for matching users.
 
+### Access matrix
+
+Every route you add also goes into the access matrix, which proves that other households, a
+pending or former partner and anonymous callers get nothing. The matrix test fails and lists any
+registered route that is not classified, so you will be told. In
+`packages/backend/src/routes/accessMatrix.cases.ts`:
+
+- add a `row` case for a route that takes an id, and a `cross` case for a body field that names a
+  parent (account, mortgage, employment…); use `scope: 'joint'` only if an accepted partner may
+  act on joint rows;
+- add a `list` case for a collection and a `caller` case for a write that takes no id;
+- or list the route in `EXEMPT_ROUTES` with the reason it needs no per-actor check.
+
+For a new table with a `user_id` column, add a row to `seedRows` and the table to
+`SNAPSHOT_TABLES` in `packages/backend/src/test/accessWorld.ts`, so the matrix can prove that a
+refused request changes nothing. A new `eq(table.userId, …)` written outside `lib/access.ts` must
+be recorded in `packages/backend/src/lib/accessSweep.test.ts`. See
+[authorization and privacy tests](security.md#authorization-and-privacy-tests).
+
 ### UI component tests
 
 Frontend tests use Bun. Shared UI smoke cases in

@@ -24,7 +24,7 @@ async function snapshotUser(
   }
 }
 
-async function runSnapshots(): Promise<void> {
+export async function runSnapshots(): Promise<void> {
   const [rates, links, owners] = await Promise.all([
     getCurrentRatesToBaseCurrency(),
     db.select().from(partnerLinks).where(eq(partnerLinks.status, 'accepted')),

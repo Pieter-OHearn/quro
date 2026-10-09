@@ -278,6 +278,86 @@ Rules that follow from this table:
   [roadmap](../ROADMAP.md)). Keep that key with the secret files, never inside a dump. Losing it
   means reconnecting bunq; all other data stays intact.
 
+## Authorization and privacy tests
+
+Access is "your rows, plus an accepted partner's rows that are flagged joint". Only savings
+accounts, properties and mortgages, with their transactions, can be joint. Everything else
+(holdings, pensions, debts, payslips, goals, budget, imports and documents) is visible to its
+owner alone. Every request is authorised against the session on the backend; the frontend hides
+nothing that the API would serve.
+
+### What a caller sees
+
+| Situation                                                         | Answer                                                                     |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| No session, a tampered cookie or an expired session               | `401`, before any row is looked up                                         |
+| State change without the CSRF header                              | `403`, before authentication                                               |
+| An id that belongs to someone else, or to no one                  | The same `404` and the same body for both; no way to tell them apart       |
+| A foreign parent named in a body (account, mortgage, employment…) | The same refusal as a parent that does not exist                           |
+| A collection filtered by a foreign parent id                      | Shareable tables: `404`. Other tables: an empty list. Same as a missing id |
+| A refused request                                                 | Changes nothing that is stored                                             |
+| A value the database cannot store (NUL character, huge number)    | `400` with a fixed message                                                 |
+| Any other server failure                                          | `500` with a fixed message; details go to the server log only              |
+
+An accepted partner can edit and archive joint rows, as the owner can. A pending invitation, a
+link that has ended and a link to someone else grant nothing. Ending a link clears the joint flag
+on both members' rows, and the other member's open session loses access on its next request.
+
+### What the tests prove
+
+`packages/backend/src/routes/accessMatrix.integration.test.ts` builds four households on a
+throwaway database: an owner with an accepted partner, an unrelated household, a former partner
+(linked with joint rows, then unlinked through the API) and a pending, never accepted, invitation.
+Every row carries a marker, and each route is run as every kind of actor against every kind of
+row. It asserts that:
+
+- each registered route is either in the case table (`accessMatrix.cases.ts`) or exempt there with
+  a reason, so a new route cannot ship unclassified;
+- a denied request gets exactly the answer an id that does not exist gets;
+- no denied request changes any stored row (a snapshot of every household table is compared);
+- no collection or error body contains another household's marker, and no response, even the
+  owner's, contains a stored bank credential;
+- the owner, and the partner on joint rows, succeed with the same requests, so the denials are not
+  vacuous;
+- every protected route answers `401` without a session, and the public paths are exactly the
+  list in `lib/publicPaths.ts`.
+
+Other suites cover what the matrix does not:
+
+| Suite                                              | Covers                                                                                                                 |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `sessionAndHouseholdLifecycle.integration.test.ts` | Sign-out, expiry, account switching, unlinking and invitations, the nightly net-worth job and the statement import job |
+| `dynamicDeployment.integration.test.ts`            | A real backend process with rate limits on: brute-force limits, CSRF, CORS, cookie flags, stored markup, error text    |
+| `malformedRequests.integration.test.ts`            | Wrong types, sizes and shapes sent to every JSON route; ids that are not integers                                      |
+| `lib/accessSweep.test.ts`                          | The inventory of owner predicates written inline instead of through `lib/access.ts`                                    |
+| `packages/frontend/src/lib/authBoundary.test.tsx`  | Sign-in, sign-up, recovery, sign-out and a late response all leave the query cache empty                               |
+
+The dynamic suite starts the backend with its outbound proxy pointed at a closed port, so it
+cannot reach a provider. No test uses real data or a provider.
+
+### Owner predicates outside `lib/access.ts`
+
+`lib/access.ts` and `lib/partner.ts` define access for rows that can be shared. Tables that cannot
+be shared are queried with `eq(table.userId, …)` directly, which is correct while sharing is
+limited to the tables above. `accessSweep.test.ts` records every such predicate by file and table
+(148 in 26 files) and fails when a new one appears or when one touches a shareable table without
+a recorded reason. The three recorded exceptions are ending a link, a goal that follows a savings
+account its owner holds, and the bank sync writing the connected user's own accounts. Changing the
+sharing model means revisiting this list.
+
+### Known limits
+
+- An invitation names an account by email, so the error for an unknown address (`404`) differs
+  from the one for an address that already has a link (`409`). Invitations are limited to 10 per
+  15 minutes per user.
+- Net-worth history months that were stored while a link existed keep their values after it ends.
+  The current month is always computed from the rows the user can see.
+- The partner who did not end the link keeps whatever their browser cached until the next
+  refetch (five minutes, or sooner on window focus). The API refuses the old rows at once.
+- Bank sync, the stock price job and session cleanup act on a user id taken from the database.
+  Their queries are in the inventory, but they are not exercised as separate callers.
+- Text fields have no length limit in the backend; nginx caps a request at 25 MB.
+
 ## OWASP ASVS 5.0 baseline
 
 A risk-selected subset of [ASVS 5.0](https://github.com/OWASP/ASVS/tree/master/5.0), mostly level
