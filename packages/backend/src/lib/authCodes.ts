@@ -60,7 +60,8 @@ export function normalizeAuthCode(input: string): string {
 
 /**
  * Codes are random, single-use and longer than 112 bits, so a one-way hash is enough: unlike a
- * password, a code cannot be guessed from a dictionary, and salting or stretching adds nothing.
+ * password, a code cannot be guessed from a dictionary, and salting or stretching would add no
+ * meaningful protection.
  */
 export function hashAuthCode(code: string): string {
   return createHash('sha256').update(normalizeAuthCode(code)).digest('hex');

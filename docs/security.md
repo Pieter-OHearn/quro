@@ -235,10 +235,10 @@ docker compose exec backend quro user --help
 | `quro user revoke-code ID`        | Withdraws an unused code                                                           |
 
 Codes are 24 Crockford base32 characters (120 bits) in four groups of six, shown once and stored
-only as a SHA-256 digest. They are single-use, expire, and tolerate lowercase, spaces and the look-alikes
-`I`, `L` and `O`. A new reset code replaces the account's previous one. The user redeems a reset
-code with **Forgot password?** on the sign-in screen, which sets the new password, ends every
-session and signs them in. Used and expired codes are deleted after 30 days. Reset requests are
+only as a SHA-256 digest. They are single-use, expire, and tolerate lowercase, spaces and the
+look-alikes `I`, `L` and `O`. A new reset code replaces the account's previous one. The user redeems
+a reset code with **Forgot password?** on the sign-in screen, which sets the new password, ends
+every session and signs them in. Used and expired codes are deleted after 30 days. Reset requests are
 rate limited per client address.
 
 For a local development backend, run the same commands with
