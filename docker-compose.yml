@@ -1,6 +1,9 @@
 services:
   db:
-    image: postgres:16.11-alpine3.23
+    # PostgreSQL 18 keeps its cluster in a versioned directory under /var/lib/postgresql and
+    # refuses to start on data written by 16 or 17. The data lives in ./data/postgres-18, never
+    # in the ./data/postgres of earlier releases; see docs/postgresql-upgrade.md.
+    image: postgres:18.6-alpine3.23
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
@@ -9,7 +12,7 @@ services:
     secrets:
       - postgres_admin_password
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres-18:/var/lib/postgresql
     networks:
       - backend-net
     healthcheck:

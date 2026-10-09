@@ -102,6 +102,8 @@ The database and object storage are also published locally for tooling:
 
 The [install contract](docs/install-contract.md) describes how installs will work from 0.8.0, which is not released yet: the images, the `quro` maintenance commands, settings, data locations and the move from existing Compose installs.
 
+The Compose stack in this repository runs PostgreSQL 18 from `./data/postgres-18`. An install that still has a PostgreSQL 16 database in `./data/postgres` moves over by dump and restore; see [PostgreSQL 18 and the upgrade from 16](docs/postgresql-upgrade.md).
+
 The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
 
 | Problem                   | What you see                                                                                                                                                        | Workaround                                                                      |
