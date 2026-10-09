@@ -23,7 +23,13 @@ import {
 } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate } from '../lib/netWorth';
-import { answerRejectedEdit, LedgerEditRejected, withLedgerWrite } from '../lib/ledgerWrite';
+import {
+  answerRejectedEdit,
+  LedgerEditRejected,
+  type LedgerRejection,
+  lockCheckedLedgerRow,
+  withLedgerWrite,
+} from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
@@ -379,6 +385,18 @@ async function reversePropertyRepaymentEffect(
   } else {
     await reverseRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: property.id, principal });
   }
+}
+
+// Reverses a committed repayment's effect on its property's debt; other types have none.
+async function reverseRepaymentOf(
+  tx: DbTransaction,
+  userId: number,
+  partnerId: number | null,
+  transaction: typeof propertyTransactions.$inferSelect,
+): Promise<void> {
+  if (transaction.type !== 'repayment') return;
+  const property = await getAccessibleProperty(userId, partnerId, transaction.propertyId, tx);
+  if (property) await reversePropertyRepaymentEffect(tx, property, transaction.principal ?? 0);
 }
 
 function getAccessiblePropertyTransaction(
@@ -750,23 +768,24 @@ app.patch('/property-transactions/:id', async (c) => {
 
   const result = await answerRejectedEdit<
     { data: typeof propertyTransactions.$inferSelect },
-    { error: string; status: typeof HTTP_STATUS.BAD_REQUEST | typeof HTTP_STATUS.NOT_FOUND }
+    LedgerRejection
   >(() =>
     db.transaction(async (tx) => {
-      // Undo the old repayment's balance effect, then apply the edited one. Once the old
+      // Undo the committed repayment's balance effect, then apply the edited one. Once the old
       // effect is undone, a refusal must roll it back.
-      if (existing.type === 'repayment') {
-        const oldProperty = await getAccessibleProperty(
-          user.id,
-          partnerId,
-          existing.propertyId,
-          tx,
-        );
-        if (oldProperty)
-          await reversePropertyRepaymentEffect(tx, oldProperty, existing.principal ?? 0);
+      const previous = await lockCheckedLedgerRow(
+        tx,
+        propertyTransactions,
+        id,
+        (row) => row.propertyId === existing.propertyId,
+      );
+      const next = mergePropertyTransactionPayload(body.value, previous);
+      if (!next.ok) {
+        throw new LedgerEditRejected({ error: next.error, status: HTTP_STATUS.BAD_REQUEST });
       }
+      await reverseRepaymentOf(tx, user.id, partnerId, previous);
 
-      const property = await getAccessibleProperty(user.id, partnerId, merged.value.propertyId, tx);
+      const property = await getAccessibleProperty(user.id, partnerId, next.value.propertyId, tx);
       if (!property) {
         throw new LedgerEditRejected({
           error: 'Property not found',
@@ -774,16 +793,16 @@ app.patch('/property-transactions/:id', async (c) => {
         });
       }
 
-      const validationError = validatePropertyTransactionPayload(merged.value, property);
+      const validationError = validatePropertyTransactionPayload(next.value, property);
       if (validationError) {
         throw new LedgerEditRejected({ error: validationError, status: HTTP_STATUS.BAD_REQUEST });
       }
 
-      if (merged.value.type === 'repayment') {
+      if (next.value.type === 'repayment') {
         const effectError = await applyPropertyRepaymentEffect(
           tx,
           property,
-          merged.value.principal ?? 0,
+          next.value.principal ?? 0,
         );
         if (effectError) {
           throw new LedgerEditRejected({ error: effectError, status: HTTP_STATUS.BAD_REQUEST });
@@ -793,7 +812,7 @@ app.patch('/property-transactions/:id', async (c) => {
       const [updated] = await tx
         .update(propertyTransactions)
         .set({
-          ...toPropertyTransactionUpdateValues(merged.value),
+          ...toPropertyTransactionUpdateValues(next.value),
           userId: property.userId ?? user.id,
         })
         .where(eq(propertyTransactions.id, id))
@@ -801,10 +820,10 @@ app.patch('/property-transactions/:id', async (c) => {
       await withLedgerWrite(
         tx,
         [
-          { table: properties, id: existing.propertyId, partnerId, actorId: user.id },
-          { table: properties, id: merged.value.propertyId, partnerId, actorId: user.id },
+          { table: properties, id: previous.propertyId, partnerId, actorId: user.id },
+          { table: properties, id: next.value.propertyId, partnerId, actorId: user.id },
         ],
-        earliestDate(existing.date, merged.value.date),
+        earliestDate(previous.date, next.value.date),
       );
       return { data: updated };
     }),
@@ -821,25 +840,33 @@ app.delete('/property-transactions/:id', async (c) => {
   const existing = await getAccessiblePropertyTransaction(user.id, partnerId, id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const data = await db.transaction(async (tx) => {
-    // Restore the balance this repayment had reduced before removing it.
-    if (existing.type === 'repayment') {
-      const property = await getAccessibleProperty(user.id, partnerId, existing.propertyId, tx);
-      if (property) await reversePropertyRepaymentEffect(tx, property, existing.principal ?? 0);
-    }
+  const result = await answerRejectedEdit<
+    { data: typeof propertyTransactions.$inferSelect },
+    LedgerRejection
+  >(() =>
+    db.transaction(async (tx) => {
+      // Restore the balance this repayment had reduced before removing it.
+      const previous = await lockCheckedLedgerRow(
+        tx,
+        propertyTransactions,
+        id,
+        (row) => row.propertyId === existing.propertyId,
+      );
+      await reverseRepaymentOf(tx, user.id, partnerId, previous);
 
-    const [deleted] = await tx
-      .delete(propertyTransactions)
-      .where(eq(propertyTransactions.id, id))
-      .returning();
-    await withLedgerWrite(
-      tx,
-      { table: properties, id: existing.propertyId, partnerId, actorId: user.id },
-      existing.date,
-    );
-    return deleted ?? null;
-  });
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+      const [deleted] = await tx
+        .delete(propertyTransactions)
+        .where(eq(propertyTransactions.id, id))
+        .returning();
+      await withLedgerWrite(
+        tx,
+        { table: properties, id: previous.propertyId, partnerId, actorId: user.id },
+        previous.date,
+      );
+      return { data: deleted! };
+    }),
+  );
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data });
 });
 export default app;

@@ -523,6 +523,7 @@ async function updatePensionTransaction(params: {
 }): Promise<RouteMutationResult> {
   let storageKeyToDelete: string | null = null;
   const result = await db.transaction(async (tx) => {
+    // Locked so a concurrent edit or delete of this row waits and then sees this one's result.
     const [existing] = await tx
       .select()
       .from(pensionTransactions)
@@ -531,7 +532,8 @@ async function updatePensionTransaction(params: {
           eq(pensionTransactions.id, params.transactionId),
           eq(pensionTransactions.userId, params.userId),
         ),
-      );
+      )
+      .for('update');
     if (!existing) return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
 
     const normalizedExisting = normalizeTransactionRow(existing);
@@ -597,6 +599,7 @@ async function deletePensionTransaction(params: {
 }): Promise<RouteMutationResult> {
   let storageKeyToDelete: string | null = null;
   const result = await db.transaction(async (tx) => {
+    // Locked so a concurrent edit or delete of this row waits and then sees this one's result.
     const [existing] = await tx
       .select()
       .from(pensionTransactions)
@@ -605,7 +608,8 @@ async function deletePensionTransaction(params: {
           eq(pensionTransactions.id, params.transactionId),
           eq(pensionTransactions.userId, params.userId),
         ),
-      );
+      )
+      .for('update');
     if (!existing) return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
 
     const normalizedExisting = normalizeTransactionRow(existing);

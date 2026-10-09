@@ -268,10 +268,12 @@ function deleteDebtPayment(params: {
   paymentId: number;
 }): Promise<RouteMutationResult> {
   return db.transaction(async (tx) => {
+    // Locked so a second delete of the same payment waits and then finds nothing to restore.
     const [existing] = await tx
       .select()
       .from(debtPayments)
-      .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)));
+      .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)))
+      .for('update');
     if (!existing) return { error: 'Payment not found', status: HTTP_STATUS.NOT_FOUND };
 
     const restoredBalance = await reverseRepayment(tx, DEBT_BALANCE, {

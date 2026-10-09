@@ -517,10 +517,12 @@ app.patch('/transactions/:id', async (c) => {
 
   const patch = await normalizeBudgetTransactionMoney(body.value);
   const result = await db.transaction(async (tx) => {
+    // Locked so a concurrent edit waits and adjusts `spent` from this edit's result.
     const [existing] = await tx
       .select()
       .from(budgetTransactions)
-      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)));
+      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
+      .for('update');
     if (!existing) return null;
 
     const nextCategoryId = patch.categoryId ?? existing.categoryId;

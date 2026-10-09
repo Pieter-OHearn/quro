@@ -21,7 +21,7 @@ import {
   normalizeBankName,
 } from '../lib/jurisdictions/bankingEntities';
 import { earliestDate } from '../lib/netWorth';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { LEDGER_ROW_CHANGED, lockLedgerRow, withLedgerWrite } from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from '../lib/savingsBalance';
 import {
@@ -651,37 +651,44 @@ app.patch('/transactions/:id', async (c) => {
     updateValues.userId = nextAccount.nextAccountUserId;
   }
 
-  const [data] = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // Reverse the committed values, not the ones read before the transaction started.
+    const previous = await lockLedgerRow(tx, savingsTransactions, id);
+    if (!previous)
+      return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND } as const;
+    if (previous.accountId !== existing.accountId) {
+      return { error: LEDGER_ROW_CHANGED, status: HTTP_STATUS.CONFLICT } as const;
+    }
+    const next = resolveNextSavingsTransactionState(body.value, previous);
+
     const [updated] = await tx
       .update(savingsTransactions)
       .set(updateValues)
       .where(eq(savingsTransactions.id, id))
       .returning();
 
-    if (!updated) return [updated];
-
     await syncSavingsBalancesForEditedTransaction(tx, {
-      previousAccountId: existing.accountId,
-      nextAccountId: nextState.accountId,
-      previousType: existing.type,
-      nextType: nextState.type,
-      previousAmount: existing.amount,
-      nextAmount: nextState.amount,
+      previousAccountId: previous.accountId,
+      nextAccountId: next.accountId,
+      previousType: previous.type,
+      nextType: next.type,
+      previousAmount: previous.amount,
+      nextAmount: next.amount,
     });
     await withLedgerWrite(
       tx,
       [
-        { table: savingsAccounts, id: existing.accountId, partnerId, actorId: user.id },
-        { table: savingsAccounts, id: nextState.accountId, partnerId, actorId: user.id },
+        { table: savingsAccounts, id: previous.accountId, partnerId, actorId: user.id },
+        { table: savingsAccounts, id: next.accountId, partnerId, actorId: user.id },
       ],
-      earliestDate(existing.date, body.value.date ?? existing.date),
+      earliestDate(previous.date, body.value.date ?? previous.date),
     );
 
-    return [updated];
+    return { data: updated };
   });
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
 
-  return c.json({ data });
+  return c.json({ data: result.data });
 });
 
 app.delete('/transactions/:id', async (c) => {
