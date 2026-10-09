@@ -581,7 +581,7 @@ const CHANGELOG = [
   '',
 ].join('\n');
 const changelogFile = join(workDir, 'CHANGELOG.md');
-const assets = [join(workDir, 'docker-compose.release.yml'), join(workDir, 'bundle-v0.8.0.tar.gz')];
+const assets = [join(workDir, 'checksums.txt'), join(workDir, 'sample-asset.bin')];
 writeFileSync(changelogFile, CHANGELOG);
 for (const asset of assets) writeFileSync(asset, 'synthetic asset\n');
 
@@ -649,13 +649,14 @@ function releasesFor(version: string) {
 const PUBLISHED = [
   {
     draft: false,
-    assets: ['bundle-v0.8.0.tar.gz', 'docker-compose.release.yml'],
+    assets: ['checksums.txt', 'sample-asset.bin'],
     body: '## [v0.8.0] - 2026-10-20\n\n- Synthetic notes.\n',
   },
 ];
 
 describe('release-gate CLI', () => {
   beforeEach(() => {
+    releaseIds = 0;
     state = {
       checkRuns: [],
       workflowRuns: [],
@@ -716,6 +717,20 @@ describe('release-gate CLI', () => {
     expect(await releaseAfterBuild()).toEqual([0, 0, 0]);
     expect(state.tags.get('v0.8.0')).toEqual({ type: 'commit', sha: SHA });
     expect(releasesFor('v0.8.0')).toEqual(PUBLISHED);
+  });
+
+  test('stages and publishes a release that has no asset files', async () => {
+    passCi();
+    expect((await run(['create-tag'])).code).toBe(0);
+    const staged = await run(['stage-release']);
+    expect(staged.code).toBe(0);
+    expect(releasesFor('v0.8.0')).toEqual([{ draft: true, assets: [], body: PUBLISHED[0].body }]);
+    const published = await run(['publish-release'], {
+      RELEASE_ID: staged.outputs.release_id,
+      RELEASE_LATEST: staged.outputs.latest,
+    });
+    expect(published.code).toBe(0);
+    expect(releasesFor('v0.8.0')).toEqual([{ draft: false, assets: [], body: PUBLISHED[0].body }]);
   });
 
   test('a run that failed after tagging resumes on retry without stale assets', async () => {

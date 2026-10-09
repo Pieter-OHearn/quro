@@ -8,12 +8,11 @@ Quro is a self-hosted personal finance app intended for home/LAN use over plain 
 
 ### Docker Compose profiles
 
-| Profile                              | Services included                                             |
-| ------------------------------------ | ------------------------------------------------------------- |
-| default (no profile flag)            | `frontend`, `backend`, `db`, `minio`, `minio-init`, `migrate` |
-| `pension-import`                     | adds `pension-import-worker`, `vllm`, `pension-parser`        |
-| `maintenance`                        | adds `db-tools`                                               |
-| `auto-update` (release compose file) | adds `auto-updater`                                           |
+| Profile                   | Services included                                             |
+| ------------------------- | ------------------------------------------------------------- |
+| default (no profile flag) | `frontend`, `backend`, `db`, `minio`, `minio-init`, `migrate` |
+| `pension-import`          | adds `pension-import-worker`, `vllm`, `pension-parser`        |
+| `maintenance`             | adds `db-tools`                                               |
 
 ### Host-exposed ports
 
