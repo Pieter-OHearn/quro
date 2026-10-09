@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
 import { toCents, toIsoDate, type DashboardAllocationsSummary } from '@quro/shared';
 import { db } from '../db/client';
-import { netWorthSnapshots } from '../db/schema';
+import { holdings, netWorthSnapshots } from '../db/schema';
 import { upsertCurrentNetWorthSnapshot } from '../lib/netWorth';
 import { invalidateCurrentCurrencyRateCache } from '../lib/currencyRateSync';
 import { FIXTURE_RATES_TO_EUR, useFixtureCurrencyRates } from '../test/currencyRates';
@@ -424,4 +424,32 @@ describe('golden household totals reconcile across the API, the pages and the da
     await read(await send(household.owner, 'DELETE', `/api/savings/transactions/${deposit.id}`));
     await expectBoth(afterRepayment.owner, afterRepayment.partner);
   });
+});
+
+test('a failed read fails the dashboard instead of leaving an asset class out', async () => {
+  const household = await seedHousehold();
+  const path = '/api/dashboard/net-worth';
+  const before = await get<Array<{ totalValue: number }>>(household.owner, path);
+  expect(toCents(before.at(-1)!.totalValue)).toBe(toCents(netWorth(OWNER_BASELINE)));
+
+  // Make only the holdings read fail. Before the fix the request answered 200 with the
+  // brokerage left out of an unflagged total.
+  const select = db.select.bind(db);
+  const spy = spyOn(db, 'select').mockImplementation(((...args: Parameters<typeof db.select>) => {
+    const builder = select(...args);
+    const from = builder.from.bind(builder);
+    return Object.assign(builder, {
+      from: (table: Parameters<typeof from>[0]) =>
+        table === holdings
+          ? { where: () => Promise.reject(new Error('synthetic read failure')) }
+          : from(table),
+    });
+  }) as typeof db.select);
+  try {
+    const response = await send(household.owner, 'GET', path);
+    expect(response.status).toBe(500);
+  } finally {
+    spy.mockRestore();
+  }
+  expect((await send(household.owner, 'GET', path)).status).toBe(200);
 });

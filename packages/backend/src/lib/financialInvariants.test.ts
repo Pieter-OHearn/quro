@@ -1,6 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { computeDerivedAllocations } from './netWorth';
 import { householdShare, scopeHouseholdRows } from './partner';
 import { computePensionTransactionDelta } from './pensionTransactions';
@@ -336,13 +334,5 @@ describe('transaction signs (golden)', () => {
         computePensionTransactionDelta({ type, amount, taxAmount }),
       ),
     ).toEqual([380, -15, -250, 900, 0]);
-  });
-});
-
-describe('missing data', () => {
-  test('dashboard history never swaps a failed read for an empty list', () => {
-    const source = readFileSync(join(import.meta.dir, 'netWorthHistory.ts'), 'utf8');
-    expect(source).not.toContain('safeLoad');
-    expect(source).not.toMatch(/catch\s*\(/);
   });
 });
