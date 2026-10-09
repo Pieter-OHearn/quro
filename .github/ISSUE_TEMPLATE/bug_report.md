@@ -24,6 +24,9 @@ labels: bug
 
 ## Environment
 
-- OS:
+- Quro version (shown in Settings, or the release tag / image tag you run):
+- Deployment mode (HTTP on a private network, or HTTPS behind your own reverse proxy):
+- OS and how you run Quro (Docker Compose, local dev):
 - Browser / version (if relevant):
-- quro version (if known):
+
+<!-- Do not paste real financial data, passwords or tokens. Security problems: see SECURITY.md and report privately. -->
