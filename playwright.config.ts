@@ -42,6 +42,8 @@ export default defineConfig({
       env: {
         ...process.env,
         PORT: '3300',
+        // No interval schedulers, so the smoke backend never calls bunq or a price provider.
+        QRO_DISABLE_SCHEDULERS: 'true',
         DATABASE_URL,
         ADMIN_DATABASE_URL: process.env.ADMIN_DATABASE_URL || DATABASE_URL,
         APP_DATABASE_URL: process.env.APP_DATABASE_URL || DATABASE_URL,

@@ -6,19 +6,9 @@ import type {
   RunwayResponse,
   SavingsAccount,
 } from '@quro/shared';
-import { db, queryClient } from '../db/client';
-import { currencyRates } from '../db/schema';
+import { queryClient } from '../db/client';
 import { createIntegrationHelpers } from '../test/integration';
-
-const FX_RATES_TO_EUR = [
-  { fromCurrency: 'GBP', rate: 1.18 },
-  { fromCurrency: 'USD', rate: 0.92 },
-  { fromCurrency: 'AUD', rate: 0.58 },
-  { fromCurrency: 'NZD', rate: 0.53 },
-  { fromCurrency: 'CAD', rate: 0.67 },
-  { fromCurrency: 'CHF', rate: 1.04 },
-  { fromCurrency: 'SGD', rate: 0.68 },
-] as const;
+import { useFixtureCurrencyRates } from '../test/currencyRates';
 
 const integration = createIntegrationHelpers('plan.integration.quro.test');
 
@@ -30,19 +20,7 @@ async function readData<T>(response: Response, status = 200): Promise<T> {
 
 beforeAll(async () => {
   await integration.cleanup();
-  const updatedAt = new Date();
-  await db
-    .insert(currencyRates)
-    .values(
-      FX_RATES_TO_EUR.map((rate) => ({
-        ...rate,
-        toCurrency: 'EUR' as const,
-        provider: 'plan-integration-fixture',
-        sourceDate: updatedAt.toISOString().slice(0, 10),
-        updatedAt,
-      })),
-    )
-    .onConflictDoNothing();
+  await useFixtureCurrencyRates('plan-integration-fixture');
 });
 afterAll(() => integration.cleanup());
 

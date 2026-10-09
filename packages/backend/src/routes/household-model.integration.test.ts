@@ -5,7 +5,6 @@ import { db } from '../db/client';
 import {
   budgetCategories,
   budgetTransactions,
-  currencyRates,
   mortgages,
   netWorthSnapshots,
   properties,
@@ -15,18 +14,9 @@ import {
 } from '../db/schema';
 import { upsertCurrentNetWorthSnapshot } from '../lib/netWorth';
 import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
+import { useFixtureCurrencyRates } from '../test/currencyRates';
 
 const integration = createIntegrationHelpers('household-model.integration.quro.test');
-const rates = {
-  GBP: 1.18,
-  USD: 0.92,
-  AUD: 0.58,
-  NZD: 0.53,
-  CAD: 0.67,
-  CHF: 1.04,
-  SGD: 0.68,
-} as const;
-
 test('archived-account cashflow retains the parent currency and household share', async () => {
   const { owner, partner } = await household();
   const [account] = await db
@@ -59,19 +49,7 @@ test('archived-account cashflow retains the parent currency and household share'
 
 beforeAll(async () => {
   await integration.cleanup();
-  await db
-    .insert(currencyRates)
-    .values(
-      Object.entries(rates).map(([currency, rate]) => ({
-        fromCurrency: currency as keyof typeof rates,
-        toCurrency: 'EUR' as const,
-        rate,
-        provider: 'household-regression',
-        sourceDate: '2026-10-02',
-        updatedAt: new Date(),
-      })),
-    )
-    .onConflictDoNothing();
+  await useFixtureCurrencyRates('household-regression');
 });
 afterAll(() => integration.cleanup());
 

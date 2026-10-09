@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
-import { CURRENCY_CODES, addMonthsUtc, monthEndUtc, monthStartUtc, toIsoDate } from '@quro/shared';
+import { addMonthsUtc, monthEndUtc, monthStartUtc, toIsoDate } from '@quro/shared';
 import { db } from '../db/client';
 import {
   savingsAccounts,
@@ -17,9 +17,9 @@ import {
   debtPayments,
   netWorthSnapshots,
   workerHeartbeats,
-  currencyRates,
 } from '../db/schema';
 import { createIntegrationHelpers } from '../test/integration';
+import { useFixtureCurrencyRates } from '../test/currencyRates';
 import {
   buildNetWorthHistory,
   buildAllocationsFromSource,
@@ -31,20 +31,7 @@ import { runScheduledJob } from './scheduledJob';
 const integration = createIntegrationHelpers('backend-performance.quro.test');
 beforeAll(async () => {
   await integration.cleanup();
-  const rates = { GBP: 1.18, USD: 0.92, AUD: 0.58, NZD: 0.53, CAD: 0.67, CHF: 1.04, SGD: 0.68 };
-  await db
-    .insert(currencyRates)
-    .values(
-      CURRENCY_CODES.filter((currency) => currency !== 'EUR').map((fromCurrency) => ({
-        fromCurrency,
-        toCurrency: 'EUR' as const,
-        rate: rates[fromCurrency as keyof typeof rates],
-        provider: 'test',
-        sourceDate: '2020-01-01',
-        updatedAt: new Date(),
-      })),
-    )
-    .onConflictDoNothing();
+  await useFixtureCurrencyRates('backend-performance');
 });
 afterAll(() => integration.cleanup());
 

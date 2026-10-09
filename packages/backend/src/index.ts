@@ -33,6 +33,7 @@ import { startBunqSyncScheduler } from './lib/bunqSyncScheduler';
 import { startHoldingPriceSyncScheduler } from './lib/holdingPriceSyncScheduler';
 import { startCurrencyRateSyncScheduler } from './lib/currencyRateSyncScheduler';
 import { startNetWorthSnapshotScheduler } from './lib/netWorthSnapshotScheduler';
+import { schedulersDisabled } from './lib/schedulerSwitch';
 import { httpTracing } from './lib/tracing';
 
 // Fail fast on partial bunq configuration; unset leaves the integration disabled.
@@ -78,11 +79,15 @@ app.route('/api/plan', plan);
 app.route('/api/employments', employments);
 
 if (process.env.NODE_ENV !== 'test') {
-  startSessionCleanup();
-  startBunqSyncScheduler();
-  startHoldingPriceSyncScheduler();
-  startCurrencyRateSyncScheduler();
-  startNetWorthSnapshotScheduler();
+  if (schedulersDisabled()) {
+    console.log('[schedulers] QRO_DISABLE_SCHEDULERS is set; background jobs are off');
+  } else {
+    startSessionCleanup();
+    startBunqSyncScheduler();
+    startHoldingPriceSyncScheduler();
+    startCurrencyRateSyncScheduler();
+    startNetWorthSnapshotScheduler();
+  }
 }
 
 export default {

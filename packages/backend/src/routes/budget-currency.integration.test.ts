@@ -8,21 +8,13 @@ import {
   type RunwayResponse,
 } from '@quro/shared';
 import { db } from '../db/client';
-import { budgetCategories, budgetTransactions, currencyRates, savingsAccounts } from '../db/schema';
+import { budgetCategories, budgetTransactions, savingsAccounts } from '../db/schema';
 import { type BunqMonetaryAccount, type BunqPayment } from '../lib/bunqClient';
 import { importBudgetPayment } from '../services/bunqBudgetSync';
 import { createIntegrationHelpers, type AuthSession } from '../test/integration';
+import { useFixtureCurrencyRates } from '../test/currencyRates';
 
 const integration = createIntegrationHelpers('budget-currency.integration.quro.test');
-const rates = {
-  GBP: 1.18,
-  USD: 0.92,
-  AUD: 0.58,
-  NZD: 0.53,
-  CAD: 0.67,
-  CHF: 1.04,
-  SGD: 0.68,
-} as const;
 const monthDates = [0, -1].map((offset) => {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
@@ -30,19 +22,7 @@ const monthDates = [0, -1].map((offset) => {
 
 beforeAll(async () => {
   await integration.cleanup();
-  await db
-    .insert(currencyRates)
-    .values(
-      Object.entries(rates).map(([currency, rate]) => ({
-        fromCurrency: currency as keyof typeof rates,
-        toCurrency: 'EUR' as const,
-        rate,
-        provider: 'budget-regression',
-        sourceDate: new Date().toISOString().slice(0, 10),
-        updatedAt: new Date(),
-      })),
-    )
-    .onConflictDoNothing();
+  await useFixtureCurrencyRates('budget-regression');
 });
 afterAll(() => integration.cleanup());
 
