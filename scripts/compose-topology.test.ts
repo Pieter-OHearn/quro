@@ -60,7 +60,7 @@ describe('Compose topology', () => {
   test.each(COMPOSE_FILES)('%s defaults to mode A with invite-only registration', async (path) => {
     const env = environmentOf((await readCompose(path)).services.backend!);
     expect(env.SECURE_COOKIES).toBe('${SECURE_COOKIES:-false}');
-    expect(env.REGISTRATION_MODE).toBe('${REGISTRATION_MODE:-invite}');
+    expect(env.QRO_REGISTRATION_MODE).toBe('${QRO_REGISTRATION_MODE:-invite}');
     // Docker's default network range: the bundled nginx, not LAN clients in 10/8 or 192.168/16.
     expect(env.TRUSTED_PROXIES).toBe('${TRUSTED_PROXIES:-172.16.0.0/12}');
   });

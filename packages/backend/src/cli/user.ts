@@ -133,7 +133,7 @@ async function invite(parsed: ParsedArgs, io: CommandIo) {
   io.out('');
   io.out('It is shown only once. Share it through a channel you trust; it works for one sign-up.');
   if (!policy.setupRequired && mode === 'closed') {
-    io.err('Warning: REGISTRATION_MODE=closed rejects sign-ups, so this code cannot be used.');
+    io.err('Warning: QRO_REGISTRATION_MODE=closed rejects sign-ups, so this code cannot be used.');
   }
 }
 

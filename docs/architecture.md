@@ -91,7 +91,7 @@ The Vite dev server runs on `:5173` and the Bun API server on `:3000`. The Axios
 
 Authentication is session-based (`src/lib/sessions.ts`). On sign-in, the backend generates a random token, stores only its SHA-256 digest in the `sessions` table and sets the token in an HTTP-only cookie. All subsequent requests carry the cookie. The `requireAuth` middleware hashes the cookie, validates the session against the DB, and attaches `{ id, email }`, the session id and the accepted `partnerId` to the Hono context in one session query. Sessions have a 30-day TTL and are cleaned up by a background interval started in `index.ts` via `startSessionCleanup()`.
 
-Sign-up follows `REGISTRATION_MODE` (`src/lib/registration.ts`): the first account always needs an operator-issued setup code, and later sign-ups need an invite code unless the operator opts in to open registration. Operators issue registration and password reset codes with the `quro` command in the backend image (`src/cli/`). See [the security model](security.md) for the deployment modes, registration policy and recovery.
+Sign-up follows `QRO_REGISTRATION_MODE` (`src/lib/registration.ts`): the first account always needs an operator-issued setup code, and later sign-ups need an invite code unless the operator opts in to open registration. Operators issue registration and password reset codes with the `quro` command in the backend image (`src/cli/`). See [the security model](security.md) for the deployment modes, registration policy and recovery.
 
 ### CSRF protection
 

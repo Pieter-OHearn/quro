@@ -27,7 +27,7 @@ services:
       - POSTGRES_APP_USER=${POSTGRES_APP_USER:-quro_app}
       - MINIO_APP_USER=${MINIO_APP_USER:-quro_app}
       - SECURE_COOKIES=${SECURE_COOKIES:-false}
-      - REGISTRATION_MODE=${REGISTRATION_MODE:-invite}
+      - QRO_REGISTRATION_MODE=${QRO_REGISTRATION_MODE:-invite}
       - TRUSTED_PROXIES=${TRUSTED_PROXIES:-172.16.0.0/12}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000,http://localhost:5173}
       - S3_ENDPOINT=http://minio:9000

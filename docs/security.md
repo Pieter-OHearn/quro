@@ -68,7 +68,7 @@ The backend checks `FRONTEND_ORIGIN` at startup when it is set, and the `Origin`
 sign-in, sign-up and password reset requests. Browsers send `Origin` on every `POST` and proxies
 pass it through unchanged, so it shows the scheme the browser uses even behind two proxies.
 Any client can send an `Origin` header, though, so a warning based on one says so: confirm how
-browsers reach Quro before changing the setting. Unknown `SECURE_COOKIES` and `REGISTRATION_MODE`
+browsers reach Quro before changing the setting. Unknown `SECURE_COOKIES` and `QRO_REGISTRATION_MODE`
 values stop the backend at startup.
 
 ### Not supported
@@ -177,7 +177,7 @@ so concurrent sign-ups cannot create two first accounts or use one code twice
 
 ### Registration modes
 
-`REGISTRATION_MODE` decides who may sign up once the first account exists:
+`QRO_REGISTRATION_MODE` decides who may sign up once the first account exists:
 
 | Value              | Sign-up after the first account                                     |
 | ------------------ | ------------------------------------------------------------------- |

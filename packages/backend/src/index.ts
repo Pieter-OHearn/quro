@@ -43,7 +43,7 @@ import { httpTracing } from './lib/tracing';
 loadBunqConfig();
 // Fail fast on auth settings a typo could weaken. Both are read again per request.
 parseSecureCookies(process.env.SECURE_COOKIES);
-parseRegistrationMode(process.env.REGISTRATION_MODE);
+parseRegistrationMode(process.env.QRO_REGISTRATION_MODE);
 checkConfiguredCookieTransport();
 
 export const app = new Hono();

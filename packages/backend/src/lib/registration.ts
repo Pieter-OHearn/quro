@@ -9,7 +9,7 @@ import { publicUserColumns } from './users';
 export const DEFAULT_REGISTRATION_MODE: RegistrationMode = 'invite';
 
 /**
- * Parses `REGISTRATION_MODE`. Unset means invite-only; an unknown value is a startup error so a
+ * Parses `QRO_REGISTRATION_MODE`. Unset means invite-only; an unknown value is a startup error so a
  * typo cannot open registration.
  */
 export function parseRegistrationMode(raw: string | undefined): RegistrationMode {
@@ -18,11 +18,11 @@ export function parseRegistrationMode(raw: string | undefined): RegistrationMode
   if ((REGISTRATION_MODES as readonly string[]).includes(value)) {
     return value as RegistrationMode;
   }
-  throw new Error(`REGISTRATION_MODE must be one of ${REGISTRATION_MODES.join(', ')}`);
+  throw new Error(`QRO_REGISTRATION_MODE must be one of ${REGISTRATION_MODES.join(', ')}`);
 }
 
 export function getRegistrationMode(): RegistrationMode {
-  return parseRegistrationMode(process.env.REGISTRATION_MODE);
+  return parseRegistrationMode(process.env.QRO_REGISTRATION_MODE);
 }
 
 /**

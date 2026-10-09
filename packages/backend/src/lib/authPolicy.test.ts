@@ -18,7 +18,7 @@ describe('parseRegistrationMode', () => {
   });
 
   test.each(['OPEN', 'opne', 'true', '1'])('refuses %s instead of guessing', (value) => {
-    expect(() => parseRegistrationMode(value)).toThrow('REGISTRATION_MODE must be one of');
+    expect(() => parseRegistrationMode(value)).toThrow('QRO_REGISTRATION_MODE must be one of');
   });
 });
 

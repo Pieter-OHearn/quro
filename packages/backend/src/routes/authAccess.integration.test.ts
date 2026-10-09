@@ -7,11 +7,11 @@ import { hashSessionToken } from '../lib/sessions';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
 
 const integration = createIntegrationHelpers('auth-access.integration.quro.test');
-const originalMode = process.env.REGISTRATION_MODE;
+const originalMode = process.env.QRO_REGISTRATION_MODE;
 
 function setRegistrationMode(mode: string | undefined) {
-  if (mode === undefined) delete process.env.REGISTRATION_MODE;
-  else process.env.REGISTRATION_MODE = mode;
+  if (mode === undefined) delete process.env.QRO_REGISTRATION_MODE;
+  else process.env.QRO_REGISTRATION_MODE = mode;
 }
 
 function signUp(label: string, inviteCode?: string) {
@@ -55,7 +55,7 @@ afterAll(async () => {
 });
 
 describe('registration policy', () => {
-  test('is public and follows REGISTRATION_MODE once an account exists', async () => {
+  test('is public and follows QRO_REGISTRATION_MODE once an account exists', async () => {
     const expected: Record<string, RegistrationPolicy['signUp']> = {
       invite: 'code',
       closed: 'closed',
