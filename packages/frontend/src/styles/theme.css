@@ -222,6 +222,14 @@
 }
 
 @theme inline {
+  /*
+   * One family (docs/design-v1.md, section 3): the stack fonts.css gives `body`.
+   * Preflight sets `code`, `kbd`, `samp` and `pre` in the default mono family; point it
+   * at the same stack, because V1 has no monospace.
+   */
+  --font-sans: 'Geist Variable', system-ui, -apple-system, sans-serif;
+  --default-mono-font-family: var(--font-sans);
+
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-disabled: var(--brand-disabled);
@@ -404,6 +412,99 @@
     'lnum' 1;
 }
 
+/**
+ * V1 type scale (docs/design-v1.md, section 3). Each style sets size, line height, weight
+ * and letter spacing together; pair it with a colour class (`text-label text-fg-muted`).
+ * The figure styles also lock tabular, lining numerals. "Below 640px" is the phone size.
+ * New names here must also be added to `TYPE_SCALE_UTILITIES` in `lib/utils.ts`.
+ */
+@utility text-figure-hero {
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+
+  @media (width < 640px) {
+    font-size: 34px;
+    line-height: 40px;
+  }
+}
+
+@utility text-figure-lg {
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@utility text-figure-md {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums lining-nums;
+
+  @media (width < 640px) {
+    font-size: 15px;
+  }
+}
+
+@utility text-figure-cell {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@utility text-title-page {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility text-title-section {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+@utility text-body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+
+  @media (width < 640px) {
+    font-size: 15px;
+  }
+}
+
+@utility text-cell {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+@utility text-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+@utility text-caption {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
 @layer base {
   * {
     @apply border-border-default outline-focus-ring/50;
@@ -433,43 +534,35 @@
   }
 
   /**
-   * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+   * Default typography styles for HTML elements (body, h1-h4, label, button, input).
    * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg)
-   * automatically override them.
+   * automatically override them. Body, headings and labels take the V1 type scale.
    */
 
   html {
     font-size: var(--font-size);
   }
 
+  body {
+    @apply text-body;
+  }
+
   h1 {
-    font-size: var(--text-2xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    @apply text-title-page;
   }
 
-  h2 {
-    font-size: var(--text-xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
-  }
-
+  h2,
   h3 {
-    font-size: var(--text-lg);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    @apply text-title-section;
   }
 
   h4 {
     font-size: var(--text-base);
     font-weight: var(--font-weight-medium);
-    line-height: 1.5;
   }
 
   label {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    @apply text-label;
   }
 
   button {

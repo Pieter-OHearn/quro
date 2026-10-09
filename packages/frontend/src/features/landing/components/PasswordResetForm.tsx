@@ -13,8 +13,8 @@ export function PasswordResetHelp() {
   return (
     <p className="rounded-2xl border border-border-default bg-surface-sunken px-4 py-3 text-sm text-fg-subtle">
       Quro does not send email. Ask the operator of this Quro instance to run{' '}
-      <code className="font-mono text-xs text-fg-muted">quro user reset-password</code> with your
-      email address. They give you a one-time code that expires after an hour.
+      <code className="text-xs text-fg-muted">quro user reset-password</code> with your email
+      address. They give you a one-time code that expires after an hour.
     </p>
   );
 }
