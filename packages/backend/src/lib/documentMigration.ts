@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, rename, rm } from 'node:fs/promises';
+import { appendFile, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { isValidDocumentKey, type DocumentStore } from './documentStore';
 import {
@@ -20,12 +20,11 @@ import {
 // the documents directory, flushed, read back and compared by SHA-256 with what S3 returned (and
 // with the size and hash the database recorded at upload). Only when every needed object has a
 // verified copy are the copies moved into place, so a failed run adds nothing to the documents
-// directory. Verified copies stay staged and are recorded in a progress file; the next run checks
+// directory. Verified copies stay staged and are appended to a progress log; the next run checks
 // them again and downloads only what is missing, so an interrupted run resumes.
 
 export const STAGING_DIRECTORY_NAME = '.migrate-from-s3';
-const PROGRESS_FILE_NAME = 'progress.json';
-const PROGRESS_VERSION = 1;
+const PROGRESS_FILE_NAME = 'progress.jsonl';
 
 export type DocumentReference = {
   key: string;
@@ -67,7 +66,7 @@ type KeyPlan = {
   expectedHashes: Set<string>;
 };
 
-type Progress = { version: number; objects: Record<string, string> };
+type Progress = Map<string, string>;
 
 function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -112,22 +111,22 @@ async function readFileIfPresent(path: string): Promise<Buffer | null> {
   }
 }
 
+/** Verified staged copies by key: one JSON line per copy, appended as each one is made. */
 async function readProgress(path: string): Promise<Progress> {
+  const progress: Progress = new Map();
   const raw = await readFileIfPresent(path);
-  if (!raw) return { version: PROGRESS_VERSION, objects: {} };
-  try {
-    const parsed = JSON.parse(raw.toString('utf8')) as Partial<Progress>;
-    if (
-      parsed.version === PROGRESS_VERSION &&
-      parsed.objects &&
-      typeof parsed.objects === 'object'
-    ) {
-      return { version: PROGRESS_VERSION, objects: { ...parsed.objects } };
+  for (const line of raw ? raw.toString('utf8').split('\n') : []) {
+    // A line cut off by an interrupted run is skipped; that copy is downloaded again.
+    try {
+      const entry = JSON.parse(line) as { key?: unknown; sha256?: unknown };
+      if (typeof entry.key === 'string' && typeof entry.sha256 === 'string') {
+        progress.set(entry.key, entry.sha256);
+      }
+    } catch {
+      // See above.
     }
-  } catch {
-    // An unreadable progress file only costs downloads: every staged copy is fetched again.
   }
-  return { version: PROGRESS_VERSION, objects: {} };
+  return progress;
 }
 
 /** Why the bytes S3 returned do not match what the database recorded, or null when they do. */
@@ -228,7 +227,7 @@ class Migration {
   }
 
   private async verifiedStagedDigest(key: string): Promise<string | null> {
-    const recorded = this.progress.objects[key];
+    const recorded = this.progress.get(key);
     if (!recorded) return null;
     const staged = await readFileIfPresent(resolveDocumentPath(this.stagingObjects, key));
     return staged && sha256(staged) === recorded ? recorded : null;
@@ -260,8 +259,12 @@ class Migration {
     } catch (error) {
       return failed(`could not be written to the documents directory (${describeError(error)})`);
     }
-    this.progress.objects[key] = digest;
-    await writeFileAtomically(this.progressPath, Buffer.from(JSON.stringify(this.progress)));
+    // Appended, not rewritten: the log grows by one line per copy whatever the number of objects.
+    // A line lost to a crash only means that copy is downloaded again.
+    await appendFile(this.progressPath, `${JSON.stringify({ key, sha256: digest })}\n`, {
+      mode: 0o600,
+    });
+    this.progress.set(key, digest);
     return { kind: 'staged', digest };
   }
 }

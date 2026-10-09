@@ -36,7 +36,7 @@ export function createS3Client(connection: S3Connection): S3Client {
 async function readableToBuffer(readable: Readable): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   for await (const chunk of readable) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk));
+    chunks.push(Buffer.from(chunk));
   }
   return Buffer.concat(chunks);
 }

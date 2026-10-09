@@ -25,7 +25,7 @@ The `db-tools` service lives in the `maintenance` profile, so it only runs when 
 docker compose --profile maintenance run --rm db-tools backup
 ```
 
-The dump is written to `./backups/db/<database>-<timestamp>.dump` on the host. For example, `quro-20261009-001322.dump`. With filesystem storage, the command then archives `./data/documents` (mounted read-only into `db-tools`) into `quro-20261009-001322.documents.tar` in the same directory. Both files are written under a temporary name first; the archive is readable by its owner only. To add a label to the file names:
+The dump is written to `./backups/db/<database>-<timestamp>.dump` on the host. For example, `quro-20261009-001322.dump`. With filesystem storage, the command then archives `./data/documents` (mounted read-only into `db-tools`) into `quro-20261009-001322.documents.tar` in the same directory. The archive is written under a temporary name and renamed when it is complete, and only its owner can read it. To add a label to the file names:
 
 ```bash
 docker compose --profile maintenance run --rm db-tools backup --label before-upgrade

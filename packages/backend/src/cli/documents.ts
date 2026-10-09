@@ -105,13 +105,29 @@ function errorName(error: unknown): string {
   return 'unknown error';
 }
 
+/** An HTTP answer from the store means it was reached and refused, for example a missing bucket. */
+function storeAnswered(error: unknown): boolean {
+  const metadata = (error as { $metadata?: { httpStatusCode?: unknown } } | null)?.$metadata;
+  return typeof metadata?.httpStatusCode === 'number';
+}
+
+/** A PostgreSQL error class other than 08 (connection exception) means the database answered. */
+function databaseAnswered(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) && !code.startsWith('08');
+}
+
 function printReport(report: MigrationReport, directory: string, io: CommandIo): number {
   const summary = `${report.copied.length} copied, ${report.alreadyPresent.length} already present, ${report.skipped.length} skipped`;
   if (report.failures.length > 0) {
     io.err(
       `Stopped: ${report.failures.length} of ${report.objects} documents could not be copied (${summary}).`,
     );
-    io.err(`Nothing was added to ${directory}. Verified copies are kept for the next run.`);
+    io.err(
+      report.copied.length === 0
+        ? `Nothing was added to ${directory}. Verified copies are kept for the next run.`
+        : `${report.copied.length} verified copies were moved into ${directory} before the failure; run again to finish.`,
+    );
     io.err('Keep QRO_DOCUMENT_STORAGE=s3 until a run finishes without failures.');
     return EXIT_FAILURE;
   }
@@ -147,6 +163,12 @@ async function migrateFromS3(
   try {
     await source.check();
   } catch (error) {
+    if (storeAnswered(error)) {
+      io.err(
+        `The S3 store refused access to the bucket (${errorName(error)}). Nothing was copied.`,
+      );
+      return EXIT_FAILURE;
+    }
     io.err(`The S3 store cannot be reached (${errorName(error)}). Nothing was copied.`);
     return EXIT_UNAVAILABLE;
   }
@@ -156,7 +178,7 @@ async function migrateFromS3(
     references = await dependencies.readReferences();
   } catch (error) {
     io.err(`Document references could not be read from the database (${errorName(error)}).`);
-    return EXIT_UNAVAILABLE;
+    return databaseAnswered(error) ? EXIT_FAILURE : EXIT_UNAVAILABLE;
   }
 
   io.out(`Copying documents from S3 bucket ${config.s3.bucket} into ${directory}.`);

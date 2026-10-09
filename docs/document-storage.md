@@ -63,7 +63,8 @@ S3 settings (`S3_ENDPOINT`, `S3_BUCKET` or `S3_ACCESS_KEY_ID`) without `QRO_DOCU
 - It checks every copy: the bytes it wrote are read back and compared by SHA-256 with what the store returned, and with the size (and, for statement imports, the SHA-256) recorded when the document was uploaded.
 - It changes no database row and never writes to or deletes from the S3 store.
 - It adds nothing to the documents directory unless every needed document was copied. Verified copies wait in `.migrate-from-s3` inside the documents directory until then, and a later run checks them again and downloads only what is missing. After a successful run that directory is gone.
-- A file that is already in the documents directory is never overwritten. One with the same content counts as copied.
+- A file that is already in the documents directory is never overwritten. One with the same content as in the store is reported as already present.
+- Run one copy at a time. Two runs at once do not damage anything, but one of them can stop with an error; run it again afterwards.
 
 Steps for the Compose stack:
 

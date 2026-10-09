@@ -257,10 +257,12 @@ describe('migrate-from-s3', () => {
       // A process killed mid-copy: a temporary file, and a staged copy with no progress record.
       const stagedPayslip = stagingPath(PAYSLIP);
       writeFileSync(join(dirname(stagedPayslip), '.partial.pdf.1234.tmp'), '%PDF-1.4 trunc');
-      const progressPath = join(directory, STAGING_DIRECTORY_NAME, 'progress.json');
-      const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
-      delete progress.objects[PAYSLIP];
-      writeFileSync(progressPath, JSON.stringify(progress));
+      const progressPath = join(directory, STAGING_DIRECTORY_NAME, 'progress.jsonl');
+      const lines = readFileSync(progressPath, 'utf8').trim().split('\n');
+      expect(lines).toHaveLength(2);
+      const kept = lines.filter((line) => JSON.parse(line).key !== PAYSLIP);
+      // The record of the payslip copy was cut off mid-line when the process died.
+      writeFileSync(progressPath, `${kept.join('\n')}\n{"key":"users/1/sal`);
       writeFileSync(stagedPayslip, '%PDF-1.4 trunc');
 
       s3.failGet = () => undefined;
@@ -288,6 +290,33 @@ describe('migrate-from-s3', () => {
       expect(report.alreadyPresent).toEqual([PAYSLIP]);
       expect(report.copied.sort()).toEqual([QUEUED_IMPORT, STATEMENT].sort());
     });
+  });
+
+  test('a file written at a key while the copies are made is never overwritten', async () => {
+    const references = seed();
+    // Keys are processed in order, so the payslip is fetched last; by then another writer has put
+    // a different file where the pension statement is about to go.
+    s3.failGet = (key) => {
+      if (key === PAYSLIP) {
+        mkdirSync(dirname(finalPath(STATEMENT)), { recursive: true });
+        writeFileSync(finalPath(STATEMENT), 'written by someone else');
+      }
+      return undefined;
+    };
+
+    const report = await migrate(references);
+
+    expect(report.failures).toEqual([
+      {
+        key: STATEMENT,
+        reason: 'checksum mismatch: a different file is already in the documents directory',
+        sources: ['pension_transactions#20'],
+      },
+    ]);
+    expect(report.copied.sort()).toEqual([PAYSLIP, QUEUED_IMPORT].sort());
+    expect(readFileSync(finalPath(STATEMENT), 'utf8')).toBe('written by someone else');
+    // The verified copy stays staged for the operator to compare.
+    expect(existsSync(stagingPath(STATEMENT))).toBe(true);
   });
 
   test('running again after a successful run changes nothing', async () => {

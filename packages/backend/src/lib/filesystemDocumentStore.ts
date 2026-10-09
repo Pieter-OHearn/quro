@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, mkdir, open, readFile, rename, rm, stat, unlink } from 'node:fs/promises';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import {
   documentKeySegments,
   InvalidDocumentKeyError,
@@ -57,9 +57,13 @@ export async function syncDirectory(path: string): Promise<void> {
   }
 }
 
-/** Writes the file under a temporary name in the same directory, flushes it and renames it. */
+/**
+ * Writes the file under a temporary name in the same directory, flushes it and renames it. The
+ * temporary name has a fixed length and starts with a dot, so it fits any key segment and never
+ * collides with a key.
+ */
 export async function writeFileAtomically(path: string, bytes: Uint8Array): Promise<void> {
-  const temporary = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`);
+  const temporary = join(dirname(path), `.${randomUUID()}.tmp`);
   const handle = await open(temporary, 'wx', FILE_MODE);
   try {
     await handle.writeFile(bytes);

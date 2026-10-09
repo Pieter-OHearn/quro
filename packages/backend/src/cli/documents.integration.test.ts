@@ -240,6 +240,14 @@ describe('quro documents migrate-from-s3', () => {
     expect(s3.gets).toEqual([]);
   });
 
+  test('a store that answers but refuses the bucket stops with exit code 1', async () => {
+    restoreSettings?.();
+    restoreSettings = applyTestSettings(s3Settings({ S3_BUCKET: 'not-the-bucket' }));
+    const result = await run('migrate-from-s3');
+    expect(result.exitCode).toBe(EXIT_FAILURE);
+    expect(result.err).toContain('The S3 store refused access to the bucket (NoSuchBucket)');
+  });
+
   test('without the S3 settings there is nothing to copy from: exit code 2', async () => {
     restoreSettings?.();
     restoreSettings = applyTestSettings({
