@@ -1,7 +1,10 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test, setDefaultTimeout } from 'bun:test';
 import { installProviderMocks } from '../test/providerMocks';
 
 // The matrix exercises document, price and import routes without any provider or object store.
+// These suites send hundreds of requests; the default 5 seconds is for single assertions.
+setDefaultTimeout(60_000);
+
 const providers = await installProviderMocks();
 const { s3Objects } = providers;
 

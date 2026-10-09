@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test, setDefaultTimeout } from 'bun:test';
 import { resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -11,6 +11,9 @@ import { createIntegrationHelpers, integrationPassword } from '../test/integrati
  * the settings an installation uses (NODE_ENV is not "test", so rate limits are active). The
  * process serves only synthetic accounts from the test database; nothing else is contacted.
  */
+
+// These suites send hundreds of requests; the default 5 seconds is for single assertions.
+setDefaultTimeout(60_000);
 
 const integration = createIntegrationHelpers('dynamic-deployment.integration.quro.test');
 const BACKEND_DIR = resolve(import.meta.dir, '../..');

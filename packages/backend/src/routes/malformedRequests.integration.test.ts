@@ -1,5 +1,8 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test, setDefaultTimeout } from 'bun:test';
 import { installProviderMocks } from '../test/providerMocks';
+
+// These suites send hundreds of requests; the default 5 seconds is for single assertions.
+setDefaultTimeout(60_000);
 
 const providers = await installProviderMocks();
 

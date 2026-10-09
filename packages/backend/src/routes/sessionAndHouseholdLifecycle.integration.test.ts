@@ -1,8 +1,11 @@
-import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, mock, test, setDefaultTimeout } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { installProviderMocks } from '../test/providerMocks';
 
 // The statement import job runs against an in-memory store and a canned parser, never a provider.
+// These suites send hundreds of requests; the default 5 seconds is for single assertions.
+setDefaultTimeout(60_000);
+
 const providers = await installProviderMocks();
 const realParser = { ...(await import('../lib/pensionParserClient')) };
 await mock.module('../lib/pensionParserClient', () => ({
