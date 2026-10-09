@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { db } from '../db/client';
+import { ConfigError } from '../config';
 import { getPensionStatementImportCapability } from './capabilities';
-import { checkS3Readiness, S3ConfigurationError } from './s3';
+import { getDocumentStore } from './documentStorage';
 
 const READINESS_TIMEOUT_MS = 2_000;
 
@@ -95,16 +96,17 @@ export async function checkDatabaseReadiness(now = new Date()): Promise<Readines
   }
 }
 
+// Only the configured driver is checked: the filesystem directory, or the S3 bucket.
 export async function checkDocumentStorageReadiness(
   now = new Date(),
-  checkStorage = checkS3Readiness,
+  checkStorage = () => getDocumentStore().check(),
   timeoutMs = READINESS_TIMEOUT_MS,
 ): Promise<ReadinessCheck> {
   try {
     await withTimeout(checkStorage(), timeoutMs, 'Document storage readiness check');
     return createReadinessCheck(now, true, true, 'Document storage is reachable.');
   } catch (error) {
-    if (error instanceof S3ConfigurationError) {
+    if (error instanceof ConfigError) {
       return createReadinessCheck(
         now,
         true,

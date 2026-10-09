@@ -1,9 +1,6 @@
-const S3_DELETE_BATCH_SIZE = 1000;
+import type { ObjectDeletionResult } from './documentStore';
 
-export type ObjectDeletionResult = {
-  deletedKeys: string[];
-  failedKeys: string[];
-};
+const S3_DELETE_BATCH_SIZE = 1000;
 
 export async function deleteObjectsInBatches(
   keys: readonly string[],

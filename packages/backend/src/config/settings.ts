@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from 'node:path';
 import { REGISTRATION_MODES } from '@quro/shared';
 import { parseTrustedProxies, type TrustedProxies } from '../lib/clientAddress';
 
@@ -25,7 +26,7 @@ export type SettingGroup =
 
 // Named up front because the settings below refer to their features and the features to the
 // settings; `FEATURES` is checked against this list.
-export type FeatureName = 'documents' | 'bunq';
+export type FeatureName = 's3Storage' | 'bunq';
 
 /** When the loader reports a missing value for this setting. */
 export type SettingRequirement =
@@ -133,6 +134,23 @@ export function isHttpUrl(value: string): boolean {
   return protocol === 'http:' || protocol === 'https:';
 }
 
+function absoluteDirectory(meta: Meta<string>) {
+  return define(
+    'absolute directory path',
+    (raw) => {
+      // A relative path would depend on the working directory of each command, so the server and
+      // `quro documents migrate-from-s3` could disagree about where documents live.
+      if (!isAbsolute(raw)) throw new SettingValueError('must be an absolute path');
+      const normalised = resolve(raw);
+      if (normalised === resolve('/')) {
+        throw new SettingValueError('must be a directory below the filesystem root');
+      }
+      return normalised;
+    },
+    meta,
+  );
+}
+
 const httpUrl = (meta: Meta<string>) =>
   define(
     'http(s) URL',
@@ -152,6 +170,11 @@ const httpOrigin = (meta: Meta<string>) =>
     },
     meta,
   );
+
+export const DOCUMENT_STORAGE_DRIVERS = ['filesystem', 's3'] as const;
+export type DocumentStorageDriver = (typeof DOCUMENT_STORAGE_DRIVERS)[number];
+
+export const DEFAULT_DOCUMENTS_DIR = '/var/lib/quro/documents';
 
 export const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'] as const;
 
@@ -369,32 +392,46 @@ export const SETTINGS = defineSettings({
   }),
 
   // ── Document storage ─────────────────────────────────────────────────────
+  QRO_DOCUMENT_STORAGE: choice(DOCUMENT_STORAGE_DRIVERS, {
+    group: 'Document storage',
+    audience: 'operator',
+    description:
+      'Where uploaded documents are kept. `filesystem`: the directory QRO_DOCUMENTS_DIR. `s3`: an S3-compatible store set up with the S3_* settings. When it is unset but S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID or the retired MINIO_APP_USER is present, every command stops instead of guessing.',
+    default: 'filesystem',
+  }),
+  QRO_DOCUMENTS_DIR: absoluteDirectory({
+    group: 'Document storage',
+    audience: 'operator',
+    description:
+      'Directory of the filesystem store, and where `quro documents migrate-from-s3` copies to. Must exist and be writable by the backend; the pension import worker mounts the same directory.',
+    default: DEFAULT_DOCUMENTS_DIR,
+  }),
   S3_ENDPOINT: httpUrl({
     group: 'Document storage',
     audience: 'operator',
     description: 'Endpoint of the S3-compatible store.',
-    requirement: { kind: 'feature', feature: 'documents' },
+    requirement: { kind: 'feature', feature: 's3Storage' },
     example: 'https://s3.example.com',
   }),
   S3_REGION: text({
     group: 'Document storage',
     audience: 'operator',
     description: 'Region name the store expects.',
-    requirement: { kind: 'feature', feature: 'documents' },
+    requirement: { kind: 'feature', feature: 's3Storage' },
     example: 'eu-west-1',
   }),
   S3_BUCKET: text({
     group: 'Document storage',
     audience: 'operator',
     description: 'Bucket for uploaded documents. Created by the operator.',
-    requirement: { kind: 'feature', feature: 'documents' },
+    requirement: { kind: 'feature', feature: 's3Storage' },
     example: 'quro-documents',
   }),
   S3_ACCESS_KEY_ID: text({
     group: 'Document storage',
     audience: 'operator',
     description: 'Access key id of an identity that can get, put, delete and list objects.',
-    requirement: { kind: 'feature', feature: 'documents' },
+    requirement: { kind: 'feature', feature: 's3Storage' },
   }),
   S3_SECRET_ACCESS_KEY_FILE: path({
     group: 'Document storage',
@@ -402,7 +439,7 @@ export const SETTINGS = defineSettings({
     description: 'File holding the secret access key.',
     secret: 'file',
     default: '/run/secrets/s3_secret_access_key',
-    requirement: { kind: 'feature', feature: 'documents' },
+    requirement: { kind: 'feature', feature: 's3Storage' },
   }),
   S3_FORCE_PATH_STYLE: flag({
     group: 'Document storage',
@@ -561,7 +598,9 @@ export type SettingValue<K extends SettingName> =
 // Features that stay off until one of their settings is present, and then need all of theirs.
 // Partial configuration is an error, never a silently half-enabled feature.
 export const FEATURES = {
-  documents: {
+  // All or nothing, like every feature. QRO_DOCUMENT_STORAGE=s3 selects the store; the settings
+  // alone never do (they stop every command until QRO_DOCUMENT_STORAGE says what to use).
+  s3Storage: {
     label: 'S3 document storage',
     enabledBy: [
       'S3_ENDPOINT',
@@ -611,3 +650,15 @@ export const RETIRED_SETTINGS = {
 } as const satisfies Record<string, string>;
 
 export type RetiredSettingName = keyof typeof RETIRED_SETTINGS;
+
+/**
+ * Settings that show an install used S3 before QRO_DOCUMENT_STORAGE existed. Finding one without
+ * QRO_DOCUMENT_STORAGE stops every command: falling back to the filesystem would hide the
+ * documents that are still in the store (docs/install-contract.md).
+ */
+export const S3_SELECTION_SIGNALS = [
+  'S3_ENDPOINT',
+  'S3_BUCKET',
+  'S3_ACCESS_KEY_ID',
+  'MINIO_APP_USER',
+] as const satisfies readonly (SettingName | RetiredSettingName)[];
