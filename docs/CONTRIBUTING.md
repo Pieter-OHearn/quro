@@ -28,16 +28,20 @@ The `Release` GitHub workflow runs only when a maintainer starts it manually (`w
 2. **Build** (`contents: read`, `packages: write`) builds the multi-arch images and pushes them to `ghcr.io/<owner>/quro-backend` and `.../quro-frontend` under a candidate tag, `sha-<commit>`. No git tag, version tag or `latest` tag exists yet.
 3. **Publish** (`contents: write`, `packages: write`) creates the git tag at the commit and adds the version tag to the candidate image digests without rebuilding them. It then creates a draft GitHub Release with the CHANGELOG section as its notes and no uploaded assets, moves `latest` to the same digests when the version takes it (see below), and publishes the release as its last step.
 
+Build and publish, the only jobs with write scopes, run in the protected `release` environment (repository settings, **Environments**). The environment allows deployments only from `main`, so start the workflow from `main` (**Use workflow from** in the Actions tab) and choose the commit to release with the `ref` input. A run started from any other branch can still run verify, but GitHub refuses the build job because the branch is not allowed to deploy to `release`, so nothing is built, tagged or published. Each write job also waits for the repository owner, the environment's required reviewer, to approve it on the run's page before it starts: once before the build, once before publishing, and again for a re-run.
+
 `latest`, both the image tag and the repository's latest GitHub Release, moves only for a stable version newer than every published stable release. A release candidate (`vX.Y.Z-rc.N`) is published as a prerelease, and neither a release candidate nor a patch for an older release line moves `latest`.
 
-To release a commit that is not on `main`, such as a hotfix branch, first start the `CI` workflow on that branch from the Actions tab and wait for it to pass.
+To release a commit that is not on `main`, such as a hotfix branch, first start the `CI` workflow on that branch from the Actions tab and wait for it to pass. Then start the `Release` workflow from `main` with that branch or commit as `ref`.
 
 If a release fails:
 
 - Before the publish job, nothing has been tagged. Fix the cause and start the workflow again.
 - During the publish job, re-run the failed job or start the workflow again for the same commit. The workflow reuses the tag, replaces the draft release the failed run left, and applies the image tags again. To release a different commit under the same version instead, delete the tag and the draft release first.
 
-The workflow reads its release logic (`scripts/lib/release-gate.ts` and `scripts/lib/promote-images.sh`) from the branch it runs from, not from the commit being released. The verify job reads that commit, its `VERSION` and its `CHANGELOG.md` through the GitHub API and never checks it out, and no job runs a script from it. Every action in it is pinned to a reviewed commit SHA, and Dependabot proposes updates to those pins.
+The workflow reads its release logic (`scripts/lib/release-gate.ts` and `scripts/lib/promote-images.sh`) from the branch it runs from, which is `main` for any run that releases, not from the commit being released. The verify job reads that commit, its `VERSION` and its `CHANGELOG.md` through the GitHub API and never checks it out, and no job runs a script from it. Every action in it is pinned to a reviewed commit SHA, and Dependabot proposes updates to those pins.
+
+The `release` environment holds the workflow as it is committed: started from another branch, its write jobs never start, and every release waits for the owner. Token scopes come from the workflow file, not from the environment, so it does not hold a copy of the workflow that was edited on another branch to drop the `environment` key. Pushing a branch and starting a workflow both need write access to the repository, which only the owner has today, and that is what covers an edited copy.
 
 ## Branch Protection
 

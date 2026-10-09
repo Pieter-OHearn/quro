@@ -4,8 +4,10 @@ name: Release
 # later job uses that SHA. The verify job reads that commit through the API and never
 # checks it out or runs it. Images are pushed under a candidate tag before the git tag
 # exists, so a failed build leaves nothing that blocks a retry. The release logic is read
-# from this workflow's commit, not from the commit being released. See "Release Artifacts"
-# in docs/CONTRIBUTING.md.
+# from this workflow's commit, not from the commit being released. The jobs that write
+# (build-images, publish) run in the protected `release` environment, which deploys only
+# from main and waits for a required reviewer. See "Release Artifacts" in
+# docs/CONTRIBUTING.md.
 
 on:
   workflow_dispatch:
@@ -59,6 +61,7 @@ jobs:
     name: Build Candidate Images
     runs-on: ubuntu-latest
     needs: verify
+    environment: release
     permissions:
       contents: read # check out the release commit
       packages: write # push candidate images
@@ -112,6 +115,7 @@ jobs:
     name: Tag and Publish Release
     runs-on: ubuntu-latest
     needs: [verify, build-images]
+    environment: release
     permissions:
       contents: write # create the tag and the release
       packages: write # add the version and latest tags to the candidate images
