@@ -9,7 +9,8 @@ import { basename } from 'node:path';
 //                    exact commit, and the tag and release do not block this commit
 //   create-tag       after the images are built: create the tag, or confirm a tag left by an
 //                    earlier run points at the same commit
-//   stage-release    replace any draft an earlier run left and upload the assets to a new draft
+//   stage-release    replace any draft an earlier run left, upload the assets to a new draft
+//                    and decide whether this release moves latest
 //   publish-release  publish that draft
 
 export const RELEASE_VERSION_PATTERN =
@@ -209,6 +210,7 @@ export type Release = {
   id: number;
   tag_name: string;
   draft: boolean;
+  prerelease?: boolean;
   upload_url: string;
   html_url?: string;
   author?: { login?: string } | null;
@@ -232,6 +234,57 @@ export function draftsToReplace(
     }
   }
   return { drafts, problems };
+}
+
+// Release candidates are prereleases. latest (the image tag and GitHub's latest release)
+// moves only for a stable version newer than every published stable release, so neither a
+// release candidate nor a patch for an older line takes it.
+export function isPrerelease(version: string): boolean {
+  return version.includes('-rc.');
+}
+
+function versionParts(version: string): number[] {
+  const match = RELEASE_VERSION_PATTERN.exec(version);
+  if (!match) throw new ReleaseGateError(`${version} is not a release version`);
+  const [, major, minor, patch, , rc] = match;
+  // A stable version sorts after every release candidate of the same number.
+  return [major, minor, patch].map(Number).concat(rc === undefined ? Infinity : Number(rc));
+}
+
+export function compareVersions(a: string, b: string): number {
+  const left = versionParts(a);
+  const right = versionParts(b);
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return Math.sign(left[index] - right[index]);
+  }
+  return 0;
+}
+
+export function planLatest(
+  version: string,
+  releases: readonly Release[],
+): { latest: boolean; reason: string } {
+  if (isPrerelease(version)) {
+    return {
+      latest: false,
+      reason: `${version} is a release candidate: it is published as a prerelease and latest does not move.`,
+    };
+  }
+  const newest = releases
+    .filter((release) => !release.draft && !release.prerelease)
+    .map((release) => release.tag_name)
+    .filter((tag) => RELEASE_VERSION_PATTERN.test(tag) && !isPrerelease(tag))
+    .reduce<string | null>(
+      (best, tag) => (best === null || compareVersions(tag, best) > 0 ? tag : best),
+      null,
+    );
+  if (newest !== null && compareVersions(version, newest) < 0) {
+    return {
+      latest: false,
+      reason: `${version} is older than the published ${newest}, so latest stays on ${newest}.`,
+    };
+  }
+  return { latest: true, reason: `${version} becomes latest.` };
 }
 
 // ── GitHub REST client ───────────────────────────────────────────────────────
@@ -410,6 +463,8 @@ export async function preflight(env: Env, gh: GitHub, out: Output): Promise<void
     published: await isPublished(gh, version),
   });
   assertNoProblems([...gate.problems, ...plan.problems]);
+  const published = await listPages(gh, '/releases', (body) => body as Release[]);
+  out.log(planLatest(version, published).reason);
   out.log(
     plan.createTag
       ? `Tag ${version} will be created after the images are built.`
@@ -481,16 +536,24 @@ export async function stageRelease(
     out.log(`Removed draft release ${draft.id} left by an earlier run.`);
   }
 
+  const channel = planLatest(version, releases);
   const release = await gh.request<Release>('POST', '/releases', {
-    body: { tag_name: version, name: version, body: notes, draft: true },
+    body: {
+      tag_name: version,
+      name: version,
+      body: notes,
+      draft: true,
+      prerelease: isPrerelease(version),
+    },
   });
   if (!release) throw new ReleaseGateError('Creating the draft release returned no release');
   for (const asset of assets) {
     await gh.upload(release.upload_url, asset);
     out.log(`Uploaded ${basename(asset)}.`);
   }
-  out.log(`Staged draft release ${release.id} for ${version}.`);
+  out.log(`Staged draft release ${release.id} for ${version}. ${channel.reason}`);
   out.setOutput('release_id', String(release.id));
+  out.setOutput('latest', String(channel.latest));
 }
 
 export async function publishRelease(env: Env, gh: GitHub, out: Output): Promise<void> {
@@ -498,6 +561,10 @@ export async function publishRelease(env: Env, gh: GitHub, out: Output): Promise
   const releaseId = required(env, 'RELEASE_ID');
   if (!RELEASE_ID_PATTERN.test(releaseId))
     throw new ReleaseGateError('RELEASE_ID must be a release id');
+  const latest = required(env, 'RELEASE_LATEST');
+  if (latest !== 'true' && latest !== 'false') {
+    throw new ReleaseGateError('RELEASE_LATEST must be true or false');
+  }
   await requireTagAt(gh, sha, version);
 
   const draft = await gh.request<Release>('GET', `/releases/${releaseId}`);
@@ -505,7 +572,7 @@ export async function publishRelease(env: Env, gh: GitHub, out: Output): Promise
     throw new ReleaseGateError(`Release ${releaseId} is not the draft for ${version}.`);
   }
   const published = await gh.request<Release>('PATCH', `/releases/${releaseId}`, {
-    body: { draft: false },
+    body: { draft: false, prerelease: isPrerelease(version), make_latest: latest },
   });
   out.log(`Published ${version}${published?.html_url ? `: ${published.html_url}` : ''}.`);
 }

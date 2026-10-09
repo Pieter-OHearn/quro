@@ -8,10 +8,12 @@ import {
   type Release,
   type WorkflowRun,
   RELEASE_BOT_LOGIN,
+  compareVersions,
   createGitHub,
   draftsToReplace,
   evaluateRequiredChecks,
   parseReleaseVersion,
+  planLatest,
   planTag,
   runCommand,
 } from './release-gate';
@@ -199,6 +201,53 @@ describe('evaluateRequiredChecks', () => {
 
   test('refuses an empty check list', () => {
     expect(gate([pair()], []).ok).toBe(false);
+  });
+});
+
+describe('release channels', () => {
+  const published = (tag_name: string, overrides: Partial<Release> = {}): Release => ({
+    id: 1,
+    tag_name,
+    draft: false,
+    prerelease: false,
+    upload_url: '',
+    ...overrides,
+  });
+
+  test('orders versions numerically, with a release candidate before its release', () => {
+    expect(compareVersions('v0.10.0', 'v0.9.9')).toBe(1);
+    expect(compareVersions('v1.0.0-rc.2', 'v1.0.0')).toBe(-1);
+    expect(compareVersions('v1.0.0-rc.10', 'v1.0.0-rc.9')).toBe(1);
+    expect(compareVersions('v0.8.0', 'v0.8.0')).toBe(0);
+  });
+
+  test('moves latest for the first or a newer stable release', () => {
+    expect(planLatest('v0.8.0', []).latest).toBe(true);
+    expect(planLatest('v0.9.0', [published('v0.8.0'), published('v0.8.1')]).latest).toBe(true);
+    expect(planLatest('v1.0.0', [published('v1.0.0-rc.1', { prerelease: true })]).latest).toBe(
+      true,
+    );
+  });
+
+  test('keeps latest for a release candidate', () => {
+    const result = planLatest('v1.0.0-rc.1', [published('v0.9.0')]);
+    expect(result).toEqual({ latest: false, reason: expect.stringContaining('release candidate') });
+  });
+
+  test('keeps latest for a patch on an older line', () => {
+    const result = planLatest('v0.8.1', [published('v0.8.0'), published('v0.9.0')]);
+    expect(result.latest).toBe(false);
+    expect(result.reason).toContain('latest stays on v0.9.0');
+  });
+
+  test('ignores drafts, prereleases and tags that are not release versions', () => {
+    const releases = [
+      published('v0.9.0', { draft: true }),
+      published('v0.9.0-rc.1', { prerelease: true }),
+      published('nightly'),
+      published('v0.8.0'),
+    ];
+    expect(planLatest('v0.8.1', releases).latest).toBe(true);
   });
 });
 
@@ -490,7 +539,14 @@ async function releaseAfterBuild(): Promise<number[]> {
   const staged = await run(['stage-release', ...assets]);
   codes.push(staged.code);
   if (staged.code !== 0) return codes;
-  codes.push((await run(['publish-release'], { RELEASE_ID: staged.outputs.release_id })).code);
+  codes.push(
+    (
+      await run(['publish-release'], {
+        RELEASE_ID: staged.outputs.release_id,
+        RELEASE_LATEST: staged.outputs.latest,
+      })
+    ).code,
+  );
   return codes;
 }
 
@@ -639,7 +695,12 @@ describe('release-gate CLI', () => {
 
   test('stage-release and publish-release require the tag at the commit', async () => {
     expect((await run(['stage-release', ...assets])).error).toContain('must point at');
-    expect((await run(['publish-release'], { RELEASE_ID: '1' })).error).toContain('must point at');
+    expect(
+      (await run(['publish-release'], { RELEASE_ID: '1', RELEASE_LATEST: 'true' })).error,
+    ).toContain('must point at');
+    expect(
+      (await run(['publish-release'], { RELEASE_ID: '1', RELEASE_LATEST: 'yes' })).error,
+    ).toContain('RELEASE_LATEST must be true or false');
   });
 
   test('refuses unknown commands and malformed inputs', async () => {
@@ -677,6 +738,55 @@ describe('release-gate CLI', () => {
     expect(await releaseAfterBuild()).toEqual([0, 1]);
     expect(await releaseAfterBuild()).toEqual([0, 0, 0]);
     expect(releasesFor('v0.8.0')).toEqual(PUBLISHED);
+  });
+
+  test('publishes a release candidate as a prerelease without moving latest', async () => {
+    passCi();
+    writeFileSync(versionFile, 'v1.0.0-rc.1\n');
+    expect((await run(['preflight'])).log).toContain('is a release candidate');
+
+    state.tags.set('v1.0.0-rc.1', { type: 'commit', sha: SHA });
+    const rc = await run(['stage-release', ...assets], { RELEASE_VERSION: 'v1.0.0-rc.1' });
+    expect(rc.outputs.latest).toBe('false');
+    expect(state.releases).toMatchObject([{ draft: true, prerelease: true }]);
+    const publish = await run(['publish-release'], {
+      RELEASE_VERSION: 'v1.0.0-rc.1',
+      RELEASE_ID: rc.outputs.release_id,
+      RELEASE_LATEST: rc.outputs.latest,
+    });
+    expect(publish.code).toBe(0);
+    expect(state.releases).toMatchObject([
+      { tag_name: 'v1.0.0-rc.1', draft: false, prerelease: true, make_latest: 'false' },
+    ]);
+  });
+
+  test('publishes a patch on an older line without moving latest', async () => {
+    passCi();
+    state.releases.push({
+      id: 9,
+      tag_name: 'v0.9.0',
+      name: 'v0.9.0',
+      body: '',
+      draft: false,
+      prerelease: false,
+      upload_url: '',
+      author: { login: RELEASE_BOT_LOGIN },
+      assets: [],
+    });
+    expect((await run(['preflight'])).log).toContain('latest stays on v0.9.0');
+    expect(await releaseAfterBuild()).toEqual([0, 0, 0]);
+    expect(state.releases.find((release) => release.tag_name === 'v0.8.0')).toMatchObject({
+      draft: false,
+      prerelease: false,
+      make_latest: 'false',
+    });
+  });
+
+  test('marks a newer stable release as latest', async () => {
+    passCi();
+    expect((await run(['preflight'])).log).toContain('v0.8.0 becomes latest');
+    expect(await releaseAfterBuild()).toEqual([0, 0, 0]);
+    expect(state.releases[0]).toMatchObject({ prerelease: false, make_latest: 'true' });
   });
 
   test('runs as a script and writes outputs to GITHUB_OUTPUT', async () => {

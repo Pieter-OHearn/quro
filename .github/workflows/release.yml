@@ -211,11 +211,14 @@ jobs:
           bun scripts/lib/release-gate.ts stage-release \
             release/docker-compose.release.yml \
             "release/auto-update-bundle-${RELEASE_VERSION}.tar.gz"
-      # latest moves only once the draft holds every asset; publishing is the last step.
+      # latest moves only once the draft holds every asset, and only for a stable version
+      # newer than every published one. Publishing is the last step.
       - name: Move latest to the release images
+        if: steps.draft.outputs.latest == 'true'
         run: sh scripts/lib/promote-images.sh latest
       - name: Publish the release
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_ID: ${{ steps.draft.outputs.release_id }}
+          RELEASE_LATEST: ${{ steps.draft.outputs.latest }}
         run: bun scripts/lib/release-gate.ts publish-release

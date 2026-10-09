@@ -4,6 +4,7 @@ import { EXACT_COMMIT_EVENTS } from './release-gate';
 
 type Step = {
   name?: string;
+  if?: string;
   uses?: string;
   run?: string;
   with?: Record<string, unknown>;
@@ -107,6 +108,13 @@ describe('release.yml', () => {
       [login, tag, version, stage, latest, published].sort((a, b) => a - b),
     );
     expect(published).toBe(publish.steps.length - 1);
+  });
+
+  test('moves latest only when the staged release takes it', () => {
+    const latest = publish.steps[stepIndex(publish, /promote-images\.sh latest/)];
+    expect(latest.if).toBe("steps.draft.outputs.latest == 'true'");
+    const published = publish.steps[stepIndex(publish, /release-gate\.ts publish-release/)];
+    expect(published.env?.RELEASE_LATEST).toBe('${{ steps.draft.outputs.latest }}');
   });
 
   test('hands the API token only to the release gate steps', () => {

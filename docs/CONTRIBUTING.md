@@ -26,7 +26,9 @@ The `Release` GitHub workflow runs only when a maintainer starts it manually (`w
    - No release for the version is published, and the version tag either does not exist or already points at the commit.
    - `CHANGELOG.md` has a section for the version.
 2. **Build** (`contents: read`, `packages: write`) builds the multi-arch images and pushes them to `ghcr.io/<owner>/quro-backend`, `.../quro-frontend` and `.../quro-auto-updater` under a candidate tag, `sha-<commit>`. No git tag, version tag or `latest` tag exists yet.
-3. **Publish** (`contents: write`, `packages: write`) creates the git tag at the commit and adds the version tag to the candidate image digests without rebuilding them. It then creates a draft GitHub Release with the CHANGELOG section, a `docker-compose.release.yml` pinned to the version and an auto-update bundle, moves `latest` to the same digests, and publishes the release as its last step.
+3. **Publish** (`contents: write`, `packages: write`) creates the git tag at the commit and adds the version tag to the candidate image digests without rebuilding them. It then creates a draft GitHub Release with the CHANGELOG section, a `docker-compose.release.yml` pinned to the version and an auto-update bundle, moves `latest` to the same digests when the version takes it (see below), and publishes the release as its last step.
+
+`latest`, both the image tag and the repository's latest GitHub Release, moves only for a stable version newer than every published stable release. A release candidate (`vX.Y.Z-rc.N`) is published as a prerelease, and neither a release candidate nor a patch for an older release line moves `latest`.
 
 To release a commit that is not on `main`, such as a hotfix branch, first start the `CI` workflow on that branch from the Actions tab and wait for it to pass.
 
