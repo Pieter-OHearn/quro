@@ -37,7 +37,9 @@ export default defineConfig({
     {
       command: 'bun run smoke:backend',
       url: `${BACKEND_ORIGIN}/api/health`,
-      reuseExistingServer: !isCI,
+      // Never reuse a backend already on this port: it would bypass the explicit DATABASE_URL and
+      // QRO_DISABLE_SCHEDULERS below. Stop it and rerun instead.
+      reuseExistingServer: false,
       timeout: 120_000,
       env: {
         ...process.env,

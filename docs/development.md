@@ -249,10 +249,12 @@ disappears when it stops. Never point these commands at the Compose `db` service
 fall back to a localhost default, never start a Compose service, and fill
 `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` from `DATABASE_URL` when they are not set.
 
-`test:smoke` starts its backend with `QRO_DISABLE_SCHEDULERS=true`, so the interval jobs
-(session cleanup, bunq sync, holding prices, currency rates, net-worth snapshots) do not run
-and the tests never call bunq or a price provider. Set the same variable for any other local
-backend that must stay offline; leave it unset in production.
+`test:smoke` starts its own backend on port 3300, never reusing one already running there, with
+`QRO_DISABLE_SCHEDULERS=true`. The interval jobs (session cleanup, bunq sync, holding prices,
+currency rates, net-worth snapshots) then do not run, so the backend makes no provider calls on
+its own; only endpoints a test calls directly, such as a price refresh, could. Set the same
+variable for any other local backend that must not run background jobs; leave it unset in
+production.
 
 ### Synthetic data
 
