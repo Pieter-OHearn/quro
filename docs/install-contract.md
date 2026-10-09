@@ -46,11 +46,15 @@ Quro never starts, stops, pulls or updates containers. It needs no access to the
 
 ### Endpoints come from settings, never from service names
 
-Every command reads the database host, document store and backend address from settings. The names `db`, `minio` and `backend` are defaults kept so that existing Compose installs keep working; nothing depends on them.
+Every command reads the database host, document store and backend address from settings. No setting defaults to a Compose service name: `POSTGRES_HOST`, `S3_ENDPOINT` (with S3) and the frontend's `QRO_API_URL` are required, and a missing one stops the command with exit code 2.
+
+### Old settings are retired, not carried forward
+
+Aliases and defaults that only existed for 0.7.0 and earlier installs are not kept. A configuration that still depends on them fails at startup with exit code 2 and a message that names the replacement, instead of being guessed at. Every retired setting is listed in [Retired settings](#retired-settings), which the 0.8.0 upgrade notes carry.
 
 ### Documents are stored on the filesystem by default
 
-New installs keep uploaded documents in a directory. S3-compatible storage stays available as an option for operators who already run object storage. Existing installs that use S3 keep it until the operator moves the objects. The reasoning is in [Document storage evaluation](#document-storage-evaluation).
+New installs keep uploaded documents in a directory. S3-compatible storage stays available as an option for operators who already run object storage. Existing installs that use S3 must say so with `QRO_DOCUMENT_STORAGE=s3` and can keep S3 until they move the objects. The reasoning is in [Document storage evaluation](#document-storage-evaluation).
 
 ### The backend runs as an unprivileged user
 
@@ -119,35 +123,35 @@ Changing a published port is a breaking change and is called out in the upgrade 
 
 ## Settings
 
-Settings are environment variables, usually kept in one file passed with `env_file`. Secrets are files. Two naming rules apply: settings that already exist keep their names, and new Quro-specific settings start with `QRO_`. Settings that describe a dependency keep that dependency's prefix (`POSTGRES_`, `S3_`, `BUNQ_`, `OTEL_`).
+Settings are environment variables, usually kept in one file passed with `env_file`. Secrets are files. Two naming rules apply: settings that stay keep their current names, and new Quro-specific settings start with `QRO_`. Settings that describe a dependency keep that dependency's prefix (`POSTGRES_`, `S3_`, `BUNQ_`, `OTEL_`).
 
 ### Database
 
-| Setting                        | Default                                | Notes                                                                    |
-| ------------------------------ | -------------------------------------- | ------------------------------------------------------------------------ |
-| `POSTGRES_HOST`                | `db`                                   | Set it explicitly. **0.7.0:** the image ignores it and always uses `db`. |
-| `POSTGRES_PORT`                | `5432`                                 | **0.7.0:** always 5432 in the image.                                     |
-| `POSTGRES_DB`                  | `quro`                                 |                                                                          |
-| `POSTGRES_ADMIN_USER`          | `quro_admin`                           | Owner role: runs migrations, backup and restore.                         |
-| `POSTGRES_APP_USER`            | `quro_app`                             | Runtime role: data access only, no DDL.                                  |
-| `POSTGRES_ADMIN_PASSWORD_FILE` | `/run/secrets/postgres_admin_password` | Read only by `migrate`, `backup`, `restore` and `doctor`.                |
-| `POSTGRES_APP_PASSWORD_FILE`   | `/run/secrets/postgres_app_password`   |                                                                          |
-| `POSTGRES_SSLMODE`             | unset                                  | New. Passed to the client as `sslmode` for an external database.         |
+| Setting                        | Default                                | Notes                                                                         |
+| ------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------- |
+| `POSTGRES_HOST`                | none, required                         | Exit code 2 when unset. **0.7.0:** the image ignores it and always uses `db`. |
+| `POSTGRES_PORT`                | `5432`                                 | **0.7.0:** always 5432 in the image.                                          |
+| `POSTGRES_DB`                  | `quro`                                 |                                                                               |
+| `POSTGRES_ADMIN_USER`          | `quro_admin`                           | Owner role: runs migrations, backup and restore.                              |
+| `POSTGRES_APP_USER`            | `quro_app`                             | Runtime role: data access only, no DDL.                                       |
+| `POSTGRES_ADMIN_PASSWORD_FILE` | `/run/secrets/postgres_admin_password` | Read only by `migrate`, `backup`, `restore` and `doctor`.                     |
+| `POSTGRES_APP_PASSWORD_FILE`   | `/run/secrets/postgres_app_password`   |                                                                               |
+| `POSTGRES_SSLMODE`             | unset                                  | New. Passed to the client as `sslmode` for an external database.              |
 
-`DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` remain a development and test interface. They carry passwords in the environment and are not part of the operator contract.
+Older names for these settings are retired (see [Retired settings](#retired-settings)). `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` remain a development and test interface. They carry passwords in the environment and are not part of the operator contract.
 
 ### Document storage
 
-| Setting                     | Default                             | Notes                                                                                                                                                                                                                                    |
-| --------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `QRO_DOCUMENT_STORAGE`      | see notes                           | New. `filesystem` or `s3`. When unset: `s3` if `S3_BUCKET` is set (an existing install), otherwise `filesystem`. `quro doctor` warns until it is set. `quro init` and the example settings set it explicitly and do not set `S3_BUCKET`. |
-| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | New. Filesystem driver only.                                                                                                                                                                                                             |
-| `S3_ENDPOINT`               | none                                | S3 driver only. **0.7.0:** defaults to `http://minio:9000`.                                                                                                                                                                              |
-| `S3_REGION`                 | none                                | Required by the S3 driver. **0.7.0:** the Compose files set `eu-west-1`.                                                                                                                                                                 |
-| `S3_BUCKET`                 | none                                | Created by the operator.                                                                                                                                                                                                                 |
-| `S3_FORCE_PATH_STYLE`       | `true`                              |                                                                                                                                                                                                                                          |
-| `S3_ACCESS_KEY_ID`          | none                                | **0.7.0:** taken from `MINIO_APP_USER`, which stays accepted as an alias.                                                                                                                                                                |
-| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/minio_app_secret_key` | New name for the existing secret file.                                                                                                                                                                                                   |
+| Setting                     | Default                             | Notes                                                                                                                                                                                                                                                               |
+| --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QRO_DOCUMENT_STORAGE`      | `filesystem`                        | New. `filesystem` or `s3`. When it is unset but an S3 setting (`S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` or the retired `MINIO_APP_USER`) is present, every command stops with exit code 2 instead of guessing. `quro init` and the example set it explicitly. |
+| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | New. Filesystem driver only.                                                                                                                                                                                                                                        |
+| `S3_ENDPOINT`               | none                                | Required by the S3 driver. **0.7.0:** defaults to `http://minio:9000`.                                                                                                                                                                                              |
+| `S3_REGION`                 | none                                | Required by the S3 driver. **0.7.0:** the Compose files set `eu-west-1`.                                                                                                                                                                                            |
+| `S3_BUCKET`                 | none                                | Created by the operator.                                                                                                                                                                                                                                            |
+| `S3_FORCE_PATH_STYLE`       | `true`                              |                                                                                                                                                                                                                                                                     |
+| `S3_ACCESS_KEY_ID`          | none                                | Required by the S3 driver. **0.7.0:** taken from `MINIO_APP_USER`, which is retired.                                                                                                                                                                                |
+| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/s3_secret_access_key` | New. **0.7.0:** the entry point reads `/run/secrets/minio_app_secret_key`.                                                                                                                                                                                          |
 
 ### Backups
 
@@ -159,11 +163,11 @@ Settings are environment variables, usually kept in one file passed with `env_fi
 
 ### Web and frontend
 
-| Setting                                                               | Container | Notes                                                                                                                                                                                 |
-| --------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`, `HOST`                                                        | Backend   | Listen address. Defaults `3000` and `0.0.0.0`.                                                                                                                                        |
-| `SECURE_COOKIES`, `TRUSTED_PROXIES`, `CORS_ORIGIN`, `FRONTEND_ORIGIN` | Backend   | Deployment mode settings; see [Security model](security.md).                                                                                                                          |
-| `QRO_API_URL`                                                         | Frontend  | Backend address for the `/api` proxy. Default `http://backend:3000`. **0.7.0:** fixed in `packages/frontend/nginx.conf`; nginx stops at startup when no host called `backend` exists. |
+| Setting                                                               | Container | Notes                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`, `HOST`                                                        | Backend   | Listen address. Defaults `3000` and `0.0.0.0`.                                                                                                                                                                                                                        |
+| `SECURE_COOKIES`, `TRUSTED_PROXIES`, `CORS_ORIGIN`, `FRONTEND_ORIGIN` | Backend   | Deployment mode settings; see [Security model](security.md).                                                                                                                                                                                                          |
+| `QRO_API_URL`                                                         | Frontend  | Required. Backend address for the `/api` proxy, for example `http://backend:3000`; the frontend stops at startup when it is unset. **0.7.0:** fixed to `backend:3000` in `packages/frontend/nginx.conf`; nginx stops at startup when no host called `backend` exists. |
 
 Optional features (bunq, tracing, statement OCR) keep their current settings, listed in `.env.example`. Each is off when its settings are absent; partial bunq settings stop startup with a redacted error.
 
@@ -337,11 +341,29 @@ This covers installs made from any checkout or release up to and including 0.7.0
 ### Rules
 
 - Nothing is deleted or replaced. `./data/postgres`, `./data/minio`, `.env`, `secrets/` and earlier backups stay where they are until the operator removes them.
-- `quro init` only creates missing files and never edits an existing one. The old secret file names under `/run/secrets/` remain the defaults, so an existing `secrets/` directory can be reused.
+- `quro init` only creates missing files and never edits an existing one. The PostgreSQL secret file names are unchanged, so those files can be reused; the storage secret's default name changes (see [Retired settings](#retired-settings)).
 - The old images run as root; the new backend does not. On Linux, existing `secrets/*.txt` files (`chmod 600`, owned by the operator) are unreadable to UID 1000 unless the operator's UID is 1000, and files that `db-tools` wrote under `./backups` are owned by root. Before starting the new backend, either set its `user:` to the UID that owns those files or change their ownership as described in [File ownership](#file-ownership). `quro doctor` reports an unreadable secret or an unwritable directory before anything starts.
-- An install with `S3_BUCKET` set keeps using S3 until `QRO_DOCUMENT_STORAGE` says otherwise, so documents never disappear behind an empty filesystem store.
+- An install with S3 settings and no `QRO_DOCUMENT_STORAGE` refuses to start, so documents never disappear behind an empty filesystem store. Set `QRO_DOCUMENT_STORAGE=s3` to keep using the existing store, or migrate the objects and set `filesystem`.
 - MinIO keeps running until `quro documents migrate-from-s3` has copied and verified every object. Removing the MinIO service and its data afterwards is the operator's decision.
 - A PostgreSQL 16 or 17 data directory is never reused for 18; the new major gets a new directory and the old one stays until deleted by hand.
+
+### Retired settings
+
+These settings and defaults are gone. Where ignoring one could hide data or connect to the wrong place, the command stops with exit code 2 and names the replacement; the others are simply not read. `quro doctor` lists every retired setting it finds. The 0.8.0 upgrade notes repeat this table.
+
+| Retired                                                                                              | Replacement                                                                               | If left unchanged                                            |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| S3 settings without `QRO_DOCUMENT_STORAGE`                                                           | `QRO_DOCUMENT_STORAGE=s3`, or `filesystem` after `quro documents migrate-from-s3`         | Every command stops with exit code 2                         |
+| Database host `db` by default                                                                        | `POSTGRES_HOST`                                                                           | Exit code 2: `POSTGRES_HOST` is required                     |
+| Frontend upstream `backend:3000` built in                                                            | `QRO_API_URL` on the frontend                                                             | The frontend stops at startup                                |
+| `MINIO_APP_USER`                                                                                     | `S3_ACCESS_KEY_ID`                                                                        | Exit code 2 with S3 storage: `S3_ACCESS_KEY_ID` is required  |
+| Secret `/run/secrets/minio_app_secret_key`                                                           | `/run/secrets/s3_secret_access_key`, or point `S3_SECRET_ACCESS_KEY_FILE` at the old file | Exit code 2 with S3 storage: the secret file is not readable |
+| `DATABASE_HOST`, `DATABASE_PORT`                                                                     | `POSTGRES_HOST`, `POSTGRES_PORT`                                                          | Not read; an unset `POSTGRES_HOST` stops with exit code 2    |
+| `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD` in the backend's environment | `POSTGRES_ADMIN_PASSWORD_FILE`, `POSTGRES_APP_PASSWORD_FILE`                              | Not read; a missing secret file stops with exit code 2       |
+| `POSTGRES_USER` as the runtime user                                                                  | `POSTGRES_APP_USER`                                                                       | Not read by the backend (the database image still uses it)   |
+| `minio` and `minio-init` services, `MINIO_ROOT_USER`, `S3_INTERNAL_ENDPOINT`                         | An S3 store you run yourself, or the filesystem                                           | No effect with the new example                               |
+| `db-tools` service                                                                                   | `quro backup`, `quro restore`                                                             | Old dumps stay in `./backups/db`                             |
+| `migrate` service script                                                                             | `quro migrate`                                                                            | –                                                            |
 
 ### Before upgrading
 
@@ -356,21 +378,22 @@ Use `-f docker-compose.yml` for an install from a checkout, and your own user an
 
 ## Gaps between 0.7.0 and this contract
 
-| Area                     | 0.7.0                                                                                | Contract                                             |
-| ------------------------ | ------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| Entry point              | Shell wrappers in `docker/backend/` around `bun run` scripts                         | `quro <command>`                                     |
-| Database endpoint        | Host `db` and port 5432 fixed in `docker/backend/common-env.sh`                      | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_SSLMODE` |
-| Secrets per command      | The default entry point requires the storage secret for every command run through it | Each command reads only what it needs                |
-| Frontend upstream        | `backend:3000` fixed in nginx                                                        | `QRO_API_URL`                                        |
-| Container user           | root                                                                                 | UID 1000; any UID works                              |
-| Document storage         | S3 only                                                                              | Filesystem default, S3 optional                      |
-| Readiness                | Requires S3; no schema check                                                         | Configured store and schema check                    |
-| Concurrent migrations    | The second run fails                                                                 | Serialised by a database lock                        |
-| Pre-created runtime role | Migration fails changing its password                                                | Grants only                                          |
-| Backup client            | `pg_dump` 17; fails against 18 and leaves an empty file                              | Matching tools; written under a temporary name       |
-| Exit codes               | 0 or 1                                                                               | 0 to 4                                               |
-| Image health check       | None                                                                                 | `quro health`                                        |
-| Release artifact         | Rendered `docker-compose.release.yml`                                                | A tested example in the docs                         |
+| Area                     | 0.7.0                                                                                | Contract                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| Entry point              | Shell wrappers in `docker/backend/` around `bun run` scripts                         | `quro <command>`                                                |
+| Database endpoint        | Host `db` and port 5432 fixed in `docker/backend/common-env.sh`                      | `POSTGRES_HOST` (required), `POSTGRES_PORT`, `POSTGRES_SSLMODE` |
+| Secrets per command      | The default entry point requires the storage secret for every command run through it | Each command reads only what it needs                           |
+| Frontend upstream        | `backend:3000` fixed in nginx                                                        | `QRO_API_URL` (required)                                        |
+| Container user           | root                                                                                 | UID 1000; any UID works                                         |
+| Document storage         | S3 only                                                                              | Filesystem default, S3 optional                                 |
+| Readiness                | Requires S3; no schema check                                                         | Configured store and schema check                               |
+| Concurrent migrations    | The second run fails                                                                 | Serialised by a database lock                                   |
+| Pre-created runtime role | Migration fails changing its password                                                | Grants only                                                     |
+| Backup client            | `pg_dump` 17; fails against 18 and leaves an empty file                              | Matching tools; written under a temporary name                  |
+| Exit codes               | 0 or 1                                                                               | 0 to 4                                                          |
+| Image health check       | None                                                                                 | `quro health`                                                   |
+| Legacy settings          | Aliases and service-name defaults accepted                                           | Retired; old settings fail with exit code 2                     |
+| Release artifact         | Rendered `docker-compose.release.yml`                                                | A tested example in the docs                                    |
 
 ## Measurements
 
@@ -424,6 +447,7 @@ Not measured: a clean virtual machine, amd64, a person following the steps with 
 
 ## Decision log
 
-| Date       | Decision                                                                                   |
-| ---------- | ------------------------------------------------------------------------------------------ |
-| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default. |
+| Date       | Decision                                                                                                                                                                                                                                                                  |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default.                                                                                                                                                                                |
+| 2026-10-09 | Retire legacy settings and service-name defaults instead of inferring them; old configurations fail with exit code 2 and the upgrade notes list every change. Backend UID 1000, `QRO_` prefix for new settings, and `quro init` never prints secret values are confirmed. |
