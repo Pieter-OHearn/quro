@@ -204,9 +204,15 @@ describe('session management', () => {
     expect(response.status).toBe(401);
   });
 
-  test('lists the account sessions, newest use first, marking the current one', async () => {
-    const owner = await integration.signUp('listing', {});
+  test('lists the account sessions, the current one first, then by most recent use', async () => {
+    const owner = await integration.signUp('listing');
     const laptop = await integration.signIn(owner.user.email);
+    const phone = await integration.signIn(owner.user.email);
+    // The phone was used after the laptop; the laptop is the browser asking.
+    await db
+      .update(sessions)
+      .set({ lastUsedAt: new Date(Date.now() + 60 * 1000) })
+      .where(eq(sessions.id, hashSessionToken(sessionTokenOf(phone.cookie))));
     await db
       .update(sessions)
       .set({ lastUsedAt: new Date(Date.now() - 60 * 60 * 1000) })
@@ -217,9 +223,10 @@ describe('session management', () => {
       headers: { 'User-Agent': 'ignored on reads' },
     });
     const { data } = await typedJson<{ data: UserSession[] }>(response);
-    expect(data).toHaveLength(2);
-    expect(data.map((session) => session.current)).toEqual([true, false]);
-    expect(data[0]?.id).toBe(hashSessionToken(sessionTokenOf(laptop.cookie)));
+    expect(data.map((session) => session.id)).toEqual(
+      [laptop, phone, owner].map((session) => hashSessionToken(sessionTokenOf(session.cookie))),
+    );
+    expect(data.map((session) => session.current)).toEqual([true, false, false]);
   });
 
   test('records the browser user agent, truncated', async () => {

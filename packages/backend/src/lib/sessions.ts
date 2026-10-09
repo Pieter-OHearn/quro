@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, ne } from 'drizzle-orm';
 import type { UserSession } from '@quro/shared';
 import { db, type DbExecutor } from '../db/client';
 import { sessions } from '../db/schema';
@@ -95,12 +95,11 @@ export async function listUserSessions(
       expiresAt: sessions.expiresAt,
     })
     .from(sessions)
-    .where(eq(sessions.userId, userId));
+    .where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, new Date())))
+    .orderBy(desc(sessions.lastUsedAt));
 
-  const now = Date.now();
+  // The current browser comes first; last_used_at is only refreshed every few minutes.
   return rows
-    .filter((row) => row.expiresAt.getTime() > now)
-    .sort((a, b) => b.lastUsedAt.getTime() - a.lastUsedAt.getTime())
     .map((row) => ({
       id: row.id,
       current: row.id === currentSessionId,
@@ -108,7 +107,8 @@ export async function listUserSessions(
       createdAt: row.createdAt.toISOString(),
       lastUsedAt: row.lastUsedAt.toISOString(),
       expiresAt: row.expiresAt.toISOString(),
-    }));
+    }))
+    .sort((a, b) => Number(b.current) - Number(a.current));
 }
 
 /** Revokes one of the user's sessions; returns false when it is not theirs or already gone. */

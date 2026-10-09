@@ -35,7 +35,13 @@ function SessionRow({
         </div>
       </div>
       {session.current ? null : (
-        <Button variant="ghost" size="sm" loading={revoking} onClick={() => onRevoke(session.id)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex-shrink-0 whitespace-nowrap"
+          loading={revoking}
+          onClick={() => onRevoke(session.id)}
+        >
           Sign out
         </Button>
       )}
