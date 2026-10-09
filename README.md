@@ -100,6 +100,8 @@ The database and object storage are also published locally for tooling:
 > [!WARNING]
 > Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in the [roadmap](ROADMAP.md). The [Docker dev stack](#local-docker-dev) includes storage bootstrap, but requires runtime configuration and secrets and is subject to the same MinIO image availability problem.
 
+The [install contract](docs/install-contract.md) describes how installs will work from 0.8.0, which is not released yet: the images, the `quro` maintenance commands, settings, data locations and the move from existing Compose installs.
+
 The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
 
 | Problem                   | What you see                                                                                                                                                        | Workaround                                                                      |
