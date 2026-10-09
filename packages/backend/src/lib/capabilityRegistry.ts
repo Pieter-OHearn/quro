@@ -7,7 +7,7 @@ import { BUNQ_UNAVAILABLE_MESSAGE } from './bunqConfig';
 // and schedulers to those answers (src/app.ts), `GET /api/capabilities` reports them (merged with
 // runtime state such as the import worker's heartbeat), and `quro doctor` reads the same list.
 
-export type CapabilityId = 'bunq' | 'documents' | 'pensionImport';
+export type CapabilityId = 'bunq' | 's3Storage' | 'pensionImport';
 
 export type ConfiguredState = {
   enabled: boolean;
@@ -27,7 +27,6 @@ function disabled(message: string): ConfiguredState {
   return { enabled: false, reason: 'not_configured', message };
 }
 
-export const DOCUMENTS_UNAVAILABLE_MESSAGE = 'Document storage is not configured.';
 export const PENSION_IMPORT_UNCONFIGURED_MESSAGE =
   'AI import is unavailable because this Quro instance has not configured it.';
 
@@ -41,19 +40,20 @@ export const CAPABILITIES: readonly CapabilityDefinition[] = [
         : disabled(BUNQ_UNAVAILABLE_MESSAGE),
   },
   {
-    id: 'documents',
-    label: 'Document storage',
+    // Documents are always stored; this says whether an S3-compatible store holds them instead
+    // of the documents directory (QRO_DOCUMENT_STORAGE).
+    id: 's3Storage',
+    label: 'S3 document storage',
     evaluate: ({ documents }) =>
-      documents.enabled
-        ? { ...ENABLED, message: 'Document storage is configured.' }
-        : disabled(DOCUMENTS_UNAVAILABLE_MESSAGE),
+      documents.driver === 's3'
+        ? { ...ENABLED, message: 'Documents are stored in an S3-compatible store.' }
+        : disabled('Documents are stored in the documents directory.'),
   },
   {
-    // Statement import stores the uploaded PDF, so it needs document storage as well as a parser.
     id: 'pensionImport',
     label: 'Statement import',
-    evaluate: ({ pensionImport, documents }) =>
-      pensionImport.parserUrl !== null && documents.enabled
+    evaluate: ({ pensionImport }) =>
+      pensionImport.parserUrl !== null
         ? { ...ENABLED, message: 'Statement import is configured.' }
         : disabled(PENSION_IMPORT_UNCONFIGURED_MESSAGE),
   },

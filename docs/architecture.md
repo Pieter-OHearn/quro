@@ -8,18 +8,17 @@ Quro is a self-hosted personal finance app intended for home/LAN use over plain 
 
 ### Docker Compose profiles
 
-| Profile                   | Services included                                             |
-| ------------------------- | ------------------------------------------------------------- |
-| default (no profile flag) | `frontend`, `backend`, `db`, `minio`, `minio-init`, `migrate` |
-| `pension-import`          | adds `pension-import-worker`, `vllm`, `pension-parser`        |
-| `maintenance`             | adds `db-tools`                                               |
+| Profile                   | Services included                                      |
+| ------------------------- | ------------------------------------------------------ |
+| default (no profile flag) | `frontend`, `backend`, `db`, `migrate`                 |
+| `pension-import`          | adds `pension-import-worker`, `vllm`, `pension-parser` |
+| `maintenance`             | adds `db-tools`                                        |
 
 ### Host-exposed ports
 
 | Service               | Host port                    | Notes                                    |
 | --------------------- | ---------------------------- | ---------------------------------------- |
 | `frontend`            | `${QRO_FRONTEND_PORT:-3000}` | Nginx, the only entry point for browsers |
-| `minio`               | none (internal only)         | Console on :9001 is not exposed          |
 | `db`, `backend`, etc. | none                         | Internal only                            |
 
 ### Network map
@@ -34,10 +33,10 @@ graph LR
     frontend["frontend (Nginx)"]
     backend["backend (Hono)"]
     db["db (PostgreSQL)"]
-    minio["minio (S3)"]
+    documents[("./data/documents")]
     frontend -->|frontend-net| backend
     backend -->|backend-net| db
-    backend -->|backend-net| minio
+    backend -->|volume| documents
   end
 
   subgraph "pension-import profile"
@@ -45,7 +44,7 @@ graph LR
     parser["pension-parser (FastAPI)"]
     vllm["vllm (Qwen 2.5)"]
     worker -->|backend-net| db
-    worker -->|backend-net| minio
+    worker -->|volume| documents
     worker -->|ai-net| parser
     parser -->|ai-net| vllm
   end
@@ -58,20 +57,19 @@ graph LR
 | frontend              | yes          | no          | no     |
 | backend               | yes          | yes         | no     |
 | db                    | no           | yes         | no     |
-| minio                 | no           | yes         | no     |
-| minio-init            | no           | yes         | no     |
 | migrate               | no           | yes         | no     |
 | pension-import-worker | no           | yes         | yes    |
 | pension-parser        | no           | no          | yes    |
 | vllm                  | no           | no          | yes    |
 | db-tools              | no           | yes         | no     |
 
-The frontend can reach the backend (via `frontend-net`) but cannot directly reach the database, MinIO, or the AI services. The pension import worker bridges `backend-net` (for DB and MinIO) and `ai-net` (for the parser). The parser and vLLM are isolated on `ai-net` and are unreachable from the browser or the Hono API server directly.
+The frontend can reach the backend (via `frontend-net`) but cannot directly reach the database, the documents directory or the AI services. The pension import worker bridges `backend-net` (for the database) and `ai-net` (for the parser), and mounts the same documents directory as the backend. The parser and vLLM are isolated on `ai-net` and are unreachable from the browser or the Hono API server directly.
+
+Uploaded documents are stored on the filesystem (`./data/documents`, mounted at `/var/lib/quro/documents`) by default. An S3-compatible store the operator runs is the alternative; the backend then reaches it over the network instead of the volume. See [document storage](document-storage.md).
 
 ### One-shot services
 
 - `migrate`: runs Drizzle migrations on startup using the admin DB role, then exits.
-- `minio-init`: creates the S3 bucket and the `quro_app` MinIO user, then exits.
 - `db-tools`: interactive shell for backup/restore; only started with the `maintenance` profile.
 
 ---
@@ -195,7 +193,7 @@ stateDiagram-v2
 
 The user selects a PDF on the Pension page in the frontend and submits it with a `potId`. The frontend `POST`s to `/api/pensions/imports` as `multipart/form-data`.
 
-The backend (`pension-imports.ts`) validates the file (PDF MIME type, size), hashes it with SHA-256 to detect duplicates, uploads the bytes to MinIO under the key `users/{userId}/pensions/{potId}/imports/{uuid}.pdf`, then inserts a row into `pension_statement_imports` with `status = 'queued'`. The PDF storage key is stored in the DB record; the actual bytes never touch the DB.
+The backend (`pension-imports.ts`) validates the file (PDF MIME type, size), hashes it with SHA-256 to detect duplicates, stores the bytes in the document store under the key `users/{userId}/pensions/{potId}/imports/{uuid}.pdf`, then inserts a row into `pension_statement_imports` with `status = 'queued'`. The PDF storage key is stored in the DB record; the actual bytes never touch the DB.
 
 **2. Worker picks up the job**
 
@@ -206,7 +204,7 @@ The `pension-import-worker` container runs the backend's `worker:pension-imports
 
 **3. PDF parsing**
 
-Once locked, the worker fetches the PDF bytes from MinIO and calls `parsePensionStatement()` in `pensionParserClient.ts`. This posts the PDF as a multipart form to the `pension-parser` service at `POST /v1/extract`, passing `provider`, `currency`, and `languageHints`.
+Once locked, the worker reads the PDF bytes from the document store and calls `parsePensionStatement()` in `pensionParserClient.ts`. This posts the PDF as a multipart form to the `pension-parser` service at `POST /v1/extract`, passing `provider`, `currency`, and `languageHints`.
 
 The `pension-parser` is a FastAPI service that uses pdf2image/OCR to extract text from the PDF. It optionally calls vLLM (running Qwen 2.5 by default) for structured extraction when the regex-only fallback is insufficient. The parser response includes:
 
@@ -241,15 +239,15 @@ Exactly one `annual_statement` row must be present; the commit is rejected other
 
 **7. Capabilities system**
 
-`GET /api/capabilities` (authenticated) returns an `AppCapabilities` object with four fields: `ai`, `pensionStatementImport`, `bunq` and `documents`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, and `checkedAt`.
+`GET /api/capabilities` (authenticated) returns an `AppCapabilities` object with four fields: `ai`, `pensionStatementImport`, `bunq` and `documents`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, and `checkedAt`. Document storage is part of the core, so `documents` is always enabled; whether the configured store is usable is a readiness check (`GET /api/readiness`).
 
 Whether a feature is switched on comes from configuration alone and is decided by the capability registry (`lib/capabilityRegistry.ts`), the single source of truth for optional features:
 
-| Capability      | Enabled when                                                                                         |
-| --------------- | ---------------------------------------------------------------------------------------------------- |
-| `bunq`          | the complete bunq OAuth settings are present                                                         |
-| `documents`     | the complete `S3_*` document storage settings are present                                            |
-| `pensionImport` | `PENSION_PARSER_URL` and document storage are both configured (reported as `pensionStatementImport`) |
+| Capability      | Enabled when                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `bunq`          | the complete bunq OAuth settings are present                                                |
+| `s3Storage`     | `QRO_DOCUMENT_STORAGE=s3` selects an S3-compatible store instead of the documents directory |
+| `pensionImport` | `PENSION_PARSER_URL` is set (reported as `pensionStatementImport`)                          |
 
 `app.ts` mounts the routes of a capability (`/api/bunq`, `/api/pensions/imports`) only when it is enabled, and `schedulers.ts` starts the bunq sync only then, so an instance without bunq has no bunq endpoints and runs no bunq job. A capability that is not configured reports `reason: 'not_configured'`. For `pensionStatementImport`, the worker's runtime state is checked on top of that.
 
@@ -306,6 +304,8 @@ The global `app.use('/api/*', requireAuth)` guard also protects newly mounted fe
 
 Dashboard history and activity live in `src/lib/netWorthHistory.ts` and `src/lib/activity.ts`. Investments mounts the holding and property routers from `src/routes/holdings.ts` and `src/routes/properties.ts`.
 
+Ledger lists are paged with a keyset cursor (`src/lib/listPage.ts`): the transaction lists of savings, holdings, properties, mortgages and pensions, debt payments, payslips, pension statement documents, pension import rows, budget transactions and holding price history. Each answers `{ data, nextCursor }` with at most `limit` rows; `LIST_PAGE_DEFAULT_LIMIT` and the hard cap `LIST_PAGE_MAX_LIMIT` come from `@quro/shared`, and a larger `limit` is reduced to the cap. Rows follow an explicit order: date, then id, ascending, so rows entered on one day keep their entry order. Budget transactions are newest first, price history is ordered by day and then holding, and import rows by statement position and then id. A client passes `nextCursor` back as `cursor` until it is `null`; a malformed `limit` or `cursor` answers 400. Price history requires `from`. Other collections (accounts, holdings, pots, debts, goals, budget categories) are small, unpaged and ordered by id. Totals such as salary history, dashboard and runway are computed on the server over the whole ledger and are not paged.
+
 ### Frontend
 
 Each feature lives in `src/features/<feature>/` and contains:
@@ -313,6 +313,8 @@ Each feature lives in `src/features/<feature>/` and contains:
 - `index.tsx` — the page component, rendered by the router
 - `components/` — feature-specific UI components
 - `hooks/index.ts` — TanStack Query hooks: `useQuery` hooks for reads and `useMutation` hooks for writes
+
+Hooks that read a paged ledger call `apiGetAllPages` from `src/lib/api.ts`. It requests the hard cap per page and follows `nextCursor` to the last page, so totals the browser computes from a ledger still cover every row; budget transactions are windowed by month and price history by its date range. The pages are separate reads, not one snapshot: a row edited to a later position between two pages is kept once, in its newer form, and a row written behind the cursor appears on the next refetch (a ledger mutation made in the app triggers one through its domain).
 
 Mutations use `useDomainMutation`, which invalidates the query keys declared for their domain in `src/lib/queryInvalidation.ts`. Each domain lists only the server readers it affects; for example, goals refresh only goals, while savings also refresh the dashboard and plan.
 
@@ -341,6 +343,10 @@ Columns are declared with `numericAsNumber`, a custom type defined in `src/db/sc
 
 Arithmetic happens on JavaScript numbers. Where a result must be whole cents, use `toCents`, `fromCents` and `roundMoney` from `@quro/shared` (see [the shared package](#6-the-quroshared-package)) rather than ad hoc rounding. Rates are not rounded like money. Dashboard and runway totals are aggregated in EUR on the backend and converted once for display; amounts keep their native currency in storage, and a missing or invalid FX rate fails the calculation instead of assuming 1:1.
 
+### Document storage
+
+Uploaded PDFs go through `getDocumentStore()` (`lib/documentStorage.ts`), which returns the driver that `QRO_DOCUMENT_STORAGE` selects: `filesystem` (`lib/filesystemDocumentStore.ts`, the default, one file per object under `QRO_DOCUMENTS_DIR`) or `s3` (`lib/s3.ts`). Rows keep the object key, such as `users/<id>/salary/payslips/<id>/<uuid>.pdf`, which is the same in both drivers; the filesystem driver refuses a key that is not a safe relative path and never creates the documents directory itself. Readiness checks only the configured driver. Tests that inspect stored objects replace the store with `createMemoryDocumentStore()` (`packages/backend/src/test/memoryDocumentStore.ts`); other integration tests use the filesystem driver in a temporary directory. Operator documentation, including `quro documents migrate-from-s3`, is in [document storage](document-storage.md).
+
 ### Sessions
 
 Sessions are stored in the `sessions` table, keyed by the SHA-256 digest of the cookie token, with an `expires_at` timestamp (30-day TTL from login), the browser's user agent and a `last_used_at` time. Users list and revoke them in Settings; operators revoke them with `quro user revoke-sessions`. The backend calls `startSessionCleanup()` on startup, which runs a background interval to delete expired rows and old operator codes (`auth_codes`). There is no Redis or external session store.
@@ -351,7 +357,7 @@ Every setting the backend reads is declared once, in `packages/backend/src/confi
 
 - **Fail fast, in full.** A process validates the sections it needs when it starts (`bootConfig('server')` for the API, `'worker'`, `'migrate'`, `'backup'` and `'maintenance'` for the database commands) and exits with code 2 and one list of problems. The list names settings and never their values. A migration job does not need bunq, so its profile does not check it; a section that is invalid throws only when something reads it.
 - **Secrets are files.** Database and S3 secrets are read from the files named by `*_FILE` settings (defaults under `/run/secrets/`); a trailing newline is ignored and an empty file is an error. Values are wrapped in `Secret`, which prints as `[redacted]` and needs `.reveal()` to read, so logging the configuration cannot leak a credential.
-- **Optional features are all or nothing.** A feature such as S3 storage or bunq stays off until one of its settings is present, and then needs all of them; a half-configured feature stops startup instead of mounting half-working routes.
+- **Optional features are all or nothing.** A feature such as S3 storage or bunq stays off until one of its settings is present, and then needs all of them; a half-configured feature stops startup instead of mounting half-working routes. S3 settings alone never select the S3 store: without `QRO_DOCUMENT_STORAGE` they stop every command (profiles all include the `documentStorage` section, which reads no secret), so documents in an existing store are never hidden behind an empty directory.
 - **Retired settings are not read.** Names from earlier releases are reported with the setting that replaces them (`config.notices`) and never used as a fallback.
 - **The schema is the manifest.** `settingsManifest()` in `config/manifest.ts` lists every setting with its type, default, secrecy and requirement, generated from the same table; the installer and the configuration reference use it, and a test keeps the Compose files, the example files and the docs in step with it.
 

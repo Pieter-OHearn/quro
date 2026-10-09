@@ -34,6 +34,8 @@ NET="$RUN-net"
 V_OLD="$RUN-pg-old"
 V_NEW="$RUN-pg-new"
 V_DUMPS="$RUN-dumps"
+# The documents directory every backend container mounts; `db:backup` archives it.
+V_DOCUMENTS="$RUN-documents"
 WORK=$(mktemp -d)
 ADMIN_USER=quro_admin
 APP_USER=quro_app
@@ -49,7 +51,7 @@ cleanup() {
   status=$?
   docker rm -f "$RUN-old" "$RUN-new" "$RUN-old-again" "$RUN-refuse" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
-  docker volume rm "$V_OLD" "$V_NEW" "$V_DUMPS" >/dev/null 2>&1 || true
+  docker volume rm "$V_OLD" "$V_NEW" "$V_DUMPS" "$V_DOCUMENTS" >/dev/null 2>&1 || true
   rm -rf "$WORK"
   if [ "$status" -eq 0 ]; then echo; echo "PASS: PostgreSQL upgrade rehearsal"; else echo >&2; echo >&2 "FAIL: rehearsal stopped with status $status"; fi
 }
@@ -65,6 +67,7 @@ docker network create "$NET" >/dev/null
 docker volume create "$V_OLD" >/dev/null
 docker volume create "$V_NEW" >/dev/null
 docker volume create "$V_DUMPS" >/dev/null
+docker volume create "$V_DOCUMENTS" >/dev/null
 
 # start_server NAME IMAGE VOLUME MOUNT_PATH
 start_server() {
@@ -87,7 +90,7 @@ backend() {
   shift 2
   admin_url="postgres://$ADMIN_USER:$ADMIN_PASSWORD@$host:5432/$database"
   app_url="postgres://$APP_USER:$APP_PASSWORD@$host:5432/$database"
-  docker run --rm --network "$NET" -v "$V_DUMPS:/dumps" \
+  docker run --rm --network "$NET" -v "$V_DUMPS:/dumps" -v "$V_DOCUMENTS:/var/lib/quro/documents" \
     -e ADMIN_DATABASE_URL="$admin_url" -e APP_DATABASE_URL="$app_url" -e DATABASE_URL="$app_url" \
     -e QRO_DISABLE_SCHEDULERS=true -e QRO_RESTORE_CONFIRM=restore-db \
     --entrypoint bun "$IMAGE" run "$@"

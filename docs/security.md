@@ -255,16 +255,16 @@ administrators remain fully trusted.
 
 ## Keys and credentials
 
-| Secret                                    | Stored in                                 | In a database dump? | If it is lost                                                        |
-| ----------------------------------------- | ----------------------------------------- | ------------------- | -------------------------------------------------------------------- |
-| PostgreSQL admin and app passwords        | `secrets/*.txt` (Docker secrets)          | No                  | Set new ones in the files and the database as the database superuser |
-| MinIO root and app keys                   | `secrets/*.txt`                           | No                  | Reset them in MinIO; documents are unaffected                        |
-| A MinIO encryption key, if you enable one | Your MinIO configuration                  | No                  | The stored documents cannot be read                                  |
-| bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                      | No                  | Issue a new one in bunq and update the configuration                 |
-| bunq access tokens and keys               | Database (`bunq_connections`)             | **Yes**             | Reconnect bunq in Settings                                           |
-| User passwords                            | Database, as bcrypt hashes                | Yes, as hashes      | `quro user reset-password`                                           |
-| Session tokens                            | Browser cookie; database holds the digest | Digest only         | Sign in again                                                        |
-| Registration and reset codes              | Shown once; database holds the digest     | Digest only         | Issue a new code                                                     |
+| Secret                                    | Stored in                                  | In a database dump? | If it is lost                                                        |
+| ----------------------------------------- | ------------------------------------------ | ------------------- | -------------------------------------------------------------------- |
+| PostgreSQL admin and app passwords        | `secrets/*.txt` (Docker secrets)           | No                  | Set new ones in the files and the database as the database superuser |
+| S3 secret access key, with S3 storage     | The file `S3_SECRET_ACCESS_KEY_FILE` names | No                  | Issue a new key in the store; documents are unaffected               |
+| The store's encryption key, if it has one | Your S3 store's configuration              | No                  | The stored documents cannot be read                                  |
+| bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                       | No                  | Issue a new one in bunq and update the configuration                 |
+| bunq access tokens and keys               | Database (`bunq_connections`)              | **Yes**             | Reconnect bunq in Settings                                           |
+| User passwords                            | Database, as bcrypt hashes                 | Yes, as hashes      | `quro user reset-password`                                           |
+| Session tokens                            | Browser cookie; database holds the digest  | Digest only         | Sign in again                                                        |
+| Registration and reset codes              | Shown once; database holds the digest      | Digest only         | Issue a new code                                                     |
 
 Rules that follow from this table:
 
@@ -457,10 +457,12 @@ pot.
 - The `frontend` container (nginx) is the only service with a host port (`3000` by default). It
   sits on `frontend-net`.
 - The `backend` container sits on `frontend-net` (reachable by nginx) and `backend-net` (reachable
-  by the database and MinIO).
-- PostgreSQL (`db`) and MinIO are on `backend-net` only.
+  by the database).
+- PostgreSQL (`db`) is on `backend-net` only. Uploaded documents are files in a volume mounted into
+  the backend and the import worker, readable by the backend user only (directories `0700`, files
+  `0600`). With S3 storage, the store is the operator's and is reached over the network.
 - The optional AI services (`vllm`, `pension-parser`) are on `ai-net` with the
   `pension-import-worker`. The main backend cannot reach them.
 
-A compromised frontend container therefore has no direct network path to the database or object
-store.
+A compromised frontend container therefore has no direct network path to the database and no
+access to the documents volume.

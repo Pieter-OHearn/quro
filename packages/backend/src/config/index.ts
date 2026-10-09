@@ -36,15 +36,36 @@ export function isTestEnvironment(): boolean {
   return getConfig().runtime.environment === 'test';
 }
 
-/** What each kind of process needs. Settings of other sections are not checked for it. */
+/**
+ * What each kind of process needs. Settings of other sections are not checked for it. Every
+ * profile includes `documentStorage`, which reads no secret: S3 settings without
+ * QRO_DOCUMENT_STORAGE stop every command, not only the ones that touch documents.
+ */
 export const PROFILES = {
-  server: ['runtime', 'web', 'runtimeDatabase', 'documents', 'bunq', 'pensionImport', 'tracing'],
-  worker: ['runtime', 'runtimeDatabase', 'documents', 'pensionImport', 'tracing'],
-  cli: ['runtimeDatabase'],
-  migrate: ['adminDatabase', 'runtimeDatabase'],
-  backup: ['adminDatabase', 'tools'],
-  maintenance: ['adminDatabase', 'runtimeDatabase', 'tools', 'maintenance'],
-  seed: ['runtimeDatabase', 'demo'],
+  server: [
+    'runtime',
+    'web',
+    'runtimeDatabase',
+    'documentStorage',
+    'documents',
+    'bunq',
+    'pensionImport',
+    'tracing',
+  ],
+  worker: [
+    'runtime',
+    'runtimeDatabase',
+    'documentStorage',
+    'documents',
+    'pensionImport',
+    'tracing',
+  ],
+  cli: ['runtimeDatabase', 'documentStorage'],
+  documentsMigration: ['runtimeDatabase', 'documentStorage', 's3'],
+  migrate: ['adminDatabase', 'runtimeDatabase', 'documentStorage'],
+  backup: ['adminDatabase', 'tools', 'documentStorage'],
+  maintenance: ['adminDatabase', 'runtimeDatabase', 'tools', 'maintenance', 'documentStorage'],
+  seed: ['runtimeDatabase', 'demo', 'documentStorage'],
 } as const satisfies Record<string, readonly SectionName[]>;
 
 export type Profile = keyof typeof PROFILES;

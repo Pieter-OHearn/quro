@@ -22,48 +22,6 @@ services:
       retries: 10
       start_period: 5s
 
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-quro_root}
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - |
-        export MINIO_ROOT_PASSWORD="$$(tr -d '\r\n' < /run/secrets/minio_root_password)"
-        exec minio server /data --console-address ":9001"
-    secrets:
-      - minio_root_password
-    volumes:
-      - ./data/minio:/data
-    networks:
-      - backend-net
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || exit 1']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-
-  minio-init:
-    build:
-      context: .
-      dockerfile: docker/minio-init/Dockerfile
-    restart: 'no'
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-quro_root}
-      MINIO_APP_USER: ${MINIO_APP_USER:-quro_app}
-      S3_BUCKET: ${S3_BUCKET:-quro-documents}
-    secrets:
-      - minio_root_password
-      - minio_app_secret_key
-    networks:
-      - backend-net
-
   migrate:
     build:
       context: .
@@ -97,11 +55,13 @@ services:
       SECURE_COOKIES: ${SECURE_COOKIES:-false}
       QRO_REGISTRATION_MODE: ${QRO_REGISTRATION_MODE:-invite}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:5173}
-      S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
-      S3_REGION: ${S3_REGION:-eu-west-1}
-      S3_BUCKET: ${S3_BUCKET:-quro-documents}
-      S3_ACCESS_KEY_ID: ${MINIO_APP_USER:-quro_app}
-      S3_SECRET_ACCESS_KEY_FILE: /run/secrets/minio_app_secret_key
+      # Documents live in ./data/documents unless QRO_DOCUMENT_STORAGE=s3 selects an S3-compatible
+      # store (docs/document-storage.md). S3 settings without QRO_DOCUMENT_STORAGE stop the backend.
+      QRO_DOCUMENT_STORAGE: ${QRO_DOCUMENT_STORAGE:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
       PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-300000}
@@ -115,13 +75,10 @@ services:
       BUNQ_SANDBOX: ${BUNQ_SANDBOX:-true}
     secrets:
       - postgres_app_password
-      - minio_app_secret_key
+    volumes:
+      - ./data/documents:/var/lib/quro/documents
     depends_on:
       migrate:
-        condition: service_completed_successfully
-      minio:
-        condition: service_healthy
-      minio-init:
         condition: service_completed_successfully
     command: ['bun', 'run', 'start']
     networks:
@@ -138,11 +95,13 @@ services:
       POSTGRES_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
-      S3_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://minio:9000}
-      S3_REGION: ${S3_REGION:-eu-west-1}
-      S3_BUCKET: ${S3_BUCKET:-quro-documents}
-      S3_ACCESS_KEY_ID: ${MINIO_APP_USER:-quro_app}
-      S3_SECRET_ACCESS_KEY_FILE: /run/secrets/minio_app_secret_key
+      # Documents live in ./data/documents unless QRO_DOCUMENT_STORAGE=s3 selects an S3-compatible
+      # store (docs/document-storage.md). S3 settings without QRO_DOCUMENT_STORAGE stop the backend.
+      QRO_DOCUMENT_STORAGE: ${QRO_DOCUMENT_STORAGE:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PENSION_PARSER_URL: ${PENSION_PARSER_INTERNAL_URL:-http://pension-parser:8080}
       PENSION_PARSER_TIMEOUT_MS: ${PENSION_PARSER_TIMEOUT_MS:-300000}
@@ -150,13 +109,11 @@ services:
       IMPORT_WORKER_POLL_INTERVAL_MS: ${IMPORT_WORKER_POLL_INTERVAL_MS:-3000}
     secrets:
       - postgres_app_password
-      - minio_app_secret_key
+    volumes:
+      # The same directory as the backend: the worker reads uploaded statements from it.
+      - ./data/documents:/var/lib/quro/documents
     depends_on:
       migrate:
-        condition: service_completed_successfully
-      minio:
-        condition: service_healthy
-      minio-init:
         condition: service_completed_successfully
       pension-parser:
         condition: service_started
@@ -178,11 +135,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
+      # `backup` copies the documents directory next to the dump when documents are on the filesystem.
+      QRO_DOCUMENT_STORAGE: ${QRO_DOCUMENT_STORAGE:-}
     secrets:
       - postgres_admin_password
       - postgres_app_password
     volumes:
       - ./backups:/app/backups
+      - ./data/documents:/var/lib/quro/documents:ro
     depends_on:
       db:
         condition: service_healthy
@@ -262,9 +222,5 @@ secrets:
     file: ./secrets/postgres_admin_password.txt
   postgres_app_password:
     file: ./secrets/postgres_app_password.txt
-  minio_root_password:
-    file: ./secrets/minio_root_password.txt
-  minio_app_secret_key:
-    file: ./secrets/minio_app_secret_key.txt
   hugging_face_hub_token:
     file: ./secrets/hugging_face_hub_token.txt

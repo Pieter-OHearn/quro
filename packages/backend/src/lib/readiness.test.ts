@@ -1,5 +1,9 @@
 import { describe, expect, mock, test } from 'bun:test';
-import { S3ConfigurationError } from './s3';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ConfigError } from '../config';
+import { createFilesystemDocumentStore } from './filesystemDocumentStore';
 import {
   checkDocumentStorageReadiness,
   getCoreReadinessReport,
@@ -95,7 +99,7 @@ describe('readiness report aggregation', () => {
 describe('document storage readiness', () => {
   test('distinguishes missing configuration from connection failures', async () => {
     const notConfigured = await checkDocumentStorageReadiness(NOW, () =>
-      Promise.reject(new S3ConfigurationError('missing')),
+      Promise.reject(new ConfigError([{ setting: 'S3_BUCKET', message: 'required' }])),
     );
     const connectionFailed = await checkDocumentStorageReadiness(NOW, () =>
       Promise.reject(new Error('offline')),
@@ -103,6 +107,23 @@ describe('document storage readiness', () => {
 
     expect(notConfigured).toMatchObject({ ready: false, reason: 'not_configured' });
     expect(connectionFailed).toMatchObject({ ready: false, reason: 'connection_failed' });
+  });
+
+  test('checks the filesystem driver by its directory', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'quro-readiness-documents-'));
+    try {
+      const store = createFilesystemDocumentStore(directory);
+      const missing = createFilesystemDocumentStore(join(directory, 'not-mounted'));
+      expect(await checkDocumentStorageReadiness(NOW, () => store.check())).toMatchObject({
+        ready: true,
+      });
+      expect(await checkDocumentStorageReadiness(NOW, () => missing.check())).toMatchObject({
+        ready: false,
+        reason: 'connection_failed',
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   test('reports a never-resolving storage check as failed after the timeout', async () => {

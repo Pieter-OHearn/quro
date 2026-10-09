@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { HTTP_STATUS } from '../constants/http';
-import { deleteS3Object, getS3ObjectBytes, uploadS3Object } from './s3';
+import { getDocumentStore } from './documentStorage';
 
 const PDF_MAGIC = Buffer.from('%PDF', 'ascii');
 
@@ -146,11 +146,7 @@ async function uploadPdfFile(params: {
     throw new HTTPException(400, { message: 'Uploaded file is not a valid PDF' });
   }
 
-  await uploadS3Object({
-    key: params.key,
-    body: bytes,
-    contentType: PDF_MIME_TYPE,
-  });
+  await getDocumentStore().put(params.key, bytes);
 
   return {
     fileName: normalizePdfFileName(params.file.name, params.fallbackBaseName),
@@ -161,22 +157,13 @@ async function uploadPdfFile(params: {
 
 export async function deleteStoredPdfSafely(storageKey: string, context: string): Promise<void> {
   try {
-    await deleteS3Object({ key: storageKey });
+    await getDocumentStore().delete(storageKey);
   } catch (error) {
     console.error(`Failed to delete ${context} from storage`, {
       storageKey,
       error,
     });
   }
-}
-
-function isS3NotFoundError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const maybeError = error as { name?: unknown; Code?: unknown; code?: unknown };
-  const values = [maybeError.name, maybeError.Code, maybeError.code].map((value) =>
-    String(value ?? ''),
-  );
-  return values.includes('NoSuchKey') || values.includes('NotFound');
 }
 
 type HttpStatus = (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS];
@@ -262,7 +249,7 @@ export async function streamStoredPdf(
 ): Promise<Response> {
   const notFound = () => c.json({ error: 'Document not found' }, HTTP_STATUS.NOT_FOUND);
   try {
-    const bytes = await getS3ObjectBytes({ key: params.document.storageKey });
+    const bytes = await getDocumentStore().get(params.document.storageKey);
     if (!bytes) return notFound();
 
     return new Response(new Uint8Array(bytes), {
@@ -272,8 +259,6 @@ export async function streamStoredPdf(
       },
     });
   } catch (error) {
-    if (isS3NotFoundError(error)) return notFound();
-
     console.error(`Failed to download ${params.context}`, error);
     return c.json({ error: params.failureMessage }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
