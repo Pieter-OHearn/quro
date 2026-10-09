@@ -105,10 +105,13 @@ function errorName(error: unknown): string {
   return 'unknown error';
 }
 
-/** An HTTP answer from the store means it was reached and refused, for example a missing bucket. */
-function storeAnswered(error: unknown): boolean {
+/**
+ * The HTTP status when the store answered and refused, for example for a missing bucket; null when
+ * it could not be reached at all.
+ */
+function storeAnswer(error: unknown): number | null {
   const metadata = (error as { $metadata?: { httpStatusCode?: unknown } } | null)?.$metadata;
-  return typeof metadata?.httpStatusCode === 'number';
+  return typeof metadata?.httpStatusCode === 'number' ? metadata.httpStatusCode : null;
 }
 
 /** A PostgreSQL error class other than 08 (connection exception) means the database answered. */
@@ -163,9 +166,10 @@ async function migrateFromS3(
   try {
     await source.check();
   } catch (error) {
-    if (storeAnswered(error)) {
+    const status = storeAnswer(error);
+    if (status !== null) {
       io.err(
-        `The S3 store refused access to the bucket (${errorName(error)}). Nothing was copied.`,
+        `The S3 store refused access to the bucket (HTTP ${status}, ${errorName(error)}). Check S3_BUCKET and the access key. Nothing was copied.`,
       );
       return EXIT_FAILURE;
     }
