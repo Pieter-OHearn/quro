@@ -118,10 +118,7 @@ export function StatCard({
       <Link
         to={href}
         data-testid={testId}
-        className={cn(
-          'bg-surface rounded-lg p-5 border border-border-subtle hover:shadow-popover transition-shadow group',
-          className,
-        )}
+        className={cn('bg-surface rounded-lg p-5 border border-border-subtle group', className)}
       >
         <StatCardContent {...contentProps} />
       </Link>

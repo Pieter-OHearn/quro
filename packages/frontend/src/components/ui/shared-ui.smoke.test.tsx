@@ -4,6 +4,7 @@ import { expect, test } from 'bun:test';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AlertTriangle, ArrowDownUp, PiggyBank, Plus } from 'lucide-react';
+import { MemoryRouter } from 'react-router';
 import { Badge } from './atoms/Badge';
 import { Button } from './atoms/Button';
 import { Card } from './atoms/Card';
@@ -26,6 +27,7 @@ import { SegmentedControl } from './molecules/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
 import { DataTable, DataTableCell, DataTableRow } from './organisms/DataTable';
 import { Modal } from './organisms/Modal';
+import { StatCard } from './organisms/StatCard';
 import { ContentSection, PageStack } from './templates';
 
 type SmokeCase = {
@@ -64,7 +66,29 @@ const smokeCases: readonly SmokeCase[] = [
         Card body
       </Card>
     ),
-    includes: ['data-smoke="card"', 'Card body', 'rounded-lg', 'border'],
+    includes: ['data-smoke="card"', 'Card body', 'rounded-lg border border-border-subtle'],
+    excludes: ['shadow-'],
+  },
+  {
+    name: 'StatCard link renders a bordered card without a shadow',
+    element: (
+      <MemoryRouter>
+        <StatCard
+          label="Total savings"
+          value="EUR 1,250.00"
+          icon={PiggyBank}
+          color="emerald"
+          href="/savings"
+          testId="smoke-stat-card"
+        />
+      </MemoryRouter>
+    ),
+    includes: [
+      'data-testid="smoke-stat-card"',
+      'href="/savings"',
+      'rounded-lg p-5 border border-border-subtle',
+      'Total savings',
+    ],
     excludes: ['shadow-'],
   },
   {
