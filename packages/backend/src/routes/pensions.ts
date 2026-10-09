@@ -30,7 +30,7 @@ import {
   ok,
   parseCurrencyField,
   parseId,
-  parseNumberField,
+  parseMoneyField,
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
@@ -136,12 +136,21 @@ const pensionPotParsers: FieldParsers<PensionPotPayload> = {
     typeof value === 'string' && PENSION_POT_TYPES.includes(value as PensionPotType)
       ? ok(value as PensionPotType)
       : err('Invalid pension type'),
-  balance: (value) => parseNumberField(value, 'Balance must be zero or greater', 0),
+  balance: (value) =>
+    parseMoneyField(value, { field: 'balance', error: 'Balance must be zero or greater', min: 0 }),
   currency: parseCurrencyField,
   employeeMonthly: (value) =>
-    parseNumberField(value, 'Employee contribution must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'employeeMonthly',
+      error: 'Employee contribution must be zero or greater',
+      min: 0,
+    }),
   employerMonthly: (value) =>
-    parseNumberField(value, 'Employer contribution must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'employerMonthly',
+      error: 'Employer contribution must be zero or greater',
+      min: 0,
+    }),
   investmentStrategy: (value) =>
     parseOptionalTextField(value, 'Investment strategy must be a string'),
   metadata: parseMetadataField,
@@ -524,6 +533,7 @@ async function updatePensionTransaction(params: {
 }): Promise<RouteMutationResult> {
   let storageKeyToDelete: string | null = null;
   const result = await db.transaction(async (tx) => {
+    // Locked so a concurrent edit or delete of this row waits and then sees this one's result.
     const [existing] = await tx
       .select()
       .from(pensionTransactions)
@@ -532,7 +542,8 @@ async function updatePensionTransaction(params: {
           eq(pensionTransactions.id, params.transactionId),
           eq(pensionTransactions.userId, params.userId),
         ),
-      );
+      )
+      .for('update');
     if (!existing) return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
 
     const normalizedExisting = normalizeTransactionRow(existing);
@@ -598,6 +609,7 @@ async function deletePensionTransaction(params: {
 }): Promise<RouteMutationResult> {
   let storageKeyToDelete: string | null = null;
   const result = await db.transaction(async (tx) => {
+    // Locked so a concurrent edit or delete of this row waits and then sees this one's result.
     const [existing] = await tx
       .select()
       .from(pensionTransactions)
@@ -606,7 +618,8 @@ async function deletePensionTransaction(params: {
           eq(pensionTransactions.id, params.transactionId),
           eq(pensionTransactions.userId, params.userId),
         ),
-      );
+      )
+      .for('update');
     if (!existing) return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
 
     const normalizedExisting = normalizeTransactionRow(existing);

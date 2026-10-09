@@ -18,7 +18,10 @@ cannot verify is listed alongside the result instead of being presented as confi
 Dutch and Australian employment and planning rules are effective-dated in
 `packages/backend/src/lib/jurisdictions/`. Source links live beside each value so moving statutory
 figures are updated in one place. Rules past their published period are carried forward explicitly
-and labelled as extrapolated.
+and labelled as extrapolated. An open-ended rule with a source is labelled the same way once its
+last review is more than twelve months old, and any extrapolated rule marks the runway as an
+estimate. Review ownership and the correction process are in
+[financial invariants](financial-invariants.md#rule-review-and-corrections).
 
 For Australia, Quro applies the Fair Work continuous-service redundancy weeks table to estimated
 weekly base pay. It does not derive JobSeeker Payment from salary because Services Australia applies

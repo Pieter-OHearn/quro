@@ -9,7 +9,7 @@ import {
   ok,
   parseDateString,
   parseId,
-  parseNumber,
+  parseMoneyField,
   type ParseResult,
 } from './requestValidation';
 
@@ -46,11 +46,17 @@ function parsePensionTransactionPayloadBase(
   const type = parsePensionTransactionType(rawPayload.type);
   if (!type) return err('Invalid transaction type');
 
-  const amount = parseNumber(rawPayload.amount);
-  if (amount === null) return err('Invalid transaction amount');
+  const amount = parseMoneyField(rawPayload.amount, {
+    field: 'amount',
+    error: 'Invalid transaction amount',
+  });
+  if (!amount.ok) return amount;
 
-  const taxAmount = parseNumber(rawPayload.taxAmount ?? 0);
-  if (taxAmount === null) return err('Invalid tax amount');
+  const taxAmount = parseMoneyField(rawPayload.taxAmount ?? 0, {
+    field: 'taxAmount',
+    error: 'Invalid tax amount',
+  });
+  if (!taxAmount.ok) return taxAmount;
 
   const date = parseDateString(rawPayload.date);
   if (!date) return err('Invalid transaction date');
@@ -58,8 +64,8 @@ function parsePensionTransactionPayloadBase(
   return ok({
     potId,
     type,
-    amount,
-    taxAmount,
+    amount: amount.value,
+    taxAmount: taxAmount.value,
     date,
     note: typeof rawPayload.note === 'string' ? rawPayload.note : '',
     isEmployer: rawPayload.isEmployer,

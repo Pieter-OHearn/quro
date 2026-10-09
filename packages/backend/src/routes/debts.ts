@@ -26,10 +26,10 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  parseMoneyField,
   parseNonEmptyString,
   parseNumberField,
   parseOptionalDateField,
-  parsePositiveNumberField,
   parseRequiredFields,
   type ParseResult,
   parseTextField,
@@ -104,12 +104,25 @@ const debtParsers: FieldParsers<DebtPayload> = {
   type: parseDebtTypeField,
   lender: (value) => parseTextField(value, 'Lender is required'),
   originalAmount: (value) =>
-    parsePositiveNumberField(value, 'Original amount must be greater than zero'),
+    parseMoneyField(value, {
+      field: 'originalAmount',
+      error: 'Original amount must be greater than zero',
+      min: Number.MIN_VALUE,
+    }),
   remainingBalance: (value) =>
-    parseNumberField(value, 'Remaining balance must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'remainingBalance',
+      error: 'Remaining balance must be zero or greater',
+      min: 0,
+    }),
   currency: parseCurrencyField,
   interestRate: (value) => parseNumberField(value, 'Interest rate must be zero or greater', 0),
-  monthlyPayment: (value) => parseNumberField(value, 'Monthly payment must be zero or greater', 0),
+  monthlyPayment: (value) =>
+    parseMoneyField(value, {
+      field: 'monthlyPayment',
+      error: 'Monthly payment must be zero or greater',
+      min: 0,
+    }),
   startDate: (value) => parseDateField(value, 'Start date must be a valid ISO date'),
   endDate: (value) => parseOptionalDateField(value, 'End date must be a valid ISO date'),
   color: (value) => parseTextField(value, 'Color is required'),
@@ -120,8 +133,18 @@ const debtParsers: FieldParsers<DebtPayload> = {
 const debtPaymentParsers: FieldParsers<Omit<DebtPaymentPayload, 'principal'>> = {
   debtId: (value) => parseIntegerField(value, 'Invalid debt id', 1),
   date: (value) => parseDateField(value, 'Payment date must be a valid ISO date'),
-  amount: (value) => parsePositiveNumberField(value, 'Payment amount must be greater than zero'),
-  interest: (value) => parseNumberField(value, 'Interest must be zero or greater', 0),
+  amount: (value) =>
+    parseMoneyField(value, {
+      field: 'amount',
+      error: 'Payment amount must be greater than zero',
+      min: Number.MIN_VALUE,
+    }),
+  interest: (value) =>
+    parseMoneyField(value, {
+      field: 'interest',
+      error: 'Interest must be zero or greater',
+      min: 0,
+    }),
   note: (value) => ok(parseNonEmptyString(value) ?? ''),
 };
 
@@ -269,10 +292,12 @@ function deleteDebtPayment(params: {
   paymentId: number;
 }): Promise<RouteMutationResult> {
   return db.transaction(async (tx) => {
+    // Locked so a second delete of the same payment waits and then finds nothing to restore.
     const [existing] = await tx
       .select()
       .from(debtPayments)
-      .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)));
+      .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)))
+      .for('update');
     if (!existing) return { error: 'Payment not found', status: HTTP_STATUS.NOT_FOUND };
 
     const restoredBalance = await reverseRepayment(tx, DEBT_BALANCE, {

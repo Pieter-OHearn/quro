@@ -2,7 +2,8 @@
 
 The backend owns financial calculations. The frontend formats and converts their
 results into the selected display currency; it does not reconstruct net worth or
-identify allocations by their display names.
+identify allocations by their display names. The arithmetic policy and the ledger
+invariants these totals rely on are in [financial invariants](financial-invariants.md).
 
 ## Household attribution
 
@@ -112,3 +113,5 @@ model retain their existing rules and effective dates.
 - Private/archived assets and unauthorized property reads.
 - Foreign budget conversion, monetary overrides, joint liquidity and contractual payments.
 - Authoritative client totals with empty allocations and translated allocation names.
+- A golden two-partner household whose dashboard, list-endpoint and SQL totals agree to the
+  cent after partner repayments, joint deposits, moves and deletes.

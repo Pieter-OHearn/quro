@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { getConfig } from '../config';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import { HTTP_STATUS } from '../constants/http';
 import {
   pensionPots,
@@ -444,6 +444,30 @@ function earliestRowDate(rows: readonly ImportRowRecord[]): string | undefined {
   return [...rows].sort((left, right) => left.date.localeCompare(right.date)).at(0)?.date;
 }
 
+const IMPORT_NOT_READY_FOR_COMMIT = 'Import is not ready for commit';
+
+class ImportNotReadyForCommit extends Error {
+  constructor() {
+    super(IMPORT_NOT_READY_FOR_COMMIT);
+  }
+}
+
+// Claims the import before any row is written: a second commit of the same import waits here
+// and then finds it committed, so the statement reaches the ledger once.
+async function claimImportForCommit(tx: DbTransaction, importId: number, now: Date) {
+  const [claimed] = await tx
+    .update(pensionStatementImports)
+    .set({ status: 'committed', committedAt: now, updatedAt: now, errorMessage: null })
+    .where(
+      and(
+        eq(pensionStatementImports.id, importId),
+        eq(pensionStatementImports.status, 'ready_for_review'),
+      ),
+    )
+    .returning({ id: pensionStatementImports.id });
+  if (!claimed) throw new ImportNotReadyForCommit();
+}
+
 async function commitRowsToLedger(params: {
   userId: number;
   importRecord: ImportRecord;
@@ -454,6 +478,7 @@ async function commitRowsToLedger(params: {
   const committedTransactionIds: number[] = [];
 
   await db.transaction(async (tx) => {
+    await claimImportForCommit(tx, params.importId, params.now);
     let annualStatementTransactionId: number | null = null;
 
     for (const row of params.rows) {
@@ -513,16 +538,6 @@ async function commitRowsToLedger(params: {
     if (annualStatementTransactionId === null) {
       throw new Error('Missing annual statement transaction');
     }
-
-    await tx
-      .update(pensionStatementImports)
-      .set({
-        status: 'committed',
-        committedAt: params.now,
-        updatedAt: params.now,
-        errorMessage: null,
-      })
-      .where(eq(pensionStatementImports.id, params.importId));
 
     const earliestCommittedDate = earliestRowDate(params.rows);
     if (earliestCommittedDate) {
@@ -973,7 +988,7 @@ app.post('/:id/commit', async (c) => {
   const importRecord = await findOwnedRow(pensionStatementImports, importId, user.id);
   if (!importRecord) return c.json({ error: 'Import not found' }, HTTP_STATUS.NOT_FOUND);
   if (importRecord.status !== 'ready_for_review')
-    return c.json({ error: 'Import is not ready for commit' }, HTTP_STATUS.BAD_REQUEST);
+    return c.json({ error: IMPORT_NOT_READY_FOR_COMMIT }, HTTP_STATUS.BAD_REQUEST);
 
   const duplicate = await hasDuplicateImport({
     userId: user.id,
@@ -1006,6 +1021,9 @@ app.post('/:id/commit', async (c) => {
       now,
     });
   } catch (error) {
+    if (error instanceof ImportNotReadyForCommit) {
+      return c.json({ error: IMPORT_NOT_READY_FOR_COMMIT }, HTTP_STATUS.BAD_REQUEST);
+    }
     console.error('Failed to commit pension import', error);
     return c.json({ error: 'Failed to commit import' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }

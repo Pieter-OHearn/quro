@@ -12,9 +12,9 @@ import {
   ok,
   parseCurrencyField,
   parseId,
-  parseNumberField,
+  parseMoneyField,
   parseOptionalIntegerField,
-  parseOptionalNumberField,
+  parseOptionalMoneyField,
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
@@ -96,15 +96,33 @@ const goalParsers: FieldParsers<GoalPayload> = {
   sourceId: (value) => parseOptionalIntegerField(value, 'Invalid goal source id', 1),
   name: (value) => parseTextField(value, 'Goal name is required'),
   emoji: (value) => parseOptionalTextField(value, 'Goal emoji must be a string'),
-  currentAmount: (value) => parseNumberField(value, 'Current amount must be zero or greater', 0),
-  targetAmount: (value) => parseNumberField(value, 'Target amount must be zero or greater', 0),
+  currentAmount: (value) =>
+    parseMoneyField(value, {
+      field: 'currentAmount',
+      error: 'Current amount must be zero or greater',
+      min: 0,
+    }),
+  targetAmount: (value) =>
+    parseMoneyField(value, {
+      field: 'targetAmount',
+      error: 'Target amount must be zero or greater',
+      min: 0,
+    }),
   deadline: (value) => parseTextField(value, 'Goal deadline is required'),
   year: (value) => parseOptionalIntegerField(value, 'Invalid year', MIN_GOAL_YEAR, MAX_GOAL_YEAR),
   category: (value) => parseTextField(value, 'Goal category is required'),
   monthlyContribution: (value) =>
-    parseNumberField(value, 'Monthly contribution must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'monthlyContribution',
+      error: 'Monthly contribution must be zero or greater',
+      min: 0,
+    }),
   monthlyTarget: (value) =>
-    parseOptionalNumberField(value, 'Monthly target must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'monthlyTarget',
+      error: 'Monthly target must be zero or greater',
+      min: 0,
+    }),
   monthsCompleted: (value) =>
     parseOptionalIntegerField(value, 'Months completed must be zero or greater', 0),
   totalMonths: (value) =>
