@@ -18,13 +18,53 @@ function render(element: ReactElement): string {
   return renderToStaticMarkup(element);
 }
 
-/** The text a sighted reader sees: markup without tags and without the visually hidden prefix. */
+type RenderedText = {
+  /** The text a sighted reader sees, without the visually hidden prefix. */
+  visible: string;
+  /** The text inside `sr-only` elements, or null when there is none. */
+  screenReader: string | null;
+};
+
+function classList(tag: string): string[] {
+  return /\sclass="([^"]*)"/.exec(tag)?.[1].split(' ') ?? [];
+}
+
+/** Depth inside an `sr-only` element after reading one tag (0 when outside one). */
+function hiddenDepthAfter(depth: number, tag: string): number {
+  const closing = tag.startsWith('/');
+  if (depth > 0) return closing ? depth - 1 : depth + 1;
+  return !closing && classList(tag).includes('sr-only') ? 1 : 0;
+}
+
+/**
+ * Reads server-rendered markup tag by tag instead of stripping tags with a pattern.
+ * React escapes `<` in text, so every `<` in the markup opens a tag.
+ */
+function readText(markup: string): RenderedText {
+  const result: RenderedText = { visible: '', screenReader: null };
+  let hiddenDepth = 0;
+  let cursor = 0;
+  while (cursor < markup.length) {
+    const tagStart = markup.indexOf('<', cursor);
+    const text = markup.slice(cursor, tagStart === -1 ? markup.length : tagStart);
+    if (hiddenDepth > 0 && text) result.screenReader = (result.screenReader ?? '') + text;
+    else result.visible += text;
+    if (tagStart === -1) break;
+
+    const tagEnd = markup.indexOf('>', tagStart);
+    if (tagEnd === -1) throw new Error(`Unclosed tag in rendered markup: ${markup}`);
+    hiddenDepth = hiddenDepthAfter(hiddenDepth, markup.slice(tagStart + 1, tagEnd));
+    cursor = tagEnd + 1;
+  }
+  return result;
+}
+
 function visibleText(markup: string): string {
-  return markup.replaceAll(/<span class="sr-only">[^<]*<\/span>/g, '').replaceAll(/<[^>]+>/g, '');
+  return readText(markup).visible;
 }
 
 function screenReaderPrefix(markup: string): string | null {
-  return /<span class="sr-only">([^<]*)<\/span>/.exec(markup)?.[1] ?? null;
+  return readText(markup).screenReader;
 }
 
 type MatrixCase = {
@@ -69,6 +109,13 @@ const MATRIX: readonly MatrixCase[] = [
 
 const FORMATS: readonly ChangeProps['format'][] = ['amount', 'percent'];
 const VARIANTS = ['text', 'chip'] as const;
+
+test('the markup reader separates visible text from screen-reader text', () => {
+  expect(
+    readText('<span class="a"><i>x</i><span class="b sr-only">up <b>now</b></span>+1</span>'),
+  ).toEqual({ visible: 'x+1', screenReader: 'up now' });
+  expect(readText('<span>0.00</span>')).toEqual({ visible: '0.00', screenReader: null });
+});
 
 describe('Change sign, colour and arrow matrix', () => {
   for (const entry of MATRIX) {
