@@ -288,7 +288,7 @@ export function pickPatchedValue<T, U>(patchValue: T | undefined, existingValue:
 export const MONEY_LIMIT = 10_000_000_000_000;
 
 export function moneyLimitError(field: string): string {
-  return `${field} is out of range: money amounts must be below 10,000,000,000,000`;
+  return `${field} is out of range: money amounts must be below 10,000,000,000,000 in absolute value`;
 }
 
 /**

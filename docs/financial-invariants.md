@@ -70,6 +70,11 @@ Not money, and parsed without the rule: holding `currentPrice`, `manualPrice` an
 `overpaymentLimit` (a percentage); `emergencyLifestylePct`; durations and counts. bunq payments
 are provider data rather than requests and arrive with two decimals.
 
+Two edge cases. A goal with a `unit` may count something other than money, but its amounts are
+stored with two decimals either way, so the rule only does what storage already does. A dividend's
+amount travels in the holding transaction's `price` field, a unit-price field, so it is not
+parsed as money; it is still stored with two decimals.
+
 ### Measured envelope
 
 Numbers are exact enough for this policy only within bounds. These were measured and are
