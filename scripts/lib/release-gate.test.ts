@@ -121,6 +121,20 @@ describe('evaluateRequiredChecks', () => {
     expect(result.problems[0]).toContain('CI is still in_progress');
   });
 
+  test('refuses while a CI run on the commit has not reported the check yet', () => {
+    const running = (event: string) =>
+      evaluateRequiredChecks({
+        sha: SHA,
+        requiredChecks: ['CI'],
+        workflowPath: CI_PATH,
+        checkRuns: [],
+        workflowRuns: [ciRun({ event, status: 'in_progress', conclusion: null })],
+      });
+    expect(running('workflow_dispatch').problems[0]).toContain('CI has not reported yet');
+    expect(running('workflow_dispatch').problems[0]).toContain('is still in_progress');
+    expect(running('pull_request').problems[0]).toContain('No CI check');
+  });
+
   test('refuses a check reported for another commit', () => {
     const result = gate([pair({}, { head_sha: OTHER_SHA })]);
     expect(result.ok).toBe(false);

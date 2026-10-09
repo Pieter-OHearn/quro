@@ -142,6 +142,18 @@ function evaluateCheck(
     else candidates.push({ check, run });
   }
   if (candidates.length === 0) {
+    // An aggregate job reports its check only once the jobs it needs have finished.
+    const running = input.workflowRuns.find(
+      (run) =>
+        run.path === input.workflowPath &&
+        run.head_sha === input.sha &&
+        EXACT_COMMIT_EVENTS.includes(run.event) &&
+        run.status !== 'completed',
+    );
+    if (running) {
+      const problem = `${name} has not reported yet: CI workflow run ${running.id} on ${input.sha} is still ${running.status}. Wait for it to finish, then dispatch the release again.`;
+      return { notes, problem };
+    }
     const problem = `No ${name} check from ${input.workflowPath} ran on a push or workflow_dispatch event for ${input.sha}. Merge the commit to main or dispatch CI on its branch, wait for it to pass, then dispatch the release again.`;
     return { notes, problem };
   }
