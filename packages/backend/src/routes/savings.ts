@@ -34,10 +34,10 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  parseMoneyField,
   parseNumberField,
   parseOptionalTextField,
   parsePatchFields,
-  parsePositiveNumberField,
   parseRequiredFields,
   type ParseResult,
   parseTextField,
@@ -105,7 +105,11 @@ function parseManualBankingEntity(
   if (!entityName) return err('Licensed entity name is required');
   if (!normalizeBankName(entityName)) return err('Licensed entity name is invalid');
   if (!scheme) return err('Deposit guarantee scheme is required');
-  const cap = parsePositiveNumberField(body.cap, 'Deposit guarantee cap must be positive');
+  const cap = parseMoneyField(body.cap, {
+    field: 'cap',
+    error: 'Deposit guarantee cap must be positive',
+    min: Number.MIN_VALUE,
+  });
   if (!cap.ok) return cap;
   const currency = parseCurrencyField(body.currency);
   if (!currency.ok) return currency;
@@ -142,7 +146,8 @@ function parseSavingsTransactionTypeField(value: unknown): ParseResult<SavingsTr
 const savingsAccountParsers: FieldParsers<SavingsAccountPayload> = {
   name: (value) => parseTextField(value, 'Account name is required'),
   bank: (value) => parseTextField(value, 'Bank is required'),
-  balance: (value) => parseNumberField(value, 'Balance must be zero or greater', 0),
+  balance: (value) =>
+    parseMoneyField(value, { field: 'balance', error: 'Balance must be zero or greater', min: 0 }),
   currency: parseCurrencyField,
   interestRate: (value) => parseNumberField(value, 'Interest rate must be zero or greater', 0),
   accountType: parseSavingsAccountTypeField,
@@ -156,7 +161,11 @@ const savingsTransactionParsers: FieldParsers<SavingsTransactionPayload> = {
   accountId: (value) => parseIntegerField(value, 'Invalid account id', 1),
   type: parseSavingsTransactionTypeField,
   amount: (value) =>
-    parsePositiveNumberField(value, 'Transaction amount must be greater than zero'),
+    parseMoneyField(value, {
+      field: 'amount',
+      error: 'Transaction amount must be greater than zero',
+      min: Number.MIN_VALUE,
+    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
 };

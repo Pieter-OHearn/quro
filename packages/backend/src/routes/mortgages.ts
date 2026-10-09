@@ -42,9 +42,11 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  parseMoneyField,
   parseNormalizedDecimalField,
   parseNumber,
   parseOptionalId,
+  parseOptionalMoneyField,
   parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
   parsePatchFields,
@@ -54,6 +56,7 @@ import {
   pickPatchedValue,
   readJsonBody,
   rejectUnknownFields,
+  toMoneyAmount,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -147,25 +150,33 @@ const mortgageParsers: FieldParsers<MortgagePayload> = {
   lender: (value) => parseTextField(value, 'Lender is required'),
   currency: parseCurrencyField,
   originalAmount: (value) =>
-    parseNormalizedDecimalField(
-      value,
-      'Original amount must be greater than zero',
-      Number.MIN_VALUE,
-    ),
+    parseMoneyField(value, {
+      field: 'originalAmount',
+      error: 'Original amount must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   outstandingBalance: (value) =>
-    parseNormalizedDecimalField(value, 'Outstanding balance must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'outstandingBalance',
+      error: 'Outstanding balance must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   propertyValue: (value) =>
-    parseNormalizedDecimalField(
-      value,
-      'Property value must be greater than zero',
-      Number.MIN_VALUE,
-    ),
+    parseMoneyField(value, {
+      field: 'propertyValue',
+      error: 'Property value must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   monthlyPayment: (value) =>
-    parseNormalizedDecimalField(
-      value,
-      'Monthly payment must be greater than zero',
-      Number.MIN_VALUE,
-    ),
+    parseMoneyField(value, {
+      field: 'monthlyPayment',
+      error: 'Monthly payment must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   interestRate: (value) =>
     parseNormalizedDecimalField(value, 'Interest rate must be zero or greater', 0),
   rateType: parseMortgageRateTypeField,
@@ -190,9 +201,19 @@ const mortgageTransactionParsers: FieldParsers<MortgageTransactionPayload> = {
       Number.MIN_VALUE,
     ),
   interest: (value) =>
-    parseOptionalNormalizedDecimalField(value, 'Interest must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'interest',
+      error: 'Interest must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   principal: (value) =>
-    parseOptionalNormalizedDecimalField(value, 'Principal must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'principal',
+      error: 'Principal must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
   fixedYears: (value) =>
@@ -527,9 +548,14 @@ function normalizeInformationalMortgageTransaction(
 function validateMortgageTransactionPayload(
   payload: MortgageTransactionPayload,
 ): ParseResult<MortgageTransactionPayload> {
-  if (payload.type === 'repayment') return normalizeRepaymentMortgageTransaction(payload);
+  // A rate change carries the new interest rate in `amount`; every other type carries money.
   if (payload.type === 'rate_change') return normalizeRateChangeMortgageTransaction(payload);
-  return normalizeInformationalMortgageTransaction(payload);
+  const amount = toMoneyAmount(payload.amount, 'amount');
+  if (!amount.ok) return amount;
+  if (amount.value <= 0) return err('Transaction amount must be greater than zero');
+  const money = { ...payload, amount: amount.value };
+  if (money.type === 'repayment') return normalizeRepaymentMortgageTransaction(money);
+  return normalizeInformationalMortgageTransaction(money);
 }
 
 function mergeMortgagePayload(

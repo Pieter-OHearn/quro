@@ -51,6 +51,7 @@ import {
   parseDateString,
   parseOptionalBooleanField,
   parseOptionalIntegerField,
+  parseOptionalMoneyField,
   parseOptionalNumberField,
   parsePatchFields,
   type ParseResult,
@@ -95,7 +96,11 @@ type AssumptionFields = Omit<Required<PlanAssumptionsInput>, 'wwWeeklyRequiremen
 
 const assumptionParsers: FieldParsers<AssumptionFields> = {
   leanBurnOverride: (value) =>
-    parseOptionalNumberField(value, 'Lean burn must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'leanBurnOverride',
+      error: 'Lean burn must be zero or greater',
+      min: 0,
+    }),
   emergencyLifestylePct: (value) => {
     const parsed = parseOptionalNumberField(
       value,
@@ -110,7 +115,11 @@ const assumptionParsers: FieldParsers<AssumptionFields> = {
   countFullJointBalances: (value) =>
     parseOptionalBooleanField(value, 'Joint balance setting must be true or false'),
   benefitMonthlyOverride: (value) =>
-    parseOptionalNumberField(value, 'Benefit amount must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'benefitMonthlyOverride',
+      error: 'Benefit amount must be zero or greater',
+      min: 0,
+    }),
   benefitMaxMonthsOverride: (value) =>
     parseOptionalIntegerField(value, 'Benefit duration must be 0 to 120 months', 0, 120),
   wwWeeklyRequirement: (value) =>
@@ -126,7 +135,11 @@ const assumptionParsers: FieldParsers<AssumptionFields> = {
     return parsed ? ok(parsed) : err('WW confirmation date must be a valid ISO date');
   },
   severanceMonthlySalaryOverride: (value) =>
-    parseOptionalNumberField(value, 'Severance salary must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'severanceMonthlySalaryOverride',
+      error: 'Severance salary must be zero or greater',
+      min: 0,
+    }),
 };
 
 async function parsePatch<T extends object>(

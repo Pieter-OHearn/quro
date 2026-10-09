@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
   err,
+  MONEY_LIMIT,
+  moneyLimitError,
+  parseMoneyField,
+  parseOptionalMoneyField,
+  toMoneyAmount,
   isRecord,
   ok,
   parseBooleanField,
@@ -233,5 +238,43 @@ describe('shared helpers', () => {
         'bad',
       ),
     ).toEqual(err('bad'));
+  });
+});
+
+describe('money input (D38)', () => {
+  const amount = { field: 'amount', error: 'bad amount' };
+
+  test('rounds to cents half away from zero, as numeric(19,2) stores it', () => {
+    expect(parseMoneyField(10.005, amount)).toEqual(ok(10.01));
+    expect(parseMoneyField(-10.005, amount)).toEqual(ok(-10.01));
+    expect(parseMoneyField('2.675', amount)).toEqual(ok(2.68));
+    expect(parseMoneyField(0.1 + 0.2, amount)).toEqual(ok(0.3));
+    expect(parseMoneyField('1.234,565', { ...amount, localized: true })).toEqual(ok(1234.57));
+    expect(parseMoneyField(-0.004, { ...amount, min: 0 })).toEqual(ok(0));
+  });
+
+  test('applies the minimum after rounding', () => {
+    expect(parseMoneyField(0.004, { ...amount, min: Number.MIN_VALUE })).toEqual(err('bad amount'));
+    expect(parseMoneyField(0.005, { ...amount, min: Number.MIN_VALUE })).toEqual(ok(0.01));
+    expect(parseMoneyField(-0.01, { ...amount, min: 0 })).toEqual(err('bad amount'));
+    expect(parseMoneyField('abc', amount)).toEqual(err('bad amount'));
+  });
+
+  test('refuses an absolute value of 10^13 or more and names the field', () => {
+    expect(MONEY_LIMIT).toBe(1e13);
+    expect(parseMoneyField(9_999_999_999_999.99, amount)).toEqual(ok(9_999_999_999_999.99));
+    expect(parseMoneyField(-9_999_999_999_999.99, amount)).toEqual(ok(-9_999_999_999_999.99));
+    for (const value of [1e13, -1e13, '9999999999999.995', 1e21]) {
+      expect(parseMoneyField(value, amount)).toEqual(err(moneyLimitError('amount')));
+    }
+    expect(moneyLimitError('balance')).toContain('balance');
+    expect(toMoneyAmount(1e13, 'cap')).toEqual(err(moneyLimitError('cap')));
+  });
+
+  test('optional money keeps null and empty as null', () => {
+    expect(parseOptionalMoneyField(null, amount)).toEqual(ok(null));
+    expect(parseOptionalMoneyField('', amount)).toEqual(ok(null));
+    expect(parseOptionalMoneyField(undefined, amount)).toEqual(ok(null));
+    expect(parseOptionalMoneyField(12.345, amount)).toEqual(ok(12.35));
   });
 });

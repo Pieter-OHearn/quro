@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { savingsAccounts, savingsTransactions } from '../db/schema';
+import { moneyLimitError } from '../lib/requestValidation';
 import { createIntegrationHelpers, type AuthSession } from '../test/integration';
 
 const integration = createIntegrationHelpers('unstorable-values.integration.quro.test');
@@ -45,13 +46,26 @@ describe('values the database cannot store', () => {
   });
 
   test('a number beyond the column range is a 400 and writes nothing', async () => {
+    // Money is bounded when it is parsed (D38), so a rate column shows the database refusal.
+    const response = await integration.request(`/api/savings/accounts/${accountId}`, {
+      method: 'PATCH',
+      cookie: owner.cookie,
+      json: { interestRate: 1e6 },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual(REFUSED);
+    const [row] = await db.select().from(savingsAccounts).where(eq(savingsAccounts.id, accountId));
+    expect(row!.interestRate).toBe(1);
+  });
+
+  test('a money amount beyond the money limit is refused before it reaches the database', async () => {
     const response = await integration.request('/api/savings/transactions', {
       method: 'POST',
       cookie: owner.cookie,
       json: { accountId, type: 'deposit', amount: 1e21, date: '2026-03-02' },
     });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual(REFUSED);
+    expect(await response.json()).toEqual({ error: moneyLimitError('amount') });
 
     const rows = await db
       .select()

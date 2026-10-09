@@ -207,7 +207,7 @@ const holdingTransactionParsers: FieldParsers<HoldingTransactionPayload> = {
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
 };
 
-function parseHoldingCreate(body: unknown): ParseResult<HoldingCreatePayload> {
+export function parseHoldingCreate(body: unknown): ParseResult<HoldingCreatePayload> {
   if (!isRecord(body)) return err('Invalid holding payload');
   const strictCheck = rejectUnknownFields(body, HOLDING_CREATE_FIELDS);
   if (!strictCheck.ok) return strictCheck;
@@ -237,7 +237,9 @@ function parseHoldingPatch(body: unknown): ParseResult<Partial<HoldingPayload>> 
   return parsePatchFields(body, holdingParsers);
 }
 
-function parseHoldingTransactionCreate(body: unknown): ParseResult<HoldingTransactionPayload> {
+export function parseHoldingTransactionCreate(
+  body: unknown,
+): ParseResult<HoldingTransactionPayload> {
   if (!isRecord(body)) return err('Invalid holding transaction payload');
   const strictCheck = rejectUnknownFields(body, HOLDING_TRANSACTION_FIELDS);
   if (!strictCheck.ok) return strictCheck;

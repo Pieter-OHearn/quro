@@ -41,10 +41,10 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  parseMoneyField,
   parseNormalizedDecimal,
-  parseNormalizedDecimalField,
   parseOptionalId,
-  parseOptionalNormalizedDecimalField,
+  parseOptionalMoneyField,
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
@@ -117,21 +117,37 @@ const propertyParsers: FieldParsers<PropertyPayload> = {
   address: (value) => parseTextField(value, 'Property address is required'),
   propertyType: (value) => parseTextField(value, 'Property type is required'),
   purchasePrice: (value) =>
-    parseNormalizedDecimalField(
-      value,
-      'Purchase price must be greater than zero',
-      Number.MIN_VALUE,
-    ),
+    parseMoneyField(value, {
+      field: 'purchasePrice',
+      error: 'Purchase price must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   currentValue: (value) =>
-    parseNormalizedDecimalField(value, 'Current value must be greater than zero', Number.MIN_VALUE),
+    parseMoneyField(value, {
+      field: 'currentValue',
+      error: 'Current value must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   mortgage: (value) =>
-    parseNormalizedDecimalField(value, 'Mortgage balance must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'mortgage',
+      error: 'Mortgage balance must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   mortgageId: (value) => {
     const parsed = parseOptionalId(value);
     return parsed === 'invalid' ? err('Invalid mortgage id') : ok(parsed);
   },
   monthlyRent: (value) =>
-    parseNormalizedDecimalField(value, 'Monthly rent must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'monthlyRent',
+      error: 'Monthly rent must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   currency: parseCurrencyField,
   emoji: (value) => parseOptionalTextField(value, 'Emoji must be a string'),
   isJoint: (value) =>
@@ -151,11 +167,26 @@ const propertyTransactionParsers: FieldParsers<PropertyTransactionPayload> = {
   propertyId: (value) => parseIntegerField(value, 'Invalid property id', 1),
   type: parsePropertyTransactionTypeField,
   amount: (value) =>
-    parseNormalizedDecimalField(value, 'Amount must be greater than zero', Number.MIN_VALUE),
+    parseMoneyField(value, {
+      field: 'amount',
+      error: 'Amount must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   interest: (value) =>
-    parseOptionalNormalizedDecimalField(value, 'Interest must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'interest',
+      error: 'Interest must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   principal: (value) =>
-    parseOptionalNormalizedDecimalField(value, 'Principal must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'principal',
+      error: 'Principal must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
 };
