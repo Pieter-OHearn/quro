@@ -13,6 +13,7 @@ import {
   type BunqOAuthDestination,
 } from '../lib/bunqOAuthAttempts';
 import { buildOAuthAuthorizeUrl, deleteSession, exchangeCodeForTokens } from '../lib/bunqClient';
+import { describeSyncFailure } from '../lib/syncFailure';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { secureCookiesEnabled } from '../lib/sessions';
@@ -204,7 +205,7 @@ app.post('/sync/savings', async (c) => {
     );
   } catch (e) {
     logBunqError('[bunq savings sync error]', e);
-    const message = e instanceof Error ? e.message : 'Bunq savings sync failed';
+    const message = describeSyncFailure(e, 'Bunq savings sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });
@@ -229,7 +230,7 @@ app.post('/sync/budget', async (c) => {
     );
   } catch (e) {
     logBunqError('[bunq budget sync error]', e);
-    const message = e instanceof Error ? e.message : 'Bunq budget sync failed';
+    const message = describeSyncFailure(e, 'Bunq budget sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });
@@ -271,7 +272,7 @@ app.post('/sync', async (c) => {
     );
   } catch (e) {
     logBunqError('[bunq sync error]', e);
-    const message = e instanceof Error ? e.message : 'Bunq sync failed';
+    const message = describeSyncFailure(e, 'Bunq sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });
