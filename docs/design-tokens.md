@@ -3,8 +3,8 @@
 The V1 design values (color tokens, type, density, shape and motion) are defined in
 [V1 design](design-v1.md). Moving `theme.css` and the shared UI to them is tracked in milestone
 M6 (V1 design update) and lands on the `feature/m6-v1-design-update` branch. `theme.css` carries
-the V1 light colour tokens, shadows and motion; dark mode, radius, type and the shared UI follow
-in later steps, and until a value has moved `theme.css` and this page describe what the app
+the V1 light colour tokens, type scale, shadows and motion; dark mode, radius and the shared UI
+follow in later steps, and until a value has moved `theme.css` and this page describe what the app
 renders today.
 
 Quro uses semantic CSS variables defined in
@@ -35,6 +35,7 @@ the table/list patterns feature work should follow.
 | **Motion**     | `duration-fast` / `-base` / `-slow`, `ease-standard`, `ease-emphasized`                               | `transition-*`, `duration-*`, and easing utilities                      |
 | **Radius**     | `radius-sm`, `radius-md`, `radius-lg`, `radius-xl`                                                    | Shared control, card, modal, and table-card rounding                    |
 | **Numeric**    | `font-numeric` utility class                                                                          | Money, rates, quantities, and other values that align across rows       |
+| **Type**       | `text-figure-{hero,lg,md,cell}`, `text-title-{page,section}`, `text-{body,cell,label,caption}`        | V1 type styles ([section 3](design-v1.md#3-type)); add a colour class   |
 
 ## Rules
 

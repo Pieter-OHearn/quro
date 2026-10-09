@@ -226,7 +226,7 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
         align: 'center',
         visual: (
           <div className="mb-4 flex justify-center">
-            <QuroLogo size={52} showBg={false} />
+            <QuroLogo size={52} />
           </div>
         ),
         className: 'bg-gradient-to-br from-surface-inverse to-surface-auth-end px-8 pb-10 pt-8',
