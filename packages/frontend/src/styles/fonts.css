@@ -1,9 +1,2 @@
+/* The family stack is `--font-sans` in theme.css; preflight sets it on `html`. */
 @import '@fontsource-variable/geist/wght.css';
-
-body {
-  font-family:
-    'Geist Variable',
-    system-ui,
-    -apple-system,
-    sans-serif;
-}
