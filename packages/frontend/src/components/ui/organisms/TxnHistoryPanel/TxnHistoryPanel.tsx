@@ -21,7 +21,7 @@ const PANEL_VARIANTS = {
   embedded: {
     bodyClassName: 'border-t border-border-subtle bg-surface-sunken/60 p-4',
     statsClassName: 'mb-4',
-    statClassName: 'bg-surface rounded-xl px-3 py-2.5 border border-border-subtle',
+    statClassName: 'bg-surface rounded-lg px-3 py-2.5 border border-border-subtle',
     filterBarClassName: 'mb-3',
     listClassName: 'space-y-1.5',
     emptyStateClassName: 'py-5',
@@ -30,7 +30,7 @@ const PANEL_VARIANTS = {
   card: {
     bodyClassName: '',
     statsClassName: 'px-5 py-5 border-b border-border-subtle',
-    statClassName: 'bg-surface-sunken rounded-xl px-3 py-2.5',
+    statClassName: 'bg-surface-sunken rounded-lg px-3 py-2.5',
     filterBarClassName: 'px-5 py-3 border-b border-border-subtle',
     listClassName: 'divide-y divide-border-subtle',
     emptyStateClassName: 'py-10',
@@ -84,7 +84,7 @@ function StatsGrid({ stats, statsColumns, className, statClassName }: StatsGridP
   return (
     <div className={cn('grid gap-3', columnsClass, className)}>
       {stats.map(({ label, value, color }) => (
-        <div key={label} className={cn('rounded-xl px-3 py-2.5', statClassName)}>
+        <div key={label} className={cn('rounded-lg px-3 py-2.5', statClassName)}>
           <p className="text-[10px] text-fg-faint mb-0.5">{label}</p>
           <p className={cn('text-sm font-semibold', color ?? 'text-fg-strong')}>{value}</p>
         </div>
@@ -348,7 +348,7 @@ export function TxnRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 bg-surface rounded-xl px-3 py-2.5 group border border-transparent hover:border-border-subtle transition-all',
+        'flex items-center gap-3 bg-surface rounded-lg px-3 py-2.5 group border border-transparent hover:border-border-subtle transition-all',
         className,
       )}
     >

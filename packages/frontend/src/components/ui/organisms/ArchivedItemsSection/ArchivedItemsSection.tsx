@@ -59,14 +59,14 @@ function ArchivedRow<T extends ArchivedItem>({
       </div>
       <button
         onClick={() => onUnarchive(item)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border-default text-fg-muted hover:bg-surface-sunken text-xs transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-default text-fg-muted hover:bg-surface-sunken text-xs transition-colors"
         title="Restore"
       >
         <RotateCcw size={12} /> Restore
       </button>
       <button
         onClick={() => onRequestDelete(item)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-danger-border text-danger hover:bg-danger-soft text-xs transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-danger-border text-danger hover:bg-danger-soft text-xs transition-colors"
         title="Delete permanently"
       >
         <Trash2 size={12} /> Delete
@@ -115,7 +115,7 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
   const balance = pendingDelete && getBalance ? getBalance(pendingDelete) : null;
 
   return (
-    <div className="bg-surface border border-border-default rounded-2xl overflow-hidden">
+    <div className="bg-surface border border-border-default rounded-lg overflow-hidden">
       <SectionHeader
         title={title}
         count={items.length}

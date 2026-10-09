@@ -142,7 +142,7 @@ export function ModalHeader({
             aria-label="Close dialog"
             onClick={onClose}
             className={cn(
-              'absolute top-4 right-4 p-2 rounded-xl hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
+              'absolute top-4 right-4 p-2 rounded-md hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
               closeButtonClassName,
             )}
           >
@@ -178,7 +178,7 @@ export function ModalHeader({
             aria-label="Close dialog"
             onClick={onClose}
             className={cn(
-              'p-2 rounded-xl hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
+              'p-2 rounded-md hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
               closeButtonClassName,
             )}
           >
@@ -221,7 +221,7 @@ export function Modal({
       <div
         ref={dialogRef}
         className={cn(
-          'relative bg-surface rounded-2xl shadow-overlay w-full overflow-hidden',
+          'relative bg-surface rounded-lg shadow-overlay w-full overflow-hidden',
           MAX_WIDTH_MAP[maxWidth],
           scrollable && 'flex flex-col max-h-[90vh]',
           contentClassName,

@@ -13,10 +13,10 @@ const VARIANT_CLASSES = {
 } as const;
 
 const SIZE_CLASSES = {
-  sm: 'rounded-lg px-3 py-1.5 text-xs',
-  md: 'rounded-xl px-4 py-2 text-sm',
-  lg: 'rounded-xl px-4 py-2.5 text-sm',
-  xl: 'rounded-xl px-4 py-3 text-sm',
+  sm: 'rounded-md px-3 py-1.5 text-xs',
+  md: 'rounded-md px-4 py-2 text-sm',
+  lg: 'rounded-md px-4 py-2.5 text-sm',
+  xl: 'rounded-md px-4 py-3 text-sm',
 } as const;
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

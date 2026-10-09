@@ -87,6 +87,13 @@ describe('what the manifest says is required matches what the loader enforces', 
     }
   });
 
+  // S3 settings never select the S3 store by themselves (they stop every command instead), so the
+  // feature is checked with the store selected.
+  const SELECTED: Record<keyof typeof FEATURES, Environment> = {
+    s3Storage: { QRO_DOCUMENT_STORAGE: 's3' },
+    bunq: {},
+  };
+
   test.each(Object.keys(FEATURES) as (keyof typeof FEATURES)[])(
     'setting one %s setting reports every other one the feature needs',
     (feature) => {
@@ -94,6 +101,7 @@ describe('what the manifest says is required matches what the loader enforces', 
       for (const name of enabledBy as readonly SettingName[]) {
         const env: Environment = {
           DATABASE_URL: 'postgres://u:p@h/db',
+          ...SELECTED[feature],
           // A syntactically valid value of the right kind for each setting.
           [name]: name.endsWith('_FILE') ? '/dev/null' : sampleValue(name),
         };
@@ -190,7 +198,6 @@ describe('the Compose stack configures the backend with names the schema knows',
     const mountedSecrets = new Set([
       '/run/secrets/postgres_admin_password',
       '/run/secrets/postgres_app_password',
-      '/run/secrets/minio_app_secret_key',
     ]);
     const { problems } = loadConfig(environment, (path) => {
       if (mountedSecrets.has(path)) return 'secret\n';

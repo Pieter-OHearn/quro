@@ -4,6 +4,7 @@ import { loadConfig, type Environment } from './config';
 
 const BASE: Environment = { DATABASE_URL: 'postgres://u:p@h/db' };
 const FULL: Environment = {
+  QRO_DOCUMENT_STORAGE: 's3',
   S3_ENDPOINT: 'http://s3:9000',
   S3_REGION: 'eu-west-1',
   S3_BUCKET: 'docs',
@@ -50,8 +51,10 @@ describe('createApp', () => {
     expect(hasRoutesUnder(bunqOnly, '/api/bunq')).toBe(true);
     expect(hasRoutesUnder(bunqOnly, '/api/pensions/imports')).toBe(false);
 
+    // Documents go to the filesystem store by default, so a parser is all statement import needs.
     const parserOnly = appFor({ PENSION_PARSER_URL: FULL.PENSION_PARSER_URL });
-    expect(hasRoutesUnder(parserOnly, '/api/pensions/imports')).toBe(false);
+    expect(hasRoutesUnder(parserOnly, '/api/pensions/imports')).toBe(true);
+    expect(hasRoutesUnder(parserOnly, '/api/bunq')).toBe(false);
   });
 
   test('everything configured mounts every optional route', () => {

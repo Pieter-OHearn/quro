@@ -5,11 +5,12 @@ import { Hono } from 'hono';
 import { PENSION_POT_TYPES, type CurrencyCode, type PensionPotType } from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate } from '../lib/netWorth';
 import { withLedgerWrite } from '../lib/ledgerWrite';
+import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import {
   asFile,
   buildPdfStorageKey,
@@ -650,7 +651,8 @@ app.get('/pots', async (c) => {
       includeArchived
         ? eq(pensionPots.userId, user.id)
         : and(eq(pensionPots.userId, user.id), isNull(pensionPots.archivedAt)),
-    );
+    )
+    .orderBy(asc(pensionPots.id));
   return c.json({ data });
 });
 
@@ -794,13 +796,27 @@ app.get('/documents', async (c) => {
   if (whereClause === null) {
     return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const pageRequest = parseListPageQuery(c.req, 'date');
+  if (!pageRequest.ok) return c.json({ error: pageRequest.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const data = await db.select().from(pensionTransactions).where(whereClause);
+  const page = await readListPage(
+    pageRequest.value,
+    ledgerOrder(pensionTransactions),
+    (window) =>
+      db
+        .select()
+        .from(pensionTransactions)
+        .where(and(whereClause, window.where))
+        .orderBy(...window.orderBy)
+        .limit(window.limit),
+    ledgerPosition,
+  );
   return c.json({
-    data: data
+    data: page.data
       .map((row) => formatStatementDocumentFromTransaction(row))
       .filter((row): row is PensionStatementDocumentRecord => row !== null)
       .map(formatStatementDocumentResponse),
+    nextCursor: page.nextCursor,
   });
 });
 

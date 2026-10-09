@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
-
-const s3Objects = new Map<string, Uint8Array>();
+import { existsSync, readFileSync } from 'node:fs';
+import { eq } from 'drizzle-orm';
 
 type QuoteFixture = {
   close: number | null;
@@ -29,31 +29,6 @@ const quoteFixtures = new Map<string, QuoteFixture>([
     },
   ],
 ]);
-
-await mock.module('../lib/s3', () => ({
-  S3ConfigurationError: class MockS3ConfigurationError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = 'S3ConfigurationError';
-    }
-  },
-  getS3BucketName: () => 'ticket7-test-bucket',
-  checkS3Readiness: () => Promise.resolve(),
-  uploadS3Object: ({ key, body }: { key: string; body: Buffer }) => {
-    s3Objects.set(key, new Uint8Array(body));
-  },
-  getS3ObjectBytes: ({ key }: { key: string }) => {
-    const existing = s3Objects.get(key);
-    return existing ? Buffer.from(existing) : null;
-  },
-  deleteS3Object: ({ key }: { key: string }) => {
-    s3Objects.delete(key);
-  },
-  deleteS3Objects: (keys: readonly string[]) => {
-    for (const key of keys) s3Objects.delete(key);
-    return Promise.resolve({ deletedKeys: [...keys], failedKeys: [] });
-  },
-}));
 
 await mock.module('../lib/marketDataClient', () => ({
   getMarketDataClient: () => ({
@@ -95,7 +70,10 @@ await mock.module('../lib/marketDataClient', () => ({
 
 const { createIntegrationHelpers } = await import('../test/integration');
 const { db } = await import('../db/client');
-const { pensionStatementImportRows, pensionStatementImports } = await import('../db/schema');
+const { payslips, pensionStatementImportRows, pensionStatementImports } =
+  await import('../db/schema');
+const { testDocumentsDirectory } = await import('../test/config');
+const { resolveDocumentPath } = await import('../lib/filesystemDocumentStore');
 
 const integration = createIntegrationHelpers('ticket7.integration.quro.test');
 
@@ -120,7 +98,6 @@ describe('finance integration', () => {
   });
 
   afterAll(async () => {
-    s3Objects.clear();
     mock.clearAllMocks();
     mock.restore();
     await integration.cleanup();
@@ -275,6 +252,19 @@ describe('finance integration', () => {
     expect(uploadBody.data.mimeType).toBe('application/pdf');
     expect(uploadBody.data.sizeBytes).toBeGreaterThan(0);
 
+    // The default filesystem store keeps the PDF at its key inside the documents directory.
+    const [storedPayslip] = await db
+      .select({ key: payslips.documentStorageKey })
+      .from(payslips)
+      .where(eq(payslips.id, createGbpBody.data.id));
+    expect(storedPayslip?.key).toMatch(
+      new RegExp(
+        `^users/${owner.user.id}/salary/payslips/${createGbpBody.data.id}/[0-9a-f-]{36}\\.pdf$`,
+      ),
+    );
+    const storedPath = resolveDocumentPath(testDocumentsDirectory(), storedPayslip!.key!);
+    expect(readFileSync(storedPath).byteLength).toBe(uploadBody.data.sizeBytes);
+
     const withDocumentResponse = await integration.request(
       `/api/salary/payslips/${createGbpBody.data.id}`,
       {
@@ -320,6 +310,7 @@ describe('finance integration', () => {
       }>
     >(deleteDocumentResponse, 200);
     expect(deleteDocumentBody.data.fileName).toBe('march-salary.pdf');
+    expect(existsSync(storedPath)).toBe(false);
 
     const missingDocumentResponse = await integration.request(
       `/api/salary/payslips/${createGbpBody.data.id}/document/download`,
@@ -442,7 +433,7 @@ describe('finance integration', () => {
     );
 
     const initialHistoryResponse = await integration.request(
-      `/api/investments/holding-price-history?holdingIds=${createHoldingBody.data.id}`,
+      `/api/investments/holding-price-history?holdingIds=${createHoldingBody.data.id}&from=2026-01-01`,
       {
         cookie: owner.cookie,
       },

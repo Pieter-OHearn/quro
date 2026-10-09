@@ -14,7 +14,7 @@ describe('check-bun-version', () => {
   test('parses Dockerfile base images including variants and stages', () => {
     const refs = findDockerfileReferences(
       'Dockerfile',
-      'FROM oven/bun:1.4.2-debian AS build\nFROM nginx:1.28\nFROM --platform=linux/amd64 oven/bun:1.3.10',
+      'FROM oven/bun:1.4.2-debian AS build\nFROM nginx:1.30.3\nFROM --platform=linux/amd64 oven/bun:1.3.10',
     );
     expect(refs.map((r) => r.version)).toEqual(['1.4.2', '1.3.10']);
   });

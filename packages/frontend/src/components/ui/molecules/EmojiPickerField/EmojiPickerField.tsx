@@ -96,7 +96,7 @@ function PickerPortal({
     <div ref={pickerRef} style={pickerStyle}>
       <Suspense
         fallback={
-          <div role="status" className="rounded-xl bg-surface p-4 text-fg-muted">
+          <div role="status" className="rounded-lg bg-surface p-4 text-fg-muted">
             Loading emojis…
           </div>
         }
@@ -145,7 +145,7 @@ export function EmojiPickerField({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'w-14 h-[42px] rounded-xl border text-xl flex items-center justify-center transition-all hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus-ring',
+          'w-14 h-[42px] rounded-md border text-xl flex items-center justify-center transition-all hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus-ring',
           getButtonBorderClass(error, open),
           buttonClassName,
         )}

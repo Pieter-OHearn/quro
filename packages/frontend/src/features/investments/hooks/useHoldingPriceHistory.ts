@@ -1,5 +1,5 @@
 import { queryKeys } from '@/lib/queryKeys';
-import { apiGet } from '@/lib/api';
+import { apiGetAllPages } from '@/lib/api';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -35,13 +35,14 @@ export function useHoldingPriceHistory(holdingIds: number[]) {
   return useQuery({
     queryKey: queryKeys.investments.priceHistory(sortedHoldingIds.join(','), range.from, range.to),
     enabled: sortedHoldingIds.length > 0,
-    queryFn: async () => {
-      return apiGet<HoldingPriceHistoryEntry[]>('/api/investments/holding-price-history', {
+    queryFn: async ({ signal }) => {
+      return apiGetAllPages<HoldingPriceHistoryEntry>('/api/investments/holding-price-history', {
         params: {
           holdingIds: sortedHoldingIds.join(','),
           from: range.from,
           to: range.to,
         },
+        signal,
       });
     },
   });

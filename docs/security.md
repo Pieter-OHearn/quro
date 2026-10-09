@@ -255,16 +255,16 @@ administrators remain fully trusted.
 
 ## Keys and credentials
 
-| Secret                                    | Stored in                                 | In a database dump? | If it is lost                                                        |
-| ----------------------------------------- | ----------------------------------------- | ------------------- | -------------------------------------------------------------------- |
-| PostgreSQL admin and app passwords        | `secrets/*.txt` (Docker secrets)          | No                  | Set new ones in the files and the database as the database superuser |
-| MinIO root and app keys                   | `secrets/*.txt`                           | No                  | Reset them in MinIO; documents are unaffected                        |
-| A MinIO encryption key, if you enable one | Your MinIO configuration                  | No                  | The stored documents cannot be read                                  |
-| bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                      | No                  | Issue a new one in bunq and update the configuration                 |
-| bunq access tokens and keys               | Database (`bunq_connections`)             | **Yes**             | Reconnect bunq in Settings                                           |
-| User passwords                            | Database, as bcrypt hashes                | Yes, as hashes      | `quro user reset-password`                                           |
-| Session tokens                            | Browser cookie; database holds the digest | Digest only         | Sign in again                                                        |
-| Registration and reset codes              | Shown once; database holds the digest     | Digest only         | Issue a new code                                                     |
+| Secret                                    | Stored in                                  | In a database dump? | If it is lost                                                        |
+| ----------------------------------------- | ------------------------------------------ | ------------------- | -------------------------------------------------------------------- |
+| PostgreSQL admin and app passwords        | `secrets/*.txt` (Docker secrets)           | No                  | Set new ones in the files and the database as the database superuser |
+| S3 secret access key, with S3 storage     | The file `S3_SECRET_ACCESS_KEY_FILE` names | No                  | Issue a new key in the store; documents are unaffected               |
+| The store's encryption key, if it has one | Your S3 store's configuration              | No                  | The stored documents cannot be read                                  |
+| bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                       | No                  | Issue a new one in bunq and update the configuration                 |
+| bunq access tokens and keys               | Database (`bunq_connections`)              | **Yes**             | Reconnect bunq in Settings                                           |
+| User passwords                            | Database, as bcrypt hashes                 | Yes, as hashes      | `quro user reset-password`                                           |
+| Session tokens                            | Browser cookie; database holds the digest  | Digest only         | Sign in again                                                        |
+| Registration and reset codes              | Shown once; database holds the digest      | Digest only         | Issue a new code                                                     |
 
 Rules that follow from this table:
 
@@ -401,7 +401,7 @@ Auth endpoints are rate-limited with an in-process sliding window counter, keyed
 | Endpoint                        | Window     | Max requests | Key                |
 | ------------------------------- | ---------- | ------------ | ------------------ |
 | `POST /api/auth/signin`         | 1 minute   | 5            | Client IP          |
-| `POST /api/auth/signin`         | 15 minutes | 5            | Email address      |
+| `POST /api/auth/signin`         | 15 minutes | 5 failed     | Email address      |
 | `POST /api/auth/signup`         | 15 minutes | 3            | Client IP          |
 | `POST /api/auth/password-reset` | 15 minutes | 5            | Client IP          |
 | `PUT /api/settings/password`    | 15 minutes | 5            | Client IP          |
@@ -410,10 +410,18 @@ Auth endpoints are rate-limited with an in-process sliding window counter, keyed
 Requests over the limit receive `429 Too Many Requests`. The limiter state is in memory and resets
 when the backend restarts. Rate limiting is disabled when `NODE_ENV=test`.
 
+The per-email sign-in limit counts failed attempts only, whether or not the email has an account.
+Each attempt takes a place in the email's budget before the password is checked and gives it back
+when the sign-in succeeds, so simultaneous guesses cannot exceed the budget and a success does not
+clear earlier failures. While attempts that are still being checked hold the remaining places,
+another attempt is refused even if its password is right. The per-address limit counts every
+attempt, successful or not.
+
 ### Per-email lockout trade-off
 
 The sign-in email limiter stops an attacker who rotates source addresses from guessing one
-account's password. The cost is that anyone can fail five sign-ins for a known email and lock the
+account's password. Successful sign-ins do not count, so signing in on several devices does not
+lock an account. The cost is that anyone can fail five sign-ins for a known email and lock the
 owner out for up to 15 minutes. Quro accepts this for a self-hosted, low-user-count deployment. The
 lockout expires on its own and does not reveal whether the account exists.
 
@@ -449,10 +457,12 @@ pot.
 - The `frontend` container (nginx) is the only service with a host port (`3000` by default). It
   sits on `frontend-net`.
 - The `backend` container sits on `frontend-net` (reachable by nginx) and `backend-net` (reachable
-  by the database and MinIO).
-- PostgreSQL (`db`) and MinIO are on `backend-net` only.
+  by the database).
+- PostgreSQL (`db`) is on `backend-net` only. Uploaded documents are files in a volume mounted into
+  the backend and the import worker, readable by the backend user only (directories `0700`, files
+  `0600`). With S3 storage, the store is the operator's and is reached over the network.
 - The optional AI services (`vllm`, `pension-parser`) are on `ai-net` with the
   `pension-import-worker`. The main backend cannot reach them.
 
-A compromised frontend container therefore has no direct network path to the database or object
-store.
+A compromised frontend container therefore has no direct network path to the database and no
+access to the documents volume.

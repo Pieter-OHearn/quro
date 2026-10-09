@@ -14,7 +14,8 @@ type Step = {
 type Job = {
   name?: string;
   needs?: string | string[];
-  permissions?: Record<string, string>;
+  environment?: string | { name?: string; url?: string };
+  permissions?: Record<string, string> | string;
   env?: Record<string, string>;
   steps: Step[];
 };
@@ -33,6 +34,16 @@ const ci = Bun.YAML.parse(readFileSync(`${workflowsDir}/ci.yml`, 'utf8')) as Wor
 const { verify, publish } = release.jobs;
 const build = release.jobs['build-images'];
 
+function environmentName(job: Job): string | undefined {
+  return typeof job.environment === 'string' ? job.environment : job.environment?.name;
+}
+
+// A job without its own permissions gets the workflow default, which is pinned to {} below.
+function grantsWrite(job: Job): boolean {
+  if (typeof job.permissions === 'string') return job.permissions !== 'read-all';
+  return Object.values(job.permissions ?? {}).includes('write');
+}
+
 function stepIndex(job: Job, pattern: RegExp): number {
   const index = job.steps.findIndex((step) => pattern.test(step.run ?? step.uses ?? ''));
   expect(index).toBeGreaterThanOrEqual(0);
@@ -45,6 +56,15 @@ describe('release.yml', () => {
     expect(verify.permissions).toEqual({ contents: 'read', checks: 'read', actions: 'read' });
     expect(build.permissions).toEqual({ contents: 'read', packages: 'write' });
     expect(publish.permissions).toEqual({ contents: 'write', packages: 'write' });
+  });
+
+  test('runs every job that can write in the protected release environment', () => {
+    const writers = Object.keys(release.jobs).filter((id) => grantsWrite(release.jobs[id]));
+    expect(writers.sort()).toEqual(['build-images', 'publish']);
+    // A literal name, so no expression can pick another environment or none.
+    for (const id of writers) expect(environmentName(release.jobs[id])).toBe('release');
+    // verify only reads, so a dispatch from another branch can still be checked up to the gate.
+    expect(verify.environment).toBeUndefined();
   });
 
   test('pins every action to a reviewed commit SHA with its version noted', () => {
