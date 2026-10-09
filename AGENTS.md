@@ -76,6 +76,10 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   review the SQL with `packages/backend/src/db/migrations/meta/`. Migrate with admin
   credentials and run the app with runtime credentials. Do not rewrite applied migrations, guess
   repairs for ambiguous rows or bypass backup/restore confirmation guards.
+- PostgreSQL 18 is the baseline; CI runs the suite on 16 and 18. The backend image ships 18 client
+  tools, `packages/backend/src/db/pgTools.ts` refuses client tools older than the server, and a major
+  upgrade is a dump and restore into a new data directory, never a reused one
+  ([upgrade](docs/postgresql-upgrade.md)). Keep `scripts/rehearse-pg-upgrade.sh` green when changing it.
 - Reuse and export shared UI from `packages/frontend/src/components/ui/index.ts`
   before adding a primitive. Preserve persisted `DATA_COLORS` identities. Features
   own domain logic; shared UI owns presentation.

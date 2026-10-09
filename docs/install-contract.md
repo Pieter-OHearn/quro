@@ -374,7 +374,7 @@ docker compose -f docker-compose.release.yml exec -T db \
   pg_dump -U quro_admin -d quro --format=custom > quro-before-upgrade.dump
 ```
 
-Use `-f docker-compose.yml` for an install from a checkout, and your own user and database names if you changed them. `-T` matters: without it Compose attaches a terminal, which can corrupt the binary dump. Then stop the stack and copy `./data/minio`, `.env` and `secrets/` next to the dump. The full procedure, including the PostgreSQL major upgrade, is in the 0.8.0 upgrade notes.
+Use `-f docker-compose.yml` for an install from a checkout, and your own user and database names if you changed them. `-T` matters: without it Compose attaches a terminal, which can corrupt the binary dump. Then stop the stack and copy `./data/minio`, `.env` and `secrets/` next to the dump. The full procedure, including the PostgreSQL major upgrade, is in the 0.8.0 upgrade notes; the tested 16 to 18 steps for a Compose install are in [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md).
 
 ## Gaps between 0.7.0 and this contract
 
