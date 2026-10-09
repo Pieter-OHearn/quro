@@ -30,9 +30,8 @@ async function freePort(): Promise<number> {
   return port!;
 }
 
-async function startBackend(extraEnv: Record<string, string> = {}): Promise<Backend> {
-  const port = await freePort();
-  const env: Record<string, string | undefined> = {
+function backendEnv(port: number, extraEnv: Record<string, string> = {}) {
+  return {
     ...process.env,
     NODE_ENV: 'development',
     PORT: String(port),
@@ -51,7 +50,12 @@ async function startBackend(extraEnv: Record<string, string> = {}): Promise<Back
     BUNQ_CLIENT_ID: '',
     BUNQ_CLIENT_SECRET: '',
     ...extraEnv,
-  };
+  } as Record<string, string | undefined>;
+}
+
+async function startBackend(extraEnv: Record<string, string> = {}): Promise<Backend> {
+  const port = await freePort();
+  const env = backendEnv(port, extraEnv);
   const child = Bun.spawn([process.execPath, 'src/index.ts'], {
     cwd: BACKEND_DIR,
     env,
@@ -164,6 +168,21 @@ beforeAll(async () => {
 afterAll(async () => {
   await Promise.all([direct?.stop(), behindProxy?.stop()]);
   await integration.cleanup();
+});
+
+describe('outbound traffic', () => {
+  test('a process started like the test backends cannot reach the internet', async () => {
+    const probe = Bun.spawn(
+      [
+        process.execPath,
+        '-e',
+        "fetch('http://example.com/').then(() => process.exit(1), () => process.exit(0))",
+      ],
+      { env: backendEnv(0), stdout: 'ignore', stderr: 'ignore' },
+    );
+    // Exit code 0 means the request failed, which is what a closed proxy port gives.
+    expect(await probe.exited).toBe(0);
+  });
 });
 
 describe('brute-force limits', () => {

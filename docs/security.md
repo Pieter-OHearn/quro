@@ -340,7 +340,7 @@ cannot reach a provider. No test uses real data or a provider.
 `lib/access.ts` and `lib/partner.ts` define access for rows that can be shared. Tables that cannot
 be shared are queried with `eq(table.userId, …)` directly, which is correct while sharing is
 limited to the tables above. `accessSweep.test.ts` records every such predicate by file and table
-(143 in 27 files) and fails when a new one appears or when one touches a shareable table without
+(148 in 26 files) and fails when a new one appears or when one touches a shareable table without
 a recorded reason. The three recorded exceptions are ending a link, a goal that follows a savings
 account its owner holds, and the bank sync writing the connected user's own accounts. Changing the
 sharing model means revisiting this list.
