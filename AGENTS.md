@@ -22,6 +22,7 @@ run applicable checks before opening a PR and report commands, results and skipp
 | `bun run dev:doctor`                        | Contributor prerequisites and exported DB URLs; no database connection, no `.env` reads                                  |
 | `bun run check:bun-version`                 | Runtime pin consistency                                                                                                  |
 | `bun run format:check`                      | Repository Prettier check; format only files you changed                                                                 |
+| `bun run docs:check`                        | Markdown links and anchors, repository paths, `bun run` script names and config variables; offline                       |
 | `bun run lint`                              | TypeScript/JS lint                                                                                                       |
 | `bun run typecheck`                         | Shared, frontend, backend and scripts                                                                                    |
 | `bun run test`                              | Shared/script, backend unit/integration and frontend Bun tests; isolated migrated PostgreSQL required                    |

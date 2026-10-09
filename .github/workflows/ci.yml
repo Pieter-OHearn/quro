@@ -32,6 +32,15 @@ jobs:
       - name: Check formatting
         run: bun run check:format
 
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-bun-dependencies
+      - name: Check links, paths, commands and config examples
+        run: bun run check:docs
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -220,6 +229,7 @@ jobs:
     needs:
       - bun-version
       - format
+      - docs
       - lint
       - typecheck
       - test

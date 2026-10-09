@@ -198,7 +198,7 @@ The backend (`pension-imports.ts`) validates the file (PDF MIME type, size), has
 
 **2. Worker picks up the job**
 
-The `pension-import-worker` container runs `bun run worker:pension-imports`, which loads `pensionImportWorker.ts`. It runs two concurrent loops:
+The `pension-import-worker` container runs the backend's `worker:pension-imports` script (see `docker-compose.yml`), which loads `pensionImportWorker.ts`. It runs two concurrent loops:
 
 - **Processing loop**: polls every `IMPORT_WORKER_POLL_INTERVAL_MS` (default 3 s). Each tick calls `runPensionImportWorkerTick()`, which first expires any imports whose `expiresAt` has passed (default 7-day TTL), then calls `lockNextQueuedImport()`. The lock is an optimistic `UPDATE ... WHERE status = 'queued'` that sets `status = 'processing'`; this prevents double-processing if two workers were ever running.
 - **Heartbeat loop**: every 5 s, the worker checks the pension-parser's `/health` endpoint and upserts a row in `worker_heartbeats`. The backend reads this table to decide whether the `pensionStatementImport` capability is enabled.
@@ -240,7 +240,7 @@ Exactly one `annual_statement` row must be present; the commit is rejected other
 
 **7. Capabilities system**
 
-`GET /api/capabilities` (authenticated) reads the `worker_heartbeats` table and returns an `AppCapabilities` object with two fields: `ai` and `pensionStatementImport`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, and `checkedAt`.
+`GET /api/capabilities` (authenticated) returns an `AppCapabilities` object with three fields: `ai`, `pensionStatementImport` and `bunq`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, and `checkedAt`. The first two come from the `worker_heartbeats` table; `bunq` is enabled only when the complete bunq OAuth configuration is set (`reason: 'not_configured'` otherwise).
 
 The `pensionStatementImport` capability is disabled when:
 
@@ -256,11 +256,11 @@ The frontend (`useAppCapabilities.ts`) polls this endpoint every 15 s and uses t
 
 ## 6. The @quro/shared Package
 
-`packages/shared` is a TypeScript-only package with no runtime dependencies. It exports all types that cross the HTTP API boundary — every request body, response payload, and enumeration used by both the frontend and backend.
+`packages/shared` is a TypeScript source package with no runtime dependencies. It holds every type that crosses the HTTP API boundary (request bodies, response payloads and enumerations) and the pure helpers that both sides must compute identically: number and currency formatting, cent-based money rounding, date-only conversion, loan maths and shared validation rules.
 
-It is the single source of truth for cross-boundary data shapes. Any new type that appears in both a route handler and a frontend hook must be defined here, not duplicated in each package.
+It is the single source of truth for cross-boundary data shapes and those rules. Any new type or rule that appears in both a route handler and the frontend must be defined here, not duplicated in each package.
 
-Both `packages/backend` and `packages/frontend` import from it as `@quro/shared` via path aliases in their respective `tsconfig.json` files. Because it is types-only, it produces no compiled output and adds no bundle weight.
+Both `packages/backend` and `packages/frontend` depend on it as a workspace package (`"@quro/shared": "workspace:*"`) and resolve it to `packages/shared/src` through the `paths` entry in their `tsconfig.json`. It is never compiled or published on its own: Bun runs the source in the backend, and Vite bundles the helpers the frontend imports.
 
 Notable exports:
 
@@ -269,6 +269,10 @@ Notable exports:
 - Import pipeline types: `PensionStatementImport`, `PensionStatementImportRow`, `PensionImportStatus`, `PensionImportConfidenceLabel`
 - Capabilities types: `AppCapabilities`, `AppCapabilityStatus`, `AppCapabilityReason`
 - Currency helpers: `CURRENCY_META`, `isCurrencyCode`, `CURRENCY_CODES`
+- Formatting: `formatNumber`, `formatCurrency`, `formatPercent` (`src/utils/index.ts`)
+- Money: `toCents`, `fromCents`, `roundMoney` (`src/utils/money.ts`); see [currency and monetary precision](#currency-and-monetary-precision)
+- Dates: `toIsoDate`, `toDateOnly` (UTC) and `todayIsoDate` (local calendar day) (`src/utils/date.ts`)
+- Loan maths and validation: `monthlyInterest`, `monthsToPayoff` (`src/utils/finance.ts`), and the `validate*` rules in `src/utils/validation.ts`
 
 ---
 
@@ -310,7 +314,20 @@ Query keys are defined centrally in `src/lib/queryKeys.ts` as hierarchical array
 
 ### Currency and monetary precision
 
-All monetary columns use `numeric(19, 2)` (Drizzle: the schema-local `numericAsNumber('col', { precision: 19, scale: 2 })`). Interest rate columns use `numeric(7, 4)`. This avoids floating-point rounding errors in financial calculations. Confidence scores in the import pipeline use `numeric(5, 4)`. `numericAsNumber` (`src/db/driverNumeric.ts`) maps driver strings to finite numbers and preserves nulls, so public JSON values stay numeric.
+Every fractional value is stored as a PostgreSQL `numeric`; the schema has no floating-point columns. The precision depends on what the column holds:
+
+| Values                                                | Type             |
+| ----------------------------------------------------- | ---------------- |
+| Money amounts and balances                            | `numeric(19, 2)` |
+| Interest rates                                        | `numeric(7, 4)`  |
+| Ratios (import confidence, `emergency_lifestyle_pct`) | `numeric(5, 4)`  |
+| Share quantities (`holding_transactions.shares`)      | `numeric(19, 6)` |
+| FX rates (`currency_rates`, `currency_rate_history`)  | `numeric(12, 6)` |
+| Mortgage fixed-rate term in years (`fixed_years`)     | `numeric(4, 1)`  |
+
+Columns are declared with `numericAsNumber`, a custom type defined in `src/db/schema.ts`. It turns the driver's strings into numbers through `parseDriverNumeric` (`src/db/driverNumeric.ts`), which throws on a non-finite value, and leaves `null` as `null`, so public JSON stays numeric and null-preserving.
+
+Arithmetic happens on JavaScript numbers. Where a result must be whole cents, use `toCents`, `fromCents` and `roundMoney` from `@quro/shared` (see [the shared package](#6-the-quroshared-package)) rather than ad hoc rounding. Rates are not rounded like money. Dashboard and runway totals are aggregated in EUR on the backend and converted once for display; amounts keep their native currency in storage, and a missing or invalid FX rate fails the calculation instead of assuming 1:1.
 
 ### Sessions
 
@@ -323,7 +340,7 @@ Sessions are stored in the `sessions` table with an `expires_at` timestamp (30-d
 | `quro_admin` (default: `quro_admin`) | DDL and migrations only; used by the `migrate` one-shot container             |
 | `quro_app` (default: `quro_app`)     | Runtime queries from `backend` and `pension-import-worker`; no DDL privileges |
 
-Credentials are supplied via Docker secrets (files in `./secrets/`) and never appear in environment variables or images.
+Credentials are supplied as Docker secrets (files in `./secrets/`), not as Compose environment entries, and are not baked into images. At container start the entrypoint scripts in `docker/backend/` read the secret files and export the connection settings (for example `DATABASE_URL`) into the process environment.
 
 ### Schema highlights
 

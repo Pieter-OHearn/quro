@@ -17,8 +17,10 @@ Each GitHub Release attaches `auto-update-bundle-<version>.tar.gz`. When extract
 - `.env.template` – copy to `.env` and fill in ports and repository settings.
 - `secrets/*.example` – copy to `secrets/*.txt` and set secure values.
 - `deploy/auto-update/apply-release.sh` – lock + update wrapper.
-- `scripts/auto-update/fetch-release.js` – compiled script that downloads the newest manifest via the GitHub API.
+- `scripts/auto-update/fetch-release.js` – compiled script that downloads the newest manifest via the GitHub API. The release workflow builds it from `scripts/auto-update/fetch-release.ts`; it is not in the repository.
 - This documentation file.
+
+<!-- docs:check skip-paths: scripts/auto-update/fetch-release.js -->
 
 Place these files somewhere durable (for example `/opt/quro`). The examples below assume that directory is your stack root.
 

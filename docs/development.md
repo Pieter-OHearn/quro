@@ -187,8 +187,10 @@ Repository agent guidance starts at [AGENTS.md](../AGENTS.md).
 bun run dev:doctor # prerequisites; no database, no .env files
 bun run ci:check   # full suite, Python tooling and network audits required
 bun run typecheck
+bun run docs:check # Markdown links, paths, script names and config variables; offline
 bun run test       # shared/script, backend and frontend; migrated test DB required
 bun run test:ui    # all frontend Bun tests; no browser or DB
+bun run test:smoke # Playwright browser tests; migrates and seeds the test DB
 ```
 
 The [verification table](../AGENTS.md#verification) lists every check with its
