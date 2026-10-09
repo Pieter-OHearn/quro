@@ -11,11 +11,15 @@
  * in shared primitives. Do not introduce raw Tailwind palette values
  * (bg-blue-600, text-slate-500, …) when a token already covers the use case.
  *
- * Dark mode is not wired up — when it lands, add a `.dark { … }` block here
- * that overrides the same raw variables.
+ * Dark mode: the `.dark { … }` block below overrides the raw colour and shadow
+ * variables when `dark` is on <html> (set by public/theme-init.js before the
+ * first paint and by src/lib/theme.ts afterwards). Aliases (`var(--…)`) are not
+ * repeated there; they follow the theme on their own.
  */
 
 :root {
+  color-scheme: light;
+
   /* Typography. */
   --font-size: 16px;
   --font-weight-normal: 400;
@@ -220,6 +224,63 @@
    */
   --radius: 0.625rem;
 }
+
+/*
+ * Dark theme (docs/design-v1.md, "Dark" column). Only values the design system
+ * defines; every alias above follows them. Declared after `:root` so it wins at
+ * equal specificity.
+ */
+.dark {
+  color-scheme: dark;
+
+  --brand: #7fd6a8;
+  --brand-hover: #a3e4c2;
+  --brand-soft: #173326;
+
+  --secondary: #b5a4ff;
+  --secondary-soft: #2a2350;
+
+  --surface: #161d19;
+  --surface-sunken: #0e1411;
+  --surface-muted: #1e2722;
+  --surface-nav: #121915;
+  --scrim: #00000099;
+
+  --border-subtle: #232d27;
+  --border-default: #2e3a33;
+  --border-control: #6c7a72;
+  --border-strong: #8b978f;
+
+  --fg: #edf1ee;
+  --fg-muted: #a9b4ad;
+  --fg-subtle: #8a968e;
+  --fg-faint: #5e6a63;
+  --fg-inverted: #0e1411;
+
+  --gain: #5fd39a;
+  --gain-soft: #153324;
+  --loss: #ff8f85;
+  --loss-soft: #3d1a17;
+
+  --warning: #f0b34a;
+  --warning-soft: #33260c;
+
+  --info: #6fb4e6;
+  --info-soft: #142a3a;
+
+  --viz-1: #5fc796;
+  --viz-2: #6fb4e6;
+  --viz-3: #edb95a;
+  --viz-4: #e09a78;
+  --viz-5: #cf95cb;
+  --viz-6: #7c877f;
+
+  --shadow-popover: 0 4px 12px rgb(0 0 0 / 0.5);
+  --shadow-overlay: 0 16px 40px rgb(0 0 0 / 0.6);
+}
+
+/* Tailwind's `dark:` variant follows the class above, not the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-brand: var(--brand);

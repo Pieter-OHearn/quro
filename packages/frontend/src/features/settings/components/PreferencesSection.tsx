@@ -16,6 +16,7 @@ import { CURRENCY_CODES, CURRENCY_META } from '@/lib/CurrencyContext';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+import { AppearanceSetting } from './AppearanceSetting';
 import {
   type PreferencesSectionProps,
   useSavedState,
@@ -204,13 +205,14 @@ function PreferencesForm({
         </p>
       </div>
 
+      <AppearanceSetting />
+
       <div className="mb-8 border-t border-border-subtle pt-6">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
           Coming Soon
         </p>
         <div className="space-y-2">
           {[
-            'Dark mode',
             'Email and push notifications',
             'Two-factor authentication',
             'CSV and PDF export packs',
