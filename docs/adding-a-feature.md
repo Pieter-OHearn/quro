@@ -134,7 +134,7 @@ bun run db:migrate    # applies it to the explicitly selected isolated database
 
 **File:** `packages/backend/src/routes/recurring-payments.ts`
 
-Create a new file. The existing route files fall into two styles; **prefer the newer `requestValidation` style** used in `goals.ts` over the manual parsing style used in `debts.ts`. The `requestValidation` helpers (`parseTextField`, `parseNumberField`, `parseDateField`, `parseCurrencyField`, `rejectUnknownFields`, `parseRequiredFields`, `parsePatchFields`, `readJsonBody`, `parseId`, `ok`, `err`) are all exported from `src/lib/requestValidation.ts` and handle the common cases cleanly.
+Create a new file. The existing route files fall into two styles; **prefer the newer `requestValidation` style** used in `goals.ts` over the manual parsing style used in `debts.ts`. The `requestValidation` helpers (`parseTextField`, `parseNumberField`, `parseMoneyField`, `parseDateField`, `parseCurrencyField`, `rejectUnknownFields`, `parseRequiredFields`, `parsePatchFields`, `readJsonBody`, `parseId`, `ok`, `err`) are all exported from `src/lib/requestValidation.ts` and handle the common cases cleanly. Parse every money amount with `parseMoneyField` or `parseOptionalMoneyField`: they round to cents and refuse amounts of 10^13 or more (see [financial invariants](financial-invariants.md#money-input)). Unit prices, quantities, rates and percentages are not money; parse them with `parseNumberField` or `parseNormalizedDecimalField`.
 
 ```ts
 import { and, eq } from 'drizzle-orm';
@@ -150,7 +150,7 @@ import {
   parseCurrencyField,
   parseDateField,
   parseId,
-  parseNumberField,
+  parseMoneyField,
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
@@ -196,7 +196,8 @@ function parseFrequency(value: unknown): ParseResult<RecurringPaymentFrequency> 
 
 const parsers: FieldParsers<Payload> = {
   name: (v) => parseTextField(v, 'Name is required'),
-  amount: (v) => parseNumberField(v, 'Amount must be greater than zero', 0.01),
+  amount: (v) =>
+    parseMoneyField(v, { field: 'amount', error: 'Amount must be greater than zero', min: 0.01 }),
   currency: parseCurrencyField,
   frequency: parseFrequency,
   nextDueDate: (v) => parseDateField(v, 'Next due date must be a valid ISO date'),

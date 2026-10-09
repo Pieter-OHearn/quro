@@ -7,24 +7,68 @@ the dashboard contract, and [wealth planning](wealth-planning.md) covers the run
 
 ## Arithmetic policy
 
-Quro stores amounts in PostgreSQL `numeric` columns and does arithmetic on JavaScript numbers,
-rounding at a few explicit points. The database is the record; numbers are how values travel.
+Decided on 2026-10-09 (planning decision D38):
+
+- Money stays PostgreSQL `numeric` at rest (exact decimal, `numeric(19,2)` today) and plain
+  numbers on the wire. It is not migrated to integer columns.
+- Money arithmetic in code goes through integer cents with `toCents` and `fromCents`, rounding
+  half away from zero once, at the [rounding points](#rounding-points) below. No float sum of
+  money is kept without that rounding.
+- Money in a request is rounded to cents when it is parsed, and an amount of 10^13 or more is
+  refused ([money input](#money-input)).
+- Unit prices, share quantities, FX rates and percentages are not money and keep their decimal
+  precision. Prices per share are stored with two decimals today; widening them to six decimals
+  is a separate change.
+- A money scale wider than two decimals, for a three-decimal currency, would be an additive
+  migration if it is ever needed.
+
+How values move:
 
 - **Storage.** Each column has a fixed scale (see the [precision table](#precision)). PostgreSQL
-  rounds a written value to that scale, half away from zero.
+  rounds a written value to that scale, half away from zero, like `toCents`.
 - **Reading.** The schema's `numericAsNumber` type turns the driver's decimal string into a
   number and refuses `NaN` and infinities (`packages/backend/src/db/driverNumeric.ts`). It never
   replaces a bad value with 0.
-- **Writing.** A number is sent as its shortest decimal text, so `10.005` reaches PostgreSQL as
-  exactly `10.005`, and balance updates such as `balance + delta` run in exact `numeric`.
-- **Rounding points.** Shared `toCents`, `fromCents` and `roundMoney` round to cents half away
-  from zero, matching PostgreSQL. Code rounds to cents only where it derives a stored amount:
-  budget amounts converted to EUR on write, a repayment's principal derived as
-  `amount - interest`, and the clamped balance helpers in `packages/backend/src/lib/balance.ts`.
-  Aggregates such as net worth and runway are summed unrounded and rounded once, when stored or
-  displayed. Rates, shares and percentages are never rounded like money.
+- **Writing.** A number is sent as its shortest decimal text, and balance updates such as
+  `balance + delta` run in exact `numeric`.
 - **JSON.** API responses carry numbers, keep `null` as `null`, and keep each row's native
   currency next to its amounts.
+
+### Rounding points
+
+Money is rounded to cents, half away from zero, at these points and nowhere else:
+
+- When a request is parsed ([money input](#money-input)).
+- When a budget amount is converted to EUR on write.
+- When a repayment's principal is derived as `amount - interest`.
+- In the clamped balance helpers in `packages/backend/src/lib/balance.ts`.
+- When an aggregate (net worth, snapshot, runway) is stored or shown. These aggregates still sum
+  numbers and round once at the end; moving them onto integer cents is part of consolidating the
+  domain maths in `@quro/shared`.
+
+### Money input
+
+Request money is parsed by `parseMoneyField` and `parseOptionalMoneyField` in
+`packages/backend/src/lib/requestValidation.ts`. They round the amount to cents half away from
+zero, apply the field's minimum after rounding (so `0.004` is not "greater than zero"), and
+refuse an absolute value of 10^13 or more with a 400 that names the field.
+
+| Family           | Money fields                                                                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Savings          | account `balance`, deposit guarantee `cap`, transaction `amount`                                                                                     |
+| Budget           | category `budgeted` and `spent`, transaction `amount`                                                                                                |
+| Pensions         | pot `balance`, `employeeMonthly`, `employerMonthly`; transaction and import row `amount`, `taxAmount`                                                |
+| Properties       | `purchasePrice`, `currentValue`, `mortgage`, `monthlyRent`; transaction `amount`, `interest`, `principal`                                            |
+| Mortgages        | `originalAmount`, `outstandingBalance`, `propertyValue`, `monthlyPayment`; transaction `interest`, `principal`, and `amount` except on a rate change |
+| Debts            | `originalAmount`, `remainingBalance`, `monthlyPayment`; payment `amount`, `interest`                                                                 |
+| Payslips         | `gross`, `tax`, `pension`, `net`, `bonus`                                                                                                            |
+| Goals            | `currentAmount`, `targetAmount`, `monthlyContribution`, `monthlyTarget`                                                                              |
+| Plan assumptions | `leanBurnOverride`, `benefitMonthlyOverride`, `severanceMonthlySalaryOverride`                                                                       |
+
+Not money, and parsed without the rule: holding `currentPrice`, `manualPrice` and transaction
+`price` and `shares`; every interest rate; a mortgage rate change's `amount` (the new rate);
+`overpaymentLimit` (a percentage); `emergencyLifestylePct`; durations and counts. bunq payments
+are provider data rather than requests and arrive with two decimals.
 
 ### Measured envelope
 
@@ -39,57 +83,45 @@ asserted by the property tests:
 | `toCents(a + b) = toCents(a) + toCents(b)` for cent amounts             | below 10^12                          |
 | A float sum of cent amounts, rounded once, equals the exact cent sum    | 2,000 terms below 10^6 each (tested) |
 
-A float sum drifts by at most about `n × |largest partial sum| × 2^-53`, so the last row holds
-while that stays well under half a cent. Personal balances are far inside every bound.
-`numeric(19,2)` itself accepts values up to 10^17, which is outside the envelope.
+A float sum drifts by at most about `n × |largest partial sum| × 2^-53`, which is why money is
+summed in integer cents. `numeric(19,2)` itself accepts values up to 10^17; the money input
+limit keeps every amount inside the 10^13 round-trip bound.
 
 ### Options compared
 
-The step that wrote this page (F01) compared the current policy with integer minor units.
+Before the decision, the integer-cents-in-code policy was compared with integer minor units in
+storage.
 
-| Concern                    | Numbers with explicit rounding (current)                              | Integer minor units                                                                     |
-| -------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Currency precision         | Every supported currency has 2 decimals; storage scale is per column. | Needs a minor-unit exponent per currency once a 0- or 3-decimal currency is added.      |
-| Shares, FX rates, interest | Stored and carried at their own scale (6, 6 and 4 decimals).          | Still fractional; they stay numeric either way, so the codebase keeps two number kinds. |
-| FX conversion and shares   | Produce sub-cent values; rounded once at the documented points.       | Produce the same sub-cent values; a rounding rule is still required at every product.   |
-| Exactness of stored values | Exact: `numeric` is the record and does balance updates itself.       | Exact.                                                                                  |
-| Exactness in memory        | Exact within the envelope above; aggregates rounded once.             | Exact for sums below 2^53 cents (9 × 10^13 units); same bound as today in practice.     |
-| JSON and clients           | Plain JSON numbers; the frontend formats them.                        | Every client converts; a breaking API change for every amount.                          |
-| Change cost                | None.                                                                 | 66 numeric columns, every route, the frontend, fixtures, backup and restore tests.      |
+| Concern                    | `numeric` at rest, integer cents in code (decided)                  | Integer minor units in storage                                                          |
+| -------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Currency precision         | Every supported currency has 2 decimals; a wider scale is additive. | Needs a minor-unit exponent per currency once a 0- or 3-decimal currency is added.      |
+| Shares, FX rates, interest | Stored and carried at their own scale (6, 6 and 4 decimals).        | Still fractional; they stay numeric either way, so the codebase keeps two number kinds. |
+| FX conversion and shares   | Produce sub-cent values; rounded once at the rounding points.       | Produce the same sub-cent values; a rounding rule is still required at every product.   |
+| Exactness of stored values | Exact: `numeric` is the record and does balance updates itself.     | Exact.                                                                                  |
+| Exactness in memory        | Exact in integer cents below 2^53 cents.                            | Exact for sums below 2^53 cents (9 × 10^13 units); the same bound.                      |
+| JSON and clients           | Plain JSON numbers; the frontend formats them.                      | Every client converts; a breaking API change for every amount.                          |
+| Change cost                | No migration; code moves to integer cents.                          | 52 money columns, every route, the frontend, fixtures, backup and restore tests.        |
 
-### Recommendation
+Storage is already exact; the risk was float arithmetic in JavaScript, which integer cents in
+code remove without migrating 52 columns of real data or breaking the API.
 
-Keep the current policy for 1.0: `numeric` storage stays the record, numbers carry values, and
-rounding happens only at the documented points. Integer minor units would not remove a rounding
-rule (FX, shares and interest still produce fractions) and would cost a migration of every money
-column and a breaking API change.
-
-Two input guards would close the gaps the tests found, without a migration or a change to stored
-values. They change what the API accepts, so they wait for an owner decision:
-
-1. Round (or reject) money input with more than two decimals at the API boundary. Today a
-   half-cent input such as `10.005` is stored as `10.01` in its ledger row, but the balance update
-   `balance + 10.005` rounds after adding, so it can end a cent away from the ledger when the
-   balance changes sign (see [known exceptions](#known-exceptions)).
-2. Reject money amounts of 10^13 or more, the bound below which a cent value survives the round
-   trip through a number.
-
-**Migration implications.** Keeping the policy needs no migration. Moving to integer minor units
-would need a new integer column per amount, an idempotent backfill from `numeric` with a
-preflight that refuses values outside `bigint` or with more decimals than the currency allows, a
-dual-read period, an API version for the new shape, and the 0.7.0 upgrade fixture to prove nulls,
-negative equity, native currencies and provenance survive. None of that is planned.
+**Migration implications.** None. Had integer minor units been chosen, each amount would have
+needed a new integer column, an idempotent backfill from `numeric` with a preflight that refuses
+values outside `bigint` or with more decimals than the currency allows, a dual-read period, an
+API version for the new shape, and the 0.7.0 upgrade fixture to prove nulls, negative equity,
+native currencies and provenance survive.
 
 ## Precision
 
-| Value                                                    | Column type     | Rounded when                                                    |
-| -------------------------------------------------------- | --------------- | --------------------------------------------------------------- |
-| Balances, amounts, prices, payments, snapshot components | `numeric(19,2)` | stored (PostgreSQL); explicitly at the rounding points above    |
-| Holding shares                                           | `numeric(19,6)` | stored                                                          |
-| FX rates to EUR                                          | `numeric(12,6)` | stored; never rounded in conversion                             |
-| Interest rates                                           | `numeric(7,4)`  | stored                                                          |
-| Import confidence                                        | `numeric(5,4)`  | stored                                                          |
-| Display                                                  | n/a             | `formatCurrency`: 2 decimals unless a view asks for whole units |
+| Value                                            | Column type     | Rounded when                                                    |
+| ------------------------------------------------ | --------------- | --------------------------------------------------------------- |
+| Balances, amounts, payments, snapshot components | `numeric(19,2)` | when parsed; at the rounding points; stored (PostgreSQL)        |
+| Holding prices (unit prices)                     | `numeric(19,2)` | stored                                                          |
+| Holding shares                                   | `numeric(19,6)` | stored                                                          |
+| FX rates to EUR                                  | `numeric(12,6)` | stored; never rounded in conversion                             |
+| Interest rates                                   | `numeric(7,4)`  | stored                                                          |
+| Import confidence                                | `numeric(5,4)`  | stored                                                          |
+| Display                                          | n/a             | `formatCurrency`: 2 decimals unless a view asks for whole units |
 
 Holding prices are stored with 2 decimals, so a quote with more decimals loses them when saved.
 
@@ -173,9 +205,6 @@ These are recorded, not yet fixed:
 - **Clamp at zero.** A repayment whose principal exceeds the balance by up to one cent is accepted
   and leaves the balance at zero. Deleting it restores the full principal, so the balance ends one
   cent above where it started.
-- **Half-cent input across zero.** A sub-cent amount such as `10.005` added to a balance of
-  `-20.00` stores `-10.00`, while its ledger row stores `10.01` (sum `-9.99`). See the first input
-  guard in the [recommendation](#recommendation).
 - **Provider balances.** A bunq-synced savings account takes its balance from bunq; its imported
   transactions are a record and do not move the balance.
 
@@ -199,7 +228,7 @@ Rules for every figure:
   replaces an unreadable asset class with an empty list.
 - **Stale rules are never current.** A rule used outside its published period is
   `isExtrapolated`. An open-ended rule with a source (`effectiveTo: null`) is current only for
-  twelve months after its `reviewedAt` date (`RULE_REVIEW_INTERVAL_MONTHS` in
+  twelve months after its `reviewedAt` date (planning decision D39; `RULE_REVIEW_INTERVAL_MONTHS` in
   `packages/shared/src/types/jurisdiction.ts`); after that it resolves as extrapolated until
   someone reviews it. Rules without a source, such as the default tax rate, are model
   assumptions and are labelled as defaults instead.
@@ -216,7 +245,7 @@ jurisdiction rules in `packages/backend/src/lib/jurisdictions/` and the calculat
 - **When.** Before every release, and when a publisher's period starts: the Dutch UWV maximum
   daily wage changes on 1 January and 1 July, Dutch tax and Box 3 figures on 1 January, and
   Australian figures on 1 July. An open-ended rule falls back to extrapolated twelve months after
-  its last review, which forces a review at least once a year.
+  its last review (D39), which forces a review at least once a year.
 - **How.** Check each value against its source link, then update `reviewedAt` on every source
   that was checked, even when nothing changed. A new published value is a new effective-dated
   entry; an earlier period is not edited.
@@ -249,6 +278,7 @@ correction. Inputs and outputs below were run against both implementations.
 | Invariant                                                 | Tests                                                                                                                                  |
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Cent rounding, round trips, float sums                    | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                            |
+| Money input: cents, the 10^13 limit, non-money untouched  | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                     |
 | Allocation identities, order, additivity, FX, linked debt | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                 |
 | Joint shares, signs, missing data                         | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                     |
 | FX cut-offs and fail-closed rates                         | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                   |
