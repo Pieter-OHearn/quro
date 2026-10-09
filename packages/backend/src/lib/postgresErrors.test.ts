@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { hasPostgresErrorCode, isForeignKeyViolation, isUniqueViolation } from './postgresErrors';
+import {
+  hasPostgresErrorCode,
+  isDataException,
+  isForeignKeyViolation,
+  isUniqueViolation,
+} from './postgresErrors';
 
 describe('hasPostgresErrorCode', () => {
   it('finds direct and wrapped PostgreSQL error codes', () => {
@@ -22,5 +27,24 @@ describe('violation helpers', () => {
     expect(isUniqueViolation({ code: '23503' })).toBe(false);
     expect(isForeignKeyViolation({ cause: { code: '23503' } })).toBe(true);
     expect(isForeignKeyViolation({ code: '23505' })).toBe(false);
+  });
+});
+
+describe('isDataException', () => {
+  it('matches the data exception class, wrapped or not', () => {
+    expect(isDataException({ code: '22003' })).toBe(true);
+    expect(isDataException({ cause: { cause: { code: '22021' } } })).toBe(true);
+    expect(isDataException({ code: '22P02' })).toBe(true);
+  });
+
+  it('ignores other classes, other kinds of code and cyclic causes', () => {
+    const cyclic: { cause?: unknown } = {};
+    cyclic.cause = cyclic;
+
+    expect(isDataException({ code: '23505' })).toBe(false);
+    expect(isDataException({ code: 'ECONNREFUSED' })).toBe(false);
+    expect(isDataException({ code: 22003 })).toBe(false);
+    expect(isDataException(cyclic)).toBe(false);
+    expect(isDataException('22003')).toBe(false);
   });
 });
