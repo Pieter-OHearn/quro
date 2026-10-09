@@ -20,11 +20,7 @@ Please use synthetic data only. Do not include real financial data, passwords, t
 
 ## What to expect
 
-Quro has a single maintainer, so responses are best effort:
-
-- You should get an acknowledgement within 7 days.
-- The maintainer will tell you whether the report is accepted, and will keep you updated while a fix is prepared. Time to fix depends on severity and complexity.
-- Fixes ship in a new release. Once users have had a reasonable chance to upgrade, the release notes describe the change, and you are credited if you wish.
+Quro has a single maintainer, so responses are best effort and no response time is guaranteed. Reports are read, and genuine problems are fixed in a new release as soon as the maintainer is able to. The release notes describe the change once users have had a reasonable chance to upgrade.
 
 Please give the maintainer a reasonable time to release a fix before you disclose the problem publicly.
 
