@@ -68,16 +68,17 @@ type DemoUserRow = {
 };
 
 export function assertConfirmation(
-  envVarName: string,
+  settingName: string,
+  actualValue: string | null,
   expectedValue: string,
   operationDescription: string,
 ) {
-  if (process.env[envVarName] === expectedValue) {
+  if (actualValue === expectedValue) {
     return;
   }
 
   throw new Error(
-    `Refusing to ${operationDescription}. Set ${envVarName}=${expectedValue} after verifying the target database and backup state.`,
+    `Refusing to ${operationDescription}. Set ${settingName}=${expectedValue} after verifying the target database and backup state.`,
   );
 }
 

@@ -5,7 +5,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
 import { bunqConnections, bunqPaymentProgress } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { BUNQ_UNAVAILABLE_MESSAGE, loadBunqConfig } from '../lib/bunqConfig';
+import { BUNQ_UNAVAILABLE_MESSAGE, getBunqConfig } from '../lib/bunqConfig';
 import {
   OAUTH_ATTEMPT_TTL_MS,
   consumeOAuthAttempt,
@@ -59,7 +59,7 @@ function mergeSyncResults(
 }
 
 app.get('/oauth/start', async (c) => {
-  if (!loadBunqConfig().enabled) return unavailable(c);
+  if (!getBunqConfig().enabled) return unavailable(c);
 
   const user = getAuthUser(c);
   const destination = resolveOAuthDestination(c.req.query('returnTo'));
@@ -77,7 +77,7 @@ app.get('/oauth/start', async (c) => {
 });
 
 app.get('/oauth/callback', async (c) => {
-  const config = loadBunqConfig();
+  const config = getBunqConfig();
   if (!config.enabled) return unavailable(c);
 
   const storedState = getCookie(c, STATE_COOKIE);

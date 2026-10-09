@@ -1,3 +1,4 @@
+import { isTestEnvironment } from '../config';
 import { HOUR_MS, MINUTE_MS } from '../constants/time';
 import { runScheduledJob } from './scheduledJob';
 
@@ -10,10 +11,6 @@ type IntervalJobOptions = {
   coordinated?: boolean;
   run: () => Promise<void>;
 };
-
-function isTestEnvironment(): boolean {
-  return process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
-}
 
 // Start a recurring background job. Does nothing under test so importing an
 // app module never leaves timers running. A cycle that throws is logged and

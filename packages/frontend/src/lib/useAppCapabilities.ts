@@ -24,6 +24,12 @@ export const DEFAULT_APP_CAPABILITIES: AppCapabilities = {
     message: 'Bunq linking is unavailable because this Quro instance has not configured it.',
     checkedAt: new Date(0).toISOString(),
   },
+  documents: {
+    enabled: false,
+    reason: 'not_configured',
+    message: 'Document storage is not configured.',
+    checkedAt: new Date(0).toISOString(),
+  },
 };
 
 export function useAppCapabilities() {

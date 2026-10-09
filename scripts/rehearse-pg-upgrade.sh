@@ -89,7 +89,6 @@ backend() {
   app_url="postgres://$APP_USER:$APP_PASSWORD@$host:5432/$database"
   docker run --rm --network "$NET" -v "$V_DUMPS:/dumps" \
     -e ADMIN_DATABASE_URL="$admin_url" -e APP_DATABASE_URL="$app_url" -e DATABASE_URL="$app_url" \
-    -e APP_DB_USER="$APP_USER" -e APP_DB_PASSWORD="$APP_PASSWORD" \
     -e QRO_DISABLE_SCHEDULERS=true -e QRO_RESTORE_CONFIRM=restore-db \
     --entrypoint bun "$IMAGE" run "$@"
 }

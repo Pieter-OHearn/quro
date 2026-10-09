@@ -4,6 +4,7 @@ import { parseTrustedProxies } from '../lib/clientAddress';
 import { getClientAddress } from '../middleware/rateLimit';
 import { peerEnv } from '../test/peer';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
+import { applyTestSettings } from '../test/config';
 
 // The two supported deployment modes from docs/security.md, as the backend sees them. The
 // bundled nginx overwrites X-Real-IP with its peer, appends its peer to X-Forwarded-For and sets
@@ -49,8 +50,7 @@ const integration = createIntegrationHelpers('deployment-modes.integration.quro.
 const originalSecureCookies = process.env.SECURE_COOKIES;
 
 function restoreSecureCookies() {
-  if (originalSecureCookies === undefined) delete process.env.SECURE_COOKIES;
-  else process.env.SECURE_COOKIES = originalSecureCookies;
+  applyTestSettings({ SECURE_COOKIES: originalSecureCookies });
 }
 
 type CookieAttributes = { value: string; flags: Set<string>; attributes: Map<string, string> };
@@ -110,7 +110,7 @@ afterAll(async () => {
 
 describe.each(MODES)('$name', (mode) => {
   beforeAll(() => {
-    process.env.SECURE_COOKIES = mode.secureCookies;
+    applyTestSettings({ SECURE_COOKIES: mode.secureCookies });
   });
 
   afterAll(restoreSecureCookies);
@@ -232,7 +232,7 @@ describe('direct access to the backend, bypassing nginx', () => {
   });
 
   test('a forwarded https scheme does not change cookie flags', async () => {
-    process.env.SECURE_COOKIES = 'false';
+    applyTestSettings({ SECURE_COOKIES: 'false' });
     try {
       const response = await integration.request('/api/auth/signin', {
         method: 'POST',

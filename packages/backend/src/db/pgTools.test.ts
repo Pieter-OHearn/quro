@@ -9,6 +9,7 @@ import {
   restoreDatabaseBackup,
   serverMajorFromVersionNum,
 } from './pgTools';
+import { applyTestSettings } from '../test/config';
 
 describe('PostgreSQL tool versions', () => {
   test('reads the major version from tool output', () => {
@@ -62,10 +63,7 @@ describe('backup and restore client guard', () => {
   });
 
   afterEach(async () => {
-    for (const name of OVERRIDES) {
-      if (savedEnv[name] === undefined) delete process.env[name];
-      else process.env[name] = savedEnv[name];
-    }
+    applyTestSettings(savedEnv);
     await rm(workDir, { recursive: true, force: true });
   });
 
@@ -88,7 +86,7 @@ describe('backup and restore client guard', () => {
   }
 
   test('a dump with an older pg_dump is refused before anything is written', async () => {
-    process.env.QRO_PG_DUMP_BIN = await fakeTool('pg_dump', 'pg_dump (PostgreSQL) 12.0');
+    applyTestSettings({ QRO_PG_DUMP_BIN: await fakeTool('pg_dump', 'pg_dump (PostgreSQL) 12.0') });
     const outputPath = join(workDir, 'backups', 'quro.dump');
 
     await expect(createDatabaseBackup({ connectionString, outputPath })).rejects.toThrow(
@@ -99,7 +97,9 @@ describe('backup and restore client guard', () => {
   });
 
   test('a restore with an older pg_restore is refused without running it', async () => {
-    process.env.QRO_PG_RESTORE_BIN = await fakeTool('pg_restore', 'pg_restore (PostgreSQL) 12.0');
+    applyTestSettings({
+      QRO_PG_RESTORE_BIN: await fakeTool('pg_restore', 'pg_restore (PostgreSQL) 12.0'),
+    });
 
     await expect(
       restoreDatabaseBackup({ connectionString, inputPath: join(workDir, 'quro.dump') }),
@@ -108,7 +108,7 @@ describe('backup and restore client guard', () => {
   });
 
   test('a plain SQL restore with an older psql is refused without running it', async () => {
-    process.env.QRO_PSQL_BIN = await fakeTool('psql', 'psql (PostgreSQL) 12.0');
+    applyTestSettings({ QRO_PSQL_BIN: await fakeTool('psql', 'psql (PostgreSQL) 12.0') });
 
     await expect(
       restoreDatabaseBackup({ connectionString, inputPath: join(workDir, 'quro.sql') }),
@@ -117,7 +117,7 @@ describe('backup and restore client guard', () => {
   });
 
   test('a tool whose version cannot be read is refused', async () => {
-    process.env.QRO_PG_DUMP_BIN = await fakeTool('pg_dump', 'not a version');
+    applyTestSettings({ QRO_PG_DUMP_BIN: await fakeTool('pg_dump', 'not a version') });
 
     await expect(
       createDatabaseBackup({ connectionString, outputPath: join(workDir, 'quro.dump') }),
@@ -126,7 +126,7 @@ describe('backup and restore client guard', () => {
   });
 
   test('a newer client is allowed through to the tool', async () => {
-    process.env.QRO_PG_DUMP_BIN = await fakeTool('pg_dump', 'pg_dump (PostgreSQL) 99.0');
+    applyTestSettings({ QRO_PG_DUMP_BIN: await fakeTool('pg_dump', 'pg_dump (PostgreSQL) 99.0') });
 
     await createDatabaseBackup({ connectionString, outputPath: join(workDir, 'out', 'quro.dump') });
     expect(await exists(join(workDir, 'ran'))).toBe(true);

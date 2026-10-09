@@ -1,5 +1,5 @@
 import { type Sql } from 'postgres';
-import { getRuntimeDatabaseUrl } from './config';
+import { getConfig } from '../config';
 import { quoteIdentifier } from './maintenance';
 
 function escapeLiteral(value: string) {
@@ -24,50 +24,12 @@ type RoleExistsRow = {
   exists: boolean;
 };
 
-function readEnvValue(name: 'APP_DB_PASSWORD' | 'APP_DB_USER') {
-  return process.env[name] ?? '';
-}
-
-function readTrimmedEnvValue(name: 'APP_DB_PASSWORD' | 'APP_DB_USER') {
-  return readEnvValue(name).trim();
-}
-
-function decodeUrlCredential(value: string | undefined) {
-  return value ? decodeURIComponent(value) : '';
-}
-
-function getFirstNonEmptyValue(values: readonly string[]) {
-  for (const value of values) {
-    if (value !== '') {
-      return value;
-    }
-  }
-
-  return '';
-}
-
-function parseAppDatabaseUrl() {
-  const appDatabaseUrl =
-    process.env.APP_DATABASE_URL || process.env.DATABASE_URL || getRuntimeDatabaseUrl();
-  return appDatabaseUrl ? new URL(appDatabaseUrl) : null;
-}
-
-export function getRuntimeRoleConfigFromEnv(): RuntimeRoleConfig | null {
-  const parsedUrl = parseAppDatabaseUrl();
-  const roleName = getFirstNonEmptyValue([
-    readTrimmedEnvValue('APP_DB_USER'),
-    decodeUrlCredential(parsedUrl?.username),
-  ]);
-  const password = getFirstNonEmptyValue([
-    readEnvValue('APP_DB_PASSWORD'),
-    decodeUrlCredential(parsedUrl?.password),
-  ]);
-
-  if (roleName === '' || password === '') {
-    return null;
-  }
-
-  return { password, roleName };
+/** The runtime role the application connects as, or null when its credentials are not set. */
+export function getRuntimeRoleConfig(): RuntimeRoleConfig | null {
+  const { user, password } = getConfig().runtimeDatabase;
+  const secret = password.reveal();
+  if (user === '' || secret === '') return null;
+  return { password: secret, roleName: user };
 }
 
 export async function ensureRuntimeRole(

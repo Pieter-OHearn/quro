@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { bootConfig } from '../config';
 import { createDb } from './client';
 import { getRuntimeDatabaseUrl } from './config';
 import { buildSeedCurrencyRates, DEFAULT_DEMO_PASSWORD, DEMO_USER_PROFILE } from './demoSeed';
@@ -14,9 +15,10 @@ async function ensureCurrencyRates(db: ReturnType<typeof createDb>['db']): Promi
 }
 
 async function seedDemoUser() {
+  const { demo } = bootConfig('seed');
   const { db, queryClient } = createDb(getRuntimeDatabaseUrl());
   try {
-    const password = process.env.DEMO_USER_PASSWORD?.trim() || DEFAULT_DEMO_PASSWORD;
+    const password = demo.userPassword?.reveal() ?? DEFAULT_DEMO_PASSWORD;
     const passwordHash = await Bun.password.hash(password, {
       algorithm: 'bcrypt',
       cost: 10,

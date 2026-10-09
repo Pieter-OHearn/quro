@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
 import type { AuthSession } from '../test/integration';
+import { applyTestSettings } from '../test/config';
 
 // The dashboard's currency conversion lazily syncs FX rates from the real
 // market data client when the cache is empty/stale. Mock it so this suite
@@ -201,7 +202,7 @@ describe('partner link lifecycle', () => {
     const originalNodeEnv = process.env.NODE_ENV;
 
     try {
-      process.env.NODE_ENV = 'development';
+      applyTestSettings({ NODE_ENV: 'development' });
       for (let attempt = 0; attempt < PARTNER_INVITE_ALLOWED_ATTEMPTS; attempt += 1) {
         const response = await invitePartner(requester, integration.buildEmail('unknown-target'));
         expect(response.status).toBe(404);
@@ -216,7 +217,7 @@ describe('partner link lifecycle', () => {
         error: 'Too many requests, please try again later',
       });
     } finally {
-      process.env.NODE_ENV = originalNodeEnv;
+      applyTestSettings({ NODE_ENV: originalNodeEnv });
     }
   });
 

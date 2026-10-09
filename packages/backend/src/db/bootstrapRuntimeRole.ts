@@ -1,9 +1,11 @@
+import { bootConfig } from '../config';
 import { createQueryClient } from './client';
 import { getBootstrapDatabaseUrl, redactDatabaseUrl } from './config';
-import { ensureRuntimeRole, getRuntimeRoleConfigFromEnv } from './runtimeRole';
+import { ensureRuntimeRole, getRuntimeRoleConfig } from './runtimeRole';
 
 async function main() {
-  const config = getRuntimeRoleConfigFromEnv();
+  bootConfig('migrate');
+  const config = getRuntimeRoleConfig();
   if (!config) {
     console.log(
       'Skipping runtime-role bootstrap because no runtime database credentials were configured.',

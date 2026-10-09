@@ -11,6 +11,7 @@ import { db } from '../db/client';
 import { sessions } from '../db/schema';
 import { hashSessionToken } from '../lib/sessions';
 import { createIntegrationHelpers, integrationPassword, randomTestIp } from '../test/integration';
+import { applyTestSettings } from '../test/config';
 
 const integration = createIntegrationHelpers('settings.integration.quro.test');
 
@@ -379,7 +380,7 @@ describe('settings integration', () => {
     const isolatedIp = randomTestIp();
 
     try {
-      process.env.NODE_ENV = 'development';
+      applyTestSettings({ NODE_ENV: 'development' });
 
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const response = await integration.request('/api/settings/password', {
@@ -410,11 +411,7 @@ describe('settings integration', () => {
         error: 'Too many requests, please try again later',
       });
     } finally {
-      if (previousNodeEnv === undefined) {
-        delete process.env.NODE_ENV;
-      } else {
-        process.env.NODE_ENV = previousNodeEnv;
-      }
+      applyTestSettings({ NODE_ENV: previousNodeEnv });
     }
 
     const sessionRows = await db
