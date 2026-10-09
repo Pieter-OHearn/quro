@@ -47,7 +47,7 @@ fail() { echo >&2 "FAIL: $1"; exit 1; }
 
 cleanup() {
   status=$?
-  docker rm -f "$RUN-old" "$RUN-new" "$RUN-old-again" >/dev/null 2>&1 || true
+  docker rm -f "$RUN-old" "$RUN-new" "$RUN-old-again" "$RUN-refuse" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   docker volume rm "$V_OLD" "$V_NEW" "$V_DUMPS" >/dev/null 2>&1 || true
   rm -rf "$WORK"
@@ -132,6 +132,9 @@ docker exec "$RUN-old" pg_dump -U "$ADMIN_USER" -d "$DB" --format=custom \
   | docker run --rm -i -v "$V_DUMPS:/dumps" --entrypoint sh "$IMAGE" -c 'cat > /dumps/before-upgrade.dump'
 dump_bytes=$(docker run --rm -v "$V_DUMPS:/dumps" --entrypoint sh "$IMAGE" -c 'wc -c < /dumps/before-upgrade.dump')
 [ "$dump_bytes" -gt 1000 ] || fail "the dump is empty or truncated ($dump_bytes bytes)"
+# The pipe above hides a failing pg_dump, so also require a readable archive.
+docker run --rm -v "$V_DUMPS:/dumps" --entrypoint pg_restore "$IMAGE" --list /dumps/before-upgrade.dump >/dev/null \
+  || fail "the dump is not a readable archive"
 echo "dump written: $dump_bytes bytes"
 
 step "The backend image's tools can also dump the 16 server (client 18 >= server 16)"
@@ -141,10 +144,18 @@ step "Stop 16 and check that $PG_NEW_IMAGE refuses its data directory"
 docker stop "$RUN-old" >/dev/null
 docker rm "$RUN-old" >/dev/null
 for mount in /var/lib/postgresql/data /var/lib/postgresql; do
-  if docker run --rm -e POSTGRES_PASSWORD=unused -v "$V_OLD:$mount" "$PG_NEW_IMAGE" >"$WORK/refuse.log" 2>&1; then
-    fail "$PG_NEW_IMAGE started on the 16 data directory mounted at $mount"
-  fi
-  echo "refused at $mount (exit status non-zero)"
+  # Detached, so a server that does start is reported instead of blocking the run.
+  docker run -d --name "$RUN-refuse" -e POSTGRES_PASSWORD=unused -v "$V_OLD:$mount" "$PG_NEW_IMAGE" >/dev/null
+  tries=0
+  while [ "$(docker inspect -f '{{.State.Running}}' "$RUN-refuse")" = "true" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -le 30 ] || fail "$PG_NEW_IMAGE kept running on the 16 data directory mounted at $mount"
+    sleep 1
+  done
+  refused_status=$(docker inspect -f '{{.State.ExitCode}}' "$RUN-refuse")
+  [ "$refused_status" != "0" ] || fail "$PG_NEW_IMAGE exited cleanly on the 16 data directory mounted at $mount"
+  echo "refused at $mount (exit status $refused_status)"
+  docker rm "$RUN-refuse" >/dev/null
 done
 old_major=$(docker run --rm --entrypoint cat -v "$V_OLD:/old" "$PG_OLD_IMAGE" /old/PG_VERSION)
 [ "$old_major" = "16" ] || fail "the 16 data directory changed (PG_VERSION=$old_major)"

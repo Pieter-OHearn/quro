@@ -19,27 +19,29 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
 
 - Plan for a short outage: the app is stopped from the dump until the restore has been checked.
 - You need free disk space for the dump and for a second copy of the database.
-- Do the steps in this order. Steps 1 to 5 run against the old stack, so take them **before** you update the checkout; once the checkout is updated, `db` means PostgreSQL 18.
+- Do the steps in this order. Steps 1 to 4 run against the old stack, so take them **before** you update the checkout (step 5); once the checkout is updated, `db` means PostgreSQL 18.
 - The commands assume the Compose stack of this repository and run from the checkout that holds `docker-compose.yml`, `.env` and `secrets/`. If you run a release file instead, take the dump with the same `docker compose exec -T db ... pg_dump` command and follow the upgrade notes of the release.
 - Nothing below deletes anything. The old directory `./data/postgres` stays where it is.
 
 ## Upgrade a Compose install from 16 to 18
 
-1. Check what you are upgrading from, and stop everything that writes to the database. The database keeps running.
+1. Get the fingerprint query of the release you are installing without updating your checkout yet, check what you are upgrading from, and stop everything that writes to the database. The database keeps running. (An older checkout does not contain the query file.)
 
    ```bash
+   git fetch --tags
+   mkdir -p backups/db
+   git show <tag>:scripts/pg-table-fingerprint.sql > backups/db/pg-table-fingerprint.sql
    docker compose exec -T db postgres --version
    docker compose stop frontend backend pension-import-worker
    ```
 
-   The first command should print a PostgreSQL 16 version. Do not continue if it does not.
+   Replace `<tag>` with the release tag. The `postgres --version` command should print a PostgreSQL 16 version. Do not continue if it does not.
 
 2. Record a fingerprint of the old database. It lists each table with its row count and a checksum of its rows, and each sequence with its last value. It contains no row data.
 
    ```bash
-   mkdir -p backups/db
    docker compose exec -T db sh -c 'psql -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-     < scripts/pg-table-fingerprint.sql | LC_ALL=C sort > backups/db/fingerprint-before.txt
+     < backups/db/pg-table-fingerprint.sql | LC_ALL=C sort > backups/db/fingerprint-before.txt
    ```
 
 3. Back up with the old server's own tools, which always match its version. `-T` matters: without it Compose attaches a terminal that can corrupt the binary dump.
@@ -89,7 +91,7 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
 
    ```bash
    docker compose --profile maintenance run --rm -T db-tools psql -X -At \
-     < scripts/pg-table-fingerprint.sql | LC_ALL=C sort > backups/db/fingerprint-after.txt
+     < backups/db/pg-table-fingerprint.sql | LC_ALL=C sort > backups/db/fingerprint-after.txt
    diff backups/db/fingerprint-before.txt backups/db/fingerprint-after.txt && echo identical
    docker compose exec -T db sh -c 'psql -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "show data_checksums"'
    ```
