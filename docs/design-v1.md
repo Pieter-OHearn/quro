@@ -6,10 +6,11 @@ Later changes implement these values; they do not round or rename them. It was r
 09 Oct 2026 after a review of the design system (contrast audit, chart palette, selection rule,
 zero change, scrim and status tokens).
 
-Until the migration is complete,
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css) holds the
-values the app renders today. See [design tokens](design-tokens.md) for how tokens become Tailwind
-utilities and the rules for using them.
+light colour values, shadows and motion of this page (VD03); until the dark theme, radius, type
+and shared UI steps land, it also holds the values the app renders today for those. See
+[design tokens](design-tokens.md) for how tokens become Tailwind utilities and the rules for
+using them.
 
 ## 1. Principles
 
@@ -22,7 +23,7 @@ utilities and the rules for using them.
 
 ## 2. Colour tokens
 
-The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" do not exist in `theme.css` yet. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`; rows marked "Legacy alias" exist only until the components that use them are migrated (VD14 to VD17) and are deleted in VD19.
+The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" were added to `theme.css` with the light values. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`; rows marked "Legacy alias" exist only until the components that use them are migrated (VD14 to VD17) and are deleted in VD19.
 
 | Variable                   | Light                    | Dark                     | Use                                                                                                         |
 | -------------------------- | ------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------- |
