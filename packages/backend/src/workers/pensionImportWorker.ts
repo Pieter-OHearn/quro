@@ -10,12 +10,13 @@ import {
 import { evaluateCapability } from '../lib/capabilityRegistry';
 import { runPensionImportWorkerTick } from '../routes/pension-imports';
 
-// The worker has nothing to do without a parser and document storage; stop with the settings exit
-// code instead of polling a service that cannot be reached.
+// The worker has nothing to do without a parser; stop with the settings exit code instead of
+// polling a service that cannot be reached. It reads documents from the same store as the server
+// (QRO_DOCUMENT_STORAGE), so with the filesystem driver it mounts the same directory.
 const configured = evaluateCapability('pensionImport');
 if (!configured.enabled) {
   console.error(
-    '[pension-import-worker] Statement import is not configured: set PENSION_PARSER_URL and the S3_* document storage settings.',
+    '[pension-import-worker] Statement import is not configured: set PENSION_PARSER_URL.',
   );
   process.exit(2);
 }

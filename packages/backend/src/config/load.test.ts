@@ -48,7 +48,15 @@ describe('loadConfig defaults', () => {
     expect(config.web.trustedProxies).toBeNull();
     expect(config.web.frontendOrigin).toBeNull();
     expect(config.web.corsOrigins).toEqual(['http://localhost:3000', 'http://localhost:5173']);
-    expect(config.documents).toEqual({ enabled: false });
+    expect(config.documents).toEqual({
+      driver: 'filesystem',
+      directory: '/var/lib/quro/documents',
+    });
+    expect(config.documentStorage).toEqual({
+      driver: 'filesystem',
+      directory: '/var/lib/quro/documents',
+    });
+    expect(config.s3).toEqual({ enabled: false });
     expect(config.bunq).toEqual({ enabled: false });
     expect(config.pensionImport).toEqual({
       parserUrl: null,
@@ -230,6 +238,7 @@ describe('retired settings', () => {
   test('S3 with MINIO_APP_USER and the old secret variable says what replaces them', () => {
     const { problems } = load({
       ...DATABASE_ENV,
+      QRO_DOCUMENT_STORAGE: 's3',
       S3_ENDPOINT: 'http://s3:9000',
       S3_REGION: 'eu-west-1',
       S3_BUCKET: 'docs',
@@ -260,26 +269,94 @@ describe('document storage', () => {
   };
   const S3_SECRETS = { ...SECRETS, '/run/secrets/s3_secret_access_key': `${CANARY}-s3\n` };
 
-  test('is off when no S3 setting is present', () => {
-    expect(load(DATABASE_ENV).config.documents).toEqual({ enabled: false });
+  test('defaults to the filesystem store in /var/lib/quro/documents', () => {
+    expect(load(DATABASE_ENV).config.documents).toEqual({
+      driver: 'filesystem',
+      directory: '/var/lib/quro/documents',
+    });
   });
 
-  test('is on with a complete configuration', () => {
-    const { config } = load({ ...DATABASE_ENV, ...S3_ENV }, S3_SECRETS);
-    expect(config.documents).toMatchObject({
-      enabled: true,
+  test('takes an absolute documents directory and refuses a relative one or the root', () => {
+    const configured = load({ ...DATABASE_ENV, QRO_DOCUMENTS_DIR: '/srv/quro/documents/' });
+    expect(configured.config.documents).toEqual({
+      driver: 'filesystem',
+      directory: '/srv/quro/documents',
+    });
+    for (const directory of ['data/documents', './documents', '/']) {
+      const { problems } = load({ ...DATABASE_ENV, QRO_DOCUMENTS_DIR: directory });
+      expect(problems.documents.map((p) => p.setting)).toEqual(['QRO_DOCUMENTS_DIR']);
+      expect(problems.documentStorage.map((p) => p.setting)).toEqual(['QRO_DOCUMENTS_DIR']);
+    }
+  });
+
+  test('rejects an unknown driver', () => {
+    const { problems } = load({ ...DATABASE_ENV, QRO_DOCUMENT_STORAGE: 'minio' });
+    expect(problems.documents).toEqual([
+      { setting: 'QRO_DOCUMENT_STORAGE', message: 'must be one of filesystem, s3' },
+    ]);
+  });
+
+  test.each([
+    ['S3_ENDPOINT', 'http://minio:9000'],
+    ['S3_BUCKET', 'quro-documents'],
+    ['S3_ACCESS_KEY_ID', 'quro_app'],
+    ['MINIO_APP_USER', 'quro_app'],
+  ])('%s without QRO_DOCUMENT_STORAGE stops every command instead of guessing', (name, value) => {
+    const { problems } = load({ ...DATABASE_ENV, [name]: value }, S3_SECRETS);
+    const expected = {
+      setting: 'QRO_DOCUMENT_STORAGE',
+      message: `required because ${name} is set: use s3 to keep the existing store, or filesystem once \`quro documents migrate-from-s3\` has copied its documents`,
+    };
+    expect(problems.documentStorage).toEqual([expected]);
+    expect(problems.documents).toEqual([expected]);
+  });
+
+  test('the guard lists every S3 setting it found', () => {
+    const { problems } = load({ ...DATABASE_ENV, ...S3_ENV }, S3_SECRETS);
+    expect(problems.documentStorage[0]?.message).toStartWith(
+      'required because S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID are set',
+    );
+  });
+
+  test('S3_REGION or S3_FORCE_PATH_STYLE on their own do not select a driver', () => {
+    const { config } = load({
+      ...DATABASE_ENV,
+      S3_REGION: 'eu-west-1',
+      S3_FORCE_PATH_STYLE: 'true',
+    });
+    expect(config.documents.driver).toBe('filesystem');
+  });
+
+  test('the S3 driver needs every S3 setting', () => {
+    const { problems } = load({ ...DATABASE_ENV, QRO_DOCUMENT_STORAGE: 's3' });
+    expect(problems.documents.map((p) => p.setting).sort()).toEqual([
+      'S3_ACCESS_KEY_ID',
+      'S3_BUCKET',
+      'S3_ENDPOINT',
+      'S3_REGION',
+      'S3_SECRET_ACCESS_KEY_FILE',
+    ]);
+  });
+
+  test('the S3 driver with a complete configuration', () => {
+    const { config } = load({ ...DATABASE_ENV, ...S3_ENV, QRO_DOCUMENT_STORAGE: 's3' }, S3_SECRETS);
+    if (config.documents.driver !== 's3') throw new Error('expected the S3 driver');
+    expect(config.documents.s3).toMatchObject({
       endpoint: 'http://s3.internal:9000',
       region: 'eu-west-1',
       bucket: 'quro-documents',
       accessKeyId: 'quro_app',
       forcePathStyle: true,
     });
-    if (!config.documents.enabled) throw new Error('expected documents to be enabled');
-    expect(config.documents.secretAccessKey.reveal()).toBe(`${CANARY}-s3`);
+    expect(config.documents.s3.secretAccessKey.reveal()).toBe(`${CANARY}-s3`);
+    expect(config.documentStorage.driver).toBe('s3');
   });
 
-  test('a partial configuration lists every missing setting', () => {
-    const { problems } = load({ ...DATABASE_ENV, S3_BUCKET: 'docs' }, S3_SECRETS);
+  test('a partial S3 configuration lists every missing setting', () => {
+    const { problems } = load(
+      { ...DATABASE_ENV, QRO_DOCUMENT_STORAGE: 's3', S3_BUCKET: 'docs' },
+      S3_SECRETS,
+    );
     expect(problems.documents.map((p) => p.setting).sort()).toEqual([
       'S3_ACCESS_KEY_ID',
       'S3_ENDPOINT',
@@ -287,15 +364,24 @@ describe('document storage', () => {
     ]);
   });
 
-  test('a secret file at its default location does not turn S3 on by itself', () => {
-    const { config, problems } = load(DATABASE_ENV, S3_SECRETS);
-    expect(config.documents).toEqual({ enabled: false });
+  test('the filesystem driver ignores S3 settings, which stay available as a migration source', () => {
+    const env = { ...DATABASE_ENV, ...S3_ENV, QRO_DOCUMENT_STORAGE: 'filesystem' };
+    const readFile = files(SECRETS);
+    const { config, problems } = loadConfig(env, readFile);
+    // The server does not need the S3 secret once documents are on the filesystem.
+    expect(config.documents.driver).toBe('filesystem');
     expect(problems.documents).toEqual([]);
+    // The migration source does, and reports it.
+    expect(problems.s3.map((p) => p.setting)).toEqual(['S3_SECRET_ACCESS_KEY_FILE']);
+    const withSecret = load(env, S3_SECRETS).config.s3;
+    expect(withSecret).toMatchObject({ enabled: true, bucket: 'quro-documents' });
   });
 
-  test('the secret is found at its default location once S3 is configured', () => {
-    const { config } = load({ ...DATABASE_ENV, ...S3_ENV }, S3_SECRETS);
-    expect(config.documents.enabled).toBe(true);
+  test('a secret file at its default location does not turn S3 on by itself', () => {
+    const { config, problems } = load(DATABASE_ENV, S3_SECRETS);
+    expect(config.s3).toEqual({ enabled: false });
+    expect(config.documents.driver).toBe('filesystem');
+    expect(problems.documents).toEqual([]);
   });
 
   test('reads the secret from a configured file and honours path style', () => {
@@ -303,17 +389,23 @@ describe('document storage', () => {
       {
         ...DATABASE_ENV,
         ...S3_ENV,
+        QRO_DOCUMENT_STORAGE: 's3',
         S3_SECRET_ACCESS_KEY_FILE: '/custom/secret',
         S3_FORCE_PATH_STYLE: 'false',
       },
       { '/custom/secret': 'abc' },
     );
-    expect(config.documents).toMatchObject({ enabled: true, forcePathStyle: false });
+    expect(config.documents).toMatchObject({ driver: 's3', s3: { forcePathStyle: false } });
   });
 
   test('rejects a malformed endpoint without echoing it', () => {
     const { problems } = load(
-      { ...DATABASE_ENV, ...S3_ENV, S3_ENDPOINT: `not-a-url-${CANARY}` },
+      {
+        ...DATABASE_ENV,
+        ...S3_ENV,
+        QRO_DOCUMENT_STORAGE: 's3',
+        S3_ENDPOINT: `not-a-url-${CANARY}`,
+      },
       S3_SECRETS,
     );
     expect(problems.documents).toEqual([

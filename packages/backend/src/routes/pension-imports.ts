@@ -42,7 +42,7 @@ import {
   applyPensionPotBalanceDelta,
   computePensionTransactionDelta,
 } from '../lib/pensionTransactions';
-import { deleteS3Objects, getS3ObjectBytes, uploadS3Object } from '../lib/s3';
+import { getDocumentStore } from '../lib/documentStorage';
 import {
   type NormalizedPensionTransactionPayload,
   validatePensionTransactionPayload,
@@ -575,7 +575,7 @@ async function getImportPot(
 }
 
 async function parseLockedImport(importRecord: ImportRecord): Promise<PensionParserResult> {
-  const bytes = await getS3ObjectBytes({ key: importRecord.storageKey });
+  const bytes = await getDocumentStore().get(importRecord.storageKey);
   if (!bytes || bytes.length === 0) throw new Error('Import document was not found');
 
   const pot = await getImportPot(importRecord);
@@ -770,11 +770,7 @@ app.post('/', async (c) => {
   const expiresAt = getImportExpiryDate(now);
 
   try {
-    await uploadS3Object({
-      key: storageKey,
-      body: bytes,
-      contentType: PDF_MIME_TYPE,
-    });
+    await getDocumentStore().put(storageKey, bytes);
   } catch (error) {
     console.error('Failed to upload pension statement import document', error);
     return c.json({ error: 'Failed to upload PDF' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
@@ -1107,7 +1103,7 @@ async function expireDraftImports(): Promise<void> {
     )
     .returning({ id: pensionStatementImports.id, storageKey: pensionStatementImports.storageKey });
   try {
-    const result = await deleteS3Objects(expired.map((row) => row.storageKey));
+    const result = await getDocumentStore().deleteMany(expired.map((row) => row.storageKey));
     const deleted = new Set(result.deletedKeys);
     const ids = expired.filter((row) => deleted.has(row.storageKey)).map((row) => row.id);
     await markImportStorageDeleted(ids, now);

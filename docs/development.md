@@ -42,7 +42,7 @@ bun run hooks:install
 bun run dev:doctor
 ```
 
-2. Copy the Docker runtime config and secrets. The local Bun workflow reuses the same Postgres and MinIO credentials as the Docker stack:
+2. Copy the Docker runtime config and secrets. The local Bun workflow reuses the same Postgres credentials as the Docker stack:
 
 ```bash
 cp .env.example .env
@@ -68,14 +68,14 @@ In `packages/frontend/.env`, uncomment `VITE_API_URL=http://localhost:3000`. The
 
 - `ADMIN_DATABASE_URL` should point at your admin Postgres user on `127.0.0.1:5432`
 - `APP_DATABASE_URL` should point at your runtime Postgres user on `127.0.0.1:5432`
-- Leave the `S3_*` settings commented out unless you need document storage. Then set all of `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY_FILE`, matching the MinIO bucket and app user created by `minio-init`; `S3_ENDPOINT` should point at `http://127.0.0.1:9000` only if you temporarily expose MinIO for contributor work (the public Docker path keeps it internal). The secret is read from a file, so point `S3_SECRET_ACCESS_KEY_FILE` at `secrets/minio_app_secret_key.txt`. Setting only some of them stops the backend at startup with the full list of what is missing.
+- Uploaded documents go to the directory in `QRO_DOCUMENTS_DIR` (default `/var/lib/quro/documents`). On the host, create a directory you own and set `QRO_DOCUMENTS_DIR` to its absolute path; the backend never creates it, and a relative path is refused. Leave `QRO_DOCUMENT_STORAGE` at `filesystem` and the `S3_*` settings commented out unless you work on the S3 driver; then set `QRO_DOCUMENT_STORAGE=s3` and all of `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY_FILE` for an S3-compatible store you run (see [document storage](document-storage.md)). An `S3_ENDPOINT`, `S3_BUCKET` or `S3_ACCESS_KEY_ID` without `QRO_DOCUMENT_STORAGE` stops the backend at startup.
 
 The backend validates every setting once at startup (see [Configuration](architecture.md#configuration)). Names that earlier releases accepted (`DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY`) are no longer read; if one is still in your `.env`, the backend prints which setting replaces it. To run the demo seed with a password of your own, set `DEMO_USER_PASSWORD`. The test scripts set `NODE_ENV=test`, which turns off rate limiting and the background jobs.
 
-5. Start the infrastructure containers you need. The development override exposes Postgres and MinIO back to `127.0.0.1` for host-side Bun and Python processes without changing the public default compose file:
+5. Start the database. The development override exposes Postgres on `127.0.0.1` for host-side Bun and Python processes without changing the public default compose file:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.development.yml up -d db minio minio-init
+docker compose -f docker-compose.yml -f docker-compose.development.yml up -d db
 ```
 
 6. Run migrations and bootstrap the runtime DB role:
@@ -123,11 +123,11 @@ The Docker stack publishes:
 # App UI
 http://localhost:3000
 
-# Database and object storage for host-side tools
+# Database for host-side tools
 127.0.0.1:5432
-127.0.0.1:9000
-127.0.0.1:9001
 ```
+
+Uploaded documents are stored in `./data/documents`.
 
 For Docker, the backend stays internal to the compose network and Nginx proxies `/api` to it. That means bunq OAuth should use `http://localhost:3000/api/bunq/oauth/callback`.
 
