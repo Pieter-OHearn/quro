@@ -95,7 +95,7 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
         className="w-full flex items-center justify-between px-4 py-3 bg-surface border border-border-default rounded-md hover:bg-surface-sunken transition-colors text-fg-subtle text-sm group"
       >
         <span className="flex items-center gap-2.5">
-          <span className="text-[10px] font-mono bg-surface-muted group-hover:bg-brand-soft group-hover:text-brand-accent text-fg-subtle px-2 py-0.5 rounded-sm transition-colors font-semibold tracking-wider">
+          <span className="text-[10px] bg-surface-muted group-hover:bg-brand-soft group-hover:text-brand-accent text-fg-subtle px-2 py-0.5 rounded-sm transition-colors font-semibold tracking-wider">
             DEV
           </span>
           <span className="text-fg-muted">Technical details</span>
@@ -118,9 +118,9 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
               <div className="w-3 h-3 rounded-full bg-warning-accent/80" />
               <div className="w-3 h-3 rounded-full bg-success-accent/80" />
             </div>
-            <span className="text-xs text-fg-subtle font-mono ml-2">error.log - quro</span>
+            <span className="text-xs text-fg-subtle ml-2">error.log - quro</span>
           </div>
-          <pre className="p-4 text-xs font-mono text-danger-border-strong/90 overflow-auto max-h-56 leading-relaxed whitespace-pre-wrap break-all">
+          <pre className="p-4 text-xs text-danger-border-strong/90 overflow-auto max-h-56 leading-relaxed whitespace-pre-wrap break-all">
             {detail}
           </pre>
         </div>

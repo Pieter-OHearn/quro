@@ -162,7 +162,7 @@ export function Settings() {
                 <p className="mb-1 text-[10px] uppercase tracking-widest text-fg-faint">
                   App Version
                 </p>
-                <p className="font-mono text-sm font-semibold text-fg-strong">{appVersion}</p>
+                <p className="text-sm font-semibold text-fg-strong">{appVersion}</p>
               </div>
             </nav>
 
