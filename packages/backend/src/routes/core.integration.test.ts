@@ -3,17 +3,15 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings, sessions } from '../db/schema';
 import { createIntegrationHelpers, integrationPassword, randomTestIp } from '../test/integration';
+import { applyTestSettings } from '../test/config';
+import { clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 
 const integration = createIntegrationHelpers('ticket6.integration.quro.test');
 const SIGNIN_ALLOWED_ATTEMPTS = 5;
 const SIGNUP_ALLOWED_ATTEMPTS = 3;
 
 function restoreNodeEnv(previousNodeEnv: string | undefined) {
-  if (previousNodeEnv === undefined) {
-    delete process.env.NODE_ENV;
-  } else {
-    process.env.NODE_ENV = previousNodeEnv;
-  }
+  applyTestSettings({ NODE_ENV: previousNodeEnv });
 }
 
 beforeAll(async () => {
@@ -107,7 +105,7 @@ describe('auth integration', () => {
     const isolatedIp = randomTestIp();
 
     try {
-      process.env.NODE_ENV = 'development';
+      applyTestSettings({ NODE_ENV: 'development' });
       for (let attempt = 0; attempt < SIGNIN_ALLOWED_ATTEMPTS; attempt += 1) {
         const response = await integration.request('/api/auth/signin', {
           method: 'POST',
@@ -136,7 +134,7 @@ describe('auth integration', () => {
     const isolatedIp = randomTestIp();
 
     try {
-      process.env.NODE_ENV = 'development';
+      applyTestSettings({ NODE_ENV: 'development' });
       for (let attempt = 0; attempt < SIGNUP_ALLOWED_ATTEMPTS; attempt += 1) {
         const response = await integration.request('/api/auth/signup', {
           method: 'POST',
@@ -297,12 +295,12 @@ describe('auth integration', () => {
       error: 'Authentication required',
     });
 
-    // The bunq callback is public, but with bunq unconfigured it fails closed.
-    // Configured behaviour is covered in bunq.integration.test.ts.
+    // With bunq unconfigured its routes are not mounted at all, so the public callback path
+    // answers like any unknown path. Configured behaviour is covered in bunq.integration.test.ts.
     const bunqCallbackResponse = await integration.request(
       '/api/bunq/oauth/callback?state=state&code=code',
     );
-    expect(bunqCallbackResponse.status).toBe(503);
+    expect(bunqCallbackResponse.status).toBe(404);
   });
 });
 
@@ -1471,6 +1469,14 @@ describe('budget integration', () => {
 });
 
 describe('bunq integration', () => {
+  beforeAll(() => {
+    setBunqTestEnv();
+  });
+
+  afterAll(() => {
+    clearBunqTestEnv();
+  });
+
   test('returns not found for sync requests without a Bunq connection', async () => {
     const owner = await integration.signUp('bunq-no-connection');
 

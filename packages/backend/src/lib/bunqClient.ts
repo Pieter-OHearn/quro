@@ -10,21 +10,10 @@ import {
 
 export const BUNQ_PAYMENT_PAGE_CAP = 100;
 
-import { requireBunqConfig } from './bunqConfig';
+import { bunqUrls, requireBunqConfig } from './bunqConfig';
 
 const RATE_LIMIT_RETRY_MS = 30_000;
 const RATE_LIMIT_STATUS = 429;
-
-const isSandbox = process.env.BUNQ_SANDBOX === 'true';
-const API_BASE_URL = isSandbox
-  ? 'https://public-api.sandbox.bunq.com/v1'
-  : 'https://api.bunq.com/v1';
-const OAUTH_BASE_URL = isSandbox
-  ? 'https://api-oauth.sandbox.bunq.com/v1'
-  : 'https://api.oauth.bunq.com/v1';
-const OAUTH_AUTHORIZE_URL = isSandbox
-  ? 'https://oauth.sandbox.bunq.com/auth'
-  : 'https://oauth.bunq.com/auth';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -189,8 +178,9 @@ async function performFetch(url: string, init: RequestInit): Promise<unknown> {
 
 function resolveApiUrl(pathOrUrl: string): string {
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  if (pathOrUrl.startsWith('/v1/')) return new URL(pathOrUrl, API_BASE_URL).toString();
-  return `${API_BASE_URL}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+  const apiBaseUrl = bunqUrls().api;
+  if (pathOrUrl.startsWith('/v1/')) return new URL(pathOrUrl, apiBaseUrl).toString();
+  return `${apiBaseUrl}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
 }
 
 function apiGet(url: string, sessionToken: string): Promise<unknown> {
@@ -226,7 +216,7 @@ function apiPost(
 
 function oauthPost(params: Readonly<Record<string, string>>): Promise<unknown> {
   const query = new URLSearchParams(params).toString();
-  return performFetch(`${OAUTH_BASE_URL}/token?${query}`, {
+  return performFetch(`${bunqUrls().oauth}/token?${query}`, {
     method: 'POST',
   });
 }
@@ -352,11 +342,11 @@ export function buildOAuthAuthorizeUrl(state: string): string {
   const config = requireBunqConfig();
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: config.clientId,
+    client_id: config.clientId.reveal(),
     redirect_uri: config.redirectUri,
     state,
   });
-  return `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
+  return `${bunqUrls().authorize}?${params.toString()}`;
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<BunqTokens> {
@@ -365,15 +355,15 @@ export async function exchangeCodeForTokens(code: string): Promise<BunqTokens> {
     grant_type: 'authorization_code',
     code,
     redirect_uri: config.redirectUri,
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
+    client_id: config.clientId.reveal(),
+    client_secret: config.clientSecret.reveal(),
   });
   return parseTokens(payload);
 }
 
 export async function createInstallation(publicKey: string): Promise<BunqInstallationResult> {
   const body = JSON.stringify({ client_public_key: publicKey });
-  const payload = await performFetch(`${API_BASE_URL}/installation`, {
+  const payload = await performFetch(`${bunqUrls().api}/installation`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': 'quro/1.0' },
     body,
@@ -394,7 +384,7 @@ export async function registerDevice(
   privateKey: string,
 ): Promise<void> {
   await apiPost(
-    `${API_BASE_URL}/device-server`,
+    `${bunqUrls().api}/device-server`,
     { description: 'Quro Finance', secret: accessToken, permitted_ips: ['*'] },
     installationToken,
     privateKey,
@@ -407,7 +397,7 @@ export async function createSession(
   privateKey: string,
 ): Promise<BunqSessionResult> {
   const payload = await apiPost(
-    `${API_BASE_URL}/session-server`,
+    `${bunqUrls().api}/session-server`,
     { secret: accessToken },
     installationToken,
     privateKey,
@@ -429,7 +419,10 @@ export async function fetchMonetaryAccounts(
   sessionToken: string,
   bunqUserId: string,
 ): Promise<BunqMonetaryAccount[]> {
-  const payload = await apiGet(`${API_BASE_URL}/user/${bunqUserId}/monetary-account`, sessionToken);
+  const payload = await apiGet(
+    `${bunqUrls().api}/user/${bunqUserId}/monetary-account`,
+    sessionToken,
+  );
   return parseMonetaryAccounts(payload);
 }
 
@@ -462,7 +455,7 @@ export async function fetchPayments(
 ): Promise<{ payments: BunqPayment[]; nextPageUrl: string | null }> {
   const cutoffTime = parsePaymentCutoff(newerThan);
   const payments: BunqPayment[] = [];
-  const url = new URL(`${API_BASE_URL}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
+  const url = new URL(`${bunqUrls().api}/user/${bunqUserId}/monetary-account/${accountId}/payment`);
   url.searchParams.set('count', '200');
 
   let nextUrl: string | null = resumeUrl ?? url.toString();
@@ -486,7 +479,7 @@ export async function fetchPayments(
 }
 
 export async function deleteSession(sessionToken: string, sessionId: number): Promise<void> {
-  await performFetch(`${API_BASE_URL}/session/${sessionId}`, {
+  await performFetch(`${bunqUrls().api}/session/${sessionId}`, {
     method: 'DELETE',
     headers: {
       'X-Bunq-Client-Authentication': sessionToken,

@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { and, desc, eq, gt, ne } from 'drizzle-orm';
 import type { UserSession } from '@quro/shared';
+import { getConfig } from '../config';
 import { db, type DbExecutor } from '../db/client';
 import { sessions } from '../db/schema';
 import { DAY_MS, MINUTE_MS, MS_PER_SECOND } from '../constants/time';
@@ -19,19 +20,11 @@ const SESSION_TOUCH_INTERVAL_MINUTES = 5;
 export const SESSION_TOUCH_INTERVAL_MS = SESSION_TOUCH_INTERVAL_MINUTES * MINUTE_MS;
 
 /**
- * Parses `SECURE_COOKIES`. Only `true` and `false` (or unset, meaning false) are accepted so a
- * typo such as `TRUE` or `1` cannot silently leave HTTPS deployments with insecure cookies.
- * The flag is configuration, never inferred from forwarded headers a client could send.
+ * Whether session cookies carry the Secure flag. It is configuration (`SECURE_COOKIES`), never
+ * inferred from forwarded headers a client could send.
  */
-export function parseSecureCookies(raw: string | undefined): boolean {
-  const value = raw?.trim() ?? '';
-  if (value === '' || value === 'false') return false;
-  if (value === 'true') return true;
-  throw new Error('SECURE_COOKIES must be "true" or "false"');
-}
-
 export function secureCookiesEnabled(): boolean {
-  return parseSecureCookies(process.env.SECURE_COOKIES);
+  return getConfig().web.secureCookies;
 }
 
 // Raw tokens are base64url, which never matches the stored hex digest format.

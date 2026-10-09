@@ -3,8 +3,10 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { bootConfig } from '../config';
 import { getAdminDatabaseUrl, redactDatabaseUrl } from './config';
 
+bootConfig('migrate');
 const connectionString = getAdminDatabaseUrl();
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = resolve(here, 'migrations');

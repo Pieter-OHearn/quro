@@ -69,7 +69,7 @@ sign-in, sign-up and password reset requests. Browsers send `Origin` on every `P
 pass it through unchanged, so it shows the scheme the browser uses even behind two proxies.
 Any client can send an `Origin` header, though, so a warning based on one says so: confirm how
 browsers reach Quro before changing the setting. Unknown `SECURE_COOKIES` and `QRO_REGISTRATION_MODE`
-values stop the backend at startup.
+values stop the backend at startup, together with every other invalid setting in one list.
 
 ### Not supported
 

@@ -2,25 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { REGISTRATION_MODES } from '@quro/shared';
 import { generateAuthCode, hashAuthCode, normalizeAuthCode } from './authCodes';
-import { parseRegistrationMode, registrationRequirement } from './registration';
-import { generateSessionToken, hashSessionToken, parseSecureCookies } from './sessions';
+import { registrationRequirement } from './registration';
+import { generateSessionToken, hashSessionToken } from './sessions';
 
 const SESSION_DIGEST = /^[0-9a-f]{64}$/;
-
-describe('parseRegistrationMode', () => {
-  test('defaults to invite-only when unset or blank', () => {
-    expect(parseRegistrationMode(undefined)).toBe('invite');
-    expect(parseRegistrationMode('  ')).toBe('invite');
-  });
-
-  test.each([...REGISTRATION_MODES])('accepts %s', (mode) => {
-    expect(parseRegistrationMode(` ${mode} `)).toBe(mode);
-  });
-
-  test.each(['OPEN', 'opne', 'true', '1'])('refuses %s instead of guessing', (value) => {
-    expect(() => parseRegistrationMode(value)).toThrow('QRO_REGISTRATION_MODE must be one of');
-  });
-});
 
 describe('registrationRequirement', () => {
   test.each([...REGISTRATION_MODES])('the first account needs a code in %s mode', (mode) => {
@@ -32,22 +17,6 @@ describe('registrationRequirement', () => {
     expect(registrationRequirement('invite', true)).toBe('code');
     expect(registrationRequirement('open', true)).toBe('open');
   });
-});
-
-describe('parseSecureCookies', () => {
-  test('only accepts true and false', () => {
-    expect(parseSecureCookies(undefined)).toBe(false);
-    expect(parseSecureCookies('')).toBe(false);
-    expect(parseSecureCookies('false')).toBe(false);
-    expect(parseSecureCookies('true')).toBe(true);
-  });
-
-  test.each(['TRUE', '1', 'yes', 'on'])(
-    'refuses %s instead of silently disabling Secure',
-    (raw) => {
-      expect(() => parseSecureCookies(raw)).toThrow('SECURE_COOKIES must be');
-    },
-  );
 });
 
 describe('session tokens', () => {

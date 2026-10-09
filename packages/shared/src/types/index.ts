@@ -454,6 +454,7 @@ export type AppCapabilities = {
   ai: AppCapabilityStatus;
   pensionStatementImport: AppCapabilityStatus;
   bunq: AppCapabilityStatus;
+  documents: AppCapabilityStatus;
 };
 
 export type PensionStatementImport = {

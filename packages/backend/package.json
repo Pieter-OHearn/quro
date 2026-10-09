@@ -13,6 +13,7 @@
     "db:backup": "bun run src/db/backup.ts",
     "db:restore": "bun run src/db/restore.ts",
     "db:clear": "bun run src/db/clear.ts",
+    "db:psql": "bun run src/db/psql.ts",
     "db:bootstrap-runtime-role": "bun run src/db/bootstrapRuntimeRole.ts",
     "db:seed-demo": "bun run src/db/seedDemoUser.ts",
     "quro": "bun run src/cli/quro.ts"

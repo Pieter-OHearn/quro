@@ -1,28 +1,15 @@
 import { eq, sql } from 'drizzle-orm';
-import { REGISTRATION_MODES, type RegistrationMode, type RegistrationPolicy } from '@quro/shared';
+import type { RegistrationMode, RegistrationPolicy } from '@quro/shared';
+import { getConfig } from '../config';
 import { db, type DbExecutor } from '../db/client';
 import { users } from '../db/schema';
 import { consumeAuthCode, recordAuthCodeUser } from './authCodes';
 import { isUniqueViolation } from './postgresErrors';
 import { publicUserColumns } from './users';
 
-export const DEFAULT_REGISTRATION_MODE: RegistrationMode = 'invite';
-
-/**
- * Parses `QRO_REGISTRATION_MODE`. Unset means invite-only; an unknown value is a startup error so a
- * typo cannot open registration.
- */
-export function parseRegistrationMode(raw: string | undefined): RegistrationMode {
-  const value = raw?.trim() ?? '';
-  if (value === '') return DEFAULT_REGISTRATION_MODE;
-  if ((REGISTRATION_MODES as readonly string[]).includes(value)) {
-    return value as RegistrationMode;
-  }
-  throw new Error(`QRO_REGISTRATION_MODE must be one of ${REGISTRATION_MODES.join(', ')}`);
-}
-
+/** `QRO_REGISTRATION_MODE`: unset means invite-only, and an unknown value stops startup. */
 export function getRegistrationMode(): RegistrationMode {
-  return parseRegistrationMode(process.env.QRO_REGISTRATION_MODE);
+  return getConfig().web.registrationMode;
 }
 
 /**

@@ -1,3 +1,5 @@
+import '../config/bootWorker';
+import { getConfig } from '../config';
 import { checkPensionParserHealth } from '../lib/pensionParserClient';
 import {
   PENSION_IMPORT_WORKER_NAME,
@@ -5,18 +7,22 @@ import {
   type WorkerHeartbeatRuntimeStatus,
   upsertWorkerHeartbeat,
 } from '../lib/capabilities';
+import { evaluateCapability } from '../lib/capabilityRegistry';
 import { runPensionImportWorkerTick } from '../routes/pension-imports';
 
-const DEFAULT_POLL_INTERVAL_MS = 3_000;
-const DEFAULT_IDLE_LOG_INTERVAL_MS = 60_000;
-
-function readPollIntervalMs(): number {
-  const parsed = Number.parseInt(process.env.IMPORT_WORKER_POLL_INTERVAL_MS ?? '', 10);
-  if (Number.isFinite(parsed) && parsed >= 500) return parsed;
-  return DEFAULT_POLL_INTERVAL_MS;
+// The worker has nothing to do without a parser and document storage; stop with the settings exit
+// code instead of polling a service that cannot be reached.
+const configured = evaluateCapability('pensionImport');
+if (!configured.enabled) {
+  console.error(
+    '[pension-import-worker] Statement import is not configured: set PENSION_PARSER_URL and the S3_* document storage settings.',
+  );
+  process.exit(2);
 }
 
-const POLL_INTERVAL_MS = readPollIntervalMs();
+const DEFAULT_IDLE_LOG_INTERVAL_MS = 60_000;
+
+const POLL_INTERVAL_MS = getConfig().pensionImport.workerPollIntervalMs;
 let shuttingDown = false;
 let lastLogAt = 0;
 const runtimeState: {
