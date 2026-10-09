@@ -83,8 +83,14 @@ export function checkDependencies(ctx: DoctorContext): CheckResult {
   return { name: 'Dependencies', status: 'ok', detail: 'installed (bun.lock present)' };
 }
 
+// Resolves like ci:check does: the repository .venv first, then PATH.
+function toolPath(ctx: DoctorContext): string {
+  return [join(ctx.root, '.venv', 'bin'), ctx.env.PATH ?? ''].filter(Boolean).join(delimiter);
+}
+
 export function checkPython(ctx: DoctorContext): CheckResult {
-  const result = ctx.run('python3', ['--version']);
+  const python = ctx.which('python3', toolPath(ctx));
+  const result = python ? ctx.run(python, ['--version']) : { ok: false, stdout: '' };
   const version = result.ok ? parseVersion(result.stdout) : null;
   const wanted = `${SUPPORTED_PYTHON.major}.${SUPPORTED_PYTHON.minor}`;
   if (!version) {
@@ -110,10 +116,6 @@ export function checkPython(ctx: DoctorContext): CheckResult {
   return { name: 'Python', status: 'ok', detail: `${label} (${note})` };
 }
 
-function toolPath(ctx: DoctorContext): string {
-  return [join(ctx.root, '.venv', 'bin'), ctx.env.PATH ?? ''].filter(Boolean).join(delimiter);
-}
-
 export function checkTool(
   ctx: DoctorContext,
   name: string,
@@ -135,7 +137,8 @@ export function checkTool(
 
 export function checkGitHooks(ctx: DoctorContext): CheckResult {
   const result = ctx.run('git', ['-C', ctx.root, 'config', '--get', 'core.hooksPath']);
-  if (result.ok && result.stdout.trim() === '.githooks') {
+  const hooksPath = result.ok ? result.stdout.trim().replace(/\/$/, '') : '';
+  if (hooksPath === '.githooks' || hooksPath === join(ctx.root, '.githooks')) {
     return { name: 'Git hooks', status: 'ok', detail: 'core.hooksPath is .githooks' };
   }
   return {
@@ -181,11 +184,13 @@ export function parseDatabaseTarget(value: string): DatabaseTarget | null {
   }
   if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') return null;
   if (!url.hostname) return null;
-  return {
-    host: url.hostname,
-    port: url.port || COMPOSE_DB_PORT,
-    database: decodeURIComponent(url.pathname.replace(/^\//, '')),
-  };
+  let database: string;
+  try {
+    database = decodeURIComponent(url.pathname.replace(/^\//, ''));
+  } catch {
+    return null;
+  }
+  return { host: url.hostname, port: url.port || COMPOSE_DB_PORT, database };
 }
 
 function describeTarget(target: DatabaseTarget): string {

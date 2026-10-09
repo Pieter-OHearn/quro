@@ -8,6 +8,7 @@ import {
   checkDatabaseUrls,
   checkDependencies,
   checkDockerCompose,
+  checkGitHooks,
   checkPython,
   checkTool,
   formatReport,
@@ -23,7 +24,7 @@ const ROOT = '/work/quro';
 const PASSWORD_PROBE = 'redaction-probe-value';
 const THROWAWAY_URL = `postgres://quro:${PASSWORD_PROBE}@127.0.0.1:55432/quro`;
 const HEALTHY_COMMANDS: Record<string, CommandResult> = {
-  'python3 --version': { ok: true, stdout: 'Python 3.12.11\n' },
+  '/usr/bin/python3 --version': { ok: true, stdout: 'Python 3.12.11\n' },
   [`git -C ${ROOT} config --get core.hooksPath`]: { ok: true, stdout: '.githooks\n' },
   'docker compose version --short': { ok: true, stdout: '2.39.4\n' },
 };
@@ -101,6 +102,31 @@ describe('dev doctor', () => {
     expect(python('Python 3.14.7').detail).toContain('3.12');
   });
 
+  test('checks the Python from the repository .venv before PATH', () => {
+    const calls: string[] = [];
+    const result = checkPython(
+      fixtureContext({
+        which: (command, path) => `${path.split(':')[0]}/${command}`,
+        run: (command) => {
+          calls.push(command);
+          return { ok: true, stdout: 'Python 3.12.11' };
+        },
+      }),
+    );
+    expect(calls).toEqual([`${ROOT}/.venv/bin/python3`]);
+    expect(result.status).toBe('ok');
+  });
+
+  test('accepts an absolute hooks path to the checked-in hooks', () => {
+    const result = checkGitHooks(
+      fixtureContext({ run: () => ({ ok: true, stdout: `${ROOT}/.githooks/\n` }) }),
+    );
+    expect(result.status).toBe('ok');
+    expect(
+      checkGitHooks(fixtureContext({ run: () => ({ ok: true, stdout: '.husky' }) })).status,
+    ).toBe('warn');
+  });
+
   test('prefers tools from the repository .venv', () => {
     const result = checkTool(
       fixtureContext({ which: (command, path) => `${path.split(':')[0]}/${command}` }),
@@ -136,6 +162,7 @@ describe('dev doctor', () => {
     `not a url ${PASSWORD_PROBE}`,
     `postgres://quro:${PASSWORD_PROBE}@`,
     `postgres://quro:${PASSWORD_PROBE}@db:notaport/quro`,
+    `postgres://quro:${PASSWORD_PROBE}@db:5432/qu%zzro`,
   ])('fails on a malformed URL without printing it: %#', (value) => {
     const results = checkDatabaseUrls(
       fixtureContext({ env: { DATABASE_URL: value, ADMIN_DATABASE_URL: value } }),
