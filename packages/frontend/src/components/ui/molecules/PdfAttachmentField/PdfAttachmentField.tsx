@@ -74,7 +74,7 @@ function EmptyPdfState({ busy, helperText, onChoosePdf }: Readonly<EmptyPdfState
         type="button"
         onClick={onChoosePdf}
         disabled={busy}
-        className="rounded-lg bg-brand-soft-strong px-3 py-1.5 text-xs font-semibold text-brand-fg transition-colors hover:bg-brand-border disabled:opacity-60"
+        className="rounded-md bg-brand-soft-strong px-3 py-1.5 text-xs font-semibold text-brand-fg transition-colors hover:bg-brand-border disabled:opacity-60"
       >
         Choose PDF
       </button>
@@ -198,7 +198,7 @@ export function PdfAttachmentField({
 
   return (
     <FormField label={label} error={fileError}>
-      <div className="space-y-2 rounded-xl border border-border-default bg-surface-sunken px-3 py-3">
+      <div className="space-y-2 rounded-lg border border-border-default bg-surface-sunken px-3 py-3">
         <input
           id={inputId}
           ref={inputRef}

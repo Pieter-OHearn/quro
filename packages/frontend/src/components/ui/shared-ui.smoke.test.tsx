@@ -45,7 +45,8 @@ const smokeCases: readonly SmokeCase[] = [
         Pending
       </Badge>
     ),
-    includes: ['data-smoke="badge"', 'Pending'],
+    includes: ['data-smoke="badge"', 'Pending', 'rounded-sm'],
+    excludes: ['rounded-full'],
   },
   {
     name: 'Button renders loading state markup',
@@ -54,7 +55,7 @@ const smokeCases: readonly SmokeCase[] = [
         Save
       </Button>
     ),
-    includes: ['aria-busy="true"', 'Saving item'],
+    includes: ['aria-busy="true"', 'Saving item', 'rounded-md'],
   },
   {
     name: 'Card renders wrapper and children',
@@ -63,7 +64,8 @@ const smokeCases: readonly SmokeCase[] = [
         Card body
       </Card>
     ),
-    includes: ['data-smoke="card"', 'Card body'],
+    includes: ['data-smoke="card"', 'Card body', 'rounded-lg', 'border'],
+    excludes: ['shadow-'],
   },
   {
     name: 'Spinner renders accessible svg markup',
@@ -280,9 +282,11 @@ const smokeCases: readonly SmokeCase[] = [
       'data-priority="secondary"',
       'data-mobile-label="Note"',
       'max-md:hidden',
+      'max-md:rounded-lg',
       'Checking',
       'Hidden on mobile',
     ],
+    excludes: ['shadow-'],
   },
   {
     name: 'DataTable applies column cell metadata',
@@ -320,7 +324,7 @@ const smokeCases: readonly SmokeCase[] = [
       </DataTable>
     ),
     includes: ['colSpan="1"', 'p-0', 'Expanded panel'],
-    excludes: ['max-md:shadow-card'],
+    excludes: ['max-md:rounded-lg'],
   },
   {
     name: 'DataTable renders toolbar and filter slots',

@@ -4,23 +4,23 @@ import { cn } from '@/lib/utils';
 const WRAPPER_CLASSES = {
   pill: 'flex items-center gap-2 flex-wrap',
   contained:
-    'flex items-center gap-1.5 bg-surface border border-border-default rounded-xl p-1 flex-wrap',
+    'flex items-center gap-1.5 bg-surface border border-border-default rounded-md p-1 flex-wrap',
   soft: 'flex items-center gap-1 flex-wrap',
   underline: 'flex border-b border-border-subtle',
 } as const;
 
 const BUTTON_CLASSES = {
-  pill: 'inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all',
+  pill: 'inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-all',
   contained:
-    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
-  soft: 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors',
+    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+  soft: 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors',
   underline:
     'flex flex-1 min-w-0 items-center justify-center gap-2 border-b-2 border-transparent py-4 text-sm font-medium transition-colors',
 } as const;
 
 const PILL_ACTIVE_TONE_CLASSES = {
-  dark: 'bg-surface-inverse text-fg-inverted border-surface-inverse shadow-card',
-  indigo: 'bg-brand text-fg-inverted border-brand shadow-brand',
+  dark: 'bg-surface-inverse text-fg-inverted border-surface-inverse',
+  indigo: 'bg-brand text-fg-inverted border-brand',
 } as const;
 
 const PILL_INACTIVE_TONE_CLASSES = {
@@ -30,7 +30,7 @@ const PILL_INACTIVE_TONE_CLASSES = {
 } as const;
 
 const ACTIVE_CLASSES = {
-  contained: 'bg-brand text-fg-inverted shadow-card',
+  contained: 'bg-brand text-fg-inverted',
   soft: 'bg-brand-soft-strong text-brand-fg font-medium',
   underline: 'border-brand bg-brand-soft/40 text-brand',
 } as const;

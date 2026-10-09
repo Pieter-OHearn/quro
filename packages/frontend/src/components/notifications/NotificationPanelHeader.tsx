@@ -15,7 +15,7 @@ export function NotificationPanelHeader({
         <Bell size={14} className="text-warning-muted" />
         <span className="text-sm font-semibold text-fg-inverted">Notifications</span>
         {totalCount > 0 && (
-          <span className="text-[10px] bg-surface/10 text-fg-disabled px-1.5 py-0.5 rounded-full tabular-nums">
+          <span className="text-[10px] bg-surface/10 text-fg-disabled px-1.5 py-0.5 rounded-sm tabular-nums">
             {totalCount}
           </span>
         )}

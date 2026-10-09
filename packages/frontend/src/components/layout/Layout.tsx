@@ -73,7 +73,7 @@ function CurrencyDropdown({
   ratesUpdatedAt,
 }: CurrencyDropdownWithRatesProps) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-56 bg-surface rounded-2xl border border-border-default shadow-xl z-50 overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-56 bg-surface rounded-lg border border-border-default shadow-popover z-50 overflow-hidden">
       <div className="px-3 py-2.5 border-b border-border-subtle">
         <p className="text-[10px] font-semibold text-fg-faint uppercase tracking-widest">
           Base Currency
@@ -125,7 +125,7 @@ function CurrencySelector() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border-default hover:bg-surface-sunken text-sm font-medium text-fg-strong transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border-default hover:bg-surface-sunken text-sm font-medium text-fg-strong transition-colors"
       >
         <span className="text-base leading-none">{meta.flag}</span>
         <span>{baseCurrency}</span>
@@ -167,14 +167,14 @@ function SidebarNav({ collapsed, pathname, onNavigate }: NavItemsProps) {
             key={path}
             to={path}
             onClick={onNavigate}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 relative group
-              ${isActive ? 'bg-brand text-fg-inverted shadow-lg shadow-brand-accent/30' : 'text-fg-faint hover:bg-surface/5 hover:text-fg-inverted'}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-150 relative group
+              ${isActive ? 'bg-brand text-fg-inverted' : 'text-fg-faint hover:bg-surface/5 hover:text-fg-inverted'}
               ${collapsed ? 'justify-center' : ''}`}
           >
             <Icon size={18} className="flex-shrink-0" />
             {!collapsed && <span className="text-sm font-medium">{label}</span>}
             {collapsed && (
-              <div className="absolute left-14 bg-fg-emphasis text-fg-inverted text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity shadow-lg">
+              <div className="absolute left-14 bg-fg-emphasis text-fg-inverted text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity shadow-popover">
                 {label}
               </div>
             )}
@@ -200,9 +200,9 @@ function SidebarBottom({ collapsed, pathname, onNavigate }: SidebarBottomProps) 
       <NavLink
         to="/settings"
         onClick={onNavigate}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all ${
           settingsActive
-            ? 'bg-brand text-fg-inverted shadow-lg shadow-brand-accent/30'
+            ? 'bg-brand text-fg-inverted'
             : 'text-fg-faint hover:bg-surface/5 hover:text-fg-inverted'
         } ${collapsed ? 'justify-center' : ''}`}
       >
@@ -213,7 +213,7 @@ function SidebarBottom({ collapsed, pathname, onNavigate }: SidebarBottomProps) 
         onClick={() => {
           void signOut();
         }}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-fg-faint hover:bg-surface/5 hover:text-fg-inverted transition-all ${collapsed ? 'justify-center' : ''}`}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-fg-faint hover:bg-surface/5 hover:text-fg-inverted transition-all ${collapsed ? 'justify-center' : ''}`}
       >
         <LogOut size={18} />
         {!collapsed && <span className="text-sm font-medium">Sign out</span>}
@@ -262,7 +262,7 @@ function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen, pathname 
       />
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-brand rounded-full items-center justify-center shadow-md hover:bg-brand-accent transition-colors"
+        className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-brand rounded-md border border-border-default items-center justify-center hover:bg-brand-accent transition-colors"
       >
         {collapsed ? (
           <ChevronRight size={12} className="text-fg-inverted" />
@@ -293,7 +293,7 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
       <div className="flex items-center gap-3">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden p-2 rounded-lg hover:bg-surface-muted text-fg-muted"
+          className="lg:hidden p-2 rounded-md hover:bg-surface-muted text-fg-muted"
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -310,7 +310,7 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
           onClick={() => {
             void navigate('/settings?tab=profile');
           }}
-          className="group flex items-center gap-2 rounded-xl border-l border-border-default pl-3 text-left transition-colors hover:bg-surface-sunken"
+          className="group flex items-center gap-2 rounded-md border-l border-border-default pl-3 text-left transition-colors hover:bg-surface-sunken"
           aria-label="Open profile settings"
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-accent to-accent-premium flex items-center justify-center">

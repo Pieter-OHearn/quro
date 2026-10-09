@@ -20,7 +20,7 @@ const reassuranceItems = [
 
 function ErrorHeader() {
   return (
-    <header className="bg-gradient-to-r from-surface-inverse to-surface-inverse-panel px-6 py-4 flex items-center justify-between flex-shrink-0 shadow-lg">
+    <header className="bg-gradient-to-r from-surface-inverse to-surface-inverse-panel px-6 py-4 flex items-center justify-between flex-shrink-0 border-b border-border-default">
       <QuroLogo className="h-7 w-auto" />
       <span className="text-[10px] text-fg-subtle tracking-widest uppercase font-semibold">
         System Error
@@ -33,11 +33,11 @@ function ErrorIconCluster() {
   return (
     <div className="relative mb-8 select-none">
       <div className="absolute inset-0 rounded-full bg-brand-tint/25 blur-3xl scale-[2]" />
-      <div className="relative w-28 h-28 rounded-full bg-surface border-2 border-border-subtle shadow-2xl flex items-center justify-center">
+      <div className="relative w-28 h-28 rounded-full bg-surface border-2 border-border-subtle flex items-center justify-center">
         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-soft via-surface to-danger-soft flex items-center justify-center">
           <TrendingDown size={38} className="text-danger-muted" strokeWidth={1.5} />
         </div>
-        <div className="absolute -top-1.5 -right-1.5 w-9 h-9 rounded-full bg-warning-muted border-[3px] border-fg-inverted flex items-center justify-center shadow-md">
+        <div className="absolute -top-1.5 -right-1.5 w-9 h-9 rounded-full bg-warning-muted border-[3px] border-fg-inverted flex items-center justify-center">
           <AlertTriangle size={14} className="text-fg-inverted" strokeWidth={2.5} />
         </div>
       </div>
@@ -53,7 +53,7 @@ function ErrorActions({ onGoHome, onReload }: ErrorActionsProps) {
       <button
         type="button"
         onClick={onGoHome}
-        className="flex items-center justify-center gap-2.5 bg-gradient-to-r from-surface-inverse to-surface-inverse-panel hover:from-surface-inverse-hover hover:to-surface-inverse-panel-hover text-fg-inverted px-7 py-3 rounded-2xl transition-all shadow-lg hover:shadow-xl font-medium"
+        className="flex items-center justify-center gap-2.5 bg-gradient-to-r from-surface-inverse to-surface-inverse-panel hover:from-surface-inverse-hover hover:to-surface-inverse-panel-hover text-fg-inverted border border-border-default px-7 py-3 rounded-md transition-all font-medium"
       >
         <Home size={15} />
         Back to Dashboard
@@ -61,7 +61,7 @@ function ErrorActions({ onGoHome, onReload }: ErrorActionsProps) {
       <button
         type="button"
         onClick={onReload}
-        className="flex items-center justify-center gap-2.5 bg-surface hover:bg-surface-sunken text-fg-strong border border-border-default px-7 py-3 rounded-2xl transition-all shadow-sm hover:shadow-md font-medium"
+        className="flex items-center justify-center gap-2.5 bg-surface hover:bg-surface-sunken text-fg-strong border border-border-default px-7 py-3 rounded-md transition-all font-medium"
       >
         <RefreshCw size={15} />
         Try Again
@@ -92,10 +92,10 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
       <button
         type="button"
         onClick={onToggleDetails}
-        className="w-full flex items-center justify-between px-4 py-3 bg-surface border border-border-default rounded-2xl hover:bg-surface-sunken transition-colors text-fg-subtle text-sm group"
+        className="w-full flex items-center justify-between px-4 py-3 bg-surface border border-border-default rounded-md hover:bg-surface-sunken transition-colors text-fg-subtle text-sm group"
       >
         <span className="flex items-center gap-2.5">
-          <span className="text-[10px] font-mono bg-surface-muted group-hover:bg-brand-soft group-hover:text-brand-accent text-fg-subtle px-2 py-0.5 rounded-md transition-colors font-semibold tracking-wider">
+          <span className="text-[10px] font-mono bg-surface-muted group-hover:bg-brand-soft group-hover:text-brand-accent text-fg-subtle px-2 py-0.5 rounded-sm transition-colors font-semibold tracking-wider">
             DEV
           </span>
           <span className="text-fg-muted">Technical details</span>
@@ -111,7 +111,7 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
       </button>
 
       {showDetails && (
-        <div className="mt-2 bg-surface-code border border-fg-strong/60 rounded-2xl overflow-hidden shadow-xl">
+        <div className="mt-2 bg-surface-code border border-fg-strong/60 rounded-lg overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-fg-strong/60 bg-surface-code-header">
             <div className="flex gap-1.5">
               <div className="w-3 h-3 rounded-full bg-danger/80" />
@@ -157,7 +157,7 @@ export function ErrorDisplay({
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
         <ErrorIconCluster />
 
-        <div className="flex items-center gap-2 bg-danger-soft border border-danger-border text-danger-hover px-3 py-1.5 rounded-full text-[11px] font-semibold mb-5 tracking-widest uppercase">
+        <div className="flex items-center gap-2 bg-danger-soft border border-danger-border text-danger-hover px-3 py-1.5 rounded-sm text-[11px] font-semibold mb-5 tracking-widest uppercase">
           <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse flex-shrink-0" />
           Unexpected Error
         </div>

@@ -69,7 +69,7 @@ function StatCardContent({
         )}
       >
         <div
-          className={cn('w-10 h-10 rounded-xl flex items-center justify-center', COLOR_MAP[color])}
+          className={cn('w-10 h-10 rounded-lg flex items-center justify-center', COLOR_MAP[color])}
         >
           <Icon size={18} />
         </div>
@@ -119,7 +119,7 @@ export function StatCard({
         to={href}
         data-testid={testId}
         className={cn(
-          'bg-surface rounded-2xl p-5 border border-border-subtle shadow-card hover:shadow-popover transition-shadow group',
+          'bg-surface rounded-lg p-5 border border-border-subtle hover:shadow-popover transition-shadow group',
           className,
         )}
       >
@@ -130,10 +130,7 @@ export function StatCard({
   return (
     <div
       data-testid={testId}
-      className={cn(
-        'bg-surface rounded-2xl p-5 border border-border-subtle shadow-card',
-        className,
-      )}
+      className={cn('bg-surface rounded-lg p-5 border border-border-subtle', className)}
     >
       <StatCardContent {...contentProps} />
     </div>

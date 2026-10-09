@@ -40,7 +40,7 @@ export function TxnTypeSelector<T extends string>({
             key={t.key}
             onClick={() => onChange(t.key as T)}
             className={cn(
-              'flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all',
+              'flex flex-col items-center gap-1.5 py-3 rounded-md border-2 transition-all',
               active
                 ? `${t.borderColor} ${t.bg} ${t.color}`
                 : 'border-border-default text-fg-faint hover:border-border-strong hover:bg-surface-sunken',
