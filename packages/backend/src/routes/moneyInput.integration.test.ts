@@ -14,7 +14,7 @@ import { toSignedSavingsAmount } from '../lib/savingsBalance';
 import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
 import { parseHoldingCreate, parseHoldingTransactionCreate } from './holdings';
 
-// The money input rule (D38, docs/financial-invariants.md): money in a request is rounded to
+// The money input rule (docs/financial-invariants.md): money in a request is rounded to
 // cents half away from zero when it is parsed, as numeric(19,2) stores it, and an absolute value
 // of 10^13 or more is refused with a 400 that names the field. Unit prices, share quantities,
 // rates and percentages are not money and keep their precision.

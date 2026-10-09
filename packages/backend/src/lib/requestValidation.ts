@@ -279,7 +279,7 @@ export function pickPatchedValue<T, U>(patchValue: T | undefined, existingValue:
   return patchValue === undefined ? existingValue : patchValue;
 }
 
-// ── Money (D38) ──────────────────────────────────────────────────────────────
+// ── Money input rule (docs/financial-invariants.md) ──────────────────────────
 
 /**
  * Money amounts must stay below this absolute value: below it a cent amount survives the round

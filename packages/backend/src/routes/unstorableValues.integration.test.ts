@@ -46,7 +46,8 @@ describe('values the database cannot store', () => {
   });
 
   test('a number beyond the column range is a 400 and writes nothing', async () => {
-    // Money is bounded when it is parsed (D38), so a rate column shows the database refusal.
+    // Money is bounded when it is parsed (the money input rule), so a rate column shows the
+    // database refusal.
     const response = await integration.request(`/api/savings/accounts/${accountId}`, {
       method: 'PATCH',
       cookie: owner.cookie,

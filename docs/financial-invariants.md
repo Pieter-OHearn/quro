@@ -7,7 +7,7 @@ the dashboard contract, and [wealth planning](wealth-planning.md) covers the run
 
 ## Arithmetic policy
 
-Decided on 2026-10-09 (planning decision D38):
+Decided on 2026-10-09:
 
 - Money stays PostgreSQL `numeric` at rest (exact decimal, `numeric(19,2)` today) and plain
   numbers on the wire. It is not migrated to integer columns.
@@ -233,7 +233,7 @@ Rules for every figure:
   replaces an unreadable asset class with an empty list.
 - **Stale rules are never current.** A rule used outside its published period is
   `isExtrapolated`. An open-ended rule with a source (`effectiveTo: null`) is current only for
-  twelve months after its `reviewedAt` date (planning decision D39; `RULE_REVIEW_INTERVAL_MONTHS` in
+  twelve months after its `reviewedAt` date (the rule review interval, `RULE_REVIEW_INTERVAL_MONTHS` in
   `packages/shared/src/types/jurisdiction.ts`); after that it resolves as extrapolated until
   someone reviews it. Rules without a source, such as the default tax rate, are model
   assumptions and are labelled as defaults instead.
@@ -250,7 +250,7 @@ jurisdiction rules in `packages/backend/src/lib/jurisdictions/` and the calculat
 - **When.** Before every release, and when a publisher's period starts: the Dutch UWV maximum
   daily wage changes on 1 January and 1 July, Dutch tax and Box 3 figures on 1 January, and
   Australian figures on 1 July. An open-ended rule falls back to extrapolated twelve months after
-  its last review (D39), which forces a review at least once a year.
+  its last review (the rule review interval), which forces a review at least once a year.
 - **How.** Check each value against its source link, then update `reviewedAt` on every source
   that was checked, even when nothing changed. A new published value is a new effective-dated
   entry; an earlier period is not edited.
@@ -263,7 +263,7 @@ jurisdiction rules in `packages/backend/src/lib/jurisdictions/` and the calculat
 ## Cross-view divergences (baseline for consolidation)
 
 The frontend and backend still compute some figures separately. These differences were recorded
-on 2026-10-09 so the consolidation into `@quro/shared` (planned step C02) can prove each
+on 2026-10-09 so the consolidation into `@quro/shared` (planned) can prove each
 correction. Inputs and outputs below were run against both implementations.
 
 | Topic                      | Backend                                                                                                                 | Frontend                                                                                                                  | Example                                                                               |

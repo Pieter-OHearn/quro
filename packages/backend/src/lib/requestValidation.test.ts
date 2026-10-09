@@ -241,7 +241,7 @@ describe('shared helpers', () => {
   });
 });
 
-describe('money input (D38)', () => {
+describe('money input', () => {
   const amount = { field: 'amount', error: 'bad amount' };
 
   test('rounds to cents half away from zero, as numeric(19,2) stores it', () => {
