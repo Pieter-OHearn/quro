@@ -63,8 +63,18 @@ export const PROFILES = {
   cli: ['runtimeDatabase', 'documentStorage'],
   documentsMigration: ['runtimeDatabase', 'documentStorage', 's3'],
   migrate: ['adminDatabase', 'runtimeDatabase', 'documentStorage'],
-  backup: ['adminDatabase', 'tools', 'documentStorage'],
+  backup: ['adminDatabase', 'tools', 'documentStorage', 'backup'],
+  /** `quro backup verify`: reads an archive, and the key when it is encrypted. */
+  backupVerify: ['documentStorage', 'backup'],
   maintenance: ['adminDatabase', 'runtimeDatabase', 'tools', 'maintenance', 'documentStorage'],
+  restore: [
+    'adminDatabase',
+    'runtimeDatabase',
+    'tools',
+    'maintenance',
+    'documentStorage',
+    'backup',
+  ],
   seed: ['runtimeDatabase', 'demo', 'documentStorage'],
 } as const satisfies Record<string, readonly SectionName[]>;
 

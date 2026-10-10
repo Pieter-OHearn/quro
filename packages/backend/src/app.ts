@@ -4,6 +4,7 @@ import { corsMiddleware } from './middleware/cors';
 import { errorHandler } from './middleware/errorHandler';
 import { requireAuth } from './middleware/auth';
 import { requireCsrf } from './middleware/csrf';
+import { pauseWritesDuringMaintenance } from './middleware/maintenance';
 import auth from './routes/auth';
 import savings from './routes/savings';
 import investments from './routes/investments';
@@ -44,6 +45,7 @@ export function createApp(config: Config = getConfig()) {
   app.use('*', corsMiddleware);
   app.use('*', requireCsrf);
   app.use('/api/*', requireAuth);
+  app.use('/api/*', pauseWritesDuringMaintenance);
   app.onError(errorHandler);
 
   // Public routes

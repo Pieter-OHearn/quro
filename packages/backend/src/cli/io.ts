@@ -6,6 +6,8 @@ export type CommandIo = {
 export const EXIT_OK = 0;
 export const EXIT_FAILURE = 1;
 export const EXIT_USAGE = 2;
+/** A safety guard refused, for example a missing confirmation (install contract). */
+export const EXIT_REFUSED = 3;
 /** A dependency such as the database or the document store cannot be reached (install contract). */
 export const EXIT_UNAVAILABLE = 4;
 

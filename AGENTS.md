@@ -67,6 +67,9 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   `packages/backend/src/lib/publicPaths.ts`. Derive ownership from the authenticated context, reject
   client ownership fields, and enforce ownership on referenced parents and writes.
   Keep core functionality usable without OCR, bank linking, GPU or AI.
+- Write requests, background job cycles and the import worker hold the maintenance lock in shared
+  mode (`packages/backend/src/lib/maintenanceMode.ts`); `quro backup` and `quro restore` take it
+  exclusively. Start jobs with `startIntervalJob` or wrap other writers in `runUnlessMaintenance`.
 - Documents go through `getDocumentStore()` (`packages/backend/src/lib/documentStorage.ts`):
   the filesystem by default, S3 only with `QRO_DOCUMENT_STORAGE=s3`. Keys are relative paths that
   both drivers share; build them on the server, never from client input. See

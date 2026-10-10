@@ -32,6 +32,8 @@ RUN cd packages/backend && bun install --frozen-lockfile
 COPY packages/shared packages/shared
 COPY packages/backend packages/backend
 COPY docker/backend docker/backend
+# The application version, recorded in backup manifests and checked on restore.
+COPY VERSION ./
 
 RUN chmod +x /app/docker/backend/*.sh /app/docker/backend/quro && \
     ln -s /app/docker/backend/quro /usr/local/bin/quro

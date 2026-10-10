@@ -135,14 +135,18 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
-      # `backup` copies the documents directory next to the dump when documents are on the filesystem.
+      # Backups include the documents directory when documents are on the filesystem.
       QRO_DOCUMENT_STORAGE: ${QRO_DOCUMENT_STORAGE:-}
     secrets:
       - postgres_admin_password
       - postgres_app_password
     volumes:
+      # `quro backup` writes archives to ./backups (QRO_BACKUP_DIR); the older `backup` and
+      # `restore` commands of this service use ./backups/db.
+      - ./backups:/var/lib/quro/backups
       - ./backups:/app/backups
-      - ./data/documents:/var/lib/quro/documents:ro
+      # Writable: `quro restore` puts the archive's documents back.
+      - ./data/documents:/var/lib/quro/documents
     depends_on:
       db:
         condition: service_healthy
