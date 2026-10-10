@@ -223,9 +223,31 @@ jobs:
             test "$actual" = "$expected"
           done
 
+  # Upgrades the synthetic 0.7.0 installation in scripts/upgrade-fixture to this commit (16 to 18
+  # by dump and restore, then `quro migrate` from this commit's image) and fails on any change to
+  # its rows or documents that scripts/upgrade-fixture/expectations.ts does not declare.
+  upgrade-fixture:
+    name: Upgrade from 0.7.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-bun-dependencies
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          push: false
+          load: true
+          tags: quro-backend:ci
+          cache-from: type=gha,scope=backend
+      - name: Upgrade the 0.7.0 fixture and compare
+        run: sh scripts/upgrade-fixture/upgrade.sh
+
   # Rehearses the documented PostgreSQL 16 to 18 upgrade with the image's own tools: dump on 16,
-  # restore on 18 in a new data directory, compare, and round-trip on 18. The synthetic 0.7.0
-  # fixture from O05 replaces the demo seed here when it exists.
+  # restore on 18 in a new data directory, compare, and round-trip on 18. Data from 0.7.0 itself
+  # goes through the same dump and restore in the upgrade-fixture job.
   pg-upgrade:
     name: PostgreSQL Upgrade Rehearsal
     runs-on: ubuntu-latest
@@ -373,6 +395,7 @@ jobs:
       - python-lint
       - build-worker
       - docker-build
+      - upgrade-fixture
       - pg-upgrade
       - clean-install
       - image-access
