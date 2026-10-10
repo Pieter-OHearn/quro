@@ -25,13 +25,12 @@ import {
   type FieldParsers,
   isRecord,
   ok,
-  parseDateField,
   parseCurrencyField,
+  parseDateField,
   parseId,
   parseIntegerField,
-  parseNumberField,
+  parseMoneyField,
   parsePatchFields,
-  parsePositiveNumberField,
   parseRequiredFields,
   type ParseResult,
   parseTextField,
@@ -114,8 +113,18 @@ const budgetCategoryParsers: FieldParsers<BudgetCategoryPayload> = {
   currency: (value) => parseCurrencyField(value === undefined ? 'EUR' : value),
   name: (value) => parseTextField(value, 'Category name is required'),
   emoji: (value) => parseTextField(value, 'Emoji is required'),
-  budgeted: (value) => parseNumberField(value, 'Budgeted amount must be zero or greater', 0),
-  spent: (value) => parseNumberField(value, 'Spent amount must be zero or greater', 0),
+  budgeted: (value) =>
+    parseMoneyField(value, {
+      field: 'budgeted',
+      error: 'Budgeted amount must be zero or greater',
+      min: 0,
+    }),
+  spent: (value) =>
+    parseMoneyField(value, {
+      field: 'spent',
+      error: 'Spent amount must be zero or greater',
+      min: 0,
+    }),
   color: (value) => parseTextField(value, 'Color is required'),
   month: parseBudgetMonthField,
   year: (value) => parseIntegerField(value, 'Invalid year', MIN_BUDGET_YEAR, MAX_BUDGET_YEAR),
@@ -126,7 +135,11 @@ const budgetTransactionParsers: FieldParsers<BudgetTransactionPayload> = {
   categoryId: (value) => parseIntegerField(value, 'Invalid category id', 1),
   description: (value) => parseTextField(value, 'Description is required'),
   amount: (value) =>
-    parsePositiveNumberField(value, 'Transaction amount must be greater than zero'),
+    parseMoneyField(value, {
+      field: 'amount',
+      error: 'Transaction amount must be greater than zero',
+      min: Number.MIN_VALUE,
+    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   merchant: (value) => parseTextField(value, 'Merchant is required'),
 };
@@ -523,10 +536,12 @@ app.patch('/transactions/:id', async (c) => {
 
   const patch = await normalizeBudgetTransactionMoney(body.value);
   const result = await db.transaction(async (tx) => {
+    // Locked so a concurrent edit waits and adjusts `spent` from this edit's result.
     const [existing] = await tx
       .select()
       .from(budgetTransactions)
-      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)));
+      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
+      .for('update');
     if (!existing) return null;
 
     const nextCategoryId = patch.categoryId ?? existing.categoryId;

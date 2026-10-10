@@ -24,7 +24,13 @@ import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { applyRepayment, MORTGAGE_BALANCE, reverseRepayment } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate } from '../lib/netWorth';
-import { answerRejectedEdit, LedgerEditRejected, withLedgerWrite } from '../lib/ledgerWrite';
+import {
+  answerRejectedEdit,
+  LedgerEditRejected,
+  type LedgerRejection,
+  lockCheckedLedgerRow,
+  withLedgerWrite,
+} from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import {
   err,
@@ -36,9 +42,11 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  parseMoneyField,
   parseNormalizedDecimalField,
   parseNumber,
   parseOptionalId,
+  parseOptionalMoneyField,
   parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
   parsePatchFields,
@@ -48,6 +56,7 @@ import {
   pickPatchedValue,
   readJsonBody,
   rejectUnknownFields,
+  toMoneyAmount,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -141,25 +150,33 @@ const mortgageParsers: FieldParsers<MortgagePayload> = {
   lender: (value) => parseTextField(value, 'Lender is required'),
   currency: parseCurrencyField,
   originalAmount: (value) =>
-    parseNormalizedDecimalField(
-      value,
-      'Original amount must be greater than zero',
-      Number.MIN_VALUE,
-    ),
+    parseMoneyField(value, {
+      field: 'originalAmount',
+      error: 'Original amount must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   outstandingBalance: (value) =>
-    parseNormalizedDecimalField(value, 'Outstanding balance must be zero or greater', 0),
+    parseMoneyField(value, {
+      field: 'outstandingBalance',
+      error: 'Outstanding balance must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   propertyValue: (value) =>
-    parseNormalizedDecimalField(
-      value,
-      'Property value must be greater than zero',
-      Number.MIN_VALUE,
-    ),
+    parseMoneyField(value, {
+      field: 'propertyValue',
+      error: 'Property value must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   monthlyPayment: (value) =>
-    parseNormalizedDecimalField(
-      value,
-      'Monthly payment must be greater than zero',
-      Number.MIN_VALUE,
-    ),
+    parseMoneyField(value, {
+      field: 'monthlyPayment',
+      error: 'Monthly payment must be greater than zero',
+      min: Number.MIN_VALUE,
+      localized: true,
+    }),
   interestRate: (value) =>
     parseNormalizedDecimalField(value, 'Interest rate must be zero or greater', 0),
   rateType: parseMortgageRateTypeField,
@@ -184,9 +201,19 @@ const mortgageTransactionParsers: FieldParsers<MortgageTransactionPayload> = {
       Number.MIN_VALUE,
     ),
   interest: (value) =>
-    parseOptionalNormalizedDecimalField(value, 'Interest must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'interest',
+      error: 'Interest must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   principal: (value) =>
-    parseOptionalNormalizedDecimalField(value, 'Principal must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'principal',
+      error: 'Principal must be zero or greater',
+      min: 0,
+      localized: true,
+    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
   fixedYears: (value) =>
@@ -521,9 +548,14 @@ function normalizeInformationalMortgageTransaction(
 function validateMortgageTransactionPayload(
   payload: MortgageTransactionPayload,
 ): ParseResult<MortgageTransactionPayload> {
-  if (payload.type === 'repayment') return normalizeRepaymentMortgageTransaction(payload);
+  // A rate change carries the new interest rate in `amount`; every other type carries money.
   if (payload.type === 'rate_change') return normalizeRateChangeMortgageTransaction(payload);
-  return normalizeInformationalMortgageTransaction(payload);
+  const amount = toMoneyAmount(payload.amount, 'amount');
+  if (!amount.ok) return amount;
+  if (amount.value <= 0) return err('Transaction amount must be greater than zero');
+  const money = { ...payload, amount: amount.value };
+  if (money.type === 'repayment') return normalizeRepaymentMortgageTransaction(money);
+  return normalizeInformationalMortgageTransaction(money);
 }
 
 function mergeMortgagePayload(
@@ -834,20 +866,27 @@ app.patch('/transactions/:id', async (c) => {
     return c.json({ error: 'No mortgage transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
 
-  const merged = mergeMortgageTransactionPayload(body.value, existing);
-  if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);
-
   const result = await answerRejectedEdit<
     { data: typeof mortgageTransactions.$inferSelect },
-    { error: string; status: typeof HTTP_STATUS.BAD_REQUEST | typeof HTTP_STATUS.NOT_FOUND }
+    LedgerRejection
   >(() =>
     db.transaction(async (tx) => {
-      // Undo the old transaction's balance effect, then apply the edited one against the
+      // Undo the committed transaction's balance effect, then apply the edited one against the
       // freshly-restored balance. Once the old effect is undone, a refusal must roll it back.
-      const oldMortgage = await getAccessibleMortgage(user.id, partnerId, existing.mortgageId, tx);
-      if (oldMortgage) await reverseMortgageTxnEffect(tx, oldMortgage, existing);
+      const previous = await lockCheckedLedgerRow(
+        tx,
+        mortgageTransactions,
+        id,
+        (row) => row.mortgageId === existing.mortgageId,
+      );
+      const next = mergeMortgageTransactionPayload(body.value, previous);
+      if (!next.ok) {
+        throw new LedgerEditRejected({ error: next.error, status: HTTP_STATUS.BAD_REQUEST });
+      }
+      const oldMortgage = await getAccessibleMortgage(user.id, partnerId, previous.mortgageId, tx);
+      if (oldMortgage) await reverseMortgageTxnEffect(tx, oldMortgage, previous);
 
-      const mortgage = await getAccessibleMortgage(user.id, partnerId, merged.value.mortgageId, tx);
+      const mortgage = await getAccessibleMortgage(user.id, partnerId, next.value.mortgageId, tx);
       if (!mortgage) {
         throw new LedgerEditRejected({
           error: 'Mortgage not found',
@@ -855,23 +894,23 @@ app.patch('/transactions/:id', async (c) => {
         });
       }
 
-      const effectError = await applyMortgageTxnEffect(tx, mortgage, merged.value);
+      const effectError = await applyMortgageTxnEffect(tx, mortgage, next.value);
       if (effectError) {
         throw new LedgerEditRejected({ error: effectError, status: HTTP_STATUS.BAD_REQUEST });
       }
 
       const [updated] = await tx
         .update(mortgageTransactions)
-        .set({ ...toMortgageTransactionValues(merged.value), userId: mortgage.userId ?? user.id })
+        .set({ ...toMortgageTransactionValues(next.value), userId: mortgage.userId ?? user.id })
         .where(eq(mortgageTransactions.id, id))
         .returning();
       await withLedgerWrite(
         tx,
         [
-          { table: mortgages, id: existing.mortgageId, partnerId, actorId: user.id },
-          { table: mortgages, id: merged.value.mortgageId, partnerId, actorId: user.id },
+          { table: mortgages, id: previous.mortgageId, partnerId, actorId: user.id },
+          { table: mortgages, id: next.value.mortgageId, partnerId, actorId: user.id },
         ],
-        earliestDate(existing.date, merged.value.date),
+        earliestDate(previous.date, next.value.date),
       );
       return { data: updated };
     }),
@@ -892,24 +931,35 @@ app.delete('/transactions/:id', async (c) => {
   );
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const data = await db.transaction(async (tx) => {
-    // Restore the balance this repayment had reduced before removing it.
-    const mortgage = await getAccessibleMortgage(user.id, partnerId, existing.mortgageId, tx);
-    if (mortgage) await reverseMortgageTxnEffect(tx, mortgage, existing);
+  const result = await answerRejectedEdit<
+    { data: typeof mortgageTransactions.$inferSelect },
+    LedgerRejection
+  >(() =>
+    db.transaction(async (tx) => {
+      // Restore the balance this repayment had reduced before removing it.
+      const previous = await lockCheckedLedgerRow(
+        tx,
+        mortgageTransactions,
+        id,
+        (row) => row.mortgageId === existing.mortgageId,
+      );
+      const mortgage = await getAccessibleMortgage(user.id, partnerId, previous.mortgageId, tx);
+      if (mortgage) await reverseMortgageTxnEffect(tx, mortgage, previous);
 
-    const [deleted] = await tx
-      .delete(mortgageTransactions)
-      .where(eq(mortgageTransactions.id, id))
-      .returning();
-    await withLedgerWrite(
-      tx,
-      { table: mortgages, id: existing.mortgageId, partnerId, actorId: user.id },
-      existing.date,
-    );
-    return deleted ?? null;
-  });
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+      const [deleted] = await tx
+        .delete(mortgageTransactions)
+        .where(eq(mortgageTransactions.id, id))
+        .returning();
+      await withLedgerWrite(
+        tx,
+        { table: mortgages, id: previous.mortgageId, partnerId, actorId: user.id },
+        previous.date,
+      );
+      return { data: deleted! };
+    }),
+  );
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data });
 });
 
 export default app;

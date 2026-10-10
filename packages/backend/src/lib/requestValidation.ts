@@ -1,4 +1,4 @@
-import { isCurrencyCode, type CurrencyCode, toIsoDate } from '@quro/shared';
+import { isCurrencyCode, type CurrencyCode, roundMoney, toIsoDate } from '@quro/shared';
 import { parseNumber } from './numbers';
 
 const MAX_INT32 = 2_147_483_647;
@@ -277,4 +277,53 @@ export function parseWholeNumber(value: unknown): number | null {
 
 export function pickPatchedValue<T, U>(patchValue: T | undefined, existingValue: U): T | U {
   return patchValue === undefined ? existingValue : patchValue;
+}
+
+// ── Money input rule (docs/financial-invariants.md) ──────────────────────────
+
+/**
+ * Money amounts must stay below this absolute value: below it a cent amount survives the round
+ * trip through a JavaScript number exactly (docs/financial-invariants.md).
+ */
+export const MONEY_LIMIT = 10_000_000_000_000;
+
+export function moneyLimitError(field: string): string {
+  return `${field} is out of range: money amounts must be below 10,000,000,000,000 in absolute value`;
+}
+
+/**
+ * The money input rule for an already parsed number: round to cents half away from zero, as
+ * `numeric(19,2)` stores it, and refuse an absolute value of 10^13 or more. Unit prices, share
+ * quantities, FX and interest rates and percentages are not money and never go through this.
+ */
+export function toMoneyAmount(value: number, field: string): ParseResult<number> {
+  const amount = roundMoney(value);
+  return Math.abs(amount) >= MONEY_LIMIT ? err(moneyLimitError(field)) : ok(amount);
+}
+
+export type MoneyFieldOptions = {
+  /** The request field, named in the out-of-range error. */
+  field: string;
+  /** Answer for a missing, unparsable or below-minimum value. */
+  error: string;
+  /** Smallest accepted amount after rounding; `Number.MIN_VALUE` means greater than zero. */
+  min?: number;
+  /** Accept localized decimal text such as `1.234,56` (see `parseNormalizedDecimal`). */
+  localized?: boolean;
+};
+
+export function parseMoneyField(value: unknown, options: MoneyFieldOptions): ParseResult<number> {
+  const parsed = options.localized ? parseNormalizedDecimal(value) : parseNumber(value);
+  if (parsed === null) return err(options.error);
+  const amount = toMoneyAmount(parsed, options.field);
+  if (!amount.ok) return amount;
+  return amount.value < (options.min ?? Number.NEGATIVE_INFINITY) ? err(options.error) : amount;
+}
+
+export function parseOptionalMoneyField(
+  value: unknown,
+  options: MoneyFieldOptions,
+): ParseResult<number | null> {
+  if (value == null || value === '') return ok(null);
+  return parseMoneyField(value, options);
 }

@@ -16,6 +16,10 @@ RUN bun run build
 
 FROM nginx:1.30.3-alpine3.23
 COPY --from=build /app/packages/frontend/dist /usr/share/nginx/html
-COPY packages/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# nginx renders templates with the environment at startup; only QRO_ settings are substituted,
+# so nginx's own variables such as $host stay as they are.
+ENV NGINX_ENVSUBST_FILTER=^QRO_
+COPY packages/frontend/nginx.conf /etc/nginx/templates/default.conf.template
+COPY --chmod=755 packages/frontend/docker-entrypoint.d/05-require-api-url.sh /docker-entrypoint.d/
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

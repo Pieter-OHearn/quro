@@ -343,23 +343,11 @@ async function loadJointScopedRows(
   const propertyAccess = ownedOrJointPredicate(properties, userId, partnerId);
 
   const [savings, savingsTxns, propertyRows, propertyTxns, mortgageRows] = await Promise.all([
-    safeLoad(
-      'savings accounts',
-      loadHouseholdRows(savingsAccounts, userId, partnerId, { includeArchived: true }),
-      [],
-    ),
-    safeLoad('savings transactions', loadSavingsHistory(savingsAccess, windowStart), []),
-    safeLoad(
-      'properties',
-      loadHouseholdRows(properties, userId, partnerId, { includeArchived: true }),
-      [],
-    ),
-    safeLoad('property transactions', loadPropertyHistory(propertyAccess, windowStart), []),
-    safeLoad(
-      'mortgages',
-      loadHouseholdRows(mortgages, userId, partnerId, { includeArchived: true }),
-      [],
-    ),
+    loadHouseholdRows(savingsAccounts, userId, partnerId, { includeArchived: true }),
+    loadSavingsHistory(savingsAccess, windowStart),
+    loadHouseholdRows(properties, userId, partnerId, { includeArchived: true }),
+    loadPropertyHistory(propertyAccess, windowStart),
+    loadHouseholdRows(mortgages, userId, partnerId, { includeArchived: true }),
   ]);
 
   return {
@@ -712,33 +700,21 @@ type NetWorthHistoryPoint = {
   isEstimated: boolean;
 };
 
-async function safeLoad<T>(label: string, query: Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await query;
-  } catch (error) {
-    console.warn(`[Dashboard] Failed to load ${label}`, error);
-    return fallback;
-  }
-}
-
 export async function loadNetWorthSourceData(
   userId: number,
   partnerId: number | null,
 ): Promise<NetWorthSourceData> {
   const months = buildRollingMonths();
-  const snapshots = await safeLoad(
-    'net worth snapshots',
-    db
-      .select()
-      .from(netWorthSnapshots)
-      .where(
-        and(
-          eq(netWorthSnapshots.userId, userId),
-          gte(netWorthSnapshots.snapshotDate, months[0].snapshotDate),
-        ),
+  // A failed read fails the request: a total never silently leaves out a whole asset class.
+  const snapshots = await db
+    .select()
+    .from(netWorthSnapshots)
+    .where(
+      and(
+        eq(netWorthSnapshots.userId, userId),
+        gte(netWorthSnapshots.snapshotDate, months[0].snapshotDate),
       ),
-    [],
-  );
+    );
   const snapshotDates = new Set(snapshots.map((row) => row.snapshotDate));
   const firstMissing = months.find(
     (month) => month.isCurrent || !snapshotDates.has(month.snapshotDate),
@@ -759,17 +735,13 @@ export async function loadNetWorthSourceData(
     getRatesToBaseCurrency(),
     getHistoricalCurrencyRateRows(windowStart),
     loadJointScopedRows(userId, partnerId, windowStart),
-    safeLoad('holdings', db.select().from(holdings).where(eq(holdings.userId, userId)), []),
-    safeLoad('holding transactions', loadHoldingHistory(userId, windowStart), []),
-    safeLoad('holding price history', loadHoldingPrices(userId, windowStart), []),
-    safeLoad(
-      'pension pots',
-      db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
-      [],
-    ),
-    safeLoad('pension transactions', loadPensionHistory(userId, windowStart), []),
-    safeLoad('debts', db.select().from(debts).where(eq(debts.userId, userId)), []),
-    safeLoad('debt payments', loadDebtHistory(userId, windowStart), []),
+    db.select().from(holdings).where(eq(holdings.userId, userId)),
+    loadHoldingHistory(userId, windowStart),
+    loadHoldingPrices(userId, windowStart),
+    db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
+    loadPensionHistory(userId, windowStart),
+    db.select().from(debts).where(eq(debts.userId, userId)),
+    loadDebtHistory(userId, windowStart),
   ]);
 
   return {

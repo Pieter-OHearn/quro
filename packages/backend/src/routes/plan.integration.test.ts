@@ -8,6 +8,7 @@ import type {
 } from '@quro/shared';
 import { queryClient } from '../db/client';
 import { createIntegrationHelpers } from '../test/integration';
+import { buildRunwayResponse, runwayEstimateFlags } from './plan';
 import { useFixtureCurrencyRates } from '../test/currencyRates';
 
 const integration = createIntegrationHelpers('plan.integration.quro.test');
@@ -593,4 +594,43 @@ test('a runway request executes its primary employment lookup once', async () =>
   } finally {
     queryClient.options.debug = originalDebug;
   }
+});
+
+test('rules carried past their published or reviewed period make the runway an estimate', async () => {
+  const owner = await integration.signUp('runway-stale-rules');
+  const runwayOn = async (jurisdiction: 'NL' | 'AU', isoDate: string) => {
+    await readData(
+      await integration.request('/api/settings/preferences', {
+        method: 'PUT',
+        cookie: owner.cookie,
+        json: { baseCurrency: 'EUR', numberFormat: 'en-US', jurisdiction },
+      }),
+    );
+    return (await buildRunwayResponse(owner.user.id, null, new Date(`${isoDate}T12:00:00Z`)))!;
+  };
+
+  // NL publishes bounded periods: the day after the last one, its rules are carried forward.
+  expect((await runwayOn('NL', '2026-12-31')).jurisdiction.isExtrapolated).toBe(false);
+  const nlStale = await runwayOn('NL', '2027-01-01');
+  expect(nlStale.jurisdiction.isExtrapolated).toBe(true);
+  expect(nlStale.isEstimated).toBe(true);
+
+  // The AU redundancy table is open-ended: it goes stale twelve months after its last review.
+  expect((await runwayOn('AU', '2027-08-11')).jurisdiction.isExtrapolated).toBe(false);
+  const auStale = await runwayOn('AU', '2027-08-12');
+  expect(auStale.jurisdiction.isExtrapolated).toBe(true);
+  expect(auStale.isEstimated).toBe(true);
+
+  // With every other input confirmed, the stale rule alone is what marks the estimate.
+  const confirmed = {
+    salaryBasis: { status: 'linked_payslips' },
+    unemployment: { status: 'included' },
+  } as RunwayResponse['incomeSupport'];
+  const flags = (isExtrapolated: boolean) =>
+    runwayEstimateFlags({ categories: [], budgetTxns: [] }, confirmed, {
+      ...auStale.jurisdiction,
+      isExtrapolated,
+    });
+  expect(flags(false)).toEqual({ budgetCurrencyNeedsReview: false, isEstimated: false });
+  expect(flags(true)).toEqual({ budgetCurrencyNeedsReview: false, isEstimated: true });
 });

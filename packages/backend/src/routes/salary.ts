@@ -29,7 +29,7 @@ import {
   parseCurrencyField,
   parseDateField,
   parseId,
-  parseNumberField,
+  parseMoneyField,
   parsePatchFields,
   parseRequiredFields,
   type ParseResult,
@@ -81,11 +81,15 @@ const payslipFieldParsers: FieldParsers<PayslipInput> = {
   employmentId: parseEmploymentIdField,
   month: (value) => parseTextField(value, 'Invalid month'),
   date: (value) => parseDateField(value, 'Invalid date (expected YYYY-MM-DD)'),
-  gross: (value) => parseNumberField(value, 'Invalid gross', 0),
-  tax: (value) => parseNumberField(value, 'Invalid tax', 0),
-  pension: (value) => parseNumberField(value, 'Invalid pension', 0),
-  net: (value) => parseNumberField(value, 'Invalid net', 0),
-  bonus: (value) => (value == null ? ok(null) : parseNumberField(value, 'Invalid bonus', 0)),
+  gross: (value) => parseMoneyField(value, { field: 'gross', error: 'Invalid gross', min: 0 }),
+  tax: (value) => parseMoneyField(value, { field: 'tax', error: 'Invalid tax', min: 0 }),
+  pension: (value) =>
+    parseMoneyField(value, { field: 'pension', error: 'Invalid pension', min: 0 }),
+  net: (value) => parseMoneyField(value, { field: 'net', error: 'Invalid net', min: 0 }),
+  bonus: (value) =>
+    value == null
+      ? ok(null)
+      : parseMoneyField(value, { field: 'bonus', error: 'Invalid bonus', min: 0 }),
   currency: parseCurrencyField,
 };
 

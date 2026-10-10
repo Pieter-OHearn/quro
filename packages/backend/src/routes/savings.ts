@@ -21,7 +21,7 @@ import {
   normalizeBankName,
 } from '../lib/jurisdictions/bankingEntities';
 import { earliestDate } from '../lib/netWorth';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { LEDGER_ROW_CHANGED, lockLedgerRow, withLedgerWrite } from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from '../lib/savingsBalance';
 import {
@@ -34,10 +34,10 @@ import {
   parseDateField,
   parseId,
   parseIntegerField,
+  parseMoneyField,
   parseNumberField,
   parseOptionalTextField,
   parsePatchFields,
-  parsePositiveNumberField,
   parseRequiredFields,
   type ParseResult,
   parseTextField,
@@ -105,7 +105,11 @@ function parseManualBankingEntity(
   if (!entityName) return err('Licensed entity name is required');
   if (!normalizeBankName(entityName)) return err('Licensed entity name is invalid');
   if (!scheme) return err('Deposit guarantee scheme is required');
-  const cap = parsePositiveNumberField(body.cap, 'Deposit guarantee cap must be positive');
+  const cap = parseMoneyField(body.cap, {
+    field: 'cap',
+    error: 'Deposit guarantee cap must be positive',
+    min: Number.MIN_VALUE,
+  });
   if (!cap.ok) return cap;
   const currency = parseCurrencyField(body.currency);
   if (!currency.ok) return currency;
@@ -142,7 +146,8 @@ function parseSavingsTransactionTypeField(value: unknown): ParseResult<SavingsTr
 const savingsAccountParsers: FieldParsers<SavingsAccountPayload> = {
   name: (value) => parseTextField(value, 'Account name is required'),
   bank: (value) => parseTextField(value, 'Bank is required'),
-  balance: (value) => parseNumberField(value, 'Balance must be zero or greater', 0),
+  balance: (value) =>
+    parseMoneyField(value, { field: 'balance', error: 'Balance must be zero or greater', min: 0 }),
   currency: parseCurrencyField,
   interestRate: (value) => parseNumberField(value, 'Interest rate must be zero or greater', 0),
   accountType: parseSavingsAccountTypeField,
@@ -156,7 +161,11 @@ const savingsTransactionParsers: FieldParsers<SavingsTransactionPayload> = {
   accountId: (value) => parseIntegerField(value, 'Invalid account id', 1),
   type: parseSavingsTransactionTypeField,
   amount: (value) =>
-    parsePositiveNumberField(value, 'Transaction amount must be greater than zero'),
+    parseMoneyField(value, {
+      field: 'amount',
+      error: 'Transaction amount must be greater than zero',
+      min: Number.MIN_VALUE,
+    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
 };
@@ -652,37 +661,44 @@ app.patch('/transactions/:id', async (c) => {
     updateValues.userId = nextAccount.nextAccountUserId;
   }
 
-  const [data] = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // Reverse the committed values, not the ones read before the transaction started.
+    const previous = await lockLedgerRow(tx, savingsTransactions, id);
+    if (!previous)
+      return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND } as const;
+    if (previous.accountId !== existing.accountId) {
+      return { error: LEDGER_ROW_CHANGED, status: HTTP_STATUS.CONFLICT } as const;
+    }
+    const next = resolveNextSavingsTransactionState(body.value, previous);
+
     const [updated] = await tx
       .update(savingsTransactions)
       .set(updateValues)
       .where(eq(savingsTransactions.id, id))
       .returning();
 
-    if (!updated) return [updated];
-
     await syncSavingsBalancesForEditedTransaction(tx, {
-      previousAccountId: existing.accountId,
-      nextAccountId: nextState.accountId,
-      previousType: existing.type,
-      nextType: nextState.type,
-      previousAmount: existing.amount,
-      nextAmount: nextState.amount,
+      previousAccountId: previous.accountId,
+      nextAccountId: next.accountId,
+      previousType: previous.type,
+      nextType: next.type,
+      previousAmount: previous.amount,
+      nextAmount: next.amount,
     });
     await withLedgerWrite(
       tx,
       [
-        { table: savingsAccounts, id: existing.accountId, partnerId, actorId: user.id },
-        { table: savingsAccounts, id: nextState.accountId, partnerId, actorId: user.id },
+        { table: savingsAccounts, id: previous.accountId, partnerId, actorId: user.id },
+        { table: savingsAccounts, id: next.accountId, partnerId, actorId: user.id },
       ],
-      earliestDate(existing.date, body.value.date ?? existing.date),
+      earliestDate(previous.date, body.value.date ?? previous.date),
     );
 
-    return [updated];
+    return { data: updated };
   });
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
 
-  return c.json({ data });
+  return c.json({ data: result.data });
 });
 
 app.delete('/transactions/:id', async (c) => {

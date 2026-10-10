@@ -1,0 +1,103 @@
+# Quro: example Docker Compose file for a single host.
+#
+# Copy it into an empty directory as compose.yaml and follow docs/install.md. It is a plain
+# file: nothing is rendered or substituted, so what you read is what runs. CI starts it from
+# empty directories on every change.
+#
+# Layout next to this file:
+#   config/quro.env    settings, written once by `quro init`; edit freely
+#   config/secrets/    generated database passwords, written once by `quro init`
+#   data/documents/    uploaded documents (create it before the first start)
+#   the `postgres` named volume holds the database
+#
+# The backend runs as UID 1000. On Linux, config/ and data/documents/ must belong to that UID
+# (see docs/install.md).
+
+name: quro
+
+services:
+  db:
+    image: postgres:18.6-alpine3.23
+    restart: unless-stopped
+    environment:
+      # Keep these equal to POSTGRES_ADMIN_USER and POSTGRES_DB in config/quro.env.
+      POSTGRES_USER: quro_admin
+      POSTGRES_DB: quro
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+    secrets:
+      - postgres_admin_password
+    volumes:
+      - postgres:/var/lib/postgresql
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'quro_admin', '-d', 'quro']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Applies schema migrations and prepares the runtime role, then exits. It runs on every
+  # `docker compose up`; when nothing is pending it changes nothing. Also the place to run
+  # maintenance commands: `docker compose run --rm migrate doctor`.
+  migrate:
+    image: ghcr.io/pieter-ohearn/quro-backend:v0.8.0
+    command: ['migrate']
+    restart: 'no'
+    env_file: ./config/quro.env
+    secrets:
+      - postgres_admin_password
+      - postgres_app_password
+    volumes:
+      - ./data/documents:/var/lib/quro/documents
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    image: ghcr.io/pieter-ohearn/quro-backend:v0.8.0
+    restart: unless-stopped
+    env_file: ./config/quro.env
+    secrets:
+      - postgres_app_password
+    volumes:
+      - ./data/documents:/var/lib/quro/documents
+    networks:
+      - internal
+      - web
+    healthcheck:
+      test: ['CMD', 'quro', 'health']
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    image: ghcr.io/pieter-ohearn/quro-frontend:v0.8.0
+    restart: unless-stopped
+    environment:
+      QRO_API_URL: http://backend:3000
+    ports:
+      - '3000:80'
+    networks:
+      - web
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  internal:
+  web:
+
+volumes:
+  postgres:
+
+secrets:
+  postgres_admin_password:
+    file: ./config/secrets/postgres_admin_password
+  postgres_app_password:
+    file: ./config/secrets/postgres_app_password

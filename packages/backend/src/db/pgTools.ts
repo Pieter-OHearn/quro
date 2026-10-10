@@ -242,3 +242,8 @@ async function runPgTool(command: string, args: string[], env: Record<string, st
 export function runPsql(connectionString: string, args: string[]) {
   return spawnPgTool(resolvePgTool('psql'), args, buildPgEnv(connectionString, 'quro-db-psql'));
 }
+
+/** Major version of the configured or installed client tool; throws when it cannot be read. */
+export function readInstalledToolMajor(toolName: PgToolName) {
+  return readToolMajor(toolName, resolvePgTool(toolName));
+}

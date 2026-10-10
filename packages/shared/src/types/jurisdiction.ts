@@ -1,4 +1,5 @@
 import type { CurrencyCode } from './index.js';
+import { toIsoDate } from '../utils/date.js';
 
 export const JURISDICTION_CODES = ['NL', 'AU', 'GENERIC'] as const;
 export type JurisdictionCode = (typeof JURISDICTION_CODES)[number];
@@ -113,6 +114,27 @@ export function isJurisdictionCode(value: unknown): value is JurisdictionCode {
   return typeof value === 'string' && JURISDICTION_CODES.includes(value as JurisdictionCode);
 }
 
+/**
+ * An open-ended sourced rule (`effectiveTo: null`) counts as current for this many months after
+ * its source was last reviewed. After that it resolves as extrapolated, like a rule past its
+ * published period, so an unreviewed statutory value never silently stays current.
+ */
+export const RULE_REVIEW_INTERVAL_MONTHS = 12;
+
+/** The last `YYYY-MM-DD` date on which an open-ended rule reviewed on `reviewedAt` is current. */
+export function ruleReviewExpiresOn(reviewedAt: string): string {
+  const [year, month, day] = reviewedAt.split('-').map(Number);
+  return toIsoDate(new Date(Date.UTC(year, month - 1 + RULE_REVIEW_INTERVAL_MONTHS, day)));
+}
+
+function isPastReview(rule: DatedRule<unknown>, asOf: string): boolean {
+  return (
+    rule.effectiveTo === null &&
+    rule.source !== undefined &&
+    asOf > ruleReviewExpiresOn(rule.source.reviewedAt)
+  );
+}
+
 export function resolveRule<T>(rules: NonEmptyDatedRules<T>, asOf: string): RuleResolution<T> {
   const sortedRules = [...rules].sort((left, right) =>
     left.effectiveFrom.localeCompare(right.effectiveFrom),
@@ -125,7 +147,7 @@ export function resolveRule<T>(rules: NonEmptyDatedRules<T>, asOf: string): Rule
       value: matchingRule.value,
       effectiveFrom: matchingRule.effectiveFrom,
       effectiveTo: matchingRule.effectiveTo,
-      isExtrapolated: false,
+      isExtrapolated: isPastReview(matchingRule, asOf),
       source: matchingRule.source ?? null,
     };
   }

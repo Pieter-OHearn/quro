@@ -51,6 +51,7 @@ import {
   parseDateString,
   parseOptionalBooleanField,
   parseOptionalIntegerField,
+  parseOptionalMoneyField,
   parseOptionalNumberField,
   parsePatchFields,
   type ParseResult,
@@ -95,7 +96,11 @@ type AssumptionFields = Omit<Required<PlanAssumptionsInput>, 'wwWeeklyRequiremen
 
 const assumptionParsers: FieldParsers<AssumptionFields> = {
   leanBurnOverride: (value) =>
-    parseOptionalNumberField(value, 'Lean burn must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'leanBurnOverride',
+      error: 'Lean burn must be zero or greater',
+      min: 0,
+    }),
   emergencyLifestylePct: (value) => {
     const parsed = parseOptionalNumberField(
       value,
@@ -110,7 +115,11 @@ const assumptionParsers: FieldParsers<AssumptionFields> = {
   countFullJointBalances: (value) =>
     parseOptionalBooleanField(value, 'Joint balance setting must be true or false'),
   benefitMonthlyOverride: (value) =>
-    parseOptionalNumberField(value, 'Benefit amount must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'benefitMonthlyOverride',
+      error: 'Benefit amount must be zero or greater',
+      min: 0,
+    }),
   benefitMaxMonthsOverride: (value) =>
     parseOptionalIntegerField(value, 'Benefit duration must be 0 to 120 months', 0, 120),
   wwWeeklyRequirement: (value) =>
@@ -126,7 +135,11 @@ const assumptionParsers: FieldParsers<AssumptionFields> = {
     return parsed ? ok(parsed) : err('WW confirmation date must be a valid ISO date');
   },
   severanceMonthlySalaryOverride: (value) =>
-    parseOptionalNumberField(value, 'Severance salary must be zero or greater', 0),
+    parseOptionalMoneyField(value, {
+      field: 'severanceMonthlySalaryOverride',
+      error: 'Severance salary must be zero or greater',
+      min: 0,
+    }),
 };
 
 async function parsePatch<T extends object>(
@@ -477,10 +490,11 @@ function buildEurRunwayResponse(
     ? calculateServiceDuration(primaryEmployment.serviceStartDate, asOf)
     : null;
   const missingFields = getMissingEmploymentFields(data.primaryEmployment);
+  const jurisdictionMetadata = resolveJurisdictionMetadata(jurisdiction, asOf);
   return {
     baseCurrency: FX_BASE_CURRENCY,
     asOf,
-    jurisdiction: resolveJurisdictionMetadata(jurisdiction, asOf),
+    jurisdiction: jurisdictionMetadata,
     employment: {
       primary: primaryEmployment,
       derived: service ? { asOf, ...service } : null,
@@ -512,13 +526,26 @@ function buildEurRunwayResponse(
       })),
       convertToEur,
     ),
-    budgetCurrencyNeedsReview:
-      data.categories.some((row) => row.currencyNeedsReview) ||
-      data.budgetTxns.some((row) => row.currencyNeedsReview),
     setupComplete: missingFields.length === 0,
+    ...runwayEstimateFlags(data, incomeSupport, jurisdictionMetadata),
+  };
+}
+
+// Any input that is unreviewed, a fallback, unknown or a rule carried past its published or
+// reviewed period makes the whole runway an estimate; the specific flags say which.
+function runwayEstimateFlags(
+  data: Pick<RunwayData, 'categories' | 'budgetTxns'>,
+  incomeSupport: RunwayResponse['incomeSupport'],
+  jurisdiction: RunwayResponse['jurisdiction'],
+): Pick<RunwayResponse, 'budgetCurrencyNeedsReview' | 'isEstimated'> {
+  const budgetCurrencyNeedsReview =
+    data.categories.some((row) => row.currencyNeedsReview) ||
+    data.budgetTxns.some((row) => row.currencyNeedsReview);
+  return {
+    budgetCurrencyNeedsReview,
     isEstimated:
-      data.categories.some((row) => row.currencyNeedsReview) ||
-      data.budgetTxns.some((row) => row.currencyNeedsReview) ||
+      budgetCurrencyNeedsReview ||
+      jurisdiction.isExtrapolated ||
       incomeSupport.salaryBasis.status === 'unlinked_fallback' ||
       incomeSupport.unemployment.status === 'unknown',
   };
@@ -570,5 +597,5 @@ app.put('/assumptions', async (c) => {
   return c.json({ data });
 });
 
-export { buildRunwayResponse };
+export { buildRunwayResponse, runwayEstimateFlags };
 export default app;

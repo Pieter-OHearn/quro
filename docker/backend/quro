@@ -1,7 +1,23 @@
 #!/bin/sh
-# Operator command line, for example: docker compose exec backend quro user invite
-# The command reads the database settings and password files from the container's configuration.
+# The image's entry point: `quro <command>`. The server and the worker replace this shell so they
+# receive the container's signals directly; every other command runs the operator command line.
 set -eu
 
 cd /app/packages/backend
+case "${1:-}" in
+  bun | sh | /bin/sh | /app/*)
+    # Compose files written for earlier images ran `bun run start` or the shell scripts directly.
+    echo >&2 "The image's entry point is now \`quro\`: use \`serve\` instead of \`bun run start\`,"
+    echo >&2 "\`worker pension-imports\` for the worker and \`migrate\` for the migrate job (quro --help)."
+    exit 2
+    ;;
+  serve)
+    if [ "$#" -eq 1 ]; then exec bun src/index.ts; fi
+    ;;
+  worker)
+    if [ "$#" -eq 2 ] && [ "$2" = "pension-imports" ]; then
+      exec bun src/workers/pensionImportWorker.ts
+    fi
+    ;;
+esac
 exec bun src/cli/quro.ts "$@"

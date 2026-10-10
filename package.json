@@ -17,6 +17,7 @@
     "build": "bun run --filter '@quro/frontend' build && bun run --filter '@quro/backend' build",
     "typecheck": "bun run --filter '@quro/shared' typecheck && bun run --filter '@quro/frontend' typecheck && bun run --filter '@quro/backend' typecheck && tsc --noEmit -p tsconfig.scripts.json",
     "check:bun-version": "bun scripts/check-bun-version.ts",
+    "check:image-access": "bun scripts/lib/image-access.ts",
     "check:format": "prettier --check .",
     "check:docs": "bun scripts/check-docs.ts",
     "check:lint": "bunx eslint packages scripts playwright.config.ts --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts",
