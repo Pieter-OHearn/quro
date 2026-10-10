@@ -4,16 +4,14 @@ import { access, open, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type Sql, type TransactionSql } from 'postgres';
 import type { DocumentStorageConfig, Secret } from '../config';
-import {
-  bundledMigrations,
-  compareSchema,
-  lastMigration,
-  readAppliedMigrations,
-  type AppliedMigration,
-  type BundledMigration,
-} from '../db/migrationState';
 import { checkPgDump, createDatabaseBackup } from '../db/pgTools';
-import { readAppVersion } from '../lib/appVersion';
+import {
+  BUNDLED_MIGRATIONS,
+  compareSchema,
+  readLatestAppliedWhen,
+  type BundledMigration,
+} from '../db/schemaVersion';
+import { getBuildInfo } from '../lib/buildInfo';
 import {
   assertMaintenanceHeld,
   enterMaintenance,
@@ -44,6 +42,7 @@ import {
   type DocumentFile,
   type DocumentsSection,
   type Manifest,
+  type MigrationPoint,
   type ReferencedDocument,
 } from './manifest';
 import { TarWriter } from './tar';
@@ -66,11 +65,11 @@ export class BackupDirectoryError extends Error {
   }
 }
 
-/** The database was migrated by a newer release than this image. */
+/** The database was migrated by a newer or a different build than this image. */
 export class SchemaNewerThanImageError extends Error {
-  constructor(tag: string | null) {
+  constructor() {
     super(
-      `The database has a migration this image does not know (${tag ?? 'unknown'}); it was migrated by a newer release. Run the backup with the image that matches the database.`,
+      'The database has a migration this image does not ship; it was migrated by a newer or a different release. Run the backup with the image that matches the database.',
     );
     this.name = 'SchemaNewerThanImageError';
   }
@@ -95,16 +94,21 @@ export type BackupDependencies = {
   checkDump: (connectionString: string) => Promise<void>;
   now: () => Date;
   appVersion: string | null;
+  revision: string | null;
   migrations: readonly BundledMigration[];
 };
 
+const known = (value: string) => (value === 'unknown' ? null : value);
+
 export function defaultBackupDependencies(): BackupDependencies {
+  const build = getBuildInfo();
   return {
     dump: createDatabaseBackup,
     checkDump: checkPgDump,
     now: () => new Date(),
-    appVersion: readAppVersion(),
-    migrations: bundledMigrations(),
+    appVersion: known(build.version),
+    revision: known(build.revision),
+    migrations: BUNDLED_MIGRATIONS,
   };
 }
 
@@ -119,7 +123,7 @@ export type WrittenArchive = {
 type Snapshot = {
   serverVersion: string;
   fingerprint: DatabaseFingerprint;
-  applied: AppliedMigration[] | null;
+  lastMigration: MigrationPoint | null;
   references: (ReferencedDocument & { needed: boolean })[] | null;
 };
 
@@ -193,6 +197,20 @@ async function createPrivateFile(path: string): Promise<void> {
   await (await open(path, 'wx', ARCHIVE_FILE_MODE)).close();
 }
 
+/** The newest applied migration, or null for a database without the migrations table. */
+async function readLastMigration(
+  tx: TransactionSql,
+  migrations: readonly BundledMigration[],
+): Promise<MigrationPoint | null> {
+  // Checked first: a failing query would abort the snapshot's transaction.
+  const [table] = await tx<{ present: boolean }[]>`
+    select to_regclass('drizzle.__drizzle_migrations') is not null as present
+  `;
+  const when = table?.present ? await readLatestAppliedWhen(tx) : null;
+  if (when === null) return null;
+  return { tag: migrations.find((migration) => migration.when === when)?.tag ?? null, when };
+}
+
 /** Reads what the manifest records and runs pg_dump, all from one exported snapshot. */
 function captureSnapshot(
   session: Sql,
@@ -205,7 +223,7 @@ function captureSnapshot(
       select pg_export_snapshot() as id, current_setting('server_version') as version
     `;
     const fingerprint = await readDatabaseFingerprint(tx);
-    const applied = await readAppliedMigrations(tx);
+    const lastMigration = await readLastMigration(tx, dependencies.migrations);
     const references = await readReferences(tx, request.log);
     request.log('Dumping the database');
     await createPrivateFile(dumpPath);
@@ -216,7 +234,7 @@ function captureSnapshot(
       signal: request.signal,
       log: () => undefined,
     });
-    return { serverVersion: exported!.version, fingerprint, applied, references };
+    return { serverVersion: exported!.version, fingerprint, lastMigration, references };
   });
 }
 
@@ -295,13 +313,12 @@ function buildManifest(
     formatVersion: ARCHIVE_FORMAT_VERSION,
     createdAt: parts.createdAt.toISOString(),
     label: request.label,
-    app: { version: dependencies.appVersion },
+    app: { version: dependencies.appVersion, revision: dependencies.revision },
     database: {
       entry: DATABASE_ENTRY,
       ...parts.dump,
       serverVersion: snapshot.serverVersion,
-      lastMigration: lastMigration(snapshot.applied, dependencies.migrations),
-      appliedMigrations: snapshot.applied?.length ?? 0,
+      lastMigration: snapshot.lastMigration,
       fingerprint: snapshot.fingerprint,
     },
     documents: parts.documents,
@@ -351,8 +368,8 @@ async function writeArchiveFile(
 
 /** Refuses a database migrated by a newer release, before anything is paused or written. */
 async function checkSchema(session: Sql, dependencies: BackupDependencies): Promise<void> {
-  const state = compareSchema(await readAppliedMigrations(session), dependencies.migrations);
-  if (state.kind === 'ahead') throw new SchemaNewerThanImageError(state.last.tag);
+  const state = compareSchema(await readLatestAppliedWhen(session), dependencies.migrations);
+  if (state.status === 'ahead' || state.status === 'unknown') throw new SchemaNewerThanImageError();
 }
 
 /** Turns maintenance mode on, unless the caller (a restore) already holds it. */

@@ -7,10 +7,20 @@ import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, UsageError, type CommandIo } from '.
 export const QURO_USAGE = `Usage: quro <command> [options]
 
 Commands:
+  serve       Run the API server (the image's default command)
+  worker      Run the optional pension import worker (quro worker pension-imports)
+  init        Write a settings file and generated secret files into a directory (quro init --help)
+  migrate     Apply schema migrations and prepare the runtime role (quro migrate --help)
+  doctor      Read-only checks of settings, database, schema and storage (quro doctor --help)
+  health      Exit 0 when the local server reports ready (container health checks)
+  version     Print the version, newest bundled migration and image revision
   user        Accounts, registration codes, password resets and sessions (quro user --help)
   documents   Document storage: copy documents out of S3 (quro documents --help)
   backup      Write one archive of the database and documents (quro backup --help)
-  restore     Restore an archive written by quro backup (quro restore --help)`;
+  restore     Restore an archive written by quro backup (quro restore --help)
+
+Exit codes: 0 done, 1 failed, 2 invalid usage or settings, 3 refused by a safety check,
+4 database or document store unreachable.`;
 
 type CommandGroup = {
   usage: () => Promise<string>;
@@ -21,6 +31,34 @@ let usesDatabase = false;
 const POOL_CLOSE_TIMEOUT_SECONDS = 5;
 
 const GROUPS: Record<string, CommandGroup> = {
+  serve: {
+    usage: async () => (await import('./service')).SERVICE_USAGE.serve,
+    run: async (args) => (await import('./service')).runServeCommand(args),
+  },
+  worker: {
+    usage: async () => (await import('./service')).SERVICE_USAGE.worker,
+    run: async (args) => (await import('./service')).runWorkerCommand(args),
+  },
+  init: {
+    usage: async () => (await import('./init')).INIT_USAGE,
+    run: async (args, io) => (await import('./init')).runInitCommand(args, io),
+  },
+  migrate: {
+    usage: async () => (await import('./migrate')).MIGRATE_USAGE,
+    run: async (args, io) => (await import('./migrate')).runMigrateCommand(args, io),
+  },
+  doctor: {
+    usage: async () => (await import('./doctor')).DOCTOR_USAGE,
+    run: async (args, io) => (await import('./doctor')).runDoctorCommand(args, io),
+  },
+  health: {
+    usage: async () => (await import('./service')).SERVICE_USAGE.health,
+    run: async (args, io) => (await import('./service')).runHealthCommand(args, io),
+  },
+  version: {
+    usage: async () => (await import('./service')).SERVICE_USAGE.version,
+    run: async (args, io) => (await import('./service')).runVersionCommand(args, io),
+  },
   user: {
     usage: async () => (await import('./user')).USER_USAGE,
     run: async (args, io) => {
@@ -75,6 +113,10 @@ export async function runQuro(args: readonly string[], io: CommandIo): Promise<n
     io.err(`Unknown command: ${name}`);
     io.err(QURO_USAGE);
     return EXIT_USAGE;
+  }
+  if (rest[0] === '--help') {
+    io.out(await group.usage());
+    return EXIT_OK;
   }
   try {
     return await group.run(rest, io);

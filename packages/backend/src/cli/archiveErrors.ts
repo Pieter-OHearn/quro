@@ -1,4 +1,5 @@
 import { ConfigError } from '../config';
+import { classifyDatabaseError, describeDatabaseError } from '../db/connectionErrors';
 import { PgToolError } from '../db/pgTools';
 import { BackupDirectoryError, SchemaNewerThanImageError } from '../backup/createBackup';
 import { ArchiveDecryptionError } from '../backup/encryption';
@@ -26,44 +27,28 @@ const USAGE_ERRORS = [
 const REFUSALS = [RestoreRefusedError, ArchiveVersionError, SchemaNewerThanImageError];
 const DAMAGED = [ArchiveDecryptionError, ArchiveFormatError, ArchiveIntegrityError, TarFormatError];
 
-const NETWORK_CODES = new Set([
-  'ECONNREFUSED',
-  'ECONNRESET',
-  'ENOTFOUND',
-  'EAI_AGAIN',
-  'ETIMEDOUT',
-  'EHOSTUNREACH',
-  'ENETUNREACH',
-  'CONNECT_TIMEOUT',
-  'CONNECTION_CLOSED',
-  'CONNECTION_ENDED',
-  'CONNECTION_DESTROYED',
-]);
-// Server shutting down or starting up.
-const UNAVAILABLE_SQLSTATES = new Set(['57P01', '57P02', '57P03']);
-// Wrong password or user, or a database that does not exist: the settings are wrong.
-const SETTINGS_SQLSTATES = new Set(['28P01', '28000', '3D000']);
-
 const MAX_CAUSE_DEPTH = 5;
 
-function codesOf(error: unknown): string[] {
-  const codes: string[] = [];
+/** The error and the errors it wraps (pgTools wraps connection errors with a cause). */
+function causeChain(error: unknown): unknown[] {
+  const chain: unknown[] = [];
   let current: unknown = error;
   for (let depth = 0; current && depth < MAX_CAUSE_DEPTH; depth += 1) {
-    const code = (current as { code?: unknown }).code;
-    if (typeof code === 'string') codes.push(code);
+    chain.push(current);
     current = (current as { cause?: unknown }).cause;
   }
-  return codes;
+  return chain;
 }
 
-function databaseExitCode(error: unknown): number | null {
-  const codes = codesOf(error);
-  const unavailable = codes.some(
-    (code) => NETWORK_CODES.has(code) || UNAVAILABLE_SQLSTATES.has(code) || code.startsWith('08'),
-  );
-  if (unavailable) return EXIT_UNAVAILABLE;
-  return codes.some((code) => SETTINGS_SQLSTATES.has(code)) ? EXIT_USAGE : null;
+/** The first database error in the chain that the install contract gives its own exit code. */
+function databaseError(
+  error: unknown,
+): { kind: 'unreachable' | 'rejected'; error: unknown } | null {
+  for (const candidate of causeChain(error)) {
+    const kind = classifyDatabaseError(candidate);
+    if (kind !== 'other') return { kind, error: candidate };
+  }
+  return null;
 }
 
 const isOneOf = (error: unknown, kinds: readonly (abstract new (...args: never[]) => Error)[]) =>
@@ -73,17 +58,19 @@ export function archiveExitCode(error: unknown): number {
   if (isOneOf(error, USAGE_ERRORS)) return EXIT_USAGE;
   if (isOneOf(error, REFUSALS)) return EXIT_REFUSED;
   if (isOneOf(error, DAMAGED)) return EXIT_FAILURE;
-  return databaseExitCode(error) ?? EXIT_FAILURE;
+  const database = databaseError(error);
+  if (!database) return EXIT_FAILURE;
+  return database.kind === 'unreachable' ? EXIT_UNAVAILABLE : EXIT_USAGE;
 }
 
 /** A one-line reason that names no secret. Database errors carry no connection string. */
 export function archiveErrorMessage(error: unknown): string {
   if (error instanceof ConfigError) return error.message;
-  if (error instanceof Error) {
-    if (databaseExitCode(error) === EXIT_UNAVAILABLE) {
-      return `The database cannot be reached (${codesOf(error)[0]}). Nothing was changed.`;
-    }
-    return error.message;
+  const database = databaseError(error);
+  if (database?.kind === 'unreachable') {
+    return `The database cannot be reached: ${describeDatabaseError(database.error)}. Nothing was changed.`;
   }
-  return String(error);
+  if (database)
+    return `The database refused the connection: ${describeDatabaseError(database.error)}.`;
+  return error instanceof Error ? error.message : String(error);
 }

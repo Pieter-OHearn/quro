@@ -3,9 +3,15 @@ import { join } from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { type Sql } from 'postgres';
 import type { BackupConfig, DocumentStorageConfig } from '../config';
-import { readAppliedMigrations, type AppliedMigration } from '../db/migrationState';
+import { readLatestAppliedWhen } from '../db/schemaVersion';
 import { checkPgRestore, restoreDatabaseBackup } from '../db/pgTools';
-import { ensureRuntimeRole, type RuntimeRoleConfig } from '../db/runtimeRole';
+import {
+  applyRuntimeRolePlan,
+  planRuntimeRole,
+  readOwnerFacts,
+  type RuntimeRoleConfig,
+  type RuntimeRolePlan,
+} from '../db/runtimeRole';
 import {
   assertMaintenanceHeld,
   enterMaintenance,
@@ -62,7 +68,8 @@ export class RestoreVerificationError extends Error {
 export type RestoreRequest = {
   archivePath: string;
   adminUrl: string;
-  runtimeRole: RuntimeRoleConfig | null;
+  /** The runtime role to make usable after the restore, as `quro migrate` does; null to skip. */
+  runtime: { user: string; url: string; role: RuntimeRoleConfig } | null;
   documentStorage: DocumentStorageConfig;
   backup: BackupConfig;
   confirm: string | null;
@@ -92,7 +99,7 @@ export type RestoreResult = {
   pendingMigrations: number;
 };
 
-type TargetState = { applied: AppliedMigration[] | null; hasRows: boolean; hasTables: boolean };
+type TargetState = { latestWhen: number | null; hasRows: boolean; hasTables: boolean };
 
 async function readTargetState(session: Sql): Promise<TargetState> {
   const tables = await session<{ name: string }[]>`
@@ -108,7 +115,11 @@ async function readTargetState(session: Sql): Promise<TargetState> {
       break;
     }
   }
-  return { applied: await readAppliedMigrations(session), hasRows, hasTables: tables.length > 0 };
+  return {
+    latestWhen: await readLatestAppliedWhen(session),
+    hasRows,
+    hasTables: tables.length > 0,
+  };
 }
 
 async function assertNoOtherSessions(session: Sql): Promise<void> {
@@ -125,10 +136,9 @@ async function assertNoOtherSessions(session: Sql): Promise<void> {
 
 /** The target must be a new database or one at the archive's migration. */
 function assertSchemaMatches(state: TargetState, manifest: Manifest): void {
-  const last = state.applied?.[state.applied.length - 1];
-  if (!last && !state.hasTables) return;
+  if (state.latestWhen === null && !state.hasTables) return;
   const archived = manifest.database.lastMigration;
-  if (last && archived && last.createdAt === archived.createdAt) return;
+  if (archived && state.latestWhen === archived.when) return;
   throw new RestoreRefusedError(
     `The database's schema is not the archive's (the archive is at migration ${archived?.tag ?? 'none'}). Restore into a new, empty database instead, without running the migrations first, and run the migrations afterwards.`,
   );
@@ -149,11 +159,21 @@ function assertDocumentsFit(manifest: Manifest, storage: DocumentStorageConfig):
   }
 }
 
+type ApplicablePlan = Exclude<RuntimeRolePlan, { action: 'refuse' }>;
+
+/** What the restore will do about the runtime role; refuses before anything changes. */
+async function planRuntime(session: Sql, request: RestoreRequest): Promise<ApplicablePlan | null> {
+  if (!request.runtime) return null;
+  const plan = await planRuntimeRole(session, await readOwnerFacts(session), request.runtime);
+  if (plan.action === 'refuse') throw new RestoreRefusedError(plan.reason);
+  return plan;
+}
+
 async function guardTarget(
   session: Sql,
   request: RestoreRequest,
   manifest: Manifest,
-): Promise<{ replacing: boolean }> {
+): Promise<{ replacing: boolean; runtimePlan: ApplicablePlan | null }> {
   await assertNoOtherSessions(session);
   await enterMaintenance(session, MAINTENANCE_WAIT_SECONDS);
   const state = await readTargetState(session);
@@ -167,7 +187,7 @@ async function guardTarget(
       'Refusing to restore over a non-empty database or documents directory. Set QRO_RESTORE_ALLOW_NON_EMPTY=1 after verifying the target and your latest backup.',
     );
   }
-  return { replacing };
+  return { replacing, runtimePlan: await planRuntime(session, request) };
 }
 
 type Staged = { dumpPath: string; documents: DocumentStaging | null };
@@ -253,8 +273,9 @@ async function replaceData(
   session: Sql,
   request: RestoreRequest,
   staged: Staged,
-  dependencies: RestoreDependencies,
+  steps: { dependencies: RestoreDependencies; runtimePlan: ApplicablePlan | null },
 ): Promise<void> {
+  const { dependencies, runtimePlan } = steps;
   // Nothing has changed yet; a lost connection would have let writers in.
   await assertMaintenanceHeld(session);
   request.log('Restoring the database (one transaction)');
@@ -275,9 +296,10 @@ async function replaceData(
       },
     );
   }
-  if (request.runtimeRole) {
-    await ensureRuntimeRole(session, request.runtimeRole);
-    request.log(`Re-applied the grants of the runtime role ${request.runtimeRole.roleName}`);
+  if (runtimePlan && request.runtime) {
+    for (const change of await applyRuntimeRolePlan(session, runtimePlan, request.runtime.role)) {
+      request.log(change);
+    }
   }
 }
 
@@ -296,8 +318,8 @@ async function warnAboutLeftovers(request: RestoreRequest): Promise<void> {
 }
 
 function pendingMigrations(manifest: Manifest, dependencies: RestoreDependencies): number {
-  const last = manifest.database.lastMigration?.createdAt ?? 0;
-  return dependencies.migrations.filter((migration) => migration.createdAt > last).length;
+  const last = manifest.database.lastMigration?.when ?? 0;
+  return dependencies.migrations.filter((migration) => migration.when > last).length;
 }
 
 async function checkPrerequisites(
@@ -328,11 +350,11 @@ export async function restoreArchive(
   const session = openMaintenanceSession(request.adminUrl, 'quro-restore');
   try {
     await warnAboutLeftovers(request);
-    const { replacing } = await guardTarget(session, request, manifest);
+    const { replacing, runtimePlan } = await guardTarget(session, request, manifest);
     const preRestore = replacing ? await preRestoreArchive(request, dependencies) : null;
     const staged = await stageArchive(request, manifest);
     try {
-      await replaceData(session, request, staged, dependencies);
+      await replaceData(session, request, staged, { dependencies, runtimePlan });
     } finally {
       await discardStaging(staged);
     }

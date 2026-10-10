@@ -1,10 +1,8 @@
 # Install contract
 
-<!-- docs:check skip-paths: docs/compose.example.yaml -->
-
 This page records how Quro is installed from release images and what each piece promises. It is written for operators who run Quro and for contributors who build the installer. It is a decision record plus a service contract: it fixes names, paths, commands and behaviour, and lists where 0.7.0 differs.
 
-The contract applies from 0.8.0. Until that release ships, the [Self-hosting](../README.md#self-hosting) section of the README describes what works today, and the rows marked **0.7.0** below describe the code as it is.
+The contract applies from 0.8.0. Until that release ships, the [Self-hosting](../README.md#self-hosting) section of the README describes what works today, and the rows marked **0.7.0** below describe that release. The step-by-step install with these commands is in [Install Quro](install.md).
 
 ## Status
 
@@ -74,7 +72,7 @@ The pension statement parser and its model server stay behind the `pension-impor
 | Any S3-compatible service                 | Optional document store. The project does not pin or ship one        | Operator's choice            |
 | `ghcr.io/pieter-ohearn/quro-auto-updater` | Retired. Existing tags stay published; no new releases               | –                            |
 
-Pin images by version tag and record the digest. The core images must pull without a registry account; the 0.7.0 images did on arm64 in the measurements below. The pension parser and model server images are not published; the OCR profile builds them from a checkout.
+Pin images by version tag and record the digest. The core images must pull without a registry account, and a check in CI and in the release workflow keeps that true: [Distribution](distribution.md) records the anonymous manifest, layer and runtime evidence for both platforms of the 0.7.0 images and explains why package visibility is per package, not per tag. The updater is not a release requirement. The pension parser and model server images are not published; the OCR profile builds them from a checkout.
 
 ## Commands
 
@@ -84,7 +82,7 @@ The image's entry point is `quro`; its default command is `serve`.
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- |
 | `quro serve`                     | Runs the API server. Does not migrate.                                                                                                                                                                                                                                                                    | Application data                   | Runtime database, storage              |
 | `quro worker pension-imports`    | Runs the optional pension import worker.                                                                                                                                                                                                                                                                  | Application data                   | Runtime database, storage              |
-| `quro init [--dir <path>]`       | Writes a settings file and generated secret files into a mounted directory (default `/config`). Creates only missing files; never changes an existing one.                                                                                                                                                | New files only                     | None                                   |
+| `quro init [--dir <path>]`       | Writes a settings file and generated secret files into a mounted directory (default `/config`). Creates only missing files; never changes an existing one. `--dry-run` lists what it would create.                                                                                                        | New files only                     | None                                   |
 | `quro migrate [--dry-run]`       | Applies pending schema migrations as the owner role, then creates or updates the runtime role and its grants.                                                                                                                                                                                             | Schema, runtime role               | Admin and runtime database             |
 | `quro doctor [--json]`           | Read-only checks: settings, database reachability for both roles, schema against the image, backup tool version, document store access.                                                                                                                                                                   | Nothing                            | All configured                         |
 | `quro backup [--output <dir>]`   | Writes one archive: database dump, documents (filesystem) or an object manifest (S3), and a manifest with versions and checksums. Changes are paused while it copies. `--label` and `--wait` as in [Backup and restore](backup-and-restore.md#back-up); `quro backup verify <archive>` checks an archive. | A new file in the backup directory | Admin database, backup key             |
@@ -210,7 +208,7 @@ On a database you provide yourself:
 
 ### Outbound network
 
-The core needs none. Price and exchange-rate refreshes call Yahoo Finance, bank linking calls bunq, and tracing exports to the configured endpoint. These are listed per feature in the operator docs.
+Installing needs the registries the images come from, and no account at either. Once running, the core makes one kind of outbound call without being configured: the scheduled price and exchange-rate refreshes to Yahoo Finance, which have no separate switch. Bank linking calls bunq, S3 storage calls its endpoint, and tracing exports to the configured endpoint, each only when set. [Distribution](distribution.md#service-feature-hardware-and-egress-matrix) lists every call per feature, with the hardware and accounts each feature needs.
 
 ## Persistent data
 
@@ -255,13 +253,13 @@ The backend container's health check is `quro health`. The server never migrates
 
 `quro backup` and `quro restore` replace the backup and restore commands of the `db-tools` Compose service. They read the same settings as every other command, so they work without Compose and without a service named `db`. The procedure, the measured recovery times and their limits are in [Backup and restore](backup-and-restore.md).
 
-- A backup is one archive in `QRO_BACKUP_DIR`: a custom-format database dump, the documents directory (filesystem) or an object manifest (S3), and a manifest with the application version, the last applied migration, the SHA-256 of every entry, a row count and checksum of every table, and what the archive leaves out (settings, secret files, the encryption key). The archive is written under a temporary name, read back and checked, and renamed when complete. **0.7.0:** a failed dump leaves an empty file with the final name.
+- A backup is one archive in `QRO_BACKUP_DIR`: a custom-format database dump, the documents directory (filesystem) or an object manifest (S3), and a manifest with the application version and image revision, the last applied migration, the SHA-256 of every entry, a row count and checksum of every table, and what the archive leaves out (settings, secret files, the encryption key). The archive is written under a temporary name, read back and checked, and renamed when complete. **0.7.0:** a failed dump leaves an empty file with the final name.
 - While the dump and the documents are copied, maintenance mode holds a database advisory lock: the server answers changes with 503 and background jobs skip their turn; running changes finish first. The lock ends with the command's connection, so a killed backup cannot leave the instance paused. The server finishes open requests on `SIGTERM` before it exits.
 - Optional: archives encrypted with a key file (AES-256-GCM, scrypt), a checked copy in an off-device directory, and retention that deletes older unlabelled archives only after the new one and its copy are checked.
 - A backup refuses to run with client tools older than the server, and refuses a database migrated by a newer release (exit code 3).
 - A restore keeps the current guards: explicit confirmation, a refusal to overwrite a non-empty database or documents directory unless allowed, a refusal while other sessions are connected, and an automatic pre-restore archive. It reads the whole archive and checks every checksum before it changes anything, refuses an archive from a newer application version or with a migration the image does not bundle, and compares every table and document with the manifest afterwards.
 - A restore needs a database that is new and empty, or at the archive's migration. On a new machine with an image of the archive's version, `quro migrate` may run before or after `quro restore`; with a newer image, run `quro restore` into the empty database first, then `quro migrate`.
-- Bare dumps (`.dump`) from earlier releases are restored with the `db-tools` `restore` command, not with `quro restore`.
+- Bare dumps (`.dump`) from earlier releases are restored with the image's `db:restore` script, not with `quro restore` (see [Restore a database dump](backup-and-restore.md#restore-a-database-dump)).
 
 ## Scenarios
 
@@ -449,11 +447,12 @@ What the prototype showed:
 | Readiness with no S3 settings                                                         | 503, document storage `not_configured`                                                                                                           |
 | Database password starting with `-` through the 0.7.0 entry point                     | URL encoding failed and printed Bun's usage text in place of the value                                                                           |
 
-Not measured: a clean virtual machine, amd64, a person following the steps with a stopwatch, the filesystem storage driver itself (it does not exist yet), and PostgreSQL 16 and 17 for the role checks.
+Not measured: a clean virtual machine, native amd64 hardware (the amd64 images were pulled and started under emulation, see [Distribution](distribution.md#recorded-evidence-v070)), a person following the steps with a stopwatch, the filesystem storage driver itself (it does not exist yet), and PostgreSQL 16 and 17 for the role checks.
 
 ## Decision log
 
-| Date       | Decision                                                                                                                                                                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default.                                                                                                                                                                                |
-| 2026-10-09 | Retire legacy settings and service-name defaults instead of inferring them; old configurations fail with exit code 2 and the upgrade notes list every change. Backend UID 1000, `QRO_` prefix for new settings, and `quro init` never prints secret values are confirmed. |
+| Date       | Decision                                                                                                                                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default.                                                                                                                                                                                                             |
+| 2026-10-09 | Retire legacy settings and service-name defaults instead of inferring them; old configurations fail with exit code 2 and the upgrade notes list every change. Backend UID 1000, `QRO_` prefix for new settings, and `quro init` never prints secret values are confirmed.                              |
+| 2026-10-10 | Outbound network clarified: installing needs no registry account, and the running core's only unconfigured outbound call is the scheduled Yahoo Finance refresh. An anonymous image check gates CI and releases; the updater is not a release requirement. Details in [Distribution](distribution.md). |

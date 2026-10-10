@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runUnlessMaintenance } from '../lib/maintenanceMode';
 import type { BackupDependencies } from '../backup/createBackup';
-import { bundledMigrations } from '../db/migrationState';
+import { BUNDLED_MIGRATIONS } from '../db/schemaVersion';
 import { applyTestSettings, writeTestSecret } from '../test/config';
 import { runBackupCommand } from './backup';
 import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, EXIT_UNAVAILABLE, EXIT_USAGE } from './io';
@@ -43,7 +43,8 @@ const fakes = (): BackupDependencies => ({
   checkDump: () => Promise.resolve(),
   now: () => new Date(Date.UTC(2026, 9, 10, 3, 0, tick++)),
   appVersion: 'v0.8.0',
-  migrations: bundledMigrations(),
+  revision: null,
+  migrations: BUNDLED_MIGRATIONS,
 });
 
 function capture() {

@@ -2,7 +2,7 @@
 
 This guide is for someone who runs Quro and wants to be able to get their data back. It assumes you have never taken a backup of Quro before. It covers the first backup, encrypted copies on another device, scheduled backups, restoring onto the same or a new machine, and checking that a restore worked. For local development see [development](development.md).
 
-The commands are `quro backup` and `quro restore` in the backend image. The examples run them through the `db-tools` service of the Docker Compose stack in this repository, from the checkout that holds your `docker-compose.yml`, `.env` and `secrets/` directory. [Without Compose](#without-compose) shows the same commands with `docker run` and from a checkout.
+The commands are `quro backup` and `quro restore` in the backend image. The examples assume an install made with [the install guide](install.md): they run in the directory that holds `compose.yaml`, `config/` and `data/`, through the `migrate` service, which has the owner role's password and mounts `./data/documents` and `./backups`. With the Compose stack of this repository, see [Compose stack of this repository](#compose-stack-of-this-repository); [Without Compose](#without-compose) shows `docker run` and a checkout.
 
 ## Start here
 
@@ -12,14 +12,15 @@ If you have no backup yet, do these steps today. They take a few minutes.
 2. Take a backup:
 
    ```bash
-   mkdir -p backups
-   docker compose --profile maintenance run --rm --entrypoint quro db-tools backup
+   docker compose run --rm migrate backup
    ```
 
    The archive is written to `./backups`, for example `./backups/quro-backup-20261010-031500Z.tar`. The command reads it back and checks every checksum before it keeps it, and prints what it holds.
 
+   The backend image runs as UID 1000. On Linux, `./backups` must exist and belong to that user; if the command says the backup directory does not exist or is not writable, run `mkdir -p backups && sudo chown 1000:1000 backups` (see [File ownership](install-contract.md#file-ownership)). An install made before `./backups` was in the example Compose file needs the line `- ./backups:/var/lib/quro/backups` under the `volumes` of its `migrate` service.
+
 3. Copy that file to another device: a USB disk, a NAS, another computer. A backup on the same disk does not survive the disk. [Encrypt](#encrypt-archives-and-copy-them-off-the-device) the archives before they leave the machine.
-4. Copy `.env` and the `secrets/` directory to a safe place as well, separately from the archives (see [what is not in an archive](#what-an-archive-contains)). Without the database passwords the archive still restores, but you will have to set new ones.
+4. Copy the `config/` directory (the settings file and the secrets) to a safe place as well, separately from the archives (see [what is not in an archive](#what-an-archive-contains)). Without the database passwords the archive still restores, but you will have to set new ones.
 5. [Schedule](#schedule-backups) a daily backup.
 6. [Rehearse a restore](#rehearse-a-restore) on another machine or in a separate checkout, so the first restore you ever run is not during an incident.
 
@@ -35,12 +36,12 @@ One archive is one file. It is a tar file (`.tar`), or an encrypted one (`.tar.e
 | `documents/…`: every uploaded PDF, with [filesystem storage](document-storage.md)       | Payslips, pension statements and statement imports, under their storage keys                                                           |
 | `manifest.json`                                                                         | The Quro version, the last applied migration, a SHA-256 of the dump and of every document, and a row count and checksum of every table |
 
-| Not in the archive                                                           | Keep it like this                                                                                                     |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `.env` (or your settings file)                                               | A copy next to your secrets copy                                                                                      |
-| `secrets/*.txt`: database passwords, the S3 secret key, the bunq credentials | A copy only you can read, not next to the archives                                                                    |
-| The backup encryption key                                                    | Somewhere other than the archives, for example a password manager. Without it an encrypted archive cannot be restored |
-| Documents with S3 storage (`QRO_DOCUMENT_STORAGE=s3`)                        | Copy the bucket with your store's tools; the manifest lists every object the database refers to                       |
+| Not in the archive                                                                                  | Keep it like this                                                                                                     |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| The settings file (`config/quro.env`, or `.env` in a checkout)                                      | A copy next to your secrets copy                                                                                      |
+| `config/secrets/` (or `secrets/*.txt`): database passwords, the S3 secret key, the bunq credentials | A copy only you can read, not next to the archives                                                                    |
+| The backup encryption key                                                                           | Somewhere other than the archives, for example a password manager. Without it an encrypted archive cannot be restored |
+| Documents with S3 storage (`QRO_DOCUMENT_STORAGE=s3`)                                               | Copy the bucket with your store's tools; the manifest lists every object the database refers to                       |
 
 The manifest records this split under `secrets`. Treat every archive as sensitive: the dump holds your financial records, password hashes and the tokens of any connected bank account. Unencrypted archives are written readable by their owner only.
 
@@ -59,7 +60,7 @@ The server also shuts down gracefully: on `SIGTERM` (what `docker stop` and `doc
 ## Back up
 
 ```bash
-docker compose --profile maintenance run --rm --entrypoint quro db-tools backup
+docker compose run --rm migrate backup
 ```
 
 Options:
@@ -67,7 +68,7 @@ Options:
 | Option             | Meaning                                                                                                                                                                 |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--label <name>`   | Adds a label to the file name, for example `--label before-upgrade` gives `quro-backup-20261010-031500Z-before-upgrade.tar`. Retention never deletes labelled archives. |
-| `--output <dir>`   | Writes into another directory inside the container instead of `QRO_BACKUP_DIR` (`/var/lib/quro/backups`, which the Compose file maps to `./backups`).                   |
+| `--output <dir>`   | Writes into another directory inside the container instead of `QRO_BACKUP_DIR` (`/var/lib/quro/backups`, which the Compose files map to `./backups`).                   |
 | `--wait <seconds>` | How long to wait for running changes and jobs before giving up (default 600).                                                                                           |
 
 The archive is written under a hidden temporary name, read back and checked, and only then renamed into place. A backup that fails or is interrupted leaves nothing behind. Archive names use UTC time, so they sort in the order they were taken.
@@ -89,15 +90,17 @@ Encryption uses a key file that you create once. Archives are then encrypted wit
 1. Create the key and keep a copy somewhere other than the backups, for example in a password manager:
 
    ```bash
-   openssl rand -hex 32 > secrets/backup_encryption_key.txt
-   chmod 600 secrets/backup_encryption_key.txt
+   openssl rand -hex 32 > config/secrets/backup_encryption_key
+   chmod 600 config/secrets/backup_encryption_key
    ```
 
-2. Put an override file next to `docker-compose.yml`, for example `compose.backup.yaml`. This one also copies every archive to a disk mounted at `/mnt/backup-disk` and keeps the 14 newest:
+   On Linux, give the file to UID 1000 as well (`sudo chown 1000:1000 config/secrets/backup_encryption_key`): Compose mounts it with its host owner and mode.
+
+2. Put an override file next to `compose.yaml`, for example `compose.backup.yaml`. This one also copies every archive to a disk mounted at `/mnt/backup-disk` (a directory there that UID 1000 can write) and keeps the 14 newest:
 
    ```yaml
    services:
-     db-tools:
+     migrate:
        environment:
          QRO_BACKUP_ENCRYPTION_KEY_FILE: /run/secrets/backup_encryption_key
          QRO_BACKUP_OFFSITE_DIR: /var/lib/quro/offsite
@@ -108,13 +111,13 @@ Encryption uses a key file that you create once. Archives are then encrypted wit
 
    secrets:
      backup_encryption_key:
-       file: ./secrets/backup_encryption_key.txt
+       file: ./config/secrets/backup_encryption_key
    ```
 
 3. Run backups with both files:
 
    ```bash
-   docker compose -f docker-compose.yml -f compose.backup.yaml --profile maintenance run --rm --entrypoint quro db-tools backup
+   docker compose -f compose.yaml -f compose.backup.yaml run --rm migrate backup
    ```
 
 | Setting                          | Effect                                                                                                                                                                                                                                                                                                                            |
@@ -132,7 +135,7 @@ Keep `QRO_BACKUP_DIR` on the machine itself. While a backup runs, `pg_dump` writ
 Quro does not schedule anything itself. Run the command from cron, a systemd timer or your NAS scheduler. A daily backup gives a recovery point objective of 24 hours. For example, every night at 03:15 (`-T` because cron has no terminal):
 
 ```bash
-15 3 * * * cd /srv/quro && docker compose -f docker-compose.yml -f compose.backup.yaml --profile maintenance run --rm -T --entrypoint quro db-tools backup >> backups/backup.log 2>&1
+15 3 * * * cd /srv/quro && docker compose -f compose.yaml -f compose.backup.yaml run --rm -T migrate backup >> backup.log 2>&1
 ```
 
 Check the log, or alert on a non-zero exit code: a backup that fails every night protects nothing.
@@ -144,7 +147,7 @@ With `QRO_DOCUMENT_STORAGE=s3`, an archive holds the database and a manifest of 
 ## Check an archive
 
 ```bash
-docker compose -f docker-compose.yml -f compose.backup.yaml --profile maintenance run --rm --entrypoint quro db-tools backup verify /var/lib/quro/backups/quro-backup-20261010-031500Z.tar.enc
+docker compose -f compose.yaml -f compose.backup.yaml run --rm migrate backup verify /var/lib/quro/backups/quro-backup-20261010-031500Z.tar.enc
 ```
 
 `quro backup verify` reads the whole archive, decrypts it when needed, and compares the dump and every document with the checksums in the manifest. It needs no database. Run it now and then on the off-device copies too. Exit code 0 means the archive is complete; 1 means it is damaged, cut off or the key is wrong; 2 means the file does not exist or the key setting is missing.
@@ -153,13 +156,13 @@ docker compose -f docker-compose.yml -f compose.backup.yaml --profile maintenanc
 
 A restore replaces the database and the documents with the archive's. It refuses, and changes nothing, unless you confirm it and the target is safe to replace:
 
-| Refusal (exit code 3)                                                                                           | What to do                                                                                                              |
-| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `Refusing to restore. Set QRO_RESTORE_CONFIRM=restore-db …`                                                     | Set it, after checking that you are pointing at the right database and archive                                          |
-| `Refusing to restore while other database sessions are connected`                                               | Stop the backend, the import worker and any SQL client                                                                  |
-| `Refusing to restore over a non-empty database or documents directory`                                          | Set `QRO_RESTORE_ALLOW_NON_EMPTY=1` if replacing the current data is what you want                                      |
-| `The database's schema is not the archive's`                                                                    | The database was migrated to another version. Restore into a new, empty database (without running `quro migrate` first) |
-| `The archive was written by Quro …, which is newer than this image` or `… a migration this image does not know` | Restore with the release that wrote the archive, or a newer one                                                         |
+| Refusal (exit code 3)                                                                                           | What to do                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `Refusing to restore. Set QRO_RESTORE_CONFIRM=restore-db …`                                                     | Set it, after checking that you are pointing at the right database and archive                              |
+| `Refusing to restore while other database sessions are connected`                                               | Stop the backend, the import worker and any SQL client                                                      |
+| `Refusing to restore over a non-empty database or documents directory`                                          | Set `QRO_RESTORE_ALLOW_NON_EMPTY=1` if replacing the current data is what you want                          |
+| `The database's schema is not the archive's`                                                                    | The database was migrated to another version. Restore into a new, empty database, before any `quro migrate` |
+| `The archive was written by Quro …, which is newer than this image` or `… a migration this image does not know` | Restore with the release that wrote the archive, or a newer one                                             |
 
 Other exit codes: 1 when the archive is damaged, cut off or the key is wrong (nothing is changed), or when the restored data does not match the archive; 2 when the archive does not exist, an encrypted archive has no key configured, a directory is missing, or an archive with documents meets `QRO_DOCUMENT_STORAGE=s3`; 4 when the database cannot be reached.
 
@@ -171,56 +174,48 @@ What `quro restore` does, in order:
 4. Reads the archive again into a staging area, checking every checksum again.
 5. Restores the database with `pg_restore` in a single transaction: a failure part way changes nothing.
 6. Replaces the documents directory's content with the archive's documents. Documents added after the backup are removed; they are in the pre-restore archive.
-7. Re-applies the runtime role's privileges.
+7. Makes the runtime role usable the way `quro migrate` does: creates it or sets its password from its secret file when needed, and applies its privileges.
 8. Compares every table (row count and checksum of every row) and every document with the manifest and prints the result.
 
 ### Restore on the same install
 
-1. Stop everything that writes:
+1. Stop everything that writes (and the import worker, if you run one):
 
    ```bash
-   docker compose stop backend pension-import-worker
+   docker compose stop backend
    ```
 
 2. Restore, with your override file if the archive is encrypted:
 
    ```bash
-   docker compose -f docker-compose.yml -f compose.backup.yaml --profile maintenance run --rm \
+   docker compose -f compose.yaml -f compose.backup.yaml run --rm \
      -e QRO_RESTORE_CONFIRM=restore-db -e QRO_RESTORE_ALLOW_NON_EMPTY=1 \
-     --entrypoint quro db-tools restore /var/lib/quro/backups/quro-backup-20261010-031500Z.tar.enc
+     migrate restore /var/lib/quro/backups/quro-backup-20261010-031500Z.tar.enc
    ```
 
-3. If the output says the image has migrations newer than the archive, apply them:
-
-   ```bash
-   docker compose run --rm migrate
-   ```
-
-4. [Verify](#verify-a-restore), then start everything again with `docker compose up -d`.
+3. [Verify](#verify-a-restore), then start everything again with `docker compose up -d`. The `migrate` service applies any migrations of the image that are newer than the archive before the backend starts.
 
 ### Restore on a new machine
 
-This is the case after losing the disk or the machine. You need the archive, the encryption key if it is encrypted, and your copy of `.env` and `secrets/`.
+This is the case after losing the disk or the machine. You need the archive, the encryption key if it is encrypted, and your copy of `config/`.
 
-1. Install the release the archive was taken with, or a newer one, following the README. Do not create an account.
-2. Put your copies of `.env` and `secrets/` in place (including `secrets/backup_encryption_key.txt` and `compose.backup.yaml` for an encrypted archive), and the archive into `./backups`.
-3. Start only the database, empty, and restore into it. Do not run the migrations first:
+1. Follow steps 1 and 2 of [the install guide](install.md) with the release the archive was taken with, or a newer one. Instead of `quro init`, put your copy of `config/` in place (with `config/secrets/backup_encryption_key` and `compose.backup.yaml` for an encrypted archive), and the archive into `./backups`. Do not run `docker compose up` yet.
+2. Start only the database, empty, and restore into it. Do not run the migrations first:
 
    ```bash
    docker compose up -d --wait db
-   docker compose -f docker-compose.yml -f compose.backup.yaml --profile maintenance run --rm \
+   docker compose -f compose.yaml -f compose.backup.yaml run --rm \
      -e QRO_RESTORE_CONFIRM=restore-db \
-     --entrypoint quro db-tools restore /var/lib/quro/backups/quro-backup-20261010-031500Z.tar.enc
+     migrate restore /var/lib/quro/backups/quro-backup-20261010-031500Z.tar.enc
    ```
 
-4. Apply the migrations of a newer release, if any, and start Quro:
+3. Start Quro. The `migrate` service applies the migrations of a newer release, if any:
 
    ```bash
-   docker compose run --rm migrate
    docker compose up -d
    ```
 
-If your secrets are lost too, create new password files before step 3. The restore sets the runtime role's password from `secrets/postgres_app_password.txt`. bunq has to be connected again only if its client credentials are lost.
+If your secrets are lost too, run `quro init` to create new ones before step 2. The restore creates the runtime role, or sets its password, from the runtime password file. bunq has to be connected again only if its client credentials are lost.
 
 ### With S3 storage
 
@@ -233,7 +228,7 @@ The restore puts back the database. Restore the bucket with your store's tools t
 1. Review the pension statement imports **before** the import worker starts again. Overdue drafts can make the worker delete the PDFs you just recovered, and imports that were processing at backup time are not queued again on their own:
 
    ```bash
-   docker compose --profile maintenance run --rm db-tools psql -c \
+   docker compose exec db psql -U quro_admin -d quro -c \
      'select id, status, expires_at, storage_deleted_at from pension_statement_imports order by id'
    ```
 
@@ -244,7 +239,7 @@ If something is wrong, restore the pre-restore archive the command wrote, with t
 
 ## Rehearse a restore
 
-Restore your latest archive into a separate checkout with an empty `./data` directory, or on another machine, and follow [Verify a restore](#verify-a-restore). Do it once now and after every upgrade.
+Restore your latest archive on another machine, or into a second install directory with its own `compose.yaml` (change the project `name:` and the published port), following [Restore on a new machine](#restore-on-a-new-machine) and [Verify a restore](#verify-a-restore). Do it once now and after every upgrade.
 
 The project runs the same rehearsal on every change: `scripts/recovery-drill.sh` (the `Recovery Drill` CI job) builds a synthetic instance with the demo seed, a partner with a joint and a private account, ledgers and uploaded PDFs, backs it up with `quro backup`, checks that missing, damaged, cut-off, wrong-key and newer-release archives are refused without changes, restores into an isolated PostgreSQL and documents volume, and compares every table, the ledger totals, the runtime role's privileges, every document's SHA-256, and sign-in and downloads through the API. It also takes a backup while a client keeps writing and checks retention and a restore over existing data. Run it with Docker:
 
@@ -279,27 +274,38 @@ Limits:
 
 ## Restore a database dump
 
-Files that end in `.dump` are bare PostgreSQL dumps: from the `db-tools backup` command of earlier releases, from `bun run db:backup`, or from `pg_dump` in the database container before an upgrade. `quro restore` does not take them. Restore one with the older command, which keeps the same confirmation guards and writes a `-pre-restore.dump` before it overwrites data:
+Files that end in `.dump` are bare PostgreSQL dumps: from the `db-tools backup` command of earlier releases, from `bun run db:backup`, or from `pg_dump` in the database container before an upgrade. `quro restore` does not take them. Restore one with the older command, which keeps the same confirmation guards and writes a `-pre-restore.dump` into `./backups/db` before it overwrites data. Put the dump into `./backups`, then:
 
 ```bash
-docker compose stop backend pension-import-worker
-docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db \
-  db-tools restore backups/db/<dump-file>.dump
+docker compose stop backend
+docker compose run --rm -e QRO_RESTORE_CONFIRM=restore-db --entrypoint bun \
+  migrate run db:restore -- /var/lib/quro/backups/<dump-file>.dump
 ```
 
-Add `-e QRO_RESTORE_ALLOW_NON_EMPTY=1` to restore over data. A dump does not contain the documents; put back the documents directory from the copy you took with it. [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md) uses this command for the database major upgrade.
+Add `-e QRO_RESTORE_ALLOW_NON_EMPTY=1` to restore over data. A dump does not contain the documents; put back the documents directory from the copy you took with it. In the Compose stack of this repository the same command is `docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db db-tools restore backups/db/<dump-file>.dump`, which [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md) uses for the database major upgrade.
+
+## Compose stack of this repository
+
+The `docker-compose.yml` in a checkout runs the same commands through its `db-tools` service (profile `maintenance`), whose volumes map `./backups` and `./data/documents`, and keeps settings in `.env` and secrets in `secrets/*.txt`. Read the commands above with these changes:
+
+| In the commands above                                   | In the repository stack                                                           |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `docker compose run --rm migrate backup` (or `restore`) | `docker compose --profile maintenance run --rm --entrypoint quro db-tools backup` |
+| `compose.yaml`, service `migrate` in the override file  | `docker-compose.yml`, service `db-tools`                                          |
+| `config/secrets/backup_encryption_key`                  | `secrets/backup_encryption_key.txt`                                               |
+| `docker compose stop backend`                           | `docker compose stop backend pension-import-worker`                               |
+| Migrations after a restore                              | `docker compose run --rm migrate`, then `docker compose up -d`                    |
 
 ## Without Compose
 
 The commands read the same settings as the server (see [the install contract](install-contract.md#settings)): `POSTGRES_HOST` and the other database settings, the password files, `QRO_DOCUMENT_STORAGE` and `QRO_DOCUMENTS_DIR`, and the backup settings above. With `docker run`, mount the documents directory, the backup directory and the secrets:
 
 ```bash
-docker run --rm --network quro_backend-net \
-  -e POSTGRES_HOST=db -e QRO_DOCUMENT_STORAGE=filesystem \
-  -v "$PWD/secrets/postgres_admin_password.txt:/run/secrets/postgres_admin_password:ro" \
-  -v "$PWD/secrets/postgres_app_password.txt:/run/secrets/postgres_app_password:ro" \
+docker run --rm --network quro_internal --env-file config/quro.env \
+  -v "$PWD/config/secrets/postgres_admin_password:/run/secrets/postgres_admin_password:ro" \
+  -v "$PWD/config/secrets/postgres_app_password:/run/secrets/postgres_app_password:ro" \
   -v "$PWD/data/documents:/var/lib/quro/documents" -v "$PWD/backups:/var/lib/quro/backups" \
-  --entrypoint quro ghcr.io/pieter-ohearn/quro-backend:<version> backup
+  ghcr.io/pieter-ohearn/quro-backend:<version> backup
 ```
 
 From a checkout, with PostgreSQL client tools of the server's major version or newer on the machine (`QRO_PG_DUMP_BIN`, `QRO_PG_RESTORE_BIN` and, for the older dump commands, `QRO_PSQL_BIN` point at them when they are not on `PATH`; an older tool is refused with exit code 2 before anything is written):

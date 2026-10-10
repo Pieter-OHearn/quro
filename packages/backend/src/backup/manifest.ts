@@ -1,5 +1,5 @@
 import { compareAppVersions, parseAppVersion } from '../lib/appVersion';
-import type { BundledMigration, MigrationPoint } from '../db/migrationState';
+import type { BundledMigration } from '../db/schemaVersion';
 import type { DatabaseFingerprint } from './fingerprint';
 
 // The manifest is the last entry of every archive (`manifest.json`). It names what the archive
@@ -14,6 +14,9 @@ export const DATABASE_ENTRY = 'database.dump';
 export const DOCUMENTS_PREFIX = 'documents/';
 
 export type DocumentFile = { key: string; bytes: number; sha256: string };
+
+/** The newest migration the database had applied: its `when`, and its tag when the image knows it. */
+export type MigrationPoint = { tag: string | null; when: number };
 
 /** A document the database refers to, with what its row recorded (S3 manifests). */
 export type ReferencedDocument = {
@@ -45,14 +48,14 @@ export type Manifest = {
   formatVersion: number;
   createdAt: string;
   label: string | null;
-  app: { version: string | null };
+  /** The release and the image revision (commit) that wrote the archive, when known. */
+  app: { version: string | null; revision: string | null };
   database: {
     entry: typeof DATABASE_ENTRY;
     bytes: number;
     sha256: string;
     serverVersion: string;
     lastMigration: MigrationPoint | null;
-    appliedMigrations: number;
     fingerprint: DatabaseFingerprint;
   };
   documents: DocumentsSection;
@@ -166,9 +169,9 @@ export function assertRestorableBy(
     );
   }
   const last = manifest.database.lastMigration;
-  if (last && !image.migrations.some((migration) => migration.createdAt === last.createdAt)) {
+  if (last && !image.migrations.some((migration) => migration.when === last.when)) {
     throw new ArchiveVersionError(
-      `The archive's database has a migration this image does not know (${last.tag ?? `created ${last.createdAt}`}): it was written by a newer release. Restore it with the release that wrote it or a newer one.`,
+      `The archive's database has a migration this image does not know (${last.tag ?? `created ${last.when}`}): it was written by a newer release. Restore it with the release that wrote it or a newer one.`,
     );
   }
 }

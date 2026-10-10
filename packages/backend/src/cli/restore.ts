@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { assertConfig } from '../config';
+import { assertConfig, type Config } from '../config';
 import {
   defaultRestoreDependencies,
   restoreArchive,
@@ -25,6 +25,13 @@ restored in one transaction; afterwards every table and document is compared wit
 
 In Docker Compose: see docs/backup-and-restore.md.`;
 
+function runtimeTarget(config: Config) {
+  const role = getRuntimeRoleConfig();
+  if (!role) return null;
+  const { user, url } = config.runtimeDatabase;
+  return { user, url: url.reveal(), role };
+}
+
 async function restore(path: string, io: CommandIo, dependencies: RestoreDependencies) {
   const config = assertConfig('restore');
   const result = await withInterruption((signal) =>
@@ -32,7 +39,7 @@ async function restore(path: string, io: CommandIo, dependencies: RestoreDepende
       {
         archivePath: resolve(process.cwd(), path),
         adminUrl: config.adminDatabase.url.reveal(),
-        runtimeRole: getRuntimeRoleConfig(),
+        runtime: runtimeTarget(config),
         documentStorage: config.documentStorage,
         backup: config.backup,
         confirm: config.maintenance.restoreConfirm,

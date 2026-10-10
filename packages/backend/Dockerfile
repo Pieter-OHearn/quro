@@ -32,12 +32,25 @@ RUN cd packages/backend && bun install --frozen-lockfile
 COPY packages/shared packages/shared
 COPY packages/backend packages/backend
 COPY docker/backend docker/backend
-# The application version, recorded in backup manifests and checked on restore.
-COPY VERSION ./
+COPY VERSION /app/VERSION
 
+# `quro version` reports the commit the image was built from; release builds pass it in.
+ARG QRO_IMAGE_REVISION=unknown
+
+# The data directories belong to UID 1000, so a new named volume mounted there is writable
+# without a chown. /var/lib/quro stays traversable for any --user with its own bind mounts.
+# The database backup scripts write under /app/backups, which points into the backup directory.
 RUN chmod +x /app/docker/backend/*.sh /app/docker/backend/quro && \
-    ln -s /app/docker/backend/quro /usr/local/bin/quro
+    ln -s /app/docker/backend/quro /usr/local/bin/quro && \
+    printf '%s\n' "$QRO_IMAGE_REVISION" > /app/REVISION && \
+    install -d -m 0755 /var/lib/quro && \
+    install -d -o 1000 -g 1000 -m 0750 /var/lib/quro/documents /var/lib/quro/backups && \
+    ln -s /var/lib/quro/backups /app/backups
 
 WORKDIR /app/packages/backend
-CMD ["bun", "run", "start"]
+# Unprivileged by default; any other UID works through --user (no passwd entry needed).
+USER 1000:1000
 EXPOSE 3000
+# Every task is a `quro` subcommand: `docker run <image> migrate`, `... doctor`, and so on.
+ENTRYPOINT ["quro"]
+CMD ["serve"]

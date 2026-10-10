@@ -69,7 +69,7 @@ Uploaded documents are stored on the filesystem (`./data/documents`, mounted at 
 
 ### One-shot services
 
-- `migrate`: runs Drizzle migrations on startup using the admin DB role, then exits.
+- `migrate`: runs `quro migrate` (schema migrations as the admin DB role, under a database lock, then the runtime role and its grants), then exits. The backend's health check is `quro health`.
 - `db-tools`: runs `quro backup`, `quro restore` (with `--entrypoint quro`) and the older dump commands; only started with the `maintenance` profile. See [backup and restore](backup-and-restore.md).
 
 ---

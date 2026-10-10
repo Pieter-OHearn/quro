@@ -24,7 +24,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres, { type Sql } from 'postgres';
 import { getConfig, Secret, type BackupConfig } from '../config';
-import { bundledMigrations } from '../db/migrationState';
+import { BUNDLED_MIGRATIONS } from '../db/schemaVersion';
 import { runUnlessMaintenance } from '../lib/maintenanceMode';
 import { SchemaNewerThanImageError, writeBackupArchive, type BackupRequest } from './createBackup';
 import { ArchiveDecryptionError } from './encryption';
@@ -163,7 +163,8 @@ function dependencies(overrides: Partial<RestoreDependencies> = {}): RestoreDepe
     checkDump: () => Promise.resolve(),
     now: () => new Date(),
     appVersion: 'v0.8.0',
-    migrations: bundledMigrations(),
+    revision: 'synthetic-revision',
+    migrations: BUNDLED_MIGRATIONS,
     restore: () => copySourceIntoTarget(),
     checkRestore: () => Promise.resolve(),
     ...overrides,
@@ -201,7 +202,7 @@ function restoreRequest(
   return {
     archivePath,
     adminUrl: targetUrl,
-    runtimeRole: null,
+    runtime: null,
     documentStorage: { driver: 'filesystem', directory: targetDocuments },
     backup: backupConfig(),
     confirm: 'restore-db',
@@ -266,8 +267,11 @@ describe('quro backup', () => {
 
     const { manifest } = archive;
     expect(manifest.app.version).toBe('v0.8.0');
-    expect(manifest.database.lastMigration?.tag).toBe(bundledMigrations().at(-1)!.tag);
-    expect(manifest.database.appliedMigrations).toBe(bundledMigrations().length);
+    expect(manifest.app).toEqual({ version: 'v0.8.0', revision: 'synthetic-revision' });
+    expect(manifest.database.lastMigration).toEqual({
+      tag: BUNDLED_MIGRATIONS.at(-1)!.tag,
+      when: BUNDLED_MIGRATIONS.at(-1)!.when,
+    });
     expect(manifest.database.fingerprint.tables['public.users']?.rows).toBe(2);
     expect(manifest.database.fingerprint.tables['public.savings_accounts']?.rows).toBe(2);
     expect(manifest.documents).toMatchObject({ driver: 'filesystem', included: true, count: 2 });
@@ -331,7 +335,7 @@ describe('quro backup', () => {
     await expect(
       writeBackupArchive(
         backupRequest(),
-        dependencies({ migrations: bundledMigrations().slice(0, -1) }),
+        dependencies({ migrations: BUNDLED_MIGRATIONS.slice(0, -1) }),
       ),
     ).rejects.toThrow(SchemaNewerThanImageError);
     expect(dumped.snapshots).toEqual([]);
@@ -479,7 +483,7 @@ describe('quro restore', () => {
       restoreArchive(restoreRequest(newer, { allowNonEmpty: true }), dependencies()),
     ).rejects.toThrow(ArchiveVersionError);
     const unknownMigration = await withManifest(archive.path, (manifest) => {
-      manifest.database.lastMigration = { tag: '9999_future', createdAt: 9e15, hash: 'x' };
+      manifest.database.lastMigration = { tag: '9999_future', when: 9e15 };
     });
     await expect(
       restoreArchive(restoreRequest(unknownMigration, { allowNonEmpty: true }), dependencies()),
@@ -527,14 +531,13 @@ describe('quro restore', () => {
         formatVersion: 1,
         createdAt: new Date().toISOString(),
         label: null,
-        app: { version: null },
+        app: { version: null, revision: null },
         database: {
           entry: 'database.dump',
           bytes: 1,
           sha256: 'x',
           serverVersion: '18',
           lastMigration: null,
-          appliedMigrations: 0,
           fingerprint: { tables: {}, sequences: {} },
         },
         documents: { driver: 's3', included: false, note: '', referenced: [] },

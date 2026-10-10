@@ -131,8 +131,11 @@ export default [
             'playwright.config.ts',
             'scripts/*.ts',
             'scripts/lib/*.ts',
+            'scripts/clean-install/*.ts',
           ],
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 24,
+          // Every file above is still linted with type information; the cap only bounds the
+          // default project, which grows by one with each top-level script.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 32,
         },
         tsconfigRootDir: __dirname,
       },

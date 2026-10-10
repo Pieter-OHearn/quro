@@ -29,6 +29,7 @@ run applicable checks before opening a PR and report commands, results and skipp
 | `bun run test:ui`                           | Frontend Bun tests, including static shared UI markup; no browser or DB                                                  |
 | `bun run --filter '@quro/frontend' test:ui` | Only shared UI markup smoke tests                                                                                        |
 | `bun run test:smoke`                        | Playwright browser tests; starts backend, migrates and seeds demo data in the selected DB                                |
+| `sh scripts/clean-install/run.sh`           | Install from empty volumes with `docs/compose.example.yaml`; Docker, builds images; loopback ports 18085-18086           |
 | `bun run build`                             | Frontend and backend builds                                                                                              |
 | `bun run ci:check`                          | Full suite, migrations, Python checks and dependency audits; isolated DB, Python tools and audit network access required |
 

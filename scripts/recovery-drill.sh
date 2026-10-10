@@ -76,6 +76,9 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 docker network create --internal "$NET" >/dev/null
 for volume in $VOLUMES; do docker volume create "$volume" >/dev/null; done
+# The image creates its documents and backup directories for UID 1000; the off-device directory
+# is the operator's, so hand it to that user as an operator would.
+docker run --rm --user 0 -v "$RUN-offsite:/offsite" --entrypoint chown "$IMAGE" 1000:1000 /offsite
 
 # start_db NAME VOLUME
 start_db() {
@@ -190,8 +193,7 @@ ROUTINE="$KEY_OPTIONS -e QRO_BACKUP_OFFSITE_DIR=/var/lib/quro/offsite -e QRO_BAC
 
 step "Source instance on $PG_IMAGE: $ROWS ledger rows, $DOCUMENTS documents of $DOCUMENT_KIB KiB"
 start_db "$RUN-db-source" "$RUN-pg-source"
-backend "$RUN-db-source" "$RUN-docs-source" --entrypoint bun -- run db:migrate >/dev/null
-backend "$RUN-db-source" "$RUN-docs-source" --entrypoint bun -- run db:bootstrap-runtime-role >/dev/null
+quro "$RUN-db-source" "$RUN-docs-source" -- migrate >/dev/null
 backend "$RUN-db-source" "$RUN-docs-source" --entrypoint bun -- run db:seed-demo >/dev/null
 psql_on "$RUN-db-source" <scripts/fixtures/pg-upgrade-synthetic.sql >/dev/null
 psql_on "$RUN-db-source" -v rows="$ROWS" <scripts/fixtures/recovery-drill.sql >/dev/null

@@ -98,3 +98,51 @@ describe('Compose topology', () => {
     expect(services['db-tools']?.volumes).toContain('./backups:/var/lib/quro/backups');
   });
 });
+
+// docs/compose.example.yaml is the file operators copy. The clean-install test
+// (scripts/clean-install/run.sh) starts it; these checks keep its shape.
+describe('the example Compose file', () => {
+  const example = () => readCompose('docs/compose.example.yaml');
+
+  test('publishes only nginx, mounts no Docker socket and has no object storage service', async () => {
+    const { services } = await example();
+    const published = Object.entries(services)
+      .filter(([, service]) => (service.ports ?? []).length > 0)
+      .map(([name]) => name);
+    expect(published).toEqual(['frontend']);
+    for (const [name, service] of Object.entries(services)) {
+      expect(JSON.stringify(service.volumes ?? [])).not.toContain('docker.sock');
+      expect(`${name} ${service.image ?? ''}`).not.toMatch(/minio|updater/i);
+    }
+  });
+
+  test('pins one release of both Quro images and the baseline PostgreSQL', async () => {
+    const { services } = await example();
+    const quroTags = Object.values(services)
+      .map((service) => service.image ?? '')
+      .filter((image) => image.startsWith('ghcr.io/pieter-ohearn/quro-'))
+      .map((image) => image.split(':')[1]);
+    expect(quroTags.length).toBe(3);
+    expect(new Set(quroTags).size).toBe(1);
+    expect(quroTags[0]).toMatch(/^v\d+\.\d+\.\d+(-rc\.\d+)?$/);
+    expect(services.db?.image).toBe((await readCompose('docker-compose.yml')).services.db?.image);
+  });
+
+  test('wires the backend to its settings, secrets, documents and health check', async () => {
+    const { services } = await example();
+    const backend = services.backend as Service & {
+      command?: string[];
+      healthcheck?: { test: string[] };
+      env_file?: string;
+    };
+    expect(backend.command).toBeUndefined(); // the image's default command is `serve`
+    expect(backend.healthcheck?.test).toEqual(['CMD', 'quro', 'health']);
+    expect(backend.env_file).toBe('./config/quro.env');
+    expect(backend.volumes).toContain('./data/documents:/var/lib/quro/documents');
+    expect((services.migrate as Service & { command?: string[] }).command).toEqual(['migrate']);
+    expect(environmentOf(services.frontend!).QRO_API_URL).toBe('http://backend:3000');
+    expect(
+      environmentOf((await readCompose('docker-compose.yml')).services.frontend!).QRO_API_URL,
+    ).toBe('http://backend:3000');
+  });
+});

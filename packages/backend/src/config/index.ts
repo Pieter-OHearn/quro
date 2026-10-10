@@ -76,6 +76,19 @@ export const PROFILES = {
     'backup',
   ],
   seed: ['runtimeDatabase', 'demo', 'documentStorage'],
+  // `quro doctor` checks every section an install uses, without starting anything.
+  doctor: [
+    'runtime',
+    'web',
+    'runtimeDatabase',
+    'adminDatabase',
+    'documentStorage',
+    'documents',
+    'bunq',
+    'pensionImport',
+    'tracing',
+    'tools',
+  ],
 } as const satisfies Record<string, readonly SectionName[]>;
 
 export type Profile = keyof typeof PROFILES;

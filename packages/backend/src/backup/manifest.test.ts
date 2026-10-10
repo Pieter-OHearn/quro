@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { compareAppVersions, parseAppVersion, readAppVersion } from '../lib/appVersion';
-import { compareSchema, type BundledMigration } from '../db/migrationState';
+import { getBuildInfo } from '../lib/buildInfo';
+import { compareAppVersions, parseAppVersion } from '../lib/appVersion';
+import type { BundledMigration } from '../db/schemaVersion';
 import { archiveName, parseArchiveName } from './archiveNames';
 import { compareFingerprints } from './fingerprint';
 import {
@@ -13,8 +14,8 @@ import {
 import { archivesToDelete } from './retention';
 
 const MIGRATIONS: BundledMigration[] = [
-  { index: 0, tag: '0000_first', createdAt: 100 },
-  { index: 1, tag: '0001_second', createdAt: 200 },
+  { tag: '0000_first', when: 100 },
+  { tag: '0001_second', when: 200 },
 ];
 
 function manifest(overrides: Partial<Manifest> = {}): Manifest {
@@ -23,14 +24,13 @@ function manifest(overrides: Partial<Manifest> = {}): Manifest {
     formatVersion: 1,
     createdAt: '2026-10-10T03:15:00.000Z',
     label: null,
-    app: { version: 'v0.8.0' },
+    app: { version: 'v0.8.0', revision: null },
     database: {
       entry: 'database.dump',
       bytes: 10,
       sha256: 'a'.repeat(64),
       serverVersion: '18.6',
-      lastMigration: { tag: '0001_second', createdAt: 200, hash: 'h' },
-      appliedMigrations: 2,
+      lastMigration: { tag: '0001_second', when: 200 },
       fingerprint: { tables: {}, sequences: {} },
     },
     documents: { driver: 'filesystem', included: true, count: 0, bytes: 0, files: [], missing: [] },
@@ -58,34 +58,8 @@ describe('application versions', () => {
     }
   });
 
-  test('the repository has a readable VERSION', () => {
-    expect(parseAppVersion(readAppVersion() ?? '')).not.toBeNull();
-    expect(readAppVersion('/nonexistent/VERSION')).toBeNull();
-  });
-});
-
-describe('schema state', () => {
-  test('compares applied migrations with the bundled journal', () => {
-    expect(compareSchema(null, MIGRATIONS)).toEqual({ kind: 'empty' });
-    expect(compareSchema([], MIGRATIONS)).toEqual({ kind: 'empty' });
-    expect(compareSchema([{ createdAt: 100, hash: 'x' }], MIGRATIONS)).toMatchObject({
-      kind: 'behind',
-      pending: 1,
-      last: { tag: '0000_first' },
-    });
-    expect(
-      compareSchema(
-        [
-          { createdAt: 100, hash: 'x' },
-          { createdAt: 200, hash: 'y' },
-        ],
-        MIGRATIONS,
-      ),
-    ).toMatchObject({ kind: 'current', last: { tag: '0001_second' } });
-    expect(compareSchema([{ createdAt: 300, hash: 'z' }], MIGRATIONS)).toMatchObject({
-      kind: 'ahead',
-      last: { tag: null, createdAt: 300 },
-    });
+  test('the build version is one the comparison understands', () => {
+    expect(parseAppVersion(getBuildInfo().version)).not.toBeNull();
   });
 });
 
@@ -111,12 +85,14 @@ describe('manifest', () => {
   test('an archive from a newer release is refused, an older one is accepted', () => {
     const image = { version: 'v0.8.0', migrations: MIGRATIONS };
     expect(() => assertRestorableBy(manifest(), image)).not.toThrow();
-    expect(() => assertRestorableBy(manifest({ app: { version: 'v0.7.0' } }), image)).not.toThrow();
-    expect(() => assertRestorableBy(manifest({ app: { version: 'v0.9.0' } }), image)).toThrow(
-      'newer than this image',
-    );
+    expect(() =>
+      assertRestorableBy(manifest({ app: { version: 'v0.7.0', revision: null } }), image),
+    ).not.toThrow();
+    expect(() =>
+      assertRestorableBy(manifest({ app: { version: 'v0.9.0', revision: null } }), image),
+    ).toThrow('newer than this image');
     const newerSchema = manifest();
-    newerSchema.database.lastMigration = { tag: '0002_third', createdAt: 300, hash: 'z' };
+    newerSchema.database.lastMigration = { tag: '0002_third', when: 300 };
     expect(() => assertRestorableBy(newerSchema, image)).toThrow('does not know (0002_third)');
   });
 });

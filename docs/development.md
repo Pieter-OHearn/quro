@@ -129,6 +129,15 @@ http://localhost:3000
 
 Uploaded documents are stored in `./data/documents`.
 
+The backend image runs as UID 1000. Docker Desktop on macOS does not enforce bind-mount
+ownership; on Linux, give `./data/documents` and `./backups` to that UID first unless it is
+already yours:
+
+```bash
+mkdir -p data/documents backups
+sudo chown 1000:1000 data/documents backups
+```
+
 For Docker, the backend stays internal to the compose network and Nginx proxies `/api` to it. That means bunq OAuth should use `http://localhost:3000/api/bunq/oauth/callback`.
 
 ## Optional Bunq Linking
@@ -248,8 +257,8 @@ disappears when it stops. Never point these commands at the Compose `db` service
    export DATABASE_URL=postgres://quro:tmp@127.0.0.1:55432/quro ADMIN_DATABASE_URL=postgres://quro:tmp@127.0.0.1:55432/quro APP_DATABASE_URL=postgres://quro:tmp@127.0.0.1:55432/quro
    ```
 
-3. Check the setup, migrate and run the checks. The first migration can fail while
-   PostgreSQL is still starting; run it again.
+3. Check the setup, migrate and run the checks. `db:migrate` waits up to 30 seconds for
+   PostgreSQL to accept connections.
 
    ```bash
    bun run dev:doctor
@@ -266,6 +275,26 @@ disappears when it stops. Never point these commands at the Compose `db` service
 `bun run test`, `ci:check` and `test:smoke` refuse to run without `DATABASE_URL`, never
 fall back to a localhost default, never start a Compose service, and fill
 `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` from `DATABASE_URL` when they are not set.
+The `quro migrate` and `quro doctor` tests create databases and roles with random
+`quro_migrate_` and `quro_doctor_` names on that server and drop them afterwards, so the test
+role needs to be a superuser, as it is in the throwaway container.
+
+### Clean-install test
+
+`scripts/clean-install/run.sh` installs Quro from empty directories the way
+[Install Quro](install.md) describes, with `docs/compose.example.yaml`, and exercises it: sign-in,
+a ledger write, a document upload and download, maintenance commands, concurrent and interrupted
+migrations, restarts, an existing PostgreSQL server with an S3-compatible test store, and the
+image as another UID. CI runs it on amd64 and arm64. Locally it needs Docker, Bun and `curl`, and
+builds the images when the tags it is given do not exist:
+
+```bash
+QURO_BACKEND_IMAGE=quro-backend:local QURO_FRONTEND_IMAGE=quro-frontend:local \
+  sh scripts/clean-install/run.sh
+```
+
+It uses loopback ports 18085 and 18086 (`QURO_INSTALL_PORT`, `QURO_INSTALL_API_PORT`) and
+removes every container, network and volume it created.
 
 `test:smoke` starts its own backend on port 3300, never reusing one already running there, with
 `QRO_DISABLE_SCHEDULERS=true`. The interval jobs (session cleanup, bunq sync, holding prices,
