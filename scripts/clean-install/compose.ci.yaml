@@ -1,0 +1,17 @@
+# Test-only overrides for scripts/clean-install/run.sh: locally built images, a free host port
+# on the loopback interface and no scheduled provider calls. Everything else comes unchanged
+# from docs/compose.example.yaml.
+services:
+  migrate:
+    image: ${QURO_BACKEND_IMAGE:?}
+    pull_policy: never
+  backend:
+    image: ${QURO_BACKEND_IMAGE:?}
+    pull_policy: never
+    environment:
+      QRO_DISABLE_SCHEDULERS: 'true'
+  frontend:
+    image: ${QURO_FRONTEND_IMAGE:?}
+    pull_policy: never
+    ports: !override
+      - '127.0.0.1:${QURO_INSTALL_PORT:?}:80'

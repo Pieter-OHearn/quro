@@ -97,6 +97,7 @@ jobs:
             output=$1 image=$2 dockerfile=$3
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
+              --build-arg QRO_IMAGE_REVISION="$RELEASE_SHA" \
               --file "$dockerfile" \
               --tag "$REGISTRY/$image:sha-$RELEASE_SHA" \
               --metadata-file "$RUNNER_TEMP/$image.json" \

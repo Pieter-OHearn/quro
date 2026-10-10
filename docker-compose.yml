@@ -38,7 +38,8 @@ services:
     secrets:
       - postgres_admin_password
       - postgres_app_password
-    entrypoint: ['/bin/sh', '/app/docker/backend/run-migrate.sh']
+    # The image's entry point is `quro`; its default command is `serve`.
+    command: ['migrate']
     networks:
       - backend-net
 
@@ -80,7 +81,13 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    command: ['bun', 'run', 'start']
+    command: ['serve']
+    healthcheck:
+      test: ['CMD', 'quro', 'health']
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 10s
     networks:
       - frontend-net
       - backend-net
@@ -117,7 +124,7 @@ services:
         condition: service_completed_successfully
       pension-parser:
         condition: service_started
-    command: ['bun', 'run', 'worker:pension-imports']
+    command: ['worker', 'pension-imports']
     networks:
       - backend-net
       - ai-net
@@ -206,6 +213,8 @@ services:
     restart: unless-stopped
     ports:
       - '${QRO_FRONTEND_PORT:-3000}:80'
+    environment:
+      QRO_API_URL: http://backend:3000
     depends_on:
       backend:
         condition: service_started
