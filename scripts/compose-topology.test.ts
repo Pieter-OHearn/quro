@@ -92,8 +92,10 @@ describe('Compose topology', () => {
       // Unset means filesystem; an old .env with S3 settings then stops the backend (exit 2).
       expect(environmentOf(services[name]!).QRO_DOCUMENT_STORAGE).toBe('${QRO_DOCUMENT_STORAGE:-}');
     }
-    // Backups read the documents; they never write to them.
-    expect(services['db-tools']?.volumes).toContain('./data/documents:/var/lib/quro/documents:ro');
+    // `quro backup` reads the documents and `quro restore` writes them back; archives go to
+    // ./backups, the default QRO_BACKUP_DIR inside the container.
+    expect(services['db-tools']?.volumes).toContain('./data/documents:/var/lib/quro/documents');
+    expect(services['db-tools']?.volumes).toContain('./backups:/var/lib/quro/backups');
   });
 });
 

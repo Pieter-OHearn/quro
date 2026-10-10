@@ -8,10 +8,11 @@
 #   config/quro.env    settings, written once by `quro init`; edit freely
 #   config/secrets/    generated database passwords, written once by `quro init`
 #   data/documents/    uploaded documents (create it before the first start)
+#   backups/           archives written by `docker compose run --rm migrate backup`
 #   the `postgres` named volume holds the database
 #
-# The backend runs as UID 1000. On Linux, config/ and data/documents/ must belong to that UID
-# (see docs/install.md).
+# The backend runs as UID 1000. On Linux, config/, data/documents/ and backups/ must belong to
+# that UID (see docs/install.md).
 
 name: quro
 
@@ -38,7 +39,7 @@ services:
 
   # Applies schema migrations and prepares the runtime role, then exits. It runs on every
   # `docker compose up`; when nothing is pending it changes nothing. Also the place to run
-  # maintenance commands: `docker compose run --rm migrate doctor`.
+  # maintenance commands: `docker compose run --rm migrate doctor`, `... migrate backup`.
   migrate:
     image: ghcr.io/pieter-ohearn/quro-backend:v0.8.0
     command: ['migrate']
@@ -49,6 +50,7 @@ services:
       - postgres_app_password
     volumes:
       - ./data/documents:/var/lib/quro/documents
+      - ./backups:/var/lib/quro/backups
     networks:
       - internal
     depends_on:

@@ -691,3 +691,77 @@ describe('least privilege', () => {
     }
   });
 });
+
+describe('backups', () => {
+  const KEY = 'k'.repeat(40);
+
+  test('default to the backup directory, no encryption, no copy and no retention', () => {
+    expect(load({}).config.backup).toEqual({
+      directory: '/var/lib/quro/backups',
+      encryptionKey: null,
+      offsiteDirectory: null,
+      keep: null,
+    });
+  });
+
+  test('read the key from its file and the off-device directory and retention', () => {
+    const { config } = load(
+      {
+        QRO_BACKUP_DIR: '/srv/quro/backups',
+        QRO_BACKUP_ENCRYPTION_KEY_FILE: '/run/secrets/backup_key',
+        QRO_BACKUP_OFFSITE_DIR: '/mnt/offsite/quro',
+        QRO_BACKUP_KEEP: '14',
+      },
+      { '/run/secrets/backup_key': `${KEY}\n` },
+    );
+    expect(config.backup.directory).toBe('/srv/quro/backups');
+    expect(config.backup.encryptionKey?.reveal()).toBe(KEY);
+    expect(config.backup.offsiteDirectory).toBe('/mnt/offsite/quro');
+    expect(config.backup.keep).toBe(14);
+  });
+
+  test('an off-device directory without a key is refused', () => {
+    expect(problemsOf({ QRO_BACKUP_OFFSITE_DIR: '/mnt/offsite' }, 'backup')).toEqual([
+      {
+        setting: 'QRO_BACKUP_OFFSITE_DIR',
+        message:
+          'needs QRO_BACKUP_ENCRYPTION_KEY_FILE: copies that leave this machine are always encrypted',
+      },
+    ]);
+  });
+
+  test('a short, missing or empty key is refused without echoing it', () => {
+    const short = problemsOf(
+      { QRO_BACKUP_ENCRYPTION_KEY_FILE: '/run/secrets/backup_key' },
+      'backup',
+      { '/run/secrets/backup_key': `${CANARY}\n` },
+    );
+    expect(short.map((p) => p.setting)).toEqual(['QRO_BACKUP_ENCRYPTION_KEY_FILE']);
+    expect(JSON.stringify(short)).not.toContain(CANARY);
+    const missing = problemsOf({ QRO_BACKUP_ENCRYPTION_KEY_FILE: '/run/secrets/none' }, 'backup');
+    expect(missing[0]?.message).toContain('secret file not found at /run/secrets/none');
+  });
+
+  test('the same directory twice, a relative directory and a zero retention are refused', () => {
+    const problems = problemsOf(
+      {
+        QRO_BACKUP_DIR: 'backups',
+        QRO_BACKUP_KEEP: '0',
+      },
+      'backup',
+    );
+    expect(problems.map((p) => p.setting).sort()).toEqual(['QRO_BACKUP_DIR', 'QRO_BACKUP_KEEP']);
+    const same = problemsOf(
+      {
+        QRO_BACKUP_DIR: '/srv/backups',
+        QRO_BACKUP_OFFSITE_DIR: '/srv/backups/',
+        QRO_BACKUP_ENCRYPTION_KEY_FILE: '/run/secrets/backup_key',
+      },
+      'backup',
+      { '/run/secrets/backup_key': KEY },
+    );
+    expect(same.map((p) => p.message)).toEqual([
+      'must be a different directory from QRO_BACKUP_DIR',
+    ]);
+  });
+});

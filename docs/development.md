@@ -192,7 +192,7 @@ QRO_CLEAR_CONFIRM=clear-all-data QRO_CLEAR_ALLOW_NON_EMPTY=1 bun run db:clear
 QRO_RESTORE_CONFIRM=restore-db QRO_RESTORE_ALLOW_NON_EMPTY=1 bun run db:restore -- backups/db/<dump-file>.dump
 ```
 
-`db:clear` and `db:restore` keep the current confirmation guards and automatic pre-destructive backups.
+`db:clear` and `db:restore` keep the current confirmation guards and automatic pre-destructive backups. These scripts write and read bare dumps; the operator commands `quro backup` and `quro restore` write one archive with the documents and a manifest (`bun run --filter '@quro/backend' quro backup --output <absolute dir>` from a checkout). Their tests replace `pg_dump` and `pg_restore` with stand-ins; `sh scripts/recovery-drill.sh` runs the real tools in Docker.
 
 Accounts on a host-run backend are managed with the same operator commands as in Docker. Sign-up
 needs a code from `quro user invite`; `quro user --help` lists the others (password reset codes,

@@ -53,7 +53,7 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
    docker compose exec -T db pg_restore --list < backups/db/pre-pg18-upgrade.dump | head -n 5
    ```
 
-   The file must be more than a few kilobytes and `pg_restore --list` must print the start of the archive's table of contents. Treat the dump as sensitive: it holds your financial records and bank tokens. Also keep copies of `.env`, `secrets/` and `./data/minio`; see [backup and restore](backup-and-restore.md#back-up-uploaded-documents).
+   The file must be more than a few kilobytes and `pg_restore --list` must print the start of the archive's table of contents. Treat the dump as sensitive: it holds your financial records and bank tokens. Also keep copies of `.env`, `secrets/` and `./data/minio`; see [backup and restore](backup-and-restore.md#what-an-archive-contains).
 
 4. Stop the stack.
 

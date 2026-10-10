@@ -15,7 +15,7 @@ The keys are the same in both stores, for example `users/<user id>/salary/paysli
 - Each document is a file at its key under the directory. Directories are created with mode `0700` and files with `0600`, readable by the backend user only. A file is written under a temporary name, flushed and renamed, so a reader never sees half a document.
 - `QRO_DOCUMENTS_DIR` must be an absolute path.
 - The pension import worker, when you run it, mounts the same directory and runs as the same user as the backend.
-- The `backup` command archives the directory next to the database dump. See [backup and restore](backup-and-restore.md).
+- `quro backup` puts the documents into the same archive as the database dump, with every file's SHA-256, while changes are paused; `quro restore` puts them back. Names starting with a dot (temporary files) are left out. See [backup and restore](backup-and-restore.md).
 
 ## S3-compatible storage
 

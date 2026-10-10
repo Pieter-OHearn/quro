@@ -12,18 +12,18 @@ The steps apply from 0.8.0. Images up to 0.7.0 have no `quro init`, `migrate` or
 
 ## Install
 
-1. Create a directory with a `config` and a `data/documents` directory, and copy [`docs/compose.example.yaml`](compose.example.yaml) into it as `compose.yaml`:
+1. Create a directory with a `config`, a `data/documents` and a `backups` directory, and copy [`docs/compose.example.yaml`](compose.example.yaml) into it as `compose.yaml`:
 
    ```bash
-   mkdir -p quro/config quro/data/documents
+   mkdir -p quro/config quro/data/documents quro/backups
    cd quro
    cp /path/to/compose.example.yaml compose.yaml
    ```
 
-2. On Linux, give both directories to UID 1000, the user the backend runs as. Skip this when `id -u` already prints `1000`, or on Docker Desktop:
+2. On Linux, give the directories to UID 1000, the user the backend runs as. Skip this when `id -u` already prints `1000`, or on Docker Desktop:
 
    ```bash
-   sudo chown 1000:1000 config data/documents
+   sudo chown 1000:1000 config data/documents backups
    ```
 
    Quro never creates the documents directory itself; when Docker creates a missing bind-mount source on Linux, it belongs to root and the backend cannot write to it.
