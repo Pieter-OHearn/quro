@@ -97,16 +97,22 @@ fingerprint() {
   docker exec -i "$1" psql -X -q -At -U "$ADMIN_USER" -d "$2" <"$REPO/scripts/pg-table-fingerprint.sql" | LC_ALL=C sort
 }
 
-verify() {
-  bun "$HERE/verify.ts" "$1" --fixture "$FIXTURE" --endpoint "$S3_URL" --bucket "$BUCKET" \
-    --before "$(url_for "$RUN-old" "$DB")" --after "$(url_for "$RUN-new" "$2")"
+# compare DATABASE: verify.ts against the 0.7.0 database and DATABASE on the new server.
+compare() {
+  BEFORE_DATABASE_URL=$(url_for "$RUN-old" "$DB") AFTER_DATABASE_URL=$(url_for "$RUN-new" "$1") \
+    bun "$HERE/verify.ts" compare --fixture "$FIXTURE" --endpoint "$S3_URL" --bucket "$BUCKET"
 }
 
-# expect_failure LABEL DATABASE: the comparison must fail, naming the difference.
+# expect_failure LABEL DATABASE EXPECTED: the comparison must run to the end and report a
+# difference containing EXPECTED; failing for any other reason does not count.
 expect_failure() {
-  if verify compare "$2" >"$WORK/self-check.log" 2>&1; then
+  if compare "$2" >"$WORK/self-check.log" 2>&1; then
     cat "$WORK/self-check.log" >&2
     fail "self-check: $1 was not detected"
+  fi
+  if ! grep -q 'difference(s):' "$WORK/self-check.log" || ! grep -qF -- "$3" "$WORK/self-check.log"; then
+    cat "$WORK/self-check.log" >&2
+    fail "self-check: $1 did not produce the expected difference ($3)"
   fi
   echo "$1: detected"
   grep '^  - ' "$WORK/self-check.log" | head -n 3
@@ -176,19 +182,19 @@ case "$second_out" in *'No migrations to apply.'*) ;; *) fail "a second quro mig
 echo "a second run changed nothing"
 
 step "Compare the upgraded database and the store with the 0.7.0 fixture"
-verify compare "$DB"
+compare "$DB"
 
 step "Self-check: the comparison notices damage"
 echo "create database quro_self_check template $DB;" | psql_in "$RUN-new" postgres
 echo "update savings_accounts set balance = balance + 0.01 where id = (select min(id) from savings_accounts);" |
   psql_in "$RUN-new" quro_self_check
-expect_failure "a one-cent change" quro_self_check
+expect_failure "a one-cent change" quro_self_check "public.savings_accounts: row contents differ"
 echo "drop database quro_self_check; create database quro_self_check template $DB;" | psql_in "$RUN-new" postgres
 echo "delete from payslips where id = (select min(id) from payslips where document_storage_key is not null);" |
   psql_in "$RUN-new" quro_self_check
-expect_failure "a removed attachment row" quro_self_check
+expect_failure "a removed attachment row" quro_self_check "no longer refers to its document"
 key=$(sed -n '1s/^[0-9a-f]*  //p' "$FIXTURE/documents.sha256")
 bun -e 'const [endpoint, bucket, key] = process.argv.slice(1);
   await new Bun.S3Client({ endpoint, bucket, region: "us-east-1", accessKeyId: "fixture", secretAccessKey: "fixture" }).delete(key);' \
   "$S3_URL" "$BUCKET" "$key"
-expect_failure "a missing object" "$DB"
+expect_failure "a missing object" "$DB" "$key): not in the store"

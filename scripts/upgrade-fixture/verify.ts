@@ -5,6 +5,8 @@
 //   compare     Compares the fixture database before the upgrade (PostgreSQL 16, 0.7.0 schema)
 //               with the upgraded one, table by table, as declared in expectations.ts, and checks
 //               that every document the upgraded rows refer to is in the store, unchanged.
+//               The database URLs come from BEFORE_DATABASE_URL and AFTER_DATABASE_URL, so their
+//               passwords stay out of the process list.
 //
 // Exit status 1 with one line per difference when a check fails. Output names tables, columns,
 // row ids and keys, never row contents.
@@ -211,7 +213,7 @@ async function compareTable(
   const { table, columns, beforeSelect, change } = plan;
   const afterSelect = columns.map((column) => quoteIdent(column.name));
   let afterWhere: string | undefined;
-  let appended = 0;
+  let appendedFound = 0;
   if (change.appendedRows) {
     const key = quoteIdent(change.appendedRows.key);
     const max = await first(
@@ -219,14 +221,15 @@ async function compareTable(
       `select coalesce(max(${key}), 0)::text as max from ${quoteTable(table)}`,
     );
     afterWhere = `${key} <= ${Number(max.max)}`;
-    appended =
+    const expected =
       change.appendedRows.count === 'journal' ? migrationsBehind : change.appendedRows.count;
     const added = await first(
       after,
       `select count(*)::text as n from ${quoteTable(table)} where not (${afterWhere})`,
     );
-    if (Number(added.n) !== appended)
-      failures.push(`${table}: ${added.n} rows appended, expected ${appended}`);
+    appendedFound = Number(added.n);
+    if (appendedFound !== expected)
+      failures.push(`${table}: ${added.n} rows appended, expected ${expected}`);
   }
   const old = await first(before, summaryQuery(table, beforeSelect, columns, change.keptRows));
   const now = await first(after, summaryQuery(table, afterSelect, columns, afterWhere));
@@ -250,7 +253,7 @@ async function compareTable(
     )) as Row[];
     compareTotals(table, columns, oldTotals, newTotals, failures);
   }
-  return Number(now.rows) + appended;
+  return Number(now.rows) + appendedFound;
 }
 
 export function compareTotals(
@@ -532,13 +535,16 @@ if (import.meta.main) {
     args: Bun.argv.slice(FIRST_ARGUMENT),
     allowPositionals: true,
     options: {
-      before: { type: 'string' },
-      after: { type: 'string' },
       fixture: { type: 'string' },
       endpoint: { type: 'string' },
       bucket: { type: 'string' },
     },
   });
+  const fromEnv = (name: string): string => {
+    const value = process.env[name];
+    if (!value) throw new Error(`${name} is required`);
+    return value;
+  };
   const need = (name: keyof typeof values): string => {
     const value = values[name];
     if (!value) throw new Error(`--${name} is required`);
@@ -547,9 +553,13 @@ if (import.meta.main) {
   const store = { fixture: need('fixture'), endpoint: need('endpoint'), bucket: need('bucket') };
   if (positionals[0] === 'load-store') await loadStore(store);
   else if (positionals[0] === 'compare')
-    await compare({ ...store, before: need('before'), after: need('after') });
+    await compare({
+      ...store,
+      before: fromEnv('BEFORE_DATABASE_URL'),
+      after: fromEnv('AFTER_DATABASE_URL'),
+    });
   else
     throw new Error(
-      'usage: verify.ts load-store|compare --fixture DIR --endpoint URL --bucket NAME [--before URL --after URL]',
+      'usage: verify.ts load-store|compare --fixture DIR --endpoint URL --bucket NAME',
     );
 }
