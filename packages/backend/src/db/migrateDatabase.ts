@@ -160,16 +160,29 @@ async function applyChanges(sql: AdminSql, options: MigrateOptions): Promise<Mig
   }
 
   if (options.runtime && checked.plan && checked.plan.action !== 'refuse') {
-    const changes = await applyRuntimeRolePlan(sql, checked.plan, {
-      roleName: options.runtime.user,
-      password: options.runtime.password,
-    });
-    for (const change of changes) options.print(change);
+    try {
+      const changes = await applyRuntimeRolePlan(sql, checked.plan, {
+        roleName: options.runtime.user,
+        password: options.runtime.password,
+      });
+      for (const change of changes) options.print(change);
+    } catch (error) {
+      throw new RuntimeRoleStepError(error);
+    }
   }
   return { kind: 'ok' };
 }
 
-function outcomeForError(error: unknown): MigrateOutcome {
+/** A failure after the migrations were committed, while preparing the runtime role. */
+class RuntimeRoleStepError extends Error {
+  constructor(readonly original: unknown) {
+    super('runtime role step failed');
+  }
+}
+
+function outcomeForError(caught: unknown): MigrateOutcome {
+  const roleStep = caught instanceof RuntimeRoleStepError;
+  const error = roleStep ? caught.original : caught;
   const reason = describeDatabaseError(error);
   switch (classifyDatabaseError(error)) {
     case 'unreachable':
@@ -182,9 +195,15 @@ function outcomeForError(error: unknown): MigrateOutcome {
   if ((error as { code?: unknown }).code === INSUFFICIENT_PRIVILEGE) {
     return { kind: 'refused', message: `Missing database privileges: ${reason}.` };
   }
+  if (roleStep) {
+    return {
+      kind: 'failed',
+      message: `The schema is migrated, but preparing the runtime role failed: ${reason}. Fix the cause and run \`quro migrate\` again.`,
+    };
+  }
   return {
     kind: 'failed',
-    message: `Migration failed: ${reason}. No migration from this run was recorded; fix the cause and run \`quro migrate\` again.`,
+    message: `Migration failed: ${reason}. Pending migrations run in one transaction, so none from this run was recorded; fix the cause and run \`quro migrate\` again.`,
   };
 }
 

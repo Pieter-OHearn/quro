@@ -212,6 +212,23 @@ async function backupToolCheck(serverMajor: number | null): Promise<DoctorCheck>
   );
 }
 
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_FORBIDDEN = 403;
+const HTTP_NOT_FOUND = 404;
+
+/** A rejected key is a settings problem, a missing bucket a failed check, the rest the network. */
+export function s3FailureKind(error: unknown): FailureKind {
+  const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+  if (status === HTTP_UNAUTHORIZED || status === HTTP_FORBIDDEN) return 'settings';
+  if (status === HTTP_NOT_FOUND) return 'failed';
+  return 'unreachable';
+}
+
+const S3_HINTS: Partial<Record<FailureKind, string>> = {
+  settings: ' The store rejected the access key; check S3_ACCESS_KEY_ID and the secret key file.',
+  failed: ' The bucket does not exist; create it first.',
+};
+
 async function documentStoreCheck(): Promise<DoctorCheck> {
   const documents = section(() => getConfig().documents);
   if (!documents) return skip('documents', 'Not checked: invalid settings.');
@@ -223,10 +240,12 @@ async function documentStoreCheck(): Promise<DoctorCheck> {
     await createDocumentStore(documents).check();
     return ok('documents', `${documents.driver}: ${where} is usable.`);
   } catch (error) {
-    const reason =
-      error instanceof Error && documents.driver === 'filesystem' ? ` ${error.message}` : '';
-    const failure: FailureKind = documents.driver === 's3' ? 'unreachable' : 'failed';
-    return fail('documents', failure, `${documents.driver}: ${where} is not usable.${reason}`);
+    if (documents.driver === 's3') {
+      const failure = s3FailureKind(error);
+      return fail('documents', failure, `s3: ${where} is not usable.${S3_HINTS[failure] ?? ''}`);
+    }
+    const reason = error instanceof Error ? ` ${error.message}` : '';
+    return fail('documents', 'failed', `filesystem: ${where} is not usable.${reason}`);
   }
 }
 

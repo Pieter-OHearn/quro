@@ -150,7 +150,10 @@ describe('schema readiness', () => {
     checkSchemaReadiness(NOW, {}, () => Promise.resolve(latest));
 
   test('is ready only when the newest applied migration is the newest bundled one', async () => {
-    expect(await schema(newest.when)).toMatchObject({ ready: true, reason: null });
+    const current = await schema(newest.when);
+    expect(current).toMatchObject({ ready: true, reason: null });
+    // Public endpoint: the schema version is not named.
+    expect(current.message).not.toContain(newest.tag);
   });
 
   test('reports a schema behind the image with the command that fixes it', async () => {

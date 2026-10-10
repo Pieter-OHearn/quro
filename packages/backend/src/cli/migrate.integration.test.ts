@@ -354,6 +354,23 @@ describe('refusals and exit codes', () => {
     expect(await appliedCount(database)).toBe(BUNDLED);
   });
 
+  test('a runtime role step that fails after the migrations says the schema is migrated', async () => {
+    const database = await freshDatabase('rolestep');
+    const lines: string[] = [];
+    const outcome = await migrateDatabase({
+      adminUrl: urlFor(database),
+      target: { host: 'test', port: 5432, database, user: 'test' },
+      // Not a valid role identifier: the role step refuses to build SQL with it.
+      runtime: { user: 'not-a-valid-identifier', url: urlFor(database), password: 'unused' },
+      dryRun: false,
+      print: (line) => lines.push(line),
+      connectAttempts: 1,
+    });
+    expect(outcome.kind).toBe('failed');
+    expect('message' in outcome && outcome.message).toContain('The schema is migrated');
+    expect(await appliedCount(database)).toBe(BUNDLED);
+  });
+
   test('an owner that does not own the database is refused with exit code 3', async () => {
     const outsider = await freshRole('outsider');
     const database = await freshDatabase('notowner');

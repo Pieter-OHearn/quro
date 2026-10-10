@@ -129,11 +129,12 @@ export async function checkSchemaReadiness(
       await withTimeout(readLatest(), READINESS_TIMEOUT_MS, 'Schema readiness check'),
     );
     const ready = schema.status === 'current';
+    // The endpoint is public: a matching schema is not described by name.
     return createReadinessCheck(
       now,
       true,
       ready,
-      describeSchema(schema),
+      ready ? 'The database schema matches this image.' : describeSchema(schema),
       ready ? null : `schema_${schema.status}`,
     );
   } catch (error) {
