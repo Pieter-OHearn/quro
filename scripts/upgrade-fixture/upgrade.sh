@@ -9,7 +9,8 @@
 #      server's own pg_dump, restore with the new server's own pg_restore into an empty database
 #      on a new data directory, before any new migration runs. Every table and sequence must be
 #      identical across the two majors.
-#   3. The checkout's migrations run against PostgreSQL 18 with Bun, as `db:migrate` does.
+#   3. `quro migrate` from the backend image built from this checkout applies the migrations and
+#      the runtime role's grants, as an operator runs it; a second run must change nothing.
 #   4. verify.ts compares the upgraded database with the 0.7.0 one and checks every document the
 #      rows refer to against the store.
 #   5. Self-check: a one-cent change, a removed attachment row and a missing object must each
@@ -18,9 +19,10 @@
 # Usage: sh scripts/upgrade-fixture/upgrade.sh
 # Needs Docker and Bun with the repository's dependencies installed. No application server is
 # started; the containers publish ports on 127.0.0.1 only and hold synthetic data. Every container
-# it creates is removed on exit.
+# and network it creates is removed on exit.
 #
 # Environment:
+#   QURO_BACKEND_IMAGE  backend image under test (default quro-backend:ci; built when missing)
 #   PG_OLD_IMAGE  the 0.7.0 database (default postgres:16.11-alpine3.23)
 #   PG_NEW_IMAGE  the database to upgrade to (default: the db image in docker-compose.yml)
 set -eu
@@ -35,6 +37,7 @@ PG_NEW_IMAGE=${PG_NEW_IMAGE:-$(sed -n 's/^ *image: *\(postgres:[^ ]*\) *$/\1/p' 
   exit 1
 }
 # Same test double as generate.sh (Apache-2.0, pinned by digest).
+IMAGE=${QURO_BACKEND_IMAGE:-quro-backend:ci}
 S3_IMAGE=adobe/s3mock:4.11.0@sha256:cd49108c0094bc3f420b24bff354073032a9ec1a6f4cc89f8e8f483a308cf99e
 DB=quro
 ADMIN_USER=quro_admin
@@ -42,6 +45,7 @@ APP_USER=quro_app
 BUCKET=quro-documents
 
 RUN="quro-upgrade-fixture-$$"
+NET="$RUN-net"
 WORK=$(mktemp -d)
 # Throwaway credentials for containers that live for a few minutes on the loopback interface.
 ADMIN_PASSWORD=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
@@ -56,6 +60,7 @@ fail() {
 cleanup() {
   status=$?
   docker rm -f "$RUN-old" "$RUN-new" "$RUN-s3" >/dev/null 2>&1 || true
+  docker network rm "$NET" >/dev/null 2>&1 || true
   rm -rf "$WORK"
   if [ "$status" -eq 0 ]; then
     printf '\nPASS: upgrade from the 0.7.0 fixture\n'
@@ -69,7 +74,7 @@ trap 'exit 130' INT TERM
 
 # start_server NAME IMAGE DATA_DIR: a server on tmpfs, published on a free loopback port.
 start_server() {
-  docker run -d --name "$1" -p 127.0.0.1::5432 --tmpfs "$3" \
+  docker run -d --name "$1" --network "$NET" -p 127.0.0.1::5432 --tmpfs "$3" \
     -e POSTGRES_USER="$ADMIN_USER" -e POSTGRES_PASSWORD="$ADMIN_PASSWORD" -e POSTGRES_DB="$DB" \
     "$2" >/dev/null
   tries=0
@@ -107,6 +112,28 @@ expect_failure() {
   grep '^  - ' "$WORK/self-check.log" | head -n 3
 }
 
+# quro ARGS...: the backend image's operator command against the new server, with the settings
+# and password files an operator gives it. It runs as the invoking user so the files stay private.
+quro() {
+  docker run --rm --network "$NET" --user "$(id -u):$(id -g)" \
+    -e POSTGRES_HOST="$RUN-new" -e POSTGRES_DB="$DB" \
+    -e POSTGRES_ADMIN_USER="$ADMIN_USER" -e POSTGRES_APP_USER="$APP_USER" \
+    -e POSTGRES_ADMIN_PASSWORD_FILE=/run/secrets/postgres_admin_password \
+    -e POSTGRES_APP_PASSWORD_FILE=/run/secrets/postgres_app_password \
+    -e QRO_DISABLE_SCHEDULERS=true \
+    -v "$WORK/postgres_admin_password:/run/secrets/postgres_admin_password:ro" \
+    -v "$WORK/postgres_app_password:/run/secrets/postgres_app_password:ro" \
+    "$IMAGE" "$@"
+}
+
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  step "Building $IMAGE"
+  docker build -q -f "$REPO/packages/backend/Dockerfile" -t "$IMAGE" "$REPO" >/dev/null
+fi
+docker network create "$NET" >/dev/null
+(umask 077 && printf '%s' "$ADMIN_PASSWORD" >"$WORK/postgres_admin_password" &&
+  printf '%s' "$APP_PASSWORD" >"$WORK/postgres_app_password")
+
 step "PostgreSQL 16 ($PG_OLD_IMAGE) loads the 0.7.0 fixture"
 start_server "$RUN-old" "$PG_OLD_IMAGE" /var/lib/postgresql/data
 psql_in "$RUN-old" "$DB" <"$FIXTURE/database.sql" >/dev/null
@@ -140,14 +167,13 @@ fingerprint "$RUN-new" "$DB" >"$WORK/restored.snap"
 if ! diff "$WORK/before.snap" "$WORK/restored.snap"; then fail "the restore on $major differs from the 16 database"; fi
 echo "identical on PostgreSQL $major before migrating"
 
-step "This checkout's migrations"
-(
-  cd "$REPO/packages/backend"
-  url=$(url_for "$RUN-new" "$DB")
-  # Explicit URLs and no .env file: nothing can redirect the migration to another database.
-  DATABASE_URL="$url" ADMIN_DATABASE_URL="$url" APP_DATABASE_URL="$url" \
-    bun --no-env-file src/db/migrate.ts
-)
+step "quro migrate from this checkout's backend image ($IMAGE)"
+migrate_out=$(quro migrate)
+echo "$migrate_out"
+case "$migrate_out" in *'Applied '*) ;; *) fail "quro migrate applied no migration" ;; esac
+second_out=$(quro migrate)
+case "$second_out" in *'No migrations to apply.'*) ;; *) fail "a second quro migrate was not a no-op: $second_out" ;; esac
+echo "a second run changed nothing"
 
 step "Compare the upgraded database and the store with the 0.7.0 fixture"
 verify compare "$DB"

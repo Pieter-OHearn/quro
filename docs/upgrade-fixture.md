@@ -22,7 +22,7 @@ Plain SQL and loose files keep the fixture small (about 130 KB), readable in a d
 
 1. PostgreSQL 16.11 loads `database.sql`; an S3 test double receives the documents.
 2. The database moves to the PostgreSQL version in `docker-compose.yml` by dump and restore, each with its own server's client tools, into a new data directory, as in [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md). The restore goes into an empty database, before any migration of the new version has run. Every table and sequence must be identical across the two versions.
-3. The checkout's migrations run against the new database.
+3. `quro migrate` from the backend image built from the checkout applies the migrations and the runtime role's grants, the way an operator runs it. A second run must find nothing to do.
 4. [`verify.ts`](../scripts/upgrade-fixture/verify.ts) compares the upgraded database with the 0.7.0 one and fails on any difference that [`expectations.ts`](../scripts/upgrade-fixture/expectations.ts) does not declare:
    - every table: row count, a checksum over all rows and null counts per column;
    - every numeric column: its total, per currency where the table has a `currency` column;
@@ -31,7 +31,7 @@ Plain SQL and loose files keep the fixture small (about 130 KB), readable in a d
    - documents: every key a payslip, pension transaction or statement import refers to must be in the store with the recorded size and SHA-256, and no row may lose its document.
 5. A one-cent change, a removed attachment row and a missing object must each make step 4 fail.
 
-Run it locally the same way (it uses ports on 127.0.0.1 only and removes its containers):
+Run it locally the same way. It builds the backend image as `quro-backend:ci` when that tag is missing (set `QURO_BACKEND_IMAGE` to test another tag), publishes ports on 127.0.0.1 only and removes its containers:
 
 ```bash
 sh scripts/upgrade-fixture/upgrade.sh

@@ -31,7 +31,7 @@ run applicable checks before opening a PR and report commands, results and skipp
 | `bun run test:smoke`                        | Playwright browser tests; starts backend, migrates and seeds demo data in the selected DB                                |
 | `sh scripts/clean-install/run.sh`           | Install from empty volumes with `docs/compose.example.yaml`; Docker, builds images; loopback ports 18085-18086           |
 | `bun run build`                             | Frontend and backend builds                                                                                              |
-| `sh scripts/upgrade-fixture/upgrade.sh`     | Upgrades the synthetic 0.7.0 fixture to this checkout and compares data and documents; Docker, loopback ports only       |
+| `sh scripts/upgrade-fixture/upgrade.sh`     | Upgrade the synthetic 0.7.0 fixture to this checkout, compare data and documents; Docker, builds backend image; loopback |
 | `bun run ci:check`                          | Full suite, migrations, Python checks and dependency audits; isolated DB, Python tools and audit network access required |
 
 `ci:check`'s pre-commit mode skips DB tests; a passing hook is not full CI evidence.
