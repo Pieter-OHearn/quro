@@ -128,7 +128,9 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
 - The 18 image must refuse the 16 directory at both mount points, and the 16 directory must still start with the same fingerprint afterwards.
 - A one-cent change to a copy must change the fingerprint, so the comparison cannot pass vacuously.
 
-Run it locally with Docker (it builds the backend image when `quro-backend:ci` is missing):
+The [upgrade test from 0.7.0](upgrade-fixture.md) runs the same dump and restore on a synthetic 0.7.0 installation, then applies the current migrations and compares every table and stored document with the original.
+
+Run the rehearsal locally with Docker (it builds the backend image when `quro-backend:ci` is missing):
 
 ```bash
 sh scripts/rehearse-pg-upgrade.sh
