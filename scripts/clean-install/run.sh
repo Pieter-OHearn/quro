@@ -35,6 +35,8 @@ S3_IMAGE=adobe/s3mock:4.11.0@sha256:cd49108c0094bc3f420b24bff354073032a9ec1a6f4c
 PG_IMAGE=$(sed -n 's/^ *image: *\(postgres:[^ ]*\).*/\1/p' "$REPO/docs/compose.example.yaml" | head -n 1)
 RUN="quro-install-$$"
 WORK=$(mktemp -d)
+# Traversable by UID 1000, which owns the configuration files below it on Linux.
+chmod 0755 "$WORK"
 INSTALL="$WORK/install"
 EXT="$WORK/external"
 CODE_PATTERN='[0-9A-Z]{6}(-[0-9A-Z]{6}){3}'

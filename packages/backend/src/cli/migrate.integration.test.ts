@@ -188,7 +188,7 @@ describe('quro migrate on a new database', () => {
     expect(run.out).toContain(`Applied ${BUNDLED} migration(s)`);
     expect(run.out).toContain(`Created the runtime role ${app.name}.`);
     expect(run.out).not.toContain(app.password);
-    expect(run.out).not.toContain(serverUrl.password);
+    expect(run.out).not.toContain('postgres://');
     expect(await appliedCount(database)).toBe(BUNDLED);
     expect(await roleExists(app.name)).toBe(true);
   });
@@ -400,7 +400,7 @@ describe('refusals and exit codes', () => {
       };
       expect(await runMigrateCommand([], io, { connectAttempts: 1, runtimeRole: false })).toBe(4);
       expect(lines.join('\n')).toContain('cannot be reached');
-      expect(lines.join('\n')).not.toContain(serverUrl.password);
+      expect(lines.join('\n')).not.toContain('postgres://');
     } finally {
       restore();
     }
