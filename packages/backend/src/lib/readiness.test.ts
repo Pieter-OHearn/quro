@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigError } from '../config';
 import { createFilesystemDocumentStore } from './filesystemDocumentStore';
+import { BUNDLED_MIGRATIONS } from '../db/schemaVersion';
 import {
   checkDocumentStorageReadiness,
+  checkSchemaReadiness,
   getCoreReadinessReport,
   getHealthReport,
   getPensionImportReadinessReport,
@@ -36,6 +38,7 @@ describe('readiness report aggregation', () => {
   test('maps all required checks ready to ready and HTTP 200', async () => {
     const report = await getCoreReadinessReport(NOW, {
       checkDatabase: () => Promise.resolve(check(true)),
+      checkSchema: () => Promise.resolve(check(true)),
       checkDocumentStorage: () => Promise.resolve(check(true)),
       checkPensionImport: () => Promise.resolve(check(true, false)),
     });
@@ -47,6 +50,7 @@ describe('readiness report aggregation', () => {
   test('maps any failed required check to not ready and HTTP 503', async () => {
     const report = await getCoreReadinessReport(NOW, {
       checkDatabase: () => Promise.resolve(check(true)),
+      checkSchema: () => Promise.resolve(check(true)),
       checkDocumentStorage: () => Promise.resolve(check(false)),
       checkPensionImport: () => Promise.resolve(check(true, false)),
     });
@@ -58,6 +62,7 @@ describe('readiness report aggregation', () => {
   test('does not let an optional pension import failure affect core status', async () => {
     const report = await getCoreReadinessReport(NOW, {
       checkDatabase: () => Promise.resolve(check(true)),
+      checkSchema: () => Promise.resolve(check(true)),
       checkDocumentStorage: () => Promise.resolve(check(true)),
       checkPensionImport: () => Promise.resolve(check(false, false)),
     });
@@ -72,6 +77,7 @@ describe('readiness report aggregation', () => {
 
     await getCoreReadinessReport(NOW, {
       checkDatabase: () => Promise.resolve(check(false)),
+      checkSchema: () => Promise.resolve(check(false)),
       checkDocumentStorage: () => Promise.resolve(check(true)),
       checkPensionImport,
     });
@@ -134,5 +140,53 @@ describe('document storage readiness', () => {
     );
 
     expect(report).toMatchObject({ ready: false, reason: 'connection_failed' });
+  });
+});
+
+describe('schema readiness', () => {
+  const newest = BUNDLED_MIGRATIONS.at(-1)!;
+  const previous = BUNDLED_MIGRATIONS.at(-2)!;
+  const schema = (latest: number | null) =>
+    checkSchemaReadiness(NOW, {}, () => Promise.resolve(latest));
+
+  test('is ready only when the newest applied migration is the newest bundled one', async () => {
+    expect(await schema(newest.when)).toMatchObject({ ready: true, reason: null });
+  });
+
+  test('reports a schema behind the image with the command that fixes it', async () => {
+    const behind = await schema(previous.when);
+    expect(behind).toMatchObject({ required: true, ready: false, reason: 'schema_behind' });
+    expect(behind.message).toContain('1 migration(s) behind');
+    expect(behind.message).toContain('quro migrate');
+    expect(await schema(null)).toMatchObject({ ready: false, reason: 'schema_empty' });
+  });
+
+  test('reports a schema newer than the image, or one it does not know, as incompatible', async () => {
+    const ahead = await schema(newest.when + 1);
+    expect(ahead).toMatchObject({ ready: false, reason: 'schema_ahead' });
+    expect(ahead.message).toContain('newer than this image');
+    expect(await schema(newest.when - 1)).toMatchObject({ ready: false, reason: 'schema_unknown' });
+  });
+
+  test('says when the runtime role cannot read the migration history', async () => {
+    const denied = await checkSchemaReadiness(NOW, {}, () =>
+      Promise.reject(Object.assign(new Error('permission denied'), { code: '42501' })),
+    );
+    expect(denied).toMatchObject({ ready: false, reason: 'schema_unreadable' });
+    expect(await checkSchemaReadiness(NOW, { skipDueToDatabaseFailure: true })).toMatchObject({
+      ready: false,
+      reason: 'database_unavailable',
+    });
+  });
+
+  test('keeps the instance not ready when the schema does not match', async () => {
+    const report = await getCoreReadinessReport(NOW, {
+      checkDatabase: () => Promise.resolve(check(true)),
+      checkSchema: () => Promise.resolve(check(false)),
+      checkDocumentStorage: () => Promise.resolve(check(true)),
+      checkPensionImport: () => Promise.resolve(check(true, false)),
+    });
+    expect(report.status).toBe('not_ready');
+    expect(getReadinessStatusCode(report)).toBe(503);
   });
 });

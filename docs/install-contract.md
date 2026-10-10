@@ -1,10 +1,8 @@
 # Install contract
 
-<!-- docs:check skip-paths: docs/compose.example.yaml -->
-
 This page records how Quro is installed from release images and what each piece promises. It is written for operators who run Quro and for contributors who build the installer. It is a decision record plus a service contract: it fixes names, paths, commands and behaviour, and lists where 0.7.0 differs.
 
-The contract applies from 0.8.0. Until that release ships, the [Self-hosting](../README.md#self-hosting) section of the README describes what works today, and the rows marked **0.7.0** below describe the code as it is.
+The contract applies from 0.8.0. Until that release ships, the [Self-hosting](../README.md#self-hosting) section of the README describes what works today, and the rows marked **0.7.0** below describe that release. The step-by-step install with these commands is in [Install Quro](install.md).
 
 ## Status
 
@@ -84,7 +82,7 @@ The image's entry point is `quro`; its default command is `serve`.
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ----------------------------------- |
 | `quro serve`                     | Runs the API server. Does not migrate.                                                                                                                                                                                               | Application data                   | Runtime database, storage           |
 | `quro worker pension-imports`    | Runs the optional pension import worker.                                                                                                                                                                                             | Application data                   | Runtime database, storage           |
-| `quro init [--dir <path>]`       | Writes a settings file and generated secret files into a mounted directory (default `/config`). Creates only missing files; never changes an existing one.                                                                           | New files only                     | None                                |
+| `quro init [--dir <path>]`       | Writes a settings file and generated secret files into a mounted directory (default `/config`). Creates only missing files; never changes an existing one. `--dry-run` lists what it would create.                                   | New files only                     | None                                |
 | `quro migrate [--dry-run]`       | Applies pending schema migrations as the owner role, then creates or updates the runtime role and its grants.                                                                                                                        | Schema, runtime role               | Admin and runtime database          |
 | `quro doctor [--json]`           | Read-only checks: settings, database reachability for both roles, schema against the image, backup tool version, document store access.                                                                                              | Nothing                            | All configured                      |
 | `quro backup [--output <dir>]`   | Writes one archive: database dump, documents (filesystem) or an object manifest (S3), and a manifest with versions and checksums.                                                                                                    | A new file in the backup directory | Admin database, storage             |

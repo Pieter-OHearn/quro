@@ -1,7 +1,17 @@
 #!/bin/sh
-# Operator command line, for example: docker compose exec backend quro user invite
-# The command reads the database settings and password files from the container's configuration.
+# The image's entry point: `quro <command>`. The server and the worker replace this shell so they
+# receive the container's signals directly; every other command runs the operator command line.
 set -eu
 
 cd /app/packages/backend
+case "${1:-}" in
+  serve)
+    if [ "$#" -eq 1 ]; then exec bun src/index.ts; fi
+    ;;
+  worker)
+    if [ "$#" -eq 2 ] && [ "$2" = "pension-imports" ]; then
+      exec bun src/workers/pensionImportWorker.ts
+    fi
+    ;;
+esac
 exec bun src/cli/quro.ts "$@"

@@ -87,7 +87,7 @@ A restore replaces the contents of the database with the contents of the dump.
 
    Before it overwrites a non-empty database, the command writes a safety backup named `<database>-<timestamp>-pre-restore.dump` into `./backups/db`. Keep it until you have verified the restore.
 
-4. With filesystem storage, restore the documents from the archive with the same name as the dump. The backend writes as root in the current image, so on Linux run `tar` with `sudo` if `./data/documents` is owned by root:
+4. With filesystem storage, restore the documents from the archive with the same name as the dump. The backend runs as UID 1000, so on Linux the restored files must belong to that user: run `tar` with `sudo` when `./data/documents` is not yours, then `sudo chown -R 1000:1000 ./data/documents`. The backup commands write as the same user, so `./backups` must be writable by UID 1000 too:
 
    ```bash
    mkdir -p ./data/documents

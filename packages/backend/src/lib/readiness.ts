@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { db } from '../db/client';
+import { db, queryClient } from '../db/client';
 import { ConfigError } from '../config';
+import { compareSchema, describeSchema, readLatestAppliedWhen } from '../db/schemaVersion';
 import { getPensionStatementImportCapability } from './capabilities';
 import { getDocumentStore } from './documentStorage';
 
@@ -19,6 +20,7 @@ export type CoreReadinessReport = {
   checkedAt: string;
   checks: {
     database: ReadinessCheck;
+    schema: ReadinessCheck;
     documentStorage: ReadinessCheck;
   };
   optional: {
@@ -38,8 +40,13 @@ type CheckPensionImportOptions = {
   skipDueToDatabaseFailure?: boolean;
 };
 
+type CheckSchemaOptions = {
+  skipDueToDatabaseFailure?: boolean;
+};
+
 type ReadinessDependencies = {
   checkDatabase: (now: Date) => Promise<ReadinessCheck>;
+  checkSchema: (now: Date, options?: CheckSchemaOptions) => Promise<ReadinessCheck>;
   checkDocumentStorage: (now: Date) => Promise<ReadinessCheck>;
   checkPensionImport: (now: Date, options?: CheckPensionImportOptions) => Promise<ReadinessCheck>;
 };
@@ -92,6 +99,53 @@ export async function checkDatabaseReadiness(now = new Date()): Promise<Readines
       false,
       'Database connection failed.',
       'connection_failed',
+    );
+  }
+}
+
+const INSUFFICIENT_PRIVILEGE = '42501';
+
+/**
+ * Compares the migrations applied to the database with the journal this image ships. The server
+ * never migrates by itself, so a schema that is behind (run `quro migrate`) or ahead (a newer image
+ * migrated it) keeps the instance not ready, with a message that says which.
+ */
+export async function checkSchemaReadiness(
+  now = new Date(),
+  options: CheckSchemaOptions = {},
+  readLatest = () => readLatestAppliedWhen(queryClient),
+): Promise<ReadinessCheck> {
+  if (options.skipDueToDatabaseFailure) {
+    return createReadinessCheck(
+      now,
+      true,
+      false,
+      'The schema could not be checked because the database is unavailable.',
+      'database_unavailable',
+    );
+  }
+  try {
+    const schema = compareSchema(
+      await withTimeout(readLatest(), READINESS_TIMEOUT_MS, 'Schema readiness check'),
+    );
+    const ready = schema.status === 'current';
+    return createReadinessCheck(
+      now,
+      true,
+      ready,
+      describeSchema(schema),
+      ready ? null : `schema_${schema.status}`,
+    );
+  } catch (error) {
+    const unreadable = (error as { code?: unknown }).code === INSUFFICIENT_PRIVILEGE;
+    return createReadinessCheck(
+      now,
+      true,
+      false,
+      unreadable
+        ? 'The runtime role cannot read the migration history. Run `quro migrate`.'
+        : 'The schema could not be checked.',
+      unreadable ? 'schema_unreadable' : 'connection_failed',
     );
   }
 }
@@ -175,6 +229,7 @@ export async function getCoreReadinessReport(
 ): Promise<CoreReadinessReport> {
   const dependencies: ReadinessDependencies = {
     checkDatabase: overrides.checkDatabase ?? checkDatabaseReadiness,
+    checkSchema: overrides.checkSchema ?? checkSchemaReadiness,
     checkDocumentStorage: overrides.checkDocumentStorage ?? checkDocumentStorageReadiness,
     checkPensionImport: overrides.checkPensionImport ?? checkPensionImportReadiness,
   };
@@ -183,15 +238,18 @@ export async function getCoreReadinessReport(
     dependencies.checkDatabase(now),
     dependencies.checkDocumentStorage(now),
   ]);
-  const pensionImport = await dependencies.checkPensionImport(now, {
-    skipDueToDatabaseFailure: !database.ready,
-  });
+  const skipDueToDatabaseFailure = !database.ready;
+  const [schema, pensionImport] = await Promise.all([
+    dependencies.checkSchema(now, { skipDueToDatabaseFailure }),
+    dependencies.checkPensionImport(now, { skipDueToDatabaseFailure }),
+  ]);
 
   return {
-    status: resolveStatus([database, documentStorage]),
+    status: resolveStatus([database, schema, documentStorage]),
     checkedAt: now.toISOString(),
     checks: {
       database,
+      schema,
       documentStorage,
     },
     optional: {
