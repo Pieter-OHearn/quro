@@ -1,6 +1,87 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers. ￼
+All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
+
+## [v0.8.0] - 2026-10-10
+
+Quro 0.8.0 is the first release that a new self-hoster can install from the published images, and the first with a tested upgrade path from 0.7.0. It changes how Quro is configured, started, stored and backed up, and moves the database to PostgreSQL 18. Read the [upgrade notes](docs/upgrade.md#upgrade-from-070-to-080) before you upgrade, and back up first.
+
+### Breaking changes
+
+Each item needs action from some operators or API users and links to what to change in the upgrade notes.
+
+- **Auto-updater removed.** Releases no longer include the `quro-auto-updater` image, `docker-compose.release.yml` or the auto-update bundle. If you ever ran the updater, stop and remove it before upgrading. [Details](docs/upgrade.md#auto-updater-removed)
+- **Backend image entry point is `quro`.** The server is `quro serve` (the default command), the import worker `quro worker pension-imports` and migrations `quro migrate`. `bun run start`, `run-migrate.sh` and the other shell wrappers are gone, so Compose files that set `entrypoint:` or a `bun` command must change. [Details](docs/upgrade.md#backend-image-entry-point)
+- **Backend runs as UID 1000, not root.** On Linux the documents directory, the backup directory and the secret files must be readable and writable by that user, or the service needs a matching `user:`. [Details](docs/upgrade.md#backend-runs-as-uid-1000)
+- **Frontend requires `QRO_API_URL`.** The backend address is no longer built in; without `QRO_API_URL` (for example `http://backend:3000`, without a path) the frontend container stops at startup. Its nginx configuration is now rendered from a template. [Details](docs/upgrade.md#frontend-api-url)
+- **Database settings renamed or retired.** `POSTGRES_HOST` is required (there is no default `db`); passwords come only from files (`POSTGRES_ADMIN_PASSWORD_FILE`, `POSTGRES_APP_PASSWORD_FILE`); `DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD` and `POSTGRES_APP_PASSWORD` are no longer read. `POSTGRES_PORT` is honoured and `POSTGRES_SSLMODE` is new. `quro migrate` stops unless the owner role owns the database (or is a superuser) and the server runs PostgreSQL 16, 17 or 18. [Details](docs/upgrade.md#database-settings)
+- **S3 settings renamed or retired.** `MINIO_APP_USER` becomes `S3_ACCESS_KEY_ID`; `S3_SECRET_ACCESS_KEY` becomes the file setting `S3_SECRET_ACCESS_KEY_FILE` (default `/run/secrets/s3_secret_access_key`, previously `minio_app_secret_key`); `S3_ENDPOINT` and `S3_REGION` have no defaults; `S3_INTERNAL_ENDPOINT` is not read. All S3 settings are required together. [Details](docs/upgrade.md#s3-settings)
+- **Documents are stored on the filesystem by default.** Installs that keep documents in S3 set `QRO_DOCUMENT_STORAGE=s3`; S3 settings without it stop every command with exit code 2, which includes a `.env` carried over from 0.7.0. To move to the filesystem, run `quro documents migrate-from-s3`, then set `QRO_DOCUMENT_STORAGE=filesystem`. [Details](docs/upgrade.md#document-storage)
+- **No Compose file is released, and the repository's Compose file no longer runs MinIO.** `docs/compose.example.yaml` is the reference to copy. The repository's `docker-compose.yml` drops `minio`, `minio-init` and their secrets (override files that refer to them fail), runs `migrate` and the import worker with `command:` instead of shell entry points, mounts `./data/documents` into the backend, the import worker and `db-tools`, and mounts `./backups` at `/var/lib/quro/backups` in `db-tools`. [Details](docs/upgrade.md#bundled-compose-file)
+- **Invalid settings stop startup.** Malformed numbers and switches no longer fall back to defaults: `PORT`, `SESSION_CLEANUP_INTERVAL_MS`, `PENSION_PARSER_TIMEOUT_MS`, `IMPORT_DRAFT_TTL_DAYS`, `IMPORT_WORKER_POLL_INTERVAL_MS` (at least 500), `S3_FORCE_PATH_STYLE`, `FRONTEND_ORIGIN` and the tracing settings are checked, and `SECURE_COOKIES` and `OTEL_SDK_DISABLED` accept only `true` or `false`. `BUNQ_SANDBOX=1`, `yes` or `TRUE` selected the production bunq API in 0.7.0 and select the sandbox now. A partial set of bunq or S3 settings stops startup. [Details](docs/upgrade.md#strict-settings)
+- **`PENSION_PARSER_URL` has no default.** Statement import is off, and its endpoints answer 404, until it is set. The repository's Compose file still sets it. [Details](docs/upgrade.md#statement-import-parser-url)
+- **Unconfigured bunq answers 404, not 503.** The `/api/bunq` routes exist only when bunq is fully configured; `GET /api/capabilities` says why. [Details](docs/upgrade.md#bunq-endpoints)
+- **PostgreSQL 18 is the baseline.** The repository's Compose file starts `postgres:18.6` in a new data directory, `./data/postgres-18`, so an install that only pulls the change starts an empty database. Move PostgreSQL 16 or 17 data with a dump and a restore into the new directory. Restoring into a PostgreSQL 16 server with the image's tools is not supported. [Details](docs/upgrade.md#postgresql-18)
+- **Registration is invite-only by default.** The first account on a new instance needs a setup code (`quro user invite`), and later accounts need an invite code unless `QRO_REGISTRATION_MODE` is `open`. `POST /api/auth/signup` takes an `inviteCode` and answers 403 without a valid one. Existing accounts are unaffected. [Details](docs/upgrade.md#registration-invite-only)
+- **Public auth endpoints accept only JSON.** Sign-in, sign-up and password reset answer 415 to other content types. [Details](docs/upgrade.md#auth-json-only)
+- **`TRUSTED_PROXIES` defaults to `172.16.0.0/12`** in the repository's Compose file and in `quro init` (the 0.7.0 Compose file trusted every private range). Docker networks or reverse proxies outside that range need an explicit value, or all browsers share one rate-limit key. [Details](docs/upgrade.md#trusted-proxies-default)
+- **Ledger list endpoints are paged.** They return `{ data, nextCursor }` with 100 rows by default (at most 1000 with `limit`); holding price history requires `from`. API clients must follow `nextCursor`. [Details](docs/upgrade.md#paged-list-endpoints)
+- **Money input is rounded to cents and bounded.** Amounts with more than two decimals are rounded when parsed, minimums are checked after rounding, and amounts of 10^13 or more answer 400. [Details](docs/upgrade.md#money-input-limits)
+- **Repeated or conflicting ledger writes answer differently.** A second delete of the same row answers 404, a transaction that moved to another account answers 409, and committing a statement import twice answers 400. [Details](docs/upgrade.md#ledger-write-status-codes)
+- **Readiness checks the schema and the configured document store.** `GET /api/readiness` answers 503 while migrations are pending (run `quro migrate`), when the schema is newer than the image, or when the documents directory is unusable; it no longer requires S3. [Details](docs/upgrade.md#readiness-checks)
+
+### Added
+
+- `quro` commands in the backend image: `init`, `migrate`, `doctor`, `health`, `version`, `serve`, `worker`, `user`, `documents migrate-from-s3`, `backup` and `restore`, with the same exit codes 0 to 4 everywhere. `quro migrate` checks the host and the database first, takes a database lock and prepares the runtime role; `quro migrate --status [--json]` compares the database with the image without changing anything.
+- An install from the published images: a README quickstart, `docs/install.md` and `docs/compose.example.yaml`, with the configuration reference `docs/configuration.md`, `docs/reverse-proxy.md` for HTTPS behind your reverse proxy, and `docs/uninstall.md`. On every change CI runs the quickstart on amd64 and a clean install on amd64 and arm64, with images built from that change.
+- The upgrade guide `docs/upgrade.md`: version and digest pinning, a backup before each upgrade, `quro migrate`, readiness, rollback versus restore, what each failure looks like, a CI/CD job, the interfaces scripts can rely on, and the move from 0.7.0.
+- `quro backup` and `quro restore`: one verified archive with the database dump, the documents and a manifest of checksums; optional encryption, a checked off-device copy and retention; an archive of the current data before a restore replaces it. Writes pause during a backup (they answer 503 with `Retry-After`). `docs/backup-and-restore.md` publishes measured recovery times.
+- Filesystem document storage (`QRO_DOCUMENT_STORAGE`, `QRO_DOCUMENTS_DIR`) and `quro documents migrate-from-s3`, which copies documents out of S3 with checksum verification and never changes the store or the database.
+- Validated configuration: every setting is checked once at startup, all problems are reported together and values are never printed. Optional features (bunq, S3, statement import) register as capabilities and have no routes or jobs when they are not configured. New settings: `POSTGRES_PORT`, `POSTGRES_SSLMODE`, `BUNQ_CLIENT_ID_FILE`, `BUNQ_CLIENT_SECRET_FILE`, `QRO_REGISTRATION_MODE`, `QRO_DOCUMENT_STORAGE`, `QRO_DOCUMENTS_DIR` and the `QRO_BACKUP_*` settings.
+- Account recovery without email: `quro user invite`, `reset-password`, `revoke-sessions`, `list`, `codes` and `revoke-code`; **Forgot password?** redeems a one-time code. Settings > Security lists signed-in browsers and signs out one or all others.
+- `GET /api/auth/registration`, `POST /api/auth/password-reset`, `GET` and `DELETE /api/settings/sessions`, and `documents` in `GET /api/capabilities`.
+- `docs/security.md` describes the two supported deployment modes (plain HTTP on a private network, HTTPS at your reverse proxy), the threat model and the key inventory. Quro logs a warning when `SECURE_COOKIES` disagrees with the scheme browsers use.
+- Documentation: install contract, PostgreSQL 18 upgrade, document storage, retiring the auto-updater, distribution and outbound connections, financial invariants, `SECURITY.md` and `ROADMAP.md`.
+- Graceful shutdown: on SIGTERM the server finishes open requests and running jobs, then exits.
+- CI jobs that upgrade a synthetic 0.7.0 install, rehearse the PostgreSQL 16 to 18 move, run a recovery drill, install from empty volumes, run the README quickstart and pull the published images anonymously.
+
+### Changed
+
+- The backend image ships PostgreSQL 18 client tools. `db:backup`, `db:restore` and `db:clear` refuse a client tool older than the server before writing anything.
+- A failing migration reports the database's message and SQLSTATE instead of a generic error; nothing from that run is recorded.
+- The frontend image uses nginx 1.30 (stable line). The statement parser image uses Python 3.12.14 and updated FastAPI, Starlette and Uvicorn.
+- Ledger lists have an explicit order (by date, then id; budget transactions newest first); other lists are ordered by id. The web app follows every page, so totals on screen are unchanged.
+- The dashboard and net-worth history fail when a read fails, instead of showing a total that leaves out an asset class.
+- The runway marks its result as an estimate when it relies on a statutory rule more than 12 months past its review date.
+- `BUN_ENV` no longer affects background jobs; only `NODE_ENV=test` does.
+- The per-account sign-in limit (5 per 15 minutes) counts only failed attempts, so signing in on several devices no longer locks an account. The per-address limit is unchanged.
+- Releases come from one commit that passed CI, run their write jobs in a protected environment with the owner's approval, check both images for anonymous pull on amd64 and arm64 before publishing, and publish release candidates as prereleases.
+
+### Fixed
+
+- Concurrent edits or deletes of one ledger row (a double click, two tabs, both partners) apply once instead of reversing the balance effect twice; a reviewed statement import can be committed once.
+- A refused edit to a mortgage or property transaction no longer changes the balance.
+- Text with a NUL character or numbers beyond a column's range answer 400 instead of 500.
+- Unlinking a partner clears the former partner's joint data from the browser cache.
+- `db:restore` and `db:clear` work on a database without Quro's tables, so a 0.7.0 dump restores into an empty PostgreSQL 18 database; the PostgreSQL upgrade guide restores before migrating.
+- Database passwords that start with `-` or contain URL characters work.
+- Concurrent `quro migrate` runs wait for each other instead of failing part way.
+- Smoke runs and tests no longer call price or exchange-rate providers (`QRO_DISABLE_SCHEDULERS`).
+
+### Security
+
+- Session tokens are stored only as SHA-256 digests (migration `0038`; nobody is signed out). Registration and password-reset codes have 120 bits, are single use, expire and are stored as digests.
+- Sign-up requires an operator-issued code by default.
+- Public auth endpoints accept only JSON requests, and password reset has its own rate limit.
+- The backend runs as an unprivileged user and reads its secrets from files directly.
+- API errors and bank sync status messages use a fixed text for database failures.
+- The Release workflow pins its actions by commit and runs its write jobs in a protected environment.
+- Dependencies with advisories (`proxy-addr`, `source-map-js`, and `yahoo-finance2` with its transitive dependencies) moved to patched releases.
+- An access test matrix runs every route as owner, partner, unrelated user, former partner, pending invitee and anonymous caller.
+
+### Image digests
+
+The Release workflow logs the digests of `ghcr.io/pieter-ohearn/quro-backend:v0.8.0` and `ghcr.io/pieter-ohearn/quro-frontend:v0.8.0` when it publishes them; the GitHub release notes list them. Pin both images by tag and digest, as the [upgrade notes](docs/upgrade.md#how-upgrades-work) show.
 
 ## [v0.7.0] - 2026-10-04
 
