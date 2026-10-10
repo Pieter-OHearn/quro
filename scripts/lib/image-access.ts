@@ -73,7 +73,7 @@ type Manifest = {
   layers?: Descriptor[];
 };
 
-type Fetched = { digest: string; manifest: Manifest };
+type Fetched = { digest: string; size: number; manifest: Manifest };
 
 export type PlatformReport = {
   platform: string;
@@ -225,7 +225,11 @@ async function fetchManifest(
   if (announced !== null && announced !== digest) {
     throw new ImageAccessError(`${what}: the manifest hashes to ${digest}, not ${announced}`);
   }
-  return { digest, manifest: parseManifest(new TextDecoder().decode(bytes), what) };
+  return {
+    digest,
+    size: bytes.byteLength,
+    manifest: parseManifest(new TextDecoder().decode(bytes), what),
+  };
 }
 
 function platformEntry(index: Manifest, platform: string): Descriptor | undefined {
@@ -259,7 +263,11 @@ async function openBlob(
       return response;
     }
     await response.body?.cancel();
-    url = new URL(location, url).toString();
+    const next = new URL(location, url);
+    if (next.protocol !== 'https:') {
+      throw new ImageAccessError(`${what}: refusing a redirect to ${next.protocol}//${next.host}`);
+    }
+    url = next.toString();
     sendToken = false;
   }
   throw new ImageAccessError(`${what}: too many redirects`);
@@ -301,8 +309,9 @@ async function checkBlob(
     await response.body?.cancel();
     const size = rangedSize(response);
     if (size !== blob.size) {
+      const reported = size === null ? 'no size' : `${size} bytes`;
       throw new ImageAccessError(
-        `${what}: registry reports ${size} bytes, manifest says ${blob.size}`,
+        `${what}: registry reports ${reported}, manifest says ${blob.size}`,
       );
     }
     return;
@@ -345,7 +354,10 @@ async function checkPlatform(
   full: boolean,
 ): Promise<{ report: PlatformReport; problems: string[] }> {
   const what = `${repository} ${platform} manifest`;
-  const { manifest } = await fetchManifest(http, token, repository, entry.digest, what);
+  const { manifest, size } = await fetchManifest(http, token, repository, entry.digest, what);
+  if (size !== entry.size) {
+    throw new ImageAccessError(`${what}: ${size} bytes, the manifest list says ${entry.size}`);
+  }
   const blobs = [...(manifest.config ? [manifest.config] : []), ...(manifest.layers ?? [])];
   const problems = await runLimited(blobs, (blob) =>
     checkBlob(http, token, repository, blob, full),

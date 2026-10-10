@@ -36,6 +36,10 @@ type Behaviour = {
   // Report a wrong total in Content-Range.
   wrongRangeTotal?: boolean;
   omitArm64?: boolean;
+  // Redirect blobs to a plain http URL.
+  insecureRedirect?: boolean;
+  // List the platform manifests with a wrong size in the index.
+  wrongIndexSize?: boolean;
   failFirstManifestWith?: number;
 };
 
@@ -64,7 +68,7 @@ function buildRegistry(image: string, tag: string, behaviour: Behaviour = {}) {
     entries.push({
       mediaType: 'application/vnd.oci.image.manifest.v1+json',
       digest: digestOf(body),
-      size: body.length,
+      size: behaviour.wrongIndexSize ? body.length + 1 : body.length,
       platform: { os: 'linux', architecture },
     });
     // Attestation manifests are listed with an unknown platform and must be ignored.
@@ -113,36 +117,40 @@ function fakeHttp(image: string, tag: string, behaviour: Behaviour = {}) {
       }
       return Response.json({ token: 'anonymous-test-token' });
     }
-    if (url.host === STORAGE_HOST) return serveBlob(url, headers, true);
+    if (url.host === STORAGE_HOST) return serveBlob(url, headers);
     if (headers.get('authorization') !== 'Bearer anonymous-test-token') {
       return Response.json({ errors: [{ code: 'UNAUTHORIZED' }] }, { status: 401 });
     }
     const manifest = /^\/v2\/[^/]+\/[^/]+\/manifests\/(.+)$/.exec(url.pathname);
-    if (manifest) {
-      manifestCalls += 1;
-      if (behaviour.failFirstManifestWith && manifestCalls === 1) {
-        return new Response('unavailable', { status: behaviour.failFirstManifestWith });
-      }
-      const status = behaviour.manifestStatus;
-      const body = registry.manifests.get(manifest[1]);
-      if (status !== undefined || body === undefined) {
-        return Response.json({ errors: [{ code: 'MANIFEST_UNKNOWN' }] }, { status: status ?? 404 });
-      }
-      return new Response(body, { headers: { 'docker-content-digest': digestOf(body) } });
-    }
-    if (/^\/v2\/[^/]+\/[^/]+\/blobs\//.test(url.pathname)) {
-      if (behaviour.blobStatus !== undefined) {
-        return new Response('', { status: behaviour.blobStatus });
-      }
-      const target = `https://${STORAGE_HOST}/blob/${url.pathname.split('/').pop()}`;
-      return new Response(null, { status: 307, headers: { location: target } });
-    }
+    if (manifest) return answerManifest(manifest[1]);
+    if (/^\/v2\/[^/]+\/[^/]+\/blobs\//.test(url.pathname)) return answerBlobRedirect(url);
     return new Response('', { status: 404 });
   }
 
-  function serveBlob(url: URL, headers: Headers, redirected: boolean): Response {
+  function answerManifest(reference: string): Response {
+    manifestCalls += 1;
+    if (behaviour.failFirstManifestWith && manifestCalls === 1) {
+      return new Response('unavailable', { status: behaviour.failFirstManifestWith });
+    }
+    const body = registry.manifests.get(reference);
+    if (behaviour.manifestStatus !== undefined || body === undefined) {
+      const status = behaviour.manifestStatus ?? 404;
+      return Response.json({ errors: [{ code: 'MANIFEST_UNKNOWN' }] }, { status });
+    }
+    return new Response(body, { headers: { 'docker-content-digest': digestOf(body) } });
+  }
+
+  function answerBlobRedirect(url: URL): Response {
+    if (behaviour.blobStatus !== undefined)
+      return new Response('', { status: behaviour.blobStatus });
+    const scheme = behaviour.insecureRedirect ? 'http' : 'https';
+    const target = `${scheme}://${STORAGE_HOST}/blob/${url.pathname.split('/').pop()}`;
+    return new Response(null, { status: 307, headers: { location: target } });
+  }
+
+  function serveBlob(url: URL, headers: Headers): Response {
     const found = registry.blobs.get(url.pathname.split('/').pop() ?? '');
-    if (!found || !redirected) return new Response('', { status: 404 });
+    if (!found) return new Response('', { status: 404 });
     const data = behaviour.corruptBlobs ? new TextEncoder().encode('corrupted') : found.data;
     if (headers.get('range') === 'bytes=0-0') {
       const total = behaviour.wrongRangeTotal ? found.size + 1 : found.size;
@@ -261,6 +269,20 @@ describe('checkImage', () => {
     const fake = fakeHttp('quro-backend', 'v1.2.3', { wrongRangeTotal: true });
     const report = await checkImage(fake.http, options(), 'quro-backend');
     expect(report.problems[0]).toMatch(/registry reports \d+ bytes, manifest says \d+/);
+  });
+
+  test('refuses a blob redirect to a plain http URL', async () => {
+    const fake = fakeHttp('quro-backend', 'v1.2.3', { insecureRedirect: true });
+    const report = await checkImage(fake.http, options(), 'quro-backend');
+    expect(report.problems.length).toBe(6);
+    expect(report.problems[0]).toContain('refusing a redirect to http://storage.example.test');
+    expect(fake.requests.some((entry) => entry.url.startsWith('http://'))).toBe(false);
+  });
+
+  test('fails when a platform manifest is not the size the index lists', async () => {
+    const fake = fakeHttp('quro-backend', 'v1.2.3', { wrongIndexSize: true });
+    const report = await checkImage(fake.http, options(), 'quro-backend');
+    expect(report.problems[0]).toMatch(/manifest: \d+ bytes, the manifest list says \d+/);
   });
 
   test('fails when a required platform is missing and ignores attestation entries', async () => {
