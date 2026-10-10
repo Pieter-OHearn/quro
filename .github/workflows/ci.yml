@@ -288,6 +288,31 @@ jobs:
       - name: Install and exercise from empty volumes
         run: sh scripts/clean-install/run.sh
 
+  # Reads the published core images the way a first-time operator's docker pull does, with no
+  # login, and requires the check itself to fail for a tag that does not exist. This tests the
+  # published packages, not the commit, so it also notices a package that was made private.
+  image-access:
+    name: Anonymous Image Access
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts/lib
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Read the latest core images without credentials
+        run: bun scripts/lib/image-access.ts --tag latest
+      - name: Fail clearly for a tag that does not exist
+        run: |
+          if output=$(bun scripts/lib/image-access.ts --tag ci-tag-that-does-not-exist 2>&1); then
+            echo "$output"
+            echo "The check passed for a tag that does not exist" >&2
+            exit 1
+          fi
+          echo "$output"
+          printf '%s\n' "$output" | grep -F 'not found (HTTP 404, manifest unknown)'
+
   # ── Security ─────────────────────────────────────────────────────────────
 
   security:
@@ -328,6 +353,7 @@ jobs:
       - docker-build
       - pg-upgrade
       - clean-install
+      - image-access
       - security
     steps:
       - uses: actions/checkout@v7

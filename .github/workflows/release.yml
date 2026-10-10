@@ -3,7 +3,8 @@ name: Release
 # Releases one commit that passed CI. The ref is resolved to a commit SHA once and every
 # later job uses that SHA. The verify job reads that commit through the API and never
 # checks it out or runs it. Images are pushed under a candidate tag before the git tag
-# exists, so a failed build leaves nothing that blocks a retry. The release logic is read
+# exists, so a failed build leaves nothing that blocks a retry. A job with no login then reads
+# those images anonymously, and publishing waits for it. The release logic is read
 # from this workflow's commit, not from the commit being released. The jobs that write
 # (build-images, publish) run in the protected `release` environment, which deploys only
 # from main and waits for a required reviewer. See "Release Artifacts" in
@@ -112,10 +113,39 @@ jobs:
           build backend quro-backend packages/backend/Dockerfile
           build frontend quro-frontend packages/frontend/Dockerfile
 
+  # Reads the candidate images with no login and no token, as an operator's first pull would.
+  # A package on GitHub starts private, and visibility belongs to the whole package, so this
+  # fails the release here, before anything is tagged, if the images are not public.
+  verify-public-access:
+    name: Verify Anonymous Image Access
+    runs-on: ubuntu-latest
+    needs: [verify, build-images]
+    permissions:
+      contents: read # check out the release tooling; the image check itself sends no credentials
+    env:
+      RELEASE_SHA: ${{ needs.verify.outputs.sha }}
+      BACKEND_DIGEST: ${{ needs.build-images.outputs.backend }}
+      FRONTEND_DIGEST: ${{ needs.build-images.outputs.frontend }}
+      REGISTRY_OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Check out the release tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/lib
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - name: Read the candidate images without credentials
+        run: |
+          OWNER_LC=$(printf '%s' "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
+          bun scripts/lib/image-access.ts --owner "$OWNER_LC" --tag "sha-$RELEASE_SHA" \
+            --expect "quro-backend=$BACKEND_DIGEST" --expect "quro-frontend=$FRONTEND_DIGEST"
+
   publish:
     name: Tag and Publish Release
     runs-on: ubuntu-latest
-    needs: [verify, build-images]
+    needs: [verify, build-images, verify-public-access]
     environment: release
     permissions:
       contents: write # create the tag and the release

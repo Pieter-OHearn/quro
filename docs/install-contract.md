@@ -72,7 +72,7 @@ The pension statement parser and its model server stay behind the `pension-impor
 | Any S3-compatible service                 | Optional document store. The project does not pin or ship one        | Operator's choice            |
 | `ghcr.io/pieter-ohearn/quro-auto-updater` | Retired. Existing tags stay published; no new releases               | –                            |
 
-Pin images by version tag and record the digest. The core images must pull without a registry account; the 0.7.0 images did on arm64 in the measurements below. The pension parser and model server images are not published; the OCR profile builds them from a checkout.
+Pin images by version tag and record the digest. The core images must pull without a registry account, and a check in CI and in the release workflow keeps that true: [Distribution](distribution.md) records the anonymous manifest, layer and runtime evidence for both platforms of the 0.7.0 images and explains why package visibility is per package, not per tag. The updater is not a release requirement. The pension parser and model server images are not published; the OCR profile builds them from a checkout.
 
 ## Commands
 
@@ -205,7 +205,7 @@ On a database you provide yourself:
 
 ### Outbound network
 
-The core needs none. Price and exchange-rate refreshes call Yahoo Finance, bank linking calls bunq, and tracing exports to the configured endpoint. These are listed per feature in the operator docs.
+Installing needs the registries the images come from, and no account at either. Once running, the core makes one kind of outbound call without being configured: the scheduled price and exchange-rate refreshes to Yahoo Finance, which have no separate switch. Bank linking calls bunq, S3 storage calls its endpoint, and tracing exports to the configured endpoint, each only when set. [Distribution](distribution.md#service-feature-hardware-and-egress-matrix) lists every call per feature, with the hardware and accounts each feature needs.
 
 ## Persistent data
 
@@ -441,11 +441,12 @@ What the prototype showed:
 | Readiness with no S3 settings                                                         | 503, document storage `not_configured`                                                                                                           |
 | Database password starting with `-` through the 0.7.0 entry point                     | URL encoding failed and printed Bun's usage text in place of the value                                                                           |
 
-Not measured: a clean virtual machine, amd64, a person following the steps with a stopwatch, the filesystem storage driver itself (it does not exist yet), and PostgreSQL 16 and 17 for the role checks.
+Not measured: a clean virtual machine, native amd64 hardware (the amd64 images were pulled and started under emulation, see [Distribution](distribution.md#recorded-evidence-v070)), a person following the steps with a stopwatch, the filesystem storage driver itself (it does not exist yet), and PostgreSQL 16 and 17 for the role checks.
 
 ## Decision log
 
-| Date       | Decision                                                                                                                                                                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default.                                                                                                                                                                                |
-| 2026-10-09 | Retire legacy settings and service-name defaults instead of inferring them; old configurations fail with exit code 2 and the upgrade notes list every change. Backend UID 1000, `QRO_` prefix for new settings, and `quro init` never prints secret values are confirmed. |
+| Date       | Decision                                                                                                                                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default.                                                                                                                                                                                                             |
+| 2026-10-09 | Retire legacy settings and service-name defaults instead of inferring them; old configurations fail with exit code 2 and the upgrade notes list every change. Backend UID 1000, `QRO_` prefix for new settings, and `quro init` never prints secret values are confirmed.                              |
+| 2026-10-10 | Outbound network clarified: installing needs no registry account, and the running core's only unconfigured outbound call is the scheduled Yahoo Finance refresh. An anonymous image check gates CI and releases; the updater is not a release requirement. Details in [Distribution](distribution.md). |
