@@ -153,27 +153,47 @@ export function logDatabaseSummary(summary: DatabaseSummary, label: string) {
   );
 }
 
-export async function getDatabaseSummary(
-  sql: Sql<Record<string, unknown>>,
-  countPlan: readonly CountPlanEntry[],
-): Promise<DatabaseSummary> {
+async function tableExists(sql: Sql<Record<string, unknown>>, tableName: string) {
+  const [row] = await sql<{ exists: boolean }[]>`
+    select to_regclass(${quoteIdentifier(tableName)}) is not null as "exists"
+  `;
+  return Boolean(row?.exists);
+}
+
+type UserSummary = Pick<DatabaseSummary, 'demoUserId' | 'nonDemoUsers' | 'totalUsers'>;
+
+async function readUserSummary(sql: Sql<Record<string, unknown>>): Promise<UserSummary> {
+  if (!(await tableExists(sql, 'users'))) {
+    return { demoUserId: null, nonDemoUsers: 0, totalUsers: 0 };
+  }
   const [[totalUsersRow], [nonDemoUsersRow], [demoUserRow]] = await Promise.all([
     sql<CountRow[]>`select count(*)::int as count from users`,
     sql<CountRow[]>`select count(*)::int as count from users where email <> ${DEMO_USER_EMAIL}`,
     sql<DemoUserRow[]>`select id from users where email = ${DEMO_USER_EMAIL} limit 1`,
   ]);
-
-  const tableCounts: TableCounts = {};
-  for (const entry of countPlan) {
-    tableCounts[entry.tableName] = await getPlannedTableCount(sql, entry, demoUserRow?.id ?? null);
-  }
-
   return {
     demoUserId: demoUserRow?.id ?? null,
     nonDemoUsers: nonDemoUsersRow?.count ?? 0,
-    tableCounts,
     totalUsers: totalUsersRow?.count ?? 0,
   };
+}
+
+/**
+ * Users and planned row counts. A table that does not exist counts as empty, so a new database,
+ * or one an older dump is about to be restored into, reads as empty instead of failing.
+ */
+export async function getDatabaseSummary(
+  sql: Sql<Record<string, unknown>>,
+  countPlan: readonly CountPlanEntry[],
+): Promise<DatabaseSummary> {
+  const users = await readUserSummary(sql);
+  const tableCounts: TableCounts = {};
+  for (const entry of countPlan) {
+    tableCounts[entry.tableName] = (await tableExists(sql, entry.tableName))
+      ? await getPlannedTableCount(sql, entry, users.demoUserId)
+      : 0;
+  }
+  return { ...users, tableCounts };
 }
 
 function getPlannedTableCount(

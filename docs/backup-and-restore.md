@@ -24,7 +24,7 @@ If you have no backup yet, do these steps today. They take a few minutes.
 5. [Schedule](#schedule-backups) a daily backup.
 6. [Rehearse a restore](#rehearse-a-restore) on another machine or in a separate checkout, so the first restore you ever run is not during an incident.
 
-Installs up to 0.7.0 have no `quro` command. Before upgrading such an install, take a database dump with the database container's own `pg_dump` as described in [Before upgrading](install-contract.md#before-upgrading), and copy the documents. Once the new release runs, take your first `quro backup`.
+Installs up to 0.7.0 have no `quro` command. Before upgrading such an install, take a database dump with the database container's own `pg_dump` and copy the documents, as [Upgrade from 0.7.0 to 0.8.0](upgrade.md#upgrade-from-070-to-080) describes. Once the new release runs, take your first `quro backup`.
 
 ## What an archive contains
 
@@ -282,7 +282,7 @@ docker compose run --rm -e QRO_RESTORE_CONFIRM=restore-db --entrypoint bun \
   migrate run db:restore -- /var/lib/quro/backups/<dump-file>.dump
 ```
 
-Add `-e QRO_RESTORE_ALLOW_NON_EMPTY=1` to restore over data. A dump does not contain the documents; put back the documents directory from the copy you took with it. In the Compose stack of this repository the same command is `docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db db-tools restore backups/db/<dump-file>.dump`, which [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md) uses for the database major upgrade.
+Add `-e QRO_RESTORE_ALLOW_NON_EMPTY=1` to restore over data. A dump does not contain the documents; put back the documents directory from the copy you took with it. A dump from an earlier release, such as the one taken before upgrading from 0.7.0, goes into a new, empty database before `quro migrate` runs: start only the database (`docker compose up -d --wait db`), restore, then start Quro. Restoring it over a database the newer release has migrated stops without changes. In the Compose stack of this repository the same command is `docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db db-tools restore backups/db/<dump-file>.dump`, which [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md) uses for the database major upgrade.
 
 ## Compose stack of this repository
 

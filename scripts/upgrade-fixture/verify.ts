@@ -4,13 +4,15 @@
 //               documents.sha256.
 //   compare     Compares the fixture database before the upgrade (PostgreSQL 16, 0.7.0 schema)
 //               with the upgraded one, table by table, as declared in expectations.ts, and checks
-//               that every document the upgraded rows refer to is in the store, unchanged.
+//               that every document the upgraded rows refer to is in the store, unchanged: the
+//               S3 store, or with --documents-dir the filesystem store that
+//               `quro documents migrate-from-s3` filled.
 //               The database URLs come from BEFORE_DATABASE_URL and AFTER_DATABASE_URL, so their
 //               passwords stay out of the process list.
 //
 // Exit status 1 with one line per difference when a check fails. Output names tables, columns,
 // row ids and keys, never row contents.
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { sha256Hex } from './documents';
@@ -391,10 +393,33 @@ export async function readManifest(fixture: string): Promise<Map<string, string>
 }
 
 type StoreView = {
-  client: ReturnType<typeof s3Client>;
+  /** Stored keys and their sizes. */
   stored: Map<string, number>;
+  read: (key: string) => Promise<Uint8Array>;
   manifest: Map<string, string>;
 };
+
+async function s3Store(client: ReturnType<typeof s3Client>, manifest: Map<string, string>) {
+  return {
+    stored: await listStore(client),
+    read: async (key: string) => new Uint8Array(await client.file(key).arrayBuffer()),
+    manifest,
+  } satisfies StoreView;
+}
+
+/** The filesystem store after `quro documents migrate-from-s3`: one file per key. */
+async function directoryStore(directory: string, manifest: Map<string, string>) {
+  const stored = new Map<string, number>();
+  // Names starting with a dot are the store's temporary and staging files, not documents.
+  for await (const key of new Bun.Glob('**/*').scan({ cwd: directory, dot: false })) {
+    stored.set(key, (await stat(join(directory, key))).size);
+  }
+  return {
+    stored,
+    read: async (key: string) => new Uint8Array(await Bun.file(join(directory, key)).arrayBuffer()),
+    manifest,
+  } satisfies StoreView;
+}
 
 async function checkReference(
   reference: Reference,
@@ -409,7 +434,7 @@ async function checkReference(
   }
   if (String(size) !== reference.size)
     failures.push(`${where}: ${size} bytes stored, ${reference.size} recorded`);
-  const sha256 = sha256Hex(new Uint8Array(await store.client.file(reference.key).arrayBuffer()));
+  const sha256 = sha256Hex(await store.read(reference.key));
   if (reference.sha256 && reference.sha256 !== sha256)
     failures.push(`${where}: SHA-256 differs from the recorded one`);
   const expected = store.manifest.get(reference.key);
@@ -418,10 +443,8 @@ async function checkReference(
 
 async function compareAttachments(
   context: Context,
-  client: ReturnType<typeof s3Client>,
-  manifest: Map<string, string>,
+  store: StoreView,
 ): Promise<{ references: number; objects: number }> {
-  const store: StoreView = { client, stored: await listStore(client), manifest };
   const afterKeys = new Set<string>();
   for (const attachment of ATTACHMENTS) {
     for (const reference of await references(context.after, attachment)) {
@@ -447,6 +470,8 @@ async function compare(options: {
   fixture: string;
   endpoint: string;
   bucket: string;
+  /** Check the documents in this directory (the filesystem store) instead of the S3 store. */
+  documentsDir?: string;
 }) {
   const context: Context = {
     before: new Bun.SQL(options.before),
@@ -488,10 +513,12 @@ async function compare(options: {
       context,
       new Map(plan.tables.map((table) => [table.table, table])),
     );
+    const manifest = await readManifest(options.fixture);
     const store = await compareAttachments(
       context,
-      s3Client(options.endpoint, options.bucket),
-      await readManifest(options.fixture),
+      options.documentsDir
+        ? await directoryStore(options.documentsDir, manifest)
+        : await s3Store(s3Client(options.endpoint, options.bucket), manifest),
     );
     console.log(
       `tables: ${plan.tables.length} compared, ${plan.newTables.length} new (${plan.newTables.map((t) => t.table).join(', ') || 'none'})`,
@@ -501,7 +528,7 @@ async function compare(options: {
     );
     console.log(`provenance: ${provenance} rows compared column by column`);
     console.log(
-      `documents: ${store.references} references, all checked against ${store.objects} stored objects`,
+      `documents: ${store.references} references, all checked against ${store.objects} stored ${options.documentsDir ? 'files in the documents directory' : 'objects in S3'}`,
     );
   } finally {
     await Promise.all([context.before.close(), context.after.close()]);
@@ -538,6 +565,7 @@ if (import.meta.main) {
       fixture: { type: 'string' },
       endpoint: { type: 'string' },
       bucket: { type: 'string' },
+      'documents-dir': { type: 'string' },
     },
   });
   const fromEnv = (name: string): string => {
@@ -545,7 +573,7 @@ if (import.meta.main) {
     if (!value) throw new Error(`${name} is required`);
     return value;
   };
-  const need = (name: keyof typeof values): string => {
+  const need = (name: 'fixture' | 'endpoint' | 'bucket'): string => {
     const value = values[name];
     if (!value) throw new Error(`--${name} is required`);
     return value;
@@ -557,9 +585,10 @@ if (import.meta.main) {
       ...store,
       before: fromEnv('BEFORE_DATABASE_URL'),
       after: fromEnv('AFTER_DATABASE_URL'),
+      documentsDir: values['documents-dir'],
     });
   else
     throw new Error(
-      'usage: verify.ts load-store|compare --fixture DIR --endpoint URL --bucket NAME',
+      'usage: verify.ts load-store|compare --fixture DIR --endpoint URL --bucket NAME [--documents-dir DIR]',
     );
 }

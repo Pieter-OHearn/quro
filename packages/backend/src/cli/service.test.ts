@@ -51,6 +51,10 @@ describe('quro version', () => {
     const { io, text } = capture();
     expect(runVersionCommand(['--json'], io)).toBe(EXIT_OK);
     const info = JSON.parse(text());
+    // An interface for automation (docs/upgrade.md): these fields stay.
+    expect(Object.keys(info).sort()).toEqual(['migrations', 'revision', 'runtime', 'version']);
+    expect(Object.keys(info.migrations).sort()).toEqual(['count', 'latest']);
+    expect(Object.keys(info.runtime).sort()).toEqual(['arch', 'bun', 'platform']);
     expect(info.version).toMatch(/^v?\d+\.\d+\.\d+/);
     expect(info.migrations.latest).toMatch(/^\d{4}_\w+$/);
     expect(info.migrations.count).toBeGreaterThan(0);

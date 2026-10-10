@@ -63,6 +63,8 @@ export const PROFILES = {
   cli: ['runtimeDatabase', 'documentStorage'],
   documentsMigration: ['runtimeDatabase', 'documentStorage', 's3'],
   migrate: ['adminDatabase', 'runtimeDatabase', 'documentStorage'],
+  /** `quro migrate --status`: reads the migration history as the owner role. */
+  migrationStatus: ['adminDatabase', 'documentStorage'],
   backup: ['adminDatabase', 'tools', 'documentStorage', 'backup'],
   /** `quro backup verify`: reads an archive, and the key when it is encrypted. */
   backupVerify: ['documentStorage', 'backup'],
