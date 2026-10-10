@@ -18,24 +18,31 @@ Plain SQL and loose files keep the fixture small (about 130 KB), readable in a d
 
 ## What the test does
 
-[`upgrade.sh`](../scripts/upgrade-fixture/upgrade.sh) runs these steps with Docker and Bun:
+[`upgrade.sh`](../scripts/upgrade-fixture/upgrade.sh) takes the fixture through the upgrade the way [Upgrade Quro](upgrade.md#upgrade-from-070-to-080) tells an operator to, and injects the failures that guide covers:
 
 1. PostgreSQL 16.11 loads `database.sql`; an S3 test double receives the documents.
-2. The database moves to the PostgreSQL version in `docker-compose.yml` by dump and restore, each with its own server's client tools, into a new data directory, as in [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md). The restore goes into an empty database, before any migration of the new version has run. Every table and sequence must be identical across the two versions.
-3. `quro migrate` from the backend image built from the checkout applies the migrations and the runtime role's grants, the way an operator runs it. A second run must find nothing to do.
-4. [`verify.ts`](../scripts/upgrade-fixture/verify.ts) compares the upgraded database with the 0.7.0 one and fails on any difference that [`expectations.ts`](../scripts/upgrade-fixture/expectations.ts) does not declare:
+2. The database moves to the PostgreSQL version in `docker-compose.yml` by dump and restore, each with its own server's client tools, into a new data directory. The restore goes into an empty database, before any migration of the new version has run. Every table and sequence must be identical across the two versions.
+3. Before `quro migrate`, the backend image built from the checkout starts as a server with the example Compose file's health check. It must stay not ready: `GET /api/readiness` answers `503` with the schema's reason, `quro health` exits 1, Docker reports the container `unhealthy`, and `quro migrate --status --json` reports the pending migration with exit code 1. A configuration written for 0.7.0 (no `POSTGRES_HOST`, S3 settings without `QRO_DOCUMENT_STORAGE`) and the 0.7.0 server command must stop with exit code 2.
+4. Failures change nothing: a `quro migrate` that fails on an object in its way, and one killed while it records its migration, leave every table and sequence as restored. Two `quro migrate` runs started at once both succeed: one applies the migration, the other waits for the lock and finds nothing to do. A further run changes nothing.
+5. The server becomes ready without a restart. A schema newer than the image is refused by `quro migrate` and `quro migrate --status` (exit code 3) and reported by readiness (`schema_ahead`).
+6. [`verify.ts`](../scripts/upgrade-fixture/verify.ts) compares the upgraded database with the 0.7.0 one and fails on any difference that [`expectations.ts`](../scripts/upgrade-fixture/expectations.ts) does not declare:
    - every table: row count, a checksum over all rows and null counts per column;
    - every numeric column: its total, per currency where the table has a `currency` column;
    - sequences: unchanged, or ahead where the migrations appended rows;
    - provenance columns (rate sources, bank ids, source amounts and currencies, review flags): row by row;
    - documents: every key a payslip, pension transaction or statement import refers to must be in the store with the recorded size and SHA-256, and no row may lose its document.
-5. A one-cent change, a removed attachment row and a missing object must each make step 4 fail.
+7. `quro documents migrate-from-s3` stops with exit code 1 and adds nothing while a needed object is missing from S3; with the object back it copies every document, and step 6 is repeated against the documents directory.
+8. A one-cent change, a removed attachment row and a missing object must each make step 6 fail.
+9. On S3 and then on the filesystem store, the server keeps a browser signed in with a session cookie from 0.7.0 (an expired one stays out), and every fixture user signs in and downloads their documents, byte for byte ([`exercise.ts`](../scripts/upgrade-fixture/exercise.ts)).
+10. A document missing from S3 stops `quro documents migrate-from-s3` until its owner removes the attachment in the app; then the copy completes.
 
-Run it locally the same way. It builds the backend image as `quro-backend:ci` when that tag is missing (set `QURO_BACKEND_IMAGE` to test another tag), publishes ports on 127.0.0.1 only and removes its containers:
+Run it locally the same way. It builds the backend image as `quro-backend:ci` when that tag is missing (set `QURO_BACKEND_IMAGE` to test another tag), publishes ports on 127.0.0.1 only, runs the server with schedulers off and removes its containers:
 
 ```bash
 sh scripts/upgrade-fixture/upgrade.sh
 ```
+
+The [PostgreSQL upgrade rehearsal](postgresql-upgrade.md#how-this-is-tested) starts from the same fixture.
 
 ## When your migration changes existing data
 
@@ -73,4 +80,4 @@ sh scripts/upgrade-fixture/generate.sh --check  # a second run must produce iden
 
 ## What it does not cover
 
-The test checks data, not the running application: it does not start a server, sign in, or exercise the operator commands of the new version. The backend test suite and the browser smoke tests cover those.
+The frontend image, a reverse proxy, the import worker and the operator's own Compose file are not part of this test; the [clean-install test](install.md) covers the frontend and the example Compose file. The guide's Compose commands were last run end to end, against the published 0.7.0 images and images built from the checkout, when the guide changed.

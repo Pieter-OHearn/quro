@@ -20,7 +20,7 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
 - Plan for a short outage: the app is stopped from the dump until the restore has been checked.
 - You need free disk space for the dump and for a second copy of the database.
 - Do the steps in this order. Steps 1 to 4 run against the old stack, so take them **before** you update the checkout (step 5); once the checkout is updated, `db` means PostgreSQL 18.
-- The commands assume the Compose stack of this repository and run from the checkout that holds `docker-compose.yml`, `.env` and `secrets/`. If you run a release file instead, take the dump with the same `docker compose exec -T db ... pg_dump` command and follow the upgrade notes of the release.
+- The commands assume the Compose stack of this repository and run from the checkout that holds `docker-compose.yml`, `.env` and `secrets/`. If you run the release Compose file of 0.7.0 or a Compose file of your own, follow [Upgrade from 0.7.0 to 0.8.0](upgrade.md#upgrade-from-070-to-080) instead; it includes this database move.
 - Nothing below deletes anything. The old directory `./data/postgres` stays where it is.
 
 ## Upgrade a Compose install from 16 to 18
@@ -61,7 +61,7 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
    docker compose down
    ```
 
-5. Update the checkout to the release you are installing (for example `git fetch --tags && git checkout <tag>`), then rebuild the images. The backend image now ships the PostgreSQL 18 tools.
+5. Update the checkout to the release you are installing (for example `git fetch --tags && git checkout <tag>`), then rebuild the images. The backend image now ships the PostgreSQL 18 tools. Coming from 0.7.0, update `.env` as the [0.8.0 upgrade notes](upgrade.md#changes-in-080) describe before you go on: for example, `S3_BUCKET` without `QRO_DOCUMENT_STORAGE` stops every command.
 
    ```bash
    docker compose --profile maintenance build
@@ -74,20 +74,16 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
    docker compose exec -T db postgres --version
    ```
 
-7. Create the schema and the runtime role in the new database.
-
-   ```bash
-   docker compose run --rm migrate
-   ```
-
-8. Restore the dump. The target is empty, so no overwrite flag is needed.
+7. Restore the dump into the new, empty database, before any migration of the new release runs. The target is empty, so no overwrite flag is needed. The restore runs in one transaction and gives the runtime role its access.
 
    ```bash
    docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db \
      db-tools restore backups/db/pre-pg18-upgrade.dump
    ```
 
-9. Verify before the application starts. The fingerprints must be identical, and data checksums must be on.
+   Migrating first does not work for a dump from an older release: the restore then has to replace tables the new migrations changed, and stops (`cannot drop constraint users_pkey … because other objects depend on it`) without changing anything.
+
+8. Verify before anything else runs. The fingerprints must be identical, and data checksums must be on.
 
    ```bash
    docker compose --profile maintenance run --rm -T db-tools psql -X -At \
@@ -97,6 +93,12 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
    ```
 
    The `diff` prints nothing and `identical` appears; the last command prints `on`. If the fingerprints differ, do not start the application: go to [If something is wrong](#if-something-is-wrong).
+
+9. Apply the migrations of the release you are installing. From 0.7.0 that is `0038_session_hashes_and_auth_codes`; a dump of the same release has none pending.
+
+   ```bash
+   docker compose run --rm migrate
+   ```
 
 10. Start the application, sign in and check a few accounts.
 
@@ -108,7 +110,7 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
 
 ## If something is wrong
 
-- **The new database does not match.** Nothing has touched the old data. Stop the stack with `docker compose down`, remove the new directory `./data/postgres-18`, and run steps 6 to 9 again, or check out the previous release (its Compose file points at `./data/postgres` again) and start it. Keep the dump and the fingerprint files and note the first differing line of `diff`.
+- **The new database does not match.** Nothing has touched the old data. Stop the stack with `docker compose down`, remove the new directory `./data/postgres-18`, and run steps 6 to 8 again, or check out the previous release (its Compose file points at `./data/postgres` again) and start it. Keep the dump and the fingerprint files and note the first differing line of `diff`.
 - **You started PostgreSQL 18 on the old directory.** The 18 image refuses to start on a PostgreSQL 16 data directory, mounted at either `/var/lib/postgresql/data` or `/var/lib/postgresql`, and exits with an error that names the directory. The directory is not modified. Use a new directory.
 - **A backup command says the tool is older than the server.** You are running the command with PostgreSQL client tools older than the server. Run it from the backend image of this release, or point `QRO_PG_DUMP_BIN`, `QRO_PG_RESTORE_BIN` or `QRO_PSQL_BIN` at tools of the server's version or newer.
 - **You want to go back after using the application on 18.** Data written on 18 is not in the old directory. Take a dump from 18 first (`db-tools backup`), then decide; restoring it into a 16 server is not tested.
@@ -121,10 +123,10 @@ Why the backup tools matter: `pg_dump` stops with `server version mismatch` when
 
 `scripts/rehearse-pg-upgrade.sh` (also the `PostgreSQL Upgrade Rehearsal` CI job) runs this procedure on a throwaway Docker stack with synthetic data, using the backend image's own tools:
 
-- PostgreSQL 16 is migrated and filled with the demo seed plus [synthetic edge-case rows](../scripts/fixtures/pg-upgrade-synthetic.sql) (large and tiny amounts, negative balances, several currencies, nulls, jsonb, non-ASCII text).
+- PostgreSQL 16 holds the [synthetic 0.7.0 installation](upgrade-fixture.md): every 0.7.0 table, amounts at the edges of the money columns, negative balances, several currencies, nulls, jsonb and non-ASCII text.
 - The database is dumped with the 16 server's own `pg_dump`, and PostgreSQL 18 starts on a new volume.
-- `db:migrate` and `db:restore` load the dump on 18, and the fingerprint must equal the one taken on 16.
-- `db:backup` dumps the 18 server and `db:restore` loads that dump into a second database; the fingerprint must equal again.
+- `db:restore` loads the dump into the empty database on 18, and the fingerprint must equal the one taken on 16. Then `quro migrate` applies the newer migrations.
+- `db:backup` dumps the 18 server and `db:restore` loads that dump into a second, empty database; the fingerprint must equal the migrated one.
 - The 18 image must refuse the 16 directory at both mount points, and the 16 directory must still start with the same fingerprint afterwards.
 - A one-cent change to a copy must change the fingerprint, so the comparison cannot pass vacuously.
 

@@ -35,6 +35,36 @@ describe('readiness report aggregation', () => {
     });
   });
 
+  // GET /api/readiness is an interface for operators' automation (docs/upgrade.md): its fields
+  // and their meaning stay the same across releases.
+  test('keeps the documented JSON shape', async () => {
+    const report = await getCoreReadinessReport(NOW, {
+      checkDatabase: () => Promise.resolve(check(true)),
+      checkSchema: () => Promise.resolve(check(false)),
+      checkDocumentStorage: () => Promise.resolve(check(true)),
+      checkPensionImport: () => Promise.resolve(check(false, false)),
+    });
+    const json = JSON.parse(JSON.stringify(report)) as Record<string, unknown> & {
+      checks: Record<string, Record<string, unknown>>;
+      optional: Record<string, Record<string, unknown>>;
+    };
+    expect(Object.keys(json).sort()).toEqual(['checkedAt', 'checks', 'optional', 'status']);
+    expect(json.status).toBe('not_ready');
+    expect(Object.keys(json.checks).sort()).toEqual(['database', 'documentStorage', 'schema']);
+    expect(Object.keys(json.optional)).toEqual(['pensionImport']);
+    for (const item of [...Object.values(json.checks), ...Object.values(json.optional)]) {
+      expect(Object.keys(item).sort()).toEqual([
+        'checkedAt',
+        'message',
+        'ready',
+        'reason',
+        'required',
+      ]);
+    }
+    expect(json.checks.schema).toMatchObject({ required: true, ready: false });
+    expect(json.optional.pensionImport).toMatchObject({ required: false });
+  });
+
   test('maps all required checks ready to ready and HTTP 200', async () => {
     const report = await getCoreReadinessReport(NOW, {
       checkDatabase: () => Promise.resolve(check(true)),
