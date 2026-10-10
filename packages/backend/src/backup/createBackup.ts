@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
-import { access, stat } from 'node:fs/promises';
+import { access, open, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import postgres, { type Sql, type TransactionSql } from 'postgres';
+import { type Sql, type TransactionSql } from 'postgres';
 import type { DocumentStorageConfig, Secret } from '../config';
 import {
   bundledMigrations,
@@ -14,10 +14,16 @@ import {
 } from '../db/migrationState';
 import { checkPgDump, createDatabaseBackup } from '../db/pgTools';
 import { readAppVersion } from '../lib/appVersion';
-import { enterMaintenance, leaveMaintenance } from '../lib/maintenanceMode';
+import {
+  assertMaintenanceHeld,
+  enterMaintenance,
+  leaveMaintenance,
+  openMaintenanceSession,
+} from '../lib/maintenanceMode';
 import { archiveName, partialName } from './archiveNames';
 import { EncryptingSink } from './encryption';
 import {
+  ARCHIVE_FILE_MODE,
   FileSink,
   fileChunks,
   hashing,
@@ -165,14 +171,26 @@ const REFERENCES_SQL = `
   order by 2`;
 
 /** The documents the database refers to, or null when the schema has no such tables yet. */
-async function readReferences(tx: TransactionSql): Promise<Snapshot['references']> {
+async function readReferences(
+  tx: TransactionSql,
+  log: (line: string) => void,
+): Promise<Snapshot['references']> {
   try {
     return await tx.savepoint((savepoint) =>
       savepoint.unsafe<(ReferencedDocument & { needed: boolean })[]>(REFERENCES_SQL),
     );
   } catch {
+    log('The database has no document tables to list; documents are archived without that check.');
     return null;
   }
+}
+
+/**
+ * pg_dump writes the dump unencrypted next to the archive while the backup runs. Created here
+ * first, so it is never readable by other users, whatever the umask.
+ */
+async function createPrivateFile(path: string): Promise<void> {
+  await (await open(path, 'wx', ARCHIVE_FILE_MODE)).close();
 }
 
 /** Reads what the manifest records and runs pg_dump, all from one exported snapshot. */
@@ -188,8 +206,9 @@ function captureSnapshot(
     `;
     const fingerprint = await readDatabaseFingerprint(tx);
     const applied = await readAppliedMigrations(tx);
-    const references = await readReferences(tx);
+    const references = await readReferences(tx, request.log);
     request.log('Dumping the database');
+    await createPrivateFile(dumpPath);
     await dependencies.dump({
       connectionString: request.adminUrl,
       outputPath: dumpPath,
@@ -336,24 +355,36 @@ async function checkSchema(session: Sql, dependencies: BackupDependencies): Prom
   if (state.kind === 'ahead') throw new SchemaNewerThanImageError(state.last.tag);
 }
 
-/** Dumps and archives with changes paused, then turns them back on. */
+/** Turns maintenance mode on, unless the caller (a restore) already holds it. */
+async function pauseChanges(session: Sql, request: BackupRequest): Promise<void> {
+  if (request.maintenanceHeld) return;
+  request.log(
+    `Pausing changes: new changes are refused from now on; waiting up to ${request.waitSeconds} s for running ones to finish`,
+  );
+  await enterMaintenance(session, request.waitSeconds);
+}
+
+/**
+ * Dumps and archives with changes paused, then turns them back on. The archive is dated by the
+ * moment changes were paused, which is the moment it represents.
+ */
 async function writeWhilePaused(
   session: Sql,
-  paths: Paths,
   request: BackupRequest,
   dependencies: BackupDependencies,
-  createdAt: Date,
-) {
-  if (!request.maintenanceHeld) {
-    request.log(
-      `Pausing changes: new changes are refused from now on; waiting up to ${request.waitSeconds} s for running ones to finish`,
-    );
-    await enterMaintenance(session, request.waitSeconds);
-  }
+  onPlanned: (paths: Paths) => void,
+): Promise<{ paths: Paths; bytes: number; sha256: string; manifest: Manifest }> {
+  await pauseChanges(session, request);
   const pausedAt = performance.now();
   try {
+    const createdAt = dependencies.now();
+    const paths = planPaths(request, createdAt);
+    onPlanned(paths);
     const snapshot = await captureSnapshot(session, request, dependencies, paths.dump);
-    return await writeArchiveFile(paths, request, dependencies, { createdAt, snapshot });
+    const written = await writeArchiveFile(paths, request, dependencies, { createdAt, snapshot });
+    // A broken connection would have ended the pause part way; such an archive is not kept.
+    if (!request.maintenanceHeld) await assertMaintenanceHeld(session);
+    return { paths, ...written };
   } finally {
     if (!request.maintenanceHeld) {
       await leaveMaintenance(session).catch(() => undefined);
@@ -375,27 +406,24 @@ export async function writeBackupArchive(
   if (request.documentStorage.driver === 'filesystem') {
     await assertDocumentsDirectory(request.documentStorage.directory);
   }
-  const createdAt = dependencies.now();
-  const paths = planPaths(request, createdAt);
-  const session = postgres(request.adminUrl, {
-    max: 1,
-    onnotice: () => undefined,
-    connection: { application_name: 'quro-backup' },
-  });
-  let written: { bytes: number; sha256: string; manifest: Manifest };
+  const session = openMaintenanceSession(request.adminUrl, 'quro-backup');
+  const planned: { paths: Paths | null } = { paths: null };
   try {
     await checkSchema(session, dependencies);
     await dependencies.checkDump(request.adminUrl);
-    written = await writeWhilePaused(session, paths, request, dependencies, createdAt);
+    const { paths, ...written } = await writeWhilePaused(session, request, dependencies, (p) => {
+      planned.paths = p;
+    });
     request.log('Verifying the archive');
     await scanArchive(paths.partial, request.encryptionKey);
+    request.signal?.throwIfAborted();
     await publishFile(paths.partial, paths.final, request.directory);
+    return { path: paths.final, name: paths.name, ...written };
   } catch (error) {
-    await removeQuietly(paths.partial);
+    if (planned.paths) await removeQuietly(planned.paths.partial);
     throw error;
   } finally {
-    await removeQuietly(paths.dump);
+    if (planned.paths) await removeQuietly(planned.paths.dump);
     await session.end({ timeout: SESSION_CLOSE_SECONDS }).catch(() => undefined);
   }
-  return { path: paths.final, name: paths.name, ...written };
 }

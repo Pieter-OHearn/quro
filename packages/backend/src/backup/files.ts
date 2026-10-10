@@ -35,16 +35,25 @@ export class FileSink implements ByteSink {
     this.bytes += bytes.length;
     if (this.used + bytes.length > this.buffer.length) await this.flush();
     if (bytes.length >= this.buffer.length) {
-      await this.handle.write(bytes);
+      await this.writeAll(bytes);
       return;
     }
     this.buffer.set(bytes, this.used);
     this.used += bytes.length;
   }
 
+  /** A write may store fewer bytes than asked; continue until all are written. */
+  private async writeAll(bytes: Uint8Array): Promise<void> {
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesWritten } = await this.handle.write(bytes, offset);
+      offset += bytesWritten;
+    }
+  }
+
   private async flush(): Promise<void> {
     if (this.used === 0) return;
-    await this.handle.write(this.buffer.subarray(0, this.used));
+    await this.writeAll(this.buffer.subarray(0, this.used));
     // A new buffer: the write may still read the old one.
     this.buffer = new Uint8Array(WRITE_BUFFER_BYTES);
     this.used = 0;

@@ -15,7 +15,7 @@ import type { BackupDependencies } from '../backup/createBackup';
 import { bundledMigrations } from '../db/migrationState';
 import { applyTestSettings, writeTestSecret } from '../test/config';
 import { runBackupCommand } from './backup';
-import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, EXIT_USAGE } from './io';
+import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, EXIT_UNAVAILABLE, EXIT_USAGE } from './io';
 import { runQuro } from './quro';
 import { runRestoreCommand } from './restore';
 
@@ -85,6 +85,7 @@ function settings(extra: Record<string, string | undefined> = {}) {
     QRO_BACKUP_KEEP: undefined,
     QRO_RESTORE_CONFIRM: undefined,
     QRO_RESTORE_ALLOW_NON_EMPTY: undefined,
+    ADMIN_DATABASE_URL: process.env.ADMIN_DATABASE_URL,
     ...extra,
   });
 }
@@ -192,6 +193,15 @@ describe('quro backup', () => {
       expect(readdirSync(backups).filter((name) => name.endsWith('.enc'))).toHaveLength(2);
     },
   );
+
+  test('an unreachable database is exit code 4 and writes nothing', async () => {
+    settings({ ADMIN_DATABASE_URL: 'postgres://quro:unused@127.0.0.1:9/quro' });
+    const result = await backup();
+    expect(result.exitCode).toBe(EXIT_UNAVAILABLE);
+    expect(result.err).toContain('The database cannot be reached');
+    expect(result.err).not.toContain('unused');
+    expect(readdirSync(backups)).toEqual([]);
+  });
 
   test('an off-device directory without encryption is refused as a setting', async () => {
     settings({ QRO_BACKUP_OFFSITE_DIR: offsite });

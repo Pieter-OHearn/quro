@@ -9,6 +9,8 @@ const MAX_USTAR_NAME = 100;
 // Eleven octal digits: 8 GiB - 1. Larger entries carry their size in a pax header.
 const MAX_USTAR_SIZE = 0o77777777777;
 const FILE_MODE = 0o600;
+// Quro writes a path and a size; anything near this is not one of its archives.
+const MAX_PAX_HEADER_BYTES = 65_536;
 const TYPE_FILE = '0';
 const TYPE_PAX = 'x';
 const encoder = new TextEncoder();
@@ -291,6 +293,26 @@ function parseHeader(block: Uint8Array): Header {
 
 const isZeroBlock = (block: Uint8Array) => block.every((byte) => byte === 0);
 
+async function readPaxHeader(reader: ByteReader, size: number): Promise<Map<string, string>> {
+  if (size > MAX_PAX_HEADER_BYTES) {
+    throw new TarFormatError('The archive has an oversized extended header');
+  }
+  const records = parsePax(await reader.exactly(size));
+  await reader.skip(padding(size).length);
+  return records;
+}
+
+function fileEntry(header: Header, pax: Map<string, string>): TarEntry {
+  if (header.type !== TYPE_FILE) {
+    throw new TarFormatError(`The archive holds an entry that is not a regular file`);
+  }
+  const size = pax.has('size') ? Number(pax.get('size')) : header.size;
+  if (!Number.isSafeInteger(size) || size < 0) {
+    throw new TarFormatError('The archive has a damaged entry size');
+  }
+  return { path: pax.get('path') ?? header.name, size };
+}
+
 async function nextEntry(reader: ByteReader): Promise<TarEntry | null> {
   let pax = new Map<string, string>();
   for (;;) {
@@ -302,19 +324,8 @@ async function nextEntry(reader: ByteReader): Promise<TarEntry | null> {
       return null;
     }
     const header = parseHeader(block);
-    if (header.type === TYPE_PAX) {
-      pax = parsePax(await reader.exactly(header.size));
-      await reader.skip(padding(header.size).length);
-      continue;
-    }
-    if (header.type !== TYPE_FILE) {
-      throw new TarFormatError(`The archive holds an entry that is not a regular file`);
-    }
-    const size = pax.has('size') ? Number(pax.get('size')) : header.size;
-    if (!Number.isSafeInteger(size) || size < 0) {
-      throw new TarFormatError('The archive has a damaged entry size');
-    }
-    return { path: pax.get('path') ?? header.name, size };
+    if (header.type !== TYPE_PAX) return fileEntry(header, pax);
+    pax = await readPaxHeader(reader, header.size);
   }
 }
 

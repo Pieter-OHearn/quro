@@ -136,9 +136,10 @@ async function copySourceIntoTarget(): Promise<void> {
   }
 }
 
-const dumped: { snapshots: string[]; pausedDuringDump: boolean[] } = {
+const dumped: { snapshots: string[]; pausedDuringDump: boolean[]; modes: number[] } = {
   snapshots: [],
   pausedDuringDump: [],
+  modes: [],
 };
 
 function dependencies(overrides: Partial<RestoreDependencies> = {}): RestoreDependencies {
@@ -154,6 +155,8 @@ function dependencies(overrides: Partial<RestoreDependencies> = {}): RestoreDepe
       } finally {
         await probe.end();
       }
+      // The file pg_dump writes into exists already, readable by its owner only.
+      dumped.modes.push(statSync(outputPath!).mode & 0o777);
       writeFileSync(outputPath!, `PGDMP synthetic dump of snapshot ${snapshot}\n`);
       return outputPath!;
     },
@@ -232,6 +235,7 @@ beforeEach(() => {
   writeDocument(documents, 'users/1/.0b1c.tmp', 'partial upload');
   dumped.snapshots.length = 0;
   dumped.pausedDuringDump.length = 0;
+  dumped.modes.length = 0;
 });
 
 afterAll(async () => {
@@ -254,6 +258,7 @@ describe('quro backup', () => {
     expect(statSync(archive.path).mode & 0o777).toBe(0o600);
     expect(dumped.snapshots[0]).toMatch(/^[0-9A-F]+-[0-9A-F]+-\d+$/);
     expect(dumped.pausedDuringDump).toEqual([true]);
+    expect(dumped.modes).toEqual([0o600]);
     // Changes are accepted again afterwards.
     const probe = postgres(sourceUrl, { max: 1 });
     expect((await runUnlessMaintenance(() => Promise.resolve(), probe)).ran).toBe(true);

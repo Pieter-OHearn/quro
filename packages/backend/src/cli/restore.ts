@@ -57,7 +57,7 @@ async function restore(path: string, io: CommandIo, dependencies: RestoreDepende
   }
   if (result.pendingMigrations > 0) {
     io.out(
-      `This image has ${result.pendingMigrations} migration(s) newer than the archive: run quro migrate before starting the application.`,
+      `This image has ${result.pendingMigrations} migration(s) newer than the archive: run the database migrations before starting the application (in Docker Compose: docker compose run --rm migrate).`,
     );
   }
   io.out(

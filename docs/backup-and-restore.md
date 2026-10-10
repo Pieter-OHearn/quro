@@ -123,7 +123,9 @@ Encryption uses a key file that you create once. Archives are then encrypted wit
 | `QRO_BACKUP_OFFSITE_DIR`         | After the archive is checked, it is copied into this directory: a network share, a removable disk or a directory a sync tool sends elsewhere, mounted into the container. The copy is read back and compared with the archive before it is kept. Requires the encryption key: copies that leave the machine are always encrypted. |
 | `QRO_BACKUP_KEEP`                | After the new archive (and its copy) have been checked, older unlabelled archives are deleted in each directory so that this many remain, counting the new one. Labelled archives and other files are never deleted. Unset keeps everything.                                                                                      |
 
-Retention runs last. If writing, checking or copying fails, nothing is deleted. If a deletion fails, the command says which file and exits with code 1.
+Retention runs last. If writing, checking or copying fails, nothing is deleted. If a deletion fails, the command says which file and exits with code 1. Give every Quro instance a backup and off-device directory of its own: retention counts every archive in a directory.
+
+Keep `QRO_BACKUP_DIR` on the machine itself. While a backup runs, `pg_dump` writes the database there unencrypted (readable by its owner only) before it goes into the archive, and a restore stages the archive's dump there; only the finished archive is encrypted. The off-device directory only ever receives finished, encrypted archives.
 
 ### Schedule backups
 
@@ -257,19 +259,19 @@ The targets are a recovery point objective (RPO) of 24 hours and a recovery time
 - **RPO** is the time between backups plus the duration of one backup. A daily backup meets 24 hours. Changes made after the last backup are lost in a restore.
 - **RTO** is the time from deciding to restore to signing in again. The machine part is measured below; the rest is a person's: finding the archive, the key and the settings copy, installing the release on a new machine (about a minute with images present, see [the install contract](install-contract.md#measurements)) and checking the result.
 
-Measured with `scripts/recovery-drill.sh` on an Apple M1 (16 GB) with Docker Desktop (Engine 29.5.3, arm64, 8 CPUs and 7.75 GiB for the Linux VM), PostgreSQL 18.6, encrypted archives, every container on one machine. Times are end to end for the command, including container start, both checksum passes of a restore and the comparison afterwards:
+Measured with `scripts/recovery-drill.sh` on an Apple M1 (16 GB) with Docker Desktop (Engine 29.5.3, arm64, 8 CPUs and 7.75 GiB for the Linux VM), PostgreSQL 18.6, encrypted archives, every container on one machine. Times are end to end for the command, including container start, both checksum passes of a restore and the comparison afterwards. Each dataset was run twice on 2026-10-10 while other containers shared the machine; the slower run is shown:
 
 | Dataset                                                   | Rows    | Documents    | Archive | Backup | Changes paused | Restore |
 | --------------------------------------------------------- | ------- | ------------ | ------- | ------ | -------------- | ------- |
-| Drill default (`QURO_DRILL_ROWS=1000`, 20 PDFs of 64 KiB) | 3,088   | 20, 1.3 MiB  | 1.4 MiB | 0.8 s  | 0.3 s          | 0.9 s   |
-| Reference (`QURO_DRILL_ROWS=25000`, 200 PDFs of 512 KiB)  | 75,268  | 200, 100 MiB | 101 MiB | 1.9 s  | 0.9 s          | 2.1 s   |
-| Large (`QURO_DRILL_ROWS=250000`, 500 PDFs of 1 MiB)       | 750,568 | 500, 500 MiB | 507 MiB | 7.6 s  | 4.0 s          | 9.0 s   |
+| Drill default (`QURO_DRILL_ROWS=1000`, 20 PDFs of 64 KiB) | 3,088   | 20, 1.3 MiB  | 1.4 MiB | 0.8 s  | 0.3 s          | 1.4 s   |
+| Reference (`QURO_DRILL_ROWS=25000`, 200 PDFs of 512 KiB)  | 75,268  | 200, 100 MiB | 101 MiB | 2.3 s  | 1.0 s          | 3.1 s   |
+| Large (`QURO_DRILL_ROWS=250000`, 500 PDFs of 1 MiB)       | 750,568 | 500, 500 MiB | 507 MiB | 13.1 s | 5.4 s          | 14.3 s  |
 
 The reference dataset is about ten years of a busy household: 50,000 budget and 25,000 savings transactions, 200 statements and payslips. Even the large one restores in well under a minute of machine time, so the 60-minute RTO is spent on people, not on the restore.
 
 Limits:
 
-- Changes are refused for as long as the dump and the documents copy take; that grows with the data (about a second for the reference dataset). Schedule backups when nobody uses Quro.
+- Changes are refused for as long as the dump and the documents copy take; that grows with the data (about a second for the reference dataset, five for the large one). Schedule backups when nobody uses Quro.
 - A backup needs free space for the archive and a temporary copy of the dump; a restore needs space for the pre-restore archive, a staged copy of the archive's content and, briefly, the previous documents.
 - One encrypted archive can hold up to 64 GiB.
 - Restoring into a PostgreSQL 16 server does not work with the image's PostgreSQL 18 tools: `pg_restore` 18 sets `transaction_timeout`, which 16 does not know, and stops before it changes anything. Backups of a 16 server work, and restore into PostgreSQL 17 or 18 (the baseline, see [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md)). The drill passes on 17.11 and 18.6.

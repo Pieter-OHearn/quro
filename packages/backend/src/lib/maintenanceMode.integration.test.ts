@@ -4,8 +4,10 @@ import { getConfig } from '../config';
 import { MAINTENANCE_MESSAGE } from '../middleware/maintenance';
 import { createIntegrationHelpers } from '../test/integration';
 import {
+  assertMaintenanceHeld,
   enterMaintenance,
   leaveMaintenance,
+  MaintenanceLostError,
   MaintenanceTimeoutError,
   runUnlessMaintenance,
 } from './maintenanceMode';
@@ -131,6 +133,32 @@ describe('maintenance mode', () => {
     } finally {
       finishWrite.resolve();
       await running;
+      await session.end();
+    }
+  });
+
+  test('with no wait it starts at once or refuses at once, and knows whether it holds', async () => {
+    const session = backupSession();
+    const finishWrite = deferred();
+    const writeStarted = deferred();
+    try {
+      await expect(assertMaintenanceHeld(session)).rejects.toThrow(MaintenanceLostError);
+      await enterMaintenance(session, 0);
+      await assertMaintenanceHeld(session);
+      await leaveMaintenance(session);
+
+      const running = runUnlessMaintenance(async () => {
+        writeStarted.resolve();
+        await finishWrite.promise;
+      });
+      await writeStarted.promise;
+      const started = Date.now();
+      await expect(enterMaintenance(session, 0)).rejects.toThrow(MaintenanceTimeoutError);
+      expect(Date.now() - started).toBeLessThan(1000);
+      finishWrite.resolve();
+      await running;
+    } finally {
+      finishWrite.resolve();
       await session.end();
     }
   });

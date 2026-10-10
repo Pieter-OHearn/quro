@@ -150,10 +150,16 @@ async function runRetention(
   }
 }
 
-/** Runs `work` with an abort signal that SIGINT and SIGTERM trigger, so temporary files are removed. */
+/**
+ * Runs `work` with an abort signal that SIGINT and SIGTERM trigger, so temporary files are
+ * removed. A second signal exits at once.
+ */
 export async function withInterruption<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
-  const abort = () => controller.abort();
+  const abort = () => {
+    if (controller.signal.aborted) process.exit(EXIT_FAILURE);
+    controller.abort();
+  };
   process.on('SIGINT', abort);
   process.on('SIGTERM', abort);
   try {

@@ -117,10 +117,59 @@ async function countSharedHolders(session: Sql): Promise<number> {
 }
 
 /**
- * Turns maintenance mode on for the session (a client with one connection): new writes and job
+ * A client with one connection for `quro backup` and `quro restore`. The connection holds
+ * maintenance mode, so it is never closed for being idle or old (postgres.js recycles connections
+ * otherwise, which would end maintenance mode in the middle of a long copy).
+ */
+export function openMaintenanceSession(url: string, applicationName: string): Sql {
+  return postgres(url, {
+    max: 1,
+    idle_timeout: 0,
+    max_lifetime: 0,
+    onnotice: () => undefined,
+    connection: { application_name: applicationName },
+  });
+}
+
+/** Maintenance mode was lost while it was needed, for example because the connection broke. */
+export class MaintenanceLostError extends Error {
+  constructor() {
+    super(
+      'Maintenance mode ended unexpectedly (the database connection was lost), so changes may have been made meanwhile. Nothing was kept; run the command again.',
+    );
+    this.name = 'MaintenanceLostError';
+  }
+}
+
+/** Throws `MaintenanceLostError` unless this session still holds maintenance mode. */
+export async function assertMaintenanceHeld(session: Sql): Promise<void> {
+  const [row] = await session<{ held: boolean }[]>`
+    select exists(
+      select 1 from pg_locks
+      where locktype = 'advisory' and mode = 'ExclusiveLock' and granted and pid = pg_backend_pid()
+        and classid = ${QURO_LOCK_NAMESPACE} and objid = ${MAINTENANCE_LOCK_ID} and objsubid = 2
+    ) as held
+  `;
+  if (!row?.held) throw new MaintenanceLostError();
+}
+
+async function tryEnterNow(session: Sql): Promise<void> {
+  const [row] = await session<{ entered: boolean }[]>`
+    select pg_try_advisory_lock(${QURO_LOCK_NAMESPACE}, ${MAINTENANCE_LOCK_ID}) as entered
+  `;
+  if (!row?.entered) throw new MaintenanceTimeoutError(0, await countSharedHolders(session));
+}
+
+/**
+ * Turns maintenance mode on for the session (see `openMaintenanceSession`): new writes and job
  * cycles are refused at once, and this waits up to `waitSeconds` for running ones to finish.
+ * With 0 it does not wait at all.
  */
 export async function enterMaintenance(session: Sql, waitSeconds: number): Promise<void> {
+  if (waitSeconds <= 0) {
+    await tryEnterNow(session);
+    return;
+  }
   await session`select set_config('lock_timeout', ${`${waitSeconds}s`}, false)`;
   try {
     await session`select pg_advisory_lock(${QURO_LOCK_NAMESPACE}, ${MAINTENANCE_LOCK_ID})`;

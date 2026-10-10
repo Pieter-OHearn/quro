@@ -1,11 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import postgres, { type Sql } from 'postgres';
+import { readdir } from 'node:fs/promises';
+import { type Sql } from 'postgres';
 import type { BackupConfig, DocumentStorageConfig } from '../config';
 import { readAppliedMigrations, type AppliedMigration } from '../db/migrationState';
 import { checkPgRestore, restoreDatabaseBackup } from '../db/pgTools';
 import { ensureRuntimeRole, type RuntimeRoleConfig } from '../db/runtimeRole';
-import { enterMaintenance, leaveMaintenance } from '../lib/maintenanceMode';
+import {
+  assertMaintenanceHeld,
+  enterMaintenance,
+  leaveMaintenance,
+  openMaintenanceSession,
+} from '../lib/maintenanceMode';
 import { PRE_RESTORE_LABEL } from './archiveNames';
 import {
   assertWritableDirectory,
@@ -124,7 +130,7 @@ function assertSchemaMatches(state: TargetState, manifest: Manifest): void {
   const archived = manifest.database.lastMigration;
   if (last && archived && last.createdAt === archived.createdAt) return;
   throw new RestoreRefusedError(
-    `The database's schema is not the archive's (the archive is at migration ${archived?.tag ?? 'none'}). Restore into a new, empty database instead (do not run quro migrate before the restore), then run quro migrate.`,
+    `The database's schema is not the archive's (the archive is at migration ${archived?.tag ?? 'none'}). Restore into a new, empty database instead, without running the migrations first, and run the migrations afterwards.`,
   );
 }
 
@@ -179,7 +185,12 @@ async function stageArchive(request: RestoreRequest, manifest: Manifest): Promis
     await scanArchive(request.archivePath, request.backup.encryptionKey, {
       dump: async (chunks) => {
         const sink = await FileSink.create(dumpPath);
-        for await (const chunk of chunks) await sink.write(chunk);
+        try {
+          for await (const chunk of chunks) await sink.write(chunk);
+        } catch (error) {
+          await sink.abandon();
+          throw error;
+        }
         await sink.close();
       },
       document: documents ? documents.write : undefined,
@@ -244,6 +255,8 @@ async function replaceData(
   staged: Staged,
   dependencies: RestoreDependencies,
 ): Promise<void> {
+  // Nothing has changed yet; a lost connection would have let writers in.
+  await assertMaintenanceHeld(session);
   request.log('Restoring the database (one transaction)');
   await dependencies.restore({
     connectionString: request.adminUrl,
@@ -265,6 +278,20 @@ async function replaceData(
   if (request.runtimeRole) {
     await ensureRuntimeRole(session, request.runtimeRole);
     request.log(`Re-applied the grants of the runtime role ${request.runtimeRole.roleName}`);
+  }
+}
+
+/** Staging directories of an interrupted restore stay behind, hidden; say so. */
+async function warnAboutLeftovers(request: RestoreRequest): Promise<void> {
+  const { documentStorage } = request;
+  if (documentStorage.driver !== 'filesystem') return;
+  const leftovers = (await readdir(documentStorage.directory)).filter((name) =>
+    name.startsWith('.restore-'),
+  );
+  if (leftovers.length > 0) {
+    request.log(
+      `The documents directory holds ${leftovers.length} leftover(s) of an interrupted restore (${leftovers.join(', ')}); delete them when this restore has finished.`,
+    );
   }
 }
 
@@ -298,12 +325,9 @@ export async function restoreArchive(
   dependencies: RestoreDependencies = defaultRestoreDependencies(),
 ): Promise<RestoreResult> {
   const manifest = await checkPrerequisites(request, dependencies);
-  const session = postgres(request.adminUrl, {
-    max: 1,
-    onnotice: () => undefined,
-    connection: { application_name: 'quro-restore' },
-  });
+  const session = openMaintenanceSession(request.adminUrl, 'quro-restore');
   try {
+    await warnAboutLeftovers(request);
     const { replacing } = await guardTarget(session, request, manifest);
     const preRestore = replacing ? await preRestoreArchive(request, dependencies) : null;
     const staged = await stageArchive(request, manifest);
