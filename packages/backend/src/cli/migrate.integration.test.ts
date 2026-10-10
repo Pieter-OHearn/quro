@@ -287,7 +287,6 @@ describe('quro migrate --status', () => {
       pending: [],
     });
     expect(run.stdout).not.toContain('postgres://');
-    expect(run.stdout).not.toContain(serverUrl.password);
 
     const text = await quroMigrate(env, '--status');
     expect(text.exitCode).toBe(0);
@@ -364,27 +363,28 @@ describe('quro migrate --status', () => {
     }
   });
 
-  test('needs only the owner role: no runtime password file, no runtime role', async () => {
+  test('needs only the owner role, and never prints its password', async () => {
+    // An owner with a random password and no runtime role or runtime password file at all.
+    const owner = await freshRole('statusowner', 'login');
+    const owned = await freshDatabase('statusowned', owner.name);
     const run = await quroMigrate(
       {
         DATABASE_URL: '',
         ADMIN_DATABASE_URL: '',
         APP_DATABASE_URL: '',
         POSTGRES_HOST: serverUrl.hostname,
-        POSTGRES_PORT: serverUrl.port,
-        POSTGRES_DB: database,
-        POSTGRES_ADMIN_USER: decodeURIComponent(serverUrl.username),
-        POSTGRES_ADMIN_PASSWORD_FILE: writeTestSecret(
-          `status-admin-${suffix}`,
-          decodeURIComponent(serverUrl.password),
-        ),
+        POSTGRES_PORT: serverUrl.port || '5432',
+        POSTGRES_DB: owned,
+        POSTGRES_ADMIN_USER: owner.name,
+        POSTGRES_ADMIN_PASSWORD_FILE: writeTestSecret(`status-owner-${suffix}`, owner.password),
         POSTGRES_APP_PASSWORD_FILE: '/nonexistent/postgres_app_password',
       },
       '--status',
       '--json',
     );
-    expect(run.exitCode).toBe(0);
-    expect(statusOf(run).status).toBe('current');
+    expect(run.exitCode).toBe(1);
+    expect(statusOf(run)).toMatchObject({ status: 'empty', database: { user: owner.name } });
+    expect(run.out).not.toContain(owner.password);
   });
 
   test('an unreachable database exits 4 and prints no report; usage mistakes exit 2', async () => {
