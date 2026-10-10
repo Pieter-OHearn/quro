@@ -18,7 +18,7 @@ Quro is for people who are comfortable running a few containers at home. It is p
 
 ## Quickstart
 
-This installs Quro on one host from the published images, with the example Compose file. CI runs these commands as written on every change.
+This installs Quro on one host from the published images, with the example Compose file. CI runs these commands on every change, with images built from that change standing in for the release.
 
 Quro 0.8.0 is the first release that installs this way. Releases up to 0.7.0 have no supported install path; if you run one, see [Upgrade](#upgrade).
 
@@ -102,7 +102,7 @@ curl -fsS http://localhost:3000/api/readiness
 | Uploaded documents | `data/documents/`                                                   |
 | Backups            | `backups/`, written by `docker compose run --rm migrate backup`     |
 
-Every step can run again safely. `quro init` only creates missing files and never changes an existing one; `docker compose up -d` leaves running services alone and recreates only what changed; `migrate` runs on every start and changes nothing when the schema is current. `docker compose down` followed by `up -d` keeps all data. Keep a copy of `config/` somewhere safe: backups do not include it.
+Every step can run again safely, except that the download in step 1 replaces `compose.yaml`, so keep a copy once you have edited it. `quro init` only creates missing files and never changes an existing one; `docker compose up -d` leaves running services alone and recreates only what changed; `migrate` runs on every start and changes nothing when the schema is current. `docker compose down` followed by `up -d` keeps all data. Keep a copy of `config/` somewhere safe: backups do not include it.
 
 ### Verify what you install
 
@@ -151,13 +151,13 @@ A new instance has no accounts and no default password: the first account needs 
 
 Quro keeps your data on your host and sends nothing to the project. These are all of its outbound connections:
 
-| From         | To                                    | When                                                                                                                       | What the other side learns                                |
-| ------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Docker       | `ghcr.io`, Docker Hub                 | Pulling images at install and upgrade                                                                                      | Your IP address and the images you pull                   |
-| The backend  | Yahoo Finance                         | On by default: exchange rates at start and daily, prices of the tickers you hold daily, and a lookup when you add a ticker | Your IP address, the tickers you hold and your currencies |
-| Your browser | `cdn.jsdelivr.net`                    | Images for the emoji picker, only while it is open                                                                         | Your IP address                                           |
-| The backend  | bunq                                  | Only when bank linking is configured: hourly while an account is linked                                                    | What bank linking needs                                   |
-| The backend  | Your S3 endpoint, your OTLP collector | Only when you configure them                                                                                               | Documents or traces, sent to a service you run            |
+| From         | To                                    | When                                                                                                                     | What the other side learns                                |
+| ------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| Docker       | `ghcr.io`, Docker Hub                 | Pulling images at install and upgrade                                                                                    | Your IP address and the images you pull                   |
+| The backend  | Yahoo Finance                         | On by default: exchange rates and prices of the tickers you hold, at start and daily, and a lookup when you add a ticker | Your IP address, the tickers you hold and your currencies |
+| Your browser | `cdn.jsdelivr.net`                    | Images for the emoji picker, only while it is open                                                                       | Your IP address                                           |
+| The backend  | bunq                                  | Only when bank linking is configured: hourly while an account is linked                                                  | What bank linking needs                                   |
+| The backend  | Your S3 endpoint, your OTLP collector | Only when you configure them                                                                                             | Documents or traces, sent to a service you run            |
 
 Quro needs Yahoo Finance once: the web app shows balances only after it has an exchange rate for every supported currency, and a new install fetches them when the backend starts. Until then, the app shows **Converted balances are paused** after sign-in, and the backend tries again every minute. Once the rates are stored, blocking Yahoo Finance at a firewall is safe: rates and prices stop updating, and stored rates age as described in [financial invariants](docs/financial-invariants.md). There is no switch to turn off only this provider.
 

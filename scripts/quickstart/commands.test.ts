@@ -69,6 +69,9 @@ describe('extracting runnable blocks', () => {
       'curl -o c file:///repo/c.yaml\ndocker run quro:test init\n',
     );
     expect(() => substitute(script.replaceAll('v1.2.3', 'v1.2.2'), options)).toThrow('v1.2.2');
+    expect(substitute(script, { ...options, composeFile: '/a b/c.yaml' })).toContain(
+      'file:///a%20b/c.yaml',
+    );
     expect(() =>
       substitute('docker pull ghcr.io/pieter-ohearn/quro-frontend:v1.2.3', options),
     ).toThrow('cannot substitute');

@@ -36,6 +36,14 @@ fail() {
   exit 1
 }
 contains() { printf '%s' "$1" | grep -qF -- "$2" || fail "expected output to contain: $2"; }
+wait_ready() {
+  tries=0
+  until curl -fsS "$BASE/api/readiness" >/dev/null 2>&1; do
+    tries=$((tries + 1))
+    [ "$tries" -le 60 ] || fail "$BASE did not become ready"
+    sleep 1
+  done
+}
 
 cleanup() {
   status=$?
@@ -102,6 +110,7 @@ code=$(grep -Eo "$CODE_PATTERN" "$WORK/first.log" | head -n 1)
 cd "$WORK/quro"
 
 step "The healthy state the README describes"
+wait_ready
 states=$(docker compose ps --format '{{.Service}} {{.Status}}')
 echo "$states"
 printf '%s\n' "$states" | grep -Eq '^db Up .*\(healthy\)' || fail "db is not healthy"
@@ -121,11 +130,12 @@ bun "$REPO/scripts/clean-install/exercise.ts" setup "$BASE" "$WORK/state.json" "
 step "The quickstart again: nothing changes"
 cd "$WORK"
 sh "$WORK/quickstart.sh" </dev/null >"$WORK/second.log" 2>&1 || {
-  cat "$WORK/second.log"
+  sed -E "s/$CODE_PATTERN/<setup code>/g" "$WORK/second.log"
   fail "the second quickstart run failed"
 }
 contains "$(cat "$WORK/second.log")" "Nothing to do: the configuration directory is complete."
 cd "$WORK/quro"
+wait_ready
 bun "$REPO/scripts/clean-install/exercise.ts" verify "$BASE" "$WORK/state.json"
 
 step "Uninstall, keeping the data (docs/uninstall.md)"
@@ -133,6 +143,7 @@ sh "$WORK/keep.sh"
 [ -z "$(docker compose ps -a -q)" ] || fail "containers are left after docker compose down"
 docker volume inspect "${COMPOSE_PROJECT_NAME}_postgres" >/dev/null || fail "the database volume is gone"
 docker compose up -d
+wait_ready
 bun "$REPO/scripts/clean-install/exercise.ts" verify "$BASE" "$WORK/state.json"
 
 step "Uninstall, deleting the database (docs/uninstall.md)"

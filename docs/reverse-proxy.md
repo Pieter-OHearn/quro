@@ -86,7 +86,7 @@ In the browser's developer tools, the `session` and `csrf_token` cookies are mar
 
 When the proxy is not a service in the Compose project, it forwards to nginx's published port instead of `frontend:80`:
 
-- **On the same host:** publish nginx on the loopback interface only, `'127.0.0.1:3000:80'` in the `ports` of `frontend`, and point the proxy at `http://127.0.0.1:3000`. Nginx then sees connections from the Docker network's gateway, which `172.16.0.0/12` covers by default.
+- **On the same host:** publish nginx on the loopback interface only, `'127.0.0.1:3000:80'` in the `ports` of `frontend`, and point the proxy at `http://127.0.0.1:3000`. Nginx then sees the proxy's connections coming from an address on the Docker side, usually the gateway of the `web` network. Each line of `docker compose logs frontend` starts with that address; `TRUSTED_PROXIES` must cover it.
 - **On another machine:** keep the published port, point the proxy at `http://<host>:3000`, and allow only the proxy to reach that port, for example with a firewall rule on the host. Add the proxy's address to `TRUSTED_PROXIES`, for example `TRUSTED_PROXIES=172.16.0.0/12,192.168.1.10`, so rate limits still apply per browser.
 
 ## Other proxies

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // Extracts the shell commands that the docs mark as runnable, so CI runs the README quickstart
 // as written instead of a copy that can drift from it.
@@ -97,7 +98,7 @@ export function substitute(script: string, { tag, composeFile, backendImage }: S
   const replaced = script
     .replace(RELEASE_URL_RE, (_url, ref: string) => {
       if (ref !== tag) problems.push(`the download names ${ref}, the example pins ${tag}`);
-      return `file://${composeFile}`;
+      return pathToFileURL(composeFile).href;
     })
     .replace(BACKEND_IMAGE_RE, (_image, ref: string) => {
       if (ref !== tag) problems.push(`the backend image is ${ref}, the example pins ${tag}`);

@@ -55,7 +55,7 @@ Each secret is one value in one file. A trailing newline is ignored; an empty fi
 - `quro init` writes the file once, with every optional setting commented out at its default. It never changes the file again.
 - After an edit, run `docker compose up -d`. Compose recreates the services whose settings changed and leaves the rest running.
 - Every container checks all of its settings when it starts. Invalid values stop it with exit code 2 and one list of the problems; the list names settings, never values. An empty value counts as unset.
-- Switches marked _true or false_ accept `true`, `false`, `1`, `0`, `yes` and `no`, except `SECURE_COOKIES` and `OTEL_SDK_DISABLED`, which accept only `true` or `false`.
+- The switches `S3_FORCE_PATH_STYLE`, `BUNQ_SANDBOX` and `QRO_DISABLE_SCHEDULERS` accept `true`, `false`, `1`, `0`, `yes` and `no`. `SECURE_COOKIES` and `OTEL_SDK_DISABLED` accept only `true` or `false`.
 - Settings from earlier releases are not read; `quro doctor` names each one it finds and its replacement. See [retired settings](install-contract.md#retired-settings).
 
 ## Backend settings
