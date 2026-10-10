@@ -33,6 +33,7 @@ RUN="quro-rehearsal-$$"
 NET="$RUN-net"
 V_OLD="$RUN-pg-old"
 V_NEW="$RUN-pg-new"
+# Mounted at the image's backup directory, which belongs to the image's unprivileged user.
 V_DUMPS="$RUN-dumps"
 # The documents directory every backend container mounts; `db:backup` archives it.
 V_DOCUMENTS="$RUN-documents"
@@ -90,7 +91,7 @@ backend() {
   shift 2
   admin_url="postgres://$ADMIN_USER:$ADMIN_PASSWORD@$host:5432/$database"
   app_url="postgres://$APP_USER:$APP_PASSWORD@$host:5432/$database"
-  docker run --rm --network "$NET" -v "$V_DUMPS:/dumps" -v "$V_DOCUMENTS:/var/lib/quro/documents" \
+  docker run --rm --network "$NET" -v "$V_DUMPS:/var/lib/quro/backups" -v "$V_DOCUMENTS:/var/lib/quro/documents" \
     -e ADMIN_DATABASE_URL="$admin_url" -e APP_DATABASE_URL="$app_url" -e DATABASE_URL="$app_url" \
     -e QRO_DISABLE_SCHEDULERS=true -e QRO_RESTORE_CONFIRM=restore-db \
     --entrypoint bun "$IMAGE" run "$@"
@@ -131,16 +132,16 @@ echo "recorded $tables tables and $rows rows"
 
 step "Dump with the old server's own pg_dump"
 docker exec "$RUN-old" pg_dump -U "$ADMIN_USER" -d "$DB" --format=custom \
-  | docker run --rm -i -v "$V_DUMPS:/dumps" --entrypoint sh "$IMAGE" -c 'cat > /dumps/before-upgrade.dump'
-dump_bytes=$(docker run --rm -v "$V_DUMPS:/dumps" --entrypoint sh "$IMAGE" -c 'wc -c < /dumps/before-upgrade.dump')
+  | docker run --rm -i -v "$V_DUMPS:/var/lib/quro/backups" --entrypoint sh "$IMAGE" -c 'cat > /var/lib/quro/backups/before-upgrade.dump'
+dump_bytes=$(docker run --rm -v "$V_DUMPS:/var/lib/quro/backups" --entrypoint sh "$IMAGE" -c 'wc -c < /var/lib/quro/backups/before-upgrade.dump')
 [ "$dump_bytes" -gt 1000 ] || fail "the dump is empty or truncated ($dump_bytes bytes)"
 # The pipe above hides a failing pg_dump, so also require a readable archive.
-docker run --rm -v "$V_DUMPS:/dumps" --entrypoint pg_restore "$IMAGE" --list /dumps/before-upgrade.dump >/dev/null \
+docker run --rm -v "$V_DUMPS:/var/lib/quro/backups" --entrypoint pg_restore "$IMAGE" --list /var/lib/quro/backups/before-upgrade.dump >/dev/null \
   || fail "the dump is not a readable archive"
 echo "dump written: $dump_bytes bytes"
 
 step "The backend image's tools can also dump the 16 server (client 18 >= server 16)"
-backend "$RUN-old" "$DB" db:backup -- --output /dumps/from-16-with-new-tools.dump >/dev/null
+backend "$RUN-old" "$DB" db:backup -- --output /var/lib/quro/backups/from-16-with-new-tools.dump >/dev/null
 
 step "Stop 16 and check that $PG_NEW_IMAGE refuses its data directory"
 docker stop "$RUN-old" >/dev/null
@@ -172,15 +173,15 @@ echo "server major $server_major, data_checksums=$checksums"
 
 step "Migrate, restore the old dump with the image's tools, compare"
 migrate "$RUN-new" "$DB"
-backend "$RUN-new" "$DB" db:restore -- /dumps/before-upgrade.dump >/dev/null
+backend "$RUN-new" "$DB" db:restore -- /var/lib/quro/backups/before-upgrade.dump >/dev/null
 snapshot "$RUN-new" "$DB" >"$WORK/after.snap"
 same_snapshot "16 -> 18" "$WORK/before.snap" "$WORK/after.snap"
 
 step "Round trip on 18: db:backup, then db:restore into a second database"
-backend "$RUN-new" "$DB" db:backup -- --output /dumps/round-trip.dump >/dev/null
+backend "$RUN-new" "$DB" db:backup -- --output /var/lib/quro/backups/round-trip.dump >/dev/null
 docker exec "$RUN-new" psql -X -q -U "$ADMIN_USER" -d postgres -c 'create database quro_roundtrip' >/dev/null
 migrate "$RUN-new" quro_roundtrip
-backend "$RUN-new" quro_roundtrip db:restore -- /dumps/round-trip.dump >/dev/null
+backend "$RUN-new" quro_roundtrip db:restore -- /var/lib/quro/backups/round-trip.dump >/dev/null
 snapshot "$RUN-new" quro_roundtrip >"$WORK/roundtrip.snap"
 same_snapshot "18 -> 18 round trip" "$WORK/before.snap" "$WORK/roundtrip.snap"
 

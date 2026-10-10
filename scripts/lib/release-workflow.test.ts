@@ -33,6 +33,7 @@ const release = Bun.YAML.parse(releaseText) as Workflow;
 const ci = Bun.YAML.parse(readFileSync(`${workflowsDir}/ci.yml`, 'utf8')) as Workflow;
 const { verify, publish } = release.jobs;
 const build = release.jobs['build-images'];
+const publicAccess = release.jobs['verify-public-access'];
 
 function environmentName(job: Job): string | undefined {
   return typeof job.environment === 'string' ? job.environment : job.environment?.name;
@@ -116,13 +117,33 @@ describe('release.yml', () => {
 
   test('builds only after the gate and tags only after the build', () => {
     expect(build.needs).toBe('verify');
-    expect(publish.needs).toEqual(['verify', 'build-images']);
+    expect(publish.needs).toEqual(['verify', 'build-images', 'verify-public-access']);
     expect(stepIndex(verify, /release-gate\.ts preflight/)).toBeGreaterThan(0);
     for (const step of [...verify.steps, ...build.steps]) {
       expect(step.run ?? '').not.toMatch(
         /create-tag|stage-release|publish-release|promote-images|git (tag|push)/,
       );
     }
+  });
+
+  test('reads the candidate images anonymously before anything is tagged or published', () => {
+    expect(publicAccess.needs).toEqual(['verify', 'build-images']);
+    expect(environmentName(publicAccess)).toBeUndefined();
+    // Only the tooling checkout needs a scope; the image check sends no credentials at all.
+    expect(publicAccess.permissions).toEqual({ contents: 'read' });
+    const script = publicAccess.steps.map((step) => step.run ?? '').join('\n');
+    const uses = publicAccess.steps.map((step) => step.uses ?? '').join('\n');
+    expect(uses).not.toMatch(/docker\/login-action/);
+    for (const step of publicAccess.steps) expect(step.env?.GITHUB_TOKEN).toBeUndefined();
+    expect(script).not.toMatch(/docker (login|pull)|GITHUB_TOKEN|github\.token/);
+    expect(script).toContain('scripts/lib/image-access.ts');
+    expect(script).toContain('--tag "sha-$RELEASE_SHA"');
+    expect(script).toContain('--expect "quro-backend=$BACKEND_DIGEST"');
+    expect(script).toContain('--expect "quro-frontend=$FRONTEND_DIGEST"');
+    expect(publicAccess.env?.BACKEND_DIGEST).toBe('${{ needs.build-images.outputs.backend }}');
+    expect(publicAccess.env?.FRONTEND_DIGEST).toBe('${{ needs.build-images.outputs.frontend }}');
+    // The version tags are added only after the images have been read anonymously.
+    expect(publish.needs).toContain('verify-public-access');
   });
 
   test('pushes only candidate tags from the build job', () => {
@@ -181,5 +202,15 @@ describe('release.yml', () => {
     expect(release.env?.CI_WORKFLOW_PATH).toBe('.github/workflows/ci.yml');
     expect(release.env?.REQUIRED_CHECKS).toBe(ci.jobs.ci.name);
     for (const event of EXACT_COMMIT_EVENTS) expect(Object.keys(ci.on)).toContain(event);
+  });
+
+  test('checks anonymous image access in CI and requires the check to fail for a missing tag', () => {
+    const job = ci.jobs['image-access'];
+    expect(ci.jobs.ci.needs).toContain('image-access');
+    const script = job.steps.map((step) => step.run ?? '').join('\n');
+    expect(script).toContain('image-access.ts --tag latest');
+    expect(script).toContain('ci-tag-that-does-not-exist');
+    expect(script).toContain('not found (HTTP 404, manifest unknown)');
+    expect(job.steps.map((step) => step.uses ?? '').join('\n')).not.toMatch(/docker\/login-action/);
   });
 });
