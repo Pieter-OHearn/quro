@@ -1,136 +1,222 @@
 # Quro
 
 [![Latest Release](https://img.shields.io/github/v/release/Pieter-OHearn/quro)](https://github.com/Pieter-OHearn/quro/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/Pieter-OHearn/quro/release.yml?label=build)](https://github.com/Pieter-OHearn/quro/actions/workflows/release.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/Pieter-OHearn/quro/ci.yml?branch=main&label=CI)](https://github.com/Pieter-OHearn/quro/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/Pieter-OHearn/quro)](LICENSE)
 [![GHCR](https://img.shields.io/badge/ghcr.io-quro-blue?logo=docker)](https://github.com/Pieter-OHearn/quro/pkgs/container/quro-frontend)
 
-Quro is a self-hosted personal finance app that brings budgeting, savings, investing, and long-term planning into one dashboard. It tracks your salary, savings accounts, investments, pensions, and financial goals — and lets you attach supporting documents to keep everything in one place. Open source and built to run on your own hardware.
+Quro is a self-hosted personal finance app for one household. It brings budgets, savings accounts, investments, pensions, a mortgage, debts, salary and goals into one dashboard, converts between currencies, and keeps payslips and pension statements next to the numbers they belong to.
 
-## Local Docker Dev
+It runs with Docker on a computer you own, such as a home server, a NAS or an arm64 single-board computer. Your records stay in a PostgreSQL database and a documents directory on that machine. There is no Quro account, no cloud service and no telemetry.
 
-The Docker dev stack requires Bun and Docker Compose v2. Clone the repository, then create the runtime configuration and secrets from the repository root:
+Quro is for people who are comfortable running a few containers at home. It is pre-1.0 and has a single maintainer; the [roadmap](ROADMAP.md) says what 1.0 will contain.
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="The Quro dashboard of a new demo household: net worth, savings, investments, pension, salary and liability cards, a net worth chart and the asset allocation" width="900" />
+</p>
+<p align="center"><sub>The dashboard of a new household, created by the built-in demo seed. The name and email address are synthetic.</sub></p>
+
+## Quickstart
+
+This installs Quro on one host from the published images, with the example Compose file. CI runs these commands as written on every change.
+
+Quro 0.8.0 is the first release that installs this way. Releases up to 0.7.0 have no supported install path; if you run one, see [Upgrade](#upgrade).
+
+| You need                   | Details                                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A host                     | Linux on amd64 or arm64 with Docker Engine and the Compose v2 plugin (`docker compose version`). Docker Desktop on macOS works for a trial                          |
+| Disk and memory            | About 2 GB of disk for the images and 512 MB of free memory, plus room for your data and backups                                                                    |
+| Network                    | Access to `ghcr.io` and Docker Hub to pull images, without a registry account, and to Yahoo Finance for exchange rates (see [privacy](#privacy-and-network-access)) |
+| Permission to run `docker` | Membership of the `docker` group, or prefix the `docker` commands with `sudo`                                                                                       |
+| Not needed                 | A GPU, an email server, an object store, a bank account, a domain name                                                                                              |
+
+<!-- quickstart:begin -->
+
+1. Create a directory and download the example Compose file of the release:
+
+   ```bash
+   mkdir -p quro/config quro/data/documents quro/backups && cd quro
+   curl -fsSL -o compose.yaml https://raw.githubusercontent.com/Pieter-OHearn/quro/v0.8.0/docs/compose.example.yaml
+   ```
+
+   Read `compose.yaml` before you start it. It is a plain file with four services and no template step: `db` (PostgreSQL 18), `migrate` (applies the schema, then exits), `backend` and `frontend`.
+
+2. On Linux, give the three directories to UID 1000, the user the backend runs as. Skip this on Docker Desktop, or when `id -u` already prints `1000`:
+
+   <!-- quickstart:linux-only -->
+
+   ```bash
+   sudo chown 1000:1000 config data/documents backups
+   ```
+
+3. Write the settings file and generate the database passwords:
+
+   ```bash
+   docker run --rm -v "$PWD/config:/config" ghcr.io/pieter-ohearn/quro-backend:v0.8.0 init
+   ```
+
+   This creates `config/quro.env` and two password files in `config/secrets/` (24 random bytes each, readable by their owner only). The passwords are never printed. The defaults match the example Compose file, so you can review the settings later; the next step runs `quro migrate` for you.
+
+4. Start Quro:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   The command returns once the database is up, the schema is in place and the backend reports ready.
+
+5. Create a one-time setup code for the first account:
+
+   ```bash
+   docker compose exec backend quro user invite
+   ```
+
+<!-- quickstart:end -->
+
+Open `http://localhost:3000`, or `http://<host>:3000` from another device on your network, choose **Get started**, and enter the code with your name, email and password. That account is the household's owner.
+
+New accounts after the first need a code from the same command; registration is invite-only by default. A forgotten password is reset with `docker compose exec backend quro user reset-password <email>`, which prints a code to enter under **Forgot password?**. Quro sends no email.
+
+### Check that it is healthy
 
 ```bash
-git clone https://github.com/Pieter-OHearn/quro.git
-cd quro
-cp .env.example .env
-for file in secrets/*.example; do cp "$file" "${file%.example}"; done
-chmod 600 .env secrets/*.txt
+docker compose ps
 ```
 
-Edit the copied files under `secrets/` to set your own passwords and keys before starting the stack.
-
-Once the configuration and secrets are ready, start the stack:
+`db` and `backend` show `(healthy)` and `frontend` shows `Up`. `migrate` is not listed because it has finished; `docker compose ps -a` shows it as `Exited (0)`. The readiness endpoint answers `200` with `"status":"ready"`:
 
 ```bash
-bun run dev:docker
+curl -fsS http://localhost:3000/api/readiness
 ```
 
-Then open `http://localhost:3000`. A new instance has no accounts, so create the first one with a one-time setup code:
+`docker compose run --rm migrate doctor` checks the settings, both database roles, the schema and the documents directory, and ends with `All checks passed.` If something is not healthy, `docker compose logs migrate backend` usually says why; [Install Quro](docs/install.md) covers the details.
+
+### What runs where
+
+| What               | Where                                                               |
+| ------------------ | ------------------------------------------------------------------- |
+| Web app            | Port `3000` on every interface of the host. The only published port |
+| Settings           | `config/quro.env`. Edit it, then run `docker compose up -d`         |
+| Database passwords | `config/secrets/`, generated by `quro init`                         |
+| Database           | The Docker volume `quro_postgres`                                   |
+| Uploaded documents | `data/documents/`                                                   |
+| Backups            | `backups/`, written by `docker compose run --rm migrate backup`     |
+
+Every step can run again safely. `quro init` only creates missing files and never changes an existing one; `docker compose up -d` leaves running services alone and recreates only what changed; `migrate` runs on every start and changes nothing when the schema is current. `docker compose down` followed by `up -d` keeps all data. Keep a copy of `config/` somewhere safe: backups do not include it.
+
+### Verify what you install
+
+`compose.yaml` comes from the release tag over HTTPS, and you can read all of it. The images pull without an account; [distribution](docs/distribution.md) explains how anyone can check that. To be sure you run exactly the published images, pin them by digest so that Docker refuses anything else; [Install Quro](docs/install.md#verify-the-images) shows how.
+
+### Existing PostgreSQL or S3-compatible store
+
+The quickstart starts its own PostgreSQL and keeps documents in a directory. To use a PostgreSQL server you already run (16, 17 or 18), or to keep documents in an S3-compatible store, follow [Existing PostgreSQL server](docs/install.md#existing-postgresql-server) and [Existing S3-compatible store](docs/install.md#existing-s3-compatible-store).
+
+## Configuration
+
+Settings live in `config/quro.env`, which `quro init` writes with a comment for each one. Secrets are files in `config/secrets/`, never values in the settings file. Every setting is checked when a container starts: a wrong value stops it with exit code 2 and a list of the problems, without printing any value. The settings most installs touch:
+
+| Setting                 | Default         | Change it when                                                                              |
+| ----------------------- | --------------- | ------------------------------------------------------------------------------------------- |
+| `SECURE_COOKIES`        | `false`         | Browsers reach Quro over HTTPS: set `true` ([reverse proxy](docs/reverse-proxy.md))         |
+| `TRUSTED_PROXIES`       | `172.16.0.0/12` | Docker uses other address ranges, or your reverse proxy runs on another machine             |
+| `QRO_REGISTRATION_MODE` | `invite`        | You want `closed` (no new accounts) or `open` (anyone who can reach Quro may sign up)       |
+| `QRO_DOCUMENT_STORAGE`  | `filesystem`    | You keep documents in an S3-compatible store: `s3` with the `S3_` settings                  |
+| Published port          | `3000`          | Edit `ports` of the `frontend` service in `compose.yaml`, for example `'127.0.0.1:3000:80'` |
+
+The [configuration reference](docs/configuration.md) lists every service, port, directory and setting, with defaults.
+
+## Upgrade
+
+Quro never updates itself. To move to a new release: read its upgrade notes, back up with the version you run, change the image tags in `compose.yaml`, then run `docker compose pull` and `docker compose up -d`; `migrate` applies the new schema before the backend starts. Installs of 0.7.0 and earlier, including the release Compose file and checkouts of this repository, move over once with the 0.8.0 upgrade notes.
+
+## Backup and restore
 
 ```bash
-docker compose exec backend quro user invite
+docker compose run --rm migrate backup
 ```
 
-Enter the printed code in the sign-up form. Later accounts need an invite code from the same command, and a forgotten password is reset with `quro user reset-password` instead of email. See the [security model](docs/security.md#accounts-and-registration) for registration modes and the HTTPS setup.
+This writes one checked archive with the database and the documents to `backups/`, pausing changes for about a second per 100 MB of data. Copy the archives to another device, keep `config/` separately, and schedule the command daily. [Backup and restore](docs/backup-and-restore.md) covers encryption, off-device copies, retention, restoring on the same or a new machine, and rehearsing a restore.
 
-For bunq OAuth in this mode, the callback URL is:
+## Security model
 
-```bash
-http://localhost:3000/api/bunq/oauth/callback
-```
+Quro supports two deployment modes. The app does not enforce TLS in either:
 
-The database is also published locally for tooling, on `127.0.0.1:5432`. Uploaded documents are stored in `./data/documents`; an S3-compatible store is optional (see [document storage](docs/document-storage.md)).
+- **A: plain HTTP on a private network.** The quickstart's default. Use it only on a network where you trust every device, and never forward the port to the internet.
+- **B: HTTPS behind your reverse proxy.** A proxy you run (Caddy, Traefik, nginx) terminates TLS in front of Quro's bundled nginx. Set `SECURE_COOKIES=true` and check `TRUSTED_PROXIES`. [HTTPS with a reverse proxy](docs/reverse-proxy.md) has a tested example.
 
-## Screenshots
+A new instance has no accounts and no default password: the first account needs a setup code from the operator, and later accounts need an invite code. Sessions and codes are stored only as digests. The operator, meaning whoever runs the containers, can read every record; Quro protects a household from other users and from the network, not from its operator. The [security model](docs/security.md) is the full threat model. Report a vulnerability privately as described in [SECURITY.md](SECURITY.md).
 
-<table>
-  <tr>
-    <td><img src="docs/screenshots/welcome.png" alt="Welcome screen" /></td>
-    <td><img src="docs/screenshots/dashboard.png" alt="Dashboard" /></td>
-  </tr>
-  <tr>
-    <td align="center"><em>Welcome</em></td>
-    <td align="center"><em>Dashboard</em></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/savings.png" alt="Savings" /></td>
-    <td><img src="docs/screenshots/investments.png" alt="Investments" /></td>
-  </tr>
-  <tr>
-    <td align="center"><em>Savings</em></td>
-    <td align="center"><em>Investments</em></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/goals.png" alt="Goals" /></td>
-    <td><img src="docs/screenshots/budget.png" alt="Budget" /></td>
-  </tr>
-  <tr>
-    <td align="center"><em>Goals</em></td>
-    <td align="center"><em>Budget</em></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/pension.png" alt="Pension" /></td>
-    <td><img src="docs/screenshots/salary.png" alt="Salary" /></td>
-  </tr>
-  <tr>
-    <td align="center"><em>Pension</em></td>
-    <td align="center"><em>Salary</em></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/mortgage.png" alt="Mortgage" /></td>
-    <td><img src="docs/screenshots/debts.png" alt="Debts" /></td>
-  </tr>
-  <tr>
-    <td align="center"><em>Mortgage</em></td>
-    <td align="center"><em>Debts</em></td>
-  </tr>
-</table>
+## Privacy and network access
 
-## Self-hosting
+Quro keeps your data on your host and sends nothing to the project. These are all of its outbound connections:
 
-> [!WARNING]
-> Release installs are being reworked. The v0.6.x release assets don't produce a working install on their own, so this README no longer gives a release quickstart. Follow progress in the [roadmap](ROADMAP.md). The [Docker dev stack](#local-docker-dev) stores documents on the filesystem and needs no object storage service, but it requires runtime configuration and secrets.
+| From         | To                                    | When                                                                                                                       | What the other side learns                                |
+| ------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Docker       | `ghcr.io`, Docker Hub                 | Pulling images at install and upgrade                                                                                      | Your IP address and the images you pull                   |
+| The backend  | Yahoo Finance                         | On by default: exchange rates at start and daily, prices of the tickers you hold daily, and a lookup when you add a ticker | Your IP address, the tickers you hold and your currencies |
+| Your browser | `cdn.jsdelivr.net`                    | Images for the emoji picker, only while it is open                                                                         | Your IP address                                           |
+| The backend  | bunq                                  | Only when bank linking is configured: hourly while an account is linked                                                    | What bank linking needs                                   |
+| The backend  | Your S3 endpoint, your OTLP collector | Only when you configure them                                                                                               | Documents or traces, sent to a service you run            |
 
-The [install contract](docs/install-contract.md) describes how installs will work from 0.8.0, which is not released yet: the images, the `quro` maintenance commands, settings, data locations and the move from existing Compose installs.
+Quro needs Yahoo Finance once: the web app shows balances only after it has an exchange rate for every supported currency, and a new install fetches them when the backend starts. Until then, the app shows **Converted balances are paused** after sign-in, and the backend tries again every minute. Once the rates are stored, blocking Yahoo Finance at a firewall is safe: rates and prices stop updating, and stored rates age as described in [financial invariants](docs/financial-invariants.md). There is no switch to turn off only this provider.
 
-The Compose stack in this repository runs PostgreSQL 18 from `./data/postgres-18`. An install that still has a PostgreSQL 16 database in `./data/postgres` moves over by dump and restore; see [PostgreSQL 18 and the upgrade from 16](docs/postgresql-upgrade.md).
+With no outbound access at all, Quro still starts, passes its health checks, signs users in and stores records and documents; only the web app waits for exchange rates. The content security policy allows no third-party host besides `cdn.jsdelivr.net`. [Distribution](docs/distribution.md#service-feature-hardware-and-egress-matrix) lists every connection per feature, with the hardware each needs.
 
-The v0.6.6 release has these known problems. They were verified on 2026-10-04 in a fresh directory with no existing volumes.
+## Optional features
 
-| Problem                   | What you see                                                                                                                                                        | Workaround                                                                      |
-| :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------ |
-| Compose file name         | The file is `docker-compose.release.yml`, so a bare `docker compose` command fails with `no configuration file provided`.                                           | Pass `-f docker-compose.release.yml` or set `COMPOSE_FILE`.                     |
-| Config file location      | `.env.template` and `secrets/*.example` aren't release assets. They're inside `auto-update-bundle-vX.Y.Z.tar.gz`.                                                   | Extract the bundle to get them.                                                 |
-| Missing storage bootstrap | The release has no `minio-init` service, so the `quro_app` storage user and the document bucket are never created. Document uploads fail with `InvalidAccessKeyId`. | None verified.                                                                  |
-| Missing `db-tools`        | The release has no `db-tools` service, so there are no backup and restore commands.                                                                                 | Stop the stack and copy `./data/postgres` and `./data/minio`. This is untested. |
-| Corrupted healthcheck     | The `db` healthcheck renders as `pg_isready -U "$" -d "$"`. The container still reports healthy because `pg_isready` falls back to defaults.                        | None needed.                                                                    |
-| MinIO image               | `docker compose pull` was denied for the pinned `minio/minio` image. The test host started MinIO only because it had a local copy.                                  | None verified.                                                                  |
+Each is off until you configure it, and the core works without it.
 
-You don't need `docker login ghcr.io` for the core images. `quro-frontend` and `quro-backend` pull anonymously ([evidence and what each feature needs](docs/distribution.md)). The auto-updater is retired: if you run it, follow [Retire the auto-updater](docs/retire-the-auto-updater.md).
+| Feature                      | What it needs                                                                                   | Set up with                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| bunq bank linking            | A bunq account and an OAuth client; `FRONTEND_ORIGIN` and the `BUNQ_` settings                  | [Configuration: bunq](docs/configuration.md#bunq)                            |
+| S3-compatible document store | A store you run or rent, a bucket and an access key                                             | [Existing S3-compatible store](docs/install.md#existing-s3-compatible-store) |
+| Statement import (OCR)       | An NVIDIA GPU and images built from a checkout; reads pension statement PDFs with a local model | [Pension import](docs/development.md#optional-pension-import-development)    |
+| Tracing                      | An OTLP/HTTP collector you run                                                                  | [Configuration: tracing](docs/configuration.md#tracing)                      |
 
-The database, migrations, backend and frontend start from the release assets. The missing storage bootstrap and the unpullable MinIO image are why no complete install path exists.
+## Limitations
+
+Quro is pre-1.0. What it does not do yet, or does only partly:
+
+- **Single host, single process.** One backend per database is tested. Rate limits are kept in memory per process.
+- **No built-in HTTPS.** Mode A is plain HTTP; HTTPS needs a reverse proxy you run.
+- **No email and no second factor.** Invites and password resets are codes the operator issues from the command line. Two-factor sign-in, sign-in with an external identity provider and notifications are not available.
+- **One household.** Accounts share data only through the partner model: two people, each with private records and shared joint ones.
+- **Prices and exchange rates come from Yahoo Finance only,** through an unofficial interface that can change without notice. There is no other provider and no switch to turn off only this one, and a new install cannot show balances until it has fetched the rates once.
+- **Bank linking supports bunq only.** Other banks need manual entry.
+- **No data export or CSV import yet.** Both are planned for 1.0. Until then, `quro backup` is the way to take your data with you.
+- **Statement import is not part of the example install.** It needs a GPU and images built from a checkout.
+- **PostgreSQL 16:** Quro runs on it, but restoring a backup needs PostgreSQL 17 or 18.
+- **Tested in CI and containers,** on amd64 and arm64 runners and Docker Desktop, not on a Raspberry Pi or a NAS. Measured times are in [backup and restore](docs/backup-and-restore.md#recovery-objectives).
+- **Breaking changes between minor versions** are possible before 1.0. Each release's upgrade notes say what to change.
+
+## Documentation
+
+| For           | Read                                                                                                                                                                                                                                                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Running Quro  | [Install](docs/install.md), [configuration reference](docs/configuration.md), [HTTPS with a reverse proxy](docs/reverse-proxy.md), [backup and restore](docs/backup-and-restore.md), [uninstall](docs/uninstall.md), [document storage](docs/document-storage.md), [security model](docs/security.md) |
+| Automating it | [Install contract](docs/install-contract.md) (commands, exit codes, readiness, file ownership), [distribution](docs/distribution.md) (images, anonymous access, egress)                                                                                                                               |
+| Changing Quro | [Development](docs/development.md), [contributing](docs/CONTRIBUTING.md), [architecture](docs/architecture.md), [adding a feature](docs/adding-a-feature.md)                                                                                                                                          |
 
 ## Contributing
 
-See [docs/development.md](docs/development.md) for the local development setup and [CONTRIBUTING.md](docs/CONTRIBUTING.md) for the release process.
-
-Install the pre-commit hook before your first commit:
+Contributions are welcome. [Development](docs/development.md) sets up a checkout, either with Bun on the host or with the Docker development stack, and lists the checks to run. [Contributing](docs/CONTRIBUTING.md) describes pull requests and releases. Install the pre-commit hook before your first commit:
 
 ```bash
 brew install gitleaks
 bun run hooks:install
 ```
 
+Use synthetic data only in issues, tests and screenshots. The demo seed (`bun run --filter '@quro/backend' db:seed-demo`) creates a complete household to work with.
+
 ## Support
 
 - **Questions and ideas:** [GitHub Discussions](https://github.com/Pieter-OHearn/quro/discussions).
-- **Bugs:** [open an issue](https://github.com/Pieter-OHearn/quro/issues/new/choose). Include your Quro version and how you run it.
+- **Bugs:** [open an issue](https://github.com/Pieter-OHearn/quro/issues/new/choose). Include your Quro version (`docker compose exec backend quro version`) and how you run it.
 - **Security problems:** report them privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
 
 Quro has a single maintainer, and replies are best effort. The most useful ways to help are clear bug reports, testing a release on your own setup, and improving the documentation.
 
-## License
+## Licence
 
 [MIT](LICENSE)

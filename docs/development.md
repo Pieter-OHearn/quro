@@ -97,12 +97,16 @@ Open `http://localhost:5173`. Leave `VITE_API_URL` unset for the Docker stack an
 
 This is the recommended path if you want the whole app running together with the fewest steps.
 
-1. Make sure the root `.env` exists:
+1. Make sure the root `.env` and the secret files exist, and keep them private:
 
 ```bash
-# Create it if needed.
+# Create them if needed.
 cp .env.example .env
+for file in secrets/*.example; do cp "$file" "${file%.example}"; done
+chmod 600 .env secrets/*.txt
 ```
+
+Edit the copied files under `secrets/` to set your own passwords before the first start. This stack is for development; to run Quro for real, use the [install guide](install.md).
 
 2. Start the full stack:
 
@@ -295,6 +299,22 @@ QURO_BACKEND_IMAGE=quro-backend:local QURO_FRONTEND_IMAGE=quro-frontend:local \
 
 It uses loopback ports 18085 and 18086 (`QURO_INSTALL_PORT`, `QURO_INSTALL_API_PORT`) and
 removes every container, network and volume it created.
+
+### README quickstart test
+
+`scripts/quickstart/run.sh` runs the commands of the README quickstart as written, read from
+`README.md` between the `<!-- quickstart:begin -->` and `<!-- quickstart:end -->` markers, so
+the CI job cannot drift from the text. Before a release exists, the example Compose file comes
+from the checkout and the images are the ones under test; a Compose override passed through
+`COMPOSE_FILE` moves the app to a loopback port (`QURO_QUICKSTART_PORT`, default 18087) and
+turns the schedulers off. It then checks the healthy state the README describes, signs in with
+the printed setup code, runs the quickstart again and uninstalls with the marked commands of
+[uninstall](uninstall.md). Keep the markers when you edit those pages:
+
+```bash
+QURO_BACKEND_IMAGE=quro-backend:local QURO_FRONTEND_IMAGE=quro-frontend:local \
+  sh scripts/quickstart/run.sh
+```
 
 `test:smoke` starts its own backend on port 3300, never reusing one already running there, with
 `QRO_DISABLE_SCHEDULERS=true`. The interval jobs (session cleanup, bunq sync, holding prices,
