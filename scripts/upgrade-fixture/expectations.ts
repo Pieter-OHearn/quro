@@ -36,6 +36,18 @@ export const CHANGES_SINCE_FIXTURE: Record<string, TableChange> = {
   },
   // Single-use registration and password-reset codes.
   'public.auth_codes': { newTable: { rows: 0 } },
+  // Prices per share widen from numeric(19,2) to numeric(23,6). Every value stays the same; only
+  // its text form gains four trailing zeros, so each price is compared at the new scale.
+  'public.holdings': {
+    rewrittenColumns: {
+      current_price: 'current_price::numeric(23,6)',
+      manual_price: 'manual_price::numeric(23,6)',
+    },
+  },
+  'public.holding_transactions': { rewrittenColumns: { price: 'price::numeric(23,6)' } },
+  'public.holding_price_history': {
+    rewrittenColumns: { close_price: 'close_price::numeric(23,6)' },
+  },
 };
 
 /**
