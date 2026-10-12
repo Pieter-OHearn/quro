@@ -733,6 +733,62 @@ describe('release-gate CLI', () => {
     expect(releasesFor('v0.8.0')).toEqual([{ draft: false, assets: [], body: PUBLISHED[0].body }]);
   });
 
+  test('stages release notes whose repository links are pinned to the release tag', async () => {
+    passCi();
+    const linked = join(workDir, 'CHANGELOG-linked.md');
+    writeFileSync(
+      linked,
+      [
+        '# Changelog',
+        '',
+        '## [v0.8.0] - 2026-10-20',
+        '',
+        '- Moved. [Details](docs/upgrade.md#moved) and [top](#changelog), see [site](https://example.test/a).',
+        '- Run `[x](docs/x.md)`.',
+        '',
+        '## [v0.7.0] - 2026-10-04',
+        '',
+        '- Older. [Details](docs/old.md)',
+        '',
+      ].join('\n'),
+    );
+    expect((await run(['create-tag'])).code).toBe(0);
+    const staged = await run(['stage-release'], { RELEASE_CHANGELOG_FILE: linked });
+    expect(staged.code).toBe(0);
+    expect(releasesFor('v0.8.0')[0].body).toBe(
+      [
+        '## [v0.8.0] - 2026-10-20',
+        '',
+        '- Moved. [Details](https://github.com/acme/quro/blob/v0.8.0/docs/upgrade.md#moved) and [top](#changelog), see [site](https://example.test/a).',
+        '- Run `[x](docs/x.md)`.',
+        '',
+      ].join('\n'),
+    );
+    // The file in the repository is read, never changed.
+    expect(readFileSync(linked, 'utf8')).toContain('](docs/upgrade.md#moved)');
+  });
+
+  test('takes the link host from GITHUB_SERVER_URL and refuses a malformed one', async () => {
+    passCi();
+    const linked = join(workDir, 'CHANGELOG-host.md');
+    writeFileSync(linked, '## [v0.8.0] - 2026-10-20\n\n- [a](docs/a.md)\n');
+    expect((await run(['create-tag'])).code).toBe(0);
+    const bad = await run(['stage-release'], {
+      RELEASE_CHANGELOG_FILE: linked,
+      GITHUB_SERVER_URL: 'javascript:alert(1)',
+    });
+    expect(bad.error).toContain('GITHUB_SERVER_URL must be an http or https URL');
+    expect(releasesFor('v0.8.0')).toEqual([]);
+    const staged = await run(['stage-release'], {
+      RELEASE_CHANGELOG_FILE: linked,
+      GITHUB_SERVER_URL: 'https://git.example/',
+    });
+    expect(staged.code).toBe(0);
+    expect(releasesFor('v0.8.0')[0].body).toContain(
+      '[a](https://git.example/acme/quro/blob/v0.8.0/docs/a.md)',
+    );
+  });
+
   test('a run that failed after tagging resumes on retry without stale assets', async () => {
     passCi();
     state.failUploads = 1;
