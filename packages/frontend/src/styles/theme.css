@@ -588,7 +588,8 @@
   /**
    * Default typography styles for HTML elements (body, h1-h4, label, button, input).
    * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg)
-   * automatically override them. Body, headings and labels take the V1 type scale.
+   * automatically override them. Body, headings, labels, buttons and inputs take the V1
+   * type scale; buttons and inputs use the control style, `cell`.
    */
 
   html {
@@ -618,14 +619,11 @@
   }
 
   button {
-    font-size: var(--text-base);
+    @apply text-cell;
     font-weight: var(--font-weight-medium);
-    line-height: 1.5;
   }
 
   input {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-normal);
-    line-height: 1.5;
+    @apply text-cell;
   }
 }

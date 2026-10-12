@@ -32,7 +32,7 @@ export function PasswordInput({
         value={value}
         disabled={disabled}
         error={error}
-        className={cn('pr-11', className)}
+        className={cn('pr-8', className)}
         onChange={onChange}
       />
       <button
@@ -40,7 +40,7 @@ export function PasswordInput({
         disabled={disabled}
         aria-label={show ? 'Hide password' : 'Show password'}
         aria-pressed={show}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-faint transition-colors hover:text-fg-muted disabled:cursor-not-allowed disabled:text-fg-disabled"
+        className="absolute inset-y-0 right-2 flex items-center text-fg-faint transition-colors hover:text-fg-muted disabled:cursor-not-allowed disabled:text-fg-disabled"
         onClick={onToggle}
       >
         {show ? <EyeOff size={16} /> : <Eye size={16} />}

@@ -10,6 +10,7 @@ import sonarjsPlugin from 'eslint-plugin-sonarjs';
 import unicornPlugin from 'eslint-plugin-unicorn';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import noMonospace from './scripts/eslint/no-monospace.mjs';
 import noRawPalette from './scripts/eslint/no-raw-palette.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -174,7 +175,7 @@ export default [
     plugins: {
       react: reactPlugin,
       'react-hooks': reactHooksPlugin,
-      'quro-ui': { rules: { 'no-raw-palette': noRawPalette } },
+      'quro-ui': { rules: { 'no-monospace': noMonospace, 'no-raw-palette': noRawPalette } },
     },
     settings: {
       react: {
@@ -193,6 +194,7 @@ export default [
           ],
         },
       ],
+      'quro-ui/no-monospace': 'error',
       'quro-ui/no-raw-palette': 'error',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',

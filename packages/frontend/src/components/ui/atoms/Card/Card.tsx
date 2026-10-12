@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 const PADDING_CLASSES = {
   none: '',
-  md: 'p-6',
+  md: 'p-4',
 } as const;
 
 export type CardProps = ComponentPropsWithoutRef<'div'> & {
@@ -14,7 +14,7 @@ export function Card({ className, padding = 'md', ...props }: CardProps) {
   return (
     <div
       className={cn(
-        'bg-surface rounded-lg border border-border-subtle',
+        'rounded-lg border border-border-default bg-surface',
         PADDING_CLASSES[padding],
         className,
       )}

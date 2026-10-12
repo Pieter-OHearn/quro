@@ -2,19 +2,23 @@ import type { HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
 const SIZE_CLASSES = {
-  xs: 'px-1.5 py-0.5 text-[10px]',
-  sm: 'px-2 py-0.5 text-[10px]',
-  md: 'px-2.5 py-1 text-[11px]',
+  xs: 'px-1 py-px',
+  sm: 'px-1.5 py-px',
+  md: 'px-2 py-0.5',
 } as const;
 
+// Each tone is a 1px coloured edge on a soft fill; neutral and muted sit on the card itself.
+const NEUTRAL_TONE = 'border-border-default text-fg-muted';
+const WARNING_TONE = 'border-warning bg-warning-soft text-warning';
+
 const TONE_CLASSES = {
-  brand: 'bg-brand-soft-strong text-brand-fg',
-  info: 'bg-info-soft-strong text-info-fg',
-  neutral: 'bg-surface-muted text-fg-muted',
-  muted: 'bg-surface-muted text-fg-subtle',
-  success: 'bg-success-soft-strong text-success-fg',
-  warning: 'bg-warning-soft-strong text-warning-fg',
-  warningSoft: 'bg-warning-soft text-warning-fg',
+  brand: 'border-brand bg-brand-soft text-brand-fg',
+  info: 'border-info bg-info-soft text-info',
+  neutral: NEUTRAL_TONE,
+  muted: NEUTRAL_TONE,
+  success: 'border-success bg-success-soft text-success',
+  warning: WARNING_TONE,
+  warningSoft: WARNING_TONE,
 } as const;
 
 export type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
@@ -32,7 +36,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-sm font-medium',
+        'inline-flex items-center gap-1 rounded-sm border text-[11px] leading-4 font-medium',
         SIZE_CLASSES[size],
         TONE_CLASSES[tone],
         className,

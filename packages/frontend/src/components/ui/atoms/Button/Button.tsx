@@ -3,20 +3,23 @@ import { cn } from '@/lib/utils';
 import { Spinner } from '../Spinner';
 
 const VARIANT_CLASSES = {
-  primary: 'bg-brand text-fg-inverted hover:bg-brand-hover disabled:bg-brand-disabled',
+  primary:
+    'bg-brand text-fg-inverted hover:bg-brand-hover active:bg-brand-hover disabled:bg-surface-muted disabled:text-fg-subtle',
   secondary:
-    'border border-border-default text-fg-muted hover:bg-surface-muted disabled:text-fg-faint disabled:hover:bg-transparent',
+    'border border-border-control bg-surface text-fg hover:bg-surface-muted active:bg-surface-muted disabled:bg-surface disabled:text-fg-subtle',
   danger:
-    'border border-danger-border text-danger hover:bg-danger-soft disabled:text-danger/60 disabled:hover:bg-transparent',
+    'border border-danger text-danger hover:bg-danger-soft active:bg-danger-soft disabled:border-border-default disabled:bg-transparent disabled:text-fg-subtle',
   ghost:
-    'text-fg-muted hover:bg-surface-muted disabled:text-fg-disabled disabled:hover:bg-transparent',
+    'text-fg hover:bg-surface-muted active:bg-surface-muted disabled:bg-transparent disabled:text-fg-subtle',
 } as const;
 
+// Height comes from `h-*`; text uses the type scale (`cell` is the control style, the touch
+// sizes take `body`, which is 15px on phones, and the 15px `title-section` metrics).
 const SIZE_CLASSES = {
-  sm: 'rounded-md px-3 py-1.5 text-xs',
-  md: 'rounded-md px-4 py-2 text-sm',
-  lg: 'rounded-md px-4 py-2.5 text-sm',
-  xl: 'rounded-md px-4 py-3 text-sm',
+  sm: 'h-7 rounded-md px-2 text-label',
+  md: 'h-8 rounded-md px-3 text-cell',
+  lg: 'h-11 rounded-lg px-4 text-body',
+  xl: 'h-12 rounded-lg px-4 text-title-section font-semibold',
 } as const;
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -82,7 +85,8 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading}
       className={cn(
-        'inline-flex items-center justify-center gap-2 font-medium transition-colors disabled:cursor-not-allowed',
+        'inline-flex items-center justify-center gap-1 font-medium transition-colors duration-fast disabled:cursor-not-allowed',
+        'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
         SIZE_CLASSES[size],
         VARIANT_CLASSES[variant],
         fullWidth && 'w-full',

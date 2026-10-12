@@ -25,7 +25,11 @@ export function Textarea({
       rows={rows}
       value={value}
       aria-invalid={error || undefined}
-      className={cn(getFieldChrome({ error }), 'resize-none', className)}
+      className={getFieldChrome({
+        error,
+        paddingClassName: 'px-2 py-2',
+        className: cn('h-auto max-sm:h-auto resize-none', className),
+      })}
       onChange={(event) => onChange(event.target.value)}
     />
   );
