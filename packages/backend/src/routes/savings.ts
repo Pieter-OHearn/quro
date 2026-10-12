@@ -21,7 +21,12 @@ import {
   normalizeBankName,
 } from '../lib/jurisdictions/bankingEntities';
 import { earliestDate } from '../lib/netWorth';
-import { LEDGER_ROW_CHANGED, lockLedgerRow, withLedgerWrite } from '../lib/ledgerWrite';
+import {
+  LEDGER_ROW_CHANGED,
+  lockLedgerParents,
+  lockLedgerRow,
+  withLedgerWrite,
+} from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
 import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from '../lib/savingsBalance';
 import {
@@ -662,7 +667,9 @@ app.patch('/transactions/:id', async (c) => {
   }
 
   const result = await db.transaction(async (tx) => {
-    // Reverse the committed values, not the ones read before the transaction started.
+    // Accounts before the transaction row, in the order a cascade archive uses. Reverse the
+    // committed values, not the ones read before the transaction started.
+    await lockLedgerParents(tx, savingsAccounts, [existing.accountId, nextState.accountId]);
     const previous = await lockLedgerRow(tx, savingsTransactions, id);
     if (!previous)
       return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND } as const;
@@ -710,13 +717,20 @@ app.delete('/transactions/:id', async (c) => {
   const editable = await getEditableSavingsTransaction(id, user.id, partnerId, 'delete');
   if (!editable.ok) return c.json({ error: editable.error }, editable.status);
 
-  const [data] = await db.transaction(async (tx) => {
+  const accountId = editable.transaction.accountId;
+  const result = await db.transaction(async (tx) => {
+    // The account before the transaction row, in the order a cascade archive uses.
+    await lockLedgerParents(tx, savingsAccounts, [accountId]);
+    const previous = await lockLedgerRow(tx, savingsTransactions, id);
+    if (!previous)
+      return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND } as const;
+    if (previous.accountId !== accountId) {
+      return { error: LEDGER_ROW_CHANGED, status: HTTP_STATUS.CONFLICT } as const;
+    }
     const [deleted] = await tx
       .delete(savingsTransactions)
       .where(eq(savingsTransactions.id, id))
       .returning();
-
-    if (!deleted) return [deleted];
 
     await updateSavingsAccountBalanceByDelta(
       tx,
@@ -729,11 +743,11 @@ app.delete('/transactions/:id', async (c) => {
       deleted.date,
     );
 
-    return [deleted];
+    return { data: deleted };
   });
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  if ('error' in result) return c.json({ error: result.error }, result.status);
 
-  return c.json({ data });
+  return c.json({ data: result.data });
 });
 
 export default app;

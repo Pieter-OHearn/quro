@@ -281,6 +281,13 @@
       "when": 1791813370892,
       "tag": "0039_holding_price_six_decimals",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791817533400,
+      "tag": "0040_ledger_correctness",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,9 @@ them automatically.
 stored `properties.mortgage` amount is used only for unlinked properties. Linked
 repayments update the mortgage ledger, and property API responses resolve the debt
 on read. Existing stale copies are ignored; no destructive data migration is needed.
+Each repayment records the debt it reduced, so editing or deleting it reverses the effect on that
+debt (the property's own debt or a specific mortgage) even after the property is linked to a
+mortgage, remortgaged or unlinked. Repayments recorded before 0.9.0 follow the current link.
 
 As before, archived mortgages contribute no current debt, restoring a mortgage
 restores its contribution, and unlinking clears the property's manual debt. A new

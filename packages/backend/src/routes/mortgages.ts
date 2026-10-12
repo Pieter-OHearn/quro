@@ -29,6 +29,7 @@ import {
   LedgerEditRejected,
   type LedgerRejection,
   lockCheckedLedgerRow,
+  lockLedgerParents,
   withLedgerWrite,
 } from '../lib/ledgerWrite';
 import { assertJointAllowed, ownedOrJointPredicate } from '../lib/partner';
@@ -297,22 +298,23 @@ function addYearsToIsoDate(isoDate: string, years: number): string {
 
 // Apply a transaction's effect to the mortgage: a repayment reduces the
 // outstanding balance by its principal; a rate change updates the rate (and
-// re-derives the fixed-until date). Returns an error string for invalid input.
+// re-derives the fixed-until date). Returns the principal the zero clamp
+// absorbed, or an error string for invalid input.
 async function applyMortgageTxnEffect(
   tx: DbTransaction,
   mortgage: typeof mortgages.$inferSelect,
   payload: MortgageTransactionPayload,
-): Promise<string | null> {
+): Promise<{ unappliedPrincipal: number } | string> {
   if (payload.type === 'repayment') {
     const principal = payload.principal ?? 0;
-    const updatedBalance = await applyRepayment(tx, MORTGAGE_BALANCE, {
+    const applied = await applyRepayment(tx, MORTGAGE_BALANCE, {
       id: mortgage.id,
       principal,
     });
-    if (updatedBalance === null) {
+    if (applied === null) {
       return 'Principal portion cannot exceed the current outstanding balance';
     }
-    return null;
+    return { unappliedPrincipal: applied.unapplied };
   }
   if (payload.type === 'rate_change') {
     const fixedUntil =
@@ -323,9 +325,8 @@ async function applyMortgageTxnEffect(
       .update(mortgages)
       .set({ interestRate: payload.amount, rateType: 'Fixed', fixedUntil })
       .where(eq(mortgages.id, mortgage.id));
-    return null;
   }
-  return null;
+  return { unappliedPrincipal: 0 };
 }
 
 // Reverse a repayment's balance effect. Rate changes are not reversible (the
@@ -333,12 +334,13 @@ async function applyMortgageTxnEffect(
 async function reverseMortgageTxnEffect(
   tx: DbTransaction,
   mortgage: typeof mortgages.$inferSelect,
-  txn: { type: string; principal: number | null },
+  txn: { type: string; principal: number | null; unappliedPrincipal: number },
 ): Promise<void> {
   if (txn.type !== 'repayment') return;
   await reverseRepayment(tx, MORTGAGE_BALANCE, {
     id: mortgage.id,
     principal: txn.principal ?? 0,
+    unapplied: txn.unappliedPrincipal,
   });
 }
 
@@ -826,12 +828,18 @@ app.post('/transactions', async (c) => {
     const mortgage = await getAccessibleMortgage(user.id, partnerId, body.value.mortgageId, tx);
     if (!mortgage) return { error: 'Mortgage not found', status: HTTP_STATUS.NOT_FOUND } as const;
 
-    const effectError = await applyMortgageTxnEffect(tx, mortgage, body.value);
-    if (effectError) return { error: effectError, status: HTTP_STATUS.BAD_REQUEST } as const;
+    const effect = await applyMortgageTxnEffect(tx, mortgage, body.value);
+    if (typeof effect === 'string') {
+      return { error: effect, status: HTTP_STATUS.BAD_REQUEST } as const;
+    }
 
     const [created] = await tx
       .insert(mortgageTransactions)
-      .values({ ...toMortgageTransactionValues(body.value), userId: mortgage.userId ?? user.id })
+      .values({
+        ...toMortgageTransactionValues(body.value),
+        ...effect,
+        userId: mortgage.userId ?? user.id,
+      })
       .returning();
     await withLedgerWrite(
       tx,
@@ -865,6 +873,13 @@ app.patch('/transactions/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No mortgage transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const nextMortgageId = body.value.mortgageId ?? existing.mortgageId;
+  if (
+    nextMortgageId !== existing.mortgageId &&
+    !(await getAccessibleMortgage(user.id, partnerId, nextMortgageId))
+  ) {
+    return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
+  }
 
   const result = await answerRejectedEdit<
     { data: typeof mortgageTransactions.$inferSelect },
@@ -873,6 +888,8 @@ app.patch('/transactions/:id', async (c) => {
     db.transaction(async (tx) => {
       // Undo the committed transaction's balance effect, then apply the edited one against the
       // freshly-restored balance. Once the old effect is undone, a refusal must roll it back.
+      // Mortgages are locked before the transaction row, in the order a cascade archive uses.
+      await lockLedgerParents(tx, mortgages, [existing.mortgageId, nextMortgageId]);
       const previous = await lockCheckedLedgerRow(
         tx,
         mortgageTransactions,
@@ -894,14 +911,18 @@ app.patch('/transactions/:id', async (c) => {
         });
       }
 
-      const effectError = await applyMortgageTxnEffect(tx, mortgage, next.value);
-      if (effectError) {
-        throw new LedgerEditRejected({ error: effectError, status: HTTP_STATUS.BAD_REQUEST });
+      const effect = await applyMortgageTxnEffect(tx, mortgage, next.value);
+      if (typeof effect === 'string') {
+        throw new LedgerEditRejected({ error: effect, status: HTTP_STATUS.BAD_REQUEST });
       }
 
       const [updated] = await tx
         .update(mortgageTransactions)
-        .set({ ...toMortgageTransactionValues(next.value), userId: mortgage.userId ?? user.id })
+        .set({
+          ...toMortgageTransactionValues(next.value),
+          ...effect,
+          userId: mortgage.userId ?? user.id,
+        })
         .where(eq(mortgageTransactions.id, id))
         .returning();
       await withLedgerWrite(
@@ -936,7 +957,9 @@ app.delete('/transactions/:id', async (c) => {
     LedgerRejection
   >(() =>
     db.transaction(async (tx) => {
-      // Restore the balance this repayment had reduced before removing it.
+      // Restore the balance this repayment had reduced before removing it. The mortgage is
+      // locked before the transaction row, in the order a cascade archive uses.
+      await lockLedgerParents(tx, mortgages, [existing.mortgageId]);
       const previous = await lockCheckedLedgerRow(
         tx,
         mortgageTransactions,
