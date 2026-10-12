@@ -65,6 +65,9 @@ import { sumBrokerageValue } from '../lib/netWorth';
 
 const app = new Hono();
 const HISTORY_MONTHS = 12;
+// Newest first; payslips that share a date in the order they were entered, so the twelve chosen
+// (and the tax rate derived from them) do not depend on how the database happens to sort ties.
+const LATEST_PAYSLIPS_FIRST = [desc(payslips.date), desc(payslips.id)] as const;
 const MONTHS_PER_YEAR = 12;
 const ASSUMPTION_FIELDS = [
   'leanBurnOverride',
@@ -207,13 +210,16 @@ function buildBudgetInputs(
   }));
 }
 
+// The rules this runway used: the default tax rate only when no payslip supplied a rate.
 function resolveJurisdictionMetadata(
   jurisdiction: ReturnType<typeof getJurisdictionProfile>,
   asOf: string,
+  taxRateSource: RunwayResponse['incomeSupport']['taxRateSource'],
 ): RunwayResponse['jurisdiction'] {
-  const resolutions: Array<{ effectiveFrom: string; isExtrapolated: boolean }> = [
-    resolveRule(jurisdiction.defaultEffectiveTaxRate, asOf),
-  ];
+  const resolutions: Array<{ effectiveFrom: string; isExtrapolated: boolean }> = [];
+  if (taxRateSource === 'jurisdiction_default') {
+    resolutions.push(resolveRule(jurisdiction.defaultEffectiveTaxRate, asOf));
+  }
   if (jurisdiction.unemploymentBenefit) {
     resolutions.push(resolveRule(jurisdiction.unemploymentBenefit, asOf));
   }
@@ -222,10 +228,11 @@ function resolveJurisdictionMetadata(
     code: jurisdiction.code,
     labels: jurisdiction.labels,
     unemploymentModel: jurisdiction.unemploymentModel,
-    rulesEffectiveFrom: resolutions
-      .map((resolution) => resolution.effectiveFrom)
-      .sort()
-      .at(-1)!,
+    rulesEffectiveFrom:
+      resolutions
+        .map((resolution) => resolution.effectiveFrom)
+        .sort()
+        .at(-1) ?? null,
     isExtrapolated: resolutions.some((resolution) => resolution.isExtrapolated),
   };
 }
@@ -291,7 +298,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
       .select()
       .from(payslips)
       .where(eq(payslips.userId, userId))
-      .orderBy(desc(payslips.date))
+      .orderBy(...LATEST_PAYSLIPS_FIRST)
       .limit(HISTORY_MONTHS),
     primaryEmploymentQuery.then(([primaryEmployment]) =>
       primaryEmployment
@@ -301,7 +308,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
             .where(
               and(eq(payslips.userId, userId), eq(payslips.employmentId, primaryEmployment.id)),
             )
-            .orderBy(desc(payslips.date))
+            .orderBy(...LATEST_PAYSLIPS_FIRST)
             .limit(HISTORY_MONTHS)
         : Promise.resolve([]),
     ),
@@ -309,7 +316,7 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
       .select()
       .from(payslips)
       .where(and(eq(payslips.userId, userId), isNull(payslips.employmentId)))
-      .orderBy(desc(payslips.date))
+      .orderBy(...LATEST_PAYSLIPS_FIRST)
       .limit(HISTORY_MONTHS),
     db.select().from(budgetCategories).where(eq(budgetCategories.userId, userId)),
     db
@@ -494,7 +501,11 @@ function buildEurRunwayResponse(
     ? calculateServiceDuration(primaryEmployment.serviceStartDate, asOf)
     : null;
   const missingFields = getMissingEmploymentFields(data.primaryEmployment);
-  const jurisdictionMetadata = resolveJurisdictionMetadata(jurisdiction, asOf);
+  const jurisdictionMetadata = resolveJurisdictionMetadata(
+    jurisdiction,
+    asOf,
+    incomeSupport.taxRateSource,
+  );
   return {
     baseCurrency: FX_BASE_CURRENCY,
     asOf,

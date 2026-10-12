@@ -1,6 +1,7 @@
 import { describeSyncFailure } from '../lib/syncFailure';
 import { registerDeadlineCleanup, runFailureCleanup } from '../lib/workDeadline';
 import { normalizeBudgetTransactionMoney } from '../lib/budgetCurrency';
+import { lockLedgerParents } from '../lib/ledgerWrite';
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   MONTH_ABBREVIATIONS,
@@ -369,17 +370,23 @@ async function repairLegacyBudgetPayment(
     ReturnType<typeof normalizeBudgetTransactionMoney<{ amount: number; currency: CurrencyCode }>>
   >,
 ): Promise<boolean> {
-  const [existing] = await tx
-    .select()
+  const imported = and(
+    eq(budgetTransactions.userId, userId),
+    eq(budgetTransactions.bunqTransactionId, bunqTransactionId),
+  );
+  const [current] = await tx
+    .select({ categoryId: budgetTransactions.categoryId })
     .from(budgetTransactions)
-    .where(
-      and(
-        eq(budgetTransactions.userId, userId),
-        eq(budgetTransactions.bunqTransactionId, bunqTransactionId),
-      ),
-    )
-    .for('update');
+    .where(imported);
+  if (!current) return false;
+  // The category before the transaction row, in the order every ledger write uses.
+  await lockLedgerParents(tx, budgetCategories, [current.categoryId]);
+  const [existing] = await tx.select().from(budgetTransactions).where(imported).for('update');
   if (!existing) return false;
+  // Moved to another category in the meantime: lock that one too before changing it.
+  if (existing.categoryId !== current.categoryId) {
+    await lockLedgerParents(tx, budgetCategories, [existing.categoryId]);
+  }
   if (existing.currencyNeedsReview) {
     await tx.update(budgetTransactions).set(money).where(eq(budgetTransactions.id, existing.id));
     await tx

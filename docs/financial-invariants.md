@@ -156,7 +156,7 @@ Amounts on ledger rows are positive; the row type gives the effect.
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Savings                  | `deposit` and `interest` add, `withdrawal` subtracts; the stored sign is ignored; any other type does nothing.                     |
 | Pension                  | `contribution` adds `amount - taxAmount`, `fee` subtracts, `annual_statement` adds its signed amount, any other type does nothing. |
-| Mortgage, property, debt | A repayment's principal reduces the outstanding balance, never below zero.                                                         |
+| Mortgage, property, debt | A repayment's principal reduces the outstanding balance, never below zero; the part a zero balance cannot take is recorded.        |
 | Holdings                 | Shares are buys minus sells, floored at zero per holding; dividends do not move shares (see [positions](#holding-positions)).      |
 | Budget                   | A transaction's EUR amount adds to its category's `spent`.                                                                         |
 
@@ -230,16 +230,32 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
 - **Edits and deletes are reversible.** An edit reverses the old row's effect and applies the new
   one; a delete reverses it. Editing a row and editing it back, or creating a row and deleting it,
   leaves the balance as it was.
+- **Clamped repayments reverse exactly.** A repayment whose principal exceeds the balance by up to
+  one cent leaves the balance at zero and records the principal it could not apply
+  (`unappliedPrincipal`). An edit or delete restores only what was applied, so a debt of 100.00
+  with a payment of 100.01 returns to 100.00 when the payment is deleted.
+- **Repayments stay with their debt.** A property repayment records the debt it reduced: the
+  property's own debt or a mortgage (`repaymentTarget`, `repaymentMortgageId`). Editing it on the
+  same property or deleting it reverses the effect on that debt, even after the property was
+  linked to a mortgage, relinked or unlinked. A repayment whose mortgage was deleted moves no
+  balance. Moving a repayment to another property pays that property's current debt.
 - **Moves conserve.** Moving a transaction to another account or pot removes its effect from the
   old parent and adds it to the new one.
 - **Concurrent writes serialise.** An edit or delete locks the ledger row before reversing it, so a
   second edit or delete of the same row waits for the first and works from its result. Savings,
   mortgage and property rows are reached through their parent, so one that moved to another
   parent in the meantime is refused with `409`; budget, pension and debt rows are reached through
-  their owner and need no such check.
+  their owner, and one that moved is refused with `409` too.
+- **Parents are locked before their rows.** Every edit or delete locks the parent rows it may
+  change (account, pot, debt, category, or mortgages and then properties) in ascending id order,
+  then the ledger row. A cascade archive locks the parent and then deletes its rows, so an archive
+  and an edit of one of its rows wait for each other instead of deadlocking; the edit then finds
+  the row gone (`404`).
 - **Imports apply once.** bunq payments are keyed by `(user, bunqTransactionId)`; a repeated
   import adds nothing. A reviewed pension statement is claimed by its commit, so a second commit
-  of the same import is refused and its rows reach the ledger once.
+  of the same import is refused and its rows reach the ledger once. A unique index allows one
+  committed import per statement file (by SHA-256) and pot, so of two imports of the same file
+  committed at once one writes its rows and the other is answered `409`.
 - **Linked debt is read, not copied.** A property linked to an active mortgage takes its debt from
   the mortgage; an archived or missing linked mortgage contributes no debt. Mortgage debt is
   deducted inside property equity and never counted again as a liability.
@@ -255,9 +271,9 @@ These are recorded, not yet fixed:
 - **Odd-cent joint amounts.** Each partner's total rounds its half of an odd-cent joint amount
   away from zero, so the two partners' totals can exceed the household's by one cent per such
   amount.
-- **Clamp at zero.** A repayment whose principal exceeds the balance by up to one cent is accepted
-  and leaves the balance at zero. Deleting it restores the full principal, so the balance ends one
-  cent above where it started.
+- **Repayments recorded before 0.9.0.** They carry no clamped principal and no debt. One that was
+  clamped still restores its full principal (at most one cent too much), and a property repayment
+  is still reversed against the property's current link. Quro does not guess either for old rows.
 - **Provider balances.** A bunq-synced savings account takes its balance from bunq; its imported
   transactions are a record and do not move the balance.
 
@@ -285,6 +301,11 @@ Rules for every figure:
   `packages/shared/src/types/jurisdiction.ts`); after that it resolves as extrapolated until
   someone reviews it. Rules without a source, such as the default tax rate, are model
   assumptions and are labelled as defaults instead.
+- **Only rules in use are listed.** The runway's `jurisdiction.rulesEffectiveFrom` and
+  `isExtrapolated` cover the rules the runway used. The default tax rate counts only when no
+  payslip supplied a rate (`taxRateSource` is `jurisdiction_default`); a runway that used no rule
+  reports `rulesEffectiveFrom: null`. The tax rate comes from the latest twelve payslips by date,
+  and payslips that share a date are taken in the order they were entered.
 
 The frontend already treats an FX rate as stale 48 hours after `updatedAt`, but no view shows
 that yet. Showing these indicators consistently in the interface is design work that follows this
@@ -361,6 +382,8 @@ cents (for example 4.762747 → 4.762749 months).
 | FX cut-offs and fail-closed rates                         | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                   |
 | Ledger balances under random edits, moves and deletes     | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                     |
 | Concurrent edits, deletes and import commits              | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                    |
+| Clamped repayments, repayment debt, archive vs edit       | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                    |
+| One committed import per statement (migration preflight)  | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                           |
 | Golden household reconciliation across API, pages and SQL | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                              |
 | Repeated bunq imports                                     | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts` |
 | Stale and extrapolated rules                              | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                 |

@@ -394,6 +394,9 @@ Passing tests and scanners is evidence for the listed controls only.
 | 13.2.2 Least-privilege database account                    | Met      | The backend uses an app role without DDL; see [Database role separation](#database-role-separation)                                               |
 | 13.2.3 No default service credentials                      | Met      | Every password is an operator-provided secret file                                                                                                |
 | 13.3.1 Secrets management                                  | Partial  | Docker secret files; no key vault                                                                                                                 |
+| 13.4.1 No source control metadata deployed                 | Met      | `.dockerignore` keeps `.git` out of the images                                                                                                    |
+| 15.1.1 Documented remediation time frames                  | Met      | [SECURITY.md](../SECURITY.md#how-findings-are-handled)                                                                                            |
+| 15.2.1 Components within their remediation time frames     | Partial  | Critical findings fail CI; high findings are listed for triage. Debian packages without a fixed version stay until Debian ships one               |
 
 ## Rate Limiting
 
@@ -454,6 +457,57 @@ and the `db-tools` service (backup, restore, manual SQL). An application bug the
 tables or run migrations. The app role keeps `DELETE` for normal flows such as deleting a pension
 pot.
 
+## Container hardening
+
+The backend and frontend images and [the example Compose file](compose.example.yaml) limit what a
+compromised process inside a container can do. The clean-install and recovery-drill tests run
+startup, migrations, sign-in, document uploads, backups and restores under these settings.
+
+| Setting             | Backend (`migrate`, `backend`)                                     | Frontend (nginx)                                           | `db` (PostgreSQL image)                                                    |
+| ------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| User                | UID 1000 (image default); any `--user` works                       | UID 101, the image's `nginx` user; any `--user` works      | Starts as root, then runs PostgreSQL as `postgres`                         |
+| Root filesystem     | Read-only                                                          | Read-only                                                  | Writable                                                                   |
+| Write paths         | `/tmp` (tmpfs), `/var/lib/quro/documents`, `/var/lib/quro/backups` | `/tmp` (tmpfs): pid file, temporary files, rendered config | `/var/lib/postgresql` (volume)                                             |
+| Linux capabilities  | None                                                               | None                                                       | `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, `SETUID`, for the entry point |
+| `no-new-privileges` | Yes                                                                | Yes                                                        | Yes                                                                        |
+| Memory, processes   | 1 GiB, 200                                                         | 256 MiB, 200                                               | 1 GiB, 200                                                                 |
+| Health check        | `quro health` (image and Compose); off for `migrate`               | `GET /healthz` from the image                              | `pg_isready` (Compose)                                                     |
+
+The backend image holds the backend's production dependencies and source only: no frontend,
+build, lint or test tooling and no test files. Both images apply the base distribution's security
+updates when they are built.
+
+nginx listens on port 80 inside the container without a capability: the example sets
+`net.ipv4.ip_unprivileged_port_start=0` for the frontend, which is Docker's default for a container
+with its own network namespace. With host networking, or a runtime that does not allow it, publish
+the frontend through a container network instead.
+
+The limits are sized for a household instance with headroom; raise `mem_limit` if a backup or
+restore of a large database is stopped by the kernel (exit code 137). A read-only root filesystem
+needs `/tmp` as tmpfs in both images; without one, the frontend stops at startup with a message
+saying so. nginx buffers large uploads and responses in `/tmp`, so they count toward the frontend's
+memory limit: 256 MiB leaves room for several 25 MB uploads at once.
+
+What the hardening does not cover: the containers share the host's kernel, so a kernel flaw is
+outside these controls; the `db` entry point keeps the capabilities above; the images are not
+signed and ship no SBOM, so verify them by digest ([install](install.md#verify-the-images)); and
+the base distributions carry vulnerabilities without a fixed package, which the scans list until a
+fix exists ([SECURITY.md](../SECURITY.md#how-findings-are-handled)).
+
+## Licences
+
+Quro is MIT-licensed. CI lists the licence of every third-party package Quro ships, the production
+dependencies of the backend, frontend and shared workspaces and the Python packages of the optional
+statement-import parser, and fails when one has no licence or a licence outside this list:
+0BSD, Apache-2.0, BlueOak-1.0.0, BSD-2-Clause, BSD-3-Clause, CC-BY-4.0, CC0-1.0, HPND, ISC, MIT,
+MIT-CMU, MPL-2.0, OFL-1.1, PSF-2.0, Python-2.0 and Unlicense. An `OR` expression needs one listed
+licence, an `AND` expression all of them. Development tooling is not shipped and is not listed.
+Packages from the base images' distributions keep their distribution's licences.
+
+Run `bun scripts/lib/licence-inventory.ts` after `bun install` for the inventory as Markdown; add
+`--python <interpreter>` for the parser's packages (see
+[development](development.md#security-scans)).
+
 ## Network Isolation
 
 - The `frontend` container (nginx) is the only service with a host port (`3000` by default). It
@@ -463,8 +517,13 @@ pot.
 - PostgreSQL (`db`) is on `backend-net` only. Uploaded documents are files in a volume mounted into
   the backend and the import worker, readable by the backend user only (directories `0700`, files
   `0600`). With S3 storage, the store is the operator's and is reached over the network.
-- The optional AI services (`vllm`, `pension-parser`) are on `ai-net` with the
-  `pension-import-worker`. The main backend cannot reach them.
+- The optional, experimental OCR services (`vllm`, `pension-parser`, Compose profile `ocr`) are on
+  the internal `ocr-net` with the `pension-import-worker`. The main backend cannot reach them, and
+  the parser has no route out of the host. Only the model server has a second network, to download
+  its model; `VLLM_HF_HUB_OFFLINE=1` stops downloads once the model is cached. Both run as non-root
+  users with all capabilities dropped and CPU, memory and process limits. The parser reads each
+  document in a child process with its own limits (see
+  [bounds on document processing](development.md#bounds-on-document-processing)).
 
 A compromised frontend container therefore has no direct network path to the database and no
 access to the documents volume.

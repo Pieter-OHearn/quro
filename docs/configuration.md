@@ -192,6 +192,6 @@ These exist for contributors and tests. Do not set them in an install.
 | `QRO_PSQL_BIN`              | unset         | Path to `psql` outside the image                                                                                                              |
 | `QRO_CLEAR_CONFIRM`         | unset         | Must be `clear-all-data` for `db:clear`                                                                                                       |
 | `QRO_CLEAR_ALLOW_NON_EMPTY` | unset         | `1` lets `db:clear` run on a database that holds data                                                                                         |
-| `DEMO_USER_PASSWORD`        | unset         | Password of the demo account that `db:seed-demo` creates                                                                                      |
+| `DEMO_USER_PASSWORD`        | unset         | Password of the demo accounts that `db:seed-demo` and `db:seed-household` create                                                              |
 
 [Development](development.md) describes how a checkout uses them.

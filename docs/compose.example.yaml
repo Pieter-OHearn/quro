@@ -13,6 +13,11 @@
 #
 # The backend runs as UID 1000. On Linux, config/, data/documents/ and backups/ must belong to
 # that UID (see docs/install.md).
+#
+# Every service runs without Linux capabilities it does not need, cannot gain privileges, and has
+# a memory and process limit. The Quro services also have a read-only root filesystem and write
+# only to their data directories and a tmpfs at /tmp. Raise a limit if your data needs it; the
+# security model (docs/security.md#container-hardening) explains each setting.
 
 name: quro
 
@@ -36,6 +41,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    # The entry point starts as root to prepare the data directory, then runs PostgreSQL as the
+    # image's postgres user; these are the capabilities it needs for that.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 200
 
   # Applies schema migrations and prepares the runtime role, then exits. It runs on every
   # `docker compose up`; when nothing is pending it changes nothing. Also the place to run
@@ -53,6 +72,18 @@ services:
       - ./backups:/var/lib/quro/backups
     networks:
       - internal
+    # The image's health check is for the server; this service runs a command and exits.
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 200
     depends_on:
       db:
         condition: service_healthy
@@ -74,6 +105,15 @@ services:
       timeout: 6s
       retries: 6
       start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 200
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -87,6 +127,18 @@ services:
       - '3000:80'
     networks:
       - web
+    # nginx runs unprivileged and still listens on port 80 inside the container.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 200
     depends_on:
       backend:
         condition: service_healthy

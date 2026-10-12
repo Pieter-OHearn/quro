@@ -16,7 +16,7 @@ import { db, type DbExecutor } from '../db/client';
 import { debtPayments, debts } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { applyRepayment, DEBT_BALANCE, reverseRepayment } from '../lib/balance';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { lockLedgerParents, withLedgerWrite } from '../lib/ledgerWrite';
 import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import {
   err,
@@ -265,12 +265,12 @@ async function createDebtPayment(params: {
     const debt = await getDebtById(tx, params.userId, parsed.value.debtId);
     if (!debt) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
 
-    const updatedBalance = await applyRepayment(tx, DEBT_BALANCE, {
+    const applied = await applyRepayment(tx, DEBT_BALANCE, {
       id: debt.id,
       principal: parsed.value.principal,
       where: eq(debts.userId, params.userId),
     });
-    if (updatedBalance === null) {
+    if (applied === null) {
       return {
         error: 'Principal portion cannot exceed the current remaining balance',
         status: HTTP_STATUS.BAD_REQUEST,
@@ -279,7 +279,10 @@ async function createDebtPayment(params: {
 
     const [data] = await tx
       .insert(debtPayments)
-      .values(toDebtPaymentInsertPayload(parsed.value, params.userId))
+      .values({
+        ...toDebtPaymentInsertPayload(parsed.value, params.userId),
+        unappliedPrincipal: applied.unapplied,
+      })
       .returning();
     await withLedgerWrite(tx, { userId: params.userId }, parsed.value.date);
 
@@ -292,17 +295,25 @@ function deleteDebtPayment(params: {
   paymentId: number;
 }): Promise<RouteMutationResult> {
   return db.transaction(async (tx) => {
-    // Locked so a second delete of the same payment waits and then finds nothing to restore.
-    const [existing] = await tx
-      .select()
+    const owned = and(
+      eq(debtPayments.id, params.paymentId),
+      eq(debtPayments.userId, params.userId),
+    );
+    const [payment] = await tx
+      .select({ debtId: debtPayments.debtId })
       .from(debtPayments)
-      .where(and(eq(debtPayments.id, params.paymentId), eq(debtPayments.userId, params.userId)))
-      .for('update');
+      .where(owned);
+    if (!payment) return { error: 'Payment not found', status: HTTP_STATUS.NOT_FOUND };
+    // The debt first, then the payment (a payment never changes debt). Locked so a second delete
+    // of the same payment waits and then finds nothing to restore.
+    await lockLedgerParents(tx, debts, [payment.debtId]);
+    const [existing] = await tx.select().from(debtPayments).where(owned).for('update');
     if (!existing) return { error: 'Payment not found', status: HTTP_STATUS.NOT_FOUND };
 
     const restoredBalance = await reverseRepayment(tx, DEBT_BALANCE, {
       id: existing.debtId,
       principal: existing.principal,
+      unapplied: existing.unappliedPrincipal,
       where: eq(debts.userId, params.userId),
     });
     if (restoredBalance === null) return { error: 'Debt not found', status: HTTP_STATUS.NOT_FOUND };
