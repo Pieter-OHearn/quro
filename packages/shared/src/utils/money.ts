@@ -13,3 +13,14 @@ export function fromCents(cents: number): number {
 export function roundMoney(amount: number): number {
   return fromCents(toCents(amount)) || 0;
 }
+
+/**
+ * Sums money in integer cents: each amount is rounded to cents once, half away from zero, and the
+ * cents are added exactly. Use it for every total of money, so a total always equals the sum of
+ * the rounded amounts it is made of.
+ */
+export function sumMoney(amounts: Iterable<number>): number {
+  let cents = 0;
+  for (const amount of amounts) cents += toCents(amount);
+  return fromCents(cents) || 0;
+}

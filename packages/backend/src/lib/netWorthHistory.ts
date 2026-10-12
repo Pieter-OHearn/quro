@@ -1,8 +1,13 @@
 import { getPropertyDebt } from './propertyDebt';
 import {
   addMonthsUtc,
+  holdingValue,
   monthEndUtc,
   monthStartUtc,
+  netHoldingShares,
+  pensionTransactionDelta,
+  signedSavingsAmount,
+  sumMoney,
   toIsoDate,
   toUtcTimestamp,
   type PensionTransactionType,
@@ -42,7 +47,6 @@ import {
 } from '../lib/netWorth';
 import { ownedOrJointPredicate, loadHouseholdRows, scopeHouseholdRows } from '../lib/partner';
 import { toNumberOrZero } from '../lib/numbers';
-import { computePensionTransactionDelta } from '../lib/pensionTransactions';
 
 const BASE_CURRENCY = FX_BASE_CURRENCY;
 const NET_WORTH_HISTORY_MONTHS = 7;
@@ -259,15 +263,15 @@ function loadHoldingHistory(userId: number, start: string) {
       desc(holdingTransactions.id),
     )
     .as('latest');
-  // Shares require the entire opening position, not just the last transaction.
+  // Shares require the entire opening position, not just the last transaction. Net shares do not
+  // depend on order, so one row stands in for the rows before the window: a buy of the net, or a
+  // sell of it when more was sold than bought.
+  const openingNet = sql`sum(case when ${holdingTransactions.type} = 'buy' then ${holdingTransactions.shares} else -${holdingTransactions.shares} end)`;
   const opening = db
     .select({
       holdingId: holdingTransactions.holdingId,
-      type: sql<string>`'buy'`,
-      shares:
-        sql<number>`sum(case when ${holdingTransactions.type} = 'buy' then ${holdingTransactions.shares} else -${holdingTransactions.shares} end)`.mapWith(
-          Number,
-        ),
+      type: sql<string>`case when ${openingNet} < 0 then 'sell' else 'buy' end`,
+      shares: sql<number>`abs(${openingNet})`.mapWith(Number),
       price: latest.price,
       date: latest.date,
     })
@@ -452,15 +456,17 @@ function computeDebtLiabilitiesAtCutoff(
   cutoff: number,
   rates: Map<string, number>,
 ): number {
-  return debts.reduce((sum, debt) => {
-    if (isArchivedAtCutoff(debt, cutoff)) return sum;
-    let balance = toNumberOrZero(debt.remainingBalance);
-    for (const payment of paymentsByDebtId.get(debt.id) ?? []) {
-      if (payment.timestamp <= cutoff) continue;
-      balance += payment.principal;
-    }
-    return sum + convertToBase(Math.max(0, balance), debt.currency, rates);
-  }, 0);
+  return sumMoney(
+    debts.map((debt) => {
+      if (isArchivedAtCutoff(debt, cutoff)) return 0;
+      let balance = toNumberOrZero(debt.remainingBalance);
+      for (const payment of paymentsByDebtId.get(debt.id) ?? []) {
+        if (payment.timestamp <= cutoff) continue;
+        balance += payment.principal;
+      }
+      return convertToBase(Math.max(0, balance), debt.currency, rates);
+    }),
+  );
 }
 
 export async function buildDerivedAllocations(
@@ -529,17 +535,17 @@ function computeSavingsAtCutoff(
   cutoff: number,
   rates: Map<string, number>,
 ): number {
-  return accounts.reduce((sum, account) => {
-    if (isArchivedAtCutoff(account, cutoff)) return sum;
-
-    let balance = toNumberOrZero(account.balance);
-    for (const transaction of txnsByAccountId.get(account.id) ?? []) {
-      if (transaction.timestamp <= cutoff) continue;
-      if (transaction.type === 'withdrawal') balance += transaction.amount;
-      else balance -= transaction.amount;
-    }
-    return sum + convertToBase(Math.max(0, balance), account.currency, rates);
-  }, 0);
+  return sumMoney(
+    accounts.map((account) => {
+      if (isArchivedAtCutoff(account, cutoff)) return 0;
+      let balance = toNumberOrZero(account.balance);
+      for (const transaction of txnsByAccountId.get(account.id) ?? []) {
+        if (transaction.timestamp <= cutoff) continue;
+        balance -= signedSavingsAmount(transaction.type, transaction.amount);
+      }
+      return convertToBase(Math.max(0, balance), account.currency, rates);
+    }),
+  );
 }
 
 function isArchivedAtCutoff(entity: Archivable, cutoff: number): boolean {
@@ -553,15 +559,17 @@ function computePensionAtCutoff(
   cutoff: number,
   rates: Map<string, number>,
 ): number {
-  return pots.reduce((sum, pot) => {
-    if (isArchivedAtCutoff(pot, cutoff)) return sum;
-    let balance = toNumberOrZero(pot.balance);
-    for (const transaction of txnsByPotId.get(pot.id) ?? []) {
-      if (transaction.timestamp <= cutoff) continue;
-      balance -= computePensionTransactionDelta(transaction);
-    }
-    return sum + convertToBase(Math.max(0, balance), pot.currency, rates);
-  }, 0);
+  return sumMoney(
+    pots.map((pot) => {
+      if (isArchivedAtCutoff(pot, cutoff)) return 0;
+      let balance = toNumberOrZero(pot.balance);
+      for (const transaction of txnsByPotId.get(pot.id) ?? []) {
+        if (transaction.timestamp <= cutoff) continue;
+        balance -= pensionTransactionDelta(transaction);
+      }
+      return convertToBase(Math.max(0, balance), pot.currency, rates);
+    }),
+  );
 }
 
 function computeBrokerageAtCutoff(
@@ -583,7 +591,7 @@ function computeBrokerageAtCutoff(
     ),
   );
   return {
-    value: totals.reduce((sum, holding) => sum + holding.value, 0),
+    value: sumMoney(totals.map((holding) => holding.value)),
     isEstimated: totals.some((holding) => holding.isEstimated),
   };
 }
@@ -597,17 +605,13 @@ function computeHoldingAtCutoff(
   rates: Map<string, number>,
 ): { value: number; isEstimated: boolean } {
   if (isArchivedAtCutoff(holding, cutoff)) return { value: 0, isEstimated: false };
-  let shares = 0;
-  let latestTransactionPrice: number | null = null;
-  for (const transaction of transactions) {
-    if (transaction.timestamp > cutoff) break;
-    shares += transaction.type === 'buy' ? transaction.shares : -transaction.shares;
-    latestTransactionPrice = transaction.price;
-  }
+  const upToCutoff = transactions.filter((transaction) => transaction.timestamp <= cutoff);
+  const shares = netHoldingShares(upToCutoff);
+  const latestTransactionPrice = upToCutoff[upToCutoff.length - 1]?.price ?? null;
   const historicalPrice = resolvePreparedHoldingPrice(prices, cutoffDate);
   const price = historicalPrice ?? latestTransactionPrice ?? toNumberOrZero(holding.currentPrice);
   return {
-    value: convertToBase(Math.max(0, shares) * price, holding.currency, rates),
+    value: convertToBase(holdingValue(shares, price), holding.currency, rates),
     isEstimated: historicalPrice === null && shares > 0,
   };
 }
@@ -663,14 +667,15 @@ function computePropertyEquityAtCutoff(
     return mortgageBalance;
   }
 
-  return userProperties.reduce((sum, property) => {
-    if (isArchivedAtCutoff(property, cutoff)) return sum;
-    const transactions = txnsByPropertyId.get(property.id) ?? [];
-    const propertyValue = resolvePropertyValueAtCutoff(property, transactions);
-    const mortgageBalance = resolveMortgageBalanceAtCutoff(property, transactions);
-    const equity = propertyValue - mortgageBalance;
-    return sum + convertToBase(equity, property.currency, rates);
-  }, 0);
+  return sumMoney(
+    userProperties.map((property) => {
+      if (isArchivedAtCutoff(property, cutoff)) return 0;
+      const transactions = txnsByPropertyId.get(property.id) ?? [];
+      const propertyValue = resolvePropertyValueAtCutoff(property, transactions);
+      const mortgageBalance = resolveMortgageBalanceAtCutoff(property, transactions);
+      return convertToBase(propertyValue - mortgageBalance, property.currency, rates);
+    }),
+  );
 }
 
 type NetWorthSourceData = {
@@ -922,7 +927,7 @@ function buildNetWorthHistoryPoint(
     id: index + 1,
     month: month.label,
     year: month.year,
-    totalValue: savings + brokerage.value + propertyEquity + pension - liabilities,
+    totalValue: sumMoney([savings, brokerage.value, propertyEquity, pension, -liabilities]),
     currency: BASE_CURRENCY,
     isEstimated: historicalRates.isEstimated || brokerage.isEstimated,
   };

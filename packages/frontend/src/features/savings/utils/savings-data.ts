@@ -1,4 +1,11 @@
-import { monthlyInterest, type SavingsAccount, type SavingsTransaction } from '@quro/shared';
+import {
+  householdAmount,
+  monthlyInterest,
+  signedSavingsAmount,
+  sumMoney,
+  type SavingsAccount,
+  type SavingsTransaction,
+} from '@quro/shared';
 import type {
   ConvertToBaseFn,
   MonthBucket,
@@ -25,6 +32,14 @@ function buildRollingMonthBuckets(monthCount = 7): MonthBucket[] {
   }).reverse();
 }
 
+/** The person's share of an account's balance, in the display currency. */
+export function attributedSavingsBalanceInBase(
+  account: Pick<SavingsAccount, 'balance' | 'currency' | 'isJoint'>,
+  convertToBase: ConvertToBaseFn,
+): number {
+  return convertToBase(householdAmount(account.balance, account.isJoint), account.currency);
+}
+
 export function computeSavingsMetrics(
   accounts: SavingsAccount[],
   convertToBase: ConvertToBaseFn,
@@ -33,22 +48,33 @@ export function computeSavingsMetrics(
   totalInterest: number;
   avgRate: number;
 } {
-  const totalInBase = accounts.reduce((sum, account) => {
-    return sum + convertToBase(account.balance, account.currency);
-  }, 0);
+  // The page total is the person's savings, like the dashboard: a joint account counts at the
+  // household share. Account rows still show each account's full balance.
+  const totalInBase = sumMoney(
+    accounts.map((account) => attributedSavingsBalanceInBase(account, convertToBase)),
+  );
 
-  const totalInterest = accounts.reduce((sum, account) => {
-    return (
-      sum + convertToBase(monthlyInterest(account.balance, account.interestRate), account.currency)
-    );
-  }, 0);
+  const totalInterest = sumMoney(
+    accounts.map((account) =>
+      convertToBase(
+        monthlyInterest(householdAmount(account.balance, account.isJoint), account.interestRate),
+        account.currency,
+      ),
+    ),
+  );
 
+  // Rates are weighted by the unrounded attributed balances: a rate is not money.
+  const attributed = accounts.map((account) =>
+    attributedSavingsBalanceInBase(account, convertToBase),
+  );
+  const attributedTotal = attributed.reduce((sum, balance) => sum + balance, 0);
   const avgRate =
-    accounts.length > 0 && totalInBase > 0
-      ? accounts.reduce((sum, account) => {
-          const weight = convertToBase(account.balance, account.currency) / totalInBase;
-          return sum + account.interestRate * weight;
-        }, 0)
+    accounts.length > 0 && attributedTotal > 0
+      ? accounts.reduce(
+          (sum, account, index) =>
+            sum + account.interestRate * (attributed[index] / attributedTotal),
+          0,
+        )
       : 0;
 
   return {
@@ -63,9 +89,13 @@ export function buildContribChartData(
   accounts: SavingsAccount[],
   convertToBase: ConvertToBaseFn,
 ): SavingsContributionDatum[] {
+  // Flows on a joint account count at the household share, like the page total.
   function toBase(transaction: SavingsTransaction): number {
     const account = accounts.find((item) => item.id === transaction.accountId);
-    return convertToBase(transaction.amount, account?.currency ?? 'EUR');
+    return convertToBase(
+      householdAmount(transaction.amount, account?.isJoint),
+      account?.currency ?? 'EUR',
+    );
   }
 
   return buildRollingMonthBuckets().map(({ label, prefix }) => {
@@ -109,15 +139,20 @@ export function buildGrowthChartData(
 
       const futureEffect = transactions
         .filter((transaction) => transaction.accountId === account.id && transaction.date > cutoff)
-        .reduce((transactionSum, transaction) => {
-          const amountInBase = convertToBase(transaction.amount, account.currency);
+        .reduce(
+          (transactionSum, transaction) =>
+            transactionSum +
+            convertToBase(
+              householdAmount(
+                signedSavingsAmount(transaction.type, transaction.amount),
+                account.isJoint,
+              ),
+              account.currency,
+            ),
+          0,
+        );
 
-          return transaction.type === 'withdrawal'
-            ? transactionSum - amountInBase
-            : transactionSum + amountInBase;
-        }, 0);
-
-      return sum + convertToBase(account.balance, account.currency) - futureEffect;
+      return sum + attributedSavingsBalanceInBase(account, convertToBase) - futureEffect;
     }, 0);
 
     return {

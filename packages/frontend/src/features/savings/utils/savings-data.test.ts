@@ -2,7 +2,7 @@
 
 import { afterEach, expect, setSystemTime, test } from 'bun:test';
 import type { SavingsAccount } from '@quro/shared';
-import { buildGrowthChartData } from './savings-data';
+import { buildGrowthChartData, computeSavingsMetrics } from './savings-data';
 
 const accountBase: SavingsAccount = {
   id: 1,
@@ -67,4 +67,17 @@ test('includes transactions from the final local day of each month', () => {
   );
 
   expect(data.find((point) => point.month === 'May')?.savings).toBe(1000);
+});
+
+test('counts a joint account at the household share, like the dashboard', () => {
+  const metrics = computeSavingsMetrics(
+    [
+      { ...accountBase, id: 1, balance: 10_000.01, isJoint: false, interestRate: 2 },
+      { ...accountBase, id: 2, balance: 6_000.01, isJoint: true, interestRate: 3 },
+    ],
+    (value) => value,
+  );
+  // 10,000.01 + 3,000.005 (rounded once to 3,000.01).
+  expect(metrics.totalInBase).toBe(13_000.02);
+  expect(metrics.avgRate).toBeCloseTo((2 * 10_000.01 + 3 * 3_000.005) / 13_000.015, 10);
 });

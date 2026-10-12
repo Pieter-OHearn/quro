@@ -104,13 +104,14 @@ function GoalCardSavings({
   status: GoalStatus;
   fmtBase: (n: number) => string;
 }>) {
+  const { numberFormat } = useCurrency();
   return (
     <>
       <div>
         <div className="flex justify-between mb-1.5">
           <span className="text-xs text-fg-subtle">Progress</span>
           <span className="text-xs font-semibold" style={{ color }}>
-            {formatPercent(clampedPct, 0)}
+            {formatPercent(clampedPct, numberFormat, 0)}
           </span>
         </div>
         <ProgressBar pct={clampedPct} color={color} />
@@ -173,13 +174,14 @@ function GoalCardSalary({
   clampedPct: number;
   fmtBase: (n: number) => string;
 }>) {
+  const { numberFormat } = useCurrency();
   return (
     <>
       <div>
         <div className="flex justify-between mb-1.5">
           <span className="text-xs text-fg-subtle">Current - Target</span>
           <span className="text-xs font-semibold" style={{ color }}>
-            {formatPercent(clampedPct, 0)}
+            {formatPercent(clampedPct, numberFormat, 0)}
           </span>
         </div>
         <ProgressBar pct={clampedPct} color={color} />
@@ -195,8 +197,10 @@ function GoalCardSalary({
         <p className="text-xs text-fg-muted">
           {annualGross > 0 ? (
             <>
-              <strong>{formatPercent((targetAmount / annualGross - 1) * 100, 1)} raise</strong> -{' '}
-              {fmtBase(Math.max(0, targetAmount - annualGross))} gap
+              <strong>
+                {formatPercent((targetAmount / annualGross - 1) * 100, numberFormat, 1)} raise
+              </strong>{' '}
+              - {fmtBase(Math.max(0, targetAmount - annualGross))} gap
             </>
           ) : (
             'Add a payslip to calculate required raise'
@@ -523,6 +527,7 @@ function GoalCardAnnual({
   lowerIsBetter: boolean;
   status: GoalStatus;
 }>) {
+  const { numberFormat } = useCurrency();
   const barColor = lowerIsBetter && clampedPct < 100 ? 'var(--data-forecast)' : color;
   const barWidth = getAnnualBarWidth(lowerIsBetter, clampedPct, currentAmount, targetAmount);
   return (
@@ -533,7 +538,9 @@ function GoalCardAnnual({
             Progress {goal.unit ? `(${goal.unit})` : ''}
           </span>
           <span className="text-xs font-semibold" style={{ color: barColor }}>
-            {lowerIsBetter ? `${currentAmount} -> ${targetAmount}` : formatPercent(clampedPct, 0)}
+            {lowerIsBetter
+              ? `${currentAmount} -> ${targetAmount}`
+              : formatPercent(clampedPct, numberFormat, 0)}
           </span>
         </div>
         <div className="w-full h-2.5 bg-surface-muted rounded-full overflow-hidden">

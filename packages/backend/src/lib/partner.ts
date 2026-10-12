@@ -2,18 +2,13 @@ import { and, eq, isNull, or, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { db } from '../db/client';
 import { partnerLinks } from '../db/schema';
+import { householdShare, type HouseholdWeight } from '@quro/shared';
 import { toNumberOrZero } from './numbers';
 
-export type HouseholdWeight = 'personal' | 'full';
-
-// Full balances are used only for explicit liquidity scenarios. Contractual
-// payments, net worth and deposit protection always use the personal share.
-export function householdShare(
-  isJoint: boolean | undefined,
-  weight: HouseholdWeight = 'personal',
-): number {
-  return isJoint && weight === 'personal' ? 0.5 : 1;
-}
+// The share itself lives in @quro/shared so the frontend weights joint rows identically. Full
+// balances are used only for explicit liquidity scenarios; contractual payments, net worth and
+// deposit protection always use the personal share.
+export { householdShare, type HouseholdWeight };
 
 const HOUSEHOLD_MONEY_COLUMNS = {
   savings: ['balance'],

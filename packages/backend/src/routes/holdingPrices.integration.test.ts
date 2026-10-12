@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
-import { roundMoney, type Holding, type HoldingTransaction } from '@quro/shared';
+import type { Holding, HoldingTransaction } from '@quro/shared';
 import { db } from '../db/client';
 import { holdings, holdingTransactions, netWorthSnapshots } from '../db/schema';
 import { computeDerivedAllocations, upsertCurrentNetWorthSnapshot } from '../lib/netWorth';
@@ -197,11 +197,11 @@ describe('holding value', () => {
       [],
       [],
     );
-    expect(portfolioTotal).toBeCloseTo(370.3701, 10);
-    // round_cents(3 × 123.4567); a price rounded to cents first would give 3 × 123.46 = 370.38.
-    expect(roundMoney(portfolioTotal)).toBe(370.37);
+    // round_cents(3 × 123.4567), rounded once where the holding is valued; a price rounded to
+    // cents first would give 3 × 123.46 = 370.38.
+    expect(portfolioTotal).toBe(370.37);
 
-    // The stored snapshot is a rounding point: the value is rounded there, once.
+    // The stored snapshot keeps the same whole-cent value.
     await upsertCurrentNetWorthSnapshot(userId, new Date('2026-03-15T12:00:00Z'), {
       partnerId: null,
       rates: new Map(),

@@ -1,5 +1,6 @@
 import { Calendar, ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import { attributedSavingsBalanceInBase } from '../utils/savings-data';
 import { Badge, Button, Card, IconButton, PanelHeader } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
 import { TxnHistory } from './TxnHistory';
@@ -195,7 +196,9 @@ function AccountRow({
   onDeleteTxn,
 }: Readonly<AccountRowProps>) {
   const balanceInBase = convertToBase(acc.balance, acc.currency);
-  const pct = totalInBase > 0 ? (balanceInBase / totalInBase) * 100 : 0;
+  // The total is the person's savings, so each account's part of it uses its attributed share.
+  const pct =
+    totalInBase > 0 ? (attributedSavingsBalanceInBase(acc, convertToBase) / totalInBase) * 100 : 0;
   const foreign = isForeign(acc.currency);
   const accTxns = transactions.filter((transaction) => transaction.accountId === acc.id);
   const accMonthlyInterest = monthlyInterest(acc.balance, acc.interestRate);

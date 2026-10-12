@@ -1,4 +1,5 @@
 import { AreaChartCard } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
 import type { AllocationItem, DashboardFormatFn, NetWorthMetricData } from '../types';
 import { AssetAllocationCard } from './AssetAllocationCard';
 import { formatPercent } from '@quro/shared';
@@ -22,6 +23,7 @@ export function DashboardChartsGrid({
   ytdPct: number;
   fmtBase: DashboardFormatFn;
 }>) {
+  const { numberFormat } = useCurrency();
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
       <div className="lg:col-span-2">
@@ -42,7 +44,7 @@ export function DashboardChartsGrid({
                 className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg'}`}
               >
                 {ytdPct >= 0 ? '+' : ''}
-                {formatPercent(ytdPct, 1)} YTD
+                {formatPercent(ytdPct, numberFormat, 1)} YTD
               </span>
             ) : undefined
           }

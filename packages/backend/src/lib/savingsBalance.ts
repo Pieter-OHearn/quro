@@ -1,3 +1,4 @@
+import { signedSavingsAmount } from '@quro/shared';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { savingsAccounts } from '../db/schema';
@@ -5,9 +6,9 @@ import { toNumberOrZero } from './numbers';
 
 type SavingsBalanceDb = Pick<typeof db, 'update'>;
 
+// Effect of a savings transaction on its account's balance (the shared rule the frontend uses).
 export function toSignedSavingsAmount(type: unknown, amount: unknown): number {
-  const absoluteAmount = Math.abs(toNumberOrZero(amount));
-  return type === 'withdrawal' ? -absoluteAmount : absoluteAmount;
+  return typeof type === 'string' ? signedSavingsAmount(type, toNumberOrZero(amount)) : 0;
 }
 
 // Callers must verify the actor can access the account (owned or joint) before

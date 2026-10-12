@@ -1,11 +1,13 @@
 import { DATA_COLORS } from '@/lib/dataColors';
 import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
-import type {
-  AllocationKey,
-  DashboardAllocationsSummary as DashboardAllocationSummaryPayload,
-  DashboardTransaction as DashboardTransactionPayload,
-  NetWorthSnapshot,
-  Payslip,
+import {
+  householdAmount,
+  sumMoney,
+  type AllocationKey,
+  type DashboardAllocationsSummary as DashboardAllocationSummaryPayload,
+  type DashboardTransaction as DashboardTransactionPayload,
+  type NetWorthSnapshot,
+  type Payslip,
 } from '@quro/shared';
 import type {
   AllocationSummary,
@@ -242,13 +244,11 @@ export const buildMonthlySummaryItems = (
   },
 ];
 
-const JOINT_TXN_WEIGHT = 0.5;
-
-// Joint-account transactions count half in the monthly summary so the two
-// partners' summaries add up to the real totals. Display rows keep the full
-// amount; only these aggregates are weighted.
+// Joint-account transactions count at the household share in the monthly summary so the two
+// partners' summaries add up to the real totals. Display rows keep the full amount; only these
+// aggregates are weighted.
 const weightedTxnAmount = (tx: DashboardTransaction): number =>
-  tx.isJoint ? tx.amount * JOINT_TXN_WEIGHT : tx.amount;
+  householdAmount(tx.amount, tx.isJoint);
 
 export function computeDashboardTxnStats(
   transactions: readonly DashboardTransaction[],
@@ -258,23 +258,23 @@ export function computeDashboardTxnStats(
 ): DashboardTxnStats {
   const monthTxns = transactions.filter((tx) => tx.date.startsWith(currentKey));
   const monthlyCategoryChange = (category: string) =>
-    monthTxns
-      .filter((tx) => tx.category === category)
-      .reduce(
-        (sum, tx) =>
-          sum + (tx.type === 'transfer' ? -weightedTxnAmount(tx) : weightedTxnAmount(tx)),
-        0,
-      );
+    sumMoney(
+      monthTxns
+        .filter((tx) => tx.category === category)
+        .map((tx) => (tx.type === 'transfer' ? -weightedTxnAmount(tx) : weightedTxnAmount(tx))),
+    );
   const { monthlySalaryValue, salaryTrendChange } = computeSalaryMetrics(payslips, convertToBase);
-  const totalIncome = monthTxns
-    .filter((tx) => tx.type === 'income')
-    .reduce((s, tx) => s + Math.abs(weightedTxnAmount(tx)), 0);
-  const totalExpenses = monthTxns
-    .filter((tx) => tx.type === 'expense')
-    .reduce((s, tx) => s + Math.abs(weightedTxnAmount(tx)), 0);
-  const totalSavingsDeposited = monthTxns
-    .filter((tx) => tx.type === 'transfer' && tx.category === 'Savings')
-    .reduce((s, tx) => s - weightedTxnAmount(tx), 0);
+  const totalIncome = sumMoney(
+    monthTxns.filter((tx) => tx.type === 'income').map((tx) => Math.abs(weightedTxnAmount(tx))),
+  );
+  const totalExpenses = sumMoney(
+    monthTxns.filter((tx) => tx.type === 'expense').map((tx) => Math.abs(weightedTxnAmount(tx))),
+  );
+  const totalSavingsDeposited = sumMoney(
+    monthTxns
+      .filter((tx) => tx.type === 'transfer' && tx.category === 'Savings')
+      .map((tx) => -weightedTxnAmount(tx)),
+  );
   return {
     monthlyCategoryChange,
     monthlySalaryValue,

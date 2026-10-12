@@ -2,7 +2,7 @@ import { HOLDING_TXN_META as TXN_META } from '../constants';
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
-import type { Holding, HoldingTransaction } from '@quro/shared';
+import { holdingValue, type Holding, type HoldingTransaction } from '@quro/shared';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
 
@@ -35,7 +35,11 @@ function HoldingTxnAmount({
           className={`text-sm font-semibold ${transaction.type === 'buy' ? 'text-fg-strong' : 'text-success'}`}
         >
           {transaction.type === 'buy' ? '-' : '+'}
-          {fmtNative((transaction.shares ?? 0) * transaction.price, holding.currency, true)}
+          {fmtNative(
+            holdingValue(transaction.shares ?? 0, transaction.price),
+            holding.currency,
+            true,
+          )}
         </p>
         <p className="text-[10px] text-fg-faint">
           {transaction.shares ?? 0} @ {fmtNative(transaction.price, holding.currency, true)}

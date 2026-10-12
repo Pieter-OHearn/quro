@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import {
+  computeHoldingPosition,
+  holdingValue,
   monthStartUtc,
+  sumMoney,
   toUtcTimestamp,
   type Holding,
   type HoldingTransaction,
@@ -18,12 +21,6 @@ import { getPropertyMortgageBalance, getPropertyOwnershipShare } from '../utils/
 
 type DatedHoldingTransaction = HoldingTransaction & { timestamp: number };
 type DatedPropertyTransaction = PropertyTransaction & { timestamp: number };
-type HoldingTrendAccumulator = {
-  sharesAtMonthStart: number;
-  totalCostAtMonthStart: number;
-  priceAtMonthStart: number | null;
-  dividendsYearToDate: number;
-};
 type HoldingTrendSnapshot = {
   brokerageAtMonthStartBase: number;
   costAtMonthStartBase: number;
@@ -81,58 +78,18 @@ function mapPropertyTransactions(
   return byProperty;
 }
 
-function addDividendIfYearToDate(
-  state: HoldingTrendAccumulator,
-  txn: DatedHoldingTransaction,
+function sumDividendsYearToDate(
+  txns: readonly DatedHoldingTransaction[],
   yearStart: number,
   nowTs: number,
-): void {
-  if (txn.type !== 'dividend') return;
-  if (txn.timestamp < yearStart || txn.timestamp > nowTs) return;
-  state.dividendsYearToDate += txn.price;
-}
-
-function applyHoldingTxnBeforeMonthStart(
-  state: HoldingTrendAccumulator,
-  txn: DatedHoldingTransaction,
-  monthStart: number,
-): void {
-  if (txn.type === 'dividend' || txn.timestamp >= monthStart) return;
-  const txnShares = Number(txn.shares ?? 0);
-  if (txnShares <= 0) return;
-
-  if (txn.type === 'buy') {
-    state.totalCostAtMonthStart += txnShares * txn.price;
-    state.sharesAtMonthStart += txnShares;
-    state.priceAtMonthStart = txn.price;
-    return;
-  }
-  if (txn.type !== 'sell') return;
-
-  const avgCostNow =
-    state.sharesAtMonthStart > 0 ? state.totalCostAtMonthStart / state.sharesAtMonthStart : 0;
-  state.totalCostAtMonthStart -= txnShares * avgCostNow;
-  state.sharesAtMonthStart = Math.max(0, state.sharesAtMonthStart - txnShares);
-  state.priceAtMonthStart = txn.price;
-}
-
-function computeHoldingAccumulator(
-  txns: DatedHoldingTransaction[],
-  monthStart: number,
-  yearStart: number,
-  nowTs: number,
-): HoldingTrendAccumulator {
-  const state: HoldingTrendAccumulator = {
-    sharesAtMonthStart: 0,
-    totalCostAtMonthStart: 0,
-    priceAtMonthStart: null,
-    dividendsYearToDate: 0,
-  };
-  for (const txn of txns) {
-    addDividendIfYearToDate(state, txn, yearStart, nowTs);
-    applyHoldingTxnBeforeMonthStart(state, txn, monthStart);
-  }
-  return state;
+): number {
+  return sumMoney(
+    txns
+      .filter(
+        (txn) => txn.type === 'dividend' && txn.timestamp >= yearStart && txn.timestamp <= nowTs,
+      )
+      .map((txn) => txn.price),
+  );
 }
 
 function computeHoldingTrendSnapshot(
@@ -143,29 +100,23 @@ function computeHoldingTrendSnapshot(
   nowTs: number,
   convertToBase: ConvertToBaseFn,
 ): HoldingTrendSnapshot {
-  let brokerageAtMonthStartBase = 0;
-  let costAtMonthStartBase = 0;
-  let dividendsYearToDateBase = 0;
-
-  for (const holding of holdings) {
+  const atMonthStart = holdings.map((holding) => {
     const txns = holdingTxnMap.get(holding.id) ?? [];
-    const state = computeHoldingAccumulator(txns, monthStart, yearStart, nowTs);
-    const avgCostAtMonthStart =
-      state.sharesAtMonthStart > 0 ? state.totalCostAtMonthStart / state.sharesAtMonthStart : 0;
-    const valuationPriceAtMonthStart = state.priceAtMonthStart ?? holding.currentPrice;
+    // The shared position rule over the trades before the month started.
+    const position = computeHoldingPosition(txns.filter((txn) => txn.timestamp < monthStart));
+    const price = position.lastTradePrice ?? holding.currentPrice;
+    return {
+      value: convertToBase(holdingValue(position.shares, price), holding.currency),
+      cost: convertToBase(position.costBasis, holding.currency),
+      dividends: convertToBase(sumDividendsYearToDate(txns, yearStart, nowTs), holding.currency),
+    };
+  });
 
-    brokerageAtMonthStartBase += convertToBase(
-      state.sharesAtMonthStart * valuationPriceAtMonthStart,
-      holding.currency,
-    );
-    costAtMonthStartBase += convertToBase(
-      state.sharesAtMonthStart * avgCostAtMonthStart,
-      holding.currency,
-    );
-    dividendsYearToDateBase += convertToBase(state.dividendsYearToDate, holding.currency);
-  }
-
-  return { brokerageAtMonthStartBase, costAtMonthStartBase, dividendsYearToDateBase };
+  return {
+    brokerageAtMonthStartBase: sumMoney(atMonthStart.map((holding) => holding.value)),
+    costAtMonthStartBase: sumMoney(atMonthStart.map((holding) => holding.cost)),
+    dividendsYearToDateBase: sumMoney(atMonthStart.map((holding) => holding.dividends)),
+  };
 }
 
 function computePropertyEquityAtMonthStart(
@@ -199,13 +150,17 @@ function computePropertyEquityAtMonthStartBase(
   mortgageById: Map<number, Mortgage>,
   convertToBase: ConvertToBaseFn,
 ): number {
-  return properties.reduce((sum, property) => {
-    const txns = propertyTxnMap.get(property.id) ?? [];
-    return (
-      sum +
-      computePropertyEquityAtMonthStart(property, txns, monthStart, mortgageById, convertToBase)
-    );
-  }, 0);
+  return sumMoney(
+    properties.map((property) =>
+      computePropertyEquityAtMonthStart(
+        property,
+        propertyTxnMap.get(property.id) ?? [],
+        monthStart,
+        mortgageById,
+        convertToBase,
+      ),
+    ),
+  );
 }
 
 export function useInvestmentStatTrends(
@@ -243,11 +198,16 @@ export function useInvestmentStatTrends(
       convertToBase,
     );
 
-    const brokerageDeltaThisMonth = stats.totalBrokerageBase - brokerageAtMonthStartBase;
-    const unrealizedAtMonthStartBase = brokerageAtMonthStartBase - costAtMonthStartBase;
-    const unrealizedDeltaThisMonth = stats.totalGainBase - unrealizedAtMonthStartBase;
-    const propertyEquityDeltaThisMonth =
-      stats.totalPropertyEquityBase - propertyEquityAtMonthStartBase;
+    const brokerageDeltaThisMonth = sumMoney([
+      stats.totalBrokerageBase,
+      -brokerageAtMonthStartBase,
+    ]);
+    const unrealizedAtMonthStartBase = sumMoney([brokerageAtMonthStartBase, -costAtMonthStartBase]);
+    const unrealizedDeltaThisMonth = sumMoney([stats.totalGainBase, -unrealizedAtMonthStartBase]);
+    const propertyEquityDeltaThisMonth = sumMoney([
+      stats.totalPropertyEquityBase,
+      -propertyEquityAtMonthStartBase,
+    ]);
 
     const monthStartLabel = formatDate(monthStart);
     const todayLabel = formatDate(nowTs);
