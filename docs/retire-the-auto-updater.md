@@ -73,4 +73,4 @@ The first command lists your stack without an `auto-updater` entry. The second p
 
 ## After retiring
 
-The stack stays on the version it runs now. Nothing checks for new releases, so watch the [releases page](https://github.com/Pieter-OHearn/quro/releases) and follow the upgrade notes of each release. The updater's rollback command, `apply-release.sh --target-tag`, goes away with it; to go back, set the earlier image tag in your Compose file and recreate the services.
+The stack stays on the version it runs now. Nothing checks for new releases, so watch the [releases page](https://github.com/Pieter-OHearn/quro/releases) and follow the upgrade notes of each release; [Upgrade Quro](upgrade.md) describes the procedure, starting with [the move to 0.8.0](upgrade.md#upgrade-from-070-to-080). The updater's rollback command, `apply-release.sh --target-tag`, goes away with it; to go back, see [Roll back or restore](upgrade.md#roll-back-or-restore).

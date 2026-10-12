@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres, { type Sql } from 'postgres';
 import { postgresMajorProblem, runtimeProblems } from '../lib/platformSupport';
-import { classifyDatabaseError, describeDatabaseError } from './connectionErrors';
+import { classifyDatabaseError, describeDatabaseError, errorCode } from './connectionErrors';
 import {
   applyRuntimeRolePlan,
   describeRuntimeRolePlan,
@@ -14,7 +14,13 @@ import {
   type RuntimeRolePlan,
   type SignInCheck,
 } from './runtimeRole';
-import { compareSchema, describeSchema, readLatestAppliedWhen } from './schemaVersion';
+import {
+  compareSchema,
+  describeSchema,
+  isCompatible,
+  readLatestAppliedWhen,
+  type SchemaComparison,
+} from './schemaVersion';
 
 // `quro migrate`: checks first, then applies pending migrations and the runtime role under a
 // database lock. Every check runs before the first change, so a refusal leaves the database as
@@ -180,7 +186,7 @@ class RuntimeRoleStepError extends Error {
   }
 }
 
-function outcomeForError(caught: unknown): MigrateOutcome {
+function outcomeForError(caught: unknown): Exclude<MigrateOutcome, { kind: 'ok' }> {
   const roleStep = caught instanceof RuntimeRoleStepError;
   const error = roleStep ? caught.original : caught;
   const reason = describeDatabaseError(error);
@@ -192,7 +198,7 @@ function outcomeForError(caught: unknown): MigrateOutcome {
     default:
       break;
   }
-  if ((error as { code?: unknown }).code === INSUFFICIENT_PRIVILEGE) {
+  if (errorCode(error) === INSUFFICIENT_PRIVILEGE) {
     return { kind: 'refused', message: `Missing database privileges: ${reason}.` };
   }
   if (roleStep) {
@@ -205,6 +211,92 @@ function outcomeForError(caught: unknown): MigrateOutcome {
     kind: 'failed',
     message: `Migration failed: ${reason}. Pending migrations run in one transaction, so none from this run was recorded; fix the cause and run \`quro migrate\` again.`,
   };
+}
+
+/** What `quro migrate --status` reports. Names no row data and no password. */
+export type MigrationStatus = {
+  status: SchemaComparison['status'];
+  /** Whether this image's server may run against the database: the schema is `current`. */
+  compatible: boolean;
+  message: string;
+  database: { host: string; port: number; name: string; user: string; serverVersion: string };
+  /** Rows in the migration history, and the newest one by name when this image ships it. */
+  applied: { migrations: number; latestMigration: string | null };
+  /** Migrations this image would apply, oldest first. Empty unless `behind` or `empty`. */
+  pending: string[];
+};
+
+export type MigrationStatusOutcome =
+  { kind: 'ok'; status: MigrationStatus } | Exclude<MigrateOutcome, { kind: 'ok' }>;
+
+export type MigrationStatusOptions = Pick<
+  MigrateOptions,
+  'adminUrl' | 'target' | 'print' | 'connectAttempts' | 'retryDelayMs'
+>;
+
+async function readAppliedCount(sql: AdminSql): Promise<number> {
+  const [row] = await sql<{ exists: boolean }[]>`
+    select to_regclass('drizzle.__drizzle_migrations') is not null as "exists"
+  `;
+  if (!row?.exists) return 0;
+  const [count] = await sql<{ count: number }[]>`
+    select count(*)::int as "count" from drizzle.__drizzle_migrations
+  `;
+  return count?.count ?? 0;
+}
+
+function latestAppliedTag(schema: SchemaComparison): string | null {
+  if (schema.status === 'current') return schema.latest.tag;
+  if (schema.status === 'behind') return schema.applied.tag;
+  return null;
+}
+
+/**
+ * `quro migrate --status`: reads the migration history as the owner role and compares it with the
+ * journal this image ships. Read-only: it takes no lock and changes nothing.
+ */
+export async function readMigrationStatus(
+  options: MigrationStatusOptions,
+): Promise<MigrationStatusOutcome> {
+  let sql: AdminSql | undefined;
+  try {
+    sql = await connect({ ...options, runtime: null, dryRun: true });
+    const owner = await readOwnerFacts(sql);
+    const schema = compareSchema(await readLatestAppliedWhen(sql));
+    const pending =
+      schema.status === 'behind' || schema.status === 'empty'
+        ? schema.pending.map((migration) => migration.tag)
+        : [];
+    return {
+      kind: 'ok',
+      status: {
+        status: schema.status,
+        compatible: isCompatible(schema),
+        message: describeSchema(schema),
+        database: {
+          host: options.target.host,
+          port: options.target.port,
+          name: owner.database,
+          user: owner.owner,
+          serverVersion: owner.serverVersion,
+        },
+        applied: {
+          migrations: await readAppliedCount(sql),
+          latestMigration: latestAppliedTag(schema),
+        },
+        pending,
+      },
+    };
+  } catch (error) {
+    const outcome = outcomeForError(error);
+    if (outcome.kind !== 'failed') return outcome;
+    return {
+      kind: 'failed',
+      message: `The migration status could not be read: ${describeDatabaseError(error)}.`,
+    };
+  } finally {
+    await sql?.end({ timeout: CLOSE_TIMEOUT_SECONDS }).catch(() => undefined);
+  }
 }
 
 /** Runs `quro migrate` (or its `--dry-run`) and reports how it ended. */

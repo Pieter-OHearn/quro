@@ -80,7 +80,7 @@ Steps for the Compose stack:
 
    ```bash
    docker compose -f docker-compose.yml -f compose.s3.yaml run --rm --no-deps backend \
-     quro documents migrate-from-s3
+     documents migrate-from-s3
    ```
 
    It prints one line per document and a summary. If it stops with failures, fix them (see below) and run it again.
