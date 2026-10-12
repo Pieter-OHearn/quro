@@ -368,7 +368,8 @@ Running it again resets the two demo users' rows and writes the same household a
 new ids but the same content, and only the rate dates and the users' creation times follow the
 clock. It refuses to run, writing nothing and exiting with an error, when the database holds any
 user other than the two demo users, so it cannot add synthetic rows to a real household. A backup
-or restore in progress also stops it. It is not part of `test:smoke`, whose
+or restore in progress also stops it. Each route call is its own transaction, so a seed that
+fails part-way leaves a partial household; run it again to reset and complete it. It is not part of `test:smoke`, whose
 backend keeps the plain seed: the smoke tests sign up users of their own, which the household
 seed would then refuse, and the [upgrade fixture](upgrade-fixture.md) and the recovery drill start
 from a demo user without rows.
