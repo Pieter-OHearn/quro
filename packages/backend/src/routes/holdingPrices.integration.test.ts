@@ -119,7 +119,9 @@ describe('six-decimal prices', () => {
       return state / 2_147_483_648;
     };
     const values = Array.from({ length: 2_000 }, (_, index) =>
-      Number(`${Math.floor(next() * 10 ** (index % 9))}.${String(Math.floor(next() * 1e9))}`),
+      Number(
+        `${Math.floor(next() * 10 ** (index % 9))}.${String(Math.floor(next() * 1e9)).padStart(9, '0')}`,
+      ),
     );
     const texts = values.map(String);
     const rows = await db.execute<{ stored: string }>(
