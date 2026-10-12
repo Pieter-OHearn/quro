@@ -329,8 +329,8 @@ The smoke backend runs with `QRO_DISABLE_SCHEDULERS=true`. The interval jobs (se
 bunq sync, holding prices, currency rates, net-worth snapshots) then do not run, so the backend
 makes no provider calls on its own; only endpoints a test calls directly, such as a price
 refresh, could. Set the same variable for any other local backend that must not run background
-jobs; leave it unset in production. It keeps documents in the filesystem store, in a new
-temporary directory that the run removes at the end.
+jobs; leave it unset in production. It keeps documents in the filesystem store, in a
+temporary directory that each run empties first and removes at the end.
 
 ### Synthetic data
 

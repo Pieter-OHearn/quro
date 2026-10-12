@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
@@ -22,10 +22,16 @@ if (!DATABASE_URL) {
   );
 }
 
-// The smoke backend keeps documents in a fresh directory through the filesystem store. The
-// runner creates it once; test workers load this file again and inherit the path, so the
-// document smoke test can look inside it. global-teardown.ts removes it.
-process.env.QRO_SMOKE_DOCUMENTS_DIR ||= mkdtempSync(join(tmpdir(), 'quro-smoke-documents-'));
+// The smoke backend keeps documents in an empty directory through the filesystem store. The
+// runner empties it once per run; test workers load this file again and inherit the path, so
+// the document smoke test can look inside it. global-teardown.ts removes it after the run, and
+// a run that stopped early leaves at most this one directory per backend port.
+if (!process.env.QRO_SMOKE_DOCUMENTS_DIR) {
+  const directory = join(tmpdir(), `quro-smoke-documents-${BACKEND_PORT}`);
+  rmSync(directory, { recursive: true, force: true });
+  mkdirSync(directory, { mode: 0o700 });
+  process.env.QRO_SMOKE_DOCUMENTS_DIR = directory;
+}
 const DOCUMENTS_DIR = process.env.QRO_SMOKE_DOCUMENTS_DIR;
 
 export default defineConfig({
