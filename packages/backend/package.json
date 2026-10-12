@@ -16,6 +16,7 @@
     "db:psql": "bun run src/db/psql.ts",
     "db:bootstrap-runtime-role": "bun run src/db/bootstrapRuntimeRole.ts",
     "db:seed-demo": "bun run src/db/seedDemoUser.ts",
+    "db:seed-household": "bun run src/db/seedDemoUser.ts --household",
     "quro": "bun run src/cli/quro.ts"
   },
   "dependencies": {
