@@ -17,6 +17,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { db, type DbTransaction } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
+import { LEDGER_ROW_CHANGED, lockLedgerParents } from '../lib/ledgerWrite';
 import { isForeignKeyViolation } from '../lib/postgresErrors';
 import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import { CATEGORY_PRESETS } from '../services/bunqCategoryRules';
@@ -535,14 +536,26 @@ app.patch('/transactions/:id', async (c) => {
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
 
   const patch = await normalizeBudgetTransactionMoney(body.value);
+  const current = await findOwnedRow(budgetTransactions, id, user.id);
+  if (!current) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  const targetCategoryId = patch.categoryId ?? current.categoryId;
+  if (
+    targetCategoryId !== current.categoryId &&
+    !(await findOwnedRow(budgetCategories, targetCategoryId, user.id))
+  ) {
+    return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
+  }
   const result = await db.transaction(async (tx) => {
-    // Locked so a concurrent edit waits and adjusts `spent` from this edit's result.
+    // Categories before the transaction row, in the order every ledger write uses. Locked so a
+    // concurrent edit waits and adjusts `spent` from this edit's result.
+    await lockLedgerParents(tx, budgetCategories, [current.categoryId, targetCategoryId]);
     const [existing] = await tx
       .select()
       .from(budgetTransactions)
       .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
       .for('update');
     if (!existing) return null;
+    if (existing.categoryId !== current.categoryId) return 'moved' as const;
 
     const nextCategoryId = patch.categoryId ?? existing.categoryId;
     const categoryChanging = nextCategoryId !== existing.categoryId;
@@ -574,6 +587,7 @@ app.patch('/transactions/:id', async (c) => {
   if (result === 'category-not-found') {
     return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   }
+  if (result === 'moved') return c.json({ error: LEDGER_ROW_CHANGED }, HTTP_STATUS.CONFLICT);
   const data = result;
   if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
@@ -587,19 +601,30 @@ app.delete('/transactions/:id', async (c) => {
   const existing = await findOwnedRow(budgetTransactions, id, user.id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // The category before the transaction row, in the order every ledger write uses.
+    await lockLedgerParents(tx, budgetCategories, [existing.categoryId]);
     const deleted = await tx
       .delete(budgetTransactions)
-      .where(and(eq(budgetTransactions.id, id), eq(budgetTransactions.userId, user.id)))
+      .where(
+        and(
+          eq(budgetTransactions.id, id),
+          eq(budgetTransactions.userId, user.id),
+          eq(budgetTransactions.categoryId, existing.categoryId),
+        ),
+      )
       .returning();
     if (deleted[0]) {
       await adjustCategorySpent(tx, deleted[0].categoryId, -Number(deleted[0].amount));
+      return deleted[0];
     }
-    return deleted;
+    // Gone, or moved to another category since it was read.
+    return (await findOwnedRow(budgetTransactions, id, user.id, tx)) ? ('moved' as const) : null;
   });
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
+  if (result === 'moved') return c.json({ error: LEDGER_ROW_CHANGED }, HTTP_STATUS.CONFLICT);
+  if (!result) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
 
-  return c.json({ data });
+  return c.json({ data: result });
 });
 
 // ── Category mappings ─────────────────────────────────────────────────────────

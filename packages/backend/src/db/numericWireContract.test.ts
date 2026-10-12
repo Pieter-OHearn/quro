@@ -22,7 +22,7 @@ describe('numeric wire contract', () => {
     expect(schemaSource).toContain('return parseDriverNumeric(value);');
     expect(schemaSource).not.toContain('Number.isFinite(parsed) ? parsed : 0');
     expect(schemaSource).not.toMatch(/\bnumeric\s*,/);
-    expect(schemaSource.match(/numericAsNumber\(/g)).toHaveLength(66);
+    expect(schemaSource.match(/numericAsNumber\(/g)).toHaveLength(69);
   });
 
   test('does not reintroduce frontend numeric API response coercion helpers', () => {

@@ -52,7 +52,10 @@ export function RunwayHeroCard({
           <div className="col-span-2 rounded-2xl border border-border-subtle bg-surface/85 p-4 shadow-card">
             <p className="text-xs text-fg-subtle">Model basis</p>
             <p className="mt-1 text-sm font-semibold text-fg-strong">
-              {data.jurisdiction.code} · rates from {data.jurisdiction.rulesEffectiveFrom}
+              {data.jurisdiction.code}
+              {data.jurisdiction.rulesEffectiveFrom
+                ? ` · rates from ${data.jurisdiction.rulesEffectiveFrom}`
+                : ''}
             </p>
             {data.jurisdiction.isExtrapolated ? (
               <p className="mt-1 text-xs text-warning-fg">Latest known rules carried forward.</p>
