@@ -1,6 +1,6 @@
 import { queryKeys } from './queryKeys';
 import { apiGet } from './api';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import type { AppCapabilities, AppCapabilityStatus } from '@quro/shared';
 
 export const APP_CAPABILITIES_QUERY_KEY = queryKeys.capabilities;
@@ -32,13 +32,27 @@ export const DEFAULT_APP_CAPABILITIES: AppCapabilities = {
   },
 };
 
+function fetchCapabilities(): Promise<AppCapabilities> {
+  return apiGet<AppCapabilities>('/api/capabilities');
+}
+
 export function useAppCapabilities() {
   return useQuery({
     queryKey: APP_CAPABILITIES_QUERY_KEY,
-    queryFn: async (): Promise<AppCapabilities> => {
-      return apiGet<AppCapabilities>('/api/capabilities');
-    },
+    queryFn: fetchCapabilities,
     refetchInterval: 15_000,
+  });
+}
+
+/**
+ * The capabilities from the cache, fetched first when there are none yet. Hooks for optional
+ * routes call this before their request: a capability that is not configured has no routes, and
+ * calling them only produces 404s.
+ */
+export function loadAppCapabilities(queryClient: QueryClient): Promise<AppCapabilities> {
+  return queryClient.ensureQueryData({
+    queryKey: APP_CAPABILITIES_QUERY_KEY,
+    queryFn: fetchCapabilities,
   });
 }
 

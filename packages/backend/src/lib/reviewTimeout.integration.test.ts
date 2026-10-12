@@ -225,9 +225,15 @@ test('a job deadline retains the last imported page instead of restarting the ca
   const name = `page-progress-${crypto.randomUUID()}`;
   let imported = 0;
   let requested = '';
+  // The deadline expires while the second page is in flight, after the first page's checkpoint,
+  // however long the job took to get there.
+  const deadline = new AbortController();
   globalThis.fetch = ((url: unknown) => {
     requested = String(url);
-    if (requested.includes('page=1')) return new Promise<Response>(() => {});
+    if (requested.includes('page=1')) {
+      queueMicrotask(() => deadline.abort());
+      return new Promise<Response>(() => {});
+    }
     return Promise.resolve(
       Response.json({
         Response: [
@@ -263,7 +269,7 @@ test('a job deadline retains the last imported page instead of restarting the ca
       async () => {
         await syncPaymentBatch(input);
       },
-      100,
+      deadline.signal,
     ),
   ).rejects.toThrow();
   const [checkpoint] = await db

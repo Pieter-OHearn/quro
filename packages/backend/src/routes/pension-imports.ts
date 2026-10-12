@@ -13,7 +13,12 @@ import {
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { withLedgerWrite } from '../lib/ledgerWrite';
-import { parseListPageQuery, readListPage, type KeysetOrder } from '../lib/listPage';
+import {
+  parseListLimit,
+  parseListPageQuery,
+  readListPage,
+  type KeysetOrder,
+} from '../lib/listPage';
 import { getPensionStatementImportCapability } from '../lib/capabilities';
 import {
   parsePensionStatement,
@@ -130,13 +135,6 @@ function parseEditableImportRowPatch(body: unknown): ParseResult<Record<string, 
   }
 
   return ok(patch);
-}
-
-function parseImportListLimit(value: string | undefined): number {
-  if (!value) return IMPORT_LIST_DEFAULT_LIMIT;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return IMPORT_LIST_DEFAULT_LIMIT;
-  return Math.min(parsed, IMPORT_LIST_MAX_LIMIT);
 }
 
 function parseImportStatuses(
@@ -716,15 +714,48 @@ async function persistParsedImport(
   });
 }
 
-async function markImportAsFailed(importId: number, error: unknown): Promise<void> {
+// Cancelled and failed imports end the same way: neither is ever committed, so no pension
+// transaction shares the PDF, and nothing reads it again (a failed import is not retried; the
+// user uploads the statement again). Their object is deleted as soon as the import ends, and
+// storage_deleted_at records that it is gone. The row stays. If the store refuses the delete,
+// the timestamp stays empty, so the object is still found by backups and document migration.
+async function deleteEndedImportDocument(importRecord: ImportRecord): Promise<void> {
+  try {
+    await getDocumentStore().delete(importRecord.storageKey);
+  } catch (error) {
+    console.error('Failed to delete pension import PDF from storage', {
+      importId: importRecord.id,
+      error,
+    });
+    return;
+  }
   await db
+    .update(pensionStatementImports)
+    .set({ storageDeletedAt: new Date() })
+    .where(
+      and(
+        eq(pensionStatementImports.id, importRecord.id),
+        isNull(pensionStatementImports.storageDeletedAt),
+      ),
+    );
+}
+
+async function markImportAsFailed(importRecord: ImportRecord, error: unknown): Promise<void> {
+  const [failed] = await db
     .update(pensionStatementImports)
     .set({
       status: 'failed',
       updatedAt: new Date(),
       errorMessage: error instanceof Error ? error.message : 'Failed to process import',
     })
-    .where(eq(pensionStatementImports.id, importId));
+    .where(
+      and(
+        eq(pensionStatementImports.id, importRecord.id),
+        ne(pensionStatementImports.status, 'committed'),
+      ),
+    )
+    .returning();
+  if (failed) await deleteEndedImportDocument(failed);
 }
 
 app.get('/', async (c) => {
@@ -733,10 +764,16 @@ app.get('/', async (c) => {
   if (!parsedStatuses.ok) {
     return c.json({ error: parsedStatuses.error }, HTTP_STATUS.BAD_REQUEST);
   }
+  const limit = parseListLimit(
+    c.req.query('limit'),
+    IMPORT_LIST_DEFAULT_LIMIT,
+    IMPORT_LIST_MAX_LIMIT,
+  );
+  if (limit === null) return c.json({ error: 'Invalid limit' }, HTTP_STATUS.BAD_REQUEST);
   const imports = await listImportFeedItems({
     userId: user.id,
     statuses: parsedStatuses.data,
-    limit: parseImportListLimit(c.req.query('limit')),
+    limit,
   });
 
   return c.json({
@@ -1050,6 +1087,7 @@ app.delete('/:id', async (c) => {
     return c.json({ error: 'Committed imports cannot be cancelled' }, HTTP_STATUS.BAD_REQUEST);
   }
 
+  // A commit that lands first keeps its PDF: the annual statement transaction refers to it.
   const [updated] = await db
     .update(pensionStatementImports)
     .set({
@@ -1058,11 +1096,18 @@ app.delete('/:id', async (c) => {
       errorMessage: null,
     })
     .where(
-      and(eq(pensionStatementImports.userId, user.id), eq(pensionStatementImports.id, importId)),
+      and(
+        eq(pensionStatementImports.userId, user.id),
+        eq(pensionStatementImports.id, importId),
+        ne(pensionStatementImports.status, 'committed'),
+      ),
     )
     .returning();
+  if (!updated) {
+    return c.json({ error: 'Committed imports cannot be cancelled' }, HTTP_STATUS.BAD_REQUEST);
+  }
 
-  await deleteStoredPdfSafely(importRecord.storageKey, PENSION_IMPORT_PDF_CONTEXT);
+  await deleteEndedImportDocument(updated);
 
   return c.json({ data: normalizeImportResponse(updated) });
 });
@@ -1080,7 +1125,7 @@ async function processQueuedImport(): Promise<void> {
       importId: lockedImport.id,
       error,
     });
-    await markImportAsFailed(lockedImport.id, error);
+    await markImportAsFailed(lockedImport, error);
   }
 }
 

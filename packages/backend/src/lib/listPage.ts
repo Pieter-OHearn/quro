@@ -67,12 +67,20 @@ function decodeListCursor(raw: string, keyType: KeysetOrder['keyType']): ListCur
   return encodeListCursor(cursor) === raw ? cursor : null;
 }
 
-function parseLimit(raw: string | undefined): number | null {
-  if (raw === undefined) return LIST_PAGE_DEFAULT_LIMIT;
+/**
+ * A `limit` query value: the default when absent, null when it is not a whole number of at least
+ * 1 (the caller answers 400), otherwise capped at `maxLimit`.
+ */
+export function parseListLimit(
+  raw: string | undefined,
+  defaultLimit = LIST_PAGE_DEFAULT_LIMIT,
+  maxLimit = LIST_PAGE_MAX_LIMIT,
+): number | null {
+  if (raw === undefined) return defaultLimit;
   if (!LIMIT_PATTERN.test(raw)) return null;
   const parsed = Number.parseInt(raw, 10);
   if (parsed < 1) return null;
-  return Math.min(parsed, LIST_PAGE_MAX_LIMIT);
+  return Math.min(parsed, maxLimit);
 }
 
 /** Reads `limit` (default and hard cap from `@quro/shared`) and `cursor` from a list request. */
@@ -80,7 +88,7 @@ export function parseListPageQuery(
   source: QuerySource,
   keyType: KeysetOrder['keyType'],
 ): ParseResult<ListPageRequest> {
-  const limit = parseLimit(source.query('limit'));
+  const limit = parseListLimit(source.query('limit'));
   if (limit === null) return err('Invalid limit');
   const rawCursor = source.query('cursor');
   if (rawCursor === undefined) return ok({ limit, cursor: null });

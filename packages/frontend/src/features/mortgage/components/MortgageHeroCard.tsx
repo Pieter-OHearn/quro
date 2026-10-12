@@ -34,7 +34,7 @@ function buildMortgageMetrics(
     {
       label: 'Interest Rate',
       value: `${mortgage.interestRate}%`,
-      sub: `${mortgage.rateType} (until ${mortgage.fixedUntil})`,
+      sub: `${mortgage.rateType} (until ${mortgage.fixedUntil ?? 'N/A'})`,
     },
     { label: 'Years Remaining', value: `${yearsRemaining} yrs`, sub: `~${monthsRemaining} months` },
     {
@@ -68,7 +68,7 @@ export function MortgageHeroCard({
             </div>
             <p className="text-fg-faint text-sm">
               {mortgage.lender} · {mortgage.repaymentType} · {mortgage.rateType} Rate · Fixed until{' '}
-              {mortgage.fixedUntil}
+              {mortgage.fixedUntil ?? 'N/A'}
             </p>
           </div>
         </div>

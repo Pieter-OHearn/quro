@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 
-// PostgreSQL 18 is the 1.0 baseline and 16 stays a supported server (DECISIONS D12). The backend
-// image must ship client tools of the baseline major, or `pg_dump` stops with "server version
-// mismatch" against a baseline server. These checks keep the Compose database, the image's
+// PostgreSQL 18 is the 1.0 baseline and 16 stays a supported server (see docs/install.md). The
+// backend image must ship client tools of the baseline major, or `pg_dump` stops with "server
+// version mismatch" against a baseline server. These checks keep the Compose database, the image's
 // tools and the CI matrix pointing at the same majors. CI also runs `pg_dump --version` inside
 // the built image (docker-build job).
 

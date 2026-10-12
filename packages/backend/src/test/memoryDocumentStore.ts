@@ -22,6 +22,7 @@ export function createMemoryDocumentStore() {
       return Promise.resolve(existing ? Buffer.from(existing) : null);
     },
     delete: (key) => {
+      if (failedDeletionKeys.has(key)) return Promise.reject(new Error('Synthetic store outage'));
       objects.delete(key);
       return Promise.resolve();
     },

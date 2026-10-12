@@ -64,7 +64,7 @@ jobs:
       - name: Run typecheck
         run: bun run check:typecheck
 
-  # 18 is the baseline; 16 stays a supported server until the baseline moves (D12).
+  # 18 is the baseline; 16 stays a supported server (docs/install.md) until the baseline moves.
   test:
     name: Tests (PostgreSQL ${{ matrix.postgres }})
     runs-on: ubuntu-latest
