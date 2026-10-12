@@ -89,7 +89,7 @@ export function renderSettingsFile(now = new Date()): string {
   const lines = [
     `# Quro settings, written by \`quro init\` on ${now.toISOString().slice(0, 10)}.`,
     '# Edit freely: `quro init` never changes this file. Passwords live in the secrets directory',
-    '# next to it, never here. Every setting is described in docs/install-contract.md.',
+    '# next to it, never here. Every setting is described in docs/configuration.md.',
     '',
   ];
   for (const [name, value, note] of EXPLICIT_SETTINGS) {
