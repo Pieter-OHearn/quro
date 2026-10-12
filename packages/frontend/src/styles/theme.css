@@ -439,9 +439,10 @@
   --shadow-overlay: var(--shadow-overlay);
   --shadow-brand: var(--shadow-brand);
 
-  --duration-fast: var(--motion-fast);
-  --duration-base: var(--motion-base);
-  --duration-slow: var(--motion-slow);
+  /* `duration-fast`, `duration-base` and `duration-slow` read Tailwind's transition-duration namespace. */
+  --transition-duration-fast: var(--motion-fast);
+  --transition-duration-base: var(--motion-base);
+  --transition-duration-slow: var(--motion-slow);
   --ease-standard: var(--motion-ease-standard);
   --ease-emphasized: var(--motion-ease-emphasized);
 
