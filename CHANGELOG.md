@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
-## [v0.8.0] - 2026-10-10
+## [v0.8.0] - 2026-10-12
 
 Quro 0.8.0 is the first release that a new self-hoster can install from the published images, and the first with a tested upgrade path from 0.7.0. It changes how Quro is configured, started, stored and backed up, and moves the database to PostgreSQL 18. Read the [upgrade notes](docs/upgrade.md#upgrade-from-070-to-080) before you upgrade, and back up first.
 
@@ -33,8 +33,8 @@ Each item needs action from some operators or API users and links to what to cha
 ### Added
 
 - `quro` commands in the backend image: `init`, `migrate`, `doctor`, `health`, `version`, `serve`, `worker`, `user`, `documents migrate-from-s3`, `backup` and `restore`, with the same exit codes 0 to 4 everywhere. `quro migrate` checks the host and the database first, takes a database lock and prepares the runtime role; `quro migrate --status [--json]` compares the database with the image without changing anything.
-- An install from the published images: a README quickstart, `docs/install.md` and `docs/compose.example.yaml`, with the configuration reference `docs/configuration.md`, `docs/reverse-proxy.md` for HTTPS behind your reverse proxy, and `docs/uninstall.md`. On every change CI runs the quickstart on amd64 and a clean install on amd64 and arm64, with images built from that change.
-- The upgrade guide `docs/upgrade.md`: version and digest pinning, a backup before each upgrade, `quro migrate`, readiness, rollback versus restore, what each failure looks like, a CI/CD job, the interfaces scripts can rely on, and the move from 0.7.0.
+- An install from the published images: the [README quickstart](README.md#quickstart), [Install Quro](docs/install.md) and [the example Compose file](docs/compose.example.yaml), with the [configuration reference](docs/configuration.md), [HTTPS behind your reverse proxy](docs/reverse-proxy.md) and [uninstall](docs/uninstall.md) pages. On every change CI runs the quickstart on amd64 and a clean install on amd64 and arm64, with images built from that change.
+- The [upgrade guide](docs/upgrade.md): version and digest pinning, a backup before each upgrade, `quro migrate`, readiness, rollback versus restore, what each failure looks like, a CI/CD job, the interfaces scripts can rely on, and the move from 0.7.0.
 - `quro backup` and `quro restore`: one verified archive with the database dump, the documents and a manifest of checksums; optional encryption, a checked off-device copy and retention; an archive of the current data before a restore replaces it. Writes pause during a backup (they answer 503 with `Retry-After`). `docs/backup-and-restore.md` publishes measured recovery times.
 - Filesystem document storage (`QRO_DOCUMENT_STORAGE`, `QRO_DOCUMENTS_DIR`) and `quro documents migrate-from-s3`, which copies documents out of S3 with checksum verification and never changes the store or the database.
 - Validated configuration: every setting is checked once at startup, all problems are reported together and values are never printed. Optional features (bunq, S3, statement import) register as capabilities and have no routes or jobs when they are not configured. New settings: `POSTGRES_PORT`, `POSTGRES_SSLMODE`, `BUNQ_CLIENT_ID_FILE`, `BUNQ_CLIENT_SECRET_FILE`, `QRO_REGISTRATION_MODE`, `QRO_DOCUMENT_STORAGE`, `QRO_DOCUMENTS_DIR` and the `QRO_BACKUP_*` settings.
@@ -81,7 +81,7 @@ Each item needs action from some operators or API users and links to what to cha
 
 ### Image digests
 
-The Release workflow logs the digests of `ghcr.io/pieter-ohearn/quro-backend:v0.8.0` and `ghcr.io/pieter-ohearn/quro-frontend:v0.8.0` when it publishes them; the GitHub release notes list them. Pin both images by tag and digest, as the [upgrade notes](docs/upgrade.md#how-upgrades-work) show.
+The digests of `ghcr.io/pieter-ohearn/quro-backend:v0.8.0` and `ghcr.io/pieter-ohearn/quro-frontend:v0.8.0` are listed in the [v0.8.0 release notes](https://github.com/Pieter-OHearn/quro/releases/tag/v0.8.0). Pin both images by tag and digest, as the [upgrade notes](docs/upgrade.md#how-upgrades-work) show.
 
 ## [v0.7.0] - 2026-10-04
 
