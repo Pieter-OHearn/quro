@@ -1,5 +1,6 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
+import { absoluteRepositoryLinks, type LinkBase } from './release-links';
 
 // Release gate for .github/workflows/release.yml. Every subcommand reads its inputs from
 // environment variables (never from interpolated shell), validates them as data and talks
@@ -11,9 +12,10 @@ import { basename } from 'node:path';
 //                    and release do not block it
 //   create-tag       after the images are built: create the tag, or confirm a tag left by an
 //                    earlier run points at the same commit
-//   stage-release    replace any draft an earlier run left, create a new draft, upload any
-//                    asset files named on the command line to it and decide whether this
-//                    release moves latest
+//   stage-release    replace any draft an earlier run left, create a new draft whose notes are
+//                    the CHANGELOG.md section with its repository links pinned to the tag,
+//                    upload any asset files named on the command line to it and decide
+//                    whether this release moves latest
 //   publish-release  publish that draft
 
 export const RELEASE_VERSION_PATTERN =
@@ -25,6 +27,7 @@ const RELEASE_ID_PATTERN = /^[1-9]\d*$/;
 const REF_PATTERN = /^(?![-/])(?!.*\.\.)(?!.*\/$)[\w./-]{1,200}$/;
 const GITHUB_ACTIONS_APP = 'github-actions';
 const GITHUB_API_ORIGIN = 'https://api.github.com';
+const GITHUB_SERVER_ORIGIN = 'https://github.com';
 const GITHUB_UPLOADS_ORIGIN = 'https://uploads.github.com';
 export const RELEASE_BOT_LOGIN = 'github-actions[bot]';
 // CI runs for these events check out the commit itself. A pull_request run tests a merge
@@ -571,6 +574,26 @@ async function requireTagAt(gh: GitHub, sha: string, version: string): Promise<v
   }
 }
 
+// Where the release notes' repository links point: the forge's web host, the repository and the
+// release tag. GITHUB_SERVER_URL is set on every Actions runner (GitHub Enterprise included).
+export function releaseLinkBase(env: Env, version: string): LinkBase {
+  const repository = required(env, 'GITHUB_REPOSITORY');
+  if (!REPOSITORY_PATTERN.test(repository)) {
+    throw new ReleaseGateError('GITHUB_REPOSITORY must look like owner/name');
+  }
+  const server = env.GITHUB_SERVER_URL?.trim() || GITHUB_SERVER_ORIGIN;
+  let url: URL;
+  try {
+    url = new URL(server);
+  } catch {
+    throw new ReleaseGateError('GITHUB_SERVER_URL must be an http or https URL');
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new ReleaseGateError('GITHUB_SERVER_URL must be an http or https URL');
+  }
+  return { origin: url.origin, repository, tag: parseReleaseVersion(version) };
+}
+
 export async function stageRelease(
   env: Env,
   gh: GitHub,
@@ -583,6 +606,7 @@ export async function stageRelease(
     version,
   );
   if (!notes) throw new ReleaseGateError(`CHANGELOG.md has no section for ${version}.`);
+  const body = absoluteRepositoryLinks(notes, releaseLinkBase(env, version));
   await requireTagAt(gh, sha, version);
 
   const releases = await listPages(gh, '/releases', (body) => body as Release[]);
@@ -598,7 +622,7 @@ export async function stageRelease(
     body: {
       tag_name: version,
       name: version,
-      body: notes,
+      body,
       draft: true,
       prerelease: isPrerelease(version),
     },
