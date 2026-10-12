@@ -65,7 +65,7 @@ function buildSubtitle(
 // Cancel, then "Archive …", then "Delete …": the only filled destructive button in the app is
 // this confirm step.
 const DELETE_BUTTON_CLASS_NAME =
-  'border-danger bg-danger text-fg-inverted hover:bg-danger hover:opacity-90 active:bg-danger active:opacity-90';
+  'border-danger bg-danger text-fg-inverted hover:bg-danger active:bg-danger enabled:hover:opacity-90 enabled:active:opacity-90';
 
 function DialogFooter({
   entityLabel,
