@@ -223,9 +223,10 @@ jobs:
             test "$actual" = "$expected"
           done
 
-  # Upgrades the synthetic 0.7.0 installation in scripts/upgrade-fixture to this commit (16 to 18
-  # by dump and restore, then `quro migrate` from this commit's image) and fails on any change to
-  # its rows or documents that scripts/upgrade-fixture/expectations.ts does not declare.
+  # Upgrades the synthetic 0.7.0 installation in scripts/upgrade-fixture to this commit the way
+  # docs/upgrade.md describes (16 to 18 by dump and restore, `quro migrate`, documents out of S3),
+  # injects the failures the guide covers, signs in and downloads documents through the server,
+  # and fails on any change to rows or documents that expectations.ts does not declare.
   upgrade-fixture:
     name: Upgrade from 0.7.0
     runs-on: ubuntu-latest
@@ -245,9 +246,9 @@ jobs:
       - name: Upgrade the 0.7.0 fixture and compare
         run: sh scripts/upgrade-fixture/upgrade.sh
 
-  # Rehearses the documented PostgreSQL 16 to 18 upgrade with the image's own tools: dump on 16,
-  # restore on 18 in a new data directory, compare, and round-trip on 18. Data from 0.7.0 itself
-  # goes through the same dump and restore in the upgrade-fixture job.
+  # Rehearses the documented PostgreSQL 16 to 18 upgrade with the image's own tools on the
+  # synthetic 0.7.0 installation: dump on 16, restore on 18 into an empty database in a new data
+  # directory, compare, `quro migrate`, and round-trip on 18.
   pg-upgrade:
     name: PostgreSQL Upgrade Rehearsal
     runs-on: ubuntu-latest
