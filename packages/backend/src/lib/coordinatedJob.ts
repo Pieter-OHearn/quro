@@ -3,6 +3,7 @@ import {
   HardDeadlineError,
   SCHEDULED_JOB_TIMEOUT_MS,
   withWorkDeadline,
+  type WorkDeadline,
 } from './workDeadline';
 
 export type JobLease = {
@@ -20,7 +21,7 @@ export async function runCoordinatedJob(
   reserve: () => Promise<JobLease>,
   intervalMs: number,
   run: () => Promise<void>,
-  timeoutMs = SCHEDULED_JOB_TIMEOUT_MS,
+  deadline: WorkDeadline = SCHEDULED_JOB_TIMEOUT_MS,
   graceMs?: number,
 ): Promise<void> {
   const lease = await reserve();
@@ -31,7 +32,7 @@ export async function runCoordinatedJob(
     if (!acquired) return;
     // Graceful cleanup drains writes; hard cleanup destroys the isolated pool.
     await withWorkDeadline(
-      timeoutMs,
+      deadline,
       async () => {
         const lastRun = await lease.lastSuccess();
         if (lastRun && Date.now() - lastRun.getTime() < intervalMs) return;

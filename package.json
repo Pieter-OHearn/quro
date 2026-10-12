@@ -12,7 +12,7 @@
     "dev:frontend": "bun run --filter '@quro/frontend' dev",
     "dev:backend": "bun run --filter '@quro/backend' dev",
     "dev:doctor": "bun --no-env-file scripts/dev-doctor.ts",
-    "smoke:frontend": "bun run --filter '@quro/frontend' dev -- --host 127.0.0.1 --port 4273",
+    "smoke:frontend": "bun run --filter '@quro/frontend' dev -- --host 127.0.0.1 --strictPort",
     "smoke:backend": "bun run --filter '@quro/backend' db:migrate && bun run --filter '@quro/backend' db:seed-demo && bun run --filter '@quro/backend' start",
     "build": "bun run --filter '@quro/frontend' build && bun run --filter '@quro/backend' build",
     "typecheck": "bun run --filter '@quro/shared' typecheck && bun run --filter '@quro/frontend' typecheck && bun run --filter '@quro/backend' typecheck && tsc --noEmit -p tsconfig.scripts.json",

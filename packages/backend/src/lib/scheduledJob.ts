@@ -2,7 +2,12 @@ import { eq } from 'drizzle-orm';
 import { db, createScopedQueryClient } from '../db/client';
 import { workerHeartbeats } from '../db/schema';
 import { runCoordinatedJob, type JobLease } from './coordinatedJob';
-import { DEADLINE_GRACE_MS, UPSTREAM_TIMEOUT_MS, SCHEDULED_JOB_TIMEOUT_MS } from './workDeadline';
+import {
+  DEADLINE_GRACE_MS,
+  UPSTREAM_TIMEOUT_MS,
+  SCHEDULED_JOB_TIMEOUT_MS,
+  type WorkDeadline,
+} from './workDeadline';
 
 const STATEMENT_TIMEOUT_GRACE_DIVISOR = 2;
 
@@ -12,10 +17,10 @@ export function runScheduledJob(
   name: string,
   intervalMs: number,
   run: () => Promise<void>,
-  timeoutMs = SCHEDULED_JOB_TIMEOUT_MS,
+  deadline: WorkDeadline = SCHEDULED_JOB_TIMEOUT_MS,
   graceMs = DEADLINE_GRACE_MS,
 ): Promise<void> {
-  return runCoordinatedJob(() => reserveLease(name, graceMs), intervalMs, run, timeoutMs, graceMs);
+  return runCoordinatedJob(() => reserveLease(name, graceMs), intervalMs, run, deadline, graceMs);
 }
 
 async function reserveLease(name: string, graceMs: number): Promise<JobLease> {
