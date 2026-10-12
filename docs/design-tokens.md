@@ -12,8 +12,11 @@ bordered segmented control and pagination whose selection is a `brand-soft` tint
 left-aligned dashed empty states. The desktop shell does too: a 208px `surface-nav` sidebar with 32px items
 and a `brand-soft` active item, a 48px header, and the `PageStack` and `ContentSection` templates (24px
 gutter and section gap on desktop, 16px below 640px; `ContentSection` takes an optional `title` in the
-section title style). The rest of the shared UI follows in later steps, and until a value has moved
-`theme.css` and this page describe what the app renders today.
+section title style). Below 640px the shell is the phone layout: a 56px header with the logo and a 44px
+round account button, and a `surface-nav` tab bar fixed to the bottom (Dashboard, Savings, Investments,
+Budget and More, which opens the navigation drawer); the page is padded by the bar's height and the safe
+area. The rest of the shared UI follows in later steps, and until a value has moved `theme.css` and this
+page describe what the app renders today.
 
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
@@ -43,7 +46,7 @@ the table/list patterns feature work should follow.
 | **Motion**     | `duration-fast` / `-base` / `-slow`, `ease-standard`, `ease-emphasized`                               | `transition-*`, `duration-*`, and easing utilities                      |
 | **Radius**     | `radius-sm` 4px, `radius-md` 6px, `radius-lg` 10px, `radius-xl` 12px                                  | Badges; buttons and inputs; cards, dialogs, menus; cards on phone       |
 | **Numeric**    | `font-numeric` utility class                                                                          | Money, rates, quantities, and other values that align across rows       |
-| **Type**       | `text-figure-{hero,lg,md,cell}`, `text-title-{page,section}`, `text-{body,cell,label,caption}`        | V1 type styles ([section 3](design-v1.md#3-type)); add a colour class   |
+| **Type**       | `text-figure-{hero,lg,md,cell}`, `text-title-{page,section}`, `text-{body,cell,field,label,caption}`  | V1 type styles ([section 3](design-v1.md#3-type)); add a colour class   |
 
 ## Rules
 
@@ -142,7 +145,8 @@ feature component.
 - Native wrappers pass through HTML props, accept `className` and merge it with
   `cn`. Use existing variants and sizes, and Lucide icons.
 - Style form fields with `getFieldChrome` and aligned financial values with
-  `font-numeric`.
+  `font-numeric`. Field text uses `text-field`: 13px on desktop and 16px below 640px, so iOS
+  Safari does not zoom into a focused field. Do not pass a smaller text size to a field.
 - Render an amount or percentage that went up, down or did not change with `Change`
   instead of hand-written signs and colours. It applies the sign, arrow, `gain` / `loss` /
   `flat` colour and zero rule from [V1 design](design-v1.md#7-content-rules).

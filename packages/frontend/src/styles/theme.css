@@ -543,6 +543,20 @@
   letter-spacing: 0;
 }
 
+/* Text in inputs, selects and text areas: `cell` on desktop, 16px below 640px so that iOS Safari
+ * does not zoom the page when a field takes focus. */
+@utility text-field {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+
+  @media (width < 640px) {
+    font-size: 16px;
+    line-height: 20px;
+  }
+}
+
 @utility text-label {
   font-size: 12px;
   line-height: 16px;
@@ -589,7 +603,7 @@
    * Default typography styles for HTML elements (body, h1-h4, label, button, input).
    * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg)
    * automatically override them. Body, headings, labels, buttons and inputs take the V1
-   * type scale; buttons and inputs use the control style, `cell`.
+   * type scale; buttons use the control style, `cell`, and inputs the field style, `field`.
    */
 
   html {
@@ -624,6 +638,6 @@
   }
 
   input {
-    @apply text-cell;
+    @apply text-field;
   }
 }
