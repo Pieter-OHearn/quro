@@ -1,0 +1,3 @@
+# Test tools for the parser; the service itself needs only requirements.txt.
+-r requirements.txt
+pytest==9.0.3

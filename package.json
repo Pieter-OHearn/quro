@@ -27,6 +27,7 @@
     "check:python:format": "ruff format --check services/pension-parser/",
     "check:python:lint": "ruff check services/pension-parser/",
     "check:python:build": "python3 -m compileall services/pension-parser/app/",
+    "check:python:test": "cd services/pension-parser && python3 -m pytest -q",
     "check:security:js": "bun audit",
     "check:security:python": "pip-audit -r services/pension-parser/requirements.txt",
     "ci:check": "sh ./scripts/run-ci-checks.sh",
