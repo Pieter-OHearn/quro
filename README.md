@@ -169,12 +169,12 @@ With no outbound access at all, Quro still starts, passes its health checks, sig
 
 Each is off until you configure it, and the core works without it.
 
-| Feature                      | What it needs                                                                                   | Set up with                                                                  |
-| ---------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| bunq bank linking            | A bunq account and an OAuth client; `FRONTEND_ORIGIN` and the `BUNQ_` settings                  | [Configuration: bunq](docs/configuration.md#bunq)                            |
-| S3-compatible document store | A store you run or rent, a bucket and an access key                                             | [Existing S3-compatible store](docs/install.md#existing-s3-compatible-store) |
-| Statement import (OCR)       | An NVIDIA GPU and images built from a checkout; reads pension statement PDFs with a local model | [Pension import](docs/development.md#optional-pension-import-development)    |
-| Tracing                      | An OTLP/HTTP collector you run                                                                  | [Configuration: tracing](docs/configuration.md#tracing)                      |
+| Feature                      | What it needs                                                                                                 | Set up with                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| bunq bank linking            | A bunq account and an OAuth client; `FRONTEND_ORIGIN` and the `BUNQ_` settings                                | [Configuration: bunq](docs/configuration.md#bunq)                            |
+| S3-compatible document store | A store you run or rent, a bucket and an access key                                                           | [Existing S3-compatible store](docs/install.md#existing-s3-compatible-store) |
+| Statement import (OCR)       | Experimental. An NVIDIA GPU and images built from a checkout; reads pension statement PDFs with a local model | [Pension import](docs/development.md#optional-pension-import-development)    |
+| Tracing                      | An OTLP/HTTP collector you run                                                                                | [Configuration: tracing](docs/configuration.md#tracing)                      |
 
 ## Limitations
 
