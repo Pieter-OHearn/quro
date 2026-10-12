@@ -209,7 +209,9 @@ function TxnHistoryBody({
   ) : (
     <>
       <div className={variantStyles.listClassName}>{children}</div>
-      {footer}
+      {footer ? (
+        <div className="border-t border-border-subtle px-3 py-2 max-sm:px-4">{footer}</div>
+      ) : null}
     </>
   );
 
@@ -381,13 +383,13 @@ export function TxnRow({
       <div className="flex min-w-0 flex-1 items-center gap-3 max-sm:flex-col max-sm:items-start max-sm:gap-0">
         <p
           className={cn(
-            'w-24 shrink-0 text-caption text-fg-subtle font-numeric max-sm:order-last max-sm:w-auto',
+            'w-24 shrink-0 truncate text-caption text-fg-subtle font-numeric max-sm:order-last max-sm:w-auto max-sm:max-w-full',
             dateClassName,
           )}
         >
           {formatDate(date, TXN_DATE_OPTIONS)}
         </p>
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 max-w-full items-center gap-1.5">
           <p className={cn('truncate text-cell text-fg', labelClassName)}>{label}</p>
           {badge && (
             <Badge size="xs" className={badge.className}>
@@ -399,10 +401,11 @@ export function TxnRow({
       <div className="shrink-0 text-right font-numeric">{amount}</div>
       <RowActions
         className={cn(
-          'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100',
+          'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100',
           actionsClassName,
         )}
       >
+        {/* The 28px buttons may overlap the 1px row rule so the row stays 28px high. */}
         {onEdit && (
           <IconButton
             onClick={onEdit}

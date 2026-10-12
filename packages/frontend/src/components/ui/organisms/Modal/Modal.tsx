@@ -94,7 +94,9 @@ function useModalFocusTrap(
         (element) => !element.hasAttribute('hidden'),
       );
 
-    (focusableElements()[0] ?? dialog).focus();
+    // The panel may still be entering from below the viewport; scrolling to it would shift the
+    // overflow-hidden overlay and leave a gap under the sheet.
+    (focusableElements()[0] ?? dialog).focus({ preventScroll: true });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
