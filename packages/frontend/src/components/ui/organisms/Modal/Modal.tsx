@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { useEffect, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '../../atoms';
+import { useExitTransition } from './useExitTransition';
 
 export type ModalHeaderProps = {
   title: React.ReactNode;
@@ -42,7 +43,30 @@ const MAX_WIDTH_MAP = {
   '3xl': 'max-w-3xl',
 } as const;
 
-const DEFAULT_CLOSE_ICON_SIZE = 18;
+const DEFAULT_CLOSE_ICON_SIZE = 16;
+// A 44px header with the title in the section title style, on the dialog surface.
+const HEADER_CLASS_NAME =
+  'flex min-h-11 items-center justify-between gap-3 border-b border-border-default px-4 py-2';
+const TITLE_CLASS_NAME = 'text-title-section text-fg';
+const SUBTITLE_CLASS_NAME = 'text-caption text-fg-subtle';
+const CLOSE_BUTTON_CLASS_NAME =
+  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors duration-fast hover:bg-surface-muted hover:text-fg active:bg-surface-muted active:text-fg max-sm:h-11 max-sm:w-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring';
+
+// The scrim and the panel fade in over `duration-base`. Below 640px the panel is a bottom sheet
+// that rises from the bottom edge; under reduced motion it only fades. `data-closing` is set on
+// the copy that plays the closing transition (see useExitTransition).
+const SCRIM_CLASS_NAME =
+  'absolute -inset-4 bg-scrim transition-opacity duration-base ease-standard starting:opacity-0 data-closing:opacity-0';
+const PANEL_CLASS_NAME = cn(
+  'relative w-full overflow-hidden rounded-lg border border-border-default bg-surface shadow-overlay',
+  'transition-[opacity,translate] duration-base ease-standard starting:opacity-0 data-closing:opacity-0',
+  'motion-safe:max-sm:starting:translate-y-full motion-safe:max-sm:data-closing:translate-y-full',
+  'max-sm:max-h-[calc(100dvh-1rem)] max-sm:max-w-none max-sm:rounded-b-none max-sm:rounded-t-xl max-sm:border-x-0 max-sm:border-b-0',
+);
+// Footer actions sit at the end on desktop and stack full width, 44px high, on phones.
+const FOOTER_CLASS_NAME =
+  'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:flex-col max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:w-full max-sm:*:flex-none';
+
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -70,7 +94,9 @@ function useModalFocusTrap(
         (element) => !element.hasAttribute('hidden'),
       );
 
-    (focusableElements()[0] ?? dialog).focus();
+    // The panel may still be entering from below the viewport; scrolling to it would shift the
+    // overflow-hidden overlay and leave a gap under the sheet.
+    (focusableElements()[0] ?? dialog).focus({ preventScroll: true });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -125,65 +151,50 @@ export function ModalHeader({
   titleId,
 }: ModalHeaderProps) {
   const isCentered = align === 'center';
+  const heading = (
+    <>
+      {visual}
+      <h2 id={titleId} className={cn(TITLE_CLASS_NAME, titleClassName)}>
+        {title}
+      </h2>
+      {subtitle && <p className={cn(SUBTITLE_CLASS_NAME, subtitleClassName)}>{subtitle}</p>}
+    </>
+  );
+  const closeButton = (
+    <button
+      type="button"
+      aria-label="Close dialog"
+      onClick={onClose}
+      className={cn(
+        CLOSE_BUTTON_CLASS_NAME,
+        isCentered && 'absolute right-2 top-1.5 max-sm:right-0 max-sm:top-0',
+        closeButtonClassName,
+      )}
+    >
+      <X size={closeIconSize} />
+    </button>
+  );
 
   return (
     <div
       className={cn(
-        'bg-gradient-to-r from-surface-inverse to-surface-inverse-raised px-6 py-5 flex items-center justify-between',
+        HEADER_CLASS_NAME,
         scrollable && 'flex-shrink-0',
-        isCentered && 'relative block text-center',
+        isCentered && 'relative block px-12 text-center',
         className,
       )}
     >
       {isCentered ? (
         <>
-          <button
-            type="button"
-            aria-label="Close dialog"
-            onClick={onClose}
-            className={cn(
-              'absolute top-4 right-4 p-2 rounded-md hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
-              closeButtonClassName,
-            )}
-          >
-            <X size={closeIconSize} />
-          </button>
+          {closeButton}
           <div className={cn('min-w-0 flex flex-col items-center', contentClassName)}>
-            {visual}
-            <h2 id={titleId} className={cn('font-bold text-fg-inverted', titleClassName)}>
-              {title}
-            </h2>
-            {subtitle && (
-              <p className={cn('text-xs text-brand-border mt-0.5', subtitleClassName)}>
-                {subtitle}
-              </p>
-            )}
+            {heading}
           </div>
         </>
       ) : (
         <>
-          <div className={cn('min-w-0 pr-4', contentClassName)}>
-            {visual}
-            <h2 id={titleId} className={cn('font-bold text-fg-inverted', titleClassName)}>
-              {title}
-            </h2>
-            {subtitle && (
-              <p className={cn('text-xs text-brand-border mt-0.5', subtitleClassName)}>
-                {subtitle}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            aria-label="Close dialog"
-            onClick={onClose}
-            className={cn(
-              'p-2 rounded-md hover:bg-fg-inverted/10 text-fg-faint hover:text-fg-inverted transition-colors',
-              closeButtonClassName,
-            )}
-          >
-            <X size={closeIconSize} />
-          </button>
+          <div className={cn('min-w-0', contentClassName)}>{heading}</div>
+          {closeButton}
         </>
       )}
     </div>
@@ -205,25 +216,29 @@ export function Modal({
   bodyClassName,
 }: ModalProps) {
   const titleId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(getActiveElement());
   useModalFocusTrap(dialogRef, returnFocusRef, onClose);
+  useExitTransition(rootRef);
 
   return (
-    <div className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4">
+    <div
+      ref={rootRef}
+      className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4 max-sm:items-end max-sm:px-0 max-sm:pb-0"
+    >
       <div
-        className={cn(
-          'absolute -inset-4 bg-surface-inverse/40 backdrop-blur-sm',
-          backdropClassName,
-        )}
+        data-modal-layer="scrim"
+        className={cn(SCRIM_CLASS_NAME, backdropClassName)}
         onClick={onClose}
       />
       <div
         ref={dialogRef}
+        data-modal-layer="panel"
         className={cn(
-          'relative bg-surface rounded-lg shadow-overlay w-full overflow-hidden',
+          PANEL_CLASS_NAME,
           MAX_WIDTH_MAP[maxWidth],
-          scrollable && 'flex flex-col max-h-[90vh]',
+          scrollable ? 'flex flex-col max-h-[90vh]' : 'max-sm:overflow-y-auto',
           contentClassName,
         )}
         role="dialog"
@@ -242,18 +257,13 @@ export function Modal({
             {...headerProps}
           />
         )}
-        <div className={cn('p-6 space-y-5', scrollable && 'overflow-y-auto', bodyClassName)}>
+        <div
+          className={cn('p-4 space-y-4 text-body', scrollable && 'overflow-y-auto', bodyClassName)}
+        >
           {children}
         </div>
         {footer && (
-          <div
-            className={cn(
-              'px-6 py-4 bg-surface-sunken border-t border-border-subtle flex gap-3',
-              scrollable && 'flex-shrink-0',
-            )}
-          >
-            {footer}
-          </div>
+          <div className={cn(FOOTER_CLASS_NAME, scrollable && 'flex-shrink-0')}>{footer}</div>
         )}
       </div>
     </div>
@@ -281,18 +291,16 @@ export function ModalFooter({
 }: ModalFooterProps) {
   return (
     <>
-      {danger}
-      <Button onClick={onCancel} variant="secondary" size="lg" className="flex-1">
+      {danger ? <div className="mr-auto flex max-sm:mr-0">{danger}</div> : null}
+      <Button onClick={onCancel} variant="secondary">
         {cancelLabel}
       </Button>
       <Button
         onClick={onConfirm}
         disabled={disabled}
         variant="primary"
-        size="lg"
         loading={loading}
         loadingLabel="Saving..."
-        className="flex-1"
       >
         {confirmLabel}
       </Button>

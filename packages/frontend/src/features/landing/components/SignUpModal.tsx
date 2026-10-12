@@ -229,7 +229,7 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
             <QuroLogo size={52} />
           </div>
         ),
-        className: 'bg-gradient-to-br from-surface-inverse to-surface-auth-end px-8 pb-10 pt-8',
+        className: 'px-8 pb-10 pt-8',
         titleClassName: 'text-2xl font-black tracking-tight',
         subtitleClassName: 'mt-1 text-sm',
         closeIconSize: 16,

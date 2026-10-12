@@ -30,24 +30,18 @@ export function ChartCard({
   contentClassName,
   emptyStateClassName,
 }: Readonly<ChartCardProps>) {
+  // A 36px card header, then the chart on 16px padding.
   return (
-    <Card className={className}>
-      <PanelHeader
-        title={title}
-        subtitle={subtitle}
-        action={badge}
-        spacing="none"
-        divider={false}
-        className={cn('mb-5', headerClassName)}
-      />
+    <Card padding="none" className={cn('overflow-hidden', className)}>
+      <PanelHeader title={title} subtitle={subtitle} action={badge} className={headerClassName} />
 
       {hasData ? (
-        <>
+        <div className="p-4">
           <div className={contentClassName}>{children}</div>
           {footer}
-        </>
+        </div>
       ) : (
-        <div className={cn('py-12 text-center text-sm text-fg-faint', emptyStateClassName)}>
+        <div className={cn('px-4 py-12 text-center text-cell text-fg-subtle', emptyStateClassName)}>
           {emptyMessage}
         </div>
       )}

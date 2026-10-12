@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AlertTriangle, ArrowDownUp, Pencil, PiggyBank, Plus } from 'lucide-react';
 import { MemoryRouter } from 'react-router';
+import { CurrencyContext, type CurrencyContextType } from '@/lib/currencyContextValue';
 import { Badge } from './atoms/Badge';
 import { Button } from './atoms/Button';
 import { Card } from './atoms/Card';
@@ -29,9 +30,12 @@ import { PanelHeader } from './molecules/PanelHeader';
 import { RowActions } from './molecules/RowActions';
 import { SegmentedControl } from './molecules/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
+import { ArchiveOrDeleteDialog } from './organisms/ArchiveOrDeleteDialog';
+import { ChartCard } from './organisms/ChartCard';
 import { DataTable, DataTableCell, DataTableRow } from './organisms/DataTable';
-import { Modal } from './organisms/Modal';
+import { Modal, ModalFooter } from './organisms/Modal';
 import { StatCard } from './organisms/StatCard';
+import { TxnHistoryPanel, TxnRow } from './organisms/TxnHistoryPanel';
 import { ContentSection, PageStack } from './templates';
 
 type SmokeCase = {
@@ -42,6 +46,11 @@ type SmokeCase = {
 };
 
 const noop = () => {};
+
+const smokeCurrency = {
+  baseCurrency: 'EUR',
+  fmtNative: (amount: number, currency: string) => `${currency} ${amount.toFixed(2)}`,
+} as unknown as CurrencyContextType;
 
 const smokeCases: readonly SmokeCase[] = [
   {
@@ -162,10 +171,12 @@ const smokeCases: readonly SmokeCase[] = [
     includes: [
       'data-testid="smoke-stat-card"',
       'href="/savings"',
-      'rounded-lg p-5 border border-border-subtle',
+      'rounded-lg border border-border-default bg-surface px-4 py-3',
+      'text-label text-fg-muted',
+      'text-figure-lg',
       'Total savings',
     ],
-    excludes: ['shadow-'],
+    excludes: ['shadow-', 'w-10 h-10', 'bg-success-soft'],
   },
   {
     name: 'Change renders a signed loss chip with a hidden arrow',
@@ -585,7 +596,7 @@ const smokeCases: readonly SmokeCase[] = [
         </DataTableRow>
       </DataTable>
     ),
-    includes: ['font-numeric', 'font-semibold', 'px-3 py-2.5', 'Amount', 'EUR 42.00'],
+    includes: ['font-numeric', 'font-semibold', 'md:h-7', 'text-right', 'Amount', 'EUR 42.00'],
   },
   {
     name: 'DataTable can render mobile expansion rows without card padding',
@@ -747,6 +758,163 @@ const smokeCases: readonly SmokeCase[] = [
       'aria-label="Close dialog"',
       'aria-labelledby=',
     ],
+  },
+  {
+    name: 'Modal sits on the scrim and becomes a bottom sheet on phones',
+    element: (
+      <Modal
+        title="Edit account"
+        onClose={noop}
+        footer={<ModalFooter onCancel={noop} onConfirm={noop} />}
+      >
+        <div>Body</div>
+      </Modal>
+    ),
+    includes: [
+      'bg-scrim',
+      'starting:opacity-0',
+      'duration-base',
+      'shadow-overlay',
+      'rounded-lg border border-border-default bg-surface',
+      'max-sm:items-end',
+      'max-sm:rounded-t-xl',
+      'motion-safe:max-sm:starting:translate-y-full',
+      'motion-safe:max-sm:data-closing:translate-y-full',
+      'min-h-11',
+      'text-title-section',
+      'p-4 space-y-4 text-body',
+      'bg-surface-sunken',
+      'max-sm:flex-col',
+      'max-sm:*:h-11',
+      'Cancel',
+      'Save',
+    ],
+    excludes: ['backdrop-blur', 'bg-gradient', 'scale-', 'from-surface-inverse'],
+  },
+  {
+    name: 'ArchiveOrDeleteDialog orders cancel, archive and a filled delete',
+    element: (
+      <CurrencyContext.Provider value={smokeCurrency}>
+        <ArchiveOrDeleteDialog
+          entityLabel="Savings account"
+          entityName="Holiday fund"
+          childrenLabel="transactions"
+          onArchive={noop}
+          onDelete={noop}
+          onCancel={noop}
+        />
+      </CurrencyContext.Provider>
+    ),
+    includes: ['Archive savings account', 'Delete savings account', 'bg-danger text-fg-inverted'],
+  },
+  {
+    name: 'DataTable rows are 28px on desktop and 48px lines on phones with a plain header',
+    element: (
+      <DataTable
+        title="Payments"
+        columns={[
+          { key: 'date', header: 'Date' },
+          { key: 'amount', header: 'Amount', numeric: true },
+        ]}
+      >
+        <DataTableRow interactive selected onClick={noop}>
+          <DataTableCell columnKey="date">01 Oct 2026</DataTableCell>
+          <DataTableCell columnKey="amount">1,250.00</DataTableCell>
+        </DataTableRow>
+        <DataTableRow data-total>
+          <DataTableCell columnKey="date">Total</DataTableCell>
+          <DataTableCell columnKey="amount">1,250.00</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: [
+      'h-7 px-3 text-label text-fg-muted',
+      'border-b border-border-default',
+      'md:h-7',
+      'max-sm:min-h-12',
+      'text-cell',
+      'md:hover:bg-surface-muted',
+      'bg-brand-soft',
+      'text-right font-numeric',
+      'data-total:border-t data-total:border-border-strong data-total:font-semibold',
+      'data-total="true"',
+    ],
+    excludes: ['uppercase', 'tracking-', 'bg-surface-sunken'],
+  },
+  {
+    name: 'StatCard reads a zero change as 0.00 with no sign in the flat colour',
+    element: (
+      <StatCard
+        label="Savings"
+        value="EUR 10.00"
+        icon={PiggyBank}
+        color="emerald"
+        change={{ value: '+EUR 0.00 this month', positive: true }}
+      />
+    ),
+    includes: ['text-flat', '>EUR 0.00 this month<'],
+    excludes: ['text-gain', '+EUR'],
+  },
+  {
+    name: 'StatCard shows a loss with a true minus sign',
+    element: (
+      <StatCard
+        label="Savings"
+        value="EUR 10.00"
+        icon={PiggyBank}
+        color="emerald"
+        change={{ value: '-EUR 12.50 MTD', positive: false }}
+        subtitle="2 accounts"
+      />
+    ),
+    includes: ['text-loss', '>\u2212EUR 12.50 MTD<', 'text-caption text-fg-subtle', '2 accounts'],
+  },
+  {
+    name: 'ChartCard has a card header above padded content',
+    element: (
+      <ChartCard title="Net worth" hasData>
+        <div>Chart</div>
+      </ChartCard>
+    ),
+    includes: ['min-h-9', 'border-b border-border-default', 'text-title-section', 'p-4', 'Chart'],
+    excludes: ['shadow-', 'mb-5'],
+  },
+  {
+    name: 'TxnHistoryPanel filter fills the width on phones and rows are one line on desktop',
+    element: (
+      <TxnHistoryPanel
+        filterOptions={[
+          { key: 'all', label: 'All' },
+          { key: 'deposit', label: 'Deposits' },
+        ]}
+        filter="all"
+        onFilterChange={noop}
+        onAdd={noop}
+        stats={[{ label: 'In', value: 'EUR 10.00' }]}
+        isEmpty={false}
+      >
+        <TxnRow
+          icon={Plus}
+          iconColor="text-gain"
+          iconBg="bg-gain-soft"
+          label="Deposit"
+          date="2026-10-01"
+          amount={<span className="text-gain">+EUR 10.00</span>}
+          onDelete={noop}
+        />
+      </TxnHistoryPanel>
+    ),
+    includes: [
+      'aria-label="Filter transactions"',
+      'max-sm:w-full',
+      'min-h-7',
+      'max-sm:min-h-12',
+      '01 Oct 2026',
+      'text-right font-numeric',
+      'text-figure-md',
+      'max-sm:opacity-100',
+    ],
+    excludes: ['bg-gain-soft', 'Filter:', 'text-[10px]'],
   },
   {
     name: 'PageStack renders shared page spacing classes',

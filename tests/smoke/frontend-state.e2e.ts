@@ -174,7 +174,7 @@ test('archive warnings use the saved number format and keep deletion gated by th
   await page.getByRole('button', { name: 'Remove Pot', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Remove Pension pot' });
   await expect(dialog.getByText(/still has a balance of/)).toContainText('1.234,56');
-  const remove = dialog.getByRole('button', { name: 'Delete', exact: true });
+  const remove = dialog.getByRole('button', { name: 'Delete pension pot', exact: true });
   await expect(remove).toBeDisabled();
   await dialog.getByPlaceholder('UI Retirement', { exact: true }).fill('UI Retirement');
   await expect(remove).toBeEnabled();

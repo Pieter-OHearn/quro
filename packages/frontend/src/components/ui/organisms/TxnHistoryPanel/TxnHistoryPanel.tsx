@@ -17,36 +17,37 @@ export type TxnHistoryStat = {
   color?: string;
 };
 
+// Both variants are flat: stats, a filter bar and the rows are separated by rules, not boxes.
+// `embedded` sits inside another card, `card` brings its own card and header.
 const PANEL_VARIANTS = {
   embedded: {
-    bodyClassName: 'border-t border-border-subtle bg-surface-sunken/60 p-4',
-    statsClassName: 'mb-4',
-    statClassName: 'bg-surface rounded-lg px-3 py-2.5 border border-border-subtle',
-    filterBarClassName: 'mb-3',
-    listClassName: 'space-y-1.5',
-    emptyStateClassName: 'py-5',
+    bodyClassName: 'border-t border-border-default',
+    statsClassName: 'px-3 py-2 border-b border-border-subtle max-sm:px-4',
+    filterBarClassName: 'px-3 py-2 border-b border-border-subtle max-sm:px-4',
+    listClassName: 'divide-y divide-border-subtle',
+    emptyStateClassName: 'px-3 py-6 max-sm:px-4',
     addButtonSize: 'sm',
   },
   card: {
     bodyClassName: '',
-    statsClassName: 'px-5 py-5 border-b border-border-subtle',
-    statClassName: 'bg-surface-sunken rounded-lg px-3 py-2.5',
-    filterBarClassName: 'px-5 py-3 border-b border-border-subtle',
+    statsClassName: 'px-3 py-2 border-b border-border-subtle max-sm:px-4',
+    filterBarClassName: 'px-3 py-2 border-b border-border-subtle max-sm:px-4',
     listClassName: 'divide-y divide-border-subtle',
-    emptyStateClassName: 'py-10',
+    emptyStateClassName: 'px-3 py-8 max-sm:px-4',
     addButtonSize: 'md',
   },
 } as const;
 
+// Two columns on phones, so five or six stats do not squeeze into 390px.
 const GRID_COLUMN_CLASSES = {
   '1': 'grid-cols-1',
   '2': 'grid-cols-2',
-  '3': 'grid-cols-3',
-  '4': 'grid-cols-4',
-  '5': 'grid-cols-5',
+  '3': 'grid-cols-2 sm:grid-cols-3',
+  '4': 'grid-cols-2 sm:grid-cols-4',
+  '5': 'grid-cols-2 sm:grid-cols-5',
 } as const;
 
-const DEFAULT_GRID_COLUMN_CLASS = 'grid-cols-6';
+const DEFAULT_GRID_COLUMN_CLASS = 'grid-cols-2 sm:grid-cols-6';
 
 export type TxnHistoryPanelProps = {
   filterOptions: FilterOption[];
@@ -72,24 +73,23 @@ type StatsGridProps = {
   stats: TxnHistoryStat[];
   statsColumns?: number;
   className?: string;
-  statClassName?: string;
 };
 
-function StatsGrid({ stats, statsColumns, className, statClassName }: StatsGridProps) {
+function StatsGrid({ stats, statsColumns, className }: StatsGridProps) {
   const columns = statsColumns ?? stats.length;
   const columnsClass =
     GRID_COLUMN_CLASSES[String(columns) as keyof typeof GRID_COLUMN_CLASSES] ??
     DEFAULT_GRID_COLUMN_CLASS;
 
   return (
-    <div className={cn('grid gap-3', columnsClass, className)}>
+    <dl className={cn('grid gap-x-4 gap-y-2', columnsClass, className)}>
       {stats.map(({ label, value, color }) => (
-        <div key={label} className={cn('rounded-lg px-3 py-2.5', statClassName)}>
-          <p className="text-[10px] text-fg-faint mb-0.5">{label}</p>
-          <p className={cn('text-sm font-semibold', color ?? 'text-fg-strong')}>{value}</p>
+        <div key={label} className="min-w-0">
+          <dt className="text-label text-fg-muted">{label}</dt>
+          <dd className={cn('text-figure-md', color ?? 'text-fg')}>{value}</dd>
         </div>
       ))}
-    </div>
+    </dl>
   );
 }
 
@@ -108,12 +108,16 @@ function FilterBar({
   addAction,
   className,
 }: FilterBarProps) {
+  // Below 640px the filter takes the full width and the add button wraps below it.
   return (
-    <div className={cn('flex items-center justify-between flex-wrap gap-2', className)}>
-      <div className="flex items-center gap-1">
-        <Filter size={12} className="text-fg-faint" />
-        <span className="text-xs text-fg-faint mr-1">Filter:</span>
+    <div className={cn('flex flex-wrap items-center justify-between gap-2', className)}>
+      <div className="flex min-w-0 items-center gap-2 max-sm:w-full">
+        <span className="flex items-center gap-1 text-label text-fg-muted max-sm:hidden">
+          <Filter size={12} className="text-fg-faint" aria-hidden />
+          Filter
+        </span>
         <SegmentedControl
+          aria-label="Filter transactions"
           options={filterOptions.map((option) => ({
             value: option.key,
             label: option.label,
@@ -121,9 +125,10 @@ function FilterBar({
           value={filter}
           onChange={onFilterChange}
           variant="soft"
+          className="max-sm:w-full"
         />
       </div>
-      {addAction}
+      {addAction ? <div className="max-sm:w-full max-sm:*:w-full">{addAction}</div> : null}
     </div>
   );
 }
@@ -191,16 +196,22 @@ function TxnHistoryBody({
 }: TxnHistoryBodyProps) {
   const resolvedStats = stats && stats.length > 0 ? stats : undefined;
   const content = isEmpty ? (
-    <p className={cn('text-center text-fg-faint text-sm', variantStyles.emptyStateClassName)}>
+    <p className={cn('text-cell text-fg-subtle', variantStyles.emptyStateClassName)}>
       {emptyMessage}{' '}
-      <button onClick={onAdd} className="text-brand hover:underline">
+      <button
+        type="button"
+        onClick={onAdd}
+        className="rounded-sm font-medium text-brand hover:underline active:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+      >
         Add one
       </button>
     </p>
   ) : (
     <>
       <div className={variantStyles.listClassName}>{children}</div>
-      {footer}
+      {footer ? (
+        <div className="border-t border-border-subtle px-3 py-2 max-sm:px-4">{footer}</div>
+      ) : null}
     </>
   );
 
@@ -211,7 +222,6 @@ function TxnHistoryBody({
           stats={resolvedStats}
           statsColumns={statsColumns}
           className={variantStyles.statsClassName}
-          statClassName={variantStyles.statClassName}
         />
       )}
       <FilterBar
@@ -328,12 +338,24 @@ export type TxnRowProps = {
   actionsClassName?: string;
 };
 
+// Dates read "01 Oct 2026".
+const TXN_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+};
+
+/**
+ * One transaction on one 28px line on desktop: date, type icon, label, amount and actions.
+ * Below 640px the row is 48px with the date under the label and the actions always visible.
+ * The caller formats `amount` (sign and colour); the row right-aligns it in tabular figures.
+ */
 export function TxnRow({
   icon: Icon,
   iconColor,
-  iconBg,
+  iconBg: _iconBg,
   iconContainerClassName,
-  iconSize = 13,
+  iconSize = 14,
   label,
   labelClassName,
   date,
@@ -348,37 +370,42 @@ export function TxnRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 bg-surface rounded-lg px-3 py-2.5 group border border-transparent hover:border-border-subtle transition-all',
+        'group flex min-h-7 items-center gap-2 px-3 text-cell transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4',
         className,
       )}
     >
-      <div
-        className={cn(
-          'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
-          iconBg,
-          iconContainerClassName,
-        )}
+      <span
+        className={cn('flex shrink-0 items-center justify-center', iconContainerClassName)}
+        aria-hidden
       >
         <Icon size={iconSize} className={iconColor} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className={cn('text-xs font-medium text-fg-strong', labelClassName)}>{label}</p>
+      </span>
+      <div className="flex min-w-0 flex-1 items-center gap-3 max-sm:flex-col max-sm:items-start max-sm:gap-0">
+        <p
+          className={cn(
+            'w-24 shrink-0 truncate text-caption text-fg-subtle font-numeric max-sm:order-last max-sm:w-auto max-sm:max-w-full',
+            dateClassName,
+          )}
+        >
+          {formatDate(date, TXN_DATE_OPTIONS)}
+        </p>
+        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+          <p className={cn('truncate text-cell text-fg', labelClassName)}>{label}</p>
           {badge && (
             <Badge size="xs" className={badge.className}>
               {badge.text}
             </Badge>
           )}
         </div>
-        <p className={cn('text-[10px] text-fg-faint', dateClassName)}>{formatDate(date)}</p>
       </div>
-      {amount}
+      <div className="shrink-0 text-right font-numeric">{amount}</div>
       <RowActions
         className={cn(
-          'opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0',
+          'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100',
           actionsClassName,
         )}
       >
+        {/* The 28px buttons may overlap the 1px row rule so the row stays 28px high. */}
         {onEdit && (
           <IconButton
             onClick={onEdit}
