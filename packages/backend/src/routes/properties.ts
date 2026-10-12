@@ -4,6 +4,7 @@ import { registerArchivableResource } from '../lib/archivableResource';
 import { findAccessible, findAccessibleChild } from '../lib/access';
 import { Hono } from 'hono';
 import {
+  isInvestmentPropertyType,
   PROPERTY_TRANSACTION_TYPES,
   type CurrencyCode,
   type PropertyTransactionType,
@@ -79,14 +80,6 @@ const PROPERTY_TRANSACTION_FIELDS = [
   'date',
   'note',
 ] as const;
-
-const INVESTMENT_PROPERTY_TYPE_KEYS = new Set([
-  'buy-to-let',
-  'investment',
-  'holiday home',
-  'commercial',
-  'rental',
-]);
 
 type PropertyPayload = {
   address: string;
@@ -304,10 +297,6 @@ function mergePropertyTransactionPayload(
     date: patch.date ?? existing.date,
     note: patch.note === undefined ? existing.note : patch.note,
   });
-}
-
-function isInvestmentPropertyType(value: string): boolean {
-  return INVESTMENT_PROPERTY_TYPE_KEYS.has(value.trim().toLowerCase());
 }
 
 function toPropertyInsertValues(

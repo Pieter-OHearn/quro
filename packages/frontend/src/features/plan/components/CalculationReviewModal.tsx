@@ -1,4 +1,5 @@
 import { formatPercent, type RunwayResponse } from '@quro/shared';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { Badge, Modal } from '@/components/ui';
 
 const STATUS_LABELS = {
@@ -23,6 +24,7 @@ export function CalculationReviewModal({
   fmtBase,
   onClose,
 }: Readonly<{ data: RunwayResponse; fmtBase: (value: number) => string; onClose: () => void }>) {
+  const { numberFormat } = useCurrency();
   const support = data.incomeSupport;
   const { labels, unemploymentModel } = data.jurisdiction;
   const hasWeeklyRequirement = unemploymentModel === 'salary_replacement';
@@ -115,7 +117,7 @@ export function CalculationReviewModal({
           <div>
             <dt className="text-fg-subtle">Effective tax estimate</dt>
             <dd className="font-medium text-fg">
-              {formatPercent(support.effectiveTaxRate * 100, 1)} ·{' '}
+              {formatPercent(support.effectiveTaxRate * 100, numberFormat, 1)} ·{' '}
               {support.taxRateSource.replace('_', ' ')}
             </dd>
           </div>

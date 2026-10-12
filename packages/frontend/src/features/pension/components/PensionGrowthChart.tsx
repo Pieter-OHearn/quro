@@ -1,4 +1,5 @@
 import { ChartCard } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
 import {
   Area,
   AreaChart,
@@ -72,6 +73,7 @@ export function PensionGrowthChart({
   fmtBase,
   baseCurrency,
 }: Readonly<PensionGrowthChartProps>) {
+  const { numberFormat } = useCurrency();
   return (
     <ChartCard
       title="Total Pension Growth"
@@ -82,7 +84,7 @@ export function PensionGrowthChart({
             className={`text-sm px-4 py-2 rounded-full font-semibold ${pensionGrowthPct >= 0 ? 'bg-warning-soft text-warning-fg' : 'bg-danger-soft text-danger-hover'}`}
           >
             {pensionGrowthPct >= 0 ? '+' : ''}
-            {formatPercent(pensionGrowthPct, 0)} since {pensionGrowthData[0].year}
+            {formatPercent(pensionGrowthPct, numberFormat, 0)} since {pensionGrowthData[0].year}
           </span>
         ) : undefined
       }

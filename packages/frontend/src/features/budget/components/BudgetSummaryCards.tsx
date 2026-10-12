@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, TrendingDown, Wallet } from 'lucide-react';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { StatCard, StatsGrid } from '@/components/ui';
 import type { BudgetFormatFn } from '../types';
 import { formatPercent } from '@quro/shared';
@@ -58,10 +59,11 @@ function RemainingCard({ remaining, fmt }: Readonly<{ remaining: number; fmt: Bu
 }
 
 function SavingsRateCard({ savingsRate }: Readonly<{ savingsRate: number }>) {
+  const { numberFormat } = useCurrency();
   return (
     <StatCard
       label="Savings Rate"
-      value={formatPercent(savingsRate, 1)}
+      value={formatPercent(savingsRate, numberFormat, 1)}
       valueClassName="text-info"
       subtitle="of monthly budget"
       icon={CheckCircle2}

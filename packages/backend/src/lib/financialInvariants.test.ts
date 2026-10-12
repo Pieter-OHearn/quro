@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { sumMoney, toCents } from '@quro/shared';
 import { computeDerivedAllocations } from './netWorth';
 import { householdShare, scopeHouseholdRows } from './partner';
 import { computePensionTransactionDelta } from './pensionTransactions';
@@ -104,17 +105,21 @@ function allocate(input: Household, rates: Inputs[0] = RATES) {
 }
 
 const TOLERANCE_DIGITS = 6;
+const isWholeCents = (value: number) => Math.abs(value * 100 - toCents(value)) < 1e-6;
 
 describe('dashboard allocation invariants', () => {
   test('net worth is total assets minus liabilities, and assets are the sum of allocations', () => {
     const random = seededRandom(11);
     for (let index = 0; index < CASES; index += 1) {
       const { summary } = allocate(household(random));
-      const assets = summary.allocations.reduce((sum, row) => sum + row.value, 0);
-      expect(summary.totalAssets).toBeCloseTo(assets, TOLERANCE_DIGITS);
-      expect(summary.netWorth).toBeCloseTo(
-        summary.totalAssets - summary.liabilitiesTotal,
-        TOLERANCE_DIGITS,
+      // Every figure is whole cents, and the identities hold exactly in cents.
+      for (const value of [summary.netWorth, summary.totalAssets, summary.liabilitiesTotal]) {
+        expect(isWholeCents(value)).toBe(true);
+      }
+      const assetCents = summary.allocations.reduce((sum, row) => sum + toCents(row.value), 0);
+      expect(toCents(summary.totalAssets)).toBe(assetCents);
+      expect(toCents(summary.netWorth)).toBe(
+        toCents(summary.totalAssets) - toCents(summary.liabilitiesTotal),
       );
       expect(summary.portfolioTotal).toBe(summary.allocations[1]!.value);
       expect(summary.currency).toBe('EUR');
@@ -134,10 +139,8 @@ describe('dashboard allocation invariants', () => {
         mortgages: random.shuffle(input.mortgages),
         debts: random.shuffle(input.debts),
       };
-      expect(allocate(shuffled).summary.netWorth).toBeCloseTo(
-        allocate(input).summary.netWorth,
-        TOLERANCE_DIGITS,
-      );
+      // Sums of cents are exact, so order cannot move a total by even a float residue.
+      expect(allocate(shuffled).summary.netWorth).toBe(allocate(input).summary.netWorth);
     }
   });
 
@@ -157,11 +160,10 @@ describe('dashboard allocation invariants', () => {
       };
       const [a, b, both] = [allocate(left), allocate(right), allocate(union)];
       for (const key of ['savings', 'brokerage', 'propertyEquity', 'pension'] as const) {
-        expect(both[key]).toBeCloseTo(a[key] + b[key], TOLERANCE_DIGITS);
+        expect(toCents(both[key])).toBe(toCents(a[key]) + toCents(b[key]));
       }
-      expect(both.summary.liabilitiesTotal).toBeCloseTo(
-        a.summary.liabilitiesTotal + b.summary.liabilitiesTotal,
-        TOLERANCE_DIGITS,
+      expect(toCents(both.summary.liabilitiesTotal)).toBe(
+        toCents(a.summary.liabilitiesTotal) + toCents(b.summary.liabilitiesTotal),
       );
     }
   });
@@ -189,7 +191,13 @@ describe('dashboard allocation invariants', () => {
         pensions: inEur(input.pensions, ['balance']),
         debts: inEur(input.debts, ['remainingBalance']),
       });
-      expect(converted.summary.netWorth).toBeCloseTo(native.summary.netWorth, TOLERANCE_DIGITS);
+      // Each row is rounded to cents once, after conversion, whichever currency it was entered
+      // in. A holding's native value is rounded before it is converted, and a property converts
+      // value minus debt rather than each side, so each of those rows may differ by a cent.
+      const drift = Math.abs(
+        toCents(converted.summary.netWorth) - toCents(native.summary.netWorth),
+      );
+      expect(drift).toBeLessThanOrEqual(input.holdings.length + input.properties.length);
     }
   });
 
@@ -211,15 +219,17 @@ describe('dashboard allocation invariants', () => {
       const full = allocate(input);
       // Mortgages never enter liabilities: they are deducted inside property equity.
       expect(full.summary.liabilitiesTotal).toBe(withoutMortgageRows.summary.liabilitiesTotal);
-      const expectedEquity = input.properties.reduce((sum, property) => {
-        const debt =
-          property.mortgageId === null
-            ? property.mortgage
-            : (input.mortgages.find((row) => row.id === property.mortgageId)?.outstandingBalance ??
-              0);
-        return sum + (property.currentValue - debt) * RATES.get(property.currency)!;
-      }, 0);
-      expect(full.propertyEquity).toBeCloseTo(expectedEquity, TOLERANCE_DIGITS);
+      const expectedEquity = sumMoney(
+        input.properties.map((property) => {
+          const debt =
+            property.mortgageId === null
+              ? property.mortgage
+              : (input.mortgages.find((row) => row.id === property.mortgageId)
+                  ?.outstandingBalance ?? 0);
+          return (property.currentValue - debt) * RATES.get(property.currency)!;
+        }),
+      );
+      expect(full.propertyEquity).toBe(expectedEquity);
     }
     // Negative equity is kept, not floored.
     const underwater = allocate({
@@ -307,7 +317,7 @@ describe('household attribution', () => {
 });
 
 describe('transaction signs (golden)', () => {
-  test('savings: withdrawals subtract, deposits and interest add, the stored sign is ignored', () => {
+  test('savings: withdrawals subtract, deposits and interest add, the stored sign is ignored, unknown types do nothing', () => {
     expect(
       [
         ['deposit', 100],
@@ -317,7 +327,7 @@ describe('transaction signs (golden)', () => {
         ['deposit', -100],
         ['unknown', 7],
       ].map(([type, amount]) => toSignedSavingsAmount(type, amount)),
-    ).toEqual([100, 2.5, -40, -40, 100, 7]);
+    ).toEqual([100, 2.5, -40, -40, 100, 0]);
   });
 
   test('pension: net contribution, negative fee, statement adjustment, unknown types do nothing', () => {

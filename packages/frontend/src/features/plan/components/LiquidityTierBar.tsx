@@ -1,4 +1,5 @@
 import { formatPercent, type RunwayResponse } from '@quro/shared';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { Card, ProgressMeter } from '@/components/ui';
 import { RUNWAY_CITATIONS } from '../utils/runway-display';
 
@@ -6,6 +7,7 @@ export function LiquidityTierBar({
   tiers,
   fmtBase,
 }: Readonly<{ tiers: RunwayResponse['tiers']; fmtBase: (value: number) => string }>) {
+  const { numberFormat } = useCurrency();
   const maximum = Math.max(1, ...tiers.map((tier) => tier.amount));
   return (
     <Card>
@@ -25,7 +27,7 @@ export function LiquidityTierBar({
                   Tier {tier.tier} · {tier.label}
                 </span>
                 <span className="ml-2 text-xs text-fg-faint">
-                  {formatPercent(tier.haircutPct * 100, 0)} haircut
+                  {formatPercent(tier.haircutPct * 100, numberFormat, 0)} haircut
                 </span>
               </div>
               <span className="font-semibold text-fg">{fmtBase(tier.amount)}</span>

@@ -1,7 +1,11 @@
 import {
   addMonthsUtc,
+  computeHoldingPosition,
+  EMPTY_HOLDING_POSITION,
+  holdingValue,
   monthEndUtc,
   monthStartUtc,
+  sumMoney,
   toUtcTimestamp,
   type Holding,
   type HoldingPriceHistoryEntry,
@@ -19,12 +23,7 @@ import {
   type Position,
 } from './position';
 
-export const EMPTY_POSITION: Position = {
-  shares: 0,
-  avgCost: 0,
-  realizedGain: 0,
-  totalDividends: 0,
-};
+export const EMPTY_POSITION: Position = EMPTY_HOLDING_POSITION;
 
 type DatedHoldingPriceHistoryEntry = HoldingPriceHistoryEntry & { timestamp: number };
 const BINARY_SEARCH_DIVISOR = 2;
@@ -70,75 +69,9 @@ function buildHoldingPriceMap(datedHoldingPrices: DatedHoldingPriceHistoryEntry[
   return map;
 }
 
-type HoldingStateAtCutoff = {
-  shares: number;
-  avgCost: number;
-  latestTxnPrice: number | null;
-};
-
-type MutableHoldingState = {
-  shares: number;
-  totalCost: number;
-  latestTxnPrice: number | null;
-};
-
-function applyBuyHoldingTxn(state: MutableHoldingState, txnShares: number, txnPrice: number): void {
-  state.shares += txnShares;
-  state.totalCost += txnShares * txnPrice;
-  state.latestTxnPrice = txnPrice;
-}
-
-function applySellHoldingTxn(
-  state: MutableHoldingState,
-  txnShares: number,
-  txnPrice: number,
-): void {
-  const avgCostNow = state.shares > 0 ? state.totalCost / state.shares : 0;
-  const soldShares = Math.min(txnShares, state.shares);
-  state.shares -= soldShares;
-  state.totalCost = Math.max(0, state.totalCost - soldShares * avgCostNow);
-  state.latestTxnPrice = txnPrice;
-}
-
-function applyHoldingTxn(
-  state: MutableHoldingState,
-  transaction: DatedHoldingTransaction,
-  cutoff: number,
-): boolean {
-  if (transaction.timestamp > cutoff) return false;
-
-  const txnShares = Number(transaction.shares ?? 0);
-  const txnPrice = Number(transaction.price ?? 0);
-  if (transaction.type === 'buy' && txnShares > 0) {
-    applyBuyHoldingTxn(state, txnShares, txnPrice);
-    return true;
-  }
-
-  if (transaction.type === 'sell' && txnShares > 0) {
-    applySellHoldingTxn(state, txnShares, txnPrice);
-  }
-  return true;
-}
-
-function computeHoldingStateAtCutoff(
-  txns: DatedHoldingTransaction[],
-  cutoff: number,
-): HoldingStateAtCutoff {
-  const state: MutableHoldingState = {
-    shares: 0,
-    totalCost: 0,
-    latestTxnPrice: null,
-  };
-
-  for (const transaction of txns) {
-    if (!applyHoldingTxn(state, transaction, cutoff)) break;
-  }
-
-  return {
-    shares: state.shares,
-    avgCost: state.shares > 0 ? state.totalCost / state.shares : 0,
-    latestTxnPrice: state.latestTxnPrice,
-  };
+// The shared position rule over the trades up to the cutoff (dividends never move shares).
+function computeHoldingStateAtCutoff(txns: DatedHoldingTransaction[], cutoff: number): Position {
+  return computeHoldingPosition(txns.filter((transaction) => transaction.timestamp <= cutoff));
 }
 
 function resolveHoldingMarketPrice(
@@ -172,17 +105,17 @@ function computeBrokerageForMonth(
   convertToBase: (value: number, currency: string) => number,
 ) {
   let isEstimated = false;
-  const brokerage = holdings.reduce((sum, holding) => {
-    const txns = holdingTxnMap.get(holding.id) ?? [];
-    const state = computeHoldingStateAtCutoff(txns, cutoff);
-    const marketPrice = resolveHoldingMarketPrice(holdingPriceMap.get(holding.id) ?? [], cutoff);
-    const resolvedPrice =
-      marketPrice ?? state.latestTxnPrice ?? (state.avgCost > 0 ? state.avgCost : 0);
-    if (marketPrice === null && state.shares > 0) isEstimated = true;
-
-    const nativeValue = Math.max(0, state.shares) * resolvedPrice;
-    return sum + convertToBase(nativeValue, holding.currency);
-  }, 0);
+  const brokerage = sumMoney(
+    holdings.map((holding) => {
+      const txns = holdingTxnMap.get(holding.id) ?? [];
+      const state = computeHoldingStateAtCutoff(txns, cutoff);
+      const marketPrice = resolveHoldingMarketPrice(holdingPriceMap.get(holding.id) ?? [], cutoff);
+      const resolvedPrice =
+        marketPrice ?? state.lastTradePrice ?? (state.avgCost > 0 ? state.avgCost : 0);
+      if (marketPrice === null && state.shares > 0) isEstimated = true;
+      return convertToBase(holdingValue(state.shares, resolvedPrice), holding.currency);
+    }),
+  );
   return { brokerage, isEstimated };
 }
 
@@ -215,9 +148,8 @@ function computePropertyEquityForMonth(
   mortgageById: Map<number, Mortgage>,
   convertToBase: (value: number, currency: string) => number,
 ) {
-  return properties.reduce(
-    (sum, property) =>
-      sum +
+  return sumMoney(
+    properties.map((property) =>
       getPropertyEquity(
         property,
         propertyTxnMap.get(property.id) ?? [],
@@ -225,7 +157,7 @@ function computePropertyEquityForMonth(
         mortgageById,
         convertToBase,
       ),
-    0,
+    ),
   );
 }
 
@@ -295,8 +227,8 @@ export function computePortfolioHistory(
 }
 
 export function computeTotalRental(
-  propertyTxns: PropertyTransaction[],
-  properties: Property[],
+  propertyTxns: readonly PropertyTransaction[],
+  properties: readonly Property[],
   convertToBase: (value: number, currency: string) => number,
 ) {
   const currentMonth = new Date().toISOString().slice(0, DATE_MONTH_SLICE_LENGTH);
@@ -306,21 +238,22 @@ export function computeTotalRental(
   );
 
   if (rentalTxns.length === 0) {
-    return properties.reduce(
-      (sum, property) =>
-        sum +
+    return sumMoney(
+      properties.map((property) =>
         convertToBase(
           property.monthlyRent * getPropertyOwnershipShare(property),
           property.currency,
         ),
-      0,
+      ),
     );
   }
 
   const propertyById = new Map(properties.map((property) => [property.id, property]));
-  return rentalTxns.reduce((sum, transaction) => {
-    const property = propertyById.get(transaction.propertyId);
-    const ownershipShare = property ? getPropertyOwnershipShare(property) : 1;
-    return sum + convertToBase(transaction.amount * ownershipShare, property?.currency ?? 'EUR');
-  }, 0);
+  return sumMoney(
+    rentalTxns.map((transaction) => {
+      const property = propertyById.get(transaction.propertyId);
+      const ownershipShare = property ? getPropertyOwnershipShare(property) : 1;
+      return convertToBase(transaction.amount * ownershipShare, property?.currency ?? 'EUR');
+    }),
+  );
 }

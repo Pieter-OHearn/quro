@@ -39,10 +39,22 @@ export function formatNumber(
   return getNumberFormat(resolveNumberFormat(numberFormat), options).format(amount);
 }
 
-/** Formats a percentage; non-finite values and negative zero render as 0. */
-export function formatPercent(value: number, fractionDigits = 1): string {
-  const text = (Number.isFinite(value) ? value : 0).toFixed(fractionDigits);
-  return `${Number(text) === 0 ? (0).toFixed(fractionDigits) : text}%`;
+/**
+ * Formats a percentage in the user's number format, with grouping and a fixed number of decimals
+ * (`1234.5` reads `1,234.5%` in en-US and `1.234,5%` in de-DE). Non-finite values and values
+ * that round to zero render as 0, never as -0.
+ */
+export function formatPercent(
+  value: number,
+  numberFormat: NumberFormatPreference | string | null | undefined,
+  fractionDigits = 1,
+): string {
+  const finite = Number.isFinite(value) ? value : 0;
+  const roundsToZero = Math.round(Math.abs(finite) * 10 ** fractionDigits) === 0;
+  return `${formatNumber(roundsToZero ? 0 : finite, resolveNumberFormat(numberFormat), {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })}%`;
 }
 
 export function formatCurrency(

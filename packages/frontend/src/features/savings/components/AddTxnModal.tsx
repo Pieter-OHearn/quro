@@ -9,7 +9,13 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import { todayIsoDate, type SavingsAccount, type SavingsTransaction } from '@quro/shared';
+import {
+  signedSavingsAmount,
+  sumMoney,
+  todayIsoDate,
+  type SavingsAccount,
+  type SavingsTransaction,
+} from '@quro/shared';
 import { TXN_META, TXN_TYPE_LIST } from '../constants';
 import type { SaveTransactionInput, TxnType } from '../types';
 import { saveSavingsTransaction } from '../utils/save-transaction';
@@ -26,11 +32,6 @@ type AddTxnModalProps = {
   onSave: (transaction: SaveTransactionInput) => Promise<void>;
 };
 
-function signedAmount(type: TxnType, amount: number): number {
-  const absoluteAmount = Math.abs(amount);
-  return type === 'withdrawal' ? -absoluteAmount : absoluteAmount;
-}
-
 type BalancePreviewProps = {
   type: TxnType;
   parsed: number;
@@ -46,7 +47,8 @@ function BalancePreview({
   balanceBeforeTxn,
   fmtNative,
 }: BalancePreviewProps) {
-  const newBalance = balanceBeforeTxn + signedAmount(type, parsed);
+  // The shared ledger rule, so the preview moves the balance exactly as saving will.
+  const newBalance = sumMoney([balanceBeforeTxn, signedSavingsAmount(type, parsed)]);
 
   return (
     <div
@@ -84,9 +86,9 @@ function useAddTxnForm(
   const parsed = parseFloat(amount) || 0;
   const accountBalance = toFiniteNumber(account.balance);
   const existingSignedAmount = existing
-    ? signedAmount(existing.type, toFiniteNumber(existing.amount))
+    ? signedSavingsAmount(existing.type, toFiniteNumber(existing.amount))
     : 0;
-  const balanceBeforeTxn = accountBalance - existingSignedAmount;
+  const balanceBeforeTxn = sumMoney([accountBalance, -existingSignedAmount]);
 
   async function handleSave(): Promise<void> {
     if (!amount || isNaN(parsed) || parsed <= 0) {

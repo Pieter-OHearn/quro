@@ -1,4 +1,5 @@
 import { formatPercent, type Payslip } from '@quro/shared';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { PdfAttachmentField } from '@/components/ui';
 import { buildApiDownloadUrl, usePdfAttachmentState } from '@/lib/pdfDocuments';
 import { useDeletePayslipDocument, useUploadPayslipDocument } from '../hooks';
@@ -51,6 +52,7 @@ function PayBreakdownDetail({
   selected,
   fmtBase,
 }: Readonly<{ selected: Payslip; fmtBase: FmtFn }>) {
+  const { numberFormat } = useCurrency();
   const totalPay = getPayslipBreakdownTotal(selected);
   const percentageOfTotal = (value: number): number =>
     totalPay > 0 ? (value / totalPay) * 100 : 0;
@@ -82,7 +84,7 @@ function PayBreakdownDetail({
             </div>
             <div className="flex items-center gap-3">
               {pct !== undefined && (
-                <span className="text-xs text-fg-faint">{formatPercent(pct, 0)}</span>
+                <span className="text-xs text-fg-faint">{formatPercent(pct, numberFormat, 0)}</span>
               )}
               <span className={`text-sm font-semibold ${tc}`}>
                 {val >= 0 ? '+' : '\u2212'}
