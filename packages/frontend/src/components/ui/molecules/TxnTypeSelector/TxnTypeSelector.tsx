@@ -53,7 +53,7 @@ export function TxnTypeSelector<T extends string>({
             )}
           >
             <Icon size={14} aria-hidden="true" className={cn('shrink-0', active && t.color)} />
-            <span className="min-w-0 truncate">{t.label}</span>
+            <span className="max-w-full min-w-0 truncate">{t.label}</span>
           </button>
         );
       })}

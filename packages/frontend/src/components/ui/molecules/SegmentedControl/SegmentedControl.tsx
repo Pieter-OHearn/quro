@@ -15,7 +15,7 @@ const SEGMENTED_BUTTON_CLASS_NAME =
 
 const SEGMENTED_ACTIVE_CLASS_NAME = 'bg-brand-soft font-semibold text-brand-fg';
 const SEGMENTED_INACTIVE_CLASS_NAME =
-  'bg-surface text-fg-muted hover:bg-surface-muted active:bg-surface-muted';
+  'bg-surface text-fg-muted hover:bg-surface-muted active:bg-surface-muted disabled:bg-surface';
 
 const WRAPPER_CLASSES = {
   pill: SEGMENTED_WRAPPER_CLASS_NAME,

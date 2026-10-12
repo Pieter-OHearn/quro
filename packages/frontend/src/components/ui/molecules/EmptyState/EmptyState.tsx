@@ -55,10 +55,10 @@ export function EmptyState({
         className,
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         <Icon
           size={EMPTY_STATE_ICON_SIZE}
-          className={cn('shrink-0', TONE_ICON_CLASSES[tone])}
+          className={cn('mt-0.5 shrink-0', TONE_ICON_CLASSES[tone])}
           aria-hidden="true"
         />
         <h3 className={cn('text-body font-semibold text-fg', titleClassName)}>{title}</h3>
