@@ -27,7 +27,7 @@ export function CurrencyInput({
 }: CurrencyInputProps) {
   return (
     <div className={cn('relative', containerClassName)}>
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-fg-faint">
+      <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-label text-fg-faint">
         {currency}
       </span>
       <TextInput
@@ -38,7 +38,7 @@ export function CurrencyInput({
         value={value}
         error={error}
         placeholder={placeholder}
-        className={cn('pl-12 pr-4', className)}
+        className={cn('pl-12 text-right font-numeric', className)}
         onChange={onChange}
       />
     </div>

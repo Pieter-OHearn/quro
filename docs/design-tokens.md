@@ -4,9 +4,11 @@ The V1 design values (color tokens, type, density, shape and motion) are defined
 [V1 design](design-v1.md). Moving `theme.css` and the shared UI to them is tracked in milestone
 M6 (V1 design update) and lands on the `feature/m6-v1-design-update` branch. `theme.css` carries
 the V1 light and dark colour tokens, type scale, shadows, motion and radius scale, and
-`src/components/` uses that radius scale without resting shadows; the rest of the shared UI
-follows in later steps, and until a value has moved `theme.css` and this page describe what the
-app renders today.
+`src/components/` uses that radius scale without resting shadows. The atoms in
+`src/components/ui/atoms/` (buttons, icon buttons, form fields, badges, cards, progress meters and
+spinners) use the V1 density and type scale: 32px controls on desktop and at least 44px on phones. The
+rest of the shared UI follows in later steps, and until a value has moved `theme.css` and this
+page describe what the app renders today.
 
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
@@ -45,7 +47,9 @@ the table/list patterns feature work should follow.
    `bg-indigo-600` or `text-slate-500` when a token covers the use case.
 2. **In feature components:** use semantic tokens too. ESLint's
    `quro-ui/no-raw-palette` rule rejects raw color utilities in JSX, class maps,
-   and template strings, including variants and opacity modifiers.
+   and template strings, including variants and opacity modifiers. The
+   `quro-ui/no-monospace` rule rejects `font-mono` and arbitrary monospace
+   families, because V1 has one typeface; use `font-numeric` to align numbers.
 3. **Need a color that isn't covered?** Add a token to `theme.css` first, then
    use it. Don't reach for an ad-hoc Tailwind class.
 4. **Visual baseline:** the V1 design in [design-v1.md](design-v1.md) is the

@@ -24,11 +24,11 @@ export function ProgressMeter({
       aria-valuemin={0}
       aria-valuemax={max}
       aria-valuenow={Math.min(max, Math.max(0, value))}
-      className={cn('h-2 overflow-hidden rounded-full bg-surface-muted', className)}
+      className={cn('h-1.5 overflow-hidden rounded-full bg-surface-muted', className)}
       {...props}
     >
       <div
-        className={cn('h-full rounded-full bg-brand transition-[width]', indicatorClassName)}
+        className={cn('h-full rounded-full bg-secondary transition-[width]', indicatorClassName)}
         style={{ width: `${percentage}%` }}
       />
     </div>

@@ -13,7 +13,7 @@ const TONE_CLASSES = {
   brand: 'text-brand',
   current: 'text-current',
   inverse: 'text-fg-inverted',
-  muted: 'text-fg-faint',
+  muted: 'text-fg-muted',
 } as const;
 
 export type SpinnerProps = Omit<ComponentPropsWithoutRef<typeof Loader2>, 'size'> & {

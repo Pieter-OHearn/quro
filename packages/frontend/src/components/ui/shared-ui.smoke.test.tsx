@@ -3,7 +3,7 @@
 import { expect, test } from 'bun:test';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { AlertTriangle, ArrowDownUp, PiggyBank, Plus } from 'lucide-react';
+import { AlertTriangle, ArrowDownUp, Pencil, PiggyBank, Plus } from 'lucide-react';
 import { MemoryRouter } from 'react-router';
 import { Badge } from './atoms/Badge';
 import { Button } from './atoms/Button';
@@ -11,8 +11,10 @@ import { Card } from './atoms/Card';
 import { Change } from './atoms/Change';
 import { CurrencyInput } from './atoms/CurrencyInput';
 import { DateInput } from './atoms/DateInput';
+import { IconButton } from './atoms/IconButton';
 import { LoadingSpinner } from './atoms/LoadingSpinner';
 import { PasswordInput } from './atoms/PasswordInput';
+import { ProgressMeter } from './atoms/ProgressMeter';
 import { QuroLogo } from './atoms/QuroLogo';
 import { SelectInput } from './atoms/SelectInput';
 import { Spinner } from './atoms/Spinner';
@@ -49,8 +51,19 @@ const smokeCases: readonly SmokeCase[] = [
         Pending
       </Badge>
     ),
-    includes: ['data-smoke="badge"', 'Pending', 'rounded-sm'],
+    includes: [
+      'data-smoke="badge"',
+      'Pending',
+      'rounded-sm border text-[11px] leading-4 font-medium',
+      'border-warning bg-warning-soft text-warning',
+    ],
     excludes: ['rounded-full'],
+  },
+  {
+    name: 'Badge neutral tone is an outline on the card surface',
+    element: <Badge>Soon</Badge>,
+    includes: ['px-1.5 py-px', 'border-border-default text-fg-muted'],
+    excludes: ['bg-'],
   },
   {
     name: 'Button renders loading state markup',
@@ -62,14 +75,75 @@ const smokeCases: readonly SmokeCase[] = [
     includes: ['aria-busy="true"', 'Saving item', 'rounded-md'],
   },
   {
+    name: 'Button sizes take their height from the density scale',
+    element: (
+      <div>
+        <Button size="sm">Small</Button>
+        <Button>Medium</Button>
+        <Button size="lg">Large</Button>
+        <Button size="xl">Main</Button>
+      </div>
+    ),
+    includes: [
+      'h-7 max-sm:h-11 rounded-md px-2 text-label',
+      'h-8 max-sm:h-11 rounded-md px-3 text-cell',
+      'h-11 rounded-lg px-4 text-body',
+      'h-12 rounded-lg px-4 text-title-section font-semibold',
+      'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+      'hover:bg-brand-hover active:bg-brand-hover disabled:bg-surface-muted disabled:text-fg-subtle',
+    ],
+    excludes: ['py-', 'text-sm', 'text-xs', 'text-[13px]'],
+  },
+  {
+    name: 'Button secondary variant has a control border on the surface',
+    element: <Button variant="secondary">Cancel</Button>,
+    includes: ['border border-border-control bg-surface text-fg'],
+  },
+  {
+    name: 'IconButton keeps its label and renders square sizes',
+    element: (
+      <div>
+        <IconButton icon={Pencil} label="Edit row" size="sm" />
+        <IconButton icon={Pencil} label="Rename" />
+      </div>
+    ),
+    includes: [
+      'aria-label="Edit row"',
+      'aria-label="Rename"',
+      'h-7 w-7 max-sm:h-11 max-sm:w-11 rounded-md',
+      'h-8 w-8 max-sm:h-11 max-sm:w-11 rounded-md',
+      'focus-visible:outline-focus-ring',
+    ],
+  },
+  {
     name: 'Card renders wrapper and children',
     element: (
       <Card data-smoke="card" padding="none">
         Card body
       </Card>
     ),
-    includes: ['data-smoke="card"', 'Card body', 'rounded-lg border border-border-subtle'],
-    excludes: ['shadow-'],
+    includes: [
+      'data-smoke="card"',
+      'Card body',
+      'rounded-lg border border-border-default bg-surface',
+    ],
+    excludes: ['shadow-', 'p-4'],
+  },
+  {
+    name: 'Card default padding is 16px',
+    element: <Card>Padded</Card>,
+    includes: ['bg-surface p-4'],
+  },
+  {
+    name: 'ProgressMeter renders a thin secondary meter by default',
+    element: <ProgressMeter value={40} label="Goal progress" />,
+    includes: [
+      'role="progressbar"',
+      'aria-valuenow="40"',
+      'h-1.5 overflow-hidden rounded-full bg-surface-muted',
+      'bg-secondary',
+      'width:40%',
+    ],
   },
   {
     name: 'StatCard link renders a bordered card without a shadow',
@@ -130,7 +204,18 @@ const smokeCases: readonly SmokeCase[] = [
       'placeholder="name@example.com"',
       'value="demo@quro.local"',
       'aria-invalid="true"',
+      'border-danger bg-surface',
     ],
+  },
+  {
+    name: 'TextInput is 32px with a control border, 44px on phones',
+    element: <TextInput value="" onChange={noop} aria-label="Name" />,
+    includes: [
+      'h-8 max-sm:h-11 rounded-md border text-cell',
+      'px-2 border-border-control bg-surface',
+      'focus:outline-2 focus:outline-offset-1 focus:outline-focus-ring',
+    ],
+    excludes: ['bg-surface-sunken', 'py-'],
   },
   {
     name: 'SelectInput renders shared options',
@@ -151,7 +236,13 @@ const smokeCases: readonly SmokeCase[] = [
   {
     name: 'CurrencyInput renders currency prefix and numeric input',
     element: <CurrencyInput currency="EUR" value="1250.50" onChange={noop} />,
-    includes: ['>EUR</span>', 'type="number"', 'step="0.01"', 'value="1250.50"'],
+    includes: [
+      '>EUR</span>',
+      'type="number"',
+      'step="0.01"',
+      'value="1250.50"',
+      'pl-12 text-right font-numeric',
+    ],
   },
   {
     name: 'DateInput renders date field markup',
@@ -161,7 +252,14 @@ const smokeCases: readonly SmokeCase[] = [
   {
     name: 'Textarea renders rows and content',
     element: <Textarea rows={4} placeholder="Add note" value="Shared note" onChange={noop} />,
-    includes: ['rows="4"', 'placeholder="Add note"', 'Shared note'],
+    includes: [
+      'rows="4"',
+      'placeholder="Add note"',
+      'Shared note',
+      'px-2 py-2',
+      'h-auto max-sm:h-auto resize-none',
+    ],
+    excludes: ['h-8', 'max-sm:h-11'],
   },
   {
     name: 'PasswordInput renders toggle button and masked input',

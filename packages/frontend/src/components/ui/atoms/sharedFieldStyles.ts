@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
 
+// 32px on desktop and 44px on phones; the focus ring is 2px at a 1px offset like every control.
 const BASE_FIELD_CHROME =
-  'w-full rounded-md border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50';
+  'w-full h-8 max-sm:h-11 rounded-md border text-cell transition-colors duration-fast placeholder:text-fg-faint focus:outline-2 focus:outline-offset-1 focus:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-50';
 
 type FieldChromeOptions = {
   className?: string;
@@ -12,12 +13,12 @@ type FieldChromeOptions = {
 export function getFieldChrome({
   className,
   error = false,
-  paddingClassName = 'px-3 py-2.5',
+  paddingClassName = 'px-2',
 }: FieldChromeOptions) {
   return cn(
     BASE_FIELD_CHROME,
     paddingClassName,
-    error ? 'border-danger-border bg-danger-soft' : 'border-border-default bg-surface-sunken',
+    error ? 'border-danger bg-surface' : 'border-border-control bg-surface',
     className,
   );
 }

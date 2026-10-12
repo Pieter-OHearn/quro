@@ -3,15 +3,19 @@ import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const VARIANT_CLASSES = {
-  danger: 'text-border-default hover:bg-danger-soft hover:text-danger',
-  ghost: 'text-fg-disabled hover:bg-surface-muted hover:text-fg-subtle',
-  subtle: 'text-fg-faint hover:bg-surface-muted hover:text-fg-muted',
+  danger:
+    'text-fg-faint hover:bg-danger-soft hover:text-danger active:bg-danger-soft active:text-danger',
+  ghost:
+    'text-fg-faint hover:bg-surface-muted hover:text-fg-subtle active:bg-surface-muted active:text-fg-subtle',
+  subtle:
+    'text-fg-faint hover:bg-surface-muted hover:text-fg-muted active:bg-surface-muted active:text-fg-muted',
 } as const;
 
+// At least 44px square on phones, like every touch target.
 const SIZE_CLASSES = {
-  sm: 'h-6 w-6 rounded-md',
-  md: 'h-8 w-8 rounded-md',
-  lg: 'h-11 w-11 rounded-md',
+  sm: 'h-7 w-7 max-sm:h-11 max-sm:w-11 rounded-md',
+  md: 'h-8 w-8 max-sm:h-11 max-sm:w-11 rounded-md',
+  lg: 'h-11 w-11 rounded-lg',
 } as const;
 
 const ICON_SIZES = {
@@ -59,7 +63,8 @@ function getSharedClassName({
   variant = 'ghost',
 }: Pick<CommonIconButtonProps, 'className' | 'size' | 'variant'>) {
   return cn(
-    'inline-flex flex-shrink-0 items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+    'inline-flex flex-shrink-0 items-center justify-center transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-50',
+    'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
     SIZE_CLASSES[size],
     VARIANT_CLASSES[variant],
     className,
