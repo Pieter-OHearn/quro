@@ -18,6 +18,12 @@ Budget and More, which opens the navigation drawer); the page is padded by the b
 area. The rest of the shared UI follows in later steps, and until a value has moved `theme.css` and this
 page describe what the app renders today.
 
+The organisms in `src/components/ui/organisms/` are on V1 as well: 28px table rows with a plain
+sentence-case header, stat cards as label, figure and change, chart cards with a card header and one
+`brand` series, and dialogs on the `scrim` that become bottom sheets below 640px. A dialog fades in over
+`duration-base`; the sheet rises from the bottom edge and leaves the same way, and only fades under
+reduced motion. `duration-fast`, `duration-base` and `duration-slow` resolve to the `--motion-*` tokens.
+
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
 to drive Tailwind utility classes. The goal is that shared UI primitives and
@@ -99,7 +105,7 @@ so several identities share one colour until the swatch picker is redesigned.
 2. If its value is a colour or shadow rather than a `var()` alias, add its dark value to the
    `.dark` block as well. Aliases are not repeated there.
 3. Map it inside the `@theme inline` block under the right namespace
-   (`--color-*` for colors, `--shadow-*` for shadows, `--duration-*` /
+   (`--color-*` for colors, `--shadow-*` for shadows, `--transition-duration-*` /
    `--ease-*` for motion, `--radius-*` for radius) so it becomes a Tailwind
    utility.
 4. Use it from primitives and update this doc if it introduces a new group.
@@ -275,7 +281,10 @@ repeating alignment, labels, numeric styling, and priority on every cell.
 `DataTable` renders normal table headers on desktop and card-like rows on
 mobile. The desktop header is hidden under the medium breakpoint. Each mobile
 cell shows a label from `mobileLabel`, falling back to `header` when the header
-is plain text.
+is plain text. Rows are 28px in the default `compact` density and 36px in
+`default` density; on mobile each card line is at least 48px below 640px. Mark a
+total row with `<DataTableRow data-total>` for the strong rule and semibold
+figures.
 
 Use `priority` to decide what survives on mobile:
 
@@ -292,8 +301,8 @@ secondary columns. Keep high-density numeric comparison on desktop by setting
 `minWidth` and `tableLayout="fixed"` when columns need stable widths.
 
 Use `numeric: true` for money, quantities, rates, and percentages. It applies
-the shared `font-numeric` utility and should usually be paired with
-`align: 'right'`.
+the shared `font-numeric` utility and right-aligns the column unless `align`
+says otherwise.
 
 ### Table slots
 

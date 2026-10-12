@@ -1,4 +1,3 @@
-import { useId } from 'react';
 import {
   AreaChart,
   Area,
@@ -11,6 +10,13 @@ import {
 import type { DataKey } from 'recharts/types/util/types';
 import { cn } from '@/lib/utils';
 import { ChartCard } from '../ChartCard';
+
+// One series: a 2px `brand` line over a flat `brand-soft` fill, horizontal gridlines only and
+// 11px tabular axis labels. `color` no longer changes the series colour; it stays for callers.
+const SERIES_STROKE = 'var(--brand)';
+const SERIES_FILL = 'var(--brand-soft)';
+const AXIS_TICK = { fontSize: 11, fill: 'var(--chart-axis)', className: 'font-numeric' };
+const ACTIVE_DOT = { r: 4, fill: SERIES_STROKE, stroke: 'var(--surface)', strokeWidth: 2 };
 
 export type AreaChartCardProps<T extends Record<string, unknown>> = {
   title: string;
@@ -33,12 +39,10 @@ type ChartContentProps<T extends Record<string, unknown>> = {
   data: readonly T[];
   dataKey: DataKey<T, number>;
   xKey: DataKey<T, string | number>;
-  color: string;
   height: number;
   formatValue: (v: number) => string;
   formatYAxis?: (v: number) => string;
   strokeWidth: number;
-  gradientId: string;
   title: string;
   estimatedKey?: keyof T;
 };
@@ -79,37 +83,22 @@ function segmentEstimatedData<T extends Record<string, unknown>>(
   return points;
 }
 
-function ChartGradient({ id, color }: Readonly<{ id: string; color: string }>) {
-  return (
-    <defs>
-      <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%" stopColor={color} stopOpacity={0.15} />
-        <stop offset="95%" stopColor={color} stopOpacity={0} />
-      </linearGradient>
-    </defs>
-  );
-}
-
 function ChartSeries<T extends Record<string, unknown>>({
   estimatedKey,
   dataKey,
-  color,
   strokeWidth,
-  gradientId,
-}: Pick<
-  ChartContentProps<T>,
-  'estimatedKey' | 'dataKey' | 'color' | 'strokeWidth' | 'gradientId'
->) {
+}: Pick<ChartContentProps<T>, 'estimatedKey' | 'dataKey' | 'strokeWidth'>) {
   if (!estimatedKey) {
     return (
       <Area
         type="monotone"
         dataKey={dataKey}
-        stroke={color}
+        stroke={SERIES_STROKE}
         strokeWidth={strokeWidth}
-        fill={`url(#${gradientId})`}
+        fill={SERIES_FILL}
+        fillOpacity={1}
         dot={false}
-        activeDot={{ r: 5, fill: color }}
+        activeDot={ACTIVE_DOT}
       />
     );
   }
@@ -118,23 +107,49 @@ function ChartSeries<T extends Record<string, unknown>>({
       <Area
         type="monotone"
         dataKey="__actualValue"
-        stroke={color}
+        stroke={SERIES_STROKE}
         strokeWidth={strokeWidth}
-        fill={`url(#${gradientId})`}
+        fill={SERIES_FILL}
+        fillOpacity={1}
         dot={false}
-        activeDot={{ r: 5, fill: color }}
+        activeDot={ACTIVE_DOT}
       />
       <Area
         type="monotone"
         dataKey="__estimatedValue"
-        stroke={color}
+        stroke={SERIES_STROKE}
         strokeWidth={strokeWidth}
         strokeDasharray="6 5"
         fill="transparent"
         dot={false}
-        activeDot={{ r: 5, fill: color }}
+        activeDot={ACTIVE_DOT}
       />
     </>
+  );
+}
+
+type ChartTooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: readonly { name?: string | number; value?: unknown }[];
+  title: string;
+  formatValue: (v: number) => string;
+};
+
+/** The shared chart tooltip: inverse surface, 12px text, popover shadow. */
+function ChartTooltip({ active, label, payload, title, formatValue }: Readonly<ChartTooltipProps>) {
+  const entries = (payload ?? []).filter((entry) => entry.value != null);
+  if (!active || entries.length === 0) return null;
+  return (
+    <div className="rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover">
+      <p className="font-medium">{label}</p>
+      {entries.map((entry) => (
+        <p key={String(entry.name)} className="font-numeric">
+          {entry.name === '__estimatedValue' ? `${title} (estimated)` : title}:{' '}
+          {formatValue(Number(entry.value) || 0)}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -142,12 +157,10 @@ function ChartContent<T extends Record<string, unknown>>({
   data,
   dataKey,
   xKey,
-  color,
   height,
   formatValue,
   formatYAxis,
   strokeWidth,
-  gradientId,
   title,
   estimatedKey,
 }: ChartContentProps<T>) {
@@ -157,38 +170,22 @@ function ChartContent<T extends Record<string, unknown>>({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={chartData}>
-        <ChartGradient id={gradientId} color={color} />
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-        <XAxis
-          dataKey={xKey}
-          tick={{ fontSize: 11, fill: 'var(--fg-faint)' }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          tick={{ fontSize: 11, fill: 'var(--fg-faint)' }}
-          axisLine={false}
-          tickLine={false}
-          tickFormatter={yTickFormatter}
-        />
+        <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+        <XAxis dataKey={xKey} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+        <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={yTickFormatter} />
         <Tooltip
-          formatter={(value, name) => [
-            formatValue(Number(value) || 0),
-            name === '__estimatedValue' ? `${title} (estimated)` : title,
-          ]}
-          contentStyle={{
-            borderRadius: '12px',
-            border: '1px solid var(--border-default)',
-            fontSize: '12px',
-          }}
+          cursor={{ stroke: 'var(--border-default)' }}
+          content={(props) => (
+            <ChartTooltip
+              active={props.active}
+              label={props.label as string | number | undefined}
+              payload={props.payload}
+              title={title}
+              formatValue={formatValue}
+            />
+          )}
         />
-        <ChartSeries
-          estimatedKey={estimatedKey}
-          dataKey={dataKey}
-          color={color}
-          strokeWidth={strokeWidth}
-          gradientId={gradientId}
-        />
+        <ChartSeries estimatedKey={estimatedKey} dataKey={dataKey} strokeWidth={strokeWidth} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -200,18 +197,15 @@ export function AreaChartCard<T extends Record<string, unknown>>({
   data,
   dataKey,
   xKey,
-  color,
   height = 220,
   formatValue,
   formatYAxis,
   badge,
   emptyMessage = 'No data yet.',
-  strokeWidth = 2.5,
+  strokeWidth = 2,
   className,
   estimatedKey,
 }: AreaChartCardProps<T>) {
-  const gradientId = useId().replace(/:/g, '');
-
   return (
     <ChartCard
       title={title}
@@ -220,25 +214,22 @@ export function AreaChartCard<T extends Record<string, unknown>>({
       hasData={data.length > 0}
       emptyMessage={emptyMessage}
       className={cn(className)}
-      headerClassName="mb-6"
     >
       {data.length > 0 && (
         <ChartContent
           data={data}
           dataKey={dataKey}
           xKey={xKey}
-          color={color}
           height={height}
           formatValue={formatValue}
           formatYAxis={formatYAxis}
           strokeWidth={strokeWidth}
-          gradientId={gradientId}
           title={title}
           estimatedKey={estimatedKey}
         />
       )}
       {estimatedKey && data.some((point) => Boolean(point[estimatedKey])) ? (
-        <p className="mt-3 text-xs text-fg-faint">
+        <p className="mt-2 text-caption text-fg-subtle">
           Dashed segments use fallback FX or price data and are estimated.
         </p>
       ) : null}

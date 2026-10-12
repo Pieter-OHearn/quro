@@ -24,6 +24,7 @@ authenticated routes, use the synthetic demo user. Do not seed the owner's insta
 - `/savings` or `/pension`: verify transaction history filters and pagination controls still render correctly and page changes do not break layout.
 - If the change touches `EmptyState`: verify an empty-state route in a disposable local state, preferably `/mortgage` with no mortgage data or a `/goals` filter/year combination with no matching items, and confirm the left-aligned dashed box with its title, description, small icon and at most one button.
 - If the change touches `LoadingState`: trigger a visible loading pass on `/salary`, `/goals`, or `/budget` by refreshing during a slow/local restart and confirm the shared loading shell still appears centered.
+- If the change touches `Modal`: on desktop confirm the dialog fades in on the scrim without blur; at 390px confirm it is a bottom sheet that rises from the bottom edge and leaves the same way, and that it only fades with reduced motion emulated. Static markup cannot show the transition.
 - If the change touches `EmojiPickerField` or `PdfAttachmentField`: manually verify the owning feature flow because those components are not covered by the smoke suite.
 
 ## PR expectation

@@ -24,41 +24,24 @@ const PRIORITY_CLASSES = {
   actions: '',
 } as const;
 
+// Rows are 28px (compact, the default) or 36px on desktop. Below the medium breakpoint rows
+// render as cards whose lines are at least 36px, and 48px below 640px.
 const DENSITY_CLASSES = {
-  default: {
-    header: 'px-4 py-3',
-    cell: 'px-4 py-3 max-md:px-0 max-md:py-2',
-    body: 'max-md:p-3',
-  },
-  compact: {
-    header: 'px-3 py-2',
-    cell: 'px-3 py-2.5 max-md:px-0 max-md:py-1.5',
-    body: 'max-md:p-2',
-  },
+  default: { row: 'md:h-9' },
+  compact: { row: 'md:h-7' },
 } as const;
 
 const TABLE_VARIANT_CLASSES = {
-  default: {
-    header: 'bg-surface-sunken/60',
-    row: '',
-    cell: '',
-  },
-  financial: {
-    header: 'bg-surface-sunken/60',
-    row: '',
-    cell: '',
-  },
-  editable: {
-    header: 'bg-surface-sunken',
-    row: 'align-top',
-    cell: 'align-top',
-  },
-  expandable: {
-    header: 'bg-surface-sunken/60',
-    row: '',
-    cell: '',
-  },
+  default: { row: '', cell: 'md:py-0' },
+  financial: { row: '', cell: 'md:py-0' },
+  editable: { row: 'align-top', cell: 'align-top md:py-1' },
+  expandable: { row: '', cell: 'md:py-0' },
 } as const;
+
+const MOBILE_CARD_CLASS_NAME =
+  'max-md:rounded-lg max-md:border max-md:border-border-default max-md:bg-surface max-md:px-3 max-sm:px-4';
+const MOBILE_CELL_CLASS_NAME =
+  'max-md:flex max-md:min-h-9 max-md:items-center max-md:justify-between max-md:gap-4 max-md:border-0 max-md:px-0 max-md:py-1.5 max-sm:min-h-12';
 
 export type DataTableColumn<Row = never> = {
   key: string;
@@ -136,7 +119,6 @@ type ResolvedCellConfig = {
   mobileLabel?: ReactNode;
   numeric: boolean;
   columnClassName?: string;
-  density: keyof typeof DENSITY_CLASSES;
   tableVariant: keyof typeof TABLE_VARIANT_CLASSES;
 };
 
@@ -168,6 +150,11 @@ function getColumnDataLabel(label: ReactNode): string | undefined {
   return undefined;
 }
 
+// Numbers are right-aligned unless the column says otherwise.
+function getColumnAlign(column: DataTableColumn): keyof typeof ALIGNMENT_CLASSES {
+  return column.align ?? (column.numeric ? 'right' : 'left');
+}
+
 function getRowTabIndex(isKeyboardInteractive: boolean, tabIndex: DataTableRowProps['tabIndex']) {
   if (!isKeyboardInteractive) return tabIndex;
   return tabIndex ?? 0;
@@ -186,16 +173,43 @@ function resolveCellConfig({
   tableContext: DataTableContextValue | null;
 }): ResolvedCellConfig {
   const column = columnKey ? tableContext?.columnsByKey.get(columnKey) : undefined;
+  const resolvedNumeric = numeric ?? column?.numeric ?? false;
 
   return {
-    align: align ?? column?.align ?? 'left',
+    // Numbers are right-aligned unless the column says otherwise.
+    align: align ?? column?.align ?? (resolvedNumeric ? 'right' : 'left'),
     priority: priority ?? column?.priority ?? 'primary',
     mobileLabel: mobileLabel ?? column?.mobileLabel ?? column?.header,
-    numeric: numeric ?? column?.numeric ?? false,
+    numeric: resolvedNumeric,
     columnClassName: column?.cellClassName,
-    density: tableContext?.density ?? 'default',
     tableVariant: tableContext?.tableVariant ?? 'default',
   };
+}
+
+function getRowClassName({
+  density,
+  tableVariant,
+  mobileCard,
+  interactive,
+  selected,
+  className,
+}: Required<Pick<DataTableRowProps, 'mobileCard' | 'interactive' | 'selected'>> & {
+  density: keyof typeof DENSITY_CLASSES;
+  tableVariant: keyof typeof TABLE_VARIANT_CLASSES;
+  className?: string;
+}) {
+  return cn(
+    'group border-b border-border-subtle transition-colors duration-fast md:last:border-b-0 md:hover:bg-surface-muted max-md:block',
+    DENSITY_CLASSES[density].row,
+    mobileCard && MOBILE_CARD_CLASS_NAME,
+    TABLE_VARIANT_CLASSES[tableVariant].row,
+    // A total row: `<DataTableRow data-total>`.
+    'data-total:border-t data-total:border-border-strong data-total:font-semibold',
+    interactive &&
+      'cursor-pointer active:bg-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring',
+    selected && 'bg-brand-soft md:hover:bg-brand-soft max-md:bg-brand-soft',
+    className,
+  );
 }
 
 export function DataTableRow({
@@ -210,7 +224,6 @@ export function DataTableRow({
   ...props
 }: Readonly<DataTableRowProps>) {
   const tableContext = useDataTableContext();
-  const tableVariant = tableContext?.tableVariant ?? 'default';
   const isKeyboardInteractive = Boolean(interactive && onClick);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTableRowElement>) {
@@ -225,15 +238,14 @@ export function DataTableRow({
 
   return (
     <tr
-      className={cn(
-        'group border-b border-border-subtle transition-colors max-md:block',
-        mobileCard &&
-          'max-md:rounded-lg max-md:border max-md:border-border-subtle max-md:bg-surface max-md:p-3',
-        TABLE_VARIANT_CLASSES[tableVariant].row,
-        interactive && 'cursor-pointer hover:bg-surface-sunken',
-        selected && 'bg-brand-soft',
+      className={getRowClassName({
+        density: tableContext?.density ?? 'compact',
+        tableVariant: tableContext?.tableVariant ?? 'default',
+        mobileCard,
+        interactive,
+        selected,
         className,
-      )}
+      })}
       onClick={onClick}
       onKeyDown={handleKeyDown}
       tabIndex={getRowTabIndex(isKeyboardInteractive, tabIndex)}
@@ -267,8 +279,8 @@ export function DataTableCell({
   return (
     <td
       className={cn(
-        'max-md:flex max-md:items-start max-md:justify-between max-md:gap-4 max-md:border-0',
-        DENSITY_CLASSES[cellConfig.density].cell,
+        'px-3',
+        MOBILE_CELL_CLASS_NAME,
         TABLE_VARIANT_CLASSES[cellConfig.tableVariant].cell,
         ALIGNMENT_CLASSES[cellConfig.align],
         PRIORITY_CLASSES[cellConfig.priority],
@@ -279,7 +291,7 @@ export function DataTableCell({
       {...props}
     >
       {cellConfig.mobileLabel ? (
-        <span className="hidden shrink-0 text-xs font-medium uppercase text-fg-faint max-md:block">
+        <span className="hidden shrink-0 text-label text-fg-muted max-md:block">
           {cellConfig.mobileLabel}
         </span>
       ) : null}
@@ -293,8 +305,7 @@ export function DataTableCell({
 }
 
 type DataTableHeaderProps = Pick<DataTableProps, 'columns'> &
-  Pick<DataTableProps, 'onSortChange' | 'sort'> &
-  Required<Pick<DataTableProps, 'density' | 'tableVariant'>>;
+  Pick<DataTableProps, 'onSortChange' | 'sort'>;
 
 function getNextSort(column: DataTableColumn, sort?: DataTableSortState): DataTableSortState {
   if (sort?.columnKey !== column.key) {
@@ -323,9 +334,9 @@ function SortIcon({
   isActive: boolean;
   direction?: DataTableSortDirection;
 }>) {
-  if (!isActive) return <ArrowUpDown size={9} className="opacity-25" aria-hidden />;
-  if (direction === 'asc') return <ArrowUp size={10} className="opacity-60" aria-hidden />;
-  return <ArrowDown size={10} className="opacity-60" aria-hidden />;
+  if (!isActive) return <ArrowUpDown size={12} className="text-fg-faint" aria-hidden />;
+  if (direction === 'asc') return <ArrowUp size={12} aria-hidden />;
+  return <ArrowDown size={12} aria-hidden />;
 }
 
 function getHeaderAriaSort(column: DataTableColumn, sort?: DataTableSortState) {
@@ -336,17 +347,11 @@ function getHeaderAriaSort(column: DataTableColumn, sort?: DataTableSortState) {
 
 type DataTableHeaderCellProps = {
   column: DataTableColumn;
-  density: keyof typeof DENSITY_CLASSES;
   onSortChange?: (sort: DataTableSortState) => void;
   sort?: DataTableSortState;
 };
 
-function DataTableHeaderCell({
-  column,
-  density,
-  onSortChange,
-  sort,
-}: Readonly<DataTableHeaderCellProps>) {
+function DataTableHeaderCell({ column, onSortChange, sort }: Readonly<DataTableHeaderCellProps>) {
   return (
     <th
       scope="col"
@@ -355,9 +360,8 @@ function DataTableHeaderCell({
       data-priority={column.priority ?? 'primary'}
       data-mobile-label={getColumnDataLabel(column.mobileLabel)}
       className={cn(
-        'text-xs font-semibold uppercase tracking-wide text-fg-faint whitespace-nowrap',
-        DENSITY_CLASSES[density].header,
-        ALIGNMENT_CLASSES[column.align ?? 'left'],
+        'h-7 px-3 text-label text-fg-muted whitespace-nowrap',
+        ALIGNMENT_CLASSES[getColumnAlign(column)],
         column.numeric && 'font-numeric',
         column.headerClassName,
       )}
@@ -368,8 +372,8 @@ function DataTableHeaderCell({
           aria-label={getSortLabel(column, sort)}
           onClick={() => onSortChange(getNextSort(column, sort))}
           className={cn(
-            'inline-flex max-w-full items-center gap-0.5 text-xs font-semibold uppercase tracking-wide leading-none text-inherit transition-colors hover:text-fg-muted focus-visible:outline-none focus-visible:text-fg-muted',
-            sort?.columnKey === column.key && 'text-fg-muted',
+            'inline-flex max-w-full items-center gap-1 rounded-sm text-label text-inherit transition-colors duration-fast hover:text-fg active:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+            sort?.columnKey === column.key && 'text-fg',
           )}
         >
           <span className="truncate">{column.header}</span>
@@ -382,23 +386,14 @@ function DataTableHeaderCell({
   );
 }
 
-function DataTableHeader({
-  columns,
-  density,
-  onSortChange,
-  sort,
-  tableVariant,
-}: DataTableHeaderProps) {
+function DataTableHeader({ columns, onSortChange, sort }: DataTableHeaderProps) {
   return (
     <thead className="max-md:hidden">
-      <tr
-        className={cn('border-b border-border-subtle', TABLE_VARIANT_CLASSES[tableVariant].header)}
-      >
+      <tr className="border-b border-border-default">
         {columns.map((column) => (
           <DataTableHeaderCell
             key={column.key}
             column={column}
-            density={density}
             onSortChange={onSortChange}
             sort={sort}
           />
@@ -411,13 +406,14 @@ function DataTableHeader({
 type DataTableBodyProps = Pick<
   DataTableProps,
   'children' | 'columns' | 'emptyState' | 'isEmpty' | 'isLoading' | 'loadingState'
-> &
-  Required<Pick<DataTableProps, 'density'>>;
+>;
+
+const BODY_CLASS_NAME = 'max-md:block max-md:space-y-2 max-md:p-3';
+const MESSAGE_CELL_CLASS_NAME = 'px-3 py-8 text-center text-cell text-fg-subtle';
 
 function DataTableBody({
   children,
   columns,
-  density,
   emptyState,
   isEmpty,
   isLoading,
@@ -425,13 +421,9 @@ function DataTableBody({
 }: DataTableBodyProps) {
   if (isLoading) {
     return (
-      <tbody className={cn('max-md:block max-md:space-y-3', DENSITY_CLASSES[density].body)}>
+      <tbody className={BODY_CLASS_NAME}>
         <tr>
-          <td
-            colSpan={columns.length}
-            className="px-4 py-12 text-center text-sm text-fg-faint"
-            role="status"
-          >
+          <td colSpan={columns.length} className={MESSAGE_CELL_CLASS_NAME} role="status">
             {loadingState}
           </td>
         </tr>
@@ -441,9 +433,9 @@ function DataTableBody({
 
   if (isEmpty) {
     return (
-      <tbody className={cn('max-md:block max-md:space-y-3', DENSITY_CLASSES[density].body)}>
+      <tbody className={BODY_CLASS_NAME}>
         <tr>
-          <td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-fg-faint">
+          <td colSpan={columns.length} className={MESSAGE_CELL_CLASS_NAME}>
             {emptyState}
           </td>
         </tr>
@@ -451,11 +443,7 @@ function DataTableBody({
     );
   }
 
-  return (
-    <tbody className={cn('max-md:block max-md:space-y-3', DENSITY_CLASSES[density].body)}>
-      {children}
-    </tbody>
-  );
+  return <tbody className={BODY_CLASS_NAME}>{children}</tbody>;
 }
 
 type DataTableElementProps = Pick<
@@ -473,15 +461,13 @@ type DataTableElementProps = Pick<
   | 'sort'
   | 'tableClassName'
   | 'tableLayout'
-> &
-  Required<Pick<DataTableProps, 'density' | 'tableVariant'>>;
+>;
 
 function DataTableElement({
   bodyClassName,
   children,
   colGroup,
   columns,
-  density,
   emptyState,
   isEmpty,
   isLoading,
@@ -491,13 +477,12 @@ function DataTableElement({
   sort,
   tableClassName,
   tableLayout,
-  tableVariant,
 }: DataTableElementProps) {
   return (
     <div className={cn('overflow-visible md:overflow-x-auto', bodyClassName)}>
       <table
         className={cn(
-          'w-full text-sm max-md:block',
+          'w-full text-cell max-md:block',
           typeof minWidth !== 'undefined' && 'md:min-w-[var(--datatable-min-width)]',
           tableLayout === 'fixed' && 'table-fixed',
           tableClassName,
@@ -505,16 +490,9 @@ function DataTableElement({
         style={getTableStyle(minWidth)}
       >
         {colGroup}
-        <DataTableHeader
-          columns={columns}
-          density={density}
-          onSortChange={onSortChange}
-          sort={sort}
-          tableVariant={tableVariant}
-        />
+        <DataTableHeader columns={columns} onSortChange={onSortChange} sort={sort} />
         <DataTableBody
           columns={columns}
-          density={density}
           emptyState={emptyState}
           isEmpty={isEmpty}
           isLoading={isLoading}
@@ -526,6 +504,9 @@ function DataTableElement({
     </div>
   );
 }
+
+// Toolbar and filters sit between the card header and the table, each above a rule.
+const SLOT_CLASS_NAME = 'border-b border-border-default px-3 py-2 max-sm:px-4';
 
 function DataTableContent({
   action,
@@ -570,18 +551,13 @@ function DataTableContent({
         />
       ) : null}
 
-      {toolbar ? <div className="border-t border-border-subtle px-4 py-3">{toolbar}</div> : null}
-      {filters ? (
-        <div className="border-t border-border-subtle bg-surface-sunken/40 px-4 py-3">
-          {filters}
-        </div>
-      ) : null}
+      {toolbar ? <div className={SLOT_CLASS_NAME}>{toolbar}</div> : null}
+      {filters ? <div className={SLOT_CLASS_NAME}>{filters}</div> : null}
 
       <DataTableElement
         bodyClassName={bodyClassName}
         colGroup={colGroup}
         columns={columns}
-        density={density}
         emptyState={emptyState}
         isEmpty={isEmpty}
         isLoading={isLoading}
@@ -591,19 +567,20 @@ function DataTableContent({
         sort={sort}
         tableClassName={tableClassName}
         tableLayout={tableLayout}
-        tableVariant={tableVariant}
       >
         {children}
       </DataTableElement>
 
-      {footer ? <div className="border-t border-border-subtle px-4 py-3">{footer}</div> : null}
+      {footer ? (
+        <div className="border-t border-border-default px-3 py-2 max-sm:px-4">{footer}</div>
+      ) : null}
     </DataTableContext.Provider>
   );
 }
 
 export function DataTable({
   variant = 'card',
-  density = 'default',
+  density = 'compact',
   tableVariant = 'default',
   emptyState = 'No data yet.',
   isEmpty = false,

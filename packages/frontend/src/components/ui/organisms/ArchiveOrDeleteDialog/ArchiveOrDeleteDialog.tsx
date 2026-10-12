@@ -62,47 +62,46 @@ function buildSubtitle(
   return `Archive keeps ${args.childrenLabel} so your wealth history stays continuous. Delete permanently removes everything.`;
 }
 
+// Cancel, then "Archive …", then "Delete …": the only filled destructive button in the app is
+// this confirm step.
+const DELETE_BUTTON_CLASS_NAME =
+  'border-danger bg-danger text-fg-inverted hover:bg-danger active:bg-danger enabled:hover:opacity-90 enabled:active:opacity-90';
+
 function DialogFooter({
+  entityLabel,
   hideArchive,
   nameMatches,
   isPending,
-  hasNonZeroBalance,
   onCancel,
   onArchive,
   onDelete,
 }: Readonly<{
+  entityLabel: string;
   hideArchive: boolean;
   nameMatches: boolean;
   isPending: boolean | undefined;
-  hasNonZeroBalance: boolean;
   onCancel: () => void;
   onArchive?: () => void;
   onDelete: () => void;
 }>) {
+  const object = entityLabel.toLowerCase();
   return (
     <>
-      <Button onClick={onCancel} variant="secondary" size="lg" className="flex-1">
+      <Button onClick={onCancel} variant="ghost">
         Cancel
       </Button>
       {!hideArchive && onArchive ? (
-        <Button
-          onClick={onArchive}
-          disabled={!nameMatches || isPending}
-          variant={hasNonZeroBalance ? 'secondary' : 'primary'}
-          size="lg"
-          className="flex-1"
-        >
-          Archive
+        <Button onClick={onArchive} disabled={!nameMatches || isPending} variant="secondary">
+          Archive {object}
         </Button>
       ) : null}
       <Button
         onClick={onDelete}
         disabled={!nameMatches || isPending}
         variant="danger"
-        size="lg"
-        className="flex-1"
+        className={DELETE_BUTTON_CLASS_NAME}
       >
-        Delete
+        Delete {object}
       </Button>
     </>
   );
@@ -139,10 +138,10 @@ export function ArchiveOrDeleteDialog({
       onClose={onCancel}
       footer={
         <DialogFooter
+          entityLabel={entityLabel}
           hideArchive={hideArchive}
           nameMatches={nameMatches}
           isPending={isPending}
-          hasNonZeroBalance={hasNonZeroBalance}
           onCancel={onCancel}
           onArchive={onArchive}
           onDelete={onDelete}
@@ -150,8 +149,8 @@ export function ArchiveOrDeleteDialog({
       }
     >
       {hasNonZeroBalance && !hideArchive ? (
-        <div className="flex gap-2 rounded-lg border border-warning-border bg-warning-soft p-3 text-sm text-warning-fg">
-          <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+        <div className="flex gap-2 rounded-md border border-warning bg-warning-soft p-3 text-cell text-warning">
+          <AlertTriangle size={16} className="mt-px shrink-0" aria-hidden />
           <p>
             <span className="font-medium">Recommended:</span> delete permanently. Archiving with a
             non-zero {balanceLabel} will make your wealth chart show a sudden step today.

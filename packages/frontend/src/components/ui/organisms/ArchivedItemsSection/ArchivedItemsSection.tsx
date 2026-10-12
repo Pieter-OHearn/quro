@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Archive, ChevronDown, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
+import { Button } from '../../atoms/Button';
+import { Card } from '../../atoms/Card';
 import { ArchiveOrDeleteDialog } from '../ArchiveOrDeleteDialog';
 
 export type ArchivedItem = {
@@ -49,28 +51,32 @@ function ArchivedRow<T extends ArchivedItem>({
 }>) {
   const archivedLabel = formatArchivedAt(item.archivedAt);
   return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-surface-sunken/60 transition-colors">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-fg-strong truncate">{item.name}</p>
-        <p className="text-xs text-fg-faint">
+    <div className="flex min-h-9 items-center gap-2 px-3 py-px transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-cell font-medium text-fg">{item.name}</p>
+        <p className="text-caption text-fg-subtle">
           {archivedLabel ? `Archived ${archivedLabel}` : 'Archived'}
           {renderMeta ? <> · {renderMeta(item)}</> : null}
         </p>
       </div>
-      <button
+      <Button
         onClick={() => onUnarchive(item)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-default text-fg-muted hover:bg-surface-sunken text-xs transition-colors"
+        variant="secondary"
+        size="sm"
+        leadingIcon={<RotateCcw size={12} aria-hidden />}
         title="Restore"
       >
-        <RotateCcw size={12} /> Restore
-      </button>
-      <button
+        Restore
+      </Button>
+      <Button
         onClick={() => onRequestDelete(item)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-danger-border text-danger hover:bg-danger-soft text-xs transition-colors"
+        variant="danger"
+        size="sm"
+        leadingIcon={<Trash2 size={12} aria-hidden />}
         title="Delete permanently"
       >
-        <Trash2 size={12} /> Delete
-      </button>
+        Delete
+      </Button>
     </div>
   );
 }
@@ -84,15 +90,17 @@ function SectionHeader({
   const Chevron = expanded ? ChevronDown : ChevronRight;
   return (
     <button
+      type="button"
       onClick={onToggle}
-      className="w-full flex items-center gap-2 px-4 py-3 hover:bg-surface-sunken/80 transition-colors"
+      aria-expanded={expanded}
+      className="flex h-9 w-full items-center gap-2 px-3 text-left transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring max-sm:h-11 max-sm:px-4"
     >
-      <Archive size={14} className="text-fg-faint" />
-      <span className="text-sm font-medium text-fg-muted">{title}</span>
-      <span className="text-xs text-fg-faint">
+      <Archive size={14} className="text-fg-faint" aria-hidden />
+      <span className="text-cell font-medium text-fg">{title}</span>
+      <span className="text-caption text-fg-subtle font-numeric">
         {count} item{count === 1 ? '' : 's'}
       </span>
-      <Chevron size={16} className="ml-auto text-fg-faint" />
+      <Chevron size={16} className="ml-auto text-fg-faint" aria-hidden />
     </button>
   );
 }
@@ -115,7 +123,7 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
   const balance = pendingDelete && getBalance ? getBalance(pendingDelete) : null;
 
   return (
-    <div className="bg-surface border border-border-default rounded-lg overflow-hidden">
+    <Card padding="none" className="overflow-hidden">
       <SectionHeader
         title={title}
         count={items.length}
@@ -123,7 +131,7 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
         onToggle={() => setExpanded((value) => !value)}
       />
       {expanded ? (
-        <div className="divide-y divide-border-subtle border-t border-border-subtle">
+        <div className="divide-y divide-border-subtle border-t border-border-default">
           {items.map((item) => (
             <ArchivedRow
               key={item.id}
@@ -151,6 +159,6 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
           onCancel={() => setPendingDelete(null)}
         />
       ) : null}
-    </div>
+    </Card>
   );
 }
