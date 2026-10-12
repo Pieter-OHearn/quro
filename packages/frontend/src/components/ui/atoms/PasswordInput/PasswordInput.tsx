@@ -32,18 +32,20 @@ export function PasswordInput({
         value={value}
         disabled={disabled}
         error={error}
-        className={cn('pr-8', className)}
+        className={cn('pr-8 max-sm:pr-11', className)}
         onChange={onChange}
       />
+      {/* The toggle covers the end of the field at its full height: 32px square on desktop and
+          44px on phones. */}
       <button
         type="button"
         disabled={disabled}
         aria-label={show ? 'Hide password' : 'Show password'}
         aria-pressed={show}
-        className="absolute inset-y-0 right-2 flex items-center text-fg-faint transition-colors hover:text-fg-muted disabled:cursor-not-allowed disabled:text-fg-disabled"
+        className="absolute inset-y-0 right-0 flex w-8 max-sm:w-11 items-center justify-center rounded-md text-fg-faint transition-colors duration-fast hover:text-fg-muted active:text-fg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:text-fg-disabled"
         onClick={onToggle}
       >
-        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        {show ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
       </button>
     </div>
   );

@@ -36,6 +36,30 @@ export const CHANGES_SINCE_FIXTURE: Record<string, TableChange> = {
   },
   // Single-use registration and password-reset codes.
   'public.auth_codes': { newTable: { rows: 0 } },
+  // Prices per share widen from numeric(19,2) to numeric(23,6). Every value stays the same; only
+  // its text form gains four trailing zeros, so each price is compared at the new scale.
+  'public.holdings': {
+    rewrittenColumns: {
+      current_price: 'current_price::numeric(23,6)',
+      manual_price: 'manual_price::numeric(23,6)',
+    },
+  },
+  'public.holding_transactions': { rewrittenColumns: { price: 'price::numeric(23,6)' } },
+  'public.holding_price_history': {
+    rewrittenColumns: { close_price: 'close_price::numeric(23,6)' },
+  },
+  // Repayments record the principal the zero clamp absorbed (none for existing rows) and, for
+  // property repayments, the debt they reduced (unknown for existing rows, which keep following
+  // the property's current link).
+  'public.debt_payments': { addedColumns: { unapplied_principal: '0::numeric(19,2)' } },
+  'public.mortgage_transactions': { addedColumns: { unapplied_principal: '0::numeric(19,2)' } },
+  'public.property_transactions': {
+    addedColumns: {
+      unapplied_principal: '0::numeric(19,2)',
+      repayment_target: 'null::text',
+      repayment_mortgage_id: 'null::integer',
+    },
+  },
 };
 
 /**

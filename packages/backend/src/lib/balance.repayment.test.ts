@@ -51,7 +51,7 @@ describe('applyRepayment / reverseRepayment', () => {
     const applied = await db.transaction((tx) =>
       applyRepayment(tx, DEBT_BALANCE, { id: debtId, principal: 40, where: ownerScope }),
     );
-    expect(applied).toBe(60);
+    expect(applied).toEqual({ balance: 60, unapplied: 0 });
     expect(await readBalance(debtId)).toBe(60);
 
     // Principal beyond the balance (plus the 0.01 tolerance) is rejected untouched.
@@ -61,11 +61,12 @@ describe('applyRepayment / reverseRepayment', () => {
     expect(rejected).toBeNull();
     expect(await readBalance(debtId)).toBe(60);
 
-    // Within tolerance the balance is clamped at zero rather than going negative.
+    // Within tolerance the balance is clamped at zero rather than going negative, and the cent
+    // the clamp absorbed is reported so a reversal can leave it out.
     const clamped = await db.transaction((tx) =>
       applyRepayment(tx, DEBT_BALANCE, { id: debtId, principal: 60.01, where: ownerScope }),
     );
-    expect(clamped).toBe(0);
+    expect(clamped).toEqual({ balance: 0, unapplied: 0.01 });
 
     // Another user's scope matches no row.
     const foreign = await db.transaction((tx) =>
@@ -83,5 +84,16 @@ describe('applyRepayment / reverseRepayment', () => {
     );
     expect(restored).toBe(40);
     expect(await readBalance(debtId)).toBe(40);
+
+    // Reversing a clamped repayment restores only what it applied.
+    const partial = await db.transaction((tx) =>
+      reverseRepayment(tx, DEBT_BALANCE, {
+        id: debtId,
+        principal: 60.01,
+        unapplied: 0.01,
+        where: ownerScope,
+      }),
+    );
+    expect(partial).toBe(100);
   });
 });

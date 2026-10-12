@@ -22,8 +22,8 @@ Plain SQL and loose files keep the fixture small (about 130 KB), readable in a d
 
 1. PostgreSQL 16.11 loads `database.sql`; an S3 test double receives the documents.
 2. The database moves to the PostgreSQL version in `docker-compose.yml` by dump and restore, each with its own server's client tools, into a new data directory. The restore goes into an empty database, before any migration of the new version has run. Every table and sequence must be identical across the two versions.
-3. Before `quro migrate`, the backend image built from the checkout starts as a server with the example Compose file's health check. It must stay not ready: `GET /api/readiness` answers `503` with the schema's reason, `quro health` exits 1, Docker reports the container `unhealthy`, and `quro migrate --status --json` reports the pending migration with exit code 1. A configuration written for 0.7.0 (no `POSTGRES_HOST`, S3 settings without `QRO_DOCUMENT_STORAGE`) and the 0.7.0 server command must stop with exit code 2.
-4. Failures change nothing: a `quro migrate` that fails on an object in its way, and one killed while it records its migration, leave every table and sequence as restored. Two `quro migrate` runs started at once both succeed: one applies the migration, the other waits for the lock and finds nothing to do. A further run changes nothing.
+3. Before `quro migrate`, the backend image built from the checkout starts as a server with the example Compose file's health check. It must stay not ready: `GET /api/readiness` answers `503` with the schema's reason, `quro health` exits 1, Docker reports the container `unhealthy`, and `quro migrate --status --json` reports exactly the migrations the checkout's journal adds to the fixture, with exit code 1. A configuration written for 0.7.0 (no `POSTGRES_HOST`, S3 settings without `QRO_DOCUMENT_STORAGE`) and the 0.7.0 server command must stop with exit code 2.
+4. Failures change nothing: a `quro migrate` that fails on an object in its way, and one killed while it records its first migration, leave every table and sequence as restored. Two `quro migrate` runs started at once both succeed: one applies the migrations, the other waits for the lock and finds nothing to do. A further run changes nothing.
 5. The server becomes ready without a restart. A schema newer than the image is refused by `quro migrate` and `quro migrate --status` (exit code 3) and reported by readiness (`schema_ahead`).
 6. [`verify.ts`](../scripts/upgrade-fixture/verify.ts) compares the upgraded database with the 0.7.0 one and fails on any difference that [`expectations.ts`](../scripts/upgrade-fixture/expectations.ts) does not declare:
    - every table: row count, a checksum over all rows and null counts per column;
@@ -46,13 +46,13 @@ The [PostgreSQL upgrade rehearsal](postgresql-upgrade.md#how-this-is-tested) sta
 
 ## When your migration changes existing data
 
-A migration that adds a table or column, rewrites values or removes rows fails the upgrade test until `expectations.ts` declares what it does. That is deliberate: the declaration is the reviewable statement of what happens to an operator's data. Add one entry per table, in the same pull request as the migration:
+A migration that adds a table or column, rewrites values, changes a column's type or removes rows fails the upgrade test until `expectations.ts` declares what it does. That is deliberate: the declaration is the reviewable statement of what happens to an operator's data. Add one entry per table, in the same pull request as the migration:
 
 | Field              | Use it for                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------ |
 | `newTable`         | A table that did not exist in 0.7.0, with the number of rows the migrations leave in it    |
 | `addedColumns`     | A new column, with SQL over the 0.7.0 row that gives the value existing rows must get      |
-| `rewrittenColumns` | A column whose values change, with SQL over the 0.7.0 row that gives the new value         |
+| `rewrittenColumns` | A column whose values or type change, with SQL over the 0.7.0 row that gives the new value |
 | `keptRows`         | A condition on the 0.7.0 row for the rows that must survive, when a migration deletes rows |
 | `appendedRows`     | Rows the migrations add to an existing table, after the 0.7.0 rows by an integer key       |
 
@@ -64,6 +64,8 @@ For example, the migration that stores session ids as digests is declared as:
   addedColumns: { last_used_at: 'created_at', user_agent: 'null::text' },
 },
 ```
+
+A type change that keeps every value, such as a wider numeric scale, is a cast: the price columns that gained four decimals are declared as `price: 'price::numeric(23,6)'`, so the comparison checks that each value is unchanged at its new scale.
 
 Dropping a column or table always fails. Removing user data needs the maintainers' approval and a backup instruction in the release notes first. New provenance or document columns go into `PROVENANCE_COLUMNS` and `ATTACHMENTS` in the same file.
 

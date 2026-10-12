@@ -1,0 +1,32 @@
+# Accepted security scan findings: the only place a finding that would fail a scan can be
+# accepted. The scans and their gate are in scripts/lib/security-scan.ts; the process is in
+# SECURITY.md ("How findings are handled"). Trivy reads this file as its ignore file; secret
+# exceptions name a gitleaks fingerprint (shown in the scan report).
+#
+# Every entry needs:
+#   id          what it covers: a CVE or GHSA id, a Trivy check id (DS-0002), a Trivy secret rule
+#               id for a secret in an image, or a gitleaks fingerprint (commit:file:rule:line)
+#   statement   why the risk is accepted for now: reachability, impact, what would remove it
+#   owner       the GitHub account that revisits it
+#   expired_at  YYYY-MM-DD, at most 90 days ahead; from that date the finding blocks again
+# Optional for Trivy entries: paths or purls, to narrow an entry to one file or package.
+#
+# Prefer a fix, an upgraded base image or a removed package over an entry here. A real secret is
+# never accepted: revoke it, then remove it from the history or record why that is not needed.
+
+vulnerabilities:
+  # Optional statement-import parser image, built from source and not published; scanned weekly.
+  - id: CVE-2026-6653
+    purls:
+      - pkg:deb/debian/libxml2
+    statement: >-
+      libxml2 denial of service on crafted XML, pulled in through libarchive for Tesseract. Debian
+      has no fixed package yet. The parser image is optional, not published and reachable only
+      from the import worker on its own network; it reads PDFs, not XML. Remove when Debian ships
+      a fix.
+    owner: Pieter-OHearn
+    expired_at: 2026-11-30
+
+misconfigurations: []
+
+secrets: []

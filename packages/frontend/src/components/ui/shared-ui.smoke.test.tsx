@@ -219,10 +219,10 @@ const smokeCases: readonly SmokeCase[] = [
     ],
   },
   {
-    name: 'TextInput is 32px with a control border, 44px on phones',
+    name: 'TextInput is 32px with a control border, 44px on phones, in the field type style',
     element: <TextInput value="" onChange={noop} aria-label="Name" />,
     includes: [
-      'h-8 max-sm:h-11 rounded-md border text-cell',
+      'h-8 max-sm:h-11 rounded-md border text-field',
       'px-2 border-border-control bg-surface',
       'focus:outline-2 focus:outline-offset-1 focus:outline-focus-ring',
     ],
@@ -275,7 +275,14 @@ const smokeCases: readonly SmokeCase[] = [
   {
     name: 'PasswordInput renders toggle button and masked input',
     element: <PasswordInput value="password123" show={false} onChange={noop} onToggle={noop} />,
-    includes: ['type="password"', 'value="password123"', 'aria-label="Show password"'],
+    includes: [
+      'type="password"',
+      'value="password123"',
+      'aria-label="Show password"',
+      'pr-8 max-sm:pr-11',
+      'absolute inset-y-0 right-0 flex w-8 max-sm:w-11 items-center justify-center rounded-md',
+      'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+    ],
   },
   {
     name: 'QuroLogo renders the one-colour V1 mark in text-brand',

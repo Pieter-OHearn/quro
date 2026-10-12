@@ -104,6 +104,8 @@ Rules:
 
 One family: Geist (variable, weights 400 to 600), self-hosted through `@fontsource-variable/geist`. The stack is `'Geist Variable', system-ui, -apple-system, sans-serif`; the platform font is the only fallback. No monospace, including `code` and `pre`. Every number that can be compared with another uses the `font-numeric` utility (tabular numerals) and is right-aligned in columns. Labels are sentence case; no uppercase, no letter-spaced labels. Tracking tightens as size grows and is 0 at body size and below.
 
+Field text is 16px below 640px because iOS Safari zooms the page into a focused field whose text is smaller than 16px; on desktop it stays the 13px `cell` style.
+
 | Style           | Size / line height                    | Weight | Letter spacing | Use                                                                       |
 | --------------- | ------------------------------------- | ------ | -------------- | ------------------------------------------------------------------------- |
 | `figure-hero`   | 30px / 36px (34px / 40px below 640px) | 600    | -0.02em        | The one headline figure of a page                                         |
@@ -114,6 +116,7 @@ One family: Geist (variable, weights 400 to 600), self-hosted through `@fontsour
 | `title-section` | 15px / 20px                           | 600    | 0              | Card and dialog titles                                                    |
 | `body`          | 14px / 20px (15px / 20px below 640px) | 400    | 0              | Prose                                                                     |
 | `cell`          | 13px / 18px                           | 400    | 0              | Tables and controls                                                       |
+| `field`         | 13px / 18px (16px / 20px below 640px) | 400    | 0              | Text in inputs, selects and text areas: `cell` on desktop                 |
 | `label`         | 12px / 16px                           | 500    | 0              | Field labels, column headers, stat labels. Sentence case, `text-fg-muted` |
 | `caption`       | 12px / 16px                           | 400    | 0              | Captions. 11px is the floor: badges, tab-bar labels and chart axes only   |
 

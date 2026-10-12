@@ -52,6 +52,8 @@ od -An -N32 -tx1 /dev/urandom | tr -d ' \n' >"$WORK/other-key/backup_key"
 chmod 755 "$WORK/secrets" "$WORK/other-key"
 chmod 644 "$WORK/secrets/"* "$WORK/other-key/"*
 ADMIN_PASSWORD=$(cat "$WORK/secrets/postgres_admin_password")
+# The restrictions of docs/compose.example.yaml: backups and restores work under them.
+HARDENED="--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true --memory 1g --pids-limit 200"
 
 step() { printf '\n==> %s\n' "$1"; }
 fail() { echo >&2 "FAIL: $1"; exit 1; }
@@ -103,7 +105,7 @@ backend() {
   while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do options="$options $1"; shift; done
   shift
   # shellcheck disable=SC2086
-  docker run --rm --network "$NET" \
+  docker run --rm --network "$NET" $HARDENED \
     -v "$WORK/secrets:/run/secrets:ro" -v "$documents:/var/lib/quro/documents" \
     -v "$RUN-backups:/var/lib/quro/backups" -v "$RUN-offsite:/var/lib/quro/offsite" \
     -e POSTGRES_HOST="$host" -e POSTGRES_DB="$DB" \
@@ -125,7 +127,8 @@ quro() {
 
 # start_api NAME HOST DOCUMENTS_VOLUME: the API server, as `docker compose up` runs it.
 start_api() {
-  docker run -d --name "$1" --network "$NET" --network-alias "$1" \
+  # shellcheck disable=SC2086
+  docker run -d --name "$1" --network "$NET" --network-alias "$1" $HARDENED \
     -v "$WORK/secrets:/run/secrets:ro" -v "$3:/var/lib/quro/documents" \
     -e POSTGRES_HOST="$2" -e POSTGRES_DB="$DB" -e POSTGRES_APP_USER=quro_app \
     -e QRO_DISABLE_SCHEDULERS=true -e QRO_DOCUMENT_STORAGE=filesystem "$IMAGE" >/dev/null

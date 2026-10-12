@@ -11,7 +11,7 @@
 #      before any new migration runs. Every table and sequence must be identical.
 #   3. Before `quro migrate`: the new image's server starts but stays unhealthy (readiness 503,
 #      `quro health` 1, Docker health status unhealthy), `quro migrate --status` reports the
-#      pending migration, and a 0.7.0-style configuration is refused with exit code 2.
+#      pending migrations, and a 0.7.0-style configuration is refused with exit code 2.
 #   4. Failures: a migration that fails, and one killed part way, change nothing; two runs started
 #      at once apply the migrations once. A further run changes nothing.
 #   5. The server becomes ready without a restart; a schema newer than the image is refused by
@@ -65,7 +65,7 @@ DOCUMENTS="$WORK/documents"
 # The advisory lock `quro migrate` holds: `quro` in ASCII, then 1 (src/db/migrateDatabase.ts).
 MIGRATION_LOCK_CLASS=$(printf '%d' 0x7175726f)
 MIGRATION_LOCK_OBJECT=1
-FIXTURE_MIGRATION=0038_session_hashes_and_auth_codes
+JOURNAL="$REPO/packages/backend/src/db/migrations/meta/_journal.json"
 # Throwaway credentials for containers that live for a few minutes on the loopback interface.
 ADMIN_PASSWORD=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
 APP_PASSWORD=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
@@ -319,6 +319,19 @@ fingerprint "$RUN-new" "$DB" >"$WORK/restored.snap"
 if ! diff "$WORK/before.snap" "$WORK/restored.snap"; then fail "the restore on $major differs from the 16 database"; fi
 echo "identical on PostgreSQL $major before migrating"
 
+# The migrations this checkout adds to the fixture: the journal entries after those it recorded.
+recorded=$(sql_new "select count(*) from drizzle.__drizzle_migrations;")
+pending() {
+  bun -e "const tags = (await Bun.file('$JOURNAL').json()).entries.slice($recorded).map((e) => e.tag);
+console.log($1)"
+}
+PENDING_JSON=$(pending 'JSON.stringify(tags)')
+# The line `quro migrate` prints once it applied them, listed as formatMigrations in
+# src/db/migrateDatabase.ts lists them.
+# shellcheck disable=SC2016
+APPLIED_LINE=$(pending '`Applied ${tags.length} migration(s): ${tags.length <= 5 ? tags.join(", ") : `${tags[0]} to ${tags.at(-1)}`}.`')
+[ "$PENDING_JSON" != '[]' ] || fail "the journal has no migration newer than the fixture"
+
 step "Before quro migrate: the new image starts, is not ready and says why"
 serve "$S3_ENV"
 reason=$(readiness_reason)
@@ -331,8 +344,8 @@ wait_health unhealthy
 echo "Docker health status: unhealthy"
 expect_exit 1 quro migrate --status --json
 [ "$(printf '%s' "$out" | json_field status)" = '"behind"' ] || fail "migrate --status: $out"
-[ "$(printf '%s' "$out" | json_field pending)" = "[\"$FIXTURE_MIGRATION\"]" ] || fail "migrate --status: $out"
-echo "quro migrate --status (exit 1): behind, pending $FIXTURE_MIGRATION"
+[ "$(printf '%s' "$out" | json_field pending)" = "$PENDING_JSON" ] || fail "migrate --status: $out"
+echo "quro migrate --status (exit 1): behind, pending $PENDING_JSON"
 
 step "A configuration written for 0.7.0 is refused before anything starts"
 expect_exit 2 docker run --rm --network "$NET" -e POSTGRES_DB="$DB" -e POSTGRES_APP_USER="$APP_USER" \
@@ -371,9 +384,9 @@ release
 docker rm "$RUN-killed" >/dev/null
 fingerprint "$RUN-new" "$DB" >"$WORK/after-kill.snap"
 diff "$WORK/restored.snap" "$WORK/after-kill.snap" || fail "the killed migration changed the database"
-echo "killed while recording $FIXTURE_MIGRATION; database unchanged"
+echo "killed while recording the first pending migration; database unchanged"
 
-step "Two quro migrate runs at once: one applies the migration, the other waits and changes nothing"
+step "Two quro migrate runs at once: one applies the migrations, the other waits and changes nothing"
 # The test holds the lock first, so both runs are certainly waiting at the same time.
 hold "select pg_advisory_lock($MIGRATION_LOCK_CLASS, $MIGRATION_LOCK_OBJECT);"
 wait_for "select count(*) from pg_locks where locktype = 'advisory' and granted and classid = $MIGRATION_LOCK_CLASS and objid = $MIGRATION_LOCK_OBJECT" 1 \
@@ -389,13 +402,13 @@ for run in a b; do
   docker rm "$RUN-migrate-$run" >/dev/null
 done
 cat "$WORK/migrate-a.log"
-[ "$(cat "$WORK/migrate-a.log" "$WORK/migrate-b.log" | grep -c "^Applied 1 migration(s): $FIXTURE_MIGRATION.")" = 1 ] ||
-  fail "the migration was not applied exactly once"
+[ "$(cat "$WORK/migrate-a.log" "$WORK/migrate-b.log" | grep -cxF "$APPLIED_LINE")" = 1 ] ||
+  fail "the migrations were not applied exactly once"
 [ "$(cat "$WORK/migrate-a.log" "$WORK/migrate-b.log" | grep -c '^No migrations to apply.')" = 1 ] ||
   fail "the waiting run did not find the work done"
 [ "$(cat "$WORK/migrate-a.log" "$WORK/migrate-b.log" | grep -c 'waiting for it to finish')" = 2 ] ||
   fail "the runs did not wait for the lock"
-echo "both runs exited 0; the migration was applied once"
+echo "both runs exited 0; the migrations were applied once"
 second_out=$(quro migrate)
 case "$second_out" in *'No migrations to apply.'*) ;; *) fail "a further quro migrate was not a no-op: $second_out" ;; esac
 echo "a further run changed nothing"

@@ -17,8 +17,7 @@ Decided on 2026-10-09:
 - Money in a request is rounded to cents when it is parsed, and an amount of 10^13 or more is
   refused ([money input](#money-input)).
 - Unit prices, share quantities, FX rates and percentages are not money and keep their decimal
-  precision. Prices per share are stored with two decimals today; widening them to six decimals
-  is a separate change.
+  precision. Prices per share are stored with six decimals ([unit prices](#unit-prices)).
 - A money scale wider than two decimals, for a three-decimal currency, would be an additive
   migration if it is ever needed.
 
@@ -42,6 +41,8 @@ Money is rounded to cents, half away from zero, at these points and nowhere else
 - When a budget amount is converted to EUR on write.
 - When a repayment's principal is derived as `amount - interest`.
 - In the clamped balance helpers in `packages/backend/src/lib/balance.ts`.
+- When a holding's value (shares × price) is shown. It is computed from the stored six-decimal
+  price, never from a price rounded for display; inside an aggregate it is not rounded on its own.
 - When an aggregate (net worth, snapshot, runway) is stored or shown. These aggregates still sum
   numbers and round once at the end; moving them onto integer cents is part of consolidating the
   domain maths in `@quro/shared`.
@@ -61,19 +62,33 @@ refuse an absolute value of 10^13 or more with a 400 that names the field.
 | Properties       | `purchasePrice`, `currentValue`, `mortgage`, `monthlyRent`; transaction `amount`, `interest`, `principal`                                            |
 | Mortgages        | `originalAmount`, `outstandingBalance`, `propertyValue`, `monthlyPayment`; transaction `interest`, `principal`, and `amount` except on a rate change |
 | Debts            | `originalAmount`, `remainingBalance`, `monthlyPayment`; payment `amount`, `interest`                                                                 |
+| Holdings         | a dividend transaction's `price` (the amount received)                                                                                               |
 | Payslips         | `gross`, `tax`, `pension`, `net`, `bonus`                                                                                                            |
 | Goals            | `currentAmount`, `targetAmount`, `monthlyContribution`, `monthlyTarget`                                                                              |
 | Plan assumptions | `leanBurnOverride`, `benefitMonthlyOverride`, `severanceMonthlySalaryOverride`                                                                       |
 
-Not money, and parsed without the rule: holding `currentPrice`, `manualPrice` and transaction
-`price` and `shares`; every interest rate; a mortgage rate change's `amount` (the new rate);
-`overpaymentLimit` (a percentage); `emergencyLifestylePct`; durations and counts. bunq payments
-are provider data rather than requests and arrive with two decimals.
+Not money, and parsed without the rule: holding `currentPrice` and `manualPrice` and a buy or
+sell's `price` (unit prices, see below) and `shares`; every interest rate; a mortgage rate
+change's `amount` (the new rate); `overpaymentLimit` (a percentage); `emergencyLifestylePct`;
+durations and counts. bunq payments are provider data rather than requests and arrive with two
+decimals.
 
 Two edge cases. A goal with a `unit` may count something other than money, but its amounts are
 stored with two decimals either way, so the rule only does what storage already does. A dividend's
-amount travels in the holding transaction's `price` field, a unit-price field, so it is not
-parsed as money; it is still stored with two decimals.
+amount travels in the holding transaction's `price` field, a six-decimal unit-price column, so
+the rule is applied by transaction type: a dividend's `price` is rounded to cents and refused at
+10^13 like any amount, and the column never holds a sub-cent dividend.
+
+### Unit prices
+
+A price per share (holding `currentPrice` and `manualPrice`, a buy or sell's `price`, and the
+close prices in the price history) is stored as `numeric(23,6)`: six decimals and the same 17
+integer digits as money. `parseUnitPriceField` and `roundUnitPrice` in
+`packages/backend/src/lib/requestValidation.ts` round a price to six decimals half away from
+zero when it is parsed, working on the number's shortest decimal text, so the result is exactly
+what PostgreSQL stores; a minimum such as "greater than zero" is applied after rounding. Quotes
+from the price provider are stored with the precision they arrive with, up to six decimals.
+Interfaces may show fewer decimals; that rounding is for display only.
 
 ### Measured envelope
 
@@ -84,7 +99,7 @@ asserted by the property tests:
 | ----------------------------------------------------------------------- | ------------------------------------ |
 | `toCents` equals exact half-away-from-zero rounding of the decimal text | up to 3 decimals, below 10^12        |
 | A 2-decimal value survives text, number, text unchanged                 | below 10^13 (fails from about 10^14) |
-| A 6-decimal share or FX rate survives the same round trip               | below 10^9                           |
+| A 6-decimal share, unit price or FX rate survives the same round trip   | below 10^9                           |
 | `toCents(a + b) = toCents(a) + toCents(b)` for cent amounts             | below 10^12                          |
 | A float sum of cent amounts, rounded once, equals the exact cent sum    | 2,000 terms below 10^6 each (tested) |
 
@@ -121,14 +136,12 @@ native currencies and provenance survive.
 | Value                                            | Column type     | Rounded when                                                    |
 | ------------------------------------------------ | --------------- | --------------------------------------------------------------- |
 | Balances, amounts, payments, snapshot components | `numeric(19,2)` | when parsed; at the rounding points; stored (PostgreSQL)        |
-| Holding prices (unit prices)                     | `numeric(19,2)` | stored                                                          |
+| Holding prices (unit prices)                     | `numeric(23,6)` | when parsed; stored                                             |
 | Holding shares                                   | `numeric(19,6)` | stored                                                          |
 | FX rates to EUR                                  | `numeric(12,6)` | stored; never rounded in conversion                             |
 | Interest rates                                   | `numeric(7,4)`  | stored                                                          |
 | Import confidence                                | `numeric(5,4)`  | stored                                                          |
 | Display                                          | n/a             | `formatCurrency`: 2 decimals unless a view asks for whole units |
-
-Holding prices are stored with 2 decimals, so a quote with more decimals loses them when saved.
 
 ## Signs
 
@@ -138,7 +151,7 @@ Amounts on ledger rows are positive; the row type gives the effect.
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Savings                  | `deposit` and `interest` add, `withdrawal` subtracts; the stored sign is ignored.                                                  |
 | Pension                  | `contribution` adds `amount - taxAmount`, `fee` subtracts, `annual_statement` adds its signed amount, any other type does nothing. |
-| Mortgage, property, debt | A repayment's principal reduces the outstanding balance, never below zero.                                                         |
+| Mortgage, property, debt | A repayment's principal reduces the outstanding balance, never below zero; the part a zero balance cannot take is recorded.        |
 | Holdings                 | Shares are buys minus sells, floored at zero per holding; dividends do not move shares.                                            |
 | Budget                   | A transaction's EUR amount adds to its category's `spent`.                                                                         |
 
@@ -185,16 +198,32 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
 - **Edits and deletes are reversible.** An edit reverses the old row's effect and applies the new
   one; a delete reverses it. Editing a row and editing it back, or creating a row and deleting it,
   leaves the balance as it was.
+- **Clamped repayments reverse exactly.** A repayment whose principal exceeds the balance by up to
+  one cent leaves the balance at zero and records the principal it could not apply
+  (`unappliedPrincipal`). An edit or delete restores only what was applied, so a debt of 100.00
+  with a payment of 100.01 returns to 100.00 when the payment is deleted.
+- **Repayments stay with their debt.** A property repayment records the debt it reduced: the
+  property's own debt or a mortgage (`repaymentTarget`, `repaymentMortgageId`). Editing it on the
+  same property or deleting it reverses the effect on that debt, even after the property was
+  linked to a mortgage, relinked or unlinked. A repayment whose mortgage was deleted moves no
+  balance. Moving a repayment to another property pays that property's current debt.
 - **Moves conserve.** Moving a transaction to another account or pot removes its effect from the
   old parent and adds it to the new one.
 - **Concurrent writes serialise.** An edit or delete locks the ledger row before reversing it, so a
   second edit or delete of the same row waits for the first and works from its result. Savings,
   mortgage and property rows are reached through their parent, so one that moved to another
   parent in the meantime is refused with `409`; budget, pension and debt rows are reached through
-  their owner and need no such check.
+  their owner, and one that moved is refused with `409` too.
+- **Parents are locked before their rows.** Every edit or delete locks the parent rows it may
+  change (account, pot, debt, category, or mortgages and then properties) in ascending id order,
+  then the ledger row. A cascade archive locks the parent and then deletes its rows, so an archive
+  and an edit of one of its rows wait for each other instead of deadlocking; the edit then finds
+  the row gone (`404`).
 - **Imports apply once.** bunq payments are keyed by `(user, bunqTransactionId)`; a repeated
   import adds nothing. A reviewed pension statement is claimed by its commit, so a second commit
-  of the same import is refused and its rows reach the ledger once.
+  of the same import is refused and its rows reach the ledger once. A unique index allows one
+  committed import per statement file (by SHA-256) and pot, so of two imports of the same file
+  committed at once one writes its rows and the other is answered `409`.
 - **Linked debt is read, not copied.** A property linked to an active mortgage takes its debt from
   the mortgage; an archived or missing linked mortgage contributes no debt. Mortgage debt is
   deducted inside property equity and never counted again as a liability.
@@ -207,9 +236,9 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
 
 These are recorded, not yet fixed:
 
-- **Clamp at zero.** A repayment whose principal exceeds the balance by up to one cent is accepted
-  and leaves the balance at zero. Deleting it restores the full principal, so the balance ends one
-  cent above where it started.
+- **Repayments recorded before 0.9.0.** They carry no clamped principal and no debt. One that was
+  clamped still restores its full principal (at most one cent too much), and a property repayment
+  is still reversed against the property's current link. Quro does not guess either for old rows.
 - **Provider balances.** A bunq-synced savings account takes its balance from bunq; its imported
   transactions are a record and do not move the balance.
 
@@ -237,6 +266,11 @@ Rules for every figure:
   `packages/shared/src/types/jurisdiction.ts`); after that it resolves as extrapolated until
   someone reviews it. Rules without a source, such as the default tax rate, are model
   assumptions and are labelled as defaults instead.
+- **Only rules in use are listed.** The runway's `jurisdiction.rulesEffectiveFrom` and
+  `isExtrapolated` cover the rules the runway used. The default tax rate counts only when no
+  payslip supplied a rate (`taxRateSource` is `jurisdiction_default`); a runway that used no rule
+  reports `rulesEffectiveFrom: null`. The tax rate comes from the latest twelve payslips by date,
+  and payslips that share a date are taken in the order they were entered.
 
 The frontend already treats an FX rate as stale 48 hours after `updatedAt`, but no view shows
 that yet. Showing these indicators consistently in the interface is design work that follows this
@@ -284,11 +318,14 @@ correction. Inputs and outputs below were run against both implementations.
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Cent rounding, round trips, float sums                    | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                            |
 | Money input: cents, the 10^13 limit, non-money untouched  | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                     |
+| Unit prices: six decimals, dividends in cents, value      | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`      |
 | Allocation identities, order, additivity, FX, linked debt | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                 |
 | Joint shares, signs, missing data                         | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                     |
 | FX cut-offs and fail-closed rates                         | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                   |
 | Ledger balances under random edits, moves and deletes     | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                     |
 | Concurrent edits, deletes and import commits              | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                    |
+| Clamped repayments, repayment debt, archive vs edit       | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                    |
+| One committed import per statement (migration preflight)  | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                           |
 | Golden household reconciliation across API, pages and SQL | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                              |
 | Repeated bunq imports                                     | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts` |
 | Stale and extrapolated rules                              | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                 |

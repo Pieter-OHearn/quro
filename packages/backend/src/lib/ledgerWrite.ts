@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { HTTP_STATUS } from '../constants/http';
 import type { DbTransaction } from '../db/client';
@@ -79,6 +79,29 @@ export type LedgerRejection = {
 /** Answer (409) when a ledger row moved to another parent between its access check and its lock. */
 export const LEDGER_ROW_CHANGED =
   'Transaction changed while it was being edited; reload it and try again';
+
+/**
+ * Locks parent rows (accounts, pots, debts, mortgages, properties, categories) in ascending id
+ * order, before any of their ledger rows, and returns the ones that still exist. A cascade archive
+ * locks the parent and then deletes its ledger rows, so an edit or delete that also takes the
+ * parent first waits for the archive (or the archive waits for it) instead of deadlocking.
+ * Missing and repeated ids are ignored.
+ */
+export async function lockLedgerParents<T extends PgTable & { id: PgColumn }>(
+  tx: DbTransaction,
+  table: T,
+  ids: readonly (number | null | undefined)[],
+): Promise<T['$inferSelect'][]> {
+  const unique = [...new Set(ids.filter((id): id is number => id != null))].sort((a, b) => a - b);
+  if (unique.length === 0) return [];
+  const rows = await tx
+    .select()
+    .from(table as PgTable)
+    .where(inArray(table.id, unique))
+    .orderBy(asc(table.id))
+    .for('no key update');
+  return rows as T['$inferSelect'][];
+}
 
 /**
  * Locks one ledger row until the transaction ends and returns its committed values, or null

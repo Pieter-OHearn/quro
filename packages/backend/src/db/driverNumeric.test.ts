@@ -21,7 +21,11 @@ describe('driver numerics round-trip at their column scale', () => {
   const cases = [
     { scale: 2, below: 1e13, label: 'money numeric(19,2)' },
     { scale: 4, below: 1e3, label: 'rates numeric(7,4)' },
-    { scale: 6, below: 1e9, label: 'shares numeric(19,6) and FX numeric(12,6)' },
+    {
+      scale: 6,
+      below: 1e9,
+      label: 'shares numeric(19,6), prices numeric(23,6) and FX numeric(12,6)',
+    },
   ];
   let state = 7;
   const random = () => {

@@ -429,6 +429,10 @@ export const stockExchanges = pgTable('stock_exchanges', {
 
 // ── Holdings / Investments ───────────────────────────────────────────────────
 
+// A price per share is a unit price, not money, and keeps six decimals. It keeps the 17 integer
+// digits of numeric(19,2) too, so every price stored with two decimals fits unchanged.
+const UNIT_PRICE_NUMERIC = { precision: 23, scale: 6 } as const;
+
 export const holdings = pgTable(
   'holdings',
   {
@@ -438,14 +442,14 @@ export const holdings = pgTable(
       .notNull(),
     name: text('name').notNull(),
     ticker: text('ticker').notNull(),
-    currentPrice: numericAsNumber('current_price', { precision: 19, scale: 2 }).notNull(),
+    currentPrice: numericAsNumber('current_price', UNIT_PRICE_NUMERIC).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     sector: text('sector').notNull(),
     itemType: text('item_type'),
     exchangeMic: text('exchange_mic'),
     industry: text('industry'),
     priceUpdatedAt: timestamp('price_updated_at'),
-    manualPrice: numericAsNumber('manual_price', { precision: 19, scale: 2 }),
+    manualPrice: numericAsNumber('manual_price', UNIT_PRICE_NUMERIC),
     excludeFromSync: boolean('exclude_from_sync').default(false).notNull(),
     archivedAt: timestamp('archived_at'),
   },
@@ -466,7 +470,7 @@ export const holdingTransactions = pgTable(
       .notNull(),
     type: text('type').notNull(), // buy | sell | dividend
     shares: numericAsNumber('shares', { precision: 19, scale: 6 }),
-    price: numericAsNumber('price', { precision: 19, scale: 2 }).notNull(),
+    price: numericAsNumber('price', UNIT_PRICE_NUMERIC).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
@@ -488,7 +492,7 @@ export const holdingPriceHistory = pgTable(
       .references(() => holdings.id, { onDelete: 'cascade' })
       .notNull(),
     eodDate: date('eod_date', { mode: 'string' }).notNull(),
-    closePrice: numericAsNumber('close_price', { precision: 19, scale: 2 }).notNull(),
+    closePrice: numericAsNumber('close_price', UNIT_PRICE_NUMERIC).notNull(),
     priceCurrency: text('price_currency').notNull(),
     syncedAt: timestamp('synced_at').defaultNow().notNull(),
   },
@@ -546,6 +550,17 @@ export const propertyTransactions = pgTable(
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
     principal: numericAsNumber('principal', { precision: 19, scale: 2 }),
+    // Principal the debt could not take because its balance reached zero.
+    unappliedPrincipal: numericAsNumber('unapplied_principal', { precision: 19, scale: 2 })
+      .notNull()
+      .default(0),
+    // The debt a repayment reduced: the property's own debt or a mortgage (null once that
+    // mortgage is deleted). Both null for other types and for repayments recorded before
+    // the debt was stored, which follow the property's current link.
+    repaymentTarget: text('repayment_target'), // property | mortgage
+    repaymentMortgageId: integer('repayment_mortgage_id').references(() => mortgages.id, {
+      onDelete: 'set null',
+    }),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
@@ -553,6 +568,13 @@ export const propertyTransactions = pgTable(
     userIdx: index('property_transactions_user_id_idx').on(table.userId),
     propertyIdx: index('property_transactions_property_id_idx').on(table.propertyId),
     userDateIdx: index('property_transactions_user_date_idx').on(table.userId, table.date),
+    repaymentMortgageIdx: index('property_transactions_repayment_mortgage_id_idx').on(
+      table.repaymentMortgageId,
+    ),
+    repaymentTargetCheck: check(
+      'property_transactions_repayment_target_check',
+      sql`${table.repaymentTarget} is null or ${table.repaymentTarget} = 'mortgage' or (${table.repaymentTarget} = 'property' and ${table.repaymentMortgageId} is null)`,
+    ),
   }),
 );
 
@@ -653,6 +675,10 @@ export const pensionStatementImports = pgTable(
     ),
     potIdx: index('pension_statement_imports_pot_id_idx').on(table.potId),
     hashIdx: index('pension_statement_imports_hash_idx').on(table.fileHashSha256),
+    // A statement file reaches a pot's ledger once, however many times it was uploaded.
+    committedStatementUnique: uniqueIndex('pension_statement_imports_committed_statement_unique')
+      .on(table.userId, table.potId, table.fileHashSha256)
+      .where(sql`${table.status} = 'committed'`),
     queuedIdx: index('pension_statement_imports_queued_idx')
       .on(table.createdAt, table.id)
       .where(sql`${table.status} = 'queued'`),
@@ -764,6 +790,10 @@ export const mortgageTransactions = pgTable(
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
     principal: numericAsNumber('principal', { precision: 19, scale: 2 }),
+    // Principal the mortgage could not take because its balance reached zero.
+    unappliedPrincipal: numericAsNumber('unapplied_principal', { precision: 19, scale: 2 })
+      .notNull()
+      .default(0),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     fixedYears: numericAsNumber('fixed_years', { precision: 4, scale: 1 }),
@@ -818,6 +848,10 @@ export const debtPayments = pgTable(
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     principal: numericAsNumber('principal', { precision: 19, scale: 2 }).notNull(),
     interest: numericAsNumber('interest', { precision: 19, scale: 2 }).notNull(),
+    // Principal the debt could not take because its balance reached zero.
+    unappliedPrincipal: numericAsNumber('unapplied_principal', { precision: 19, scale: 2 })
+      .notNull()
+      .default(0),
     note: text('note'),
   },
   (table) => ({

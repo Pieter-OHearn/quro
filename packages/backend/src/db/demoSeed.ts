@@ -3,9 +3,26 @@ import { DEMO_USER_EMAIL } from './maintenance';
 
 // Synthetic demo data for local development, smoke tests and screenshots. Every value is
 // fixed so repeated seeding produces the same profile; only the rate date follows the
-// clock, so the seeded rates count as fresh.
+// clock, so the seeded rates count as fresh. The default seed is the demo user and the rates.
+// `--household` adds a linked partner and a full household (demoHousehold.ts).
 
 export const DEFAULT_DEMO_PASSWORD = 'password123';
+
+export const HOUSEHOLD_FLAG = '--household';
+export const SEED_USAGE = `Usage: db:seed-demo [${HOUSEHOLD_FLAG}]`;
+
+export type SeedOptions = { household: boolean };
+
+/** Reads the seed's command-line flags; anything else is an error, so a typo cannot seed less. */
+export function parseSeedArguments(args: readonly string[]): SeedOptions {
+  const unknown = args.filter((arg) => arg !== HOUSEHOLD_FLAG);
+  if (unknown.length > 0) {
+    throw new Error(
+      `Unknown argument ${unknown.map((arg) => `"${arg}"`).join(', ')}. ${SEED_USAGE}`,
+    );
+  }
+  return { household: args.includes(HOUSEHOLD_FLAG) };
+}
 
 export const DEMO_USER_PROFILE = {
   firstName: 'Demo',
