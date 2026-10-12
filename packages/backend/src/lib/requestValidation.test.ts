@@ -27,16 +27,20 @@ import {
   parseOptionalNormalizedDecimalField,
   parseOptionalNumberField,
   parseOptionalTextField,
+  parseOptionalUnitPriceField,
   parsePatchFields,
   parsePositiveNumberField,
   parseRequiredFields,
   parseString,
   parseTextField,
+  parseUnitPriceField,
   parseWholeNumber,
   pickPatchedValue,
   readJsonBody,
   readJsonRecord,
   rejectUnknownFields,
+  roundUnitPrice,
+  UNIT_PRICE_DECIMALS,
 } from './requestValidation';
 import { toNumberOrZero } from './numbers';
 
@@ -276,5 +280,87 @@ describe('money input', () => {
     expect(parseOptionalMoneyField('', amount)).toEqual(ok(null));
     expect(parseOptionalMoneyField(undefined, amount)).toEqual(ok(null));
     expect(parseOptionalMoneyField(12.345, amount)).toEqual(ok(12.35));
+  });
+});
+
+describe('unit prices', () => {
+  // A seeded generator, so a failure can be replayed.
+  function seededRandom(seed: number) {
+    let state = seed >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+    };
+  }
+
+  /** A non-negative decimal string below `maxInteger` with `fractionDigits` decimals. */
+  function priceText(random: () => number, maxInteger: number, fractionDigits: number): string {
+    const integer = Math.floor(random() * maxInteger);
+    const fraction = String(Math.floor(random() * 10 ** fractionDigits)).padStart(
+      fractionDigits,
+      '0',
+    );
+    return `${integer}.${fraction}`;
+  }
+
+  /** Millionths of a plain decimal string, rounded half away from zero, without floating point. */
+  function exactMillionths(decimal: string): bigint {
+    const [integer, fraction = ''] = decimal.split('.');
+    const padded = fraction.padEnd(UNIT_PRICE_DECIMALS + 1, '0');
+    const kept = BigInt(integer! + padded.slice(0, UNIT_PRICE_DECIMALS));
+    return Number(padded[UNIT_PRICE_DECIMALS]) >= 5 ? kept + 1n : kept;
+  }
+
+  const millionths = (value: number) => exactMillionths(roundUnitPrice(value).toFixed(6));
+
+  test('keeps six decimals and rounds the seventh half away from zero', () => {
+    expect(roundUnitPrice(123.4567)).toBe(123.4567);
+    expect(roundUnitPrice(123.456789)).toBe(123.456789);
+    expect(roundUnitPrice(1.0000005)).toBe(1.000001);
+    expect(roundUnitPrice(1.0000004999)).toBe(1);
+    expect(roundUnitPrice(-1.0000005)).toBe(-1.000001);
+    expect(roundUnitPrice(0.0000005)).toBe(0.000001);
+    expect(roundUnitPrice(0.0000004)).toBe(0);
+    expect(Object.is(roundUnitPrice(-0.0000004), -0)).toBe(false);
+    expect(roundUnitPrice(0.1 + 0.2)).toBe(0.3);
+    const largestStored = Number('99999999999999999.99');
+    expect(roundUnitPrice(largestStored)).toBe(largestStored);
+    expect(roundUnitPrice(1e21)).toBe(1e21);
+  });
+
+  test('rounds the shortest decimal text exactly, as numeric(23,6) stores it', () => {
+    const random = seededRandom(11);
+    for (let index = 0; index < 20_000; index += 1) {
+      const value = Number(priceText(random, 1e9, 7 + (index % 3)));
+      // String(value) is the text the database receives for the number.
+      expect({ text: String(value), millionths: millionths(value) }).toEqual({
+        text: String(value),
+        millionths: exactMillionths(String(value)),
+      });
+    }
+  });
+
+  test('a price with six decimals or fewer is never changed below 10^9', () => {
+    const random = seededRandom(12);
+    for (let index = 0; index < 20_000; index += 1) {
+      const value = Number(priceText(random, 1e9, 1 + (index % UNIT_PRICE_DECIMALS)));
+      expect(roundUnitPrice(value)).toBe(value);
+    }
+  });
+
+  test('parses localized text, applies the minimum after rounding and keeps null', () => {
+    expect(parseUnitPriceField('1.234,5678', 'bad')).toEqual(ok(1234.5678));
+    expect(parseUnitPriceField('0.0045', 'bad', 0)).toEqual(ok(0.0045));
+    expect(parseUnitPriceField(12.34567891, 'bad')).toEqual(ok(12.345679));
+    expect(parseUnitPriceField(0.0000004, 'bad', Number.MIN_VALUE)).toEqual(err('bad'));
+    expect(parseUnitPriceField(0.0000005, 'bad', Number.MIN_VALUE)).toEqual(ok(0.000001));
+    expect(parseUnitPriceField(-0.01, 'bad', 0)).toEqual(err('bad'));
+    expect(parseUnitPriceField('abc', 'bad')).toEqual(err('bad'));
+    expect(parseOptionalUnitPriceField(null, 'bad')).toEqual(ok(null));
+    expect(parseOptionalUnitPriceField('', 'bad')).toEqual(ok(null));
+    expect(parseOptionalUnitPriceField('12.3456', 'bad', 0)).toEqual(ok(12.3456));
   });
 });

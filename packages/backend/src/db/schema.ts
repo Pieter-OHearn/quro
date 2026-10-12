@@ -429,6 +429,10 @@ export const stockExchanges = pgTable('stock_exchanges', {
 
 // ── Holdings / Investments ───────────────────────────────────────────────────
 
+// A price per share is a unit price, not money, and keeps six decimals. It keeps the 17 integer
+// digits of numeric(19,2) too, so every price stored with two decimals fits unchanged.
+const UNIT_PRICE_NUMERIC = { precision: 23, scale: 6 } as const;
+
 export const holdings = pgTable(
   'holdings',
   {
@@ -438,14 +442,14 @@ export const holdings = pgTable(
       .notNull(),
     name: text('name').notNull(),
     ticker: text('ticker').notNull(),
-    currentPrice: numericAsNumber('current_price', { precision: 19, scale: 2 }).notNull(),
+    currentPrice: numericAsNumber('current_price', UNIT_PRICE_NUMERIC).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     sector: text('sector').notNull(),
     itemType: text('item_type'),
     exchangeMic: text('exchange_mic'),
     industry: text('industry'),
     priceUpdatedAt: timestamp('price_updated_at'),
-    manualPrice: numericAsNumber('manual_price', { precision: 19, scale: 2 }),
+    manualPrice: numericAsNumber('manual_price', UNIT_PRICE_NUMERIC),
     excludeFromSync: boolean('exclude_from_sync').default(false).notNull(),
     archivedAt: timestamp('archived_at'),
   },
@@ -466,7 +470,7 @@ export const holdingTransactions = pgTable(
       .notNull(),
     type: text('type').notNull(), // buy | sell | dividend
     shares: numericAsNumber('shares', { precision: 19, scale: 6 }),
-    price: numericAsNumber('price', { precision: 19, scale: 2 }).notNull(),
+    price: numericAsNumber('price', UNIT_PRICE_NUMERIC).notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
@@ -488,7 +492,7 @@ export const holdingPriceHistory = pgTable(
       .references(() => holdings.id, { onDelete: 'cascade' })
       .notNull(),
     eodDate: date('eod_date', { mode: 'string' }).notNull(),
-    closePrice: numericAsNumber('close_price', { precision: 19, scale: 2 }).notNull(),
+    closePrice: numericAsNumber('close_price', UNIT_PRICE_NUMERIC).notNull(),
     priceCurrency: text('price_currency').notNull(),
     syncedAt: timestamp('synced_at').defaultNow().notNull(),
   },

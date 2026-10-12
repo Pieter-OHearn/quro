@@ -38,12 +38,16 @@ import {
   parseOptionalDateField,
   parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
+  parseOptionalUnitPriceField,
   parsePatchFields,
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  parseUnitPriceField,
   readJsonBody,
   rejectUnknownFields,
+  roundUnitPrice,
+  toMoneyAmount,
 } from '../lib/requestValidation';
 
 const app = new Hono();
@@ -186,8 +190,7 @@ function parseHoldingTransactionTypeField(value: unknown): ParseResult<HoldingTr
 const holdingParsers: FieldParsers<HoldingPayload> = {
   name: (value) => parseTextField(value, 'Holding name is required'),
   ticker: (value) => parseTextField(value, 'Ticker is required'),
-  currentPrice: (value) =>
-    parseNormalizedDecimalField(value, 'Current price must be zero or greater', 0),
+  currentPrice: (value) => parseUnitPriceField(value, 'Current price must be zero or greater', 0),
   currency: parseCurrencyField,
   sector: (value) => parseTextField(value, 'Sector is required'),
   itemType: parseHoldingItemTypeField,
@@ -195,7 +198,7 @@ const holdingParsers: FieldParsers<HoldingPayload> = {
   industry: (value) => parseOptionalTextField(value, 'Industry must be a string'),
   priceUpdatedAt: (value) => parseOptionalTimestampField(value, 'Invalid priceUpdatedAt timestamp'),
   manualPrice: (value) =>
-    parseOptionalNormalizedDecimalField(value, 'Manual price must be a valid number', 0),
+    parseOptionalUnitPriceField(value, 'Manual price must be a valid number', 0),
   excludeFromSync: (value) =>
     value === undefined || typeof value === 'boolean'
       ? ok(value ?? false)
@@ -211,6 +214,7 @@ const holdingTransactionParsers: FieldParsers<HoldingTransactionPayload> = {
       'Shares must be greater than zero',
       Number.MIN_VALUE,
     ),
+  // Rounded once the type is known (`roundTransactionPrice`), so a patch is rounded only once.
   price: (value) =>
     parseNormalizedDecimalField(value, 'Price must be greater than zero', Number.MIN_VALUE),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
@@ -257,7 +261,24 @@ export function parseHoldingTransactionCreate(
   const parsed = parseRequiredFields(body, holdingTransactionParsers);
   if (!parsed.ok) return parsed;
   const validationError = validateHoldingTransactionPayload(parsed.value);
-  return validationError ? err(validationError) : parsed;
+  return validationError ? err(validationError) : roundTransactionPrice(parsed.value);
+}
+
+// A buy or sell carries a price per share, a unit price kept to six decimals. A dividend carries
+// the amount received in the same field: that is money, so the money input rule rounds it to
+// cents and bounds it, and six-decimal price storage never holds a sub-cent dividend.
+function roundTransactionPrice(
+  payload: HoldingTransactionPayload,
+): ParseResult<HoldingTransactionPayload> {
+  if (payload.type === 'dividend') {
+    const amount = toMoneyAmount(payload.price, 'price');
+    if (!amount.ok) return amount;
+    return amount.value > 0
+      ? ok({ ...payload, price: amount.value })
+      : err('Dividend amount must be greater than zero');
+  }
+  const price = roundUnitPrice(payload.price);
+  return price > 0 ? ok({ ...payload, price }) : err('Price must be greater than zero');
 }
 
 function parseHoldingTransactionPatch(

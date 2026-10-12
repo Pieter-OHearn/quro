@@ -46,13 +46,13 @@ The [PostgreSQL upgrade rehearsal](postgresql-upgrade.md#how-this-is-tested) sta
 
 ## When your migration changes existing data
 
-A migration that adds a table or column, rewrites values or removes rows fails the upgrade test until `expectations.ts` declares what it does. That is deliberate: the declaration is the reviewable statement of what happens to an operator's data. Add one entry per table, in the same pull request as the migration:
+A migration that adds a table or column, rewrites values, changes a column's type or removes rows fails the upgrade test until `expectations.ts` declares what it does. That is deliberate: the declaration is the reviewable statement of what happens to an operator's data. Add one entry per table, in the same pull request as the migration:
 
 | Field              | Use it for                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------ |
 | `newTable`         | A table that did not exist in 0.7.0, with the number of rows the migrations leave in it    |
 | `addedColumns`     | A new column, with SQL over the 0.7.0 row that gives the value existing rows must get      |
-| `rewrittenColumns` | A column whose values change, with SQL over the 0.7.0 row that gives the new value         |
+| `rewrittenColumns` | A column whose values or type change, with SQL over the 0.7.0 row that gives the new value |
 | `keptRows`         | A condition on the 0.7.0 row for the rows that must survive, when a migration deletes rows |
 | `appendedRows`     | Rows the migrations add to an existing table, after the 0.7.0 rows by an integer key       |
 
@@ -64,6 +64,8 @@ For example, the migration that stores session ids as digests is declared as:
   addedColumns: { last_used_at: 'created_at', user_agent: 'null::text' },
 },
 ```
+
+A type change that keeps every value, such as a wider numeric scale, is a cast: the price columns that gained four decimals are declared as `price: 'price::numeric(23,6)'`, so the comparison checks that each value is unchanged at its new scale.
 
 Dropping a column or table always fails. Removing user data needs the maintainers' approval and a backup instruction in the release notes first. New provenance or document columns go into `PROVENANCE_COLUMNS` and `ATTACHMENTS` in the same file.
 
