@@ -40,6 +40,9 @@ services:
       - postgres_app_password
     # The image's entry point is `quro`; its default command is `serve`.
     command: ['migrate']
+    # The image's health check is for the server; this service runs a command and exits.
+    healthcheck:
+      disable: true
     networks:
       - backend-net
 
@@ -126,6 +129,9 @@ services:
       pension-parser:
         condition: service_started
     command: ['worker', 'pension-imports']
+    # The image's health check is for the server, which this service does not run.
+    healthcheck:
+      disable: true
     networks:
       - backend-net
       - ocr-net
@@ -158,6 +164,8 @@ services:
       db:
         condition: service_healthy
     entrypoint: ['/bin/sh', '/app/docker/backend/run-db-tools.sh']
+    healthcheck:
+      disable: true
     networks:
       - backend-net
 

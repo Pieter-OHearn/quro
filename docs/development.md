@@ -316,10 +316,10 @@ role needs to be a superuser, as it is in the throwaway container.
 ### Clean-install test
 
 `scripts/clean-install/run.sh` installs Quro from empty directories the way
-[Install Quro](install.md) describes, with `docs/compose.example.yaml`, and exercises it: sign-in,
-a ledger write, a document upload and download, maintenance commands, concurrent and interrupted
-migrations, restarts, an existing PostgreSQL server with an S3-compatible test store, and the
-image as another UID. CI runs it on amd64 and arm64. Locally it needs Docker, Bun and `curl`, and
+[Install Quro](install.md) describes, with `docs/compose.example.yaml` and its container
+restrictions, and exercises it: sign-in, a ledger write, a document upload and download,
+maintenance commands including a backup, concurrent and interrupted migrations, restarts, an
+existing PostgreSQL server with an S3-compatible test store, and the image as another UID. CI runs it on amd64 and arm64. Locally it needs Docker, Bun and `curl`, and
 builds the images when the tags it is given do not exist:
 
 ```bash
@@ -352,6 +352,34 @@ currency rates, net-worth snapshots) then do not run, so the backend makes no pr
 its own; only endpoints a test calls directly, such as a price refresh, could. Set the same
 variable for any other local backend that must not run background jobs; leave it unset in
 production.
+
+### Security scans
+
+CI scans every change as [SECURITY.md](../SECURITY.md#how-findings-are-handled) describes, through
+`scripts/lib/security-scan.ts`. The scanners run from container images pinned by digest (Trivy and
+gitleaks), so locally they need only Docker and Bun. Output names the rule, file and line of a
+finding, never the matched text, and only files git tracks or would track are scanned:
+
+```bash
+bun scripts/lib/security-scan.ts image quro-backend:local   # vulnerabilities and secrets in an image
+bun scripts/lib/security-scan.ts config                     # misconfigured Dockerfiles
+bun scripts/lib/security-scan.ts secrets origin/main..HEAD  # secrets in commits; no range: all refs
+bun scripts/lib/security-scan.ts exceptions --strict        # security-exceptions.yaml, expiry included
+```
+
+A critical vulnerability or misconfiguration, or any secret, makes the command exit 1. Trivy keeps
+its vulnerability database in the Docker volume `quro-trivy-cache`; remove it with
+`docker volume rm quro-trivy-cache`. To accept a finding, add an entry to
+`security-exceptions.yaml` with a statement, an owner and an expiry at most 90 days ahead.
+
+The licence inventory needs installed dependencies; for the parser's packages, install
+`services/pension-parser/requirements.txt` into a virtual environment and pass its interpreter:
+
+```bash
+bun scripts/lib/licence-inventory.ts
+python3 -m venv /tmp/quro-parser && /tmp/quro-parser/bin/pip install -r services/pension-parser/requirements.txt
+bun scripts/lib/licence-inventory.ts --python /tmp/quro-parser/bin/python
+```
 
 ### Synthetic data
 

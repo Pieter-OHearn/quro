@@ -280,6 +280,17 @@ For container health checks: it asks the server in the same container for `/api/
 
 Read-only checks of everything an install depends on. The report has `status` (`ok` or `fail`), `exitCode`, `build` (the same object as `quro version --json`) and `checks`, a list of `{ id, status, message }` with `status` one of `ok`, `warn`, `fail` or `skip`. The exit code is the most serious failure: 2 for settings, 4 for unreachable, 3 for refused, 1 for any other failed check. The list of checks may grow.
 
+## Upgrade from 0.8.0 to 0.9.0
+
+### Container hardening
+
+What the operator does: add `healthcheck: disable: true` to services that run the backend image without the server, and optionally copy the new restrictions of the example Compose file. Nothing else changes for a Compose install on Docker Engine.
+
+- **The images declare health checks.** The backend image checks readiness with `quro health`, the frontend image `GET /healthz`. Services that run the backend image for something other than the server (the `migrate` service, `quro worker pension-imports`, one-off maintenance services) need `healthcheck: disable: true`; otherwise Docker reports them `unhealthy`, and a tool that restarts unhealthy containers would restart the import worker.
+- **nginx runs unprivileged.** The frontend image runs as UID 101 instead of root and writes only below `/tmp`. It still listens on port 80, so `ports:` stay as they are; Docker Engine lets unprivileged processes bind low ports inside a container's network namespace. With host networking or a runtime that does not, add `sysctls: { net.ipv4.ip_unprivileged_port_start: 0 }` to the frontend or publish it through a container network. The server configuration is now rendered into `/tmp/nginx/conf.d`, so files mounted over `/etc/nginx/conf.d` are no longer read.
+- **The backend image ships production dependencies only.** TypeScript, `drizzle-kit`, the frontend's packages and the test files are no longer in it; no documented command uses them.
+- **Optional restrictions.** The [example Compose file](compose.example.yaml) now sets `read_only`, `tmpfs`, `cap_drop`, `security_opt`, `mem_limit` and `pids_limit` (and `cap_add` for `db`), described in [container hardening](security.md#container-hardening). Copy them into your `compose.yaml` together with the 0.9.0 image tags: the 0.8.0 frontend runs as root and does not start with them.
+
 ## Upgrade from 0.7.0 to 0.8.0
 
 0.8.0 changes how Quro is configured, started and stored, and moves the database to PostgreSQL 18. The procedure below takes a 0.7.0 install to 0.8.0 with every row and document intact; the upgrade test runs its database and document steps on a synthetic 0.7.0 install on every change. Plan an outage of half an hour or so, and do it when nobody uses Quro.
