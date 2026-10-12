@@ -346,12 +346,21 @@ QURO_BACKEND_IMAGE=quro-backend:local QURO_FRONTEND_IMAGE=quro-frontend:local \
   sh scripts/quickstart/run.sh
 ```
 
-`test:smoke` starts its own backend on port 3300, never reusing one already running there, with
-`QRO_DISABLE_SCHEDULERS=true`. The interval jobs (session cleanup, bunq sync, holding prices,
-currency rates, net-worth snapshots) then do not run, so the backend makes no provider calls on
-its own; only endpoints a test calls directly, such as a price refresh, could. Set the same
-variable for any other local backend that must not run background jobs; leave it unset in
-production.
+`test:smoke` starts its own backend and frontend and never reuses a server already listening on
+their ports; stop it and rerun instead. The ports default to 3300 and 4273; set
+`QRO_SMOKE_BACKEND_PORT` and `QRO_SMOKE_FRONTEND_PORT` to run beside another checkout or a
+local Quro:
+
+```bash
+QRO_SMOKE_BACKEND_PORT=3310 QRO_SMOKE_FRONTEND_PORT=4283 bun run test:smoke
+```
+
+The smoke backend runs with `QRO_DISABLE_SCHEDULERS=true`. The interval jobs (session cleanup,
+bunq sync, holding prices, currency rates, net-worth snapshots) then do not run, so the backend
+makes no provider calls on its own; only endpoints a test calls directly, such as a price
+refresh, could. Set the same variable for any other local backend that must not run background
+jobs; leave it unset in production. It keeps documents in the filesystem store, in a
+temporary directory that each run empties first and removes at the end.
 
 ### Security scans
 

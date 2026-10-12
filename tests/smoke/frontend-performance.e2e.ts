@@ -22,6 +22,20 @@ const ALLOCATIONS = {
   debtCount: 0,
 };
 
+const capability = (enabled: boolean, reason: string | null) => ({
+  enabled,
+  reason,
+  message: enabled ? 'Available.' : 'Unavailable.',
+  checkedAt: new Date().toISOString(),
+});
+// Pension import is configured, so the notification feed calls its route; bunq is not.
+const CAPABILITIES = {
+  ai: capability(true, null),
+  pensionStatementImport: capability(true, null),
+  bunq: capability(false, 'not_configured'),
+  documents: capability(true, null),
+};
+
 async function mockApi(page: Page, authenticated: boolean, importStatuses: string[] = []) {
   const requests: string[] = [];
   let importRequests = 0;
@@ -30,6 +44,7 @@ async function mockApi(page: Page, authenticated: boolean, importStatuses: strin
     requests.push(path);
     let data: unknown = [];
     if (path === '/api/auth/me') data = authenticated ? USER : null;
+    if (path === '/api/capabilities') data = CAPABILITIES;
     if (path === '/api/currency/rates')
       data = CURRENCY_CODES.map((currency, index) => ({
         id: index + 1,

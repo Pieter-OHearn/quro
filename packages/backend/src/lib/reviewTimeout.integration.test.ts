@@ -39,7 +39,12 @@ for (const [kind, sync] of [
       sessionExpiresAt: new Date(Date.now() + 60_000),
       bunqUserId: '42',
     });
-    globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+    // The deadline expires once the first bunq request is in flight.
+    const deadline = new AbortController();
+    globalThis.fetch = (() => {
+      queueMicrotask(() => deadline.abort());
+      return new Promise<Response>(() => {});
+    }) as unknown as typeof fetch;
     try {
       await expect(
         runScheduledJob(
@@ -48,7 +53,7 @@ for (const [kind, sync] of [
           async () => {
             await sync(auth.user.id);
           },
-          100,
+          deadline.signal,
         ),
       ).rejects.toThrow();
       const [connection] = await db
@@ -135,6 +140,8 @@ test('hard grace destroys a stuck job pool and a later run can acquire its lock'
   const name = `hard-grace-${crypto.randomUUID()}`;
   let resume: () => void = () => {};
   let lateWrites = 0;
+  // The deadline expires once the job is stuck, however long it took to start.
+  const deadline = new AbortController();
   await expect(
     runScheduledJob(
       name,
@@ -142,13 +149,14 @@ test('hard grace destroys a stuck job pool and a later run can acquire its lock'
       async () => {
         await new Promise<void>((resolve) => {
           resume = resolve;
+          deadline.abort();
         });
         await db
           .insert(workerHeartbeats)
           .values({ workerName: 'late-review-write', status: 'idle', lastHeartbeatAt: new Date() });
         lateWrites += 1;
       },
-      30,
+      deadline.signal,
       40,
     ),
   ).rejects.toThrow('grace period exceeded');
@@ -225,9 +233,15 @@ test('a job deadline retains the last imported page instead of restarting the ca
   const name = `page-progress-${crypto.randomUUID()}`;
   let imported = 0;
   let requested = '';
+  // The deadline expires while the second page is in flight, after the first page's checkpoint,
+  // however long the job took to get there.
+  const deadline = new AbortController();
   globalThis.fetch = ((url: unknown) => {
     requested = String(url);
-    if (requested.includes('page=1')) return new Promise<Response>(() => {});
+    if (requested.includes('page=1')) {
+      queueMicrotask(() => deadline.abort());
+      return new Promise<Response>(() => {});
+    }
     return Promise.resolve(
       Response.json({
         Response: [
@@ -263,7 +277,7 @@ test('a job deadline retains the last imported page instead of restarting the ca
       async () => {
         await syncPaymentBatch(input);
       },
-      100,
+      deadline.signal,
     ),
   ).rejects.toThrow();
   const [checkpoint] = await db

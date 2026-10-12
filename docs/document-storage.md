@@ -9,6 +9,8 @@ Quro keeps uploaded PDFs (payslips, pension statements and statement imports) ou
 
 The keys are the same in both stores, for example `users/<user id>/salary/payslips/<payslip id>/<random id>.pdf`, so documents can move from one store to the other without changing a row.
 
+A statement import's PDF is deleted when the import ends without being committed: at once when it is cancelled or fails, and by the import worker when an unfinished draft expires. The import's row stays, and `storage_deleted_at` records when its PDF was deleted; it stays empty if the store refused the delete. A committed import's PDF is kept as the document of the statement it created.
+
 ## Filesystem storage
 
 - The directory must exist and be writable by the user the backend runs as. Quro never creates it: a missing directory usually means a missing volume, and files written into the container would be lost when it is recreated. `GET /api/readiness` reports `documentStorage` as not ready until the directory is usable, and uploads fail.
