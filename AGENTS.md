@@ -47,7 +47,9 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 - Store monetary values as PostgreSQL `numeric`; the schema's `numericAsNumber`
   converts driver strings to finite numbers (`packages/backend/src/db/driverNumeric.ts`).
   Keep public JSON numeric and null-preserving. Money arithmetic in code uses integer cents
-  through shared `toCents`/`fromCents`/`roundMoney`; parse request money with `parseMoneyField`
+  through shared `toCents`/`fromCents`/`roundMoney`, totals through `sumMoney`; positions, ledger
+  signs, joint shares and property types come from `packages/shared/src/domain/`, never a local
+  copy. Parse request money with `parseMoneyField`
   (cents, below 10^13). Unit prices, quantities, rates and percentages are not money. Preserve
   nulls, negative equity, native currencies and provenance.
   Rounding points, ledger invariants and indicators: [financial invariants](docs/financial-invariants.md).

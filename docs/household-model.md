@@ -9,8 +9,10 @@ invariants these totals rely on are in [financial invariants](financial-invarian
 
 `lib/partner.ts` owns access and attribution: owned rows plus an accepted partner's
 joint rows are visible, and joint money contributes 50% to each person's totals.
-`scopeHouseholdRows` lists money columns explicitly so identifiers, rates and dates
-are never scaled. Child transactions inherit jointness from their parent, including
+The share itself is `householdShare` in `@quro/shared`, so pages that weight a joint
+row (the savings total, the portfolio's joint properties, the dashboard's monthly
+summary) use the same rule as the server. `scopeHouseholdRows` lists money columns
+explicitly so identifiers, rates and dates are never scaled. Child transactions inherit jointness from their parent, including
 transactions entered by the other partner. Nullable principal stays nullable.
 
 Runway's “count full joint balances” assumption applies to liquidity and derived
