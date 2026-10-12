@@ -172,6 +172,9 @@ describe('ledger signs', () => {
         ] as const
       ).map(([type, amount]) => signedSavingsAmount(type, amount)),
     ).toEqual([100, 2.5, -40, -40, 100, 0]);
+    // A partner's half of a joint 99.99 withdrawal is not rounded here, only in a total.
+    expect(signedSavingsAmount('withdrawal', 49.995)).toBe(-49.995);
+    expect(Object.is(signedSavingsAmount('withdrawal', 0), -0)).toBe(false);
   });
 });
 

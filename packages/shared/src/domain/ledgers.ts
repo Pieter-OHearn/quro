@@ -19,11 +19,13 @@ export function pensionTransactionDelta(txn: {
 
 /**
  * Effect of a savings transaction on its account's balance: deposits and interest add,
- * withdrawals subtract, the stored sign is ignored, and any other type does nothing.
+ * withdrawals subtract, the stored sign is ignored, and any other type does nothing. The amount
+ * keeps its precision: a partner's share of a joint transaction can carry half a cent, which is
+ * rounded once where the balance it feeds is added to a total.
  */
 export function signedSavingsAmount(type: string, amount: number): number {
-  const absolute = Math.abs(toCents(amount));
-  if (type === 'withdrawal') return fromCents(-absolute) || 0;
-  if (type === 'deposit' || type === 'interest') return fromCents(absolute);
+  const absolute = Math.abs(amount);
+  if (type === 'withdrawal') return absolute === 0 ? 0 : -absolute;
+  if (type === 'deposit' || type === 'interest') return absolute;
   return 0;
 }
