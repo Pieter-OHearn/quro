@@ -6,7 +6,7 @@ M6 (V1 design update) and lands on the `feature/m6-v1-design-update` branch. `th
 the V1 light and dark colour tokens, type scale, shadows, motion and radius scale, and
 `src/components/` uses that radius scale without resting shadows. The atoms in
 `src/components/ui/atoms/` (buttons, icon buttons, form fields, badges, cards, progress meters and
-spinners) use the V1 density and type scale: 32px controls on desktop, 44px fields on phones. The
+spinners) use the V1 density and type scale: 32px controls on desktop and at least 44px on phones. The
 rest of the shared UI follows in later steps, and until a value has moved `theme.css` and this
 page describe what the app renders today.
 
