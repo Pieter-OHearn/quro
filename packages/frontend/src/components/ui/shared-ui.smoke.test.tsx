@@ -300,7 +300,15 @@ const smokeCases: readonly SmokeCase[] = [
         <TextInput value="" onChange={noop} />
       </FormField>
     ),
-    includes: ['Amount', 'optional', 'Required field'],
+    includes: [
+      'Amount',
+      'optional',
+      'Required field',
+      'mb-1 block text-label text-fg-muted',
+      'font-normal text-fg-subtle',
+      'mt-1 text-caption text-danger',
+    ],
+    excludes: ['text-xs', 'font-semibold', 'text-fg-faint font-normal'],
   },
   {
     name: 'PanelHeader renders title, subtitle, and action',
@@ -311,7 +319,16 @@ const smokeCases: readonly SmokeCase[] = [
         action={<Button size="sm">Add transaction</Button>}
       />
     ),
-    includes: ['Recent transactions', 'Updated just now', 'Add transaction'],
+    includes: [
+      'Recent transactions',
+      'Updated just now',
+      'Add transaction',
+      'border-b border-border-default min-h-9 px-3 py-1 max-sm:min-h-11 max-sm:px-4',
+      'text-title-section text-fg',
+      'text-caption text-fg-subtle',
+      'flex shrink-0 items-center gap-2',
+    ],
+    excludes: ['px-6', 'py-5', 'text-fg-faint'],
   },
   {
     name: 'EmptyState renders shared CTA shell',
@@ -323,7 +340,36 @@ const smokeCases: readonly SmokeCase[] = [
         action={{ label: 'Add mortgage', onClick: noop, icon: <Plus size={14} /> }}
       />
     ),
-    includes: ['No mortgages yet', 'Add your first mortgage to get started.', 'Add mortgage'],
+    includes: [
+      'No mortgages yet',
+      'Add your first mortgage to get started.',
+      'Add mortgage',
+      'items-start rounded-lg border border-dashed border-border-control bg-surface text-left px-4 py-6',
+      'text-body font-semibold text-fg',
+      'mt-1 text-cell text-fg-muted',
+      'h-8 max-sm:h-11',
+      'bg-brand text-fg-inverted',
+    ],
+    excludes: [
+      'text-center',
+      'items-center justify-center text-center',
+      'h-16 w-16',
+      'bg-brand-soft',
+    ],
+  },
+  {
+    name: 'EmptyState compact keeps 16px padding and a resting icon',
+    element: (
+      <EmptyState
+        icon={AlertTriangle}
+        title="All caught up"
+        description="Nothing to review."
+        compact
+        tone="neutral"
+      />
+    ),
+    includes: ['border-dashed', 'p-4', 'text-fg-faint', 'aria-hidden="true"'],
+    excludes: ['<button', 'py-10'],
   },
   {
     name: 'LoadingState renders shared loading alias',
@@ -343,7 +389,66 @@ const smokeCases: readonly SmokeCase[] = [
         ]}
       />
     ),
-    includes: ['role="tablist"', 'aria-selected="true"', '>2025<', '>2026<'],
+    includes: [
+      'role="tablist"',
+      'aria-selected="true"',
+      '>2025<',
+      '>2026<',
+      'border-b-2',
+      'border-brand font-semibold text-fg',
+    ],
+    excludes: ['bg-brand-soft'],
+  },
+  {
+    name: 'SegmentedControl is one bordered group with a brand-soft selection',
+    element: (
+      <SegmentedControl
+        variant="pill"
+        tone="dark"
+        value="month"
+        onChange={noop}
+        options={[
+          { value: 'month', label: 'Month' },
+          { value: 'year', label: 'Year' },
+        ]}
+      />
+    ),
+    includes: [
+      'role="group"',
+      'aria-pressed="true"',
+      'aria-pressed="false"',
+      'inline-flex max-w-full overflow-x-auto rounded-md border border-border-control max-sm:flex',
+      'h-[26px]',
+      'border-r border-border-control',
+      'last:border-r-0',
+      'max-sm:h-11 max-sm:flex-1',
+      'text-label',
+      'focus-visible:-outline-offset-2 focus-visible:outline-focus-ring',
+      'bg-brand-soft font-semibold text-brand-fg',
+      'bg-surface text-fg-muted',
+    ],
+    excludes: ['bg-brand ', 'bg-surface-inverse', 'text-fg-inverted', 'rounded-full', 'flex-wrap'],
+  },
+  {
+    name: 'SegmentedControl contained and soft variants render the same group',
+    element: (
+      <div>
+        <SegmentedControl
+          variant="contained"
+          value="a"
+          onChange={noop}
+          options={[{ value: 'a', label: 'A' }]}
+        />
+        <SegmentedControl
+          variant="soft"
+          value="a"
+          onChange={noop}
+          options={[{ value: 'a', label: 'A' }]}
+        />
+      </div>
+    ),
+    includes: ['border border-border-control', 'bg-brand-soft font-semibold text-brand-fg'],
+    excludes: ['bg-brand ', ' p-1 ', 'gap-1.5 bg-surface'],
   },
   {
     name: 'Pagination renders range and current page marker',
@@ -362,7 +467,15 @@ const smokeCases: readonly SmokeCase[] = [
       'aria-label="Previous page"',
       'aria-label="Next page"',
       'aria-current="page"',
+      'text-caption font-numeric text-fg-muted',
+      'h-7 w-7 items-center justify-center rounded-md border border-border-control text-caption font-numeric',
+      'max-sm:h-11 max-sm:w-11',
+      'bg-brand-soft font-semibold text-brand-fg',
+      'bg-surface text-fg hover:bg-surface-muted',
+      'disabled:border-border-default disabled:bg-surface disabled:text-fg-faint',
+      'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
     ],
+    excludes: ['bg-brand text-fg-inverted', 'disabled:opacity-40'],
   },
   {
     name: 'RowActions renders child action group',
@@ -591,7 +704,19 @@ const smokeCases: readonly SmokeCase[] = [
         ]}
       />
     ),
-    includes: ['Deposit', 'Transfer'],
+    includes: [
+      'Deposit',
+      'Transfer',
+      'type="button"',
+      'aria-pressed="true"',
+      'aria-pressed="false"',
+      'flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md border px-2 text-label',
+      'max-sm:h-11 max-sm:flex-col',
+      'border-brand bg-brand-soft font-semibold text-brand-fg',
+      'border-border-control bg-surface text-fg-muted',
+      'text-success',
+    ],
+    excludes: ['border-2', 'text-[10px]', 'bg-success-soft', 'border-success-border'],
   },
   {
     name: 'Modal renders shared headerProps shell',

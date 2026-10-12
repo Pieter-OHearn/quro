@@ -7,14 +7,16 @@ the V1 light and dark colour tokens, type scale, shadows, motion and radius scal
 `src/components/` uses that radius scale without resting shadows. The atoms in
 `src/components/ui/atoms/` (buttons, icon buttons, form fields, badges, cards, progress meters and
 spinners) use the V1 density and type scale: 32px controls on desktop and at least 44px on phones. The
-desktop shell does too: a 208px `surface-nav` sidebar with 32px items and a `brand-soft` active item, a
-48px header, and the `PageStack` and `ContentSection` templates (24px gutter and section gap on desktop,
-16px below 640px; `ContentSection` takes an optional `title` in the section title style). Below 640px
-the shell is the phone layout: a 56px header with the logo and a 44px round account button, and a
-`surface-nav` tab bar fixed to the bottom (Dashboard, Savings, Investments, Budget and More, which opens
-the navigation drawer); the page is padded by the bar's height and the safe area. The rest of the
-shared UI follows in later steps, and until a value has moved `theme.css` and this page describe what the
-app renders today.
+molecules in `src/components/ui/molecules/` follow the same rules: field labels in the `label` style, one
+bordered segmented control and pagination whose selection is a `brand-soft` tint, 36px card headers, and
+left-aligned dashed empty states. The desktop shell does too: a 208px `surface-nav` sidebar with 32px items
+and a `brand-soft` active item, a 48px header, and the `PageStack` and `ContentSection` templates (24px
+gutter and section gap on desktop, 16px below 640px; `ContentSection` takes an optional `title` in the
+section title style). Below 640px the shell is the phone layout: a 56px header with the logo and a 44px
+round account button, and a `surface-nav` tab bar fixed to the bottom (Dashboard, Savings, Investments,
+Budget and More, which opens the navigation drawer); the page is padded by the bar's height and the safe
+area. The rest of the shared UI follows in later steps, and until a value has moved `theme.css` and this
+page describe what the app renders today.
 
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)

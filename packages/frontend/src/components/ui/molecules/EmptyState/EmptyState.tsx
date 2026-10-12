@@ -26,56 +26,16 @@ export type EmptyStateProps = {
   descriptionClassName?: string;
 };
 
-const TONE_CLASSES = {
-  brand: {
-    iconWrapper: 'bg-brand-soft',
-    icon: 'text-brand-border',
-  },
-  neutral: {
-    iconWrapper: 'bg-surface-muted',
-    icon: 'text-fg-disabled',
-  },
+// The icon is a small glyph beside the title, not a tinted tile.
+const TONE_ICON_CLASSES = {
+  brand: 'text-brand',
+  neutral: 'text-fg-faint',
 } as const;
 
-const COMPACT_ACTION_ICON_SIZE = 14;
-const DEFAULT_ACTION_ICON_SIZE = 15;
-const COMPACT_EMPTY_STATE_ICON_SIZE = 20;
-const DEFAULT_EMPTY_STATE_ICON_SIZE = 28;
+const EMPTY_STATE_ICON_SIZE = 16;
+const ACTION_ICON_SIZE = 14;
 
-function getActionIcon(icon: ReactNode | undefined, compact: boolean) {
-  return icon ?? <Plus size={compact ? COMPACT_ACTION_ICON_SIZE : DEFAULT_ACTION_ICON_SIZE} />;
-}
-
-function getTitleClasses(compact: boolean, titleClassName?: string) {
-  return cn(
-    compact ? 'text-sm font-medium text-fg-subtle' : 'mb-1 font-semibold text-fg-strong',
-    titleClassName,
-  );
-}
-
-function getDescriptionClasses(
-  compact: boolean,
-  hasAction: boolean,
-  descriptionClassName?: string,
-) {
-  return cn(
-    compact
-      ? hasAction
-        ? 'mt-1 mb-4 text-xs text-fg-faint'
-        : 'mt-1 text-xs text-fg-faint'
-      : 'mb-6 max-w-xs text-sm text-fg-faint',
-    descriptionClassName,
-  );
-}
-
-function getActionSize(compact: boolean, size?: ButtonProps['size']) {
-  return size ?? (compact ? 'md' : 'lg');
-}
-
-function getActionClassName(compact: boolean, className?: string) {
-  return cn(!compact && 'px-5 transition-all', className);
-}
-
+// A dashed, left-aligned box: title, one line of text, then at most one button.
 export function EmptyState({
   icon: Icon,
   title,
@@ -87,41 +47,30 @@ export function EmptyState({
   titleClassName,
   descriptionClassName,
 }: EmptyStateProps) {
-  const tones = TONE_CLASSES[tone];
-  const hasAction = Boolean(action);
-  const actionIcon = action ? getActionIcon(action.icon, compact) : undefined;
-  const titleClasses = getTitleClasses(compact, titleClassName);
-  const descriptionClasses = getDescriptionClasses(compact, hasAction, descriptionClassName);
-
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center text-center',
-        compact ? 'px-4 py-10' : 'px-6 py-20',
+        'flex w-full flex-col items-start rounded-lg border border-dashed border-border-control bg-surface text-left',
+        compact ? 'p-4' : 'px-4 py-6',
         className,
       )}
     >
-      <div
-        className={cn(
-          'flex items-center justify-center rounded-lg',
-          compact ? 'mb-3 h-12 w-12' : 'mb-4 h-16 w-16',
-          tones.iconWrapper,
-        )}
-      >
+      <div className="flex items-start gap-2">
         <Icon
-          size={compact ? COMPACT_EMPTY_STATE_ICON_SIZE : DEFAULT_EMPTY_STATE_ICON_SIZE}
-          className={tones.icon}
+          size={EMPTY_STATE_ICON_SIZE}
+          className={cn('mt-0.5 shrink-0', TONE_ICON_CLASSES[tone])}
+          aria-hidden="true"
         />
+        <h3 className={cn('text-body font-semibold text-fg', titleClassName)}>{title}</h3>
       </div>
-      <h3 className={titleClasses}>{title}</h3>
-      <p className={descriptionClasses}>{description}</p>
+      <p className={cn('mt-1 text-cell text-fg-muted', descriptionClassName)}>{description}</p>
       {action && (
         <Button
           onClick={action.onClick}
           variant={action.variant ?? 'primary'}
-          size={getActionSize(compact, action.size)}
-          leadingIcon={actionIcon}
-          className={getActionClassName(compact, action.className)}
+          size={action.size ?? 'md'}
+          leadingIcon={action.icon ?? <Plus size={ACTION_ICON_SIZE} />}
+          className={cn('mt-3', action.className)}
         >
           {action.label}
         </Button>
