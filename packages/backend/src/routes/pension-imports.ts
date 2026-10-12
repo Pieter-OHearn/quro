@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { getConfig } from '../config';
 import { db, type DbTransaction } from '../db/client';
 import { HTTP_STATUS } from '../constants/http';
+import { readUploadForm } from '../lib/uploadForm';
 import {
   pensionPots,
   pensionStatementImportRows,
@@ -18,6 +19,7 @@ import { parseListPageQuery, readListPage, type KeysetOrder } from '../lib/listP
 import { getPensionStatementImportCapability } from '../lib/capabilities';
 import {
   parsePensionStatement,
+  PensionParserBusyError,
   type PensionParserResult,
   type PensionParserRow,
 } from '../lib/pensionParserClient';
@@ -25,6 +27,8 @@ import {
   asFile,
   buildPdfStorageKey,
   deleteStoredPdfSafely,
+  hasPdfSignature,
+  INVALID_PDF_ERROR,
   normalizePdfFileName,
   PDF_MIME_TYPE,
   validateUploadedPdf,
@@ -707,20 +711,10 @@ async function persistParsedImport(
 ): Promise<void> {
   const existingTransactions = await loadExistingTransactionsForImport(importRecord);
   await db.transaction(async (tx) => {
-    await tx
-      .delete(pensionStatementImportRows)
-      .where(eq(pensionStatementImportRows.importId, importRecord.id));
-
     const now = new Date();
-    const values = buildParsedImportRowValues({
-      importId: importRecord.id,
-      rows: parsed.rows,
-      existingTransactions,
-      now,
-    });
-
-    await tx.insert(pensionStatementImportRows).values(values);
-    await tx
+    // Parsing can take minutes: an import cancelled or expired meanwhile stays that way, and
+    // its rows are written only by the worker that still holds it.
+    const [claimed] = await tx
       .update(pensionStatementImports)
       .set({
         status: 'ready_for_review',
@@ -731,7 +725,26 @@ async function persistParsedImport(
         updatedAt: now,
         errorMessage: null,
       })
-      .where(eq(pensionStatementImports.id, importRecord.id));
+      .where(
+        and(
+          eq(pensionStatementImports.id, importRecord.id),
+          eq(pensionStatementImports.status, 'processing'),
+        ),
+      )
+      .returning({ id: pensionStatementImports.id });
+    if (!claimed) return;
+
+    await tx
+      .delete(pensionStatementImportRows)
+      .where(eq(pensionStatementImportRows.importId, importRecord.id));
+    await tx.insert(pensionStatementImportRows).values(
+      buildParsedImportRowValues({
+        importId: importRecord.id,
+        rows: parsed.rows,
+        existingTransactions,
+        now,
+      }),
+    );
   });
 }
 
@@ -743,7 +756,12 @@ async function markImportAsFailed(importId: number, error: unknown): Promise<voi
       updatedAt: new Date(),
       errorMessage: error instanceof Error ? error.message : 'Failed to process import',
     })
-    .where(eq(pensionStatementImports.id, importId));
+    .where(
+      and(
+        eq(pensionStatementImports.id, importId),
+        eq(pensionStatementImports.status, 'processing'),
+      ),
+    );
 }
 
 app.get('/', async (c) => {
@@ -763,6 +781,16 @@ app.get('/', async (c) => {
   });
 });
 
+function parseImportUploadFields(form: FormData): ParseResult<{ potId: number; file: File }> {
+  const potId = parseId(String(form.get('potId') ?? ''));
+  if (potId === null) return err('Invalid pension pot id');
+  const file = asFile(form.get('file'));
+  if (!file) return err('A PDF file is required');
+  const validation = validateUploadedPdf(file);
+  if (!validation.valid) return err(validation.error);
+  return ok({ potId, file });
+}
+
 app.post('/', async (c) => {
   const user = getAuthUser(c);
   const capability = await getPensionStatementImportCapability();
@@ -773,19 +801,16 @@ app.post('/', async (c) => {
     );
   }
 
-  const formData = await c.req.formData();
-  const potId = parseId(String(formData.get('potId') ?? ''));
-  if (potId === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const file = asFile(formData.get('file'));
-  if (!file) return c.json({ error: 'A PDF file is required' }, HTTP_STATUS.BAD_REQUEST);
-
-  const validation = validateUploadedPdf(file);
-  if (!validation.valid) return c.json({ error: validation.error }, HTTP_STATUS.BAD_REQUEST);
+  const upload = await readUploadForm(c);
+  if (!upload.ok) return upload.response;
+  const fields = parseImportUploadFields(upload.form);
+  if (!fields.ok) return c.json({ error: fields.error }, HTTP_STATUS.BAD_REQUEST);
+  const { potId, file } = fields.value;
   if (!(await assertOwnedPot(user.id, potId)))
     return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
 
   const bytes = Buffer.from(await file.arrayBuffer());
+  if (!hasPdfSignature(bytes)) return c.json({ error: INVALID_PDF_ERROR }, HTTP_STATUS.BAD_REQUEST);
   const fileHashSha256 = createHash('sha256').update(bytes).digest('hex');
   const duplicate = await hasDuplicateImport({ userId: user.id, potId, fileHashSha256 });
   if (duplicate) {
@@ -1086,6 +1111,19 @@ app.delete('/:id', async (c) => {
   return c.json({ data: normalizeImportResponse(updated) });
 });
 
+// The parser's queue was full: the import waits for the next tick instead of failing.
+async function returnImportToQueue(importId: number): Promise<void> {
+  await db
+    .update(pensionStatementImports)
+    .set({ status: 'queued', updatedAt: new Date() })
+    .where(
+      and(
+        eq(pensionStatementImports.id, importId),
+        eq(pensionStatementImports.status, 'processing'),
+      ),
+    );
+}
+
 async function processQueuedImport(): Promise<void> {
   const lockedImport = await lockNextQueuedImport();
   if (!lockedImport) return;
@@ -1095,6 +1133,13 @@ async function processQueuedImport(): Promise<void> {
     await ensureNoParsedDuplicate(lockedImport, parsed);
     await persistParsedImport(lockedImport, parsed);
   } catch (error) {
+    if (error instanceof PensionParserBusyError) {
+      console.warn('[PensionImportWorker] the parser is busy; the import stays queued', {
+        importId: lockedImport.id,
+      });
+      await returnImportToQueue(lockedImport.id);
+      return;
+    }
     console.error('Failed to process pension statement import', {
       importId: lockedImport.id,
       error,

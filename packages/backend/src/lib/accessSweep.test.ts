@@ -13,6 +13,30 @@ import { join, relative, sep } from 'node:path';
 type Inventory = Record<string, Record<string, number>>;
 
 const INLINE_OWNER_PREDICATES: Inventory = {
+  'db/seedHousehold.ts': {
+    budgetCategories: 1,
+    budgetTransactionRows: 1,
+    categoryMappings: 1,
+    debtPayments: 1,
+    debts: 1,
+    employments: 2,
+    goals: 1,
+    holdingPriceHistory: 1,
+    holdingTransactions: 1,
+    holdings: 1,
+    mortgageTransactions: 1,
+    mortgages: 1,
+    netWorthSnapshots: 1,
+    payslips: 1,
+    pensionPots: 1,
+    pensionStatementImports: 1,
+    pensionTransactions: 1,
+    planAssumptions: 1,
+    properties: 1,
+    propertyTransactions: 1,
+    savingsAccounts: 1,
+    savingsTransactions: 1,
+  },
   'cli/user.ts': { sessions: 1 },
   'lib/activity.ts': {
     budgetTransactions: 1,
@@ -92,6 +116,8 @@ const SHAREABLE_TABLES = new Set([
  * own rows or to both members of a link.
  */
 const SHAREABLE_EXCEPTIONS: Record<string, string> = {
+  'db/seedHousehold.ts':
+    'resetting the demo household deletes only the two demo users rows, and only after checking that no other user exists',
   'routes/partner.ts': 'ending a link clears the joint flag on both members rows',
   'routes/goals.ts': 'a goal may only follow a savings account its owner holds',
   'services/bunqSavingsSync.ts': 'a bank sync writes only the connected user own accounts',
@@ -131,7 +157,7 @@ describe('inline owner predicates', () => {
     expect(scan()).toEqual(INLINE_OWNER_PREDICATES);
   });
 
-  test('shareable tables are read through the access helpers, with three recorded exceptions', () => {
+  test('shareable tables are read through the access helpers, with recorded exceptions', () => {
     const offenders = Object.entries(scan()).flatMap(([file, tables]) =>
       Object.keys(tables)
         .filter((table) => SHAREABLE_TABLES.has(table))

@@ -34,7 +34,7 @@ const DATABASE_URL_KEYS = ['DATABASE_URL', 'ADMIN_DATABASE_URL', 'APP_DATABASE_U
 const COMPOSE_DB_PORT = '5432';
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const PYTHON_TOOLS_FIX =
-  'python3 -m venv .venv && . .venv/bin/activate && pip install -r services/pension-parser/requirements.txt ruff pip-audit';
+  'python3 -m venv .venv && . .venv/bin/activate && pip install -r services/pension-parser/requirements-dev.txt ruff pip-audit';
 const THROWAWAY_DB_DOC = 'see "DB-backed tests" in docs/development.md';
 
 function parseVersion(text: string): number[] | null {

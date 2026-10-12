@@ -2,6 +2,44 @@ import { getConfig } from '../config';
 import { toNumberOrZero } from './numbers';
 
 const DEFAULT_PARSER_HEALTH_TIMEOUT_MS = 4_000;
+const HTTP_SERVICE_UNAVAILABLE = 503;
+
+// What the parser's failure codes mean to the person importing. The parser's own message is
+// not stored: an import's error is shown in the app and kept with the import.
+const PARSER_FAILURE_MESSAGES: Record<string, string> = {
+  invalid_upload: 'The statement is not a PDF file',
+  file_too_large: 'The PDF is larger than the parser accepts',
+  not_pdf: 'The statement is not a PDF file',
+  malformed: 'The PDF is damaged or cannot be read',
+  encrypted: 'The PDF is password protected; upload a copy without a password',
+  too_many_pages: 'The PDF has more pages than the parser accepts',
+  page_too_large: 'A page of the PDF is larger than the parser accepts',
+  no_text: 'No text could be read from the PDF',
+  ocr_failed: 'Text recognition failed for the PDF',
+  resource_limit: 'Reading the PDF needed more memory or CPU than the parser allows',
+  timeout: 'Reading the PDF took longer than the parser allows',
+  extraction_failed: 'The PDF could not be read',
+  model_failed: 'The extraction model did not answer',
+};
+const PARSER_TIMEOUT_MESSAGE = 'Parsing the statement took longer than allowed';
+
+/** The parser's queue is full; the import can be tried again later. */
+export class PensionParserBusyError extends Error {
+  constructor() {
+    super('The statement parser is busy');
+  }
+}
+
+async function readParserFailure(response: Response): Promise<string> {
+  const body = (await response.json().catch(() => null)) as {
+    detail?: { code?: unknown };
+  } | null;
+  const code = body?.detail?.code;
+  if (typeof code === 'string' && code in PARSER_FAILURE_MESSAGES) {
+    return PARSER_FAILURE_MESSAGES[code]!;
+  }
+  return `The statement parser failed with status ${response.status}`;
+}
 
 export type PensionParserEvidence = {
   page: number | null;
@@ -123,10 +161,8 @@ export async function parsePensionStatement(
       signal: controller.signal,
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Parser service failed: ${response.status} ${text}`);
-    }
+    if (response.status === HTTP_SERVICE_UNAVAILABLE) throw new PensionParserBusyError();
+    if (!response.ok) throw new Error(await readParserFailure(response));
 
     const payload = (await response.json()) as Record<string, unknown>;
     return {
@@ -138,6 +174,10 @@ export async function parsePensionStatement(
       modelVersion: typeof payload.modelVersion === 'string' ? payload.modelVersion : null,
       rows: normalizeRows(payload.rows),
     };
+  } catch (error) {
+    // Aborting the request closes the connection, and the parser then stops the extraction.
+    if (controller.signal.aborted) throw new Error(PARSER_TIMEOUT_MESSAGE, { cause: error });
+    throw error;
   } finally {
     clearTimeout(timer);
   }
