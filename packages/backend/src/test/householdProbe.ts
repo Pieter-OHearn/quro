@@ -12,6 +12,7 @@ import { users } from '../db/schema';
 const PATHS = [
   '/api/dashboard/summary',
   '/api/dashboard/allocations',
+  '/api/dashboard/net-worth',
   '/api/plan/runway',
   '/api/savings/accounts',
   '/api/investments/properties',
