@@ -12,7 +12,7 @@ export function useBunqConnection() {
     queryFn: async (): Promise<BunqConnection | null> => {
       // Without bunq configured the backend has no bunq routes.
       const capabilities = await loadAppCapabilities(queryClient);
-      if (!capabilities.bunq.enabled) return null;
+      if (capabilities?.bunq.enabled === false) return null;
       try {
         return await apiGet<BunqConnection>('/api/bunq/connection');
       } catch (error: unknown) {

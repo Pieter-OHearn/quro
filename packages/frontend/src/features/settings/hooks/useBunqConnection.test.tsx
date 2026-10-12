@@ -108,3 +108,15 @@ test('the capabilities are fetched first when none are cached', async () => {
   expect(await query.fetch()).toBeNull();
   expect(get.mock.calls.map(([url]) => url)).toEqual(['/api/capabilities']);
 });
+
+test('an unreadable capabilities response still asks for the connection', async () => {
+  const get = spyOn(api, 'get').mockImplementation((url: string) =>
+    url === '/api/capabilities'
+      ? Promise.reject(new Error('Capabilities unavailable'))
+      : Promise.resolve({ data: { data: null } }),
+  );
+  const query = connectionQuery();
+  query.client.removeQueries({ queryKey: APP_CAPABILITIES_QUERY_KEY });
+  expect(await query.fetch()).toBeNull();
+  expect(get.mock.calls.map(([url]) => url)).toEqual(['/api/capabilities', '/api/bunq/connection']);
+});

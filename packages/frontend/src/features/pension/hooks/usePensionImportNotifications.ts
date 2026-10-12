@@ -33,7 +33,7 @@ export function usePensionImportNotifications(options: UsePensionImportNotificat
       // Without a configured import service the backend has no import routes. A configured
       // service whose worker is down still lists the imports made before.
       const capabilities = await loadAppCapabilities(queryClient);
-      if (capabilities.pensionStatementImport.reason === 'not_configured') return [];
+      if (capabilities?.pensionStatementImport.reason === 'not_configured') return [];
       const payload = await apiGet<ApiPensionStatementImportFeedItem[]>('/api/pensions/imports', {
         params: {
           statuses: statuses.join(','),
