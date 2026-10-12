@@ -17,8 +17,7 @@ Decided on 2026-10-09:
 - Money in a request is rounded to cents when it is parsed, and an amount of 10^13 or more is
   refused ([money input](#money-input)).
 - Unit prices, share quantities, FX rates and percentages are not money and keep their decimal
-  precision. Prices per share are stored with two decimals today; widening them to six decimals
-  is a separate change.
+  precision. Prices per share are stored with six decimals ([unit prices](#unit-prices)).
 - A money scale wider than two decimals, for a three-decimal currency, would be an additive
   migration if it is ever needed.
 
@@ -42,6 +41,8 @@ Money is rounded to cents, half away from zero, at these points and nowhere else
 - When a budget amount is converted to EUR on write.
 - When a repayment's principal is derived as `amount - interest`.
 - In the clamped balance helpers in `packages/backend/src/lib/balance.ts`.
+- When a holding's value (shares × price) is shown. It is computed from the stored six-decimal
+  price, never from a price rounded for display; inside an aggregate it is not rounded on its own.
 - When an aggregate (net worth, snapshot, runway) is stored or shown. These aggregates still sum
   numbers and round once at the end; moving them onto integer cents is part of consolidating the
   domain maths in `@quro/shared`.
@@ -61,19 +62,33 @@ refuse an absolute value of 10^13 or more with a 400 that names the field.
 | Properties       | `purchasePrice`, `currentValue`, `mortgage`, `monthlyRent`; transaction `amount`, `interest`, `principal`                                            |
 | Mortgages        | `originalAmount`, `outstandingBalance`, `propertyValue`, `monthlyPayment`; transaction `interest`, `principal`, and `amount` except on a rate change |
 | Debts            | `originalAmount`, `remainingBalance`, `monthlyPayment`; payment `amount`, `interest`                                                                 |
+| Holdings         | a dividend transaction's `price` (the amount received)                                                                                               |
 | Payslips         | `gross`, `tax`, `pension`, `net`, `bonus`                                                                                                            |
 | Goals            | `currentAmount`, `targetAmount`, `monthlyContribution`, `monthlyTarget`                                                                              |
 | Plan assumptions | `leanBurnOverride`, `benefitMonthlyOverride`, `severanceMonthlySalaryOverride`                                                                       |
 
-Not money, and parsed without the rule: holding `currentPrice`, `manualPrice` and transaction
-`price` and `shares`; every interest rate; a mortgage rate change's `amount` (the new rate);
-`overpaymentLimit` (a percentage); `emergencyLifestylePct`; durations and counts. bunq payments
-are provider data rather than requests and arrive with two decimals.
+Not money, and parsed without the rule: holding `currentPrice` and `manualPrice` and a buy or
+sell's `price` (unit prices, see below) and `shares`; every interest rate; a mortgage rate
+change's `amount` (the new rate); `overpaymentLimit` (a percentage); `emergencyLifestylePct`;
+durations and counts. bunq payments are provider data rather than requests and arrive with two
+decimals.
 
 Two edge cases. A goal with a `unit` may count something other than money, but its amounts are
 stored with two decimals either way, so the rule only does what storage already does. A dividend's
-amount travels in the holding transaction's `price` field, a unit-price field, so it is not
-parsed as money; it is still stored with two decimals.
+amount travels in the holding transaction's `price` field, a six-decimal unit-price column, so
+the rule is applied by transaction type: a dividend's `price` is rounded to cents and refused at
+10^13 like any amount, and the column never holds a sub-cent dividend.
+
+### Unit prices
+
+A price per share (holding `currentPrice` and `manualPrice`, a buy or sell's `price`, and the
+close prices in the price history) is stored as `numeric(23,6)`: six decimals and the same 17
+integer digits as money. `parseUnitPriceField` and `roundUnitPrice` in
+`packages/backend/src/lib/requestValidation.ts` round a price to six decimals half away from
+zero when it is parsed, working on the number's shortest decimal text, so the result is exactly
+what PostgreSQL stores; a minimum such as "greater than zero" is applied after rounding. Quotes
+from the price provider are stored with the precision they arrive with, up to six decimals.
+Interfaces may show fewer decimals; that rounding is for display only.
 
 ### Measured envelope
 
@@ -84,7 +99,7 @@ asserted by the property tests:
 | ----------------------------------------------------------------------- | ------------------------------------ |
 | `toCents` equals exact half-away-from-zero rounding of the decimal text | up to 3 decimals, below 10^12        |
 | A 2-decimal value survives text, number, text unchanged                 | below 10^13 (fails from about 10^14) |
-| A 6-decimal share or FX rate survives the same round trip               | below 10^9                           |
+| A 6-decimal share, unit price or FX rate survives the same round trip   | below 10^9                           |
 | `toCents(a + b) = toCents(a) + toCents(b)` for cent amounts             | below 10^12                          |
 | A float sum of cent amounts, rounded once, equals the exact cent sum    | 2,000 terms below 10^6 each (tested) |
 
@@ -121,14 +136,12 @@ native currencies and provenance survive.
 | Value                                            | Column type     | Rounded when                                                    |
 | ------------------------------------------------ | --------------- | --------------------------------------------------------------- |
 | Balances, amounts, payments, snapshot components | `numeric(19,2)` | when parsed; at the rounding points; stored (PostgreSQL)        |
-| Holding prices (unit prices)                     | `numeric(19,2)` | stored                                                          |
+| Holding prices (unit prices)                     | `numeric(23,6)` | when parsed; stored                                             |
 | Holding shares                                   | `numeric(19,6)` | stored                                                          |
 | FX rates to EUR                                  | `numeric(12,6)` | stored; never rounded in conversion                             |
 | Interest rates                                   | `numeric(7,4)`  | stored                                                          |
 | Import confidence                                | `numeric(5,4)`  | stored                                                          |
 | Display                                          | n/a             | `formatCurrency`: 2 decimals unless a view asks for whole units |
-
-Holding prices are stored with 2 decimals, so a quote with more decimals loses them when saved.
 
 ## Signs
 
@@ -284,6 +297,7 @@ correction. Inputs and outputs below were run against both implementations.
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Cent rounding, round trips, float sums                    | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                            |
 | Money input: cents, the 10^13 limit, non-money untouched  | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                     |
+| Unit prices: six decimals, dividends in cents, value      | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`      |
 | Allocation identities, order, additivity, FX, linked debt | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                 |
 | Joint shares, signs, missing data                         | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                     |
 | FX cut-offs and fail-closed rates                         | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                   |
