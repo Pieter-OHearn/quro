@@ -9,6 +9,8 @@ const PDF_MAGIC = Buffer.from('%PDF', 'ascii');
 export const PDF_MIME_TYPE = 'application/pdf' as const;
 export const PDF_EXTENSION = '.pdf';
 export const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
+export const PDF_TOO_LARGE_ERROR = 'PDF exceeds 20MB limit';
+export const INVALID_PDF_ERROR = 'Uploaded file is not a valid PDF';
 
 export const CLEAR_INLINE_PDF_DOCUMENT = {
   documentStorageKey: null,
@@ -73,11 +75,19 @@ export function normalizePdfFileName(value: string, fallbackBaseName: string): s
 
 export function validateUploadedPdf(file: File): { valid: true } | { valid: false; error: string } {
   if (file.size <= 0) return { valid: false, error: 'Uploaded file is empty' };
-  if (file.size > MAX_PDF_SIZE_BYTES) return { valid: false, error: 'PDF exceeds 20MB limit' };
+  if (file.size > MAX_PDF_SIZE_BYTES) return { valid: false, error: PDF_TOO_LARGE_ERROR };
   if (!hasPdfExtension(file.name)) return { valid: false, error: 'Only PDF files are allowed' };
   if (!isAllowedPdfMimeType(file.type))
     return { valid: false, error: 'Only PDF files are allowed' };
   return { valid: true };
+}
+
+/** True when the bytes start with the PDF signature. */
+export function hasPdfSignature(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= PDF_MAGIC.length &&
+    Buffer.from(bytes.subarray(0, PDF_MAGIC.length)).equals(PDF_MAGIC)
+  );
 }
 
 export function asFile(value: unknown): File | null {
@@ -142,8 +152,8 @@ async function uploadPdfFile(params: {
 }): Promise<{ fileName: string; sizeBytes: number; uploadedAt: Date }> {
   const bytes = Buffer.from(await params.file.arrayBuffer());
 
-  if (bytes.length < PDF_MAGIC.length || !bytes.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) {
-    throw new HTTPException(400, { message: 'Uploaded file is not a valid PDF' });
+  if (!hasPdfSignature(bytes)) {
+    throw new HTTPException(400, { message: INVALID_PDF_ERROR });
   }
 
   await getDocumentStore().put(params.key, bytes);
@@ -199,15 +209,21 @@ export async function replaceStoredPdfDocument<TRow, TDocument>(params: {
     status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
   });
 
-  const uploaded = await uploadPdfFile({
-    key: storageKey,
-    file: params.file,
-    fallbackBaseName: params.fallbackBaseName,
-  }).catch((error: unknown) => {
+  let uploaded: Awaited<ReturnType<typeof uploadPdfFile>>;
+  try {
+    uploaded = await uploadPdfFile({
+      key: storageKey,
+      file: params.file,
+      fallbackBaseName: params.fallbackBaseName,
+    });
+  } catch (error) {
+    // A file that is not a PDF is the client's mistake, not a storage failure.
+    if (error instanceof HTTPException) {
+      return { ok: false, error: error.message, status: HTTP_STATUS.BAD_REQUEST };
+    }
     console.error(`Failed to upload ${context} to storage`, error);
-    return null;
-  });
-  if (!uploaded) return internalError(errors.uploadFailed);
+    return internalError(errors.uploadFailed);
+  }
 
   let updated: TRow | undefined;
   try {

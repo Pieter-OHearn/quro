@@ -62,7 +62,7 @@ The frontend image runs nginx as its unprivileged `nginx` user (UID 101), also w
 
 ### Statement OCR stays opt-in
 
-The pension statement parser and its model server stay behind the `pension-import` Compose profile. The default install, the example Compose file and the core readiness check do not reference them.
+The pension statement parser and its model server stay behind the `ocr` Compose profile of the checkout's `docker-compose.yml` and are experimental. The default install, the example Compose file and the core readiness check do not reference them.
 
 ## Images
 

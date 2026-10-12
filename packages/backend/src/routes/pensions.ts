@@ -8,6 +8,7 @@ import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
+import { readUploadForm } from '../lib/uploadForm';
 import { earliestDate } from '../lib/netWorth';
 import { withLedgerWrite } from '../lib/ledgerWrite';
 import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
@@ -839,8 +840,9 @@ app.post('/transactions/:id/document', async (c) => {
   if (transactionId === null)
     return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const formData = await c.req.formData();
-  const file = asFile(formData.get('file'));
+  const upload = await readUploadForm(c);
+  if (!upload.ok) return upload.response;
+  const file = asFile(upload.form.get('file'));
   if (!file) return c.json({ error: 'A PDF file is required' }, HTTP_STATUS.BAD_REQUEST);
 
   const validation = validateUploadedPdf(file);

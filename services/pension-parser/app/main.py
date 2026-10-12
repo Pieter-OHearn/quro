@@ -1,28 +1,42 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import logging
 import os
 import re
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import date, datetime
-from io import BytesIO
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
-import pytesseract
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from pdf2image import convert_from_bytes
-from pypdf import PdfReader
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
+
+from app.extraction import AdmissionGate, ExtractionError, extract_text
+from app.limits import ParserLimits, load_limits
+from app.upload_limit import BodySizeLimit
+
+logger = logging.getLogger("pension-parser")
+T = TypeVar("T")
+
+# Read once at startup; an invalid bound stops the service.
+LIMITS: ParserLimits = load_limits()
+# Multipart framing and the small form fields around the PDF.
+FORM_OVERHEAD_BYTES = 1024 * 1024
+DISCONNECT_POLL_SECONDS = 0.5
+CLIENT_CLOSED_REQUEST = 499
 
 app = FastAPI(title="Pension Parser")
-logger = logging.getLogger("pension-parser")
+app.add_middleware(BodySizeLimit, max_bytes=LIMITS.max_file_bytes + FORM_OVERHEAD_BYTES)
+GATE = AdmissionGate(LIMITS.max_concurrency, LIMITS.max_queue)
 
 ALLOWED_TYPES = {"contribution", "fee", "annual_statement"}
 ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-MIN_TEXT_LENGTH = 400
-MAX_TEXT_CHARS = 80_000
 VLLM_TIMEOUT_SECONDS_DEFAULT = 180.0
+RETRY_AFTER_SECONDS = "5"
 REGEX_FALLBACK_DATE_PATTERNS = ("%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d")
 
 
@@ -280,28 +294,6 @@ def _build_regex_fallback_payload(
     }
 
 
-def _extract_pdf_text(pdf_bytes: bytes) -> str:
-    reader = PdfReader(BytesIO(pdf_bytes))
-    parts: list[str] = []
-    for index, page in enumerate(reader.pages, start=1):
-        text = page.extract_text() or ""
-        if text.strip():
-            parts.append(f"[Page {index}]\n{text.strip()}\n")
-    return "\n".join(parts).strip()
-
-
-def _extract_pdf_text_ocr(pdf_bytes: bytes, languages: list[str]) -> str:
-    lang_map = {"en": "eng", "nl": "nld"}
-    tesseract_lang = "+".join(lang_map.get(item, "eng") for item in languages)
-    images = convert_from_bytes(pdf_bytes, dpi=250, fmt="png")
-    parts: list[str] = []
-    for index, image in enumerate(images, start=1):
-        text = pytesseract.image_to_string(image, lang=tesseract_lang)
-        if text.strip():
-            parts.append(f"[Page {index}]\n{text.strip()}\n")
-    return "\n".join(parts).strip()
-
-
 def _extract_json_from_text(raw_text: str) -> dict[str, Any]:
     raw_text = raw_text.strip()
     if raw_text.startswith("```"):
@@ -455,16 +447,13 @@ async def _call_vllm(
                 },
             )
             if response.status_code >= 400:
-                raise RuntimeError(
-                    f"vLLM returned HTTP {response.status_code}: {response.text[:500]}"
-                )
+                # The body can echo the prompt, which quotes the statement.
+                raise RuntimeError(f"vLLM returned HTTP {response.status_code}")
             payload = response.json()
             content = payload.get("choices", [{}])[0].get("message", {}).get("content", "{}")
             return _extract_json_from_text(str(content))
     except Exception as exc:
-        raise RuntimeError(
-            f"vLLM request failed (base_url={base_url}, model={model}): {exc!r}"
-        ) from exc
+        raise RuntimeError(f"vLLM request failed ({type(exc).__name__})") from exc
 
 
 async def _call_llm(
@@ -484,31 +473,66 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.exception_handler(ExtractionError)
+async def extraction_error_handler(_request: Request, exc: ExtractionError) -> JSONResponse:
+    headers = {"Retry-After": RETRY_AFTER_SECONDS} if exc.code == "busy" else None
+    return JSONResponse(
+        status_code=exc.status,
+        content={"detail": {"code": exc.code, "message": exc.message}},
+        headers=headers,
+    )
+
+
+async def _until_disconnected(request: Request, work: Awaitable[T]) -> T | Response:
+    """Runs the work, and cancels it (killing any extraction) when the client goes away."""
+    task = asyncio.ensure_future(work)
+    try:
+        while True:
+            done, _ = await asyncio.wait({task}, timeout=DISCONNECT_POLL_SECONDS)
+            if done:
+                return task.result()
+            if await request.is_disconnected():
+                task.cancel()
+                with contextlib.suppress(BaseException):
+                    await task
+                logger.info("client disconnected; the extraction was stopped")
+                return Response(status_code=CLIENT_CLOSED_REQUEST)
+    except asyncio.CancelledError:
+        task.cancel()
+        raise
+
+
 @app.post("/v1/extract")
 async def extract_statement(
+    request: Request,
     file: UploadFile = File(...),
     provider: str = Form(default=""),
     currency: str = Form(default=""),
     languageHints: str | None = Form(default=None),
-) -> dict[str, Any]:
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+) -> Any:
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise ExtractionError("invalid_upload")
 
-    data = await file.read()
+    data = await file.read(LIMITS.max_file_bytes + 1)
     if not data:
-        raise HTTPException(status_code=400, detail="Uploaded PDF is empty")
+        raise ExtractionError("invalid_upload")
+    if len(data) > LIMITS.max_file_bytes:
+        raise ExtractionError("file_too_large")
 
     languages = _parse_language_hints(languageHints)
-    text = _extract_pdf_text(data)
-    if len(text.strip()) < MIN_TEXT_LENGTH:
-        text = _extract_pdf_text_ocr(data, languages)
+    return await _until_disconnected(
+        request, _extract_statement(data, provider, currency, languages)
+    )
 
-    text = text.strip()
+
+async def _extract_statement(
+    data: bytes, provider: str, currency: str, languages: list[str]
+) -> dict[str, Any]:
+    async with GATE.slot():
+        extracted = await extract_text(data, languages, LIMITS)
+    text = extracted.text.strip()[: LIMITS.max_text_chars]
     if not text:
-        raise HTTPException(status_code=422, detail="Could not extract text from PDF")
-
-    if len(text) > MAX_TEXT_CHARS:
-        text = text[:MAX_TEXT_CHARS]
+        raise ExtractionError("no_text")
 
     period_start_hint, period_end_hint = _extract_period_from_text(text)
     opening_hint = _extract_balance_from_text("opening balance", text)
@@ -537,12 +561,10 @@ async def extract_statement(
                 languages=languages,
             )
         except Exception as exc:
-            logger.exception("LLM extraction failed")
+            # Only the exception type: its text can carry the model's answer or the statement.
+            logger.warning("LLM extraction failed (%s)", type(exc).__name__)
             if not _read_bool_env("PARSER_ALLOW_REGEX_FALLBACK", True):
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"LLM extraction failed ({type(exc).__name__}): {exc!r}",
-                ) from exc
+                raise ExtractionError("model_failed") from exc
             payload = regex_payload
             model_name = "regex-fallback"
             model_version = "deterministic-v1"

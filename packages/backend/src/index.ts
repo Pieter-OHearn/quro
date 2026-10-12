@@ -5,6 +5,7 @@ import { queryClient } from './db/client';
 import { installGracefulShutdown } from './lib/gracefulShutdown';
 import { stopIntervalJobs } from './lib/intervalJob';
 import { closeMaintenanceGate } from './lib/maintenanceMode';
+import { MAX_REQUEST_BODY_BYTES } from './lib/uploadForm';
 import { checkConfiguredCookieTransport } from './middleware/cookieTransport';
 import { startSchedulers } from './schedulers';
 
@@ -20,6 +21,8 @@ export const app = createApp(config);
 const server = Bun.serve({
   port: config.runtime.port,
   hostname: config.runtime.host,
+  // No route takes more than one PDF at the size limit; larger bodies are refused with 413.
+  maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
   fetch: app.fetch,
 });
 

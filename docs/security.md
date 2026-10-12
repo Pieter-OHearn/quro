@@ -517,8 +517,13 @@ Run `bun scripts/lib/licence-inventory.ts` after `bun install` for the inventory
 - PostgreSQL (`db`) is on `backend-net` only. Uploaded documents are files in a volume mounted into
   the backend and the import worker, readable by the backend user only (directories `0700`, files
   `0600`). With S3 storage, the store is the operator's and is reached over the network.
-- The optional AI services (`vllm`, `pension-parser`) are on `ai-net` with the
-  `pension-import-worker`. The main backend cannot reach them.
+- The optional, experimental OCR services (`vllm`, `pension-parser`, Compose profile `ocr`) are on
+  the internal `ocr-net` with the `pension-import-worker`. The main backend cannot reach them, and
+  the parser has no route out of the host. Only the model server has a second network, to download
+  its model; `VLLM_HF_HUB_OFFLINE=1` stops downloads once the model is cached. Both run as non-root
+  users with all capabilities dropped and CPU, memory and process limits. The parser reads each
+  document in a child process with its own limits (see
+  [bounds on document processing](development.md#bounds-on-document-processing)).
 
 A compromised frontend container therefore has no direct network path to the database and no
 access to the documents volume.

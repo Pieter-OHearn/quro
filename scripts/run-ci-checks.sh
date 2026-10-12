@@ -16,7 +16,7 @@ require_command() {
     echo "Missing required command: $1" >&2
     if [ "$1" = "ruff" ] || [ "$1" = "pip-audit" ]; then
       echo "Install Python tooling into .venv or your PATH, for example:" >&2
-      echo "  python3 -m venv .venv && . .venv/bin/activate && pip install -r services/pension-parser/requirements.txt ruff pip-audit" >&2
+      echo "  python3 -m venv .venv && . .venv/bin/activate && pip install -r services/pension-parser/requirements-dev.txt ruff pip-audit" >&2
     elif [ "$1" = "gitleaks" ]; then
       echo "Install gitleaks and retry, for example:" >&2
       echo "  brew install gitleaks" >&2
@@ -148,6 +148,14 @@ if command -v python3 >/dev/null 2>&1; then
     run_check "Python format" bun run check:python:format
     run_check "Python lint" bun run check:python:lint
     run_check "Python compile" bun run check:python:build
+    if python3 -c 'import pytest, fastapi, pypdf' >/dev/null 2>&1; then
+      run_check "Python tests" bun run check:python:test
+    elif allow_precommit_python_skip; then
+      skip_python_check "Python tests" "pytest or the parser's dependencies"
+    else
+      echo "Install the parser's test dependencies: pip install -r services/pension-parser/requirements-dev.txt" >&2
+      exit 1
+    fi
   elif allow_precommit_python_skip; then
     skip_python_check "Python format/lint/build checks" "ruff"
   else

@@ -175,6 +175,24 @@ jobs:
       - name: Compile check
         run: python -m compileall services/pension-parser/app/
 
+  # Synthetic malformed, encrypted, oversized, decompression-bomb and slow PDFs against the
+  # extraction bounds. Process limits and OCR need Linux, poppler and tesseract.
+  python-test:
+    name: Python Tests (pension-parser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install poppler and tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils tesseract-ocr
+      - name: Install dependencies
+        run: pip install -r services/pension-parser/requirements-dev.txt
+      - name: Run parser tests
+        working-directory: services/pension-parser
+        run: python -m pytest -q
+
   # ── Container images ─────────────────────────────────────────────────────
 
   docker-build:
@@ -508,6 +526,7 @@ jobs:
       - python-format
       - python-lint
       - build-worker
+      - python-test
       - docker-build
       - upgrade-fixture
       - pg-upgrade

@@ -191,3 +191,78 @@ describe('the example Compose file', () => {
     }
   });
 });
+
+// Statement OCR is experimental and opt-in. Its services stay behind one profile, unreachable
+// from outside, without root and within resource limits.
+describe('the optional OCR services', () => {
+  type OcrService = Service & {
+    profiles?: string[];
+    user?: string;
+    read_only?: boolean;
+    init?: boolean;
+    cap_drop?: string[];
+    security_opt?: string[];
+    deploy?: { resources?: { limits?: Record<string, unknown> } };
+  };
+  type FullCompose = {
+    services: Record<string, OcrService>;
+    networks: Record<string, { internal?: boolean } | null>;
+  };
+  const OCR_SERVICES = ['pension-import-worker', 'pension-parser', 'vllm'];
+  const compose = async () => (await readCompose('docker-compose.yml')) as unknown as FullCompose;
+
+  test('run only under the ocr profile and publish no port', async () => {
+    const { services } = await compose();
+    for (const [name, service] of Object.entries(services)) {
+      const isOcr = OCR_SERVICES.includes(name);
+      expect([name, isOcr && service.profiles?.includes('ocr')]).toEqual([name, isOcr]);
+      if (isOcr) expect([name, service.ports]).toEqual([name, undefined]);
+    }
+  });
+
+  test('the parser and model server run as non-root users with limits', async () => {
+    const { services } = await compose();
+    for (const name of ['pension-parser', 'vllm']) {
+      const service = services[name]!;
+      expect(service.user).toMatch(/^[1-9]\d*:[1-9]\d*$/);
+      expect(service.cap_drop).toEqual(['ALL']);
+      expect(service.security_opt).toContain('no-new-privileges:true');
+      const limits = service.deploy?.resources?.limits ?? {};
+      expect(Object.keys(limits).sort()).toEqual(['cpus', 'memory', 'pids']);
+    }
+    const parser = services['pension-parser']!;
+    expect(parser.read_only).toBe(true);
+    expect(parser.init).toBe(true);
+    for (const bound of [
+      'PARSER_MAX_FILE_MB',
+      'PARSER_MAX_PAGES',
+      'PARSER_MAX_PAGE_PIXELS',
+      'PARSER_MAX_TEXT_CHARS',
+      'PARSER_TIMEOUT_SECONDS',
+      'PARSER_CPU_SECONDS',
+      'PARSER_MEMORY_MB',
+      'PARSER_MAX_CONCURRENCY',
+      'PARSER_MAX_QUEUE',
+    ]) {
+      expect(environmentOf(parser)[bound]).toMatch(new RegExp(`^\\$\\{${bound}:-\\d+\\}$`));
+    }
+  });
+
+  test('share an internal network; only the model server has a way out', async () => {
+    const { services, networks } = await compose();
+    const on = (network: string) =>
+      Object.entries(services)
+        .filter(([, service]) => networksOf(service).includes(network))
+        .map(([name]) => name)
+        .sort();
+    expect(networks['ocr-net']?.internal).toBe(true);
+    expect(on('ocr-net')).toEqual([...OCR_SERVICES].sort());
+    expect(networksOf(services['pension-parser']!)).toEqual(['ocr-net']);
+    expect(on('ocr-egress')).toEqual(['vllm']);
+  });
+
+  test('the example Compose file operators copy has none of them', async () => {
+    const text = await Bun.file(join(ROOT, 'docs/compose.example.yaml')).text();
+    expect(text).not.toMatch(/vllm|pension-parser|pension-import|PENSION_PARSER|profiles:/i);
+  });
+});

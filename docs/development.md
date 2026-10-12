@@ -163,6 +163,8 @@ Each connect attempt is recorded on the server for the initiating user and desti
 
 ## Optional Pension Import Development
 
+Statement OCR is experimental and opt-in. The core app never needs it, and the example Compose file operators copy does not contain it.
+
 Run the worker in a second terminal:
 
 ```bash
@@ -174,15 +176,43 @@ Run the parser locally in a third terminal, with Python 3.12 as `python3`:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r services/pension-parser/requirements.txt ruff pip-audit
+pip install -r services/pension-parser/requirements-dev.txt ruff pip-audit
 uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
 ```
 
-If you want the full Dockerized AI stack instead, use:
+`PARSER_REGEX_ONLY=true` skips the model and uses the deterministic extractor, which needs no GPU. The parser's tests build synthetic PDFs (malformed, truncated, encrypted, huge pages, decompression bombs, slow pages) and need poppler and tesseract; the process-limit and timeout tests run on Linux only and are skipped elsewhere:
 
 ```bash
-docker compose --profile pension-import up --build -d
+bun run check:python:test
 ```
+
+If you want the full Dockerized stack instead, use the `ocr` profile:
+
+```bash
+docker compose --profile ocr up --build -d
+```
+
+The model server runs as UID 1000 and keeps its model in `./data/vllm-cache`. Give that directory to the user once, also when it holds a model downloaded by an earlier release as root: `sudo chown -R 1000:1000 data/vllm-cache`. Once the model is there, `VLLM_HF_HUB_OFFLINE=1` stops the model server from contacting Hugging Face. The parser runs as UID 10001 with a read-only root filesystem and a 256 MB `/tmp`.
+
+### Bounds on document processing
+
+The parser reads each document in a new child process in its own process group. The process limits its address space, CPU time and file size before it reads the PDF, and the renderer (`pdftoppm`) and OCR (`tesseract`, one thread) processes it starts inherit those limits. When the wall-clock bound runs out, or the import worker closes the connection at its own `PENSION_PARSER_TIMEOUT_MS`, the parser kills the whole group. The text layer is read page by page; OCR renders and reads one page at a time. Every bound is a whole number set on the `pension-parser` service; an invalid value stops the parser at startup.
+
+| Setting                  | Default    | Bound                                                                             |
+| ------------------------ | ---------- | --------------------------------------------------------------------------------- |
+| `PARSER_MAX_FILE_MB`     | `20`       | Upload size. Larger bodies answer 413 before they are read                        |
+| `PARSER_MAX_PAGES`       | `30`       | Pages in one PDF                                                                  |
+| `PARSER_MAX_PAGE_PIXELS` | `40000000` | Pixels of one page rendered for OCR at 250 dpi; checked before anything is drawn  |
+| `PARSER_MAX_TEXT_CHARS`  | `80000`    | Characters of text kept and sent to the model                                     |
+| `PARSER_TIMEOUT_SECONDS` | `100`      | Wall-clock time for one extraction                                                |
+| `PARSER_CPU_SECONDS`     | `100`      | CPU time of each process of an extraction                                         |
+| `PARSER_MEMORY_MB`       | `1024`     | Address space of each process of an extraction                                    |
+| `PARSER_MAX_CONCURRENCY` | `1`        | Extractions running at once                                                       |
+| `PARSER_MAX_QUEUE`       | `2`        | Extractions waiting for a slot. More answer 503, and the worker retries next tick |
+
+Compose also caps the containers: `PARSER_CPUS` (`2`), `PARSER_MEM_LIMIT` (`2g`) and 256 processes for the parser, `VLLM_CPUS` (`4`), `VLLM_MEM_LIMIT` (`24g`) and 2048 processes for the model server. `PARSER_MEMORY_MB` bounds address space, which runs ahead of the memory a process actually uses; the container limit caps what the service and its extraction processes use together. Keep `PARSER_TIMEOUT_SECONDS` plus `VLLM_TIMEOUT_SECONDS` below `PENSION_PARSER_TIMEOUT_MS` (in seconds), so the parser gives up before the worker does.
+
+A refused document fails its import with a fixed message, such as "The PDF is password protected". Encrypted PDFs that open without a password (protected only against changes) are read; others are refused.
 
 ## Contributor DB Commands
 

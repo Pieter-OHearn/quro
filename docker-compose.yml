@@ -99,7 +99,8 @@ services:
     build:
       context: .
       dockerfile: packages/backend/Dockerfile
-    profiles: ['pension-import']
+    # Statement OCR is experimental and opt-in: `docker compose --profile ocr up`.
+    profiles: ['ocr']
     restart: unless-stopped
     environment:
       POSTGRES_HOST: db
@@ -133,7 +134,7 @@ services:
       disable: true
     networks:
       - backend-net
-      - ai-net
+      - ocr-net
 
   db-tools:
     build:
@@ -168,12 +169,16 @@ services:
     networks:
       - backend-net
 
+  # The model server and the parser are private: no published ports, an internal network shared
+  # only with the import worker, non-root users and resource limits. The model server alone may
+  # reach the internet, to download the model; VLLM_HF_HUB_OFFLINE=1 stops that once it is cached.
   vllm:
     build:
       context: .
       dockerfile: docker/vllm/Dockerfile
-    profiles: ['pension-import']
+    profiles: ['ocr']
     restart: unless-stopped
+    user: '1000:1000'
     command:
       - --model
       - ${VLLM_MODEL:-Qwen/Qwen2.5-14B-Instruct-AWQ}
@@ -185,37 +190,73 @@ services:
       - ${VLLM_GPU_MEMORY_UTILIZATION:-0.92}
       - --max-model-len
       - ${VLLM_MAX_MODEL_LEN:-8192}
+    environment:
+      HF_HOME: /var/cache/huggingface
+      HOME: /tmp/vllm
+      HF_HUB_OFFLINE: ${VLLM_HF_HUB_OFFLINE:-0}
     secrets:
       - hugging_face_hub_token
     volumes:
-      - ./data/vllm-cache:/root/.cache/huggingface
+      # Owned by UID 1000: `sudo chown -R 1000:1000 data/vllm-cache` once.
+      - ./data/vllm-cache:/var/cache/huggingface
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
     deploy:
       resources:
+        limits:
+          cpus: '${VLLM_CPUS:-4}'
+          memory: ${VLLM_MEM_LIMIT:-24g}
+          pids: 2048
         reservations:
           devices:
             - driver: nvidia
               count: all
               capabilities: [gpu]
     networks:
-      - ai-net
+      - ocr-net
+      - ocr-egress
 
   pension-parser:
     build:
       context: .
       dockerfile: services/pension-parser/Dockerfile
-    profiles: ['pension-import']
+    profiles: ['ocr']
     restart: unless-stopped
+    # Reaps the renderer and OCR processes of an extraction that was stopped.
+    init: true
+    user: '10001:10001'
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
     environment:
       PARSER_ALLOW_REGEX_FALLBACK: ${PARSER_ALLOW_REGEX_FALLBACK:-true}
       PARSER_REGEX_ONLY: ${PARSER_REGEX_ONLY:-false}
       VLLM_BASE_URL: ${VLLM_INTERNAL_BASE_URL:-http://vllm:8000}
       VLLM_MODEL: ${VLLM_MODEL:-Qwen/Qwen2.5-14B-Instruct-AWQ}
       VLLM_TIMEOUT_SECONDS: ${VLLM_TIMEOUT_SECONDS:-180}
+      # Bounds for one document (docs/development.md#bounds-on-document-processing).
+      PARSER_MAX_FILE_MB: ${PARSER_MAX_FILE_MB:-20}
+      PARSER_MAX_PAGES: ${PARSER_MAX_PAGES:-30}
+      PARSER_MAX_PAGE_PIXELS: ${PARSER_MAX_PAGE_PIXELS:-40000000}
+      PARSER_MAX_TEXT_CHARS: ${PARSER_MAX_TEXT_CHARS:-80000}
+      PARSER_TIMEOUT_SECONDS: ${PARSER_TIMEOUT_SECONDS:-100}
+      PARSER_CPU_SECONDS: ${PARSER_CPU_SECONDS:-100}
+      PARSER_MEMORY_MB: ${PARSER_MEMORY_MB:-1024}
+      PARSER_MAX_CONCURRENCY: ${PARSER_MAX_CONCURRENCY:-1}
+      PARSER_MAX_QUEUE: ${PARSER_MAX_QUEUE:-2}
+    deploy:
+      resources:
+        limits:
+          cpus: '${PARSER_CPUS:-2}'
+          memory: ${PARSER_MEM_LIMIT:-2g}
+          pids: 256
     depends_on:
       vllm:
         condition: service_started
     networks:
-      - ai-net
+      - ocr-net
 
   frontend:
     build:
@@ -235,7 +276,11 @@ services:
 networks:
   frontend-net:
   backend-net:
-  ai-net:
+  # No route out: the import worker, the parser and the model server talk only to each other.
+  ocr-net:
+    internal: true
+  # The model server's download of the model.
+  ocr-egress:
 
 secrets:
   postgres_admin_password:

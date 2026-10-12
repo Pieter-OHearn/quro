@@ -85,22 +85,20 @@ describe('replaceStoredPdfDocument', () => {
     expect(objects.has('old.pdf')).toBe(true);
   });
 
-  test('rejects a file that is not a PDF without touching the row', async () => {
-    const spy = console.error;
-    console.error = () => {};
+  test('rejects a file that is not a PDF as a client error without touching the row', async () => {
     let persisted = false;
-    try {
-      const result = await replace({
-        file: new File(['nope'], 'x.pdf', { type: 'application/pdf' }),
-        persist: () => {
-          persisted = true;
-          return Promise.resolve(undefined);
-        },
-      });
-      expect(result).toMatchObject({ ok: false, error: 'upload', status: 500 });
-      expect(persisted).toBe(false);
-    } finally {
-      console.error = spy;
-    }
+    const result = await replace({
+      file: new File(['nope'], 'x.pdf', { type: 'application/pdf' }),
+      persist: () => {
+        persisted = true;
+        return Promise.resolve(undefined);
+      },
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'Uploaded file is not a valid PDF',
+      status: 400,
+    });
+    expect(persisted).toBe(false);
   });
 });
