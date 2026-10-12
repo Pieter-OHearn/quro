@@ -3,14 +3,14 @@
 # throwaway stack: synthetic data only, private Docker network, no published ports, nothing
 # outside the Docker resources it creates (all removed on exit).
 #
-#   1. PostgreSQL 16 on its own volume, migrated and filled with the demo seed plus
-#      scripts/fixtures/pg-upgrade-synthetic.sql (money edge cases, nulls, jsonb, non-ASCII).
+#   1. PostgreSQL 16 on its own volume holds the synthetic 0.7.0 installation from
+#      scripts/upgrade-fixture/v0.7.0 (docs/upgrade-fixture.md): the data a 16 install has.
 #   2. Row counts and a content checksum per table are recorded.
 #   3. The database is dumped with the old server's own pg_dump (the documented step).
-#   4. PostgreSQL 18 starts on a NEW volume, `db:migrate` runs, and the backend image's
-#      `db:restore` loads the dump. Counts and checksums must match step 2.
+#   4. PostgreSQL 18 starts on a NEW volume, and the backend image's `db:restore` loads the dump
+#      into the empty database. Counts and checksums must match step 2. Then `quro migrate`.
 #   5. The backend image's `db:backup` dumps the 18 server and `db:restore` loads that into a
-#      second database on 18: the round trip with the shipped client tools.
+#      second, empty database on 18: the round trip with the shipped client tools.
 #   6. The 16 volume must be untouched: 18 refuses to start on it, and 16 still starts on it
 #      with the same counts and checksums.
 #
@@ -97,9 +97,12 @@ backend() {
     --entrypoint bun "$IMAGE" run "$@"
 }
 
-migrate() {
-  backend "$1" "$2" db:migrate
-  backend "$1" "$2" db:bootstrap-runtime-role
+# quro_migrate HOST DATABASE: the image's `quro migrate` against HOST, as an operator runs it.
+quro_migrate() {
+  admin_url="postgres://$ADMIN_USER:$ADMIN_PASSWORD@$1:5432/$2"
+  app_url="postgres://$APP_USER:$APP_PASSWORD@$1:5432/$2"
+  docker run --rm --network "$NET" -e ADMIN_DATABASE_URL="$admin_url" -e APP_DATABASE_URL="$app_url" \
+    -e DATABASE_URL="$app_url" "$IMAGE" migrate >/dev/null
 }
 
 # snapshot CONTAINER DATABASE: the sorted output of scripts/pg-table-fingerprint.sql, the same
@@ -118,17 +121,18 @@ same_snapshot() {
   fi
 }
 
-step "PostgreSQL 16 ($PG_OLD_IMAGE) with synthetic data"
+step "PostgreSQL 16 ($PG_OLD_IMAGE) with the synthetic 0.7.0 installation"
 start_server "$RUN-old" "$PG_OLD_IMAGE" "$V_OLD" /var/lib/postgresql/data
-migrate "$RUN-old" "$DB"
-backend "$RUN-old" "$DB" db:seed-demo
+# The runtime role exists before the data arrives, as on an installed system.
+echo "create role $APP_USER login password '$APP_PASSWORD';" |
+  docker exec -i "$RUN-old" psql -X -q -v ON_ERROR_STOP=1 -U "$ADMIN_USER" -d "$DB" >/dev/null
 docker exec -i "$RUN-old" psql -X -q -v ON_ERROR_STOP=1 -U "$ADMIN_USER" -d "$DB" \
-  <scripts/fixtures/pg-upgrade-synthetic.sql >/dev/null
+  <scripts/upgrade-fixture/v0.7.0/database.sql >/dev/null
 snapshot "$RUN-old" "$DB" >"$WORK/before.snap"
 tables=$(grep -c '^table|' "$WORK/before.snap")
 rows=$(awk -F'|' '$1 == "table" { n += $3 } END { print n + 0 }' "$WORK/before.snap")
 echo "recorded $tables tables and $rows rows"
-[ "$rows" -gt 0 ] || fail "the demo seed produced no rows"
+[ "$rows" -gt 0 ] || fail "the fixture loaded no rows"
 
 step "Dump with the old server's own pg_dump"
 docker exec "$RUN-old" pg_dump -U "$ADMIN_USER" -d "$DB" --format=custom \
@@ -171,25 +175,27 @@ echo "server major $server_major, data_checksums=$checksums"
 [ "$server_major" -ge 18 ] || fail "expected PostgreSQL 18 or later, got $server_major"
 [ "$checksums" = "on" ] || fail "data checksums are $checksums on the new cluster"
 
-step "Migrate, restore the old dump with the image's tools, compare"
-migrate "$RUN-new" "$DB"
+step "Restore the old dump into the empty database with the image's tools, compare, migrate"
+# Restore first: the new release's migrations run on the restored data, never before it.
 backend "$RUN-new" "$DB" db:restore -- /var/lib/quro/backups/before-upgrade.dump >/dev/null
 snapshot "$RUN-new" "$DB" >"$WORK/after.snap"
 same_snapshot "16 -> 18" "$WORK/before.snap" "$WORK/after.snap"
+quro_migrate "$RUN-new" "$DB"
+snapshot "$RUN-new" "$DB" >"$WORK/migrated.snap"
+echo "quro migrate applied the migrations newer than the dump"
 
-step "Round trip on 18: db:backup, then db:restore into a second database"
+step "Round trip on 18: db:backup, then db:restore into a second, empty database"
 backend "$RUN-new" "$DB" db:backup -- --output /var/lib/quro/backups/round-trip.dump >/dev/null
 docker exec "$RUN-new" psql -X -q -U "$ADMIN_USER" -d postgres -c 'create database quro_roundtrip' >/dev/null
-migrate "$RUN-new" quro_roundtrip
 backend "$RUN-new" quro_roundtrip db:restore -- /var/lib/quro/backups/round-trip.dump >/dev/null
 snapshot "$RUN-new" quro_roundtrip >"$WORK/roundtrip.snap"
-same_snapshot "18 -> 18 round trip" "$WORK/before.snap" "$WORK/roundtrip.snap"
+same_snapshot "18 -> 18 round trip" "$WORK/migrated.snap" "$WORK/roundtrip.snap"
 
 step "Self-check: the comparison notices a one-cent change"
 docker exec "$RUN-new" psql -X -q -U "$ADMIN_USER" -d quro_roundtrip \
-  -c "update savings_accounts set balance = balance + 0.01 where name = 'Everyday'" >/dev/null
+  -c "update savings_accounts set balance = balance + 0.01 where id = (select min(id) from savings_accounts)" >/dev/null
 snapshot "$RUN-new" quro_roundtrip >"$WORK/mutated.snap"
-if diff -q "$WORK/before.snap" "$WORK/mutated.snap" >/dev/null; then
+if diff -q "$WORK/migrated.snap" "$WORK/mutated.snap" >/dev/null; then
   fail "a one-cent change did not change the snapshot"
 fi
 echo "detected"

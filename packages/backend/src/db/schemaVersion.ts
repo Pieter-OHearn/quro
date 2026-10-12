@@ -1,4 +1,4 @@
-import type { Sql } from 'postgres';
+import type { Sql, TransactionSql } from 'postgres';
 import journal from './migrations/meta/_journal.json';
 
 // The schema version an image expects is the migration journal it ships. A database records what
@@ -92,7 +92,7 @@ function errorCode(error: unknown): string | undefined {
  * without the migrations table). Other errors, such as a missing privilege, are thrown.
  */
 export async function readLatestAppliedWhen(
-  sql: Sql<Record<string, unknown>>,
+  sql: Sql<Record<string, unknown>> | TransactionSql<Record<string, unknown>>,
 ): Promise<number | null> {
   try {
     const [row] = await sql<MigrationRow[]>`

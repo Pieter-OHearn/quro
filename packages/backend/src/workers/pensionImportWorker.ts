@@ -8,7 +8,9 @@ import {
   upsertWorkerHeartbeat,
 } from '../lib/capabilities';
 import { evaluateCapability } from '../lib/capabilityRegistry';
+import { closeMaintenanceGate, runUnlessMaintenance } from '../lib/maintenanceMode';
 import { runPensionImportWorkerTick } from '../routes/pension-imports';
+import { queryClient } from '../db/client';
 
 // The worker has nothing to do without a parser; stop with the settings exit code instead of
 // polling a service that cannot be reached. It reads documents from the same store as the server
@@ -101,7 +103,9 @@ async function runProcessingLoop(): Promise<void> {
   while (!shuttingDown) {
     runtimeState.status = 'processing';
     try {
-      await runPensionImportWorkerTick();
+      // A backup or restore holds maintenance mode: wait for the next tick instead.
+      const outcome = await runUnlessMaintenance(runPensionImportWorkerTick);
+      if (!outcome.ran) console.log('[PensionImportWorker] paused while a backup or restore runs');
     } catch (error) {
       console.error('[PensionImportWorker] tick failed', error);
     } finally {
@@ -127,3 +131,7 @@ process.on('SIGTERM', () => {
 });
 
 await Promise.all([runHeartbeatLoop(), runProcessingLoop()]);
+// Both loops have finished after SIGTERM or SIGINT: close the connections and exit.
+await closeMaintenanceGate();
+await queryClient.end({ timeout: 5 });
+process.exit(0);

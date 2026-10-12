@@ -70,7 +70,7 @@ Uploaded documents are stored on the filesystem (`./data/documents`, mounted at 
 ### One-shot services
 
 - `migrate`: runs `quro migrate` (schema migrations as the admin DB role, under a database lock, then the runtime role and its grants), then exits. The backend's health check is `quro health`.
-- `db-tools`: interactive shell for backup/restore; only started with the `maintenance` profile.
+- `db-tools`: runs `quro backup`, `quro restore` (with `--entrypoint quro`) and the older dump commands; only started with the `maintenance` profile. See [backup and restore](backup-and-restore.md).
 
 ---
 
@@ -351,11 +351,17 @@ Uploaded PDFs go through `getDocumentStore()` (`lib/documentStorage.ts`), which 
 
 Sessions are stored in the `sessions` table, keyed by the SHA-256 digest of the cookie token, with an `expires_at` timestamp (30-day TTL from login), the browser's user agent and a `last_used_at` time. Users list and revoke them in Settings; operators revoke them with `quro user revoke-sessions`. The backend calls `startSessionCleanup()` on startup, which runs a background interval to delete expired rows and old operator codes (`auth_codes`). There is no Redis or external session store.
 
+### Maintenance mode and shutdown
+
+`quro backup` and `quro restore` hold a PostgreSQL advisory lock exclusively while they copy or replace data (`src/lib/maintenanceMode.ts`). Every authenticated write request holds the same lock in shared mode for its duration (`pauseWritesDuringMaintenance` in `src/middleware/maintenance.ts`, after authentication), and so does every background job cycle (`startIntervalJob`) and every tick of the statement import worker. They never wait: while the lock is held or requested exclusively, a request gets 503 and a job skips its turn. Each process takes its shared holds on one dedicated connection (session locks stack), so a slow request does not tie up a connection. PostgreSQL grants the exclusive lock once the running holders have finished, so in-flight writes drain, and the lock disappears with the command's connection. Unauthenticated writes (sign-in, sign-up, password reset) touch no document; they are refused during maintenance but do not hold the lock. A new background job or a writer outside HTTP requests goes through `runUnlessMaintenance`.
+
+The server is started with `Bun.serve` in `src/index.ts` and stops gracefully on `SIGTERM` or `SIGINT` (`src/lib/gracefulShutdown.ts`): it stops listening, waits for open requests and running job cycles, closes the database pools and exits with 0. The import worker finishes its loops and exits the same way.
+
 ### Configuration
 
 Every setting the backend reads is declared once, in `packages/backend/src/config/settings.ts`: its name, type, default, whether it is secret, and when it is required. `loadConfig` in `config/load.ts` parses the environment and the secret files it points at a single time, collects every problem instead of stopping at the first, and returns a frozen, typed `Config`. Nothing outside `src/config` reads `process.env` (a lint rule enforces it); code calls `getConfig()`.
 
-- **Fail fast, in full.** A process validates the sections it needs when it starts (`bootConfig('server')` for the API, `'worker'`, `'migrate'`, `'backup'` and `'maintenance'` for the database commands) and exits with code 2 and one list of problems. The list names settings and never their values. A migration job does not need bunq, so its profile does not check it; a section that is invalid throws only when something reads it.
+- **Fail fast, in full.** A process validates the sections it needs when it starts (`bootConfig('server')` for the API, `'worker'`, `'migrate'`, `'backup'`, `'restore'` and `'maintenance'` for the database commands) and exits with code 2 and one list of problems. The list names settings and never their values. A migration job does not need bunq, so its profile does not check it; a section that is invalid throws only when something reads it.
 - **Secrets are files.** Database and S3 secrets are read from the files named by `*_FILE` settings (defaults under `/run/secrets/`); a trailing newline is ignored and an empty file is an error. Values are wrapped in `Secret`, which prints as `[redacted]` and needs `.reveal()` to read, so logging the configuration cannot leak a credential.
 - **Optional features are all or nothing.** A feature such as S3 storage or bunq stays off until one of its settings is present, and then needs all of them; a half-configured feature stops startup instead of mounting half-working routes. S3 settings alone never select the S3 store: without `QRO_DOCUMENT_STORAGE` they stop every command (profiles all include the `documentStorage` section, which reads no secret), so documents in an existing store are never hidden behind an empty directory.
 - **Retired settings are not read.** Names from earlier releases are reported with the setting that replaces them (`config.notices`) and never used as a fallback.

@@ -7,6 +7,11 @@ const withCode = (code: string, message = 'driver message') =>
 describe('database error classification', () => {
   test('maps network failures and server start-up to unreachable', () => {
     for (const code of ['ECONNREFUSED', 'ENOTFOUND', 'CONNECT_TIMEOUT', '57P03', '08006']) {
+      expect(
+        describeDatabaseError(
+          withCode('22P02', 'invalid input syntax for type numeric: "4200.17"'),
+        ),
+      ).toBe('the database refused a value (SQLSTATE 22P02)');
       expect(classifyDatabaseError(withCode(code))).toBe('unreachable');
     }
   });
@@ -24,5 +29,21 @@ describe('database error classification', () => {
     expect(describeDatabaseError(new Error('postgres://user:secret@db/quro'))).not.toContain(
       'secret',
     );
+  });
+
+  test('describes the database error inside an ORM error, never its query or parameters', () => {
+    const wrapped = Object.assign(
+      new Error('Failed query: insert into sessions values ($1)\nparams: secret-token'),
+      { cause: withCode('42P07', 'relation "auth_codes" already exists') },
+    );
+    expect(describeDatabaseError(wrapped)).toBe(
+      'relation "auth_codes" already exists (SQLSTATE 42P07)',
+    );
+    expect(describeDatabaseError(wrapped)).not.toContain('secret-token');
+    expect(
+      classifyDatabaseError(
+        Object.assign(new Error('Failed query'), { cause: withCode('ECONNRESET') }),
+      ),
+    ).toBe('unreachable');
   });
 });

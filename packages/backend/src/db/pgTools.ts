@@ -12,12 +12,26 @@ type BackupOptions = {
   connectionString: string;
   label?: string;
   outputPath?: string;
+  /** Dump the state of a snapshot exported by another session (`pg_export_snapshot()`). */
+  snapshot?: string;
+  /** Stops the dump when aborted. */
+  signal?: AbortSignal;
+  log?: (line: string) => void;
 };
 
 type RestoreOptions = {
   connectionString: string;
   inputPath: string;
+  signal?: AbortSignal;
 };
+
+/** A client tool is missing, unreadable or older than the server: a setup problem, not data. */
+export class PgToolError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PgToolError';
+  }
+}
 
 type PgToolName = 'pg_dump' | 'pg_restore' | 'psql';
 
@@ -39,7 +53,14 @@ const OVERRIDE_KEY_BY_TOOL = {
   psql: 'psql',
 } as const;
 
-export async function createDatabaseBackup({ connectionString, label, outputPath }: BackupOptions) {
+export async function createDatabaseBackup({
+  connectionString,
+  label,
+  outputPath,
+  snapshot,
+  signal,
+  log = (line) => console.log(line),
+}: BackupOptions) {
   const resolvedOutputPath = outputPath ?? buildBackupPath(connectionString, label);
   const pgDump = resolvePgTool('pg_dump');
   // Before anything is written: a refused dump must not leave an empty file behind.
@@ -47,16 +68,39 @@ export async function createDatabaseBackup({ connectionString, label, outputPath
   await ensureDirectory(dirname(resolvedOutputPath));
   const env = buildPgEnv(connectionString, APP_NAME_BY_TOOL.pg_dump);
 
-  console.log(`Writing logical backup to ${resolvedOutputPath}`);
+  log(`Writing logical backup to ${resolvedOutputPath}`);
+  const snapshotArgs = snapshot ? [`--snapshot=${snapshot}`] : [];
   await runPgTool(
     pgDump,
-    ['--format=custom', '--no-owner', '--no-privileges', '--file', resolvedOutputPath],
+    [
+      '--format=custom',
+      '--no-owner',
+      '--no-privileges',
+      ...snapshotArgs,
+      '--file',
+      resolvedOutputPath,
+    ],
     env,
+    signal,
   );
   return resolvedOutputPath;
 }
 
-export async function restoreDatabaseBackup({ connectionString, inputPath }: RestoreOptions) {
+/** Refuses, before anything is written, when `pg_dump` is missing or older than the server. */
+export async function checkPgDump(connectionString: string): Promise<void> {
+  await assertToolCoversServer('pg_dump', resolvePgTool('pg_dump'), connectionString);
+}
+
+/** Refuses, before anything is changed, when `pg_restore` is missing or older than the server. */
+export async function checkPgRestore(connectionString: string): Promise<void> {
+  await assertToolCoversServer('pg_restore', resolvePgTool('pg_restore'), connectionString);
+}
+
+export async function restoreDatabaseBackup({
+  connectionString,
+  inputPath,
+  signal,
+}: RestoreOptions) {
   const extension = extname(inputPath).toLowerCase();
   const connection = parseConnectionString(connectionString);
 
@@ -86,6 +130,7 @@ export async function restoreDatabaseBackup({ connectionString, inputPath }: Res
       inputPath,
     ],
     buildPgEnv(connectionString, APP_NAME_BY_TOOL.pg_restore),
+    signal,
   );
 }
 
@@ -136,7 +181,7 @@ export async function assertToolCoversServer(
   const serverMajor = await readServerMajor(connectionString);
   const problem = describeToolVersionProblem(toolName, toolMajor, serverMajor);
   if (problem) {
-    throw new Error(problem);
+    throw new PgToolError(problem);
   }
 }
 
@@ -151,7 +196,7 @@ async function readToolMajor(toolName: PgToolName, command: string) {
   }
   const major = parsePgToolMajor(output);
   if (major === null) {
-    throw new Error(
+    throw new PgToolError(
       `Could not read the version of ${toolName} (${command}). Set ${OVERRIDE_SETTING_BY_TOOL[toolName]} to a working PostgreSQL ${toolName}.`,
     );
   }
@@ -215,14 +260,20 @@ function resolvePgTool(toolName: PgToolName) {
     return resolved;
   }
 
-  throw new Error(
+  throw new PgToolError(
     `Missing ${toolName}. Install PostgreSQL client tools or set ${OVERRIDE_SETTING_BY_TOOL[toolName]} to the executable path.`,
   );
 }
 
-function spawnPgTool(command: string, args: string[], env: Record<string, string>) {
+function spawnPgTool(
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+  signal?: AbortSignal,
+) {
   const processHandle = Bun.spawn([command, ...args], {
     env,
+    signal,
     stderr: 'inherit',
     stdin: 'inherit',
     stdout: 'inherit',
@@ -231,8 +282,14 @@ function spawnPgTool(command: string, args: string[], env: Record<string, string
   return processHandle.exited;
 }
 
-async function runPgTool(command: string, args: string[], env: Record<string, string>) {
-  const exitCode = await spawnPgTool(command, args, env);
+async function runPgTool(
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+  signal?: AbortSignal,
+) {
+  const exitCode = await spawnPgTool(command, args, env, signal);
+  signal?.throwIfAborted();
   if (exitCode !== 0) {
     throw new Error(`${command} exited with status ${exitCode}`);
   }

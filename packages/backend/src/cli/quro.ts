@@ -16,6 +16,8 @@ Commands:
   version     Print the version, newest bundled migration and image revision
   user        Accounts, registration codes, password resets and sessions (quro user --help)
   documents   Document storage: copy documents out of S3 (quro documents --help)
+  backup      Write one archive of the database and documents (quro backup --help)
+  restore     Restore an archive written by quro backup (quro restore --help)
 
 Exit codes: 0 done, 1 failed, 2 invalid usage or settings, 3 refused by a safety check,
 4 database or document store unreachable.`;
@@ -71,6 +73,15 @@ const GROUPS: Record<string, CommandGroup> = {
       usesDatabase = true;
       return (await import('./documents')).runDocumentsCommand(args, io);
     },
+  },
+  // Backup and restore open their own owner-role connections and close them.
+  backup: {
+    usage: async () => (await import('./backup')).BACKUP_USAGE,
+    run: async (args, io) => (await import('./backup')).runBackupCommand(args, io),
+  },
+  restore: {
+    usage: async () => (await import('./restore')).RESTORE_USAGE,
+    run: async (args, io) => (await import('./restore')).runRestoreCommand(args, io),
   },
 };
 

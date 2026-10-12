@@ -31,6 +31,7 @@ run applicable checks before opening a PR and report commands, results and skipp
 | `bun run test:smoke`                        | Playwright browser tests; starts backend, migrates and seeds demo data in the selected DB                                |
 | `sh scripts/clean-install/run.sh`           | Install from empty volumes with `docs/compose.example.yaml`; Docker, builds images; loopback ports 18085-18086           |
 | `bun run build`                             | Frontend and backend builds                                                                                              |
+| `sh scripts/upgrade-fixture/upgrade.sh`     | Upgrade the synthetic 0.7.0 fixture to this checkout, compare data and documents; Docker, builds backend image; loopback |
 | `bun run ci:check`                          | Full suite, migrations, Python checks and dependency audits; isolated DB, Python tools and audit network access required |
 
 `ci:check`'s pre-commit mode skips DB tests; a passing hook is not full CI evidence.
@@ -68,6 +69,9 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   `packages/backend/src/lib/publicPaths.ts`. Derive ownership from the authenticated context, reject
   client ownership fields, and enforce ownership on referenced parents and writes.
   Keep core functionality usable without OCR, bank linking, GPU or AI.
+- Write requests, background job cycles and the import worker hold the maintenance lock in shared
+  mode (`packages/backend/src/lib/maintenanceMode.ts`); `quro backup` and `quro restore` take it
+  exclusively. Start jobs with `startIntervalJob` or wrap other writers in `runUnlessMaintenance`.
 - Documents go through `getDocumentStore()` (`packages/backend/src/lib/documentStorage.ts`):
   the filesystem by default, S3 only with `QRO_DOCUMENT_STORAGE=s3`. Keys are relative paths that
   both drivers share; build them on the server, never from client input. See
@@ -81,7 +85,8 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 ## Migration and UI boundaries
 
 - Generate schema changes with `bun run --filter '@quro/backend' db:generate` and
-  review the SQL with `packages/backend/src/db/migrations/meta/`. Migrate with admin
+  review the SQL with `packages/backend/src/db/migrations/meta/`. Declare what a migration does
+  to existing tables in `scripts/upgrade-fixture/expectations.ts` ([upgrade test](docs/upgrade-fixture.md)). Migrate with admin
   credentials and run the app with runtime credentials. Do not rewrite applied migrations, guess
   repairs for ambiguous rows or bypass backup/restore confirmation guards.
 - PostgreSQL 18 is the baseline; CI runs the suite on 16 and 18. The backend image ships 18 client

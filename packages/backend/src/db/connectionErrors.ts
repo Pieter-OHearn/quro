@@ -31,9 +31,29 @@ const REJECTED_CODES = new Set(['28P01', '28000', '3D000']);
 
 const CONNECTION_EXCEPTION_CLASS = '08';
 
-export function errorCode(error: unknown): string {
+function ownCode(error: unknown): string {
   if (typeof error !== 'object' || error === null || !('code' in error)) return '';
   return String((error as { code: unknown }).code ?? '');
+}
+
+const MAX_CAUSE_DEPTH = 5;
+
+/**
+ * The driver's error. The ORM wraps a failed statement in an error whose message repeats the
+ * query and its parameters and keeps the driver's error as `cause`; only the cause is described.
+ */
+export function databaseError(error: unknown): unknown {
+  let current = error;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth += 1) {
+    if (ownCode(current) !== '') return current;
+    if (typeof current !== 'object' || current === null || !('cause' in current)) break;
+    current = (current as { cause: unknown }).cause;
+  }
+  return error;
+}
+
+export function errorCode(error: unknown): string {
+  return ownCode(databaseError(error));
 }
 
 export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
@@ -58,15 +78,20 @@ const REASONS: Readonly<Record<string, string>> = {
 };
 
 const SQLSTATE = /^[0-9A-Z]{5}$/;
+// Class 22 (data exception) messages can quote the value the database refused, which may be a
+// stored amount or name; only the code is reported for them.
+const DATA_EXCEPTION = /^22[0-9A-Z]{3}$/;
 
 /** A short reason without values from the connection string. */
 export function describeDatabaseError(error: unknown): string {
-  const code = errorCode(error);
+  const cause = databaseError(error);
+  const code = ownCode(cause);
   const known = Object.hasOwn(REASONS, code) ? REASONS[code] : undefined;
   if (known) return known;
-  if (classifyDatabaseError(error) === 'unreachable') return 'the server cannot be reached';
+  if (classifyDatabaseError(cause) === 'unreachable') return 'the server cannot be reached';
+  if (DATA_EXCEPTION.test(code)) return `the database refused a value (SQLSTATE ${code})`;
   // PostgreSQL's own messages name objects, not values; driver messages can echo URLs.
-  return SQLSTATE.test(code) && error instanceof Error
-    ? `${error.message} (SQLSTATE ${code})`
+  return SQLSTATE.test(code) && cause instanceof Error
+    ? `${cause.message} (SQLSTATE ${code})`
     : 'unexpected database error';
 }

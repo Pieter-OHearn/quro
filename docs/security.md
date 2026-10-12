@@ -255,21 +255,23 @@ administrators remain fully trusted.
 
 ## Keys and credentials
 
-| Secret                                    | Stored in                                  | In a database dump? | If it is lost                                                        |
-| ----------------------------------------- | ------------------------------------------ | ------------------- | -------------------------------------------------------------------- |
-| PostgreSQL admin and app passwords        | `secrets/*.txt` (Docker secrets)           | No                  | Set new ones in the files and the database as the database superuser |
-| S3 secret access key, with S3 storage     | The file `S3_SECRET_ACCESS_KEY_FILE` names | No                  | Issue a new key in the store; documents are unaffected               |
-| The store's encryption key, if it has one | Your S3 store's configuration              | No                  | The stored documents cannot be read                                  |
-| bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                       | No                  | Issue a new one in bunq and update the configuration                 |
-| bunq access tokens and keys               | Database (`bunq_connections`)              | **Yes**             | Reconnect bunq in Settings                                           |
-| User passwords                            | Database, as bcrypt hashes                 | Yes, as hashes      | `quro user reset-password`                                           |
-| Session tokens                            | Browser cookie; database holds the digest  | Digest only         | Sign in again                                                        |
-| Registration and reset codes              | Shown once; database holds the digest      | Digest only         | Issue a new code                                                     |
+| Secret                                    | Stored in                                       | In a database dump? | If it is lost                                                        |
+| ----------------------------------------- | ----------------------------------------------- | ------------------- | -------------------------------------------------------------------- |
+| PostgreSQL admin and app passwords        | `secrets/*.txt` (Docker secrets)                | No                  | Set new ones in the files and the database as the database superuser |
+| S3 secret access key, with S3 storage     | The file `S3_SECRET_ACCESS_KEY_FILE` names      | No                  | Issue a new key in the store; documents are unaffected               |
+| The store's encryption key, if it has one | Your S3 store's configuration                   | No                  | The stored documents cannot be read                                  |
+| bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                            | No                  | Issue a new one in bunq and update the configuration                 |
+| Backup encryption key                     | The file `QRO_BACKUP_ENCRYPTION_KEY_FILE` names | No                  | Encrypted archives cannot be restored; keep a copy apart from them   |
+| bunq access tokens and keys               | Database (`bunq_connections`)                   | **Yes**             | Reconnect bunq in Settings                                           |
+| User passwords                            | Database, as bcrypt hashes                      | Yes, as hashes      | `quro user reset-password`                                           |
+| Session tokens                            | Browser cookie; database holds the digest       | Digest only         | Sign in again                                                        |
+| Registration and reset codes              | Shown once; database holds the digest           | Digest only         | Issue a new code                                                     |
 
 Rules that follow from this table:
 
-- A database dump contains bank tokens and financial records. Store it as carefully as the live
-  instance. See [backup and restore](backup-and-restore.md).
+- A database dump or backup archive contains bank tokens and financial records. Store it as
+  carefully as the live instance, and encrypt archives that leave the machine. See
+  [backup and restore](backup-and-restore.md).
 - The secret files are not in a dump. Back them up separately, somewhere only the operator can
   read, and not next to the dumps.
 - Restoring a dump restores the sessions that existed when it was taken. Run

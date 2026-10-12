@@ -223,9 +223,32 @@ jobs:
             test "$actual" = "$expected"
           done
 
-  # Rehearses the documented PostgreSQL 16 to 18 upgrade with the image's own tools: dump on 16,
-  # restore on 18 in a new data directory, compare, and round-trip on 18. The synthetic 0.7.0
-  # fixture from O05 replaces the demo seed here when it exists.
+  # Upgrades the synthetic 0.7.0 installation in scripts/upgrade-fixture to this commit the way
+  # docs/upgrade.md describes (16 to 18 by dump and restore, `quro migrate`, documents out of S3),
+  # injects the failures the guide covers, signs in and downloads documents through the server,
+  # and fails on any change to rows or documents that expectations.ts does not declare.
+  upgrade-fixture:
+    name: Upgrade from 0.7.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-bun-dependencies
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          push: false
+          load: true
+          tags: quro-backend:ci
+          cache-from: type=gha,scope=backend
+      - name: Upgrade the 0.7.0 fixture and compare
+        run: sh scripts/upgrade-fixture/upgrade.sh
+
+  # Rehearses the documented PostgreSQL 16 to 18 upgrade with the image's own tools on the
+  # synthetic 0.7.0 installation: dump on 16, restore on 18 into an empty database in a new data
+  # directory, compare, `quro migrate`, and round-trip on 18.
   pg-upgrade:
     name: PostgreSQL Upgrade Rehearsal
     runs-on: ubuntu-latest
@@ -288,6 +311,41 @@ jobs:
       - name: Install and exercise from empty volumes
         run: sh scripts/clean-install/run.sh
 
+  # Runs the README quickstart commands as written (extracted from README.md, so the test cannot
+  # drift from the text) with the images built from this commit standing in for the release,
+  # checks the healthy state the README describes, signs in with the printed setup code, repeats
+  # the quickstart, and uninstalls with the commands of docs/uninstall.md.
+  quickstart:
+    name: README Quickstart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          push: false
+          load: true
+          tags: quro-backend:ci
+          build-args: QRO_IMAGE_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=install-backend-amd64
+      - name: Build frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/frontend/Dockerfile
+          push: false
+          load: true
+          tags: quro-frontend:ci
+          cache-from: type=gha,scope=install-frontend-amd64
+      - name: Run the README quickstart and uninstall
+        run: sh scripts/quickstart/run.sh
+
   # Reads the published core images the way a first-time operator's docker pull does, with no
   # login, and requires the check itself to fail for a tag that does not exist. This tests the
   # published packages, not the commit, so it also notices a package that was made private.
@@ -312,6 +370,28 @@ jobs:
           fi
           echo "$output"
           printf '%s\n' "$output" | grep -F 'not found (HTTP 404, manifest unknown)'
+
+  # Backs up a synthetic instance with `quro backup` and restores it into an isolated one with
+  # `quro restore`, using the image's own tools, then compares data, documents and sign-in, and
+  # checks that missing, damaged and wrong-version archives are refused (docs/backup-and-restore.md).
+  recovery-drill:
+    name: Recovery Drill
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          push: false
+          load: true
+          tags: quro-backend:ci
+          build-args: QRO_IMAGE_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=backend
+      - name: Back up, refuse bad archives, restore and compare
+        run: sh scripts/recovery-drill.sh
 
   # ── Security ─────────────────────────────────────────────────────────────
 
@@ -351,9 +431,12 @@ jobs:
       - python-lint
       - build-worker
       - docker-build
+      - upgrade-fixture
       - pg-upgrade
       - clean-install
+      - quickstart
       - image-access
+      - recovery-drill
       - security
     steps:
       - uses: actions/checkout@v7

@@ -22,6 +22,7 @@ export type SettingGroup =
   | 'Statement import'
   | 'Tracing'
   | 'Maintenance'
+  | 'Backups'
   | 'Demo data';
 
 // Named up front because the settings below refer to their features and the features to the
@@ -175,6 +176,8 @@ export const DOCUMENT_STORAGE_DRIVERS = ['filesystem', 's3'] as const;
 export type DocumentStorageDriver = (typeof DOCUMENT_STORAGE_DRIVERS)[number];
 
 export const DEFAULT_DOCUMENTS_DIR = '/var/lib/quro/documents';
+
+export const DEFAULT_BACKUP_DIR = '/var/lib/quro/backups';
 
 export const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'] as const;
 
@@ -580,6 +583,35 @@ export const SETTINGS = defineSettings({
     group: 'Maintenance',
     audience: 'development',
     description: '`1` allows `db:clear` on a database that already holds data.',
+  }),
+
+  // ── Backups ──────────────────────────────────────────────────────────────
+  QRO_BACKUP_DIR: absoluteDirectory({
+    group: 'Backups',
+    audience: 'operator',
+    description:
+      'Directory `quro backup` writes archives to, and where `quro restore` writes its pre-restore archive. Must exist and be writable by the backend; Quro never creates it.',
+    default: DEFAULT_BACKUP_DIR,
+  }),
+  QRO_BACKUP_ENCRYPTION_KEY_FILE: path({
+    group: 'Backups',
+    audience: 'operator',
+    description:
+      'File holding the key that encrypts backup archives, at least 32 characters. Unset writes unencrypted archives. The key is never in a backup: keep a copy elsewhere, because an encrypted archive cannot be restored without it.',
+    secret: 'file',
+  }),
+  QRO_BACKUP_OFFSITE_DIR: absoluteDirectory({
+    group: 'Backups',
+    audience: 'operator',
+    description:
+      'A directory on another device (a network share or a removable disk mounted into the container). Every archive is copied there and the copy is checked. Needs QRO_BACKUP_ENCRYPTION_KEY_FILE.',
+  }),
+  QRO_BACKUP_KEEP: integer({
+    group: 'Backups',
+    audience: 'operator',
+    description:
+      'How many unlabelled archives `quro backup` keeps in each backup directory. Older ones are deleted only after the new archive has been verified. Unset keeps every archive.',
+    min: 1,
   }),
 
   // ── Demo data ────────────────────────────────────────────────────────────

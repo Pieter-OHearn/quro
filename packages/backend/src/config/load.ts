@@ -142,6 +142,17 @@ export type MaintenanceConfig = {
 
 export type DemoConfig = { userPassword: Secret | null };
 
+/** Where `quro backup` writes archives, and how they are protected and pruned. */
+export type BackupConfig = {
+  directory: string;
+  /** Archives are encrypted when a key is configured. */
+  encryptionKey: Secret | null;
+  /** A directory on another device that receives a verified copy of every archive. */
+  offsiteDirectory: string | null;
+  /** Unlabelled archives kept per directory; null keeps every archive. */
+  keep: number | null;
+};
+
 /**
  * The parsed configuration. Each property is a section; a section whose settings are invalid
  * throws a `ConfigError` when read, so a command only fails for the settings it uses (a migration
@@ -161,6 +172,7 @@ export type Config = {
   readonly tracing: TracingConfig;
   readonly tools: ToolsConfig;
   readonly maintenance: MaintenanceConfig;
+  readonly backup: BackupConfig;
   readonly demo: DemoConfig;
   /** Retired settings found in the environment and other non-fatal observations. */
   readonly notices: readonly ConfigNotice[];
@@ -560,6 +572,40 @@ function buildMaintenance(r: Reader): MaintenanceConfig {
   };
 }
 
+/** A short key would make the encryption only as strong as a guessable password. */
+export const MIN_BACKUP_KEY_LENGTH = 32;
+
+function readBackupKey(r: Reader): Secret | null | undefined {
+  if (!r.isSet('QRO_BACKUP_ENCRYPTION_KEY_FILE')) return null;
+  const key = r.needSecretFile('QRO_BACKUP_ENCRYPTION_KEY_FILE');
+  if (key && key.reveal().length < MIN_BACKUP_KEY_LENGTH) {
+    r.fail(
+      'QRO_BACKUP_ENCRYPTION_KEY_FILE',
+      `the key in the file must be at least ${MIN_BACKUP_KEY_LENGTH} characters long`,
+    );
+    return undefined;
+  }
+  return key;
+}
+
+function buildBackup(r: Reader): BackupConfig | undefined {
+  const directory = r.get('QRO_BACKUP_DIR');
+  const offsiteDirectory = r.get('QRO_BACKUP_OFFSITE_DIR') ?? null;
+  const keep = r.get('QRO_BACKUP_KEEP') ?? null;
+  const encryptionKey = readBackupKey(r);
+  if (offsiteDirectory !== null && !r.isSet('QRO_BACKUP_ENCRYPTION_KEY_FILE')) {
+    r.fail(
+      'QRO_BACKUP_OFFSITE_DIR',
+      'needs QRO_BACKUP_ENCRYPTION_KEY_FILE: copies that leave this machine are always encrypted',
+    );
+  }
+  if (offsiteDirectory !== null && offsiteDirectory === directory) {
+    r.fail('QRO_BACKUP_OFFSITE_DIR', 'must be a different directory from QRO_BACKUP_DIR');
+  }
+  if (directory === undefined || encryptionKey === undefined) return undefined;
+  return { directory, encryptionKey, offsiteDirectory, keep };
+}
+
 function buildDemo(r: Reader): DemoConfig {
   const password = r.get('DEMO_USER_PASSWORD');
   return { userPassword: password === undefined ? null : new Secret(password) };
@@ -583,6 +629,7 @@ const BUILDERS: SectionBuilders = {
   tracing: buildTracing,
   tools: buildTools,
   maintenance: buildMaintenance,
+  backup: buildBackup,
   demo: buildDemo,
 };
 
