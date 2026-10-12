@@ -1,7 +1,7 @@
 -- One line per table and sequence of the application and migration schemas: row count and an
--- md5 of the rows' text form for tables, last value for sequences. Run it on the old and the
--- new database and compare the sorted output (docs/postgresql-upgrade.md,
--- scripts/rehearse-pg-upgrade.sh). It prints names, counts and checksums only, no row data.
+-- md5 of the rows' text form for tables, last value for sequences. Run it on two databases and
+-- compare the sorted output, as scripts/recovery-drill.sh does for an instance and its restore.
+-- It prints names, counts and checksums only, no row data.
 select 'table|' || t.schemaname || '.' || t.tablename || '|' ||
   (xpath('/row/n/text()', query_to_xml(
      format('select count(*) as n from %I.%I', t.schemaname, t.tablename), false, true, '')))[1]::text || '|' ||

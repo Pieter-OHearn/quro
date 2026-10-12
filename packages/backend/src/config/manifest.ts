@@ -1,6 +1,5 @@
 import {
   FEATURES,
-  RETIRED_SETTINGS,
   SETTINGS,
   type SettingAudience,
   type SettingGroup,
@@ -76,9 +75,4 @@ export function featureManifest() {
     enabledBy: [...feature.enabledBy],
     requires: [...feature.requires],
   }));
-}
-
-/** Settings earlier releases read and this one ignores, with what replaces each. */
-export function retiredManifest() {
-  return Object.entries(RETIRED_SETTINGS).map(([name, replacement]) => ({ name, replacement }));
 }

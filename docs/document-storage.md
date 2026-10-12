@@ -70,7 +70,7 @@ S3 settings (`S3_ENDPOINT`, `S3_BUCKET` or `S3_ACCESS_KEY_ID`) without `QRO_DOCU
 
 Steps for the Compose stack:
 
-1. Keep `QRO_DOCUMENT_STORAGE=s3` and the S3 settings, and keep the store running. Installs from a 0.7.0 checkout ran MinIO from the Compose file, which no longer has it; keep running your store until the copy has finished.
+1. Keep `QRO_DOCUMENT_STORAGE=s3` and the S3 settings, and keep the store running until the copy has finished. The Compose file in this repository does not run an S3 store.
 2. Make sure the documents directory exists (`mkdir -p ./data/documents`) and that the backend has it mounted, as the Compose file in this repository does.
 3. Stop the services that write documents, so that nothing is uploaded during the copy:
 

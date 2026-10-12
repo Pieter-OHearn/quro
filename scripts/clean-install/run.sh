@@ -11,9 +11,6 @@
 #      for a schema behind and ahead of the image, an interrupted migration and a restart.
 #   3. The image as another UID with a read-only root filesystem.
 #
-# Upgrades from an earlier release are a separate test, starting from a fixture of that
-# release's data: scripts/upgrade-fixture/upgrade.sh for 0.7.0 (docs/upgrade-fixture.md).
-#
 #   QURO_BACKEND_IMAGE=quro-backend:ci QURO_FRONTEND_IMAGE=quro-frontend:ci \
 #     sh scripts/clean-install/run.sh
 #

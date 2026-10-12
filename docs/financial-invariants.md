@@ -133,8 +133,8 @@ code remove without migrating 52 columns of real data or breaking the API.
 **Migration implications.** None. Had integer minor units been chosen, each amount would have
 needed a new integer column, an idempotent backfill from `numeric` with a preflight that refuses
 values outside `bigint` or with more decimals than the currency allows, a dual-read period, an
-API version for the new shape, and the 0.7.0 upgrade fixture to prove nulls, negative equity,
-native currencies and provenance survive.
+API version for the new shape, and an integration test against pre-existing synthetic rows to
+prove nulls, negative equity, native currencies and provenance survive.
 
 ## Precision
 

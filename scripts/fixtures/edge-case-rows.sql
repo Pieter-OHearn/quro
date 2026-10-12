@@ -1,6 +1,6 @@
--- Synthetic rows for scripts/rehearse-pg-upgrade.sh, added on top of the demo seed so the
--- upgrade check covers the shapes that matter: large and tiny numerics, negative balances,
--- native currencies, nulls, jsonb, dates and non-ASCII text. Invented values only.
+-- Synthetic rows for scripts/recovery-drill.sh, added on top of the demo seed so a backup and
+-- restore covers the shapes that matter: large and tiny numerics, negative balances, native
+-- currencies, nulls, jsonb, dates and non-ASCII text. Invented values only.
 -- Runs as the admin role against a database where the demo user already exists.
 
 insert into savings_accounts (user_id, name, bank, balance, currency, interest_rate, account_type, is_joint, archived_at)

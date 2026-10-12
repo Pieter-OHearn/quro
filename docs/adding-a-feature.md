@@ -128,10 +128,10 @@ bun run db:generate   # generates a new migration file under src/db/migrations/
 bun run db:migrate    # applies it to the explicitly selected isolated database
 ```
 
-A migration that adds a table or column, or changes existing rows, also needs an entry in
-`scripts/upgrade-fixture/expectations.ts` saying what it does to existing data; the upgrade test
-from 0.7.0 fails until it has one. See [upgrade test from 0.7.0](upgrade-fixture.md) and run
-`sh scripts/upgrade-fixture/upgrade.sh` (Docker) before opening the pull request.
+A migration that changes existing rows (a constraint, a rewrite, encryption) also ships an
+integration test that runs it against pre-existing synthetic rows and checks the result. See
+[migration tests](development.md#migration-tests). Adding the `recurring_payments` table needs
+none.
 
 ---
 
