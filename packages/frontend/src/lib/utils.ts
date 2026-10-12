@@ -14,6 +14,7 @@ const TYPE_SCALE_UTILITIES = [
   'title-section',
   'body',
   'cell',
+  'field',
   'label',
   'caption',
 ];

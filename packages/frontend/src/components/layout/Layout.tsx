@@ -1,44 +1,17 @@
 import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router';
-import {
-  LayoutDashboard,
-  PiggyBank,
-  TrendingUp,
-  Home,
-  Banknote,
-  Briefcase,
-  Target,
-  Wallet,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  X,
-  LogOut,
-  User,
-  ShieldCheck,
-  Compass,
-} from 'lucide-react';
+import { Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { getUserDisplayName } from '@/lib/user';
 import { cn } from '@/lib/utils';
 import { IconButton, QuroLogo } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
 import { CurrencySelector } from './CurrencySelector';
+import { navItems } from './navItems';
 import { SidebarButton, SidebarLink } from './SidebarItem';
+import { TabBar } from './TabBar';
 
-const navItems = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Plan', path: '/plan', icon: Compass },
-  { label: 'Savings', path: '/savings', icon: PiggyBank },
-  { label: 'Investments', path: '/investments', icon: TrendingUp },
-  { label: 'Pension', path: '/pension', icon: ShieldCheck },
-  { label: 'Mortgage', path: '/mortgage', icon: Home },
-  { label: 'Debts', path: '/debts', icon: Banknote },
-  { label: 'Salary', path: '/salary', icon: Briefcase },
-  { label: 'Goals', path: '/goals', icon: Target },
-  { label: 'Budget', path: '/budget', icon: Wallet },
-];
+const SIDEBAR_ID = 'app-sidebar';
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -101,15 +74,20 @@ type SidebarProps = {
   setMobileOpen: (v: boolean) => void;
 };
 
+// From 1024px the sidebar is part of the page. Below that it is a drawer, opened by the header's
+// menu button from 640px and by the tab bar's "More" below 640px. A closed drawer is off screen
+// and out of the Tab order and the accessibility tree; visibility is transitioned too, so it only
+// turns hidden once the drawer has slid away.
 function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen }: SidebarProps) {
   const ToggleIcon = collapsed ? ChevronRight : ChevronLeft;
 
   return (
     <aside
+      id={SIDEBAR_ID}
       className={cn(
-        'fixed lg:relative z-50 h-full flex flex-col gap-2 p-2 border-r border-border-default bg-surface-nav transition-[width,transform] duration-base ease-standard',
+        'fixed lg:relative z-50 h-full flex flex-col gap-2 p-2 border-r border-border-default bg-surface-nav transition-[width,transform,visibility] duration-base ease-standard motion-reduce:transition-none',
         collapsed ? 'w-[72px]' : 'w-52',
-        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        !mobileOpen && 'max-lg:invisible max-lg:-translate-x-full',
       )}
     >
       <div
@@ -148,7 +126,7 @@ function ProfileButton() {
       onClick={() => {
         void navigate('/settings?tab=profile');
       }}
-      className="flex h-8 max-sm:h-11 items-center gap-2 rounded-md pl-1 pr-2 max-sm:w-11 max-sm:justify-center max-sm:px-0 text-left transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+      className="flex h-8 max-sm:h-11 items-center gap-2 rounded-md pl-1 pr-2 max-sm:w-11 max-sm:justify-center max-sm:rounded-full max-sm:px-0 text-left transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       aria-label="Open profile settings"
     >
       <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-fg">
@@ -169,18 +147,23 @@ type AppHeaderProps = {
   today: string;
 };
 
+// 48px on desktop; 56px on phones, where the logo takes the place of the menu button because the
+// tab bar opens the drawer.
 function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHeaderProps) {
   return (
-    <header className="flex h-12 flex-shrink-0 items-center justify-between gap-2 border-b border-border-default bg-surface-sunken px-4 sm:px-6">
+    <header className="flex h-14 sm:h-12 flex-shrink-0 items-center justify-between gap-2 border-b border-border-default bg-surface-sunken px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
         <IconButton
           icon={mobileOpen ? X : Menu}
           label={mobileOpen ? 'Close navigation' : 'Open navigation'}
           variant="subtle"
           size="md"
-          className="lg:hidden text-fg-muted"
+          className="max-sm:hidden lg:hidden text-fg-muted"
+          aria-controls={SIDEBAR_ID}
+          aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(!mobileOpen)}
         />
+        <QuroLogo size={20} className="flex-shrink-0 sm:hidden" />
         <div className="flex min-w-0 items-baseline sm:gap-3">
           <h1 className="truncate text-title-page text-fg">{currentPageLabel}</h1>
           <p className="hidden truncate text-caption text-fg-subtle sm:block">{today}</p>
@@ -215,8 +198,16 @@ export function Layout() {
     ? 'Settings'
     : (currentPage?.label ?? 'Dashboard');
 
+  // The page scrolls inside `main`. Below 640px it is padded by the tab bar's height (60px tabs,
+  // a 1px top border and the safe area) so nothing ends behind the bar, and `h-dvh` keeps the bar
+  // on the visible viewport while a phone browser shows its toolbars.
   return (
-    <div className="flex h-screen bg-surface-sunken overflow-hidden">
+    <div className="flex h-dvh bg-surface-sunken overflow-hidden">
+      <TabBar
+        moreOpen={mobileOpen}
+        moreControls={SIDEBAR_ID}
+        onMore={() => setMobileOpen(!mobileOpen)}
+      />
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-scrim z-40 lg:hidden"
@@ -236,7 +227,7 @@ export function Layout() {
           currentPageLabel={currentPageLabel}
           today={today}
         />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-[calc(61px+env(safe-area-inset-bottom))] sm:pb-0">
           <Outlet />
         </main>
       </div>
