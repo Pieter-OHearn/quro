@@ -39,6 +39,8 @@ export function formatNumber(
   return getNumberFormat(resolveNumberFormat(numberFormat), options).format(amount);
 }
 
+const DECIMAL_BASE = 10;
+
 /**
  * Formats a percentage in the user's number format, with grouping and a fixed number of decimals
  * (`1234.5` reads `1,234.5%` in en-US and `1.234,5%` in de-DE). Non-finite values and values
@@ -50,7 +52,7 @@ export function formatPercent(
   fractionDigits = 1,
 ): string {
   const finite = Number.isFinite(value) ? value : 0;
-  const roundsToZero = Math.round(Math.abs(finite) * 10 ** fractionDigits) === 0;
+  const roundsToZero = Math.round(Math.abs(finite) * DECIMAL_BASE ** fractionDigits) === 0;
   return `${formatNumber(roundsToZero ? 0 : finite, resolveNumberFormat(numberFormat), {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,

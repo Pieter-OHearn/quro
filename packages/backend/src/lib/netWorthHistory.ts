@@ -607,7 +607,7 @@ function computeHoldingAtCutoff(
   if (isArchivedAtCutoff(holding, cutoff)) return { value: 0, isEstimated: false };
   const upToCutoff = transactions.filter((transaction) => transaction.timestamp <= cutoff);
   const shares = netHoldingShares(upToCutoff);
-  const latestTransactionPrice = upToCutoff.at(-1)?.price ?? null;
+  const latestTransactionPrice = upToCutoff[upToCutoff.length - 1]?.price ?? null;
   const historicalPrice = resolvePreparedHoldingPrice(prices, cutoffDate);
   const price = historicalPrice ?? latestTransactionPrice ?? toNumberOrZero(holding.currentPrice);
   return {
