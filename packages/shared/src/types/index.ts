@@ -549,7 +549,8 @@ export type Mortgage = {
   interestRate: number;
   rateType: MortgageRateType;
   repaymentType: MortgageRepaymentType;
-  fixedUntil: string;
+  /** `YYYY-MM`, `YYYY-MM-DD` or free text such as `N/A`; null when never set. */
+  fixedUntil: string | null;
   termYears: number;
   startDate: string;
   endDate: string;

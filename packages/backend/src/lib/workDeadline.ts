@@ -81,6 +81,13 @@ export async function abortableRead<T>(signal: AbortSignal, read: () => Promise<
   }
 }
 
+/**
+ * When a job's deadline expires: after a number of milliseconds, or when a signal aborts. The
+ * signal form lets a test expire the deadline at a known point in the work instead of racing a
+ * short timer against the machine's speed.
+ */
+export type WorkDeadline = number | AbortSignal;
+
 type DeadlineOptions = {
   graceMs?: number;
   database?: object;
@@ -88,7 +95,7 @@ type DeadlineOptions = {
 };
 
 export async function withWorkDeadline<T>(
-  timeoutMs: number,
+  deadline: WorkDeadline,
   run: () => Promise<T>,
   options: DeadlineOptions = {},
 ): Promise<T> {
@@ -104,7 +111,7 @@ export async function withWorkDeadline<T>(
   const hardDeadline = new Promise<never>((_resolve, reject) => {
     rejectHard = reject;
   });
-  const timer = setTimeout(() => {
+  const expire = () => {
     controller.abort(new DOMException('Scheduled job deadline exceeded', 'TimeoutError'));
     for (const cleanup of scope.cleanup) {
       void workScope
@@ -124,7 +131,11 @@ export async function withWorkDeadline<T>(
         }
       })();
     }, options.graceMs ?? DEADLINE_GRACE_MS);
-  }, timeoutMs);
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  if (typeof deadline === 'number') timer = setTimeout(expire, deadline);
+  else if (deadline.aborted) expire();
+  else deadline.addEventListener('abort', expire, { once: true });
   const work = workScope.run(scope, async () => {
     try {
       const result = await run();
@@ -140,5 +151,6 @@ export async function withWorkDeadline<T>(
   } finally {
     clearTimeout(timer);
     clearTimeout(graceTimer);
+    if (typeof deadline !== 'number') deadline.removeEventListener('abort', expire);
   }
 }

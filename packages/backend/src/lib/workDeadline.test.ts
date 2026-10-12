@@ -135,3 +135,25 @@ test('hard grace bounds non-cancellable callbacks and tracked database drains', 
   ).rejects.toThrow('grace period exceeded');
   expect(destroys).toBe(1);
 });
+
+test('a deadline signal expires the work when it aborts, and an aborted one before it starts', async () => {
+  const deadline = new AbortController();
+  let reached = false;
+  await expect(
+    withWorkDeadline(deadline.signal, async () => {
+      deadline.abort();
+      await abortableRead(upstreamSignal(), () => new Promise<never>(() => {}));
+      reached = true;
+    }),
+  ).rejects.toThrow('deadline exceeded');
+  expect(reached).toBe(false);
+
+  let started = false;
+  await expect(
+    withWorkDeadline(deadline.signal, () => {
+      started = true;
+      return abortableRead(upstreamSignal(), () => Promise.resolve('late'));
+    }),
+  ).rejects.toThrow('deadline exceeded');
+  expect(started).toBe(true);
+});

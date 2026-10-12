@@ -6,6 +6,7 @@ import { createMemoryDocumentStore } from '../test/memoryDocumentStore';
 const documents = createMemoryDocumentStore();
 const { objects: storedDocuments, failedDeletionKeys, deletionRequests } = documents;
 let pensionImportCapabilityEnabled = true;
+let parserFails = false;
 
 // mock.module replaces modules for the whole bun process; keep the real ones so
 // afterAll can put them back before later test files (e.g. bunq) run.
@@ -37,22 +38,24 @@ await mock.module('../lib/capabilities', () => {
 
 await mock.module('../lib/pensionParserClient', () => ({
   parsePensionStatement: () =>
-    Promise.resolve({
-      statementPeriodStart: '2025-01-01',
-      statementPeriodEnd: '2025-12-31',
-      modelName: 'fixture-parser',
-      modelVersion: '1.0.0',
-      rows: [
-        buildParserRow({ type: 'annual_statement', amount: 12500, date: '2025-12-31' }),
-        buildParserRow({
-          type: 'contribution',
-          amount: 1000,
-          taxAmount: 200,
-          date: '2025-06-30',
-          isEmployer: false,
+    parserFails
+      ? Promise.reject(new Error('Synthetic parser failure'))
+      : Promise.resolve({
+          statementPeriodStart: '2025-01-01',
+          statementPeriodEnd: '2025-12-31',
+          modelName: 'fixture-parser',
+          modelVersion: '1.0.0',
+          rows: [
+            buildParserRow({ type: 'annual_statement', amount: 12500, date: '2025-12-31' }),
+            buildParserRow({
+              type: 'contribution',
+              amount: 1000,
+              taxAmount: 200,
+              date: '2025-06-30',
+              isEmployer: false,
+            }),
+          ],
         }),
-      ],
-    }),
 }));
 
 const { createIntegrationHelpers } = await import('../test/integration');
@@ -262,6 +265,94 @@ describe('pension imports integration', () => {
     );
     expect(cancelResponse.status).toBe(400);
     expect(await cancelResponse.json()).toEqual({ error: 'Committed imports cannot be cancelled' });
+  });
+
+  test('answers 400 for an invalid list limit and caps a large one', async () => {
+    const owner = await integration.signUp('list-limit');
+    for (const limit of ['0', '-1', 'abc', '1.5', '']) {
+      const response = await integration.request(`/api/pensions/imports?limit=${limit}`, {
+        cookie: owner.cookie,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Invalid limit' });
+    }
+    for (const limit of ['1', '1000']) {
+      const response = await integration.request(`/api/pensions/imports?limit=${limit}`, {
+        cookie: owner.cookie,
+      });
+      expect(response.status).toBe(200);
+    }
+  });
+
+  test('cancelling deletes the stored PDF and records it, keeping the row', async () => {
+    const owner = await integration.signUp('cancel-cleanup');
+    const potId = await createPensionPot(owner.cookie, 'Cancel cleanup');
+    const kept = await uploadImport(owner.cookie, potId, 'cancel-store-down');
+    const cancelled = await uploadImport(owner.cookie, potId, 'cancel-cleanup');
+    const [keptRow, cancelledRow] = await Promise.all(
+      [kept, cancelled].map(async ({ data }) => {
+        const [row] = await db
+          .select()
+          .from(pensionStatementImports)
+          .where(eq(pensionStatementImports.id, data.id));
+        return row;
+      }),
+    );
+    expect(storedDocuments.has(cancelledRow.storageKey)).toBe(true);
+    failedDeletionKeys.add(keptRow.storageKey);
+    try {
+      for (const { data } of [kept, cancelled]) {
+        const response = await integration.request(`/api/pensions/imports/${data.id}`, {
+          method: 'DELETE',
+          cookie: owner.cookie,
+        });
+        expect((await parseJson<ApiDataResponse<ImportResponse>>(response, 200)).data.status).toBe(
+          'cancelled',
+        );
+      }
+    } finally {
+      failedDeletionKeys.clear();
+    }
+    const rows = await db
+      .select()
+      .from(pensionStatementImports)
+      .where(inArray(pensionStatementImports.id, [kept.data.id, cancelled.data.id]));
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.id === cancelled.data.id)?.storageDeletedAt).toBeInstanceOf(Date);
+    expect(storedDocuments.has(cancelledRow.storageKey)).toBe(false);
+    // The store refused: the PDF is still there, and the row says so.
+    expect(rows.find((row) => row.id === kept.data.id)?.storageDeletedAt).toBeNull();
+    expect(storedDocuments.has(keptRow.storageKey)).toBe(true);
+  });
+
+  test('a failed import deletes its stored PDF like a cancelled one, keeping the row', async () => {
+    const owner = await integration.signUp('failed-cleanup');
+    const potId = await createPensionPot(owner.cookie, 'Failed cleanup');
+    const ready = await uploadImport(owner.cookie, potId, 'failed-ready');
+    await runPensionImportWorkerTick();
+    const failing = await uploadImport(owner.cookie, potId, 'failed-parser');
+    const [before] = await db
+      .select()
+      .from(pensionStatementImports)
+      .where(eq(pensionStatementImports.id, failing.data.id));
+    expect(storedDocuments.has(before.storageKey)).toBe(true);
+    parserFails = true;
+    try {
+      await runPensionImportWorkerTick();
+    } finally {
+      parserFails = false;
+    }
+    const rows = await db
+      .select()
+      .from(pensionStatementImports)
+      .where(inArray(pensionStatementImports.id, [ready.data.id, failing.data.id]));
+    const failed = rows.find((row) => row.id === failing.data.id)!;
+    expect(failed).toMatchObject({ status: 'failed', errorMessage: 'Synthetic parser failure' });
+    expect(failed.storageDeletedAt).toBeInstanceOf(Date);
+    expect(storedDocuments.has(failed.storageKey)).toBe(false);
+    const untouched = rows.find((row) => row.id === ready.data.id)!;
+    expect(untouched).toMatchObject({ status: 'ready_for_review', storageDeletedAt: null });
+    expect(storedDocuments.has(untouched.storageKey)).toBe(true);
   });
 
   test('rejects duplicate uploads for the same pot and PDF bytes', async () => {
