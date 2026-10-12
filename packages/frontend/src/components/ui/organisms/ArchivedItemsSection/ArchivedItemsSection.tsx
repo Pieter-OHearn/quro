@@ -51,7 +51,7 @@ function ArchivedRow<T extends ArchivedItem>({
 }>) {
   const archivedLabel = formatArchivedAt(item.archivedAt);
   return (
-    <div className="flex min-h-9 items-center gap-2 px-3 py-1 transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4">
+    <div className="flex min-h-9 items-center gap-2 px-3 py-px transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-cell font-medium text-fg">{item.name}</p>
         <p className="text-caption text-fg-subtle">
