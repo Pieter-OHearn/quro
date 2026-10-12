@@ -2,12 +2,20 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const NAV_BUTTON_CLASS_NAME =
-  'w-7 h-7 rounded-md text-fg-faint hover:bg-surface-muted hover:text-fg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-fg-faint';
+// 28px square buttons with a control border, 44px on phones. The current page is a
+// `brand-soft` tint, never a fill, because a `brand` fill is kept for the one action button.
+const BUTTON_BASE_CLASS_NAME =
+  'inline-flex h-7 w-7 items-center justify-center rounded-md border border-border-control text-caption font-numeric transition-colors duration-fast max-sm:h-11 max-sm:w-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring';
 
-const PAGE_BUTTON_CLASS_NAME = 'w-7 h-7 rounded-md text-xs font-semibold transition-colors';
-const ACTIVE_PAGE_CLASS_NAME = 'bg-brand text-fg-inverted';
-const INACTIVE_PAGE_CLASS_NAME = 'text-fg-subtle hover:bg-surface-muted';
+const NAV_BUTTON_CLASS_NAME = cn(
+  BUTTON_BASE_CLASS_NAME,
+  'bg-surface text-fg-muted hover:bg-surface-muted active:bg-surface-muted disabled:cursor-not-allowed disabled:border-border-default disabled:bg-surface disabled:text-fg-faint',
+);
+
+const PAGE_BUTTON_CLASS_NAME = BUTTON_BASE_CLASS_NAME;
+const ACTIVE_PAGE_CLASS_NAME = 'bg-brand-soft font-semibold text-brand-fg';
+const INACTIVE_PAGE_CLASS_NAME =
+  'bg-surface text-fg hover:bg-surface-muted active:bg-surface-muted';
 const DEFAULT_VISIBLE_PAGE_COUNT = 5;
 
 function clampPage(page: number, totalPages: number) {
@@ -65,12 +73,12 @@ export function Pagination({
   return (
     <div
       className={cn(
-        'mt-3 flex items-center justify-between gap-2 border-t border-border-default/80 pt-3 flex-wrap',
+        'mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3',
         className,
       )}
       {...props}
     >
-      <p className={cn('text-xs text-fg-faint', rangeClassName)}>
+      <p className={cn('text-caption font-numeric text-fg-muted', rangeClassName)}>
         {rangeStart}-{rangeEnd} of {totalCount}
       </p>
       <div className="flex items-center gap-1">
@@ -81,7 +89,7 @@ export function Pagination({
           aria-label="Previous page"
           className={NAV_BUTTON_CLASS_NAME}
         >
-          <ChevronLeft size={14} className="mx-auto" />
+          <ChevronLeft size={14} aria-hidden="true" />
         </button>
         {pageNumbers.map((pageNumber) => (
           <button
@@ -104,7 +112,7 @@ export function Pagination({
           aria-label="Next page"
           className={NAV_BUTTON_CLASS_NAME}
         >
-          <ChevronRight size={14} className="mx-auto" />
+          <ChevronRight size={14} aria-hidden="true" />
         </button>
       </div>
     </div>

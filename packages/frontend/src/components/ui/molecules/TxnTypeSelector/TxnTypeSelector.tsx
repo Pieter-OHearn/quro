@@ -17,6 +17,9 @@ export type TxnTypeSelectorProps<T extends string> = {
   columns?: 2 | 3 | 4;
 };
 
+// 32px options with the icon beside the label; on phones 44px with the icon above it. The
+// selected option is a `brand-soft` tint with a `brand` edge, like every selection; only its
+// icon keeps the type colour from `color`.
 export function TxnTypeSelector<T extends string>({
   types,
   value,
@@ -38,16 +41,19 @@ export function TxnTypeSelector<T extends string>({
         return (
           <button
             key={t.key}
+            type="button"
+            aria-pressed={active}
             onClick={() => onChange(t.key as T)}
             className={cn(
-              'flex flex-col items-center gap-1.5 py-3 rounded-md border-2 transition-all',
+              'flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md border px-2 text-label transition-colors duration-fast max-sm:h-11 max-sm:flex-col max-sm:gap-0.5',
+              'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
               active
-                ? `${t.borderColor} ${t.bg} ${t.color}`
-                : 'border-border-default text-fg-faint hover:border-border-strong hover:bg-surface-sunken',
+                ? 'border-brand bg-brand-soft font-semibold text-brand-fg'
+                : 'border-border-control bg-surface text-fg-muted hover:bg-surface-muted active:bg-surface-muted',
             )}
           >
-            <Icon size={15} />
-            <span className="text-[10px] font-semibold leading-tight text-center">{t.label}</span>
+            <Icon size={14} aria-hidden="true" className={cn('shrink-0', active && t.color)} />
+            <span className="max-w-full min-w-0 truncate">{t.label}</span>
           </button>
         );
       })}

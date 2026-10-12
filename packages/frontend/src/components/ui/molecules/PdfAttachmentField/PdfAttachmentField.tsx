@@ -1,7 +1,9 @@
 import { useId, useRef, type ChangeEvent } from 'react';
 import type { PdfDocument } from '@quro/shared';
-import { FormField } from '../FormField';
 import { formatPdfFileSize } from '@/lib/pdfDocuments';
+import { cn } from '@/lib/utils';
+import { Button } from '../../atoms';
+import { FormField } from '../FormField';
 
 export type PdfAttachmentFieldProps = {
   label: string;
@@ -19,12 +21,27 @@ export type PdfAttachmentFieldProps = {
   onSelectedAction?: () => void;
 };
 
-const actionClass =
-  'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60';
+// Actions are 32px ghost buttons (44px on phones); "View PDF" is a link styled the same way.
+const ACTION_TONE_CLASSES = {
+  neutral: '',
+  brand: 'text-brand hover:bg-brand-soft hover:text-brand-fg active:bg-brand-soft',
+  danger: 'text-danger hover:bg-danger-soft active:bg-danger-soft',
+} as const;
+
+const LINK_ACTION_CLASS_NAME = cn(
+  'inline-flex h-8 items-center justify-center rounded-md px-3 text-cell font-medium transition-colors duration-fast max-sm:h-11',
+  'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+  ACTION_TONE_CLASSES.brand,
+);
+
+const FILE_BOX_CLASS_NAME =
+  'rounded-md border border-border-default bg-surface px-3 py-2 text-caption text-fg-muted';
+const FILE_NAME_CLASS_NAME = 'break-words text-cell font-medium text-fg';
+const ACTION_ROW_CLASS_NAME = 'mt-2 flex flex-wrap items-center gap-2';
 
 type ActionButtonProps = {
   busy?: boolean;
-  className: string;
+  tone?: keyof typeof ACTION_TONE_CLASSES;
   label: string;
   onClick: () => void;
 };
@@ -53,31 +70,21 @@ type AttachedPdfStateProps = {
   onRemoveDocument?: () => Promise<void> | void;
 };
 
-function ActionButton({ busy, className, label, onClick }: Readonly<ActionButtonProps>) {
+function ActionButton({ busy, tone = 'neutral', label, onClick }: Readonly<ActionButtonProps>) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      className={`${actionClass} ${className}`}
-    >
+    <Button variant="ghost" onClick={onClick} disabled={busy} className={ACTION_TONE_CLASSES[tone]}>
       {label}
-    </button>
+    </Button>
   );
 }
 
 function EmptyPdfState({ busy, helperText, onChoosePdf }: Readonly<EmptyPdfStateProps>) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border-strong bg-surface px-3 py-3">
-      <div className="text-xs text-fg-subtle">{helperText}</div>
-      <button
-        type="button"
-        onClick={onChoosePdf}
-        disabled={busy}
-        className="rounded-md bg-brand-soft-strong px-3 py-1.5 text-xs font-semibold text-brand-fg transition-colors hover:bg-brand-border disabled:opacity-60"
-      >
+    <div className="flex items-center justify-between gap-3 rounded-md border border-dashed border-border-control bg-surface px-3 py-2">
+      <div className="text-caption text-fg-subtle">{helperText}</div>
+      <Button variant="secondary" onClick={onChoosePdf} disabled={busy} className="shrink-0">
         Choose PDF
-      </button>
+      </Button>
     </div>
   );
 }
@@ -92,31 +99,18 @@ function SelectedPdfState({
   onSelectedAction,
 }: Readonly<SelectedPdfStateProps>) {
   return (
-    <div className="rounded-lg border border-brand-soft-strong bg-surface px-2.5 py-2 text-xs text-fg-muted">
-      <p className="font-medium text-fg-strong">Selected: {selectedFile.name}</p>
-      <p>{formatPdfFileSize(selectedFile.size)}</p>
-      <p className="mt-1 text-[11px] text-fg-subtle">{selectedHint}</p>
-      <div className="mt-2 flex items-center gap-2">
+    <div className={FILE_BOX_CLASS_NAME}>
+      <p className={FILE_NAME_CLASS_NAME}>Selected: {selectedFile.name}</p>
+      <p className="font-numeric">{formatPdfFileSize(selectedFile.size)}</p>
+      <p className="mt-1 text-fg-subtle">{selectedHint}</p>
+      <div className={ACTION_ROW_CLASS_NAME}>
         {onSelectedAction && selectedActionLabel && (
-          <ActionButton
-            busy={busy}
-            onClick={onSelectedAction}
-            label={selectedActionLabel}
-            className="bg-brand-soft-strong text-brand-fg hover:bg-brand-border"
-          />
+          <Button variant="secondary" onClick={onSelectedAction} disabled={busy}>
+            {selectedActionLabel}
+          </Button>
         )}
-        <ActionButton
-          busy={busy}
-          onClick={onChoosePdf}
-          label="Choose Different PDF"
-          className="text-fg-muted hover:bg-surface-muted"
-        />
-        <ActionButton
-          busy={busy}
-          onClick={onClearFile}
-          label="Clear Selection"
-          className="text-danger hover:bg-danger-soft"
-        />
+        <ActionButton busy={busy} onClick={onChoosePdf} label="Choose Different PDF" />
+        <ActionButton busy={busy} onClick={onClearFile} label="Clear Selection" tone="danger" />
       </div>
     </div>
   );
@@ -130,32 +124,22 @@ function AttachedPdfState({
   onRemoveDocument,
 }: Readonly<AttachedPdfStateProps>) {
   return (
-    <div className="rounded-lg border border-border-default bg-surface px-2.5 py-2 text-xs text-fg-muted">
-      <p className="font-medium text-fg-strong">Attached: {document.fileName}</p>
-      <p>{formatPdfFileSize(document.sizeBytes)}</p>
-      <div className="mt-2 flex items-center gap-2">
+    <div className={FILE_BOX_CLASS_NAME}>
+      <p className={FILE_NAME_CLASS_NAME}>Attached: {document.fileName}</p>
+      <p className="font-numeric">{formatPdfFileSize(document.sizeBytes)}</p>
+      <div className={ACTION_ROW_CLASS_NAME}>
         {downloadUrl && (
-          <a
-            href={downloadUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={`${actionClass} text-brand hover:bg-brand-soft hover:text-brand-fg`}
-          >
+          <a href={downloadUrl} target="_blank" rel="noreferrer" className={LINK_ACTION_CLASS_NAME}>
             View PDF
           </a>
         )}
-        <ActionButton
-          busy={busy}
-          onClick={onChoosePdf}
-          label="Replace PDF"
-          className="text-fg-muted hover:bg-surface-muted"
-        />
+        <ActionButton busy={busy} onClick={onChoosePdf} label="Replace PDF" />
         {onRemoveDocument && (
           <ActionButton
             busy={busy}
             onClick={() => void onRemoveDocument()}
             label="Remove PDF"
-            className="text-danger hover:bg-danger-soft hover:text-danger-fg"
+            tone="danger"
           />
         )}
       </div>
@@ -198,7 +182,7 @@ export function PdfAttachmentField({
 
   return (
     <FormField label={label} error={fileError}>
-      <div className="space-y-2 rounded-lg border border-border-default bg-surface-sunken px-3 py-3">
+      <div>
         <input
           id={inputId}
           ref={inputRef}

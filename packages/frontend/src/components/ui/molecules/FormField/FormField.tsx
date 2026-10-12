@@ -12,6 +12,7 @@ export type FormFieldProps = {
   errorClassName?: string;
 };
 
+// The label sits 4px above the control; label, hint and error use the type scale.
 export function FormField({
   label,
   required,
@@ -24,13 +25,13 @@ export function FormField({
 }: FormFieldProps) {
   return (
     <div className={className}>
-      <label className={cn('mb-1.5 block text-xs font-semibold text-fg-muted', labelClassName)}>
+      <label className={cn('mb-1 block text-label text-fg-muted', labelClassName)}>
         {label}
         {required && <span className="text-danger"> *</span>}
-        {hint && <span className="text-fg-faint font-normal"> {hint}</span>}
+        {hint && <span className="font-normal text-fg-subtle"> {hint}</span>}
       </label>
       {children}
-      {error && <p className={cn('mt-1 text-xs text-danger', errorClassName)}>{error}</p>}
+      {error && <p className={cn('mt-1 text-caption text-danger', errorClassName)}>{error}</p>}
     </div>
   );
 }
