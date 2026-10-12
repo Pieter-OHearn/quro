@@ -401,8 +401,11 @@ function getAccessibleProperty(
 // The debt a property repayment reduces: a mortgage (null once that mortgage is deleted) or the
 // property's own debt. It is stored with the repayment, so an edit or delete reverses the effect
 // on the same debt even after the property is linked to a mortgage, relinked or unlinked.
+// `locked` marks a recorded mortgage the user can no longer access (a former partner's): the
+// repayment keeps pointing at it, but its balance is not changed from this household.
 type RepaymentDebt =
-  { target: 'property'; propertyId: number } | { target: 'mortgage'; mortgageId: number | null };
+  | { target: 'property'; propertyId: number }
+  | { target: 'mortgage'; mortgageId: number | null; locked?: boolean };
 
 type PropertyTransactionRow = typeof propertyTransactions.$inferSelect;
 
@@ -441,8 +444,11 @@ function applyRepaymentToDebt(
   if (debt.target === 'property') {
     return applyRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: debt.propertyId, principal });
   }
-  // The mortgage this repayment belongs to was deleted: there is no balance left to move.
-  if (debt.mortgageId == null) return Promise.resolve({ balance: 0, unapplied: 0 });
+  // The mortgage was deleted or is out of reach: nothing is applied, so the whole principal is
+  // recorded as unapplied and a later reversal restores nothing.
+  if (debt.mortgageId == null || debt.locked) {
+    return Promise.resolve({ balance: 0, unapplied: principal });
+  }
   return applyRepayment(tx, MORTGAGE_BALANCE, { id: debt.mortgageId, principal });
 }
 
@@ -454,7 +460,7 @@ async function reverseRepaymentOnDebt(
   const change = { principal: row.principal ?? 0, unapplied: row.unappliedPrincipal };
   if (debt.target === 'property') {
     await reverseRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: debt.propertyId, ...change });
-  } else if (debt.mortgageId != null) {
+  } else if (debt.mortgageId != null && !debt.locked) {
     await reverseRepayment(tx, MORTGAGE_BALANCE, { id: debt.mortgageId, ...change });
   }
 }
@@ -469,6 +475,15 @@ async function resolveRepaymentDebt(
 ): Promise<RepaymentDebt | null> {
   if (transaction.type !== 'repayment') return null;
   const recorded = recordedRepaymentDebt(transaction);
+  if (recorded?.target === 'mortgage' && recorded.mortgageId != null) {
+    const reachable = await findAccessible(
+      mortgages,
+      recorded.mortgageId,
+      { userId, partnerId },
+      { executor: tx },
+    );
+    return reachable ? recorded : { ...recorded, locked: true };
+  }
   if (recorded) return recorded;
   const property = await getAccessibleProperty(userId, partnerId, transaction.propertyId, tx);
   return property ? currentRepaymentDebt(property) : null;

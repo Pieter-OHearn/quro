@@ -11,6 +11,7 @@ import {
   pensionStatementImports,
   pensionTransactions,
   properties,
+  propertyTransactions,
 } from '../db/schema';
 import { createIntegrationHelpers, type AuthSession } from '../test/integration';
 
@@ -299,6 +300,39 @@ describe('a property repayment stays with the debt it paid', () => {
     expect(await mortgageBalance(second.id)).toBe(toCents(60000));
     expect(await mortgageBalance(first.id)).toBe(toCents(40000));
   });
+});
+
+test('a repayment recorded against a mortgage outside the household leaves it alone', async () => {
+  const owner = await integration.signUp('repayment-foreign-mortgage');
+  const other = await integration.signUp('repayment-foreign-owner');
+  const property = await createProperty(owner, '6 Link Street', 1000);
+  const foreign = await createMortgage(
+    other,
+    (await createProperty(other, '7 Link Street')).id,
+    9000,
+  );
+  // A repayment recorded while that mortgage was shared, as a former partner link leaves it.
+  const [row] = await db
+    .insert(propertyTransactions)
+    .values({
+      userId: owner.user.id,
+      propertyId: property.id,
+      type: 'repayment',
+      amount: 100,
+      interest: 0,
+      principal: 100,
+      date: DATE,
+      repaymentTarget: 'mortgage',
+      repaymentMortgageId: foreign.id,
+    })
+    .returning();
+
+  await expectStatus(
+    await patch(owner, `/api/investments/property-transactions/${row!.id}`, { note: 'Kept' }),
+    200,
+  );
+  await expectStatus(await remove(owner, `/api/investments/property-transactions/${row!.id}`), 200);
+  expect(await mortgageBalance(foreign.id)).toBe(toCents(9000));
 });
 
 // Waits until `count` other backends of this database wait for a lock.
