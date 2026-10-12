@@ -550,6 +550,17 @@ export const propertyTransactions = pgTable(
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
     principal: numericAsNumber('principal', { precision: 19, scale: 2 }),
+    // Principal the debt could not take because its balance reached zero.
+    unappliedPrincipal: numericAsNumber('unapplied_principal', { precision: 19, scale: 2 })
+      .notNull()
+      .default(0),
+    // The debt a repayment reduced: the property's own debt or a mortgage (null once that
+    // mortgage is deleted). Both null for other types and for repayments recorded before
+    // the debt was stored, which follow the property's current link.
+    repaymentTarget: text('repayment_target'), // property | mortgage
+    repaymentMortgageId: integer('repayment_mortgage_id').references(() => mortgages.id, {
+      onDelete: 'set null',
+    }),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
@@ -557,6 +568,13 @@ export const propertyTransactions = pgTable(
     userIdx: index('property_transactions_user_id_idx').on(table.userId),
     propertyIdx: index('property_transactions_property_id_idx').on(table.propertyId),
     userDateIdx: index('property_transactions_user_date_idx').on(table.userId, table.date),
+    repaymentMortgageIdx: index('property_transactions_repayment_mortgage_id_idx').on(
+      table.repaymentMortgageId,
+    ),
+    repaymentTargetCheck: check(
+      'property_transactions_repayment_target_check',
+      sql`${table.repaymentTarget} is null or ${table.repaymentTarget} = 'mortgage' or (${table.repaymentTarget} = 'property' and ${table.repaymentMortgageId} is null)`,
+    ),
   }),
 );
 
@@ -657,6 +675,10 @@ export const pensionStatementImports = pgTable(
     ),
     potIdx: index('pension_statement_imports_pot_id_idx').on(table.potId),
     hashIdx: index('pension_statement_imports_hash_idx').on(table.fileHashSha256),
+    // A statement file reaches a pot's ledger once, however many times it was uploaded.
+    committedStatementUnique: uniqueIndex('pension_statement_imports_committed_statement_unique')
+      .on(table.userId, table.potId, table.fileHashSha256)
+      .where(sql`${table.status} = 'committed'`),
     queuedIdx: index('pension_statement_imports_queued_idx')
       .on(table.createdAt, table.id)
       .where(sql`${table.status} = 'queued'`),
@@ -768,6 +790,10 @@ export const mortgageTransactions = pgTable(
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
     principal: numericAsNumber('principal', { precision: 19, scale: 2 }),
+    // Principal the mortgage could not take because its balance reached zero.
+    unappliedPrincipal: numericAsNumber('unapplied_principal', { precision: 19, scale: 2 })
+      .notNull()
+      .default(0),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     fixedYears: numericAsNumber('fixed_years', { precision: 4, scale: 1 }),
@@ -822,6 +848,10 @@ export const debtPayments = pgTable(
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     principal: numericAsNumber('principal', { precision: 19, scale: 2 }).notNull(),
     interest: numericAsNumber('interest', { precision: 19, scale: 2 }).notNull(),
+    // Principal the debt could not take because its balance reached zero.
+    unappliedPrincipal: numericAsNumber('unapplied_principal', { precision: 19, scale: 2 })
+      .notNull()
+      .default(0),
     note: text('note'),
   },
   (table) => ({
