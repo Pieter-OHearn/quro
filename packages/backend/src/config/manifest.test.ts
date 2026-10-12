@@ -156,6 +156,41 @@ describe('configuration documentation', () => {
   });
 });
 
+describe('configuration reference (docs/configuration.md)', () => {
+  // The frontend container's setting, which the backend does not read.
+  const OTHER_CONTAINERS = new Set(['QRO_API_URL']);
+
+  // Table rows whose first cell is one setting name in backticks: `| \`NAME\` | default | notes |`.
+  async function settingRows() {
+    const rows = new Map<string, string>();
+    for (const line of (await read('docs/configuration.md')).split('\n')) {
+      const match = /^\|\s*`([A-Z][A-Z0-9_]*)`\s*\|([^|]*)\|/.exec(line);
+      if (match) rows.set(match[1]!, match[2]!.trim());
+    }
+    return rows;
+  }
+
+  test('has a row for every setting, showing its default', async () => {
+    const rows = await settingRows();
+    const problems: string[] = [];
+    for (const entry of manifest) {
+      const shown = rows.get(entry.name);
+      if (shown === undefined) problems.push(`${entry.name}: no row`);
+      else if (entry.default !== null && !shown.includes(entry.default)) {
+        problems.push(`${entry.name}: the default ${entry.default} is not in "${shown}"`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test('lists no setting the backend does not read', async () => {
+    const unknown = [...(await settingRows()).keys()].filter(
+      (name) => !names.includes(name) && !OTHER_CONTAINERS.has(name),
+    );
+    expect(unknown).toEqual([]);
+  });
+});
+
 describe('the Compose stack configures the backend with names the schema knows', () => {
   type Service = { environment?: Record<string, string> | string[] };
   const SERVICE_PROFILES: Record<string, Profile> = {

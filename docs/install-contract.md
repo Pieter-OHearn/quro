@@ -2,7 +2,7 @@
 
 This page records how Quro is installed from release images and what each piece promises. It is written for operators who run Quro and for contributors who build the installer. It is a decision record plus a service contract: it fixes names, paths, commands and behaviour, and lists where 0.7.0 differs.
 
-The contract applies from 0.8.0. Until that release ships, the [Self-hosting](../README.md#self-hosting) section of the README describes what works today, and the rows marked **0.7.0** below describe that release. The step-by-step install with these commands is in [Install Quro](install.md).
+The contract applies from 0.8.0, the first release installed this way; the rows marked **0.7.0** below describe that release. The step-by-step install with these commands is in [Install Quro](install.md), the README's [quickstart](../README.md#quickstart) is its short form, and every setting is listed in the [configuration reference](configuration.md).
 
 ## Status
 
