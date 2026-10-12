@@ -53,6 +53,8 @@ test('the phone tab bar replaces the sidebar and navigates to Savings', async ({
     'Budget',
   ]);
   await expect(tabs.getByRole('button', { name: 'More', exact: true })).toBeVisible();
+  // The phone header shows the logo, the page title and the account controls, but no date.
+  await expect(page.locator('header p')).toBeHidden();
 
   for (const target of await tabs.locator('a, button').all()) {
     const box = await target.boundingBox();
@@ -108,6 +110,8 @@ test('from 640px the tab bar is not rendered and the sidebar is the navigation',
   await expect(tabBar(page)).toBeHidden();
   await expect(menu).toBeHidden();
   await expect(page.locator('aside nav[aria-label="Main"]')).toBeVisible();
+  // The sidebar lists destinations only, with no caption above them.
+  await expect(page.locator('aside').getByText('Menu', { exact: true })).toHaveCount(0);
 });
 
 test('the drawer does not slide under reduced motion', async ({ page }) => {

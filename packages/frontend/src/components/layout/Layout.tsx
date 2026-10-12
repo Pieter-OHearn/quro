@@ -26,7 +26,6 @@ function SidebarNav({ collapsed, onNavigate }: NavItemsProps) {
       aria-label="Main"
       className={cn('-m-1 flex-1 p-1', collapsed ? 'overflow-visible' : 'overflow-y-auto')}
     >
-      {!collapsed && <p className="px-2 pb-1 text-label text-fg-subtle">Menu</p>}
       <div className="space-y-0.5">
         {navItems.map(({ label, path, icon }) => (
           <SidebarLink
