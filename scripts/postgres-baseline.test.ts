@@ -1,13 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 
-// PostgreSQL 18 is the 1.0 baseline and 16 stays a supported server (DECISIONS D12). The backend
-// image must ship client tools of the baseline major, or `pg_dump` stops with "server version
-// mismatch" against a baseline server. These checks keep the Compose database, the image's
-// tools and the CI matrix pointing at the same majors. CI also runs `pg_dump --version` inside
-// the built image (docker-build job).
+// PostgreSQL 18 is the only supported server (docs/install.md). The backend image must ship client
+// tools of that major, or `pg_dump` stops with "server version mismatch" against the server. These
+// checks keep the Compose database, the image's tools and every CI database on that major;
+// packages/backend/src/lib/platformSupport.test.ts ties `quro migrate`'s version check to the same
+// tools. CI also runs `pg_dump --version` inside the built image (docker-build job).
 
 const ROOT = join(import.meta.dir, '..');
+const SUPPORTED_MAJOR = 18;
 
 async function read(path: string) {
   return Bun.file(join(ROOT, path)).text();
@@ -21,7 +22,7 @@ type CiFile = {
   jobs: Record<
     string,
     {
-      strategy?: { matrix?: { postgres?: string[] } };
+      strategy?: { matrix?: Record<string, unknown> };
       services?: { postgres?: { image?: string } };
     }
   >;
@@ -48,26 +49,24 @@ describe('PostgreSQL baseline', () => {
     expect(dockerfile).toContain('postgresql-client-${POSTGRES_CLIENT_MAJOR}');
   });
 
-  test('the Compose database is on the baseline major and uses a new data directory', async () => {
+  test('the Compose database is on the supported major and uses its own data directory', async () => {
     const db = await composeDb();
-    expect(majorOfImage(db.image)).toBeGreaterThanOrEqual(18);
+    expect(majorOfImage(db.image)).toBe(SUPPORTED_MAJOR);
     const [data] = db.volumes ?? [];
     // 18 and later keep the cluster in a versioned directory below this mount point.
     expect(data).toEndWith(':/var/lib/postgresql');
-    // Never the directory earlier releases wrote with 16 or 17.
+    // Never ./data/postgres, which older checkouts wrote with another major.
     expect(data?.startsWith('./data/postgres:')).toBe(false);
   });
 
-  test('CI runs the suite on 16 and on the baseline major', async () => {
+  test('every CI database runs the supported major, with no version matrix', async () => {
     const ci = Bun.YAML.parse(await read('.github/workflows/ci.yml')) as CiFile;
-    const baseline = String(majorOfImage((await composeDb()).image));
-    expect(ci.jobs.test?.strategy?.matrix?.postgres).toEqual(['16', baseline]);
-    expect(ci.jobs.test?.services?.postgres?.image).toBe('postgres:${{ matrix.postgres }}-alpine');
-  });
-
-  test('the browser smoke run uses the baseline major', async () => {
-    const ci = Bun.YAML.parse(await read('.github/workflows/ci.yml')) as CiFile;
-    const baseline = majorOfImage((await composeDb()).image);
-    expect(majorOfImage(ci.jobs.smoke?.services?.postgres?.image)).toBe(baseline);
+    const major = majorOfImage((await composeDb()).image);
+    const withDatabase = Object.entries(ci.jobs).filter(([, job]) => job.services?.postgres);
+    expect(withDatabase.map(([name]) => name)).toEqual(expect.arrayContaining(['smoke', 'test']));
+    for (const [, job] of withDatabase) {
+      expect(majorOfImage(job.services?.postgres?.image)).toBe(major);
+      expect(job.strategy?.matrix).toBeUndefined();
+    }
   });
 });

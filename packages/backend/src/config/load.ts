@@ -5,7 +5,6 @@ import { Secret } from './secret';
 import {
   DEFAULT_CORS_ORIGINS,
   FEATURES,
-  RETIRED_SETTINGS,
   S3_SELECTION_SIGNALS,
   SETTINGS,
   SettingValueError,
@@ -174,7 +173,7 @@ export type Config = {
   readonly maintenance: MaintenanceConfig;
   readonly backup: BackupConfig;
   readonly demo: DemoConfig;
-  /** Retired settings found in the environment and other non-fatal observations. */
+  /** Non-fatal observations about the settings, such as a replaced wildcard CORS origin. */
   readonly notices: readonly ConfigNotice[];
 };
 
@@ -215,14 +214,9 @@ class Reader {
     return value ? value : undefined;
   }
 
-  /** Whether the environment holds a value for a name, including retired ones. */
-  hasValue(name: string): boolean {
-    return Boolean(this.env[name]?.trim());
-  }
-
   fail(setting: string, message: string): void {
     this.failed.add(setting);
-    this.problems.push({ setting, message: withRetiredHint(this.env, setting, message) });
+    this.problems.push({ setting, message });
   }
 
   /** The parsed value, the documented default when unset, or undefined after recording a problem. */
@@ -311,13 +305,6 @@ class Reader {
     }
     return complete;
   }
-}
-
-function withRetiredHint(env: Environment, setting: string, message: string): string {
-  const retired = Object.entries(RETIRED_SETTINGS).find(
-    ([name, replacement]) => env[name]?.trim() && replacement.split(' and ').includes(setting),
-  );
-  return retired ? `${message} (${retired[0]} is no longer read)` : message;
 }
 
 // ── Sections ───────────────────────────────────────────────────────────────
@@ -441,7 +428,7 @@ function presentSettings(r: Reader, names: readonly SettingName[]): Set<SettingN
  */
 function readDocumentDriver(r: Reader): DocumentStorageDriver | undefined {
   if (r.raw('QRO_DOCUMENT_STORAGE') === undefined) {
-    const signals = S3_SELECTION_SIGNALS.filter((name) => r.hasValue(name));
+    const signals = S3_SELECTION_SIGNALS.filter((name) => r.isSet(name));
     if (signals.length > 0) {
       const verb = signals.length === 1 ? 'is' : 'are';
       r.fail(
@@ -643,15 +630,6 @@ function deepFreeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
-function findRetired(env: Environment): ConfigNotice[] {
-  return Object.entries(RETIRED_SETTINGS)
-    .filter(([name]) => env[name]?.trim())
-    .map(([name, replacement]) => ({
-      setting: name,
-      message: `is no longer read; use ${replacement}`,
-    }));
-}
-
 type Built = { value: unknown; problems: readonly ConfigProblem[] };
 
 /**
@@ -665,7 +643,6 @@ export function loadConfig(
   env: Environment,
   readFile: ReadFile = (path) => readFileSync(path, 'utf8'),
 ): LoadedConfig {
-  const retired = findRetired(env);
   const observed: ConfigNotice[] = [];
   const built = new Map<SectionName, Built>();
 
@@ -700,7 +677,7 @@ export function loadConfig(
     enumerable: true,
     get: () => {
       build('web');
-      return deepFreeze([...retired, ...observed]);
+      return deepFreeze([...observed]);
     },
   });
 

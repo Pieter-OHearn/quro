@@ -399,7 +399,7 @@ export const SETTINGS = defineSettings({
     group: 'Document storage',
     audience: 'operator',
     description:
-      'Where uploaded documents are kept. `filesystem`: the directory QRO_DOCUMENTS_DIR. `s3`: an S3-compatible store set up with the S3_* settings. When it is unset but S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID or the retired MINIO_APP_USER is present, every command stops instead of guessing.',
+      'Where uploaded documents are kept. `filesystem`: the directory QRO_DOCUMENTS_DIR. `s3`: an S3-compatible store set up with the S3_* settings. When it is unset but S3_ENDPOINT, S3_BUCKET or S3_ACCESS_KEY_ID is present, every command stops instead of guessing.',
     default: 'filesystem',
   }),
   QRO_DOCUMENTS_DIR: absoluteDirectory({
@@ -666,31 +666,13 @@ export const FEATURES = {
   { label: string; enabledBy: SettingName[]; requires: SettingName[] }
 >;
 
-// Settings that earlier releases read and this one does not. They are never used as a fallback;
-// finding one is reported so an upgrade does not fail silently (docs/install-contract.md).
-export const RETIRED_SETTINGS = {
-  DATABASE_HOST: 'POSTGRES_HOST',
-  DATABASE_PORT: 'POSTGRES_PORT',
-  APP_DB_USER: 'POSTGRES_APP_USER',
-  APP_DB_PASSWORD: 'POSTGRES_APP_PASSWORD_FILE',
-  POSTGRES_USER: 'POSTGRES_APP_USER',
-  POSTGRES_PASSWORD: 'POSTGRES_APP_PASSWORD_FILE and POSTGRES_ADMIN_PASSWORD_FILE',
-  POSTGRES_ADMIN_PASSWORD: 'POSTGRES_ADMIN_PASSWORD_FILE',
-  POSTGRES_APP_PASSWORD: 'POSTGRES_APP_PASSWORD_FILE',
-  MINIO_APP_USER: 'S3_ACCESS_KEY_ID',
-  S3_SECRET_ACCESS_KEY: 'S3_SECRET_ACCESS_KEY_FILE',
-} as const satisfies Record<string, string>;
-
-export type RetiredSettingName = keyof typeof RETIRED_SETTINGS;
-
 /**
- * Settings that show an install used S3 before QRO_DOCUMENT_STORAGE existed. Finding one without
- * QRO_DOCUMENT_STORAGE stops every command: falling back to the filesystem would hide the
- * documents that are still in the store (docs/install-contract.md).
+ * Settings that show an install uses an S3 store. Finding one without QRO_DOCUMENT_STORAGE stops
+ * every command: falling back to the filesystem would hide the documents that are in the store
+ * (docs/install-contract.md).
  */
 export const S3_SELECTION_SIGNALS = [
   'S3_ENDPOINT',
   'S3_BUCKET',
   'S3_ACCESS_KEY_ID',
-  'MINIO_APP_USER',
-] as const satisfies readonly (SettingName | RetiredSettingName)[];
+] as const satisfies readonly SettingName[];

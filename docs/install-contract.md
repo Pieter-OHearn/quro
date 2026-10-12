@@ -26,11 +26,11 @@ Reasons:
 
 Alternatives considered:
 
-| Option                                    | Why not                                                                                                                                                                                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Host shell installer (`curl … \| sh`)     | Runs remote code with the operator's privileges, has to support every host OS, and drifts from the image it installs.                                                                                                                 |
-| Generated Compose file as a release asset | That is the 0.6.x and 0.7.0 approach. It ties the install to one orchestrator and one file name, and template rendering already broke the published file (see [Transition from Compose installs](#transition-from-compose-installs)). |
-| Separate installer image                  | A second image to pull, publish and keep in step with the backend version.                                                                                                                                                            |
+| Option                                    | Why not                                                                                                                                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host shell installer (`curl … \| sh`)     | Runs remote code with the operator's privileges, has to support every host OS, and drifts from the image it installs.                                                             |
+| Generated Compose file as a release asset | That is the 0.6.x and 0.7.0 approach. It ties the install to one orchestrator and one file name, and template rendering already broke the published file's database health check. |
+| Separate installer image                  | A second image to pull, publish and keep in step with the backend version.                                                                                                        |
 
 ### A reference Compose example in the docs, not a release asset
 
@@ -46,9 +46,9 @@ Quro never starts, stops, pulls or updates containers. It needs no access to the
 
 Every command reads the database host, document store and backend address from settings. No setting defaults to a Compose service name: `POSTGRES_HOST`, `S3_ENDPOINT` (with S3) and the frontend's `QRO_API_URL` are required, and a missing one stops the command with exit code 2.
 
-### Old settings are retired, not carried forward
+### Old settings are not carried forward
 
-Aliases and defaults that only existed for 0.7.0 and earlier installs are not kept. A configuration that still depends on them fails at startup with exit code 2 and a message that names the replacement, instead of being guessed at. Every retired setting is listed in [Retired settings](#retired-settings), which the 0.8.0 upgrade notes carry.
+Aliases and defaults that only existed for 0.7.0 and earlier installs are not kept, and their names are not recognised: they are ignored like any other unknown variable. A configuration that depended on them is missing a required setting and fails at startup with exit code 2, instead of being guessed at.
 
 ### Documents are stored on the filesystem by default
 
@@ -70,7 +70,7 @@ The pension statement parser and its model server stay behind the `ocr` Compose 
 | ----------------------------------------- | -------------------------------------------------------------------- | ---------------------------- |
 | `ghcr.io/pieter-ohearn/quro-backend`      | API server, optional pension import worker, and every `quro` command | `linux/amd64`, `linux/arm64` |
 | `ghcr.io/pieter-ohearn/quro-frontend`     | nginx: serves the web app and proxies `/api` to the backend          | `linux/amd64`, `linux/arm64` |
-| `postgres:18` (official image)            | Database. PostgreSQL 18 is the baseline; 16 and 17 are supported     | Both                         |
+| `postgres:18` (official image)            | Database. PostgreSQL 18 is the only supported major                  | Both                         |
 | Any S3-compatible service                 | Optional document store. The project does not pin or ship one        | Operator's choice            |
 | `ghcr.io/pieter-ohearn/quro-auto-updater` | Retired. Existing tags stay published; no new releases               | –                            |
 
@@ -111,6 +111,8 @@ Exit codes:
 | 3    | A safety guard refused: missing confirmation, non-empty restore target, schema newer than the image, missing database privileges. Nothing was changed | Needs a person            |
 | 4    | The database or document store is unreachable                                                                                                         | Retry later               |
 
+The JSON output of `quro version --json`, `quro migrate --status --json` and `quro doctor --json`, and the readiness report, may change in any 0.x release; the upgrade notes list each change. They are stable from 1.0.0. `quro migrate --status` exits 1 while migrations are pending. [Interfaces for automation](upgrade.md#interfaces-for-automation) describes the fields.
+
 ## Ports
 
 | Container | Port     | Exposure                                                                                                          |
@@ -138,20 +140,20 @@ Settings are environment variables, usually kept in one file passed with `env_fi
 | `POSTGRES_APP_PASSWORD_FILE`   | `/run/secrets/postgres_app_password`   |                                                                               |
 | `POSTGRES_SSLMODE`             | unset                                  | New. Passed to the client as `sslmode` for an external database.              |
 
-Older names for these settings are retired (see [Retired settings](#retired-settings)). `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` remain a development and test interface. They carry passwords in the environment and are not part of the operator contract.
+Older names for these settings are not read. `DATABASE_URL`, `ADMIN_DATABASE_URL` and `APP_DATABASE_URL` remain a development and test interface. They carry passwords in the environment and are not part of the operator contract.
 
 ### Document storage
 
-| Setting                     | Default                             | Notes                                                                                                                                                                                                                                                               |
-| --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `QRO_DOCUMENT_STORAGE`      | `filesystem`                        | New. `filesystem` or `s3`. When it is unset but an S3 setting (`S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` or the retired `MINIO_APP_USER`) is present, every command stops with exit code 2 instead of guessing. `quro init` and the example set it explicitly. |
-| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | New. The filesystem driver, and where `quro documents migrate-from-s3` copies to. Absolute path.                                                                                                                                                                    |
-| `S3_ENDPOINT`               | none                                | Required by the S3 driver. **0.7.0:** defaults to `http://minio:9000`.                                                                                                                                                                                              |
-| `S3_REGION`                 | none                                | Required by the S3 driver. **0.7.0:** the Compose files set `eu-west-1`.                                                                                                                                                                                            |
-| `S3_BUCKET`                 | none                                | Created by the operator.                                                                                                                                                                                                                                            |
-| `S3_FORCE_PATH_STYLE`       | `true`                              |                                                                                                                                                                                                                                                                     |
-| `S3_ACCESS_KEY_ID`          | none                                | Required by the S3 driver. **0.7.0:** taken from `MINIO_APP_USER`, which is retired.                                                                                                                                                                                |
-| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/s3_secret_access_key` | New. **0.7.0:** the entry point reads `/run/secrets/minio_app_secret_key`.                                                                                                                                                                                          |
+| Setting                     | Default                             | Notes                                                                                                                                                                                                                                 |
+| --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QRO_DOCUMENT_STORAGE`      | `filesystem`                        | New. `filesystem` or `s3`. When it is unset but an S3 setting (`S3_ENDPOINT`, `S3_BUCKET` or `S3_ACCESS_KEY_ID`) is present, every command stops with exit code 2 instead of guessing. `quro init` and the example set it explicitly. |
+| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | New. The filesystem driver, and where `quro documents migrate-from-s3` copies to. Absolute path.                                                                                                                                      |
+| `S3_ENDPOINT`               | none                                | Required by the S3 driver. **0.7.0:** defaults to `http://minio:9000`.                                                                                                                                                                |
+| `S3_REGION`                 | none                                | Required by the S3 driver. **0.7.0:** the Compose files set `eu-west-1`.                                                                                                                                                              |
+| `S3_BUCKET`                 | none                                | Created by the operator.                                                                                                                                                                                                              |
+| `S3_FORCE_PATH_STYLE`       | `true`                              |                                                                                                                                                                                                                                       |
+| `S3_ACCESS_KEY_ID`          | none                                | Required by the S3 driver. **0.7.0:** taken from `MINIO_APP_USER`, which is not read.                                                                                                                                                 |
+| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/s3_secret_access_key` | New. **0.7.0:** the entry point reads `/run/secrets/minio_app_secret_key`.                                                                                                                                                            |
 
 ### Backups
 
@@ -186,7 +188,7 @@ Optional features (bunq, tracing, statement OCR) keep their current settings, li
 
 ### PostgreSQL
 
-PostgreSQL 18 is the baseline; 16 and 17 are supported. Backup and restore need client tools of the same or a newer major version than the server, so the backend image ships the client tools for the newest supported major.
+PostgreSQL 18 is the only supported server. `quro migrate` and `quro doctor` refuse any other major with exit code 3. Backup and restore need client tools of the same or a newer major version than the server, so the backend image ships PostgreSQL 18 client tools.
 
 Two roles:
 
@@ -214,16 +216,16 @@ Installing needs the registries the images come from, and no account at either. 
 
 ## Persistent data
 
-| Data                      | Location in the container                                                         | Owner                                 | In `quro backup`                    |
-| ------------------------- | --------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------- |
-| PostgreSQL cluster        | `/var/lib/postgresql` for PostgreSQL 18; `/var/lib/postgresql/data` for 16 and 17 | Database image user                   | As a logical dump                   |
-| Documents (filesystem)    | `/var/lib/quro/documents`                                                         | Backend UID                           | Yes                                 |
-| Documents (S3)            | The operator's bucket                                                             | Operator                              | As a manifest of keys and checksums |
-| Backups                   | `/var/lib/quro/backups`                                                           | Backend UID                           | –                                   |
-| Off-device copies         | `QRO_BACKUP_OFFSITE_DIR`, mounted by the operator                                 | Backend UID                           | –                                   |
-| Settings file and secrets | On the host, chosen by the operator                                               | Operator; readable by the backend UID | No; keep a protected copy           |
+| Data                      | Location in the container                         | Owner                                 | In `quro backup`                    |
+| ------------------------- | ------------------------------------------------- | ------------------------------------- | ----------------------------------- |
+| PostgreSQL cluster        | `/var/lib/postgresql`                             | Database image user                   | As a logical dump                   |
+| Documents (filesystem)    | `/var/lib/quro/documents`                         | Backend UID                           | Yes                                 |
+| Documents (S3)            | The operator's bucket                             | Operator                              | As a manifest of keys and checksums |
+| Backups                   | `/var/lib/quro/backups`                           | Backend UID                           | –                                   |
+| Off-device copies         | `QRO_BACKUP_OFFSITE_DIR`, mounted by the operator | Backend UID                           | –                                   |
+| Settings file and secrets | On the host, chosen by the operator               | Operator; readable by the backend UID | No; keep a protected copy           |
 
-Never point a PostgreSQL 18 container at a data directory written by 16 or 17. A major version change is a dump and restore into a new directory (see [Upgrade](#upgrade)).
+Never point a PostgreSQL container at a data directory written by another major. A major version change is a dump and restore into a new directory (see [Upgrade](#upgrade)).
 
 ### File ownership
 
@@ -289,7 +291,7 @@ Set `QRO_DOCUMENT_STORAGE=s3` and the `S3_` settings. Create the bucket and the 
 
 ### Upgrade
 
-These steps apply from 0.8.0 on; [Upgrade Quro](upgrade.md) has the commands, rollback and restore. Images up to 0.7.0 have no `quro` command; for those, follow [Transition from Compose installs](#transition-from-compose-installs) and [Upgrade from 0.7.0 to 0.8.0](upgrade.md#upgrade-from-070-to-080).
+These steps apply from 0.8.0 on; [Upgrade Quro](upgrade.md) has the commands, rollback and restore. Upgrading from a release before 0.8.0 is not supported by this release.
 
 1. Read the upgrade notes for every version you skip.
 2. Run `quro backup` with the old image.
@@ -309,7 +311,7 @@ Stopping and starting the containers keeps all data. Nothing runs on start excep
 
 ### Not supported
 
-Running PostgreSQL 18 on a data directory from an older major, and going back to an older version without a backup. More than one server against one database is not tested; rate limits are kept per process.
+PostgreSQL servers other than 18, running PostgreSQL on a data directory from another major, upgrading from a release before 0.8.0, and going back to an older version without a backup. More than one server against one database is not tested; rate limits are kept per process.
 
 ## Document storage evaluation
 
@@ -326,81 +328,6 @@ Running PostgreSQL 18 on a data directory from an older major, and going back to
 | Data volume             | PDF statements, at most 25 MB each (the frontend's upload limit)      | Same                                                                                                                                             |
 
 Result: the filesystem is the better default for a single-host self-hosted install. It removes the largest source of failed installs and lets one backup command cover all user data. S3 stays for operators who already run object storage or split services across hosts. Moving from S3 to the filesystem is `quro documents migrate-from-s3`; it reads through the S3 API, so it works with encrypted stores, and it never deletes the source objects.
-
-## Transition from Compose installs
-
-This covers installs made from any checkout or release up to and including 0.7.0. All of them share one layout: a Compose file with `db` (PostgreSQL 16.11), `minio` and `backend` services, a `.env` file, secrets in `secrets/*.txt`, and data in `./data/postgres` and `./data/minio`. Releases from 0.0.2 on also have a `migrate` service; the 0.0.1 release file does not.
-
-### Known defects in those releases
-
-| Defect                                   | Effect                                                                                                                                                                                                                                                                              | In the transition                                                                                                                                            |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Release file name and bundle-only config | The asset is `docker-compose.release.yml`, so a bare `docker compose` fails; `.env.template` and secret examples exist only inside the auto-update bundle.                                                                                                                          | `quro init` writes the settings and secrets; the example file is copied from the docs.                                                                       |
-| No storage bootstrap                     | The release file has no `minio-init`, so the storage user and bucket are never created and uploads fail unless the operator created them by hand.                                                                                                                                   | Such installs usually hold no documents. Check before choosing: with no objects, switch straight to the filesystem; with objects, keep `s3` or migrate them. |
-| No `db-tools`                            | The release file has no backup or restore commands.                                                                                                                                                                                                                                 | Take the pre-upgrade backup with the database container's own `pg_dump` (below).                                                                             |
-| Corrupted database health check          | The release workflow renders the template with unrestricted `envsubst`, turning `$$POSTGRES_USER` into `$`. The published check is `pg_isready -U "$" -d "$"`. It still passes, because `pg_isready` only asks whether the server accepts connections (reproduced on 18.6, exit 0). | Do not copy that line forward. The new example uses literal values and nothing is rendered.                                                                  |
-| Backup tools older than the server       | The backend image ships PostgreSQL 17 client tools. Against a PostgreSQL 18 server, `pg_dump` stops with `server version mismatch`.                                                                                                                                                 | Use the database container's `pg_dump`, which always matches its server.                                                                                     |
-| Passwords that start with `-`            | The image's entry point URL-encodes passwords by passing them to `bun -e` as an argument, so a value starting with `-` is read as an option and the connection URL is corrupted.                                                                                                    | `quro init` generates hexadecimal values, and the new entry point passes values through the environment. Existing passwords keep working.                    |
-| Auto-updater                             | The optional updater container mounts the Docker socket and the stack directory.                                                                                                                                                                                                    | Stop and remove it before upgrading, following [Retire the auto-updater](retire-the-auto-updater.md).                                                        |
-
-### Rules
-
-- Nothing is deleted or replaced. `./data/postgres`, `./data/minio`, `.env`, `secrets/` and earlier backups stay where they are until the operator removes them.
-- `quro init` only creates missing files and never edits an existing one. The PostgreSQL secret file names are unchanged, so those files can be reused; the storage secret's default name changes (see [Retired settings](#retired-settings)).
-- The old images run as root; the new backend does not. On Linux, existing `secrets/*.txt` files (`chmod 600`, owned by the operator) are unreadable to UID 1000 unless the operator's UID is 1000, and files that `db-tools` wrote under `./backups` are owned by root. Before starting the new backend, either set its `user:` to the UID that owns those files or change their ownership as described in [File ownership](#file-ownership). `quro doctor` reports an unreadable secret or an unwritable directory before anything starts.
-- An install with S3 settings and no `QRO_DOCUMENT_STORAGE` refuses to start, so documents never disappear behind an empty filesystem store. Set `QRO_DOCUMENT_STORAGE=s3` to keep using the existing store, or migrate the objects and set `filesystem`.
-- MinIO keeps running until `quro documents migrate-from-s3` has copied and verified every object. Removing the MinIO service and its data afterwards is the operator's decision.
-- A PostgreSQL 16 or 17 data directory is never reused for 18; the new major gets a new directory and the old one stays until deleted by hand.
-
-### Retired settings
-
-These settings and defaults are gone. Where ignoring one could hide data or connect to the wrong place, the command stops with exit code 2 and names the replacement; the others are simply not read. `quro doctor` lists every retired setting it finds. The [0.8.0 upgrade notes](upgrade.md#retired-settings) repeat this table.
-
-| Retired                                                                                              | Replacement                                                                               | If left unchanged                                                                                                                              |
-| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| S3 settings without `QRO_DOCUMENT_STORAGE`                                                           | `QRO_DOCUMENT_STORAGE=s3`, or `filesystem` after `quro documents migrate-from-s3`         | Every command stops with exit code 2                                                                                                           |
-| Database host `db` by default                                                                        | `POSTGRES_HOST`                                                                           | Exit code 2: `POSTGRES_HOST` is required                                                                                                       |
-| Frontend upstream `backend:3000` built in                                                            | `QRO_API_URL` on the frontend                                                             | The frontend stops at startup                                                                                                                  |
-| `MINIO_APP_USER`                                                                                     | `S3_ACCESS_KEY_ID`                                                                        | Without `QRO_DOCUMENT_STORAGE`: every command stops with exit code 2. With it: not read, and S3 storage needs `S3_ACCESS_KEY_ID` (exit code 2) |
-| Secret `/run/secrets/minio_app_secret_key`                                                           | `/run/secrets/s3_secret_access_key`, or point `S3_SECRET_ACCESS_KEY_FILE` at the old file | Exit code 2 with S3 storage: the secret file is not readable                                                                                   |
-| `DATABASE_HOST`, `DATABASE_PORT`                                                                     | `POSTGRES_HOST`, `POSTGRES_PORT`                                                          | Not read; an unset `POSTGRES_HOST` stops with exit code 2                                                                                      |
-| `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD` in the backend's environment | `POSTGRES_ADMIN_PASSWORD_FILE`, `POSTGRES_APP_PASSWORD_FILE`                              | Not read; a missing secret file stops with exit code 2                                                                                         |
-| `POSTGRES_USER` as the runtime user                                                                  | `POSTGRES_APP_USER`                                                                       | Not read by the backend (the database image still uses it)                                                                                     |
-| `S3_INTERNAL_ENDPOINT`                                                                               | `S3_ENDPOINT`, for an install that keeps S3                                               | Not read; S3 storage without `S3_ENDPOINT` stops with exit code 2                                                                              |
-| `minio` and `minio-init` services, `MINIO_ROOT_USER`                                                 | An S3 store you run yourself, or the filesystem                                           | No effect with the new example                                                                                                                 |
-| `db-tools` service                                                                                   | `quro backup`, `quro restore`                                                             | Old dumps stay in `./backups/db`                                                                                                               |
-| `migrate` service script                                                                             | `quro migrate`                                                                            | –                                                                                                                                              |
-
-### Before upgrading
-
-Take a database backup with the database container's own client, which matches its server version. From the directory with the Compose file:
-
-```bash
-docker compose -f docker-compose.release.yml exec -T db \
-  pg_dump -U quro_admin -d quro --format=custom > quro-before-upgrade.dump
-```
-
-Use `-f docker-compose.yml` for an install from a checkout, and your own user and database names if you changed them. `-T` matters: without it Compose attaches a terminal, which can corrupt the binary dump. Then stop the stack and copy `./data/minio`, `.env` and `secrets/` next to the dump. The full procedure, including the PostgreSQL major upgrade, is [Upgrade from 0.7.0 to 0.8.0](upgrade.md#upgrade-from-070-to-080); the tested 16 to 18 steps for a checkout are in [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md).
-
-## Gaps between 0.7.0 and this contract
-
-| Area                     | 0.7.0                                                                                | Contract                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Entry point              | Shell wrappers in `docker/backend/` around `bun run` scripts                         | `quro <command>`                                                |
-| Database endpoint        | Host `db` and port 5432 fixed in the shell wrappers in `docker/backend/`             | `POSTGRES_HOST` (required), `POSTGRES_PORT`, `POSTGRES_SSLMODE` |
-| Secrets per command      | The default entry point requires the storage secret for every command run through it | Each command reads only what it needs                           |
-| Frontend upstream        | `backend:3000` fixed in nginx                                                        | `QRO_API_URL` (required)                                        |
-| Container user           | root                                                                                 | UID 1000; any UID works                                         |
-| Document storage         | S3 only                                                                              | Filesystem default, S3 optional                                 |
-| Readiness                | Requires S3; no schema check                                                         | Configured store and schema check                               |
-| Concurrent migrations    | The second run fails                                                                 | Serialised by a database lock                                   |
-| Pre-created runtime role | Migration fails changing its password                                                | Grants only                                                     |
-| Backup client            | `pg_dump` 17; fails against 18 and leaves an empty file                              | Matching tools; written under a temporary name                  |
-| Backup consistency       | Database dump only; documents copied separately while writes continue                | One checked archive; changes paused while it is taken           |
-| Exit codes               | 0 or 1                                                                               | 0 to 4                                                          |
-| Image health check       | None                                                                                 | `quro health`                                                   |
-| Legacy settings          | Aliases and service-name defaults accepted                                           | Retired; old settings fail with exit code 2                     |
-| Release artifact         | Rendered `docker-compose.release.yml`                                                | A tested example in the docs                                    |
 
 ## Measurements
 
@@ -450,13 +377,14 @@ What the prototype showed:
 | Readiness with no S3 settings                                                         | 503, document storage `not_configured`                                                                                                           |
 | Database password starting with `-` through the 0.7.0 entry point                     | URL encoding failed and printed Bun's usage text in place of the value                                                                           |
 
-Not measured: a clean virtual machine, native amd64 hardware (the amd64 images were pulled and started under emulation, see [Distribution](distribution.md#recorded-evidence-v070)), a person following the steps with a stopwatch, the filesystem storage driver itself (it does not exist yet), and PostgreSQL 16 and 17 for the role checks.
+Not measured: a clean virtual machine, native amd64 hardware (the amd64 images were pulled and started under emulation, see [Distribution](distribution.md#recorded-evidence-v070)), a person following the steps with a stopwatch, and the filesystem storage driver itself (it does not exist yet).
 
 ## Decision log
 
-| Date       | Decision                                                                                                                                                                                                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default.                                                                                                                                                                                                             |
-| 2026-10-09 | Retire legacy settings and service-name defaults instead of inferring them; old configurations fail with exit code 2 and the upgrade notes list every change. Backend UID 1000, `QRO_` prefix for new settings, and `quro init` never prints secret values are confirmed.                              |
-| 2026-10-10 | Outbound network clarified: installing needs no registry account, and the running core's only unconfigured outbound call is the scheduled Yahoo Finance refresh. An anonymous image check gates CI and releases; the updater is not a release requirement. Details in [Distribution](distribution.md). |
-| 2026-10-10 | `quro doctor` is strictly read-only: its S3 check is a `HeadBucket` request with the configured key, and it never writes, reads back or deletes an object.                                                                                                                                             |
+| Date       | Decision                                                                                                                                                                                                                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-09 | Contract accepted: image subcommands, docs Compose example, filesystem storage by default.                                                                                                                                                                                                                                  |
+| 2026-10-09 | Retire legacy settings and service-name defaults instead of inferring them; old configurations fail with exit code 2 and the upgrade notes list every change. Backend UID 1000, `QRO_` prefix for new settings, and `quro init` never prints secret values are confirmed.                                                   |
+| 2026-10-10 | Outbound network clarified: installing needs no registry account, and the running core's only unconfigured outbound call is the scheduled Yahoo Finance refresh. An anonymous image check gates CI and releases; the updater is not a release requirement. Details in [Distribution](distribution.md).                      |
+| 2026-10-10 | `quro doctor` is strictly read-only: its S3 check is a `HeadBucket` request with the configured key, and it never writes, reads back or deletes an object.                                                                                                                                                                  |
+| 2026-10-12 | PostgreSQL 18 is the only supported server. Upgrades are supported from 0.8.0 on: the transition from Compose installs of 0.7.0 and earlier, its retired-settings table and the detection of those settings are removed. The JSON outputs and the readiness report may change in any 0.x release and are stable from 1.0.0. |

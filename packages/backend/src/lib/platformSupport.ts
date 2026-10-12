@@ -1,8 +1,8 @@
 // What Quro runs on. `quro migrate` and `quro doctor` check these before anything changes, so an
 // unsupported host or database stops with a clear message instead of failing half way.
 
-/** PostgreSQL majors the schema and the bundled client tools are tested against. */
-export const SUPPORTED_POSTGRES_MAJORS = { oldest: 16, newest: 18 } as const;
+/** The only PostgreSQL major Quro supports: the schema and the bundled client tools are tested on it. */
+export const SUPPORTED_POSTGRES_MAJOR = 18;
 
 /** Release images are built for these; `darwin` is a development checkout. */
 export const SUPPORTED_PLATFORMS = ['linux', 'darwin'] as const;
@@ -54,7 +54,6 @@ export function runtimeProblems(facts: RuntimeFacts = currentRuntime()): string[
 
 /** The problem with a PostgreSQL server major, or null when it is supported. */
 export function postgresMajorProblem(major: number): string | null {
-  const { oldest, newest } = SUPPORTED_POSTGRES_MAJORS;
-  if (major >= oldest && major <= newest) return null;
-  return `PostgreSQL ${major} is not supported; use PostgreSQL ${oldest} to ${newest} (${newest} is the baseline).`;
+  if (major === SUPPORTED_POSTGRES_MAJOR) return null;
+  return `PostgreSQL ${major} is not supported; use PostgreSQL ${SUPPORTED_POSTGRES_MAJOR}.`;
 }

@@ -4,7 +4,7 @@
 # PostgreSQL servers (the instance and an isolated restore target) and the backend image. Every
 # Docker resource it creates is removed on exit.
 #
-#   1. Source instance: migrated, demo seed, scripts/fixtures/pg-upgrade-synthetic.sql and
+#   1. Source instance: migrated, demo seed, scripts/fixtures/edge-case-rows.sql and
 #      scripts/fixtures/recovery-drill.sql (a partner with a joint and a private account, ledgers
 #      of QURO_DRILL_ROWS rows), and QURO_DRILL_DOCUMENTS payslip PDFs uploaded through the API.
 #   2. `quro backup`: encrypted, copied to an off-device volume, retention QURO_BACKUP_KEEP=2.
@@ -198,7 +198,7 @@ step "Source instance on $PG_IMAGE: $ROWS ledger rows, $DOCUMENTS documents of $
 start_db "$RUN-db-source" "$RUN-pg-source"
 quro "$RUN-db-source" "$RUN-docs-source" -- migrate >/dev/null
 backend "$RUN-db-source" "$RUN-docs-source" --entrypoint bun -- run db:seed-demo >/dev/null
-psql_on "$RUN-db-source" <scripts/fixtures/pg-upgrade-synthetic.sql >/dev/null
+psql_on "$RUN-db-source" <scripts/fixtures/edge-case-rows.sql >/dev/null
 psql_on "$RUN-db-source" -v rows="$ROWS" <scripts/fixtures/recovery-drill.sql >/dev/null
 start_api "$RUN-api-source" "$RUN-db-source" "$RUN-docs-source"
 client upload "http://$RUN-api-source:3000" "$DOCUMENTS" "$DOCUMENT_KIB"

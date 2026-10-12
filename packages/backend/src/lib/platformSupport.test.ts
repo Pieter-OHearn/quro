@@ -6,7 +6,7 @@ import {
   MINIMUM_BUN_VERSION,
   postgresMajorProblem,
   runtimeProblems,
-  SUPPORTED_POSTGRES_MAJORS,
+  SUPPORTED_POSTGRES_MAJOR,
 } from './platformSupport';
 
 const ROOT = join(import.meta.dir, '../../../..');
@@ -34,13 +34,15 @@ describe('supported hosts and runtimes', () => {
     expect(isAtLeast('2.0.0-canary.1', '1.4.0')).toBe(true);
   });
 
-  test('supports PostgreSQL from the oldest major to the image client tools major', () => {
+  test('supports only the major of the image client tools', () => {
     const dockerfile = readFileSync(join(ROOT, 'packages/backend/Dockerfile'), 'utf8');
     const toolsMajor = Number(/^ARG POSTGRES_CLIENT_MAJOR=(\d+)$/m.exec(dockerfile)?.[1]);
-    expect(SUPPORTED_POSTGRES_MAJORS.newest as number).toBe(toolsMajor);
-    expect(postgresMajorProblem(16)).toBeNull();
+    expect(SUPPORTED_POSTGRES_MAJOR).toBe(toolsMajor);
     expect(postgresMajorProblem(18)).toBeNull();
-    expect(postgresMajorProblem(15)).toContain('not supported');
-    expect(postgresMajorProblem(19)).toContain('not supported');
+    for (const major of [15, 16, 17, 19]) {
+      expect(postgresMajorProblem(major)).toBe(
+        `PostgreSQL ${major} is not supported; use PostgreSQL 18.`,
+      );
+    }
   });
 });

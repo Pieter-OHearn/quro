@@ -203,8 +203,8 @@ describe('database settings', () => {
   });
 });
 
-describe('retired settings', () => {
-  const RETIRED_ENV = {
+describe('settings of earlier releases', () => {
+  const OLD_ENV = {
     DATABASE_HOST: 'legacy-host',
     DATABASE_PORT: '1',
     APP_DB_USER: 'legacy',
@@ -213,50 +213,22 @@ describe('retired settings', () => {
     POSTGRES_PASSWORD: CANARY,
     POSTGRES_ADMIN_PASSWORD: CANARY,
     POSTGRES_APP_PASSWORD: CANARY,
+    MINIO_APP_USER: 'legacy',
+    S3_SECRET_ACCESS_KEY: CANARY,
   };
 
-  test('are never used as a fallback', () => {
-    const { problems, config } = load(RETIRED_ENV);
+  test('are unknown settings: never used as a fallback and not reported', () => {
+    const { problems, config } = load(OLD_ENV);
     expect(problems.runtimeDatabase.map((p) => p.setting)).toEqual(['POSTGRES_HOST']);
-    expect(config.notices.map((n) => n.setting).sort()).toEqual(Object.keys(RETIRED_ENV).sort());
+    expect(problems.documents).toEqual([]);
+    expect(config.notices).toEqual([]);
   });
 
   test('the environment password is not read, the secret file is', () => {
-    const { config } = load({ ...DATABASE_ENV, ...RETIRED_ENV });
+    const { config } = load({ ...DATABASE_ENV, ...OLD_ENV });
     expect(config.runtimeDatabase.user).toBe('quro_app');
     expect(config.runtimeDatabase.password.reveal()).toBe(`${CANARY}-app`);
     expect(config.runtimeDatabase.host).toBe('db.internal');
-  });
-
-  test('are reported with their replacement and never with their value', () => {
-    const { config } = load(RETIRED_ENV);
-    const notice = config.notices.find((n) => n.setting === 'DATABASE_HOST');
-    expect(notice?.message).toBe('is no longer read; use POSTGRES_HOST');
-    expect(JSON.stringify(config.notices)).not.toContain(CANARY);
-  });
-
-  test('S3 with MINIO_APP_USER and the old secret variable says what replaces them', () => {
-    const { problems } = load({
-      ...DATABASE_ENV,
-      QRO_DOCUMENT_STORAGE: 's3',
-      S3_ENDPOINT: 'http://s3:9000',
-      S3_REGION: 'eu-west-1',
-      S3_BUCKET: 'docs',
-      MINIO_APP_USER: 'legacy',
-      S3_SECRET_ACCESS_KEY: CANARY,
-    });
-    expect(problems.documents).toEqual([
-      {
-        setting: 'S3_SECRET_ACCESS_KEY_FILE',
-        message:
-          'secret file not found at /run/secrets/s3_secret_access_key (S3_SECRET_ACCESS_KEY is no longer read)',
-      },
-      {
-        setting: 'S3_ACCESS_KEY_ID',
-        message:
-          'required because S3 document storage is configured (MINIO_APP_USER is no longer read)',
-      },
-    ]);
   });
 });
 
@@ -300,7 +272,6 @@ describe('document storage', () => {
     ['S3_ENDPOINT', 'http://minio:9000'],
     ['S3_BUCKET', 'quro-documents'],
     ['S3_ACCESS_KEY_ID', 'quro_app'],
-    ['MINIO_APP_USER', 'quro_app'],
   ])('%s without QRO_DOCUMENT_STORAGE stops every command instead of guessing', (name, value) => {
     const { problems } = load({ ...DATABASE_ENV, [name]: value }, S3_SECRETS);
     const expected = {

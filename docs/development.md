@@ -70,7 +70,7 @@ In `packages/frontend/.env`, uncomment `VITE_API_URL=http://localhost:3000`. The
 - `APP_DATABASE_URL` should point at your runtime Postgres user on `127.0.0.1:5432`
 - Uploaded documents go to the directory in `QRO_DOCUMENTS_DIR` (default `/var/lib/quro/documents`). On the host, create a directory you own and set `QRO_DOCUMENTS_DIR` to its absolute path; the backend never creates it, and a relative path is refused. Leave `QRO_DOCUMENT_STORAGE` at `filesystem` and the `S3_*` settings commented out unless you work on the S3 driver; then set `QRO_DOCUMENT_STORAGE=s3` and all of `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY_FILE` for an S3-compatible store you run (see [document storage](document-storage.md)). An `S3_ENDPOINT`, `S3_BUCKET` or `S3_ACCESS_KEY_ID` without `QRO_DOCUMENT_STORAGE` stops the backend at startup.
 
-The backend validates every setting once at startup (see [Configuration](architecture.md#configuration)). Names that earlier releases accepted (`DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY`) are no longer read; if one is still in your `.env`, the backend prints which setting replaces it. To run the demo seed with a password of your own, set `DEMO_USER_PASSWORD`. The test scripts set `NODE_ENV=test`, which turns off rate limiting and the background jobs.
+The backend validates every setting once at startup (see [Configuration](architecture.md#configuration)). Names that releases before 0.8.0 accepted (`DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY`) are not read and not reported; use the settings in `.env.example`. To run the demo seed with a password of your own, set `DEMO_USER_PASSWORD`. The test scripts set `NODE_ENV=test`, which turns off rate limiting and the background jobs.
 
 5. Start the database. The development override exposes Postgres on `127.0.0.1` for host-side Bun and Python processes without changing the public default compose file:
 
@@ -273,15 +273,14 @@ demo data. The supported way is a throwaway container whose data lives in memory
 disappears when it stops. Never point these commands at the Compose `db` service, its
 `data/` directory or any database that holds real data.
 
-1. Start a throwaway PostgreSQL 18 on a free port (18 is the baseline; CI runs the suite on 16 and 18, so use
-   `postgres:16.11-alpine3.23` with `--tmpfs /var/lib/postgresql/data` to check a change against 16):
+1. Start a throwaway PostgreSQL 18 on a free port. 18 is the only supported server, and CI runs
+   the suite on it:
 
    ```bash
    docker run -d --rm --name quro-test-db -e POSTGRES_PASSWORD=tmp -e POSTGRES_USER=quro -e POSTGRES_DB=quro -p 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql postgres:18.6-alpine3.23
    ```
 
-   The 18 image keeps its cluster below `/var/lib/postgresql`; the 16 and 17 images use
-   `/var/lib/postgresql/data`.
+   The 18 image keeps its cluster below `/var/lib/postgresql`.
 
 2. Export all three database URLs in the same shell. Bun loads `packages/backend/.env`
    for commands that run in that package, and the role URLs take precedence over
@@ -312,6 +311,17 @@ fall back to a localhost default, never start a Compose service, and fill
 The `quro migrate` and `quro doctor` tests create databases and roles with random
 `quro_migrate_` and `quro_doctor_` names on that server and drop them afterwards, so the test
 role needs to be a superuser, as it is in the throwaway container.
+
+### Migration tests
+
+A migration that changes existing rows (a new constraint, a rewrite of values, encryption)
+ships an integration test that creates pre-existing synthetic rows in the shape the previous
+release stored, runs the migration's SQL against them and checks the result: values, nulls and
+negative amounts kept, rows that would break the constraint refused with an actionable message,
+nothing guessed. `packages/backend/src/db/holdingPriceScaleMigration.test.ts` (a type change)
+and `packages/backend/src/db/sessionHashMigration.test.ts` (a rewrite) are examples. A migration
+that only adds a table or a nullable column needs no such test; `bun run test` applies every
+migration to the throwaway database either way.
 
 ### Clean-install test
 
@@ -434,8 +444,7 @@ user other than the two demo users, so it cannot add synthetic rows to a real ho
 or restore in progress also stops it. Each route call is its own transaction, so a seed that
 fails part-way leaves a partial household; run it again to reset and complete it. It is not part of `test:smoke`, whose
 backend keeps the plain seed: the smoke tests sign up users of their own, which the household
-seed would then refuse, and the [upgrade fixture](upgrade-fixture.md) and the recovery drill start
-from a demo user without rows.
+seed would then refuse, and the recovery drill starts from a demo user without rows.
 
 The household is defined in `packages/backend/src/db/demoHousehold.ts` and written by
 `packages/backend/src/db/seedHousehold.ts`.

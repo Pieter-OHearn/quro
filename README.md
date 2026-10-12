@@ -20,7 +20,7 @@ Quro is for people who are comfortable running a few containers at home. It is p
 
 This installs Quro on one host from the published images, with the example Compose file. CI runs these commands on every change, with images built from that change standing in for the release.
 
-Quro 0.8.0 is the first release that installs this way. Releases up to 0.7.0 have no supported install path; if you run one, see [Upgrade](#upgrade).
+Quro 0.8.0 is the first release that installs this way, and upgrades are supported from 0.8.0 on (see [Upgrade](#upgrade)).
 
 | You need                   | Details                                                                                                                                                             |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -110,7 +110,7 @@ Every step can run again safely, except that the download in step 1 replaces `co
 
 ### Existing PostgreSQL or S3-compatible store
 
-The quickstart starts its own PostgreSQL and keeps documents in a directory. To use a PostgreSQL server you already run (16, 17 or 18), or to keep documents in an S3-compatible store, follow [Existing PostgreSQL server](docs/install.md#existing-postgresql-server) and [Existing S3-compatible store](docs/install.md#existing-s3-compatible-store).
+The quickstart starts its own PostgreSQL and keeps documents in a directory. To use a PostgreSQL 18 server you already run, or to keep documents in an S3-compatible store, follow [Existing PostgreSQL server](docs/install.md#existing-postgresql-server) and [Existing S3-compatible store](docs/install.md#existing-s3-compatible-store).
 
 ## Configuration
 
@@ -130,7 +130,7 @@ The [configuration reference](docs/configuration.md) lists every service, port, 
 
 Quro never updates itself. To move to a new release: read the upgrade notes of every version you skip, take a backup with the version you run, pin the new tag and digest in `compose.yaml`, and run `docker compose pull`. `docker compose run --rm migrate migrate --status` then compares the database with the new image and says whether migrations are pending, without changing anything. Stop the backend and run `docker compose up -d --wait`: `migrate` applies the new schema before the backend starts. Migrations only move forward: an older image runs only while it knows every migration the database has, and otherwise going back means restoring the backup. [Upgrade Quro](docs/upgrade.md) has every step, how to roll back, and what to do when an upgrade fails.
 
-Installs of 0.7.0 and earlier, from the release Compose file or a Compose file of your own, move over once with [Upgrade from 0.7.0 to 0.8.0](docs/upgrade.md#upgrade-from-070-to-080). It lists every changed and retired setting, and covers the move to PostgreSQL 18 and documents kept in MinIO or moved to the filesystem. A checkout that runs this repository's `docker-compose.yml` follows [PostgreSQL 18 and the upgrade from 16](docs/postgresql-upgrade.md) and the [changes in 0.8.0](docs/upgrade.md#changes-in-080).
+Upgrades are supported from 0.8.0 on, with PostgreSQL 18 as the only supported database server. An install of 0.7.0 or earlier first moves to 0.8.0 with the upgrade notes published with that release, linked from [Upgrade Quro](docs/upgrade.md).
 
 ## Backup and restore
 
@@ -188,7 +188,7 @@ Quro is pre-1.0. What it does not do yet, or does only partly:
 - **Bank linking supports bunq only.** Other banks need manual entry.
 - **No data export or CSV import yet.** Both are planned for 1.0. Until then, `quro backup` is the way to take your data with you.
 - **Statement import is not part of the example install.** It needs a GPU and images built from a checkout.
-- **PostgreSQL 16:** Quro runs on it, but restoring a backup needs PostgreSQL 17 or 18.
+- **PostgreSQL 18 only.** `quro migrate` refuses PostgreSQL 16, 17 and any other major.
 - **Tested in CI and containers,** on amd64 and arm64 runners and Docker Desktop, not on a Raspberry Pi or a NAS. Measured times are in [backup and restore](docs/backup-and-restore.md#recovery-objectives).
 - **Breaking changes between minor versions** are possible before 1.0. Each release's upgrade notes say what to change.
 
@@ -196,7 +196,7 @@ Quro is pre-1.0. What it does not do yet, or does only partly:
 
 | For           | Read                                                                                                                                                                                                                                                                                                        |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Upgrading     | [Upgrade Quro](docs/upgrade.md), [from 0.7.0 to 0.8.0](docs/upgrade.md#upgrade-from-070-to-080), [PostgreSQL 18 and the upgrade from 16](docs/postgresql-upgrade.md), [retire the auto-updater](docs/retire-the-auto-updater.md)                                                                            |
+| Upgrading     | [Upgrade Quro](docs/upgrade.md), [upgrade notes](docs/upgrade.md#upgrade-notes)                                                                                                                                                                                                                             |
 | Running Quro  | [Install](docs/install.md), [configuration reference](docs/configuration.md), [HTTPS with a reverse proxy](docs/reverse-proxy.md), [backup and restore](docs/backup-and-restore.md), [uninstall](docs/uninstall.md), [document storage](docs/document-storage.md), [security model](docs/security.md)       |
 | Automating it | [Install contract](docs/install-contract.md) (commands, exit codes, readiness, file ownership), [interfaces for automation](docs/upgrade.md#interfaces-for-automation) (exit codes, version and status JSON, health and readiness), [distribution](docs/distribution.md) (images, anonymous access, egress) |
 | Changing Quro | [Development](docs/development.md), [contributing](docs/CONTRIBUTING.md), [architecture](docs/architecture.md), [adding a feature](docs/adding-a-feature.md)                                                                                                                                                |

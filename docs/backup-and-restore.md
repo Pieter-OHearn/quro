@@ -24,8 +24,6 @@ If you have no backup yet, do these steps today. They take a few minutes.
 5. [Schedule](#schedule-backups) a daily backup.
 6. [Rehearse a restore](#rehearse-a-restore) on another machine or in a separate checkout, so the first restore you ever run is not during an incident.
 
-Installs up to 0.7.0 have no `quro` command. Before upgrading such an install, take a database dump with the database container's own `pg_dump` and copy the documents, as [Upgrade from 0.7.0 to 0.8.0](upgrade.md#upgrade-from-070-to-080) describes. Once the new release runs, take your first `quro backup`.
-
 ## What an archive contains
 
 One archive is one file. It is a tar file (`.tar`), or an encrypted one (`.tar.enc`).
@@ -269,7 +267,7 @@ Limits:
 - Changes are refused for as long as the dump and the documents copy take; that grows with the data (about a second for the reference dataset, five for the large one). Schedule backups when nobody uses Quro.
 - A backup needs free space for the archive and a temporary copy of the dump; a restore needs space for the pre-restore archive, a staged copy of the archive's content and, briefly, the previous documents.
 - One encrypted archive can hold up to 64 GiB.
-- Restoring into a PostgreSQL 16 server does not work with the image's PostgreSQL 18 tools: `pg_restore` 18 sets `transaction_timeout`, which 16 does not know, and stops before it changes anything. Backups of a 16 server work, and restore into PostgreSQL 17 or 18 (the baseline, see [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md)). The drill passes on 17.11 and 18.6.
+- Backup and restore are tested on PostgreSQL 18, the only supported server. The drill passes on 18.6.
 - Not measured: amd64, a Raspberry Pi or a NAS, network storage for the documents or the off-device directory, and restoring an S3 bucket.
 
 ## Restore a database dump
@@ -282,7 +280,7 @@ docker compose run --rm -e QRO_RESTORE_CONFIRM=restore-db --entrypoint bun \
   migrate run db:restore -- /var/lib/quro/backups/<dump-file>.dump
 ```
 
-Add `-e QRO_RESTORE_ALLOW_NON_EMPTY=1` to restore over data. A dump does not contain the documents; put back the documents directory from the copy you took with it. A dump from an earlier release, such as the one taken before upgrading from 0.7.0, goes into a new, empty database before `quro migrate` runs: start only the database (`docker compose up -d --wait db`), restore, then start Quro. Restoring it over a database the newer release has migrated stops without changes. In the Compose stack of this repository the same command is `docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db db-tools restore backups/db/<dump-file>.dump`, which [PostgreSQL 18 and the upgrade from 16](postgresql-upgrade.md) uses for the database major upgrade.
+Add `-e QRO_RESTORE_ALLOW_NON_EMPTY=1` to restore over data. A dump does not contain the documents; put back the documents directory from the copy you took with it. A dump from an earlier release goes into a new, empty database before `quro migrate` runs: start only the database (`docker compose up -d --wait db`), restore, then start Quro. Restoring it over a database the newer release has migrated stops without changes. In the Compose stack of this repository the same command is `docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db db-tools restore backups/db/<dump-file>.dump`.
 
 ## Compose stack of this repository
 
