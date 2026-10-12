@@ -29,8 +29,10 @@ const EXCEPTION_KINDS = ['vulnerabilities', 'misconfigurations', 'secrets'] as c
 type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 
 export type TrivyReport = {
+  Metadata?: { OS?: { Family?: string; Name?: string } };
   Results?: {
     Target: string;
+    MisconfSummary?: { Successes?: number; Failures?: number };
     Vulnerabilities?: {
       VulnerabilityID: string;
       PkgName: string;
@@ -132,6 +134,32 @@ export function evaluateTrivy(report: TrivyReport): Finding[] {
       ...secretFindings(result),
     ]),
   );
+}
+
+// Dockerfiles the config scan must have checked; a scan that silently found none passes nothing.
+export const REQUIRED_DOCKERFILES = ['packages/backend/Dockerfile', 'packages/frontend/Dockerfile'];
+
+/**
+ * Reasons a Trivy report cannot be trusted as a clean result: an image whose operating system
+ * Trivy did not detect (its packages were not checked), or a config scan that did not check the
+ * core Dockerfiles.
+ */
+export function incompleteScan(mode: 'image' | 'config', report: TrivyReport): string | undefined {
+  if (mode === 'image') {
+    return report.Metadata?.OS?.Family
+      ? undefined
+      : 'Trivy did not detect the image operating system, so its packages were not scanned';
+  }
+  const checked = new Set(
+    (report.Results ?? [])
+      .filter(
+        (result) =>
+          (result.MisconfSummary?.Successes ?? 0) + (result.MisconfSummary?.Failures ?? 0) > 0,
+      )
+      .map((result) => result.Target),
+  );
+  const missing = REQUIRED_DOCKERFILES.filter((file) => !checked.has(file));
+  return missing.length > 0 ? `Trivy did not check ${missing.join(', ')}` : undefined;
 }
 
 /** Every gitleaks finding blocks unless an active exception names its fingerprint. */
@@ -312,7 +340,8 @@ function copyWorkingTree(target: string): void {
 
 function scanImage(image: string, work: string): Finding[] {
   const local = spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status === 0;
-  if (!local) return evaluateTrivy(trivy([], ['image', '--scanners', 'vuln,secret', image]));
+  if (!local)
+    return checkedTrivy('image', trivy([], ['image', '--scanners', 'vuln,secret', image]));
   // A saved archive, so the scanner needs no access to the Docker socket.
   const input = join(work, 'input');
   mkdirSync(input);
@@ -323,6 +352,12 @@ function scanImage(image: string, work: string): Finding[] {
   );
   for (const result of report.Results ?? [])
     result.Target = result.Target.replace('/input/image.tar', image);
+  return checkedTrivy('image', report);
+}
+
+function checkedTrivy(mode: 'image' | 'config', report: TrivyReport): Finding[] {
+  const problem = incompleteScan(mode, report);
+  if (problem) throw new Error(problem);
   return evaluateTrivy(report);
 }
 
@@ -330,7 +365,7 @@ function scanConfig(work: string): Finding[] {
   const tree = join(work, 'tree');
   mkdirSync(tree);
   copyWorkingTree(tree);
-  return evaluateTrivy(trivy([`${tree}:/src:ro`], ['config', '/src']));
+  return checkedTrivy('config', trivy([`${tree}:/src:ro`], ['config', '/src']));
 }
 
 // Scanned commits as gitleaks logs them ("290 commits scanned."), with colour codes removed.

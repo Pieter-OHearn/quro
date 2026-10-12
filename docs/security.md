@@ -485,7 +485,8 @@ the frontend through a container network instead.
 The limits are sized for a household instance with headroom; raise `mem_limit` if a backup or
 restore of a large database is stopped by the kernel (exit code 137). A read-only root filesystem
 needs `/tmp` as tmpfs in both images; without one, the frontend stops at startup with a message
-saying so.
+saying so. nginx buffers large uploads and responses in `/tmp`, so they count toward the frontend's
+memory limit: 256 MiB leaves room for several 25 MB uploads at once.
 
 What the hardening does not cover: the containers share the host's kernel, so a kernel flaw is
 outside these controls; the `db` entry point keeps the capabilities above; the images are not

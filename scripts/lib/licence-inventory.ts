@@ -141,12 +141,14 @@ export function collectJavaScript(root: string): {
         continue;
       }
       const dependency = readManifest(resolved);
-      if (resolved.startsWith(join(root, 'packages'))) {
+      // A workspace package (Quro's own code) lives outside every node_modules directory; a
+      // dependency installed below packages/*/node_modules is still a dependency.
+      if (resolved.startsWith(join(root, 'packages')) && !resolved.includes('/node_modules/')) {
         if (!visited.has(`${workspace}:${resolved}`)) {
           visited.add(`${workspace}:${resolved}`);
           visit(resolved, workspace);
         }
-        continue; // a workspace package: Quro's own code
+        continue;
       }
       const key = `${dependency.name ?? name}@${dependency.version ?? '?'}`;
       const entry = packages.get(key) ?? {

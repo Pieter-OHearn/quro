@@ -6,6 +6,7 @@ import {
   evaluateGitleaks,
   evaluateTrivy,
   GITLEAKS_IMAGE,
+  incompleteScan,
   renderMarkdown,
   scannedCommits,
   TRIVY_IMAGE,
@@ -223,6 +224,31 @@ test('reads the scanned commit count from the gitleaks log, colour codes include
   ).toBe(291);
   expect(scannedCommits('INF 0 commits scanned.')).toBe(0);
   expect(scannedCommits('ERR fatal: not a git repository')).toBeUndefined();
+});
+
+describe('incompleteScan', () => {
+  test('requires the image operating system to be detected', () => {
+    expect(
+      incompleteScan('image', { Metadata: { OS: { Family: 'debian', Name: '13.7' } } }),
+    ).toBeUndefined();
+    expect(incompleteScan('image', { Results: [] })).toContain('operating system');
+  });
+
+  test('requires the config scan to have checked both core Dockerfiles', () => {
+    const checked = (target: string) => ({
+      Target: target,
+      MisconfSummary: { Successes: 27, Failures: 0 },
+    });
+    expect(
+      incompleteScan('config', {
+        Results: [checked('packages/backend/Dockerfile'), checked('packages/frontend/Dockerfile')],
+      }),
+    ).toBeUndefined();
+    expect(incompleteScan('config', { Results: [checked('packages/backend/Dockerfile')] })).toBe(
+      'Trivy did not check packages/frontend/Dockerfile',
+    );
+    expect(incompleteScan('config', {})).toContain('packages/backend/Dockerfile');
+  });
 });
 
 test('the scanner images are pinned by digest', () => {
