@@ -1,48 +1,54 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+// `pill`, `contained` and `soft` all render the joined segmented control: one bordered group,
+// 28px high on desktop, with 44px options that share the width on phones. The selected option
+// is a `brand-soft` tint, never a fill, because a `brand` fill is kept for the one action button
+// of a view. `underline` renders tabs whose selection is a 2px `brand` underline. A group wider
+// than its container scrolls sideways instead of wrapping or hiding options.
+const SEGMENTED_WRAPPER_CLASS_NAME =
+  'inline-flex max-w-full overflow-x-auto rounded-md border border-border-control max-sm:flex';
+
+// The focus outline is drawn inside the option because the wrapper clips its corners.
+const SEGMENTED_BUTTON_CLASS_NAME =
+  'inline-flex h-[26px] shrink-0 items-center justify-center gap-1.5 border-r border-border-control px-2.5 text-label whitespace-nowrap transition-colors duration-fast last:border-r-0 max-sm:h-11 max-sm:flex-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:text-fg-subtle';
+
+const SEGMENTED_ACTIVE_CLASS_NAME = 'bg-brand-soft font-semibold text-brand-fg';
+const SEGMENTED_INACTIVE_CLASS_NAME =
+  'bg-surface text-fg-muted hover:bg-surface-muted active:bg-surface-muted';
+
 const WRAPPER_CLASSES = {
-  pill: 'flex items-center gap-2 flex-wrap',
-  contained:
-    'flex items-center gap-1.5 bg-surface border border-border-default rounded-md p-1 flex-wrap',
-  soft: 'flex items-center gap-1 flex-wrap',
-  underline: 'flex border-b border-border-subtle',
+  pill: SEGMENTED_WRAPPER_CLASS_NAME,
+  contained: SEGMENTED_WRAPPER_CLASS_NAME,
+  soft: SEGMENTED_WRAPPER_CLASS_NAME,
+  underline: 'flex border-b border-border-default',
 } as const;
 
 const BUTTON_CLASSES = {
-  pill: 'inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-all',
-  contained:
-    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
-  soft: 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors',
+  pill: SEGMENTED_BUTTON_CLASS_NAME,
+  contained: SEGMENTED_BUTTON_CLASS_NAME,
+  soft: SEGMENTED_BUTTON_CLASS_NAME,
   underline:
-    'flex flex-1 min-w-0 items-center justify-center gap-2 border-b-2 border-transparent py-4 text-sm font-medium transition-colors',
-} as const;
-
-const PILL_ACTIVE_TONE_CLASSES = {
-  dark: 'bg-surface-inverse text-fg-inverted border-surface-inverse',
-  indigo: 'bg-brand text-fg-inverted border-brand',
-} as const;
-
-const PILL_INACTIVE_TONE_CLASSES = {
-  dark: 'bg-surface border-border-default text-fg-muted hover:bg-surface-sunken',
-  indigo:
-    'bg-surface border-border-default text-fg-muted hover:border-brand-border hover:text-brand',
+    '-mb-px flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 border-b-2 border-transparent px-3 text-cell font-medium transition-colors duration-fast max-sm:h-11 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:text-fg-subtle',
 } as const;
 
 const ACTIVE_CLASSES = {
-  contained: 'bg-brand text-fg-inverted',
-  soft: 'bg-brand-soft-strong text-brand-fg font-medium',
-  underline: 'border-brand bg-brand-soft/40 text-brand',
+  pill: SEGMENTED_ACTIVE_CLASS_NAME,
+  contained: SEGMENTED_ACTIVE_CLASS_NAME,
+  soft: SEGMENTED_ACTIVE_CLASS_NAME,
+  underline: 'border-brand font-semibold text-fg',
 } as const;
 
 const INACTIVE_CLASSES = {
-  contained: 'text-fg-muted hover:bg-surface-sunken',
-  soft: 'text-fg-subtle hover:bg-surface-muted',
-  underline: 'text-fg-subtle hover:text-fg-strong',
+  pill: SEGMENTED_INACTIVE_CLASS_NAME,
+  contained: SEGMENTED_INACTIVE_CLASS_NAME,
+  soft: SEGMENTED_INACTIVE_CLASS_NAME,
+  underline: 'text-fg-muted hover:text-fg active:text-fg',
 } as const;
 
 type SegmentedControlVariant = keyof typeof WRAPPER_CLASSES;
-type SegmentedControlTone = keyof typeof PILL_ACTIVE_TONE_CLASSES;
+// Both tones render the same `brand-soft` selection; the prop stays for existing callers.
+type SegmentedControlTone = 'dark' | 'indigo';
 
 export type SegmentedControlOption<T extends string | number> = {
   value: T;
@@ -65,20 +71,12 @@ export type SegmentedControlProps<T extends string | number> = Omit<
   buttonClassName?: string;
 };
 
-function getActiveClassName(variant: SegmentedControlVariant, tone: SegmentedControlTone) {
-  if (variant === 'pill') {
-    return PILL_ACTIVE_TONE_CLASSES[tone];
-  }
-
-  return ACTIVE_CLASSES[variant];
-}
-
 export function SegmentedControl<T extends string | number>({
   options,
   value,
   onChange,
   variant = 'pill',
-  tone = 'indigo',
+  tone: _tone,
   className,
   buttonClassName,
   ...props
@@ -103,11 +101,7 @@ export function SegmentedControl<T extends string | number>({
             onClick={() => onChange(option.value)}
             className={cn(
               BUTTON_CLASSES[variant],
-              isActive
-                ? getActiveClassName(variant, tone)
-                : variant === 'pill'
-                  ? PILL_INACTIVE_TONE_CLASSES[tone]
-                  : INACTIVE_CLASSES[variant],
+              isActive ? ACTIVE_CLASSES[variant] : INACTIVE_CLASSES[variant],
               option.className,
               buttonClassName,
             )}

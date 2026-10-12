@@ -22,7 +22,7 @@ authenticated routes, use the synthetic demo user. Do not seed the owner's insta
 - `/welcome`: switch to `Sign up`, verify the shared field and button styling still matches the current landing auth flow and the close button still dismisses the modal.
 - `/salary`: verify the year segmented control, shared table/header shell, and row action controls render without spacing or alignment regressions.
 - `/savings` or `/pension`: verify transaction history filters and pagination controls still render correctly and page changes do not break layout.
-- If the change touches `EmptyState`: verify an empty-state route in a disposable local state, preferably `/mortgage` with no mortgage data or a `/goals` filter/year combination with no matching items, and confirm title, description, icon, and CTA layout.
+- If the change touches `EmptyState`: verify an empty-state route in a disposable local state, preferably `/mortgage` with no mortgage data or a `/goals` filter/year combination with no matching items, and confirm the left-aligned dashed box with its title, description, small icon and at most one button.
 - If the change touches `LoadingState`: trigger a visible loading pass on `/salary`, `/goals`, or `/budget` by refreshing during a slow/local restart and confirm the shared loading shell still appears centered.
 - If the change touches `EmojiPickerField` or `PdfAttachmentField`: manually verify the owning feature flow because those components are not covered by the smoke suite.
 

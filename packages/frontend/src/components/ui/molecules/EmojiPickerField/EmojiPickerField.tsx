@@ -51,9 +51,9 @@ function getPickerPos(buttonEl: HTMLButtonElement, pickerWidth: number, pickerHe
 }
 
 function getButtonBorderClass(error: string | undefined, open: boolean): string {
-  if (error) return 'border-danger-border bg-danger-soft';
-  if (open) return 'border-brand-border bg-brand-soft';
-  return 'border-border-default bg-surface-sunken';
+  if (error) return 'border-danger bg-surface';
+  if (open) return 'border-brand bg-brand-soft';
+  return 'border-border-control bg-surface';
 }
 
 function useOutsideClose(
@@ -96,7 +96,10 @@ function PickerPortal({
     <div ref={pickerRef} style={pickerStyle}>
       <Suspense
         fallback={
-          <div role="status" className="rounded-lg bg-surface p-4 text-fg-muted">
+          <div
+            role="status"
+            className="rounded-lg border border-border-default bg-surface p-4 text-cell text-fg-muted shadow-popover"
+          >
             Loading emojis…
           </div>
         }
@@ -139,13 +142,16 @@ export function EmojiPickerField({
 
   return (
     <div className={cn('flex-shrink-0', containerClassName)}>
-      {label && <label className="block text-xs font-semibold text-fg-muted mb-1.5">{label}</label>}
+      {label && <label className="mb-1 block text-label text-fg-muted">{label}</label>}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'w-14 h-[42px] rounded-md border text-xl flex items-center justify-center transition-all hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus-ring',
+          // Matches the 32px (44px on phones) text inputs it sits beside. The 20px emoji uses the
+          // nearest type style, `figure-lg`; the type scale has no glyph size.
+          'flex h-8 w-14 items-center justify-center rounded-md border text-figure-lg transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted max-sm:h-11',
+          'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
           getButtonBorderClass(error, open),
           buttonClassName,
         )}
@@ -163,7 +169,7 @@ export function EmojiPickerField({
           pickerWidth={pickerWidth}
         />
       )}
-      {error && <p className="text-xs text-danger mt-1">{error}</p>}
+      {error && <p className="mt-1 text-caption text-danger">{error}</p>}
     </div>
   );
 }

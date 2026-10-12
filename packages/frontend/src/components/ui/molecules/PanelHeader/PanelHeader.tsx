@@ -1,9 +1,10 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+// A card header is 36px high with 12px side padding on desktop, 44px and 16px on phones.
 const SPACING_CLASSES = {
   none: '',
-  panel: 'px-6 py-5',
+  panel: 'min-h-9 px-3 py-1 max-sm:min-h-11 max-sm:px-4',
 } as const;
 
 export type PanelHeaderProps = Omit<ComponentPropsWithoutRef<'div'>, 'title'> & {
@@ -34,20 +35,22 @@ export function PanelHeader({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-4',
-        divider && 'border-b border-border-subtle',
+        'flex items-center justify-between gap-3',
+        divider && 'border-b border-border-default',
         SPACING_CLASSES[spacing],
         className,
       )}
       {...props}
     >
       <div className={cn('min-w-0', contentClassName)}>
-        <h3 className={cn('font-semibold text-fg', titleClassName)}>{title}</h3>
+        <h3 className={cn('text-title-section text-fg', titleClassName)}>{title}</h3>
         {subtitle && (
-          <p className={cn('text-xs text-fg-faint mt-0.5', subtitleClassName)}>{subtitle}</p>
+          <p className={cn('text-caption text-fg-subtle', subtitleClassName)}>{subtitle}</p>
         )}
       </div>
-      {action && <div className={cn('flex-shrink-0', actionClassName)}>{action}</div>}
+      {action && (
+        <div className={cn('flex shrink-0 items-center gap-2', actionClassName)}>{action}</div>
+      )}
     </div>
   );
 }
