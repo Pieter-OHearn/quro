@@ -210,7 +210,7 @@ brew install gitleaks
 bun run hooks:install
 ```
 
-Use synthetic data only in issues, tests and screenshots. The demo seed (`bun run --filter '@quro/backend' db:seed-demo`) creates a complete household to work with.
+Use synthetic data only in issues, tests and screenshots. The demo seed (`bun run --filter '@quro/backend' db:seed-demo`) creates the demo user, and `db:seed-household` adds a synthetic household for screenshots and manual checks ([development](docs/development.md#demo-household)).
 
 ## Support
 

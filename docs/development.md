@@ -358,7 +358,52 @@ Tests and screenshots use synthetic data only. The demo seed
 deterministic: it creates or resets the `demo@quro.local` user to a fixed profile and,
 when the currency-rate table is empty, adds a fixed set of approximate EUR rates dated
 on the seeding day so they count as fresh. Its values live in
-`packages/backend/src/db/demoSeed.ts`.
+`packages/backend/src/db/demoSeed.ts`. It adds no accounts or transactions, so the demo
+profile is empty.
+
+#### Demo household
+
+For screenshots and manual checks that need a lived-in profile, seed the household into a
+migrated, throwaway database (see [DB-backed tests](#db-backed-tests)):
+
+```bash
+bun run --filter '@quro/backend' db:seed-household
+```
+
+It does everything the plain seed does, then adds `demo-partner@quro.local` as the demo user's
+accepted partner and fills both accounts. Sign in as either; the password is the one of the plain
+seed (`DEMO_USER_PASSWORD`, or its fixed default). The household has:
+
+- Private and joint rows on both sides: seven savings accounts in EUR, GBP, USD and CHF with
+  deposits, withdrawals and interest (the partners write to the joint ones), a joint home with a
+  linked mortgage and monthly repayments, and a buy-to-let flat in pounds that is worth less than
+  its debt.
+- Holdings with buys, sells, dividends and a monthly price history, one of them at a loss.
+- Two pension pots with contributions, fees and annual statements, two debts with payments, two
+  employments with payslips (no documents), five goals, and a budget from July to the start of
+  October 2026 with a payment in pounds converted at the stored rate.
+- Non-ASCII text in some names, and amounts of at most two decimals.
+
+The seed writes through the application's own routes, in the process, with a short-lived session
+of its own. Balances, joint attribution and ledger effects are therefore what the app stores for
+the same input, and the seed stops with an error if a route rejects a row or the dashboard or
+runway cannot be read afterwards. The synthetic tickers are excluded from price sync, so no
+provider is asked about them. Everything is dated up to 2026-10-09, so the budget page shows
+October as a partial month and net worth history marks months before the first stored rate as
+estimated.
+
+Running it again resets the two demo users' rows and writes the same household again; rows have
+new ids but the same content, and only the rate dates and the users' creation times follow the
+clock. It refuses to run, writing nothing and exiting with an error, when the database holds any
+user other than the two demo users, so it cannot add synthetic rows to a real household. A backup
+or restore in progress also stops it. Each route call is its own transaction, so a seed that
+fails part-way leaves a partial household; run it again to reset and complete it. It is not part of `test:smoke`, whose
+backend keeps the plain seed: the smoke tests sign up users of their own, which the household
+seed would then refuse, and the [upgrade fixture](upgrade-fixture.md) and the recovery drill start
+from a demo user without rows.
+
+The household is defined in `packages/backend/src/db/demoHousehold.ts` and written by
+`packages/backend/src/db/seedHousehold.ts`.
 
 ## Packages and versions
 
