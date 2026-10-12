@@ -13,7 +13,8 @@ import {
   pensionTransactions,
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { lockLedgerParents, withLedgerWrite } from '../lib/ledgerWrite';
+import { isUniqueViolation } from '../lib/postgresErrors';
 import {
   parseListLimit,
   parseListPageQuery,
@@ -447,6 +448,8 @@ function earliestRowDate(rows: readonly ImportRowRecord[]): string | undefined {
 }
 
 const IMPORT_NOT_READY_FOR_COMMIT = 'Import is not ready for commit';
+const DUPLICATE_STATEMENT_COMMITTED =
+  'An exact duplicate statement has already been imported for this pension pot';
 
 class ImportNotReadyForCommit extends Error {
   constructor() {
@@ -454,19 +457,33 @@ class ImportNotReadyForCommit extends Error {
   }
 }
 
+class DuplicateStatementCommitted extends Error {
+  constructor() {
+    super(DUPLICATE_STATEMENT_COMMITTED);
+  }
+}
+
 // Claims the import before any row is written: a second commit of the same import waits here
-// and then finds it committed, so the statement reaches the ledger once.
+// and then finds it committed, so the statement reaches the ledger once. A unique index allows
+// one committed import per statement file and pot, so a commit of another import of the same
+// file waits here too and then fails instead of writing the rows again.
 async function claimImportForCommit(tx: DbTransaction, importId: number, now: Date) {
-  const [claimed] = await tx
-    .update(pensionStatementImports)
-    .set({ status: 'committed', committedAt: now, updatedAt: now, errorMessage: null })
-    .where(
-      and(
-        eq(pensionStatementImports.id, importId),
-        eq(pensionStatementImports.status, 'ready_for_review'),
-      ),
-    )
-    .returning({ id: pensionStatementImports.id });
+  let claimed: { id: number } | undefined;
+  try {
+    [claimed] = await tx
+      .update(pensionStatementImports)
+      .set({ status: 'committed', committedAt: now, updatedAt: now, errorMessage: null })
+      .where(
+        and(
+          eq(pensionStatementImports.id, importId),
+          eq(pensionStatementImports.status, 'ready_for_review'),
+        ),
+      )
+      .returning({ id: pensionStatementImports.id });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new DuplicateStatementCommitted();
+    throw error;
+  }
   if (!claimed) throw new ImportNotReadyForCommit();
 }
 
@@ -480,6 +497,8 @@ async function commitRowsToLedger(params: {
   const committedTransactionIds: number[] = [];
 
   await db.transaction(async (tx) => {
+    // The pot before the import and its rows, in the order a cascade archive of the pot uses.
+    await lockLedgerParents(tx, pensionPots, [params.importRecord.potId]);
     await claimImportForCommit(tx, params.importId, params.now);
     let annualStatementTransactionId: number | null = null;
 
@@ -1056,10 +1075,7 @@ app.post('/:id/commit', async (c) => {
     excludingImportId: importRecord.id,
   });
   if (duplicate) {
-    return c.json(
-      { error: 'An exact duplicate statement has already been imported for this pension pot' },
-      HTTP_STATUS.CONFLICT,
-    );
+    return c.json({ error: DUPLICATE_STATEMENT_COMMITTED }, HTTP_STATUS.CONFLICT);
   }
 
   const rows = await loadCommitRows(importId);
@@ -1080,6 +1096,9 @@ app.post('/:id/commit', async (c) => {
   } catch (error) {
     if (error instanceof ImportNotReadyForCommit) {
       return c.json({ error: IMPORT_NOT_READY_FOR_COMMIT }, HTTP_STATUS.BAD_REQUEST);
+    }
+    if (error instanceof DuplicateStatementCommitted) {
+      return c.json({ error: DUPLICATE_STATEMENT_COMMITTED }, HTTP_STATUS.CONFLICT);
     }
     console.error('Failed to commit pension import', error);
     return c.json({ error: 'Failed to commit import' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);

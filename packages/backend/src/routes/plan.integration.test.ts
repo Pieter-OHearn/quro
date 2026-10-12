@@ -6,7 +6,8 @@ import type {
   RunwayResponse,
   SavingsAccount,
 } from '@quro/shared';
-import { queryClient } from '../db/client';
+import { db, queryClient } from '../db/client';
+import { payslips } from '../db/schema';
 import { createIntegrationHelpers } from '../test/integration';
 import { buildRunwayResponse, runwayEstimateFlags } from './plan';
 import { useFixtureCurrencyRates } from '../test/currencyRates';
@@ -633,4 +634,70 @@ test('rules carried past their published or reviewed period make the runway an e
     });
   expect(flags(false)).toEqual({ budgetCurrencyNeedsReview: false, isEstimated: false });
   expect(flags(true)).toEqual({ budgetCurrencyNeedsReview: false, isEstimated: true });
+});
+
+async function setJurisdiction(cookie: string, jurisdiction: 'NL' | 'AU' | 'GENERIC') {
+  await readData(
+    await integration.request('/api/settings/preferences', {
+      method: 'PUT',
+      cookie,
+      json: { baseCurrency: 'EUR', numberFormat: 'en-US', jurisdiction },
+    }),
+  );
+}
+
+function payslipRow(userId: number, tax: number) {
+  return {
+    userId,
+    month: 'May 2026',
+    date: '2026-05-29',
+    gross: 10_000,
+    tax,
+    pension: 0,
+    net: 10_000 - tax,
+    currency: 'EUR' as const,
+  };
+}
+
+test('the last twelve payslips break a shared date by entry order', async () => {
+  const owner = await integration.signUp('runway-payslip-ties');
+  await setJurisdiction(owner.cookie, 'GENERIC');
+  // Twenty-four payslips on one date: the twelve entered last carry 30% tax, the others none.
+  await db.insert(payslips).values(Array.from({ length: 12 }, () => payslipRow(owner.user.id, 0)));
+  await db
+    .insert(payslips)
+    .values(Array.from({ length: 12 }, () => payslipRow(owner.user.id, 3_000)));
+
+  const runway = (await buildRunwayResponse(
+    owner.user.id,
+    null,
+    new Date('2026-06-15T12:00:00Z'),
+  ))!;
+  expect(runway.incomeSupport.taxRateSource).toBe('payslips');
+  expect(runway.incomeSupport.effectiveTaxRate).toBeCloseTo(0.3, 10);
+});
+
+test('runway rule metadata lists the default tax rate only when the runway uses it', async () => {
+  const asOf = new Date('2026-08-01T12:00:00Z');
+  const withoutPayslips = await integration.signUp('runway-rules-default-tax');
+  await setJurisdiction(withoutPayslips.cookie, 'AU');
+  const defaultTax = (await buildRunwayResponse(withoutPayslips.user.id, null, asOf))!;
+  expect(defaultTax.incomeSupport.taxRateSource).toBe('jurisdiction_default');
+  // The Australian default tax rate (from 2025-07-01) is newer than the redundancy table.
+  expect(defaultTax.jurisdiction.rulesEffectiveFrom).toBe('2025-07-01');
+
+  const withPayslips = await integration.signUp('runway-rules-payslip-tax');
+  await setJurisdiction(withPayslips.cookie, 'AU');
+  await db.insert(payslips).values(payslipRow(withPayslips.user.id, 2_000));
+  const payslipTax = (await buildRunwayResponse(withPayslips.user.id, null, asOf))!;
+  expect(payslipTax.incomeSupport.taxRateSource).toBe('payslips');
+  expect(payslipTax.jurisdiction.rulesEffectiveFrom).toBe('2010-01-01');
+
+  // Without unemployment or severance rules, a payslip-based runway uses no published rule.
+  const generic = await integration.signUp('runway-rules-generic');
+  await setJurisdiction(generic.cookie, 'GENERIC');
+  await db.insert(payslips).values(payslipRow(generic.user.id, 2_000));
+  const noRules = (await buildRunwayResponse(generic.user.id, null, asOf))!;
+  expect(noRules.jurisdiction.rulesEffectiveFrom).toBeNull();
+  expect(noRules.jurisdiction.isExtrapolated).toBe(false);
 });

@@ -80,7 +80,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
     pensionStatementImports: 3,
     pensionTransactions: 1,
   },
-  'routes/pensions.ts': { pensionPots: 3, pensionTransactions: 11 },
+  'routes/pensions.ts': { pensionPots: 3, pensionTransactions: 12 },
   'routes/plan.ts': {
     budgetCategories: 1,
     budgetTransactions: 1,

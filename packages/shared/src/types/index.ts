@@ -840,7 +840,8 @@ export type RunwayResponse = {
     code: JurisdictionCode;
     labels: PlanningLabels;
     unemploymentModel: UnemploymentModel;
-    rulesEffectiveFrom: string;
+    /** The newest effective date among the rules the runway used; null when it used none. */
+    rulesEffectiveFrom: string | null;
     isExtrapolated: boolean;
   };
   employment: {

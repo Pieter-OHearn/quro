@@ -10,7 +10,7 @@ import { getAuthUser } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { readUploadForm } from '../lib/uploadForm';
 import { earliestDate } from '../lib/netWorth';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { LEDGER_ROW_CHANGED, lockLedgerParents, withLedgerWrite } from '../lib/ledgerWrite';
 import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import {
   asFile,
@@ -527,6 +527,37 @@ function createPensionTransaction(params: {
   });
 }
 
+// Locks the pots an edit or delete of a pension transaction may change, before the transaction
+// row: a cascade archive locks the pot and then deletes its transactions, so taking the pot first
+// cannot deadlock with it. Returns the pot the row was on when it was read, or an error.
+async function lockPotsOfTransaction(
+  tx: DbTransaction,
+  params: { userId: number; transactionId: number; raw?: Record<string, unknown> },
+): Promise<{ potId: number } | { error: string; status: typeof HTTP_STATUS.NOT_FOUND }> {
+  const [current] = await tx
+    .select()
+    .from(pensionTransactions)
+    .where(
+      and(
+        eq(pensionTransactions.id, params.transactionId),
+        eq(pensionTransactions.userId, params.userId),
+      ),
+    );
+  if (!current) return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
+  const potIds = [current.potId];
+  const merged = params.raw
+    ? mergePensionTransactionPayload(params.raw, normalizeTransactionRow(current))
+    : null;
+  if (merged?.ok && merged.value.potId !== current.potId) {
+    if (!(await isPensionPotOwnedByUser(tx, params.userId, merged.value.potId))) {
+      return { error: 'Pension pot not found', status: HTTP_STATUS.NOT_FOUND };
+    }
+    potIds.push(merged.value.potId);
+  }
+  await lockLedgerParents(tx, pensionPots, potIds);
+  return { potId: current.potId };
+}
+
 async function updatePensionTransaction(params: {
   userId: number;
   transactionId: number;
@@ -534,6 +565,8 @@ async function updatePensionTransaction(params: {
 }): Promise<RouteMutationResult> {
   let storageKeyToDelete: string | null = null;
   const result = await db.transaction(async (tx) => {
+    const pots = await lockPotsOfTransaction(tx, params);
+    if ('error' in pots) return pots;
     // Locked so a concurrent edit or delete of this row waits and then sees this one's result.
     const [existing] = await tx
       .select()
@@ -546,6 +579,9 @@ async function updatePensionTransaction(params: {
       )
       .for('update');
     if (!existing) return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
+    if (existing.potId !== pots.potId) {
+      return { error: LEDGER_ROW_CHANGED, status: HTTP_STATUS.CONFLICT };
+    }
 
     const normalizedExisting = normalizeTransactionRow(existing);
     const mergedPayload = mergePensionTransactionPayload(params.raw, normalizedExisting);
@@ -610,6 +646,8 @@ async function deletePensionTransaction(params: {
 }): Promise<RouteMutationResult> {
   let storageKeyToDelete: string | null = null;
   const result = await db.transaction(async (tx) => {
+    const pots = await lockPotsOfTransaction(tx, params);
+    if ('error' in pots) return pots;
     // Locked so a concurrent edit or delete of this row waits and then sees this one's result.
     const [existing] = await tx
       .select()
@@ -622,6 +660,9 @@ async function deletePensionTransaction(params: {
       )
       .for('update');
     if (!existing) return { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND };
+    if (existing.potId !== pots.potId) {
+      return { error: LEDGER_ROW_CHANGED, status: HTTP_STATUS.CONFLICT };
+    }
 
     const normalizedExisting = normalizeTransactionRow(existing);
     storageKeyToDelete = readInlinePdfDocument(existing)?.storageKey ?? null;
