@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { buildSeedCurrencyRates, DEMO_USER_PROFILE, SEED_RATE_PROVIDER } from './demoSeed';
+import {
+  buildSeedCurrencyRates,
+  DEMO_USER_PROFILE,
+  parseSeedArguments,
+  SEED_RATE_PROVIDER,
+} from './demoSeed';
 
 const FIXED_NOW = new Date('2026-03-15T12:00:00.000Z');
 
@@ -32,5 +37,20 @@ describe('demo seed', () => {
       age: 35,
       retirementAge: 67,
     });
+  });
+});
+
+describe('seed arguments', () => {
+  test('seeds only the demo user by default', () => {
+    expect(parseSeedArguments([])).toEqual({ household: false });
+  });
+
+  test('adds the household on request', () => {
+    expect(parseSeedArguments(['--household'])).toEqual({ household: true });
+  });
+
+  test('refuses anything else, so a typo cannot quietly seed less', () => {
+    expect(() => parseSeedArguments(['--houshold'])).toThrow('Unknown argument "--houshold"');
+    expect(() => parseSeedArguments(['--household', 'extra'])).toThrow('"extra"');
   });
 });

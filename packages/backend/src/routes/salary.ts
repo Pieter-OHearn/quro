@@ -5,6 +5,7 @@ import { toIsoDate, type CurrencyCode } from '@quro/shared';
 import { db } from '../db/client';
 import { employments, payslips } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
+import { readUploadForm } from '../lib/uploadForm';
 import { getAuthUser } from '../lib/authUser';
 import { earliestDate } from '../lib/netWorth';
 import { withLedgerWrite } from '../lib/ledgerWrite';
@@ -305,8 +306,9 @@ app.post('/payslips/:id/document', async (c) => {
   const payslipId = parseId(c.req.param('id'));
   if (payslipId === null) return c.json({ error: 'Invalid payslip id' }, HTTP_STATUS.BAD_REQUEST);
 
-  const formData = await c.req.formData();
-  const file = asFile(formData.get('file'));
+  const upload = await readUploadForm(c);
+  if (!upload.ok) return upload.response;
+  const file = asFile(upload.form.get('file'));
   if (!file) return c.json({ error: 'A PDF file is required' }, HTTP_STATUS.BAD_REQUEST);
 
   const validation = validateUploadedPdf(file);

@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { type Sql } from 'postgres';
 
 export const DEMO_USER_EMAIL = 'demo@quro.local';
+/** The partner the optional demo household links to the demo user. */
+export const DEMO_PARTNER_EMAIL = 'demo-partner@quro.local';
+export const DEMO_USER_EMAILS: readonly string[] = [DEMO_USER_EMAIL, DEMO_PARTNER_EMAIL];
 
 export const CLEAR_TABLE_NAMES = [
   'pension_statement_import_rows',
@@ -168,7 +171,9 @@ async function readUserSummary(sql: Sql<Record<string, unknown>>): Promise<UserS
   }
   const [[totalUsersRow], [nonDemoUsersRow], [demoUserRow]] = await Promise.all([
     sql<CountRow[]>`select count(*)::int as count from users`,
-    sql<CountRow[]>`select count(*)::int as count from users where email <> ${DEMO_USER_EMAIL}`,
+    sql<
+      CountRow[]
+    >`select count(*)::int as count from users where email not in ${sql([...DEMO_USER_EMAILS])}`,
     sql<DemoUserRow[]>`select id from users where email = ${DEMO_USER_EMAIL} limit 1`,
   ]);
   return {
