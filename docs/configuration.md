@@ -56,7 +56,7 @@ Each secret is one value in one file. A trailing newline is ignored; an empty fi
 - After an edit, run `docker compose up -d`. Compose recreates the services whose settings changed and leaves the rest running.
 - Every container checks all of its settings when it starts. Invalid values stop it with exit code 2 and one list of the problems; the list names settings, never values. An empty value counts as unset.
 - The switches `S3_FORCE_PATH_STYLE`, `BUNQ_SANDBOX` and `QRO_DISABLE_SCHEDULERS` accept `true`, `false`, `1`, `0`, `yes` and `no`. `SECURE_COOKIES` and `OTEL_SDK_DISABLED` accept only `true` or `false`.
-- Settings from earlier releases are not read; `quro doctor` names each one it finds and its replacement. See [retired settings](install-contract.md#retired-settings).
+- Settings from earlier releases are not read; `quro doctor` names each one it finds and its replacement. The [0.8.0 upgrade notes](upgrade.md#retired-settings) list every retired setting, including `S3_INTERNAL_ENDPOINT`, whose value moves to `S3_ENDPOINT` for an install that keeps S3.
 
 ## Backend settings
 
@@ -99,16 +99,16 @@ Exchange rates and holding prices refresh at start and once a day, from Yahoo Fi
 
 ### Document storage
 
-| Setting                     | Default                             | Notes                                                                                                                                                         |
-| --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `QRO_DOCUMENT_STORAGE`      | `filesystem`                        | `filesystem` or `s3`. When it is unset but `S3_ENDPOINT`, `S3_BUCKET` or `S3_ACCESS_KEY_ID` is present, every command stops instead of guessing               |
-| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | Absolute path of the filesystem store, and where `quro documents migrate-from-s3` copies to. Must exist and be writable by the backend; Quro never creates it |
-| `S3_ENDPOINT`               | none; required with `s3`            | URL of the S3-compatible store, reachable from the containers                                                                                                 |
-| `S3_REGION`                 | none; required with `s3`            | Region name the store expects                                                                                                                                 |
-| `S3_BUCKET`                 | none; required with `s3`            | Bucket for uploaded documents. You create it                                                                                                                  |
-| `S3_ACCESS_KEY_ID`          | none; required with `s3`            | Access key id of an identity that can get, put, delete and list objects in the bucket                                                                         |
-| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/s3_secret_access_key` | File holding the secret access key                                                                                                                            |
-| `S3_FORCE_PATH_STYLE`       | `true`                              | Path-style addressing, which most self-hosted stores need; `false` for stores that need virtual-host style                                                    |
+| Setting                     | Default                             | Notes                                                                                                                                                                         |
+| --------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QRO_DOCUMENT_STORAGE`      | `filesystem`                        | `filesystem` or `s3`. When it is unset but `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` or the retired `MINIO_APP_USER` is present, every command stops instead of guessing |
+| `QRO_DOCUMENTS_DIR`         | `/var/lib/quro/documents`           | Absolute path of the filesystem store, and where `quro documents migrate-from-s3` copies to. Must exist and be writable by the backend; Quro never creates it                 |
+| `S3_ENDPOINT`               | none; required with `s3`            | URL of the S3-compatible store, reachable from the containers                                                                                                                 |
+| `S3_REGION`                 | none; required with `s3`            | Region name the store expects                                                                                                                                                 |
+| `S3_BUCKET`                 | none; required with `s3`            | Bucket for uploaded documents. You create it                                                                                                                                  |
+| `S3_ACCESS_KEY_ID`          | none; required with `s3`            | Access key id of an identity that can get, put, delete and list objects in the bucket                                                                                         |
+| `S3_SECRET_ACCESS_KEY_FILE` | `/run/secrets/s3_secret_access_key` | File holding the secret access key                                                                                                                                            |
+| `S3_FORCE_PATH_STYLE`       | `true`                              | Path-style addressing, which most self-hosted stores need; `false` for stores that need virtual-host style                                                                    |
 
 More in [document storage](document-storage.md).
 

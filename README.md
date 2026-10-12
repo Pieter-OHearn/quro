@@ -128,7 +128,9 @@ The [configuration reference](docs/configuration.md) lists every service, port, 
 
 ## Upgrade
 
-Quro never updates itself. To move to a new release: read its upgrade notes, back up with the version you run, change the image tags in `compose.yaml`, then run `docker compose pull` and `docker compose up -d`; `migrate` applies the new schema before the backend starts. Installs of 0.7.0 and earlier, including the release Compose file and checkouts of this repository, move over once with the 0.8.0 upgrade notes.
+Quro never updates itself. To move to a new release: read the upgrade notes of every version you skip, take a backup with the version you run, pin the new tag and digest in `compose.yaml`, and run `docker compose pull`. `docker compose run --rm migrate migrate --status` then compares the database with the new image and says whether migrations are pending, without changing anything. Stop the backend and run `docker compose up -d --wait`: `migrate` applies the new schema before the backend starts. Migrations only move forward: an older image runs only while it knows every migration the database has, and otherwise going back means restoring the backup. [Upgrade Quro](docs/upgrade.md) has every step, how to roll back, and what to do when an upgrade fails.
+
+Installs of 0.7.0 and earlier, from the release Compose file or a Compose file of your own, move over once with [Upgrade from 0.7.0 to 0.8.0](docs/upgrade.md#upgrade-from-070-to-080). It lists every changed and retired setting, and covers the move to PostgreSQL 18 and documents kept in MinIO or moved to the filesystem. A checkout that runs this repository's `docker-compose.yml` follows [PostgreSQL 18 and the upgrade from 16](docs/postgresql-upgrade.md) and the [changes in 0.8.0](docs/upgrade.md#changes-in-080).
 
 ## Backup and restore
 
@@ -192,11 +194,12 @@ Quro is pre-1.0. What it does not do yet, or does only partly:
 
 ## Documentation
 
-| For           | Read                                                                                                                                                                                                                                                                                                  |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Running Quro  | [Install](docs/install.md), [configuration reference](docs/configuration.md), [HTTPS with a reverse proxy](docs/reverse-proxy.md), [backup and restore](docs/backup-and-restore.md), [uninstall](docs/uninstall.md), [document storage](docs/document-storage.md), [security model](docs/security.md) |
-| Automating it | [Install contract](docs/install-contract.md) (commands, exit codes, readiness, file ownership), [distribution](docs/distribution.md) (images, anonymous access, egress)                                                                                                                               |
-| Changing Quro | [Development](docs/development.md), [contributing](docs/CONTRIBUTING.md), [architecture](docs/architecture.md), [adding a feature](docs/adding-a-feature.md)                                                                                                                                          |
+| For           | Read                                                                                                                                                                                                                                                                                                        |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Upgrading     | [Upgrade Quro](docs/upgrade.md), [from 0.7.0 to 0.8.0](docs/upgrade.md#upgrade-from-070-to-080), [PostgreSQL 18 and the upgrade from 16](docs/postgresql-upgrade.md), [retire the auto-updater](docs/retire-the-auto-updater.md)                                                                            |
+| Running Quro  | [Install](docs/install.md), [configuration reference](docs/configuration.md), [HTTPS with a reverse proxy](docs/reverse-proxy.md), [backup and restore](docs/backup-and-restore.md), [uninstall](docs/uninstall.md), [document storage](docs/document-storage.md), [security model](docs/security.md)       |
+| Automating it | [Install contract](docs/install-contract.md) (commands, exit codes, readiness, file ownership), [interfaces for automation](docs/upgrade.md#interfaces-for-automation) (exit codes, version and status JSON, health and readiness), [distribution](docs/distribution.md) (images, anonymous access, egress) |
+| Changing Quro | [Development](docs/development.md), [contributing](docs/CONTRIBUTING.md), [architecture](docs/architecture.md), [adding a feature](docs/adding-a-feature.md)                                                                                                                                                |
 
 ## Contributing
 
