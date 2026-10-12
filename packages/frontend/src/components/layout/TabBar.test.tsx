@@ -30,9 +30,9 @@ describe('TabBar', () => {
 
   test('labels the tabs as the pages name themselves, with More last', () => {
     const markup = renderTabBar('/');
-    const labels = [
-      ...markup.matchAll(/<span class="max-w-full truncate px-1">([^<]+)<\/span>/g),
-    ].map((match) => match[1]);
+    const labels = [...markup.matchAll(/<span class="whitespace-nowrap">([^<]+)<\/span>/g)].map(
+      (match) => match[1],
+    );
     expect(labels).toEqual(['Dashboard', 'Savings', 'Investments', 'Budget', 'More']);
     expect(markup).not.toContain('>Home<');
     expect(linkFor(markup, 'Dashboard')).toContain('href="/"');

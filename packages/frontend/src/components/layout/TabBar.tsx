@@ -32,7 +32,9 @@ function TabContent({ icon: Icon, label, active }: Readonly<TabContentProps>) {
       <span className={cn(WELL_CLASSES, active ? ACTIVE_WELL_CLASSES : REST_WELL_CLASSES)}>
         <Icon size={ICON_SIZE_PX} strokeWidth={1.8} aria-hidden="true" />
       </span>
-      <span className="max-w-full truncate px-1">{label}</span>
+      {/* Labels never truncate, so a page is never abbreviated. On a 320px screen "Investments" is
+          a few pixels wider than its tab and overhangs into the space its neighbours leave. */}
+      <span className="whitespace-nowrap">{label}</span>
     </>
   );
 }
