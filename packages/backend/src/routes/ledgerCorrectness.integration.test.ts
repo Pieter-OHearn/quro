@@ -3,6 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { toCents } from '@quro/shared';
 import { db } from '../db/client';
 import {
+  budgetCategories,
   debts,
   mortgages,
   pensionPots,
@@ -185,6 +186,53 @@ describe('a repayment that the zero clamp cuts short', () => {
     );
     expect(await manualPropertyDebt(property.id)).toBe(toCents(100));
   });
+});
+
+// Budget spending is the other balance clamped at zero. Its transactions are positive and only
+// ever add to the category they are on, so ledger writes alone never reach the clamp.
+test('budget: creating, editing, moving and deleting transactions returns spending exactly', async () => {
+  const owner = await integration.signUp('clamp-budget');
+  const category = async (name: string, spent: number) =>
+    created<{ id: number }>(
+      await post(owner, '/api/budget/categories', {
+        name,
+        emoji: 'B',
+        budgeted: 100,
+        spent,
+        color: '#f59e0b',
+        month: 'Mar',
+        year: 2026,
+      }),
+    );
+  const groceries = await category('Clamp groceries', 0.01);
+  const dining = await category('Clamp dining', 0);
+  const spent = async (id: number) => {
+    const [row] = await db.select().from(budgetCategories).where(eq(budgetCategories.id, id));
+    return toCents(row!.spent);
+  };
+
+  const shop = await created<{ id: number }>(
+    await post(owner, '/api/budget/transactions', {
+      categoryId: groceries.id,
+      description: 'Shop',
+      amount: 100.01,
+      date: DATE,
+      merchant: 'Synthetic Market',
+    }),
+  );
+  await expectStatus(
+    await patch(owner, `/api/budget/transactions/${shop.id}`, { amount: 0.02 }),
+    200,
+  );
+  await expectStatus(
+    await patch(owner, `/api/budget/transactions/${shop.id}`, { categoryId: dining.id }),
+    200,
+  );
+  expect(await spent(groceries.id)).toBe(1);
+  expect(await spent(dining.id)).toBe(2);
+  await expectStatus(await remove(owner, `/api/budget/transactions/${shop.id}`), 200);
+  expect(await spent(groceries.id)).toBe(1);
+  expect(await spent(dining.id)).toBe(0);
 });
 
 describe('a property repayment stays with the debt it paid', () => {
