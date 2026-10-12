@@ -11,9 +11,10 @@ const VARIANT_CLASSES = {
     'text-fg-faint hover:bg-surface-muted hover:text-fg-muted active:bg-surface-muted active:text-fg-muted',
 } as const;
 
+// At least 44px square on phones, like every touch target.
 const SIZE_CLASSES = {
-  sm: 'h-7 w-7 rounded-md',
-  md: 'h-8 w-8 rounded-md',
+  sm: 'h-7 w-7 max-sm:h-11 max-sm:w-11 rounded-md',
+  md: 'h-8 w-8 max-sm:h-11 max-sm:w-11 rounded-md',
   lg: 'h-11 w-11 rounded-lg',
 } as const;
 

@@ -13,11 +13,11 @@ const VARIANT_CLASSES = {
     'text-fg hover:bg-surface-muted active:bg-surface-muted disabled:bg-transparent disabled:text-fg-subtle',
 } as const;
 
-// Height comes from `h-*`; text uses the type scale (`cell` is the control style, the touch
-// sizes take `body`, which is 15px on phones, and the 15px `title-section` metrics).
+// Height comes from `h-*`, at least 44px on phones; text uses the type scale (`cell` is the
+// control style, the touch sizes take `body`, 15px on phones, and the 15px `title-section`).
 const SIZE_CLASSES = {
-  sm: 'h-7 rounded-md px-2 text-label',
-  md: 'h-8 rounded-md px-3 text-cell',
+  sm: 'h-7 max-sm:h-11 rounded-md px-2 text-label',
+  md: 'h-8 max-sm:h-11 rounded-md px-3 text-cell',
   lg: 'h-11 rounded-lg px-4 text-body',
   xl: 'h-12 rounded-lg px-4 text-title-section font-semibold',
 } as const;

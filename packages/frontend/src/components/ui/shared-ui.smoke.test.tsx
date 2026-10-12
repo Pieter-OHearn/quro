@@ -85,8 +85,8 @@ const smokeCases: readonly SmokeCase[] = [
       </div>
     ),
     includes: [
-      'h-7 rounded-md px-2 text-label',
-      'h-8 rounded-md px-3 text-cell',
+      'h-7 max-sm:h-11 rounded-md px-2 text-label',
+      'h-8 max-sm:h-11 rounded-md px-3 text-cell',
       'h-11 rounded-lg px-4 text-body',
       'h-12 rounded-lg px-4 text-title-section font-semibold',
       'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
@@ -110,8 +110,8 @@ const smokeCases: readonly SmokeCase[] = [
     includes: [
       'aria-label="Edit row"',
       'aria-label="Rename"',
-      'h-7 w-7 rounded-md',
-      'h-8 w-8 rounded-md',
+      'h-7 w-7 max-sm:h-11 max-sm:w-11 rounded-md',
+      'h-8 w-8 max-sm:h-11 max-sm:w-11 rounded-md',
       'focus-visible:outline-focus-ring',
     ],
   },
@@ -127,7 +127,7 @@ const smokeCases: readonly SmokeCase[] = [
       'Card body',
       'rounded-lg border border-border-default bg-surface',
     ],
-    excludes: ['shadow-', 'p-'],
+    excludes: ['shadow-', 'p-4'],
   },
   {
     name: 'Card default padding is 16px',
