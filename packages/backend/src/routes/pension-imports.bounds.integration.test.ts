@@ -230,7 +230,7 @@ describe('statement import processing bounds', () => {
 
   test('a busy parser leaves the import queued, and the retry stores one set of rows', async () => {
     const id = await upload('ok');
-    const name = parser.requests.length;
+    const requestsBefore = parser.requests.length;
     const fileName = (await importRecord(id)).fileName;
     parser.busyOnce.add(fileName);
 
@@ -241,7 +241,7 @@ describe('statement import processing bounds', () => {
     expect(await rowCount(id)).toBe(0);
 
     expect(await tickUntilHandled(id)).toBe('ready_for_review');
-    expect(parser.requests.length).toBeGreaterThanOrEqual(name + 2);
+    expect(parser.requests.length).toBeGreaterThanOrEqual(requestsBefore + 2);
     expect(await rowCount(id)).toBe(2);
 
     // The same import delivered once more (as after a worker restart) replaces its rows.
