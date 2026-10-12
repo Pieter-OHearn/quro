@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { loadConfig, PROFILES, type Environment, type Profile } from './index';
-import { featureManifest, retiredManifest, settingsManifest } from './manifest';
-import { FEATURES, RETIRED_SETTINGS, SETTINGS, type SettingName } from './settings';
+import { featureManifest, settingsManifest } from './manifest';
+import { FEATURES, SETTINGS, type SettingName } from './settings';
 
 const ROOT = join(import.meta.dir, '../../../..');
 const manifest = settingsManifest();
@@ -42,14 +42,6 @@ describe('settings manifest', () => {
       expect(entry.default ?? '').not.toMatch(
         /^(db|minio|backend|pension-parser)$|:\/\/(db|minio|backend|pension-parser)\b/,
       );
-    }
-  });
-
-  test('retired settings never reappear as settings', () => {
-    for (const retired of Object.keys(RETIRED_SETTINGS)) expect(names).not.toContain(retired);
-    expect(retiredManifest().map((entry) => entry.name)).toEqual(Object.keys(RETIRED_SETTINGS));
-    for (const replacement of Object.values(RETIRED_SETTINGS)) {
-      for (const name of replacement.split(' and ')) expect(names).toContain(name);
     }
   });
 

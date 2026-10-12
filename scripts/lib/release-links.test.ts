@@ -267,7 +267,7 @@ describe('absoluteRepositoryLinks', () => {
     for (const destination of destinations) {
       expect(destination).toMatch(/^(https:\/\/|#)/);
     }
-    expect(rewritten).toContain(`](${BLOB}/docs/upgrade.md#auto-updater-removed)`);
+    expect(rewritten).toContain(`](${BLOB}/docs/upgrade.md#how-upgrades-work)`);
     // Only link destinations change.
     expect(rewritten.replaceAll(`${BLOB}/`, '')).toBe(section);
   });

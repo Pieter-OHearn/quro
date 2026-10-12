@@ -1,4 +1,5 @@
 import { ChartCard } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { ArrowUpRight } from 'lucide-react';
 import {
   BarChart,
@@ -66,6 +67,7 @@ export function SalaryHistoryChart({
   fmtBase,
   baseCurrency,
 }: Readonly<SalaryHistoryChartProps>) {
+  const { numberFormat } = useCurrency();
   const chartData = data.map((entry) => ({ ...entry, deductions: entry.gross - entry.net }));
 
   return (
@@ -79,8 +81,8 @@ export function SalaryHistoryChart({
           <div className="mt-3 flex items-center gap-2 bg-success-soft rounded-xl p-3">
             <ArrowUpRight size={16} className="text-success" />
             <p className="text-xs text-success-fg">
-              Salary has grown by <strong>+{formatPercent(growthPct, 0)}</strong> since{' '}
-              {data[0].year}
+              Salary has grown by <strong>+{formatPercent(growthPct, numberFormat, 0)}</strong>{' '}
+              since {data[0].year}
             </p>
           </div>
         ) : undefined

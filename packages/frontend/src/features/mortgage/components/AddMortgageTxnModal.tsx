@@ -126,6 +126,7 @@ function ValuationPreview({
   mortgage,
   fmt,
 }: Pick<LivePreviewProps, 'parsedAmount' | 'mortgage' | 'fmt'>) {
+  const { numberFormat } = useCurrency();
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs">
@@ -152,7 +153,7 @@ function ValuationPreview({
       <div className="flex justify-between text-xs border-t border-success-soft-strong pt-1.5 mt-1">
         <span className="text-fg-muted">New LTV</span>
         <span className="font-semibold text-fg-emphasis">
-          {formatPercent((mortgage.outstandingBalance / parsedAmount) * 100, 1)}
+          {formatPercent((mortgage.outstandingBalance / parsedAmount) * 100, numberFormat, 1)}
         </span>
       </div>
     </div>

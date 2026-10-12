@@ -1,4 +1,5 @@
 import { formatPercent, type Goal } from '@quro/shared';
+import { useCurrency } from '@/lib/CurrencyContext';
 import type { GoalProgressContext } from '../types';
 import { STATUS_META } from '../utils/goals-constants';
 import {
@@ -15,6 +16,7 @@ type GlanceItemProps = {
 };
 
 function GlanceItem({ goal, goalProgressContext, currentYear }: Readonly<GlanceItemProps>) {
+  const { numberFormat } = useCurrency();
   const pct = getGoalPct(goal, goalProgressContext);
   const status = getGoalStatus(goal, goalProgressContext, currentYear);
   const type = normalizeGoalType(goal);
@@ -28,7 +30,7 @@ function GlanceItem({ goal, goalProgressContext, currentYear }: Readonly<GlanceI
           <span className="text-xs font-semibold text-fg-subtle flex-shrink-0 ml-2">
             {type === 'invest_habit'
               ? `${resolveInvestHabitMonthsCompleted(goal, goalProgressContext)}/${goal.totalMonths ?? 12}mo`
-              : formatPercent(pct, 0)}
+              : formatPercent(pct, numberFormat, 0)}
           </span>
         </div>
         <div className="w-full h-1.5 bg-surface-muted rounded-full overflow-hidden">

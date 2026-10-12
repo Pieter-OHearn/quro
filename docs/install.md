@@ -2,7 +2,7 @@
 
 This guide installs Quro on one host with Docker Compose, from the release images and the example Compose file. It also covers an existing PostgreSQL server or S3-compatible store, the `quro` commands and what each one changes. The [install contract](install-contract.md) explains the decisions behind it.
 
-The steps apply from 0.8.0. Images up to 0.7.0 have no `quro init`, `migrate` or `doctor` commands. CI runs these steps from empty directories on amd64 and arm64 for every change (`scripts/clean-install/run.sh`).
+The steps apply from 0.8.0. CI runs these steps from empty directories on amd64 and arm64 for every change (`scripts/clean-install/run.sh`).
 
 ## Before you start
 
@@ -88,7 +88,7 @@ The example Compose file runs every service without the Linux capabilities it do
 
 ## Existing PostgreSQL server
 
-PostgreSQL 16, 17 and 18 are supported. Do steps 1 to 3 of [Install](#install), then:
+PostgreSQL 18 is the only supported server; `quro migrate` refuses any other major with exit code 3. Do steps 1 to 3 of [Install](#install), then:
 
 1. In `compose.yaml`, delete the `db` service and the `depends_on` block of the `migrate` service, which waits for it. The `postgres` volume is then unused; delete it too, or leave it.
 2. Point the settings in `config/quro.env` at your server: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_ADMIN_USER` and `POSTGRES_APP_USER`, and `POSTGRES_SSLMODE` (for example `require`) for a server on another machine. The containers reach the host through `POSTGRES_HOST`, so use an address they can reach: a name or IP address on your network, not `localhost`. For a server on the Docker host itself, Docker Desktop provides `host.docker.internal`; on Linux, use the host's address on your network, and make sure PostgreSQL listens on it and `pg_hba.conf` allows the Docker network.
@@ -155,7 +155,7 @@ Exit codes, for scripts and orchestrators:
 | ---- | ----------------------------------------------------------------------------------------------------------------------------- |
 | 0    | Done, or nothing to do                                                                                                        |
 | 1    | The operation failed; read the output                                                                                         |
-| 2    | Usage or settings are invalid, including retired settings that must be replaced. Nothing was changed                          |
+| 2    | Usage or settings are invalid. Nothing was changed                                                                            |
 | 3    | A safety check refused: schema newer than the image, missing database privileges, unsupported PostgreSQL. Nothing was changed |
 | 4    | The database or document store cannot be reached; retry later                                                                 |
 
@@ -171,4 +171,4 @@ No command prints a password, a secret file's contents or a connection string wi
 
 ## Upgrades
 
-Quro does not update itself. To upgrade, read the upgrade notes of every version you skip, take a backup with the old version (see [backup and restore](backup-and-restore.md)), change the image tags in `compose.yaml`, then run `docker compose up -d`; `migrate` applies the new migrations before the backend starts. [Upgrade Quro](upgrade.md) has the steps, how to roll back, and the interfaces for automating it. Upgrading from 0.7.0 or earlier follows [Upgrade from 0.7.0 to 0.8.0](upgrade.md#upgrade-from-070-to-080).
+Quro does not update itself. To upgrade, read the upgrade notes of every version you skip, take a backup with the old version (see [backup and restore](backup-and-restore.md)), change the image tags in `compose.yaml`, then run `docker compose up -d`; `migrate` applies the new migrations before the backend starts. [Upgrade Quro](upgrade.md) has the steps, how to roll back, and the interfaces for automating it. Upgrades are supported from 0.8.0 on.

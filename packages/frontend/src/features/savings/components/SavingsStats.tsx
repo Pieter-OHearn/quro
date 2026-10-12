@@ -1,4 +1,5 @@
 import { StatCard, StatsGrid } from '@/components/ui';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { ArrowUpRight, Percent, PiggyBank, TrendingUp } from 'lucide-react';
 import { formatPercent, type SavingsAccount, type SavingsTransaction } from '@quro/shared';
 import type { SavingsFormatFn } from '../types';
@@ -20,6 +21,7 @@ export function SavingsStats({
   transactions,
   fmtBase,
 }: Readonly<SavingsStatsProps>) {
+  const { numberFormat } = useCurrency();
   return (
     <StatsGrid className="grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3">
       <StatCard
@@ -44,7 +46,7 @@ export function SavingsStats({
       />
       <StatCard
         label="Avg. Interest Rate"
-        value={formatPercent(avgRate, 2)}
+        value={formatPercent(avgRate, numberFormat, 2)}
         icon={Percent}
         color="emerald"
         layout="inline"

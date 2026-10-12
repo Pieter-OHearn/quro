@@ -5,7 +5,7 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { buildDebtOverview } from '../utils/debt-metrics';
 
 export function SummaryBanner({ debts }: Readonly<{ debts: readonly Debt[] }>) {
-  const { fmtBase, convertToBase } = useCurrency();
+  const { fmtBase, convertToBase, numberFormat } = useCurrency();
   const overview = useMemo(() => buildDebtOverview(debts, convertToBase), [debts, convertToBase]);
 
   return (
@@ -29,12 +29,12 @@ export function SummaryBanner({ debts }: Readonly<{ debts: readonly Debt[] }>) {
             { label: 'Monthly Payments', value: fmtBase(overview.totalMonthlyPayment), icon: '📅' },
             {
               label: 'Avg Interest',
-              value: `${formatPercent(overview.averageInterestRate, 2)} APR`,
+              value: `${formatPercent(overview.averageInterestRate, numberFormat, 2)} APR`,
               icon: '📊',
             },
             {
               label: 'Highest Rate',
-              value: `${formatPercent(overview.highestInterestRate, 2)} APR`,
+              value: `${formatPercent(overview.highestInterestRate, numberFormat, 2)} APR`,
               icon: '⚠️',
             },
           ].map((metric) => (

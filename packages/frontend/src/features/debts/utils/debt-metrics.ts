@@ -1,4 +1,4 @@
-import { monthlyInterest, monthsToPayoff, roundMoney, type Debt } from '@quro/shared';
+import { monthlyInterest, monthsToPayoff, roundMoney, sumMoney, type Debt } from '@quro/shared';
 
 export type DebtOverview = {
   debtCount: number;
@@ -80,29 +80,21 @@ export function buildDebtOverview(
   debts: readonly Debt[],
   convertToBase: (amount: number, currency: string) => number,
 ): DebtOverview {
-  const totals = debts.reduce(
-    (acc, debt) => {
-      const balance = convertToBase(debt.remainingBalance, debt.currency);
-      acc.totalBalance += balance;
-      acc.totalMonthlyPayment += convertToBase(debt.monthlyPayment, debt.currency);
-      acc.highestInterestRate = Math.max(acc.highestInterestRate, debt.interestRate);
-      acc.weightedInterestTotal += debt.interestRate * balance;
-      return acc;
-    },
-    {
-      totalBalance: 0,
-      totalMonthlyPayment: 0,
-      highestInterestRate: 0,
-      weightedInterestTotal: 0,
-    },
+  const balances = debts.map((debt) => convertToBase(debt.remainingBalance, debt.currency));
+  const unroundedBalance = balances.reduce((sum, balance) => sum + balance, 0);
+  const weightedInterestTotal = debts.reduce(
+    (sum, debt, index) => sum + debt.interestRate * balances[index],
+    0,
   );
 
   return {
     debtCount: debts.length,
-    totalBalance: totals.totalBalance,
-    totalMonthlyPayment: totals.totalMonthlyPayment,
-    averageInterestRate:
-      totals.totalBalance > 0 ? totals.weightedInterestTotal / totals.totalBalance : 0,
-    highestInterestRate: totals.highestInterestRate,
+    // Money totals are sums of cents, like the dashboard's liabilities.
+    totalBalance: sumMoney(balances),
+    totalMonthlyPayment: sumMoney(
+      debts.map((debt) => convertToBase(debt.monthlyPayment, debt.currency)),
+    ),
+    averageInterestRate: unroundedBalance > 0 ? weightedInterestTotal / unroundedBalance : 0,
+    highestInterestRate: debts.reduce((highest, debt) => Math.max(highest, debt.interestRate), 0),
   };
 }

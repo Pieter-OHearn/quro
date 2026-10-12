@@ -23,8 +23,8 @@ import {
 
 export const DOCTOR_USAGE = `Usage: quro doctor [--json]
 
-Read-only checks: host and runtime, settings (including retired ones), both database roles,
-the schema against this image, the backup tool version and the document store. Changes nothing.
+Read-only checks: host and runtime, settings, both database roles, the schema against this
+image, the backup tool version and the document store. Changes nothing.
 
 Options:
   --json   Print one JSON report instead of text

@@ -103,18 +103,21 @@ const buildSalarySubtext = (
   goal: Goal,
   annualGross: number,
   toBase: (n: number) => number,
+  numberFormat: ReturnType<typeof useCurrency>['numberFormat'],
 ): string => {
   if (annualGross <= 0) return 'Add a payslip to track this goal';
   const raisePct = (toBase(goal.targetAmount || 0) / annualGross - 1) * 100;
   if (raisePct <= 0) return 'Target reached';
-  return `+${formatPercent(raisePct, 1)} raise needed`;
+  return `+${formatPercent(raisePct, numberFormat, 1)} raise needed`;
 };
 
 const buildInvestHabitSubtext = (goal: Goal, context: GoalProgressContext): string =>
   `${resolveInvestHabitMonthsCompleted(goal, context)} of ${goal.totalMonths ?? 12} months hit`;
 
-const buildAnnualSubtext = (clampedPct: number): string =>
-  `currently ${formatPercent(clampedPct, 0)}`;
+const buildAnnualSubtext = (
+  clampedPct: number,
+  numberFormat: ReturnType<typeof useCurrency>['numberFormat'],
+): string => `currently ${formatPercent(clampedPct, numberFormat, 0)}`;
 
 const buildAmountSubtext = (
   goal: Goal,
@@ -122,6 +125,7 @@ const buildAmountSubtext = (
   clampedPct: number,
   fmtBase: CompactFormatFn,
   toBase: (n: number) => number,
+  numberFormat: ReturnType<typeof useCurrency>['numberFormat'],
 ): string => {
   const monthlyContrib = toBase(goal.monthlyContribution || 0);
   const remaining = Math.max(0, toBase(goal.targetAmount || 0) - currentAmount);
@@ -129,7 +133,7 @@ const buildAmountSubtext = (
     const monthsLeft = Math.ceil(remaining / monthlyContrib);
     return `${monthsLeft} months left at ${fmtBase(monthlyContrib)}/mo`;
   }
-  return `${formatPercent(clampedPct, 0)} complete`;
+  return `${formatPercent(clampedPct, numberFormat, 0)} complete`;
 };
 
 const buildGoalSubtext = (
@@ -140,19 +144,20 @@ const buildGoalSubtext = (
   context: GoalProgressContext,
   fmtBase: CompactFormatFn,
   toBase: (n: number) => number,
+  numberFormat: ReturnType<typeof useCurrency>['numberFormat'],
 ): string => {
   const notes = goal.notes.trim();
   if (notes.length > 0) return notes;
 
   switch (type) {
     case 'salary':
-      return buildSalarySubtext(goal, context.annualGross, toBase);
+      return buildSalarySubtext(goal, context.annualGross, toBase, numberFormat);
     case 'invest_habit':
       return buildInvestHabitSubtext(goal, context);
     case 'annual':
-      return buildAnnualSubtext(clampedPct);
+      return buildAnnualSubtext(clampedPct, numberFormat);
     default:
-      return buildAmountSubtext(goal, currentAmount, clampedPct, fmtBase, toBase);
+      return buildAmountSubtext(goal, currentAmount, clampedPct, fmtBase, toBase, numberFormat);
   }
 };
 
@@ -204,6 +209,7 @@ function GoalProgressItem({
           goalProgressContext,
           fmtBase,
           toBase,
+          numberFormat,
         );
 
   return (

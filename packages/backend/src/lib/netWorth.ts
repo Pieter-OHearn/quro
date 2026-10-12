@@ -1,5 +1,12 @@
 import { getPropertyDebt } from './propertyDebt';
-import type { AssetAllocation, DashboardAllocationsSummary, AllocationKey } from '@quro/shared';
+import {
+  holdingValue,
+  netHoldingShares,
+  sumMoney,
+  type AssetAllocation,
+  type DashboardAllocationsSummary,
+  type AllocationKey,
+} from '@quro/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
@@ -37,32 +44,30 @@ type MortgageRow = { id: number; outstandingBalance: unknown };
 type DebtRow = MoneyRow & { remainingBalance: unknown };
 
 function computeSharesByHolding(txns: readonly HoldingTransactionRow[]): Map<number, number> {
-  const shares = new Map<number, number>();
+  const byHolding = new Map<number, Array<{ type: string; shares: number }>>();
   for (const transaction of txns) {
-    const current = shares.get(transaction.holdingId) ?? 0;
-    const delta = toNumberOrZero(transaction.shares);
-    if (transaction.type === 'buy') shares.set(transaction.holdingId, current + delta);
-    if (transaction.type === 'sell') shares.set(transaction.holdingId, current - delta);
+    const rows = byHolding.get(transaction.holdingId) ?? [];
+    rows.push({ type: transaction.type, shares: toNumberOrZero(transaction.shares) });
+    byHolding.set(transaction.holdingId, rows);
   }
-  return shares;
+  return new Map([...byHolding].map(([holdingId, rows]) => [holdingId, netHoldingShares(rows)]));
 }
 
-// Current value of all holdings (net shares × current price), converted with
-// `convert`. Holdings that are net short are floored at zero.
+// Current value of all holdings, converted with `convert` and summed in cents. Each holding is
+// worth its net shares (floored at zero) × its unrounded current price, rounded to cents once.
 export function sumBrokerageValue(
   holdingRows: readonly HoldingRow[],
   transactions: readonly HoldingTransactionRow[],
   convert: (amount: number, currency: string) => number,
 ): number {
   const shares = computeSharesByHolding(transactions);
-  return holdingRows.reduce(
-    (sum, holding) =>
-      sum +
+  return sumMoney(
+    holdingRows.map((holding) =>
       convert(
-        Math.max(0, shares.get(holding.id) ?? 0) * toNumberOrZero(holding.currentPrice),
+        holdingValue(shares.get(holding.id) ?? 0, toNumberOrZero(holding.currentPrice)),
         holding.currency,
       ),
-    0,
+    ),
   );
 }
 
@@ -87,26 +92,30 @@ export function computeDerivedAllocations(
 ): DerivedAllocationSummary {
   const convert = (amount: number, currency: string) =>
     convertToBaseCurrency(amount, currency, rates);
-  const savings = userSavings.reduce(
-    (sum, account) => sum + convert(toNumberOrZero(account.balance), account.currency),
-    0,
+  // Every component is a sum of cents: each row is converted to EUR and rounded once, so a
+  // component equals the sum of its rows' rounded amounts and the totals add up exactly.
+  const savings = sumMoney(
+    userSavings.map((account) => convert(toNumberOrZero(account.balance), account.currency)),
   );
   const brokerage = sumBrokerageValue(userHoldings, userHoldingTxns, convert);
   const mortgageById = new Map(
     userMortgages.map((mortgage) => [mortgage.id, toNumberOrZero(mortgage.outstandingBalance)]),
   );
-  const propertyEquity = userProperties.reduce((sum, property) => {
-    const mortgage = getPropertyDebt(property, mortgageById);
-    return sum + convert(toNumberOrZero(property.currentValue) - mortgage, property.currency);
-  }, 0);
-  const pension = userPensions.reduce(
-    (sum, pot) => sum + convert(toNumberOrZero(pot.balance), pot.currency),
-    0,
+  const propertyEquity = sumMoney(
+    userProperties.map((property) =>
+      convert(
+        toNumberOrZero(property.currentValue) - getPropertyDebt(property, mortgageById),
+        property.currency,
+      ),
+    ),
   );
-  const liabilitiesTotal = userDebts.reduce(
-    (sum, debt) => sum + convert(toNumberOrZero(debt.remainingBalance), debt.currency),
-    0,
+  const pension = sumMoney(
+    userPensions.map((pot) => convert(toNumberOrZero(pot.balance), pot.currency)),
   );
+  const liabilitiesTotal = sumMoney(
+    userDebts.map((debt) => convert(toNumberOrZero(debt.remainingBalance), debt.currency)),
+  );
+  const totalAssets = sumMoney([savings, brokerage, propertyEquity, pension]);
 
   return {
     allocations: [
@@ -116,8 +125,8 @@ export function computeDerivedAllocations(
       allocation(4, 'pension', 'Pension', pension),
     ],
     currency: FX_BASE_CURRENCY,
-    netWorth: savings + brokerage + propertyEquity + pension - liabilitiesTotal,
-    totalAssets: savings + brokerage + propertyEquity + pension,
+    netWorth: sumMoney([totalAssets, -liabilitiesTotal]),
+    totalAssets,
     portfolioTotal: brokerage,
     liabilitiesCurrency: FX_BASE_CURRENCY,
     liabilitiesTotal,

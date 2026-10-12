@@ -37,6 +37,7 @@ function PropertyStatsPreview({
   currency,
   fmtNative,
 }: PropertyStatsPreviewProps) {
+  const { numberFormat } = useCurrency();
   return (
     <div className="bg-surface-sunken rounded-xl p-3 space-y-1.5">
       <div className="flex justify-between text-xs">
@@ -50,7 +51,7 @@ function PropertyStatsPreview({
         <span className={`font-semibold ${appreciation >= 0 ? 'text-success' : 'text-danger'}`}>
           {appreciation >= 0 ? '+' : ''}
           {fmtNative(appreciation, currency)} ({appreciationPct >= 0 ? '+' : ''}
-          {formatPercent(appreciationPct, 1)})
+          {formatPercent(appreciationPct, numberFormat, 1)})
         </span>
       </div>
     </div>

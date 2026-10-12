@@ -136,8 +136,7 @@ The bundled nginx overwrites `X-Real-IP` with its peer and appends its peer to `
 - **Mode A**: the backend's peer is nginx and nginx's peer is the browser. The Compose default
   `172.16.0.0/12` is Docker's default network range, which covers nginx. If your home network
   itself uses `172.16.0.0/12` addresses, set `TRUSTED_PROXIES` to the Compose network's subnet
-  instead (`docker network inspect` shows it). Releases up to 0.7.0 defaulted to every private
-  range; if you copied that value into your configuration, replace it.
+  instead (`docker network inspect` shows it).
 - **Mode B**: nginx's peer is your TLS proxy. If the proxy runs on the Docker host or in a Docker
   network, nginx sees a `172.16.0.0/12` address and the default works. If it runs on another
   machine, add its address, for example `TRUSTED_PROXIES=172.16.0.0/12,192.168.1.10`. If Docker
@@ -211,9 +210,6 @@ person signing up needs to know why it failed; the sign-up rate limit bounds pro
   other browser.
 - Changing the password signs out every other session. A password reset signs out all of them.
 - Sessions are deleted with their account.
-
-Upgrading from 0.7.0, migration `0038` replaces each stored token with its digest. Browsers stay
-signed in.
 
 ## Operator recovery without email
 

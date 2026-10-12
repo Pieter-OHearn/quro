@@ -10,7 +10,13 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import { todayIsoDate, type Holding, type HoldingTransaction } from '@quro/shared';
+import {
+  previewHoldingTrade,
+  sumMoney,
+  todayIsoDate,
+  type Holding,
+  type HoldingTransaction,
+} from '@quro/shared';
 import type { SaveHoldingTxnInput } from '../types';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
@@ -419,6 +425,7 @@ function TxnFormBody(props: TxnFormBodyProps) {
   );
 }
 
+// Previews use the shared position rule, so they match the position once the trade is saved.
 function computeNextAverageCost(
   type: HoldingTxnType,
   parsedShares: number,
@@ -426,8 +433,8 @@ function computeNextAverageCost(
   currentPosition: Position,
 ): number {
   if (type !== 'buy' || parsedShares <= 0 || parsedPrice <= 0) return currentPosition.avgCost;
-  const newTotal = currentPosition.shares * currentPosition.avgCost + parsedShares * parsedPrice;
-  return newTotal / (currentPosition.shares + parsedShares);
+  return previewHoldingTrade(currentPosition, { type, shares: parsedShares, price: parsedPrice })
+    .avgCost;
 }
 
 function computeRealizedGainEstimate(
@@ -437,7 +444,12 @@ function computeRealizedGainEstimate(
   currentPosition: Position,
 ): number {
   if (type !== 'sell' || parsedShares <= 0 || parsedPrice <= 0) return 0;
-  return (parsedPrice - currentPosition.avgCost) * parsedShares;
+  const next = previewHoldingTrade(currentPosition, {
+    type,
+    shares: parsedShares,
+    price: parsedPrice,
+  });
+  return sumMoney([next.realizedGain, -currentPosition.realizedGain]);
 }
 
 function buildInitialHoldingTxnValues(

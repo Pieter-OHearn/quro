@@ -117,14 +117,12 @@ describe('quro doctor', () => {
     expect(run.out).not.toContain('postgres://');
   });
 
-  test('lists retired settings without their values and still passes', async () => {
-    const retiredValue = `retired-${randomBytes(8).toString('hex')}`;
-    const run = await report(settingsFor(migrated, { POSTGRES_PASSWORD: retiredValue }));
+  test('ignores a setting of an earlier release without printing its value', async () => {
+    const oldValue = `old-${randomBytes(8).toString('hex')}`;
+    const run = await report(settingsFor(migrated, { POSTGRES_PASSWORD: oldValue }));
     expect(run.exitCode).toBe(EXIT_OK);
-    const check = run.report.checks.find((item) => item.id === 'settings.POSTGRES_PASSWORD');
-    expect(check).toMatchObject({ status: 'warn' });
-    expect(check?.message).toContain('POSTGRES_APP_PASSWORD_FILE');
-    expect(run.out).not.toContain(retiredValue);
+    expect(run.report.checks.some((item) => item.id === 'settings.POSTGRES_PASSWORD')).toBe(false);
+    expect(run.out).not.toContain(oldValue);
   });
 
   test('reports a schema behind the image (exit 1) and changes nothing', async () => {

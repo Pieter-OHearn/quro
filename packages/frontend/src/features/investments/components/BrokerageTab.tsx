@@ -1,4 +1,5 @@
 import { useSortedRows } from '@/hooks/useSortedRows';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { useMemo, useState } from 'react';
 import {
   Archive,
@@ -13,6 +14,8 @@ import {
 } from 'lucide-react';
 import {
   formatItemType,
+  holdingValue,
+  sumMoney,
   type Holding,
   type HoldingPriceSyncResult,
   type HoldingTransaction,
@@ -234,9 +237,9 @@ function computeHoldingRowMetrics(
   isForeign: (currency: string) => boolean,
 ): HoldingRowMetrics {
   const price = getEffectivePrice(holding);
-  const nativeValue = position.shares * price;
+  const nativeValue = holdingValue(position.shares, price);
   const valueInBase = convertToBase(nativeValue, holding.currency);
-  const gain = (price - position.avgCost) * position.shares;
+  const gain = sumMoney([nativeValue, -position.costBasis]);
   const gainPctHolding =
     position.avgCost > 0 ? ((price - position.avgCost) / position.avgCost) * 100 : 0;
   const foreign = isForeign(holding.currency);
@@ -292,6 +295,7 @@ type HoldingGainCellProps = {
 };
 
 function HoldingGainCell({ gain, gainPctHolding, holding, fmtNative }: HoldingGainCellProps) {
+  const { numberFormat } = useCurrency();
   return (
     <div className={`col-span-2 text-right ${gain >= 0 ? 'text-success' : 'text-danger'}`}>
       <div className="flex items-center justify-end gap-0.5">
@@ -303,7 +307,7 @@ function HoldingGainCell({ gain, gainPctHolding, holding, fmtNative }: HoldingGa
       </div>
       <p className="text-xs">
         {gainPctHolding >= 0 ? '+' : ''}
-        {formatPercent(gainPctHolding, 1)}
+        {formatPercent(gainPctHolding, numberFormat, 1)}
       </p>
     </div>
   );
@@ -505,6 +509,7 @@ function BrokerageSummary({
   gainPct,
   fmtBase,
 }: BrokerageSummaryProps) {
+  const { numberFormat } = useCurrency();
   return (
     <div className="flex items-center justify-between px-6 py-4 border-t border-border-subtle bg-surface-sunken/60">
       <div>
@@ -522,7 +527,7 @@ function BrokerageSummary({
           {totalGainBase >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
           <p className="font-bold">
             {totalGainBase >= 0 ? '+' : ''}
-            {fmtBase(Math.abs(totalGainBase))} ({formatPercent(gainPct, 1)})
+            {fmtBase(Math.abs(totalGainBase))} ({formatPercent(gainPct, numberFormat, 1)})
           </p>
         </div>
       </div>
@@ -657,10 +662,11 @@ function computeClosedHoldingMetrics(
     .filter((txn) => txn.type === 'sell' && Number(txn.shares ?? 0) > 0)
     .sort((a, b) => b.date.localeCompare(a.date));
   const lastSellPrice = sellTxns[0]?.price ?? null;
-  const costBasis = txns.reduce((sum, txn) => {
-    if (txn.type !== 'buy') return sum;
-    return sum + Number(txn.shares ?? 0) * txn.price;
-  }, 0);
+  const costBasis = sumMoney(
+    txns
+      .filter((txn) => txn.type === 'buy')
+      .map((txn) => holdingValue(Number(txn.shares ?? 0), txn.price)),
+  );
   const realizedPct = costBasis > 0 ? (position.realizedGain / costBasis) * 100 : 0;
   return { txnCount, lastSellPrice, costBasis, realizedPct };
 }
@@ -764,6 +770,7 @@ function ClosedHoldingRealizedCell({
   holding: Holding;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 }) {
+  const { numberFormat } = useCurrency();
   return (
     <DataTableCell
       columnKey="realized"
@@ -778,7 +785,9 @@ function ClosedHoldingRealizedCell({
           </p>
         </div>
         <p className="text-xs">
-          {costBasis > 0 ? `${realizedPct >= 0 ? '+' : ''}${formatPercent(realizedPct, 1)}` : '—'}
+          {costBasis > 0
+            ? `${realizedPct >= 0 ? '+' : ''}${formatPercent(realizedPct, numberFormat, 1)}`
+            : '—'}
         </p>
       </div>
     </DataTableCell>
@@ -994,13 +1003,15 @@ function buildClosedHoldingsSummary(
   const uniqueCurrencies = [...new Set(closedHoldings.map((holding) => holding.currency))];
   const singleCurrency = uniqueCurrencies.length === 1 ? uniqueCurrencies[0] : null;
 
-  const totalClosedRealizedBase = closedHoldings.reduce(
-    (sum, holding) => sum + convertToBase(positions[holding.id].realizedGain, holding.currency),
-    0,
+  const totalClosedRealizedBase = sumMoney(
+    closedHoldings.map((holding) =>
+      convertToBase(positions[holding.id].realizedGain, holding.currency),
+    ),
   );
-  const totalClosedDividendsBase = closedHoldings.reduce(
-    (sum, holding) => sum + convertToBase(positions[holding.id].totalDividends, holding.currency),
-    0,
+  const totalClosedDividendsBase = sumMoney(
+    closedHoldings.map((holding) =>
+      convertToBase(positions[holding.id].totalDividends, holding.currency),
+    ),
   );
 
   if (!singleCurrency) {
@@ -1010,13 +1021,11 @@ function buildClosedHoldingsSummary(
     };
   }
 
-  const totalClosedRealizedNative = closedHoldings.reduce(
-    (sum, holding) => sum + positions[holding.id].realizedGain,
-    0,
+  const totalClosedRealizedNative = sumMoney(
+    closedHoldings.map((holding) => positions[holding.id].realizedGain),
   );
-  const totalClosedDividendsNative = closedHoldings.reduce(
-    (sum, holding) => sum + positions[holding.id].totalDividends,
-    0,
+  const totalClosedDividendsNative = sumMoney(
+    closedHoldings.map((holding) => positions[holding.id].totalDividends),
   );
 
   return {

@@ -1,5 +1,5 @@
 -- Synthetic household for scripts/recovery-drill.sh, added on top of the demo seed and
--- scripts/fixtures/pg-upgrade-synthetic.sql. Invented values only. It adds what a restore must
+-- scripts/fixtures/edge-case-rows.sql. Invented values only. It adds what a restore must
 -- keep apart: a partner with an accepted link, a joint account the demo user sees and a private
 -- one they must not see, and ledgers whose size is set with `-v rows=<n>` (default 1000) for the
 -- recovery time measurement. Runs as the admin role.

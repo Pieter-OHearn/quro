@@ -1,4 +1,10 @@
-import { toUtcTimestamp, type PensionPot, type PensionTransaction } from '@quro/shared';
+import {
+  pensionTransactionDelta,
+  sumMoney,
+  toUtcTimestamp,
+  type PensionPot,
+  type PensionTransaction,
+} from '@quro/shared';
 import { ANNUAL_GROWTH_RATE, DRAWDOWN_YEARS } from '../constants';
 import type { ConvertToBaseFn, DatedPensionTransaction, PensionGrowthPoint } from '../types';
 
@@ -22,22 +28,12 @@ export function yearEndUtc(year: number): number {
   );
 }
 
-function signedPensionTxnAmount(txn: Pick<PensionTransaction, 'type' | 'amount'>): number {
-  if (txn.type === 'fee') return -txn.amount;
-  if (txn.type === 'annual_statement') return txn.amount;
-  return txn.amount;
-}
-
-function pensionTxnDelta(txn: Pick<PensionTransaction, 'type' | 'amount' | 'taxAmount'>): number {
-  if (txn.type === 'contribution') return txn.amount - txn.taxAmount;
-  return signedPensionTxnAmount(txn);
-}
-
+/** A pot's balance as stored, the same figure the dashboard counts; a negative balance is kept. */
 export function computeCurrentPensionBalance(
   pot: PensionPot,
   _pensionTxns: PensionTransaction[],
 ): number {
-  return Math.max(0, pot.balance);
+  return pot.balance;
 }
 
 export function computePensionTotals(
@@ -45,12 +41,9 @@ export function computePensionTotals(
   _pensionTxns: PensionTransaction[],
   convertToBase: ConvertToBaseFn,
 ): { totalInBase: number; totalMonthlyContribInBase: number } {
-  const totalInBase = pensions.reduce((sum, pot) => {
-    return sum + convertToBase(Math.max(0, pot.balance), pot.currency);
-  }, 0);
-  const totalMonthlyContribInBase = pensions.reduce(
-    (sum, pot) => sum + convertToBase(pot.employeeMonthly + pot.employerMonthly, pot.currency),
-    0,
+  const totalInBase = sumMoney(pensions.map((pot) => convertToBase(pot.balance, pot.currency)));
+  const totalMonthlyContribInBase = sumMoney(
+    pensions.map((pot) => convertToBase(pot.employeeMonthly + pot.employerMonthly, pot.currency)),
   );
 
   return { totalInBase, totalMonthlyContribInBase };
@@ -116,14 +109,17 @@ export function computePensionGrowthData(
     .reverse()
     .map((year) => {
       const cutoff = year === currentYear ? now : yearEndUtc(year);
-      const total = balances.reduce((sum, state) => {
-        while (state.index < state.txns.length && state.txns[state.index].timestamp > cutoff) {
-          state.netAfterCutoff += pensionTxnDelta(state.txns[state.index]);
-          state.index += 1;
-        }
-        const balance = Math.max(0, Math.max(0, state.pot.balance) - state.netAfterCutoff);
-        return sum + convertToBase(balance, state.pot.currency);
-      }, 0);
+      const total = sumMoney(
+        balances.map((state) => {
+          while (state.index < state.txns.length && state.txns[state.index].timestamp > cutoff) {
+            state.netAfterCutoff += pensionTransactionDelta(state.txns[state.index]);
+            state.index += 1;
+          }
+          // Like the net worth history, a past balance is floored at zero per pot.
+          const balance = Math.max(0, state.pot.balance - state.netAfterCutoff);
+          return convertToBase(balance, state.pot.currency);
+        }),
+      );
       return { year: String(year), value: total };
     })
     .reverse();

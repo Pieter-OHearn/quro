@@ -1,7 +1,11 @@
 /// <reference types="bun-types" />
 import { expect, test } from 'bun:test';
 import type { PensionPot, PensionTransaction } from '@quro/shared';
-import { computePensionGrowthData } from './pension-calculations';
+import {
+  computeCurrentPensionBalance,
+  computePensionGrowthData,
+  computePensionTotals,
+} from './pension-calculations';
 
 const pot = (id: number, balance: number, currency: PensionPot['currency']): PensionPot => ({
   id,
@@ -74,4 +78,33 @@ test('keeps non-negative balances and handles empty or entirely invalid historie
   expect(
     computePensionGrowthData(pots, [txn(1, `${year}-01-01`, 'contribution', 100)], identity),
   ).toEqual([{ year: String(year), value: 0 }]);
+});
+
+test('ignores transaction types the ledger does not know, like the server', () => {
+  const year = new Date().getUTCFullYear();
+  const legacy = {
+    ...txn(1, `${year}-01-01`, 'fee', 100),
+    type: 'transfer',
+  } as unknown as PensionTransaction;
+  // A transfer never moved the stored balance, so going back in time it changes nothing.
+  expect(
+    computePensionGrowthData(
+      [pot(1, 1000, 'EUR')],
+      [legacy, txn(1, `${year - 1}-01-01`, 'fee', 10)],
+      (amount) => amount,
+    ),
+  ).toEqual([
+    { year: String(year - 1), value: 1000 },
+    { year: String(year), value: 1000 },
+  ]);
+});
+
+test('counts a negative pot as stored, so the page total matches the dashboard', () => {
+  const pots = [pot(1, 30_000.5, 'EUR'), pot(2, -50, 'EUR'), pot(3, 1_000.01, 'GBP')];
+  expect(computeCurrentPensionBalance(pots[1]!, [])).toBe(-50);
+  // GBP at 1.18: 1,180.0118 rounds to 1,180.01, and the total is a sum of cents.
+  expect(
+    computePensionTotals(pots, [], (amount, currency) => amount * (currency === 'GBP' ? 1.18 : 1))
+      .totalInBase,
+  ).toBe(31_130.51);
 });

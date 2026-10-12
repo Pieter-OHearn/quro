@@ -2,7 +2,7 @@
 
 import { expect, test } from 'bun:test';
 import type { HoldingTransaction, Property } from '@quro/shared';
-import { computePositions, getPropertyOwnershipShare } from './position';
+import { computePositions, getPropertyOwnershipShare, isInvestmentProperty } from './position';
 
 const property = (isJoint: boolean): Property => ({ isJoint }) as Property;
 
@@ -34,9 +34,37 @@ test('groups positions without mixing holdings, mutating input, or reordering sa
   ];
   const before = structuredClone(transactions);
   expect(computePositions([{ id: 1 }, { id: 2 }, { id: 3 }], transactions)).toEqual({
-    1: { shares: 15, avgCost: 15, realizedGain: 75, totalDividends: 12 },
-    2: { shares: 0, avgCost: 0, realizedGain: 30, totalDividends: 0 },
-    3: { shares: 0, avgCost: 0, realizedGain: 0, totalDividends: 0 },
+    1: {
+      shares: 15,
+      costBasis: 225,
+      avgCost: 15,
+      realizedGain: 75,
+      totalDividends: 12,
+      lastTradePrice: 30,
+    },
+    2: {
+      shares: 0,
+      costBasis: 0,
+      avgCost: 0,
+      realizedGain: 30,
+      totalDividends: 0,
+      lastTradePrice: 60,
+    },
+    3: {
+      shares: 0,
+      costBasis: 0,
+      avgCost: 0,
+      realizedGain: 0,
+      totalDividends: 0,
+      lastTradePrice: null,
+    },
   });
   expect(transactions).toEqual(before);
+});
+
+test('offers rent and expense rows for the investment property types the API accepts', () => {
+  expect(
+    ['Buy-to-Let', 'buy-to-let', 'Rental', 'rental', ' Commercial '].map(isInvestmentProperty),
+  ).toEqual([true, true, true, true, true]);
+  expect(['primary_home', 'Primary Residence'].map(isInvestmentProperty)).toEqual([false, false]);
 });

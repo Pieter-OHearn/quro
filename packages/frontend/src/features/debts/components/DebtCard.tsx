@@ -123,7 +123,7 @@ function DebtBalanceSummary({ debt }: Readonly<{ debt: Debt }>) {
 }
 
 function DebtProgress({ debt }: Readonly<{ debt: Debt }>) {
-  const { fmtNative } = useCurrency();
+  const { fmtNative, numberFormat } = useCurrency();
   const paidAmount = calculateDebtPaidAmount(debt);
   const paidPercentage = calculateDebtPaidPercentage(debt);
 
@@ -131,7 +131,7 @@ function DebtProgress({ debt }: Readonly<{ debt: Debt }>) {
     <div className="mb-4">
       <div className="mb-1.5 flex items-center justify-between">
         <span className="text-[10px] text-fg-faint">
-          {formatPercent(paidPercentage, 0)} paid off
+          {formatPercent(paidPercentage, numberFormat, 0)} paid off
         </span>
         <span className="text-[10px] text-fg-faint">
           {fmtNative(paidAmount, debt.currency)} repaid
@@ -148,7 +148,7 @@ function DebtProgress({ debt }: Readonly<{ debt: Debt }>) {
 }
 
 function DebtMetricGrid({ debt, highInterest }: Readonly<{ debt: Debt; highInterest: boolean }>) {
-  const { fmtNative } = useCurrency();
+  const { fmtNative, numberFormat } = useCurrency();
   const payoffLabel = formatDebtPayoffLabel(debt);
 
   return (
@@ -156,7 +156,7 @@ function DebtMetricGrid({ debt, highInterest }: Readonly<{ debt: Debt; highInter
       {[
         {
           label: 'APR',
-          value: formatPercent(debt.interestRate, 2),
+          value: formatPercent(debt.interestRate, numberFormat, 2),
           icon: Percent,
           className: highInterest
             ? 'bg-danger-soft border-danger-soft-strong text-danger-hover'

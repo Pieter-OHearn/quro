@@ -282,8 +282,9 @@ Notable exports:
 - Import pipeline types: `PensionStatementImport`, `PensionStatementImportRow`, `PensionImportStatus`, `PensionImportConfidenceLabel`
 - Capabilities types: `AppCapabilities`, `AppCapabilityStatus`, `AppCapabilityReason`
 - Currency helpers: `CURRENCY_META`, `isCurrencyCode`, `CURRENCY_CODES`
-- Formatting: `formatNumber`, `formatCurrency`, `formatPercent` (`src/utils/index.ts`)
-- Money: `toCents`, `fromCents`, `roundMoney` (`src/utils/money.ts`); see [currency and monetary precision](#currency-and-monetary-precision)
+- Formatting: `formatNumber`, `formatCurrency`, `formatPercent` (`src/utils/index.ts`); all take the user's number format
+- Money: `toCents`, `fromCents`, `roundMoney`, `sumMoney` (`src/utils/money.ts`); see [currency and monetary precision](#currency-and-monetary-precision)
+- Domain rules the server and the pages share (`src/domain/`): the holding position (`computeHoldingPosition`, `netHoldingShares`, `holdingValue`), ledger signs (`pensionTransactionDelta`, `signedSavingsAmount`), the household share (`householdShare`) and `isInvestmentPropertyType`
 - Dates: `toIsoDate`, `toDateOnly` (UTC) and `todayIsoDate` (local calendar day) (`src/utils/date.ts`)
 - Loan maths and validation: `monthlyInterest`, `monthsToPayoff` (`src/utils/finance.ts`), and the `validate*` rules in `src/utils/validation.ts`
 
@@ -344,7 +345,7 @@ Every fractional value is stored as a PostgreSQL `numeric`; the schema has no fl
 
 Columns are declared with `numericAsNumber`, a custom type defined in `src/db/schema.ts`. It turns the driver's strings into numbers through `parseDriverNumeric` (`src/db/driverNumeric.ts`), which throws on a non-finite value, and leaves `null` as `null`, so public JSON stays numeric and null-preserving.
 
-Money arithmetic in code uses integer cents through `toCents`, `fromCents` and `roundMoney` from `@quro/shared` (see [the shared package](#6-the-quroshared-package)), rounding half away from zero once at the documented points, and money in a request is rounded to cents and bounded below 10^13 when it is parsed. Unit prices, share quantities, rates and percentages are not money and keep their precision. The policy, its rounding points and the ledger invariants are in [financial invariants](financial-invariants.md). Dashboard and runway totals are aggregated in EUR on the backend and converted once for display; amounts keep their native currency in storage, and a missing or invalid FX rate fails the calculation instead of assuming 1:1.
+Money arithmetic in code uses integer cents through `toCents`, `fromCents`, `roundMoney` and `sumMoney` from `@quro/shared` (see [the shared package](#6-the-quroshared-package)), rounding half away from zero once at the documented points, and money in a request is rounded to cents and bounded below 10^13 when it is parsed. Unit prices, share quantities, rates and percentages are not money and keep their precision. The policy, its rounding points and the ledger invariants are in [financial invariants](financial-invariants.md). Dashboard and runway totals are aggregated in EUR on the backend and converted once for display; amounts keep their native currency in storage, and a missing or invalid FX rate fails the calculation instead of assuming 1:1.
 
 ### Document storage
 
@@ -367,7 +368,7 @@ Every setting the backend reads is declared once, in `packages/backend/src/confi
 - **Fail fast, in full.** A process validates the sections it needs when it starts (`bootConfig('server')` for the API, `'worker'`, `'migrate'`, `'backup'`, `'restore'` and `'maintenance'` for the database commands) and exits with code 2 and one list of problems. The list names settings and never their values. A migration job does not need bunq, so its profile does not check it; a section that is invalid throws only when something reads it.
 - **Secrets are files.** Database and S3 secrets are read from the files named by `*_FILE` settings (defaults under `/run/secrets/`); a trailing newline is ignored and an empty file is an error. Values are wrapped in `Secret`, which prints as `[redacted]` and needs `.reveal()` to read, so logging the configuration cannot leak a credential.
 - **Optional features are all or nothing.** A feature such as S3 storage or bunq stays off until one of its settings is present, and then needs all of them; a half-configured feature stops startup instead of mounting half-working routes. S3 settings alone never select the S3 store: without `QRO_DOCUMENT_STORAGE` they stop every command (profiles all include the `documentStorage` section, which reads no secret), so documents in an existing store are never hidden behind an empty directory.
-- **Retired settings are not read.** Names from earlier releases are reported with the setting that replaces them (`config.notices`) and never used as a fallback.
+- **Old settings are not read.** Names from releases before 0.8.0 are unknown variables: they are never used as a fallback and not reported. `config.notices` carries the remaining non-fatal observations, such as a replaced wildcard CORS origin.
 - **The schema is the manifest.** `settingsManifest()` in `config/manifest.ts` lists every setting with its type, default, secrecy and requirement, generated from the same table; the installer and the configuration reference use it, and a test keeps the Compose files, the example files and the docs in step with it.
 
 To add a setting, add it to `SETTINGS`, read it in the section builder that owns it, and mention it in an example file or a doc. Tests that change settings use `applyTestSettings` (`src/test/config.ts`), which re-parses the configuration.

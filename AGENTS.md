@@ -31,7 +31,6 @@ run applicable checks before opening a PR and report commands, results and skipp
 | `bun run test:smoke`                        | Playwright browser tests; starts backend, migrates and seeds demo data in the selected DB                                |
 | `sh scripts/clean-install/run.sh`           | Install from empty volumes with `docs/compose.example.yaml`; Docker, builds images; loopback ports 18085-18086           |
 | `bun run build`                             | Frontend and backend builds                                                                                              |
-| `sh scripts/upgrade-fixture/upgrade.sh`     | Upgrade the synthetic 0.7.0 fixture to this checkout, compare data and documents; Docker, builds backend image; loopback |
 | `bun run ci:check`                          | Full suite, migrations, Python checks and dependency audits; isolated DB, Python tools and audit network access required |
 
 `ci:check`'s pre-commit mode skips DB tests; a passing hook is not full CI evidence.
@@ -47,7 +46,9 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 - Store monetary values as PostgreSQL `numeric`; the schema's `numericAsNumber`
   converts driver strings to finite numbers (`packages/backend/src/db/driverNumeric.ts`).
   Keep public JSON numeric and null-preserving. Money arithmetic in code uses integer cents
-  through shared `toCents`/`fromCents`/`roundMoney`; parse request money with `parseMoneyField`
+  through shared `toCents`/`fromCents`/`roundMoney`, totals through `sumMoney`; positions, ledger
+  signs, joint shares and property types come from `packages/shared/src/domain/`, never a local
+  copy. Parse request money with `parseMoneyField`
   (cents, below 10^13). Unit prices, quantities, rates and percentages are not money. Preserve
   nulls, negative equity, native currencies and provenance.
   Rounding points, ledger invariants and indicators: [financial invariants](docs/financial-invariants.md).
@@ -85,14 +86,15 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 ## Migration and UI boundaries
 
 - Generate schema changes with `bun run --filter '@quro/backend' db:generate` and
-  review the SQL with `packages/backend/src/db/migrations/meta/`. Declare what a migration does
-  to existing tables in `scripts/upgrade-fixture/expectations.ts` ([upgrade test](docs/upgrade-fixture.md)). Migrate with admin
-  credentials and run the app with runtime credentials. Do not rewrite applied migrations, guess
-  repairs for ambiguous rows or bypass backup/restore confirmation guards.
-- PostgreSQL 18 is the baseline; CI runs the suite on 16 and 18. The backend image ships 18 client
-  tools, `packages/backend/src/db/pgTools.ts` refuses client tools older than the server, and a major
-  upgrade is a dump and restore into a new data directory, never a reused one
-  ([upgrade](docs/postgresql-upgrade.md)). Keep `scripts/rehearse-pg-upgrade.sh` green when changing it.
+  review the SQL with `packages/backend/src/db/migrations/meta/`. A migration that changes existing
+  rows (constraints, rewrites, encryption) ships an integration test that runs it against
+  pre-existing synthetic rows and checks the result ([migration tests](docs/development.md#migration-tests)).
+  Migrate with admin credentials and run the app with runtime credentials. Do not rewrite applied
+  migrations, guess repairs for ambiguous rows or bypass backup/restore confirmation guards.
+- PostgreSQL 18 is the only supported server; CI runs the suite on 18, and `quro migrate` and
+  `quro doctor` refuse other majors (`packages/backend/src/lib/platformSupport.ts`). The backend
+  image ships 18 client tools, `packages/backend/src/db/pgTools.ts` refuses client tools older than
+  the server, and a major upgrade is a dump and restore into a new data directory, never a reused one.
 - Reuse and export shared UI from `packages/frontend/src/components/ui/index.ts`
   before adding a primitive. Preserve persisted `DATA_COLORS` identities. Features
   own domain logic; shared UI owns presentation.

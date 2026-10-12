@@ -1,4 +1,5 @@
 import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } from 'lucide-react';
+import { useCurrency } from '@/lib/CurrencyContext';
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
@@ -105,6 +106,7 @@ function getEquityLabel(isJoint: boolean, hasMortgage: boolean): string {
 }
 
 function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: PropertyValueGridProps) {
+  const { numberFormat } = useCurrency();
   const ownershipShare = getPropertyOwnershipShare(property);
   const isJoint = ownershipShare < 1;
   const equityLabel = getEquityLabel(isJoint, linkedMortgage !== undefined);
@@ -124,7 +126,7 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
           {stats.appreciation >= 0 ? '+' : ''}
           {fmtNative(stats.appreciation, property.currency, true)} (
           {stats.appreciationPct >= 0 ? '+' : ''}
-          {formatPercent(stats.appreciationPct, 1)})
+          {formatPercent(stats.appreciationPct, numberFormat, 1)})
         </p>
       </div>
       <div className="bg-surface-sunken rounded-xl p-3">
@@ -147,7 +149,7 @@ function PropertyValueGrid({ property, linkedMortgage, stats, fmtNative }: Prope
                   : 'text-warning font-medium'
               }
             >
-              {formatPercent(stats.ltv, 1)}
+              {formatPercent(stats.ltv, numberFormat, 1)}
             </span>
           </p>
         )}
@@ -163,6 +165,7 @@ type MortgageLinkRowProps = {
 };
 
 function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRowProps) {
+  const { numberFormat } = useCurrency();
   if (linkedMortgage) {
     return (
       <div className="flex items-center justify-between bg-surface-sunken border border-border-subtle rounded-xl px-3 py-2.5 mb-3">
@@ -177,7 +180,7 @@ function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRo
             <p className="text-xs font-semibold text-fg-emphasis truncate">
               {fmtNative(linkedMortgage.outstandingBalance, linkedMortgage.currency, true)}{' '}
               {property.isJoint ? 'total outstanding' : 'outstanding'} ·{' '}
-              {formatPercent(linkedMortgage.interestRate, 2)}
+              {formatPercent(linkedMortgage.interestRate, numberFormat, 2)}
             </p>
           </div>
         </div>
@@ -265,15 +268,16 @@ type PropertyYieldBadgesProps = {
 };
 
 function PropertyYieldBadges({ grossYield, netYield }: PropertyYieldBadgesProps) {
+  const { numberFormat } = useCurrency();
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-[10px] bg-brand-soft text-brand-fg px-2.5 py-1 rounded-full font-semibold">
-        Gross yield {formatPercent(grossYield, 2)}
+        Gross yield {formatPercent(grossYield, numberFormat, 2)}
       </span>
       <span
         className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${netYield >= 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-hover'}`}
       >
-        Net yield {formatPercent(netYield, 2)}
+        Net yield {formatPercent(netYield, numberFormat, 2)}
       </span>
     </div>
   );

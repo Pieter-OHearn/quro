@@ -543,7 +543,8 @@ describe('the seeded household through the application', () => {
   const component = (summary: Allocations, key: string) =>
     summary.allocations.find((row) => row.key === key)!.value;
 
-  // The same aggregate in exact numeric arithmetic from the stored rows: joint rows count half.
+  // The same aggregate from the stored rows: joint rows count half, and each row is rounded to
+  // cents once (PostgreSQL rounds half away from zero), as the shared money totals do.
   function databaseTotals(userId: number, partnerId: number) {
     return withDatabase(database, async (sql) => {
       const rates = `(select from_currency::text as currency, rate from currency_rates
@@ -553,23 +554,23 @@ describe('the seeded household through the application', () => {
       const share = (alias: string) => `(case when ${alias}.is_joint then 0.5 else 1 end)`;
       const [row] = await sql.unsafe<Record<string, string>[]>(
         `select
-          (select coalesce(sum(s.balance * ${share('s')} * r.rate), 0) from savings_accounts s
+          (select coalesce(sum(round(s.balance * ${share('s')} * r.rate, 2)), 0) from savings_accounts s
             join ${rates} r on r.currency = s.currency::text where ${visible('s')})::text as savings,
-          (select coalesce(sum(greatest(0, coalesce(t.net, 0)) * h.current_price * r.rate), 0)
+          (select coalesce(sum(round(round(greatest(0, coalesce(t.net, 0)) * h.current_price, 2) * r.rate, 2)), 0)
             from holdings h join ${rates} r on r.currency = h.currency::text
             left join (select holding_id, sum(case type when 'buy' then shares when 'sell' then -shares
               else 0 end) as net from holding_transactions group by holding_id) t on t.holding_id = h.id
             where h.user_id = $1 and h.archived_at is null)::text as brokerage,
-          (select coalesce(sum((p.current_value * ${share('p')} - case when p.mortgage_id is null
+          (select coalesce(sum(round((p.current_value * ${share('p')} - case when p.mortgage_id is null
               then p.mortgage * ${share('p')} else coalesce(m.outstanding_balance * ${share('m')}, 0)
-              end) * r.rate), 0)
+              end) * r.rate, 2)), 0)
             from properties p join ${rates} r on r.currency = p.currency::text
             left join mortgages m on m.id = p.mortgage_id and m.archived_at is null
             where ${visible('p')})::text as property_equity,
-          (select coalesce(sum(pp.balance * r.rate), 0) from pension_pots pp
+          (select coalesce(sum(round(pp.balance * r.rate, 2)), 0) from pension_pots pp
             join ${rates} r on r.currency = pp.currency::text
             where pp.user_id = $1 and pp.archived_at is null)::text as pension,
-          (select coalesce(sum(d.remaining_balance * r.rate), 0) from debts d
+          (select coalesce(sum(round(d.remaining_balance * r.rate, 2)), 0) from debts d
             join ${rates} r on r.currency = d.currency::text
             where d.user_id = $1 and d.archived_at is null)::text as liabilities`,
         [userId, partnerId],
@@ -633,7 +634,7 @@ describe('the seeded household through the application', () => {
       const expected = await databaseTotals(ids[member], ids[partner]);
       const summary = allocationsOf(member);
       const close = (actual: number, wanted: number) =>
-        expect(Math.abs(toCents(actual) - toCents(wanted))).toBeLessThanOrEqual(1);
+        expect(toCents(actual)).toBe(toCents(wanted));
       close(component(summary, 'savings'), expected.savings!);
       close(component(summary, 'brokerage'), expected.brokerage!);
       close(component(summary, 'property_equity'), expected.property_equity!);

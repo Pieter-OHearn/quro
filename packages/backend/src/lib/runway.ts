@@ -1,6 +1,7 @@
-import { householdShare } from './partner';
 import {
+  householdShare,
   resolveRule,
+  sumMoney,
   type CalculationRuleSource,
   type CurrencyCode,
   type ExpenseClass,
@@ -158,10 +159,7 @@ function buildContractualComponents(
 export function calculateBurn(input: BurnCalculationInput): BurnCalculation {
   const source = resolveBurnSource(getHistoryMonths(input.categories));
   const contractualComponents = buildContractualComponents(input.contractual);
-  const contractualTotal = contractualComponents.reduce(
-    (sum, component) => sum + component.amount,
-    0,
-  );
+  const contractualTotal = sumMoney(contractualComponents.map((component) => component.amount));
   const lifestylePct = input.assumptions?.emergencyLifestylePct ?? 1;
 
   if (source.burnSource === 'derived_cashflow') {
@@ -179,12 +177,17 @@ export function calculateBurn(input: BurnCalculationInput): BurnCalculation {
   }
 
   const budgetComponents = buildBudgetComponents(input.categories);
-  const current =
-    budgetComponents.reduce((sum, component) => sum + component.amount, 0) + contractualTotal;
-  const derivedLean =
-    budgetComponents
+  // Burn totals are sums of cents: each component is rounded once where it is added.
+  const current = sumMoney([
+    ...budgetComponents.map((component) => component.amount),
+    contractualTotal,
+  ]);
+  const derivedLean = sumMoney([
+    ...budgetComponents
       .filter((component) => component.expenseClass === 'essential')
-      .reduce((sum, component) => sum + component.amount * lifestylePct, 0) + contractualTotal;
+      .map((component) => component.amount * lifestylePct),
+    contractualTotal,
+  ]);
 
   return {
     lean: input.assumptions?.leanBurnOverride ?? derivedLean,
@@ -231,15 +234,15 @@ export function calculateLiquidityTiers(
   const excluded = new Set(assumptions?.excludedTiers ?? []);
   return (['easy_access', 'term_deposit', 'brokerage'] as const).map((kind) => {
     const definition = tierDefinition(kind);
-    const amount = assets
-      .filter((asset) => asset.kind === kind)
-      .reduce(
-        (sum, asset) =>
-          sum +
-          Math.max(0, asset.amount) *
+    const amount = sumMoney(
+      assets
+        .filter((asset) => asset.kind === kind)
+        .map(
+          (asset) =>
+            Math.max(0, asset.amount) *
             householdShare(asset.isJoint, fullJoint ? 'full' : 'personal'),
-        0,
-      );
+        ),
+    );
     return { ...definition, amount, included: !excluded.has(definition.tier) };
   });
 }

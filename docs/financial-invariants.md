@@ -12,8 +12,8 @@ Decided on 2026-10-09:
 - Money stays PostgreSQL `numeric` at rest (exact decimal, `numeric(19,2)` today) and plain
   numbers on the wire. It is not migrated to integer columns.
 - Money arithmetic in code goes through integer cents with `toCents` and `fromCents`, rounding
-  half away from zero once, at the [rounding points](#rounding-points) below. No float sum of
-  money is kept without that rounding.
+  half away from zero once, at the [rounding points](#rounding-points) below. Totals of money are
+  summed in cents with `sumMoney`, so no float sum of money is kept.
 - Money in a request is rounded to cents when it is parsed, and an amount of 10^13 or more is
   refused ([money input](#money-input)).
 - Unit prices, share quantities, FX rates and percentages are not money and keep their decimal
@@ -41,11 +41,16 @@ Money is rounded to cents, half away from zero, at these points and nowhere else
 - When a budget amount is converted to EUR on write.
 - When a repayment's principal is derived as `amount - interest`.
 - In the clamped balance helpers in `packages/backend/src/lib/balance.ts`.
-- When a holding's value (shares × price) is shown. It is computed from the stored six-decimal
-  price, never from a price rounded for display; inside an aggregate it is not rounded on its own.
-- When an aggregate (net worth, snapshot, runway) is stored or shown. These aggregates still sum
-  numbers and round once at the end; moving them onto integer cents is part of consolidating the
-  domain maths in `@quro/shared`.
+- When a holding is valued or a trade is costed: shares × the stored six-decimal price, never a
+  price rounded for display (`holdingValue`, and each buy or sell in the position rule below).
+- When an amount is added to a total. `sumMoney` rounds each amount (after FX conversion and the
+  household share, when they apply) to cents once and adds the cents exactly. Net worth and its
+  components, stored snapshots, history points, runway liquidity tiers and burn, and the page
+  totals of the savings, investments, pension and debts pages are such totals, so a total always
+  equals the sum of the rounded amounts it is made of, and its components add up to it exactly.
+
+A foreign holding is rounded twice: once in its own currency, as its page shows it, and once
+when that value is converted for a total.
 
 ### Money input
 
@@ -128,8 +133,8 @@ code remove without migrating 52 columns of real data or breaking the API.
 **Migration implications.** None. Had integer minor units been chosen, each amount would have
 needed a new integer column, an idempotent backfill from `numeric` with a preflight that refuses
 values outside `bigint` or with more decimals than the currency allows, a dual-read period, an
-API version for the new shape, and the 0.7.0 upgrade fixture to prove nulls, negative equity,
-native currencies and provenance survive.
+API version for the new shape, and an integration test against pre-existing synthetic rows to
+prove nulls, negative equity, native currencies and provenance survive.
 
 ## Precision
 
@@ -149,11 +154,32 @@ Amounts on ledger rows are positive; the row type gives the effect.
 
 | Ledger                   | Effect on its balance                                                                                                              |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Savings                  | `deposit` and `interest` add, `withdrawal` subtracts; the stored sign is ignored.                                                  |
+| Savings                  | `deposit` and `interest` add, `withdrawal` subtracts; the stored sign is ignored; any other type does nothing.                     |
 | Pension                  | `contribution` adds `amount - taxAmount`, `fee` subtracts, `annual_statement` adds its signed amount, any other type does nothing. |
 | Mortgage, property, debt | A repayment's principal reduces the outstanding balance, never below zero; the part a zero balance cannot take is recorded.        |
-| Holdings                 | Shares are buys minus sells, floored at zero per holding; dividends do not move shares.                                            |
+| Holdings                 | Shares are buys minus sells, floored at zero per holding; dividends do not move shares (see [positions](#holding-positions)).      |
 | Budget                   | A transaction's EUR amount adds to its category's `spent`.                                                                         |
+
+The savings and pension rules are `signedSavingsAmount` and `pensionTransactionDelta` in
+`@quro/shared`; the server's ledger writes and history and the pages' previews and charts all
+use them.
+
+### Holding positions
+
+`computeHoldingPosition` in `packages/shared/src/domain/holdings.ts` is the one position rule;
+the dashboard, the net worth history, the runway and the investments page all use it, or
+`netHoldingShares` where only shares are needed.
+
+- Shares are counted in whole millionths, so fractional shares sum exactly (0.1 + 0.2 - 0.3
+  shares is none, not 5.6 × 10^-17).
+- Shares held are buys minus sells, floored at zero, and do not depend on the order of the rows.
+- Cost is average cost. The ledger is replayed by date, then id; each buy or sell is costed at
+  shares × price rounded to cents. A sell realises the difference between its proceeds and the
+  average cost of the shares sold. A sell of more than is held sells what is held; the excess
+  has no cost and is netted against later buys, which add cost only for the shares beyond it.
+- Dividends add to dividends (in cents) and never move shares. Rows of an unknown type, and buys
+  or sells without a positive share count, are ignored.
+- A buy at price zero has no cost: the average cost is 0.
 
 Liabilities are positive and subtracted from assets. Property equity is value minus debt and may
 be negative; Quro keeps negative equity rather than flooring it.
@@ -189,6 +215,12 @@ sees their own rows and an accepted partner's joint rows; joint money counts 50%
 so the two halves add up to the whole; only explicit money columns are weighted; transactions
 inherit jointness from their parent; private partner rows never appear. Only the runway
 liquidity assumption can count a joint balance in full.
+
+The share comes from one function, `householdShare` in `@quro/shared`, which the server's
+household scoping, the runway and every page that weights a joint row call. A half share keeps
+its sub-cent precision until it is added to a total, where it is rounded once: each partner's
+half of an odd-cent amount rounds away from zero (half of 6,000.01 is 3,000.005, shown and
+counted as 3,000.01 for each partner).
 
 ## Ledger invariants
 
@@ -228,14 +260,17 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
   the mortgage; an archived or missing linked mortgage contributes no debt. Mortgage debt is
   deducted inside property equity and never counted again as a liability.
 - **Totals reconcile.** For each partner, the dashboard allocations, the totals a client derives
-  from the list endpoints with the documented share and FX rules, and the same aggregate computed
-  in SQL agree to the cent. A stored snapshot's total matches the live figure; its separately
-  rounded components add up to it within one cent each.
+  from the list endpoints with the shared rules the pages use, and the same aggregate computed in
+  SQL with each row rounded to cents agree to the cent. A stored snapshot's total matches the live
+  figure, and its components add up to it exactly.
 
 ### Known exceptions
 
 These are recorded, not yet fixed:
 
+- **Odd-cent joint amounts.** Each partner's total rounds its half of an odd-cent joint amount
+  away from zero, so the two partners' totals can exceed the household's by one cent per such
+  amount.
 - **Repayments recorded before 0.9.0.** They carry no clamped principal and no debt. One that was
   clamped still restores its full principal (at most one cent too much), and a property repayment
   is still reversed against the property's current link. Quro does not guess either for old rows.
@@ -294,23 +329,44 @@ jurisdiction rules in `packages/backend/src/lib/jurisdictions/` and the calculat
   A wrong value in a past period is corrected in place with its source. Completed monthly
   snapshots are not rewritten; they record what Quro showed at the time.
 
-## Cross-view divergences (baseline for consolidation)
+## Cross-view divergences
 
-The frontend and backend still compute some figures separately. These differences were recorded
-on 2026-10-09 so the consolidation into `@quro/shared` (planned) can prove each
-correction. Inputs and outputs below were run against both implementations.
+On 2026-10-09 the frontend and backend computed several figures separately and differently.
+Positions, property types, ledger signs, joint shares and money totals now come from
+`@quro/shared` (`packages/shared/src/domain/` and `sumMoney`), and a golden household asserts
+that the dashboard and the pages show the same totals to the cent
+(`packages/shared/test/fixtures/goldenHousehold.ts`).
 
-| Topic                      | Backend                                                                                                                 | Frontend                                                                                                                  | Example                                                                               |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Holding position           | Net buys minus sells, floored at zero at the end (`lib/netWorth.ts`, `lib/netWorthHistory.ts`)                          | Clamped at zero on every sell (`investments/utils/position.ts`, `utils/portfolio.ts`, `hooks/useInvestmentStatTrends.ts`) | buy 10, sell 15, buy 10: backend 5 shares, frontend 10                                |
-| Investment property type   | Lower-cased and trimmed; includes `rental` (`routes/properties.ts`)                                                     | Exact match of four labels (`investments/utils/position.ts`)                                                              | `buy-to-let` and `rental`: backend accepts rent and expense rows, frontend hides them |
-| Pension transaction effect | Unknown types do nothing (`lib/pensionTransactions.ts`)                                                                 | Unknown types add their amount (`pension/utils/pension-calculations.ts`)                                                  | a `transfer` of 100: backend 0, frontend +100                                         |
-| Pension balance            | Not floored                                                                                                             | Floored at zero for display (`computeCurrentPensionBalance`)                                                              | a pot at -50 shows 0                                                                  |
-| Joint share                | `householdShare` (`lib/partner.ts`)                                                                                     | Separate `0.5` constants: `JOINT_PROPERTY_SHARE`, `JOINT_TXN_WEIGHT`                                                      | same value today; three places to change                                              |
-| Savings page total         | Dashboard counts joint accounts at 50%                                                                                  | Savings page sums full balances (`savings/utils/savings-data.ts`)                                                         | a 6,000 joint account: dashboard 3,000, savings page 6,000                            |
-| Savings history            | Each account floored at zero, UTC months, unrounded                                                                     | Total floored, rounded to whole units, local-calendar months                                                              | months differ around midnight on the first for users outside UTC                      |
-| Current month vs dashboard | History floors negative savings and debt balances, leaves out future-dated rows, and prices holdings from price history | Dashboard allocations use current balances and `currentPrice`                                                             | an overdrawn account lowers allocations but not the current history point             |
-| FX staleness               | None                                                                                                                    | Stale 48 hours after `updatedAt`                                                                                          | a provider outage is visible only to the frontend                                     |
+### Corrections
+
+Each correction changed a figure a user can see. Old and new values are from the golden
+household and a synthetic household run before and after the change.
+
+| Topic                        | Before                                                                                   | Now                                                                                     | Example (before → now)                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Oversold holding             | Dashboard netted buys and sells; the investments page clamped each sell, so it held more | One rule: buys minus sells, floored at zero; the excess sold has no cost                | buy 10, sell 15, buy 10: page 10 shares (value 130.00) → 5 shares (65.00), as on the dashboard     |
+| Fractional shares            | Float sums left residues                                                                 | Shares counted in millionths                                                            | buy 0.1, buy 0.2, sell 0.3: 5.6 × 10^-17 shares, history month marked estimated → 0, not estimated |
+| Cost basis and realised gain | Float products of shares and price                                                       | Each trade costed in cents                                                              | buy 10 at 40.123456, buy 5 at 41.50, sell 3 at 45: realised 13.253088 → 13.25; cost basis 486.98   |
+| Investment property type     | The page matched four exact labels; the API also accepted other spellings and `rental`   | One case-insensitive rule including `rental`                                            | `buy-to-let`, `rental`: rent and expense rows hidden → offered, as the API accepts them            |
+| Pension transaction effect   | The pension chart added unknown types                                                    | Unknown types do nothing, as on the server                                              | a `transfer` of 100 a month ago: last year's chart point 100 lower → unchanged                     |
+| Pension balance              | The pension page showed a negative pot as 0 and its total left it out                    | Shown and counted as stored, as on the dashboard                                        | pots of 30,000.50 and -50: page 30,000.50 → 29,950.50                                              |
+| Savings unknown types        | Added their amount                                                                       | Do nothing (writes only accept the three known types)                                   | a stored `transfer` of 7: +7 → 0                                                                   |
+| Joint share                  | `0.5` constants in three places                                                          | `householdShare` everywhere                                                             | same value                                                                                         |
+| Savings page total           | Summed full balances of joint accounts                                                   | Counts a joint account at the household share; account rows still show the full balance | a 6,000.01 joint account: page 6,000.01 → 3,000.01, as on the dashboard                            |
+| Money totals                 | Float sums, rounded only when shown or stored                                            | Sums of cents, each amount rounded once                                                 | joint GBP 4,000.03 and EUR 6,000.01 at 1.18: 5,360.0227 (shown 5,360.02) → 5,360.03                |
+| Holding value in a total     | Unrounded inside the total                                                               | Rounded to cents once, then added                                                       | 3 shares at 123.4567: 370.3701 → 370.37 (shown 370.37 both times)                                  |
+| Percentages                  | `formatPercent` ignored the user's number format                                         | Uses it, with grouping                                                                  | 1.84 and 1234.5 for de-DE: `1.84%`, `1234.5%` → `1,84%`, `1.234,5%`                                |
+
+Runway months move in their sixth decimal because burn and liquidity totals are now sums of
+cents (for example 4.762747 → 4.762749 months).
+
+### Remaining divergences
+
+| Topic                      | Backend                                                                                                                 | Frontend                                                      | Example                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Savings history            | Each account floored at zero, UTC months                                                                                | Total floored, rounded to whole units, local-calendar months  | months differ around midnight on the first for users outside UTC          |
+| Current month vs dashboard | History floors negative savings and debt balances, leaves out future-dated rows, and prices holdings from price history | Dashboard allocations use current balances and `currentPrice` | an overdrawn account lowers allocations but not the current history point |
+| FX staleness               | None                                                                                                                    | Stale 48 hours after `updatedAt`                              | a provider outage is visible only to the frontend                         |
 
 ## Where the tests live
 
@@ -321,6 +377,8 @@ correction. Inputs and outputs below were run against both implementations.
 | Unit prices: six decimals, dividends in cents, value      | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`      |
 | Allocation identities, order, additivity, FX, linked debt | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                 |
 | Joint shares, signs, missing data                         | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                     |
+| Positions, signs, property types, shares, sums, percents  | `packages/shared/test/domainMaths.test.ts`                                                                                             |
+| Dashboard and page totals agree (golden household)        | `packages/backend/src/lib/goldenHousehold.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`                           |
 | FX cut-offs and fail-closed rates                         | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                   |
 | Ledger balances under random edits, moves and deletes     | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                     |
 | Concurrent edits, deletes and import commits              | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                    |
