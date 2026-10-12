@@ -12,6 +12,14 @@ type Service = {
   ports?: unknown[];
   networks?: string[] | Record<string, unknown>;
   environment?: string[] | Record<string, string>;
+  read_only?: boolean;
+  tmpfs?: string[];
+  cap_drop?: string[];
+  cap_add?: string[];
+  security_opt?: string[];
+  mem_limit?: string;
+  pids_limit?: number;
+  healthcheck?: { test?: string[]; disable?: boolean };
 };
 type ComposeFile = { services: Record<string, Service> };
 
@@ -144,5 +152,42 @@ describe('the example Compose file', () => {
     expect(
       environmentOf((await readCompose('docker-compose.yml')).services.frontend!).QRO_API_URL,
     ).toBe('http://backend:3000');
+  });
+
+  // docs/security.md#container-hardening describes these settings; the clean-install test runs
+  // the stack, a backup and the first sign-in under them.
+  test('runs every service without spare capabilities and with resource limits', async () => {
+    const { services } = await example();
+    for (const [name, service] of Object.entries(services)) {
+      expect(`${name}: ${service.cap_drop}`).toBe(`${name}: ALL`);
+      expect(service.security_opt).toContain('no-new-privileges:true');
+      expect(service.mem_limit).toMatch(/^\d+[mg]$/);
+      expect(service.pids_limit).toBeGreaterThan(0);
+    }
+    expect(services.db?.cap_add?.sort()).toEqual([
+      'CHOWN',
+      'DAC_OVERRIDE',
+      'FOWNER',
+      'SETGID',
+      'SETUID',
+    ]);
+  });
+
+  test('gives the Quro services a read-only root filesystem with /tmp as tmpfs', async () => {
+    const { services } = await example();
+    for (const name of ['migrate', 'backend', 'frontend']) {
+      expect(`${name}: ${services[name]?.read_only}`).toBe(`${name}: true`);
+      expect(services[name]?.tmpfs).toEqual(['/tmp']);
+      expect(services[name]?.cap_add).toBeUndefined();
+    }
+  });
+
+  test('turns off the image health check where no server runs', async () => {
+    const { services } = await example();
+    expect(services.migrate?.healthcheck).toEqual({ disable: true });
+    const repository = (await readCompose('docker-compose.yml')).services;
+    for (const name of ['migrate', 'pension-import-worker', 'db-tools']) {
+      expect(`${name}: ${repository[name]?.healthcheck?.disable}`).toBe(`${name}: true`);
+    }
   });
 });

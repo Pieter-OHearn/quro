@@ -1,0 +1,73 @@
+name: Security Scan
+
+# Deeper scans that do not depend on a change: the published images against today's
+# vulnerability data, the optional parser image, every commit in the history, and the expiry of
+# the accepted findings in security-exceptions.yaml. A failed run is triaged as SECURITY.md describes.
+on:
+  schedule:
+    - cron: '23 5 * * 1' # Mondays, 05:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  published-images:
+    name: Published Image Scan (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [quro-backend, quro-frontend]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Scan the latest release image
+        run: bun scripts/lib/security-scan.ts image "ghcr.io/pieter-ohearn/${{ matrix.image }}:latest"
+
+  parser-image:
+    name: Parser Image Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the parser image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: services/pension-parser/Dockerfile
+          push: false
+          load: true
+          tags: quro-pension-parser:scan
+          cache-from: type=gha,scope=pension-parser
+      - name: Scan for vulnerabilities and secrets
+        run: bun scripts/lib/security-scan.ts image quro-pension-parser:scan
+
+  history:
+    name: Secrets in Git History
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Scan every commit of every branch and tag
+        run: bun scripts/lib/security-scan.ts secrets
+
+  exceptions:
+    name: Scan Exceptions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Fail on malformed or expired exceptions
+        run: bun scripts/lib/security-scan.ts exceptions --strict
