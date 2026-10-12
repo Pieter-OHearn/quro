@@ -2,6 +2,8 @@ import {
   WW_WEEKLY_REQUIREMENT_STATUSES,
   isJurisdictionCode,
   resolveRule,
+  signedSavingsAmount,
+  sumMoney,
   toBudgetMonthIndex,
   type BudgetMonth,
   type ExpenseClass,
@@ -363,15 +365,17 @@ function calculateDerivedCashflow(
   convertToEur: MoneyConverter,
   fullJoint: boolean,
 ): number {
-  const liquidDelta = data.savingsTxns.reduce((sum, transaction) => {
-    const weighted = householdShare(transaction.isJoint, fullJoint ? 'full' : 'personal');
-    const amount =
-      convertToEur(toNumberOrZero(transaction.amount), transaction.currency) * weighted;
-    return sum + (transaction.type === 'withdrawal' ? -amount : amount);
-  }, 0);
-  const netIncome = data.payslipRows.reduce(
-    (sum, payslip) => sum + convertToEur(toNumberOrZero(payslip.net), payslip.currency),
-    0,
+  const liquidDelta = sumMoney(
+    data.savingsTxns.map(
+      (transaction) =>
+        convertToEur(
+          signedSavingsAmount(transaction.type, toNumberOrZero(transaction.amount)),
+          transaction.currency,
+        ) * householdShare(transaction.isJoint, fullJoint ? 'full' : 'personal'),
+    ),
+  );
+  const netIncome = sumMoney(
+    data.payslipRows.map((payslip) => convertToEur(toNumberOrZero(payslip.net), payslip.currency)),
   );
   const historyMonths = Math.max(1, Math.min(HISTORY_MONTHS, data.payslipRows.length));
   return Math.max(0, (netIncome - liquidDelta) / historyMonths);
