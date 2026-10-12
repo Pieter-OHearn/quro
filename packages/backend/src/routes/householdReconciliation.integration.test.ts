@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
-import { toCents, toIsoDate, type DashboardAllocationsSummary } from '@quro/shared';
+import {
+  holdingValue,
+  householdShare,
+  netHoldingShares,
+  sumMoney,
+  toCents,
+  toIsoDate,
+  type DashboardAllocationsSummary,
+} from '@quro/shared';
 import { db } from '../db/client';
 import { holdings, netWorthSnapshots } from '../db/schema';
 import { upsertCurrentNetWorthSnapshot } from '../lib/netWorth';
@@ -12,13 +20,14 @@ import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '.
 // joint home with a linked mortgage, holdings, pensions and debts. Every figure below is worked
 // out by hand from the fixture FX rates (GBP 1.18, USD 0.92) and the 50% joint share, then
 // checked three independent ways: the dashboard API, the totals a client derives from the list
-// endpoints its pages load, and the same aggregate computed in SQL from the stored rows.
+// endpoints its pages load with the shared rules the pages use, and the same aggregate computed
+// in SQL from the stored rows, each row rounded to cents once (PostgreSQL rounds half away from
+// zero, like `toCents`).
 
 const integration = createIntegrationHelpers('household-reconciliation.integration.quro.test');
 const DAY_MS = 86_400_000;
 // Recent dates keep every row inside any default list window.
 const DATE = toIsoDate(new Date(Date.now() - 2 * DAY_MS));
-const JOINT_SHARE = 0.5;
 
 type Components = {
   savings: number;
@@ -85,8 +94,6 @@ function rate(currency: string): number {
     ? 1
     : FIXTURE_RATES_TO_EUR[currency as keyof typeof FIXTURE_RATES_TO_EUR];
 }
-
-const share = (isJoint: boolean) => (isJoint ? JOINT_SHARE : 1);
 
 function savingsAccount(
   session: AuthSession,
@@ -218,17 +225,15 @@ async function pageTotals(session: AuthSession): Promise<Components> {
     session,
     '/api/investments/holdings',
   );
-  let brokerage = 0;
+  const holdingValues: number[] = [];
   for (const holding of holdings) {
     const txns = await get<Array<{ type: string; shares: number }>>(
       session,
       `/api/investments/holding-transactions?holdingId=${holding.id}`,
     );
-    const shares = txns.reduce(
-      (sum, txn) => sum + (txn.type === 'buy' ? txn.shares : txn.type === 'sell' ? -txn.shares : 0),
-      0,
+    holdingValues.push(
+      holdingValue(netHoldingShares(txns), holding.currentPrice) * rate(holding.currency),
     );
-    brokerage += Math.max(0, shares) * holding.currentPrice * rate(holding.currency);
   }
   const homes = await get<
     Array<Money & { currentValue: number; mortgage: number; isJoint: boolean }>
@@ -236,18 +241,18 @@ async function pageTotals(session: AuthSession): Promise<Components> {
   const pots = await get<Array<Money & { balance: number }>>(session, '/api/pensions/pots');
   const debts = await get<Array<Money & { remainingBalance: number }>>(session, '/api/debts');
   return {
-    savings: accounts.reduce(
-      (sum, row) => sum + row.balance * share(row.isJoint) * rate(row.currency),
-      0,
+    savings: sumMoney(
+      accounts.map((row) => row.balance * householdShare(row.isJoint) * rate(row.currency)),
     ),
-    brokerage,
-    propertyEquity: homes.reduce(
-      (sum, row) =>
-        sum + (row.currentValue - row.mortgage) * share(row.isJoint) * rate(row.currency),
-      0,
+    brokerage: sumMoney(holdingValues),
+    propertyEquity: sumMoney(
+      homes.map(
+        (row) =>
+          (row.currentValue - row.mortgage) * householdShare(row.isJoint) * rate(row.currency),
+      ),
     ),
-    pension: pots.reduce((sum, row) => sum + row.balance * rate(row.currency), 0),
-    liabilities: debts.reduce((sum, row) => sum + row.remainingBalance * rate(row.currency), 0),
+    pension: sumMoney(pots.map((row) => row.balance * rate(row.currency))),
+    liabilities: sumMoney(debts.map((row) => row.remainingBalance * rate(row.currency))),
   };
 }
 
@@ -265,23 +270,23 @@ async function databaseTotals(userId: number, partnerId: number): Promise<Compon
     sql`(case when ${sql.raw(alias)}.is_joint then 0.5 else 1 end)`;
   const [row] = (await db.execute(sql`
     select
-      (select coalesce(sum(s.balance * ${jointShare('s')} * r.rate), 0) from savings_accounts s
+      (select coalesce(sum(round(s.balance * ${jointShare('s')} * r.rate, 2)), 0) from savings_accounts s
         join ${rates} r on r.currency = s.currency::text where ${visible('s')})::text as savings,
-      (select coalesce(sum(greatest(0, coalesce(t.net, 0)) * h.current_price * r.rate), 0)
+      (select coalesce(sum(round(round(greatest(0, coalesce(t.net, 0)) * h.current_price, 2) * r.rate, 2)), 0)
         from holdings h join ${rates} r on r.currency = h.currency::text
         left join (select holding_id, sum(case type when 'buy' then shares when 'sell' then -shares
           else 0 end) as net from holding_transactions group by holding_id) t on t.holding_id = h.id
         where h.user_id = ${userId} and h.archived_at is null)::text as brokerage,
-      (select coalesce(sum((p.current_value * ${jointShare('p')} - case when p.mortgage_id is null
+      (select coalesce(sum(round((p.current_value * ${jointShare('p')} - case when p.mortgage_id is null
           then p.mortgage * ${jointShare('p')} else coalesce(m.outstanding_balance * ${jointShare('m')}, 0)
-          end) * r.rate), 0)
+          end) * r.rate, 2)), 0)
         from properties p join ${rates} r on r.currency = p.currency::text
         left join mortgages m on m.id = p.mortgage_id and m.archived_at is null
         where ${visible('p')})::text as property_equity,
-      (select coalesce(sum(pp.balance * r.rate), 0) from pension_pots pp
+      (select coalesce(sum(round(pp.balance * r.rate, 2)), 0) from pension_pots pp
         join ${rates} r on r.currency = pp.currency::text
         where pp.user_id = ${userId} and pp.archived_at is null)::text as pension,
-      (select coalesce(sum(d.remaining_balance * r.rate), 0) from debts d
+      (select coalesce(sum(round(d.remaining_balance * r.rate, 2)), 0) from debts d
         join ${rates} r on r.currency = d.currency::text
         where d.user_id = ${userId} and d.archived_at is null)::text as liabilities
   `)) as unknown as Array<Record<string, string>>;
@@ -305,7 +310,9 @@ function cents(components: Components) {
 
 function fromApi(summary: DashboardAllocationsSummary): Components {
   const value = (key: string) => summary.allocations.find((row) => row.key === key)!.value;
-  expect(summary.netWorth).toBeCloseTo(summary.totalAssets - summary.liabilitiesTotal, 6);
+  expect(toCents(summary.netWorth)).toBe(
+    toCents(summary.totalAssets) - toCents(summary.liabilitiesTotal),
+  );
   expect(summary.portfolioTotal).toBe(value('brokerage'));
   return {
     savings: value('savings'),
@@ -332,8 +339,8 @@ async function expectReconciled(session: AuthSession, otherId: number, expected:
   const history = await get<Array<{ totalValue: number }>>(session, '/api/dashboard/net-worth');
   expect(toCents(history.at(-1)!.totalValue)).toBe(golden.netWorth);
 
-  // A stored snapshot rounds each component and the total separately: they agree within one
-  // cent per component, and the total matches the live figure.
+  // A stored snapshot keeps each component and the total in whole cents: the components add up to
+  // the total exactly, and the total matches the live figure.
   await upsertCurrentNetWorthSnapshot(session.user.id);
   const [snapshot] = await db
     .select()
@@ -346,7 +353,7 @@ async function expectReconciled(session: AuthSession, otherId: number, expected:
     toCents(snapshot!.propertyEquity) +
     toCents(snapshot!.pension) -
     toCents(snapshot!.liabilities);
-  expect(Math.abs(recombined - golden.netWorth)).toBeLessThanOrEqual(5);
+  expect(recombined).toBe(golden.netWorth);
 }
 
 const plus = (base: Components, delta: Partial<Components>): Components => ({

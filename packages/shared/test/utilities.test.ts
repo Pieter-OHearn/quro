@@ -38,9 +38,9 @@ test('finance helpers', () => {
   expect(monthlyInterest(12000, 6)).toBe(60);
   expect(monthsToPayoff(1200, 0, 100)).toBe(12);
   expect(monthsToPayoff(1000, 0.01, 5)).toBeNull();
-  expect(formatPercent(12.345, 2)).toBe('12.35%');
-  expect(formatPercent(Number.NaN)).toBe('0.0%');
-  expect(formatPercent(-0.001)).toBe('0.0%');
+  expect(formatPercent(12.345, 'en-US', 2)).toBe('12.35%');
+  expect(formatPercent(Number.NaN, 'en-US')).toBe('0.0%');
+  expect(formatPercent(-0.001, 'en-US')).toBe('0.0%');
 });
 
 test('toDateOnly parses valid values and rejects invalid ones', () => {

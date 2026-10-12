@@ -128,6 +128,7 @@ export default [
             'packages/backend/drizzle.config.ts',
             'packages/frontend/vite.config.ts',
             'packages/shared/test/*.ts',
+            'packages/shared/test/fixtures/*.ts',
             'playwright.config.ts',
             'scripts/*.ts',
             'scripts/lib/*.ts',
@@ -243,6 +244,7 @@ export default [
       '**/*.test.{js,jsx,ts,tsx,mjs,cjs,mts,cts}',
       '**/*.spec.{js,jsx,ts,tsx,mjs,cjs,mts,cts}',
       '**/*.integration.test.{js,jsx,ts,tsx,mjs,cjs,mts,cts}',
+      'packages/shared/test/fixtures/**/*.ts',
     ],
     languageOptions: {
       globals: {
