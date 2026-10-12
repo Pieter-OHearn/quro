@@ -7,6 +7,7 @@ import { createIntegrationHelpers } from '../test/integration';
 const marketModule = await import('./marketDataClient');
 const getRealClient = marketModule.getMarketDataClient;
 const requested: string[][] = [];
+let quoteClose = 42;
 await mock.module('./marketDataClient', () => ({
   getMarketDataClient: () => ({
     getLatestEod: (symbols: string[]) => {
@@ -16,7 +17,7 @@ await mock.module('./marketDataClient', () => ({
           symbols.map((symbol) => [
             symbol,
             {
-              close: 42,
+              close: quoteClose,
               priceCurrency: 'USD',
               eodDate: '2026-10-01',
               tradeLast: '2026-10-01T12:00:00Z',
@@ -27,7 +28,7 @@ await mock.module('./marketDataClient', () => ({
     },
   }),
 }));
-const { syncAllHoldingPrices } = await import('./holdingPriceSync');
+const { syncAllHoldingPrices, syncHoldingPricesForUser } = await import('./holdingPriceSync');
 const integration = createIntegrationHelpers('holding-price-batch.quro.test');
 beforeAll(() => integration.cleanup());
 afterAll(async () => {
@@ -87,4 +88,40 @@ test('scheduled price sync fetches shared symbols once and writes each owners hi
       .from(holdingPriceHistory)
       .where(eq(holdingPriceHistory.userId, second.user.id)),
   ).toHaveLength(2);
+});
+
+test('a synced quote keeps its decimals up to the six a price column stores', async () => {
+  const owner = await integration.signUp('precision');
+  const [row] = await db
+    .insert(holdings)
+    .values({
+      userId: owner.user.id,
+      name: 'Precise stock',
+      ticker: 'PRCS',
+      sector: 'Test',
+      currentPrice: 10,
+      currency: 'EUR',
+    })
+    .returning();
+  const read = async () => {
+    const [holding] = await db.select().from(holdings).where(eq(holdings.id, row!.id));
+    const [history] = await db
+      .select()
+      .from(holdingPriceHistory)
+      .where(eq(holdingPriceHistory.holdingId, row!.id));
+    return [holding!.currentPrice, history!.closePrice];
+  };
+  try {
+    quoteClose = 123.456789;
+    const outcome = await syncHoldingPricesForUser(owner.user.id);
+    expect(outcome.updates[0]!.price.price).toBe(123.456789);
+    expect(await read()).toEqual([123.456789, 123.456789]);
+
+    // A seventh decimal is rounded half away from zero, as numeric(23,6) stores it.
+    quoteClose = 0.1234565;
+    await syncAllHoldingPrices();
+    expect(await read()).toEqual([0.123457, 0.123457]);
+  } finally {
+    quoteClose = 42;
+  }
 });

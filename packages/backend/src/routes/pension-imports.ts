@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { getConfig } from '../config';
 import { db, type DbTransaction } from '../db/client';
 import { HTTP_STATUS } from '../constants/http';
+import { readUploadForm } from '../lib/uploadForm';
 import {
   pensionPots,
   pensionStatementImportRows,
@@ -12,11 +13,13 @@ import {
   pensionTransactions,
 } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { lockLedgerParents, withLedgerWrite } from '../lib/ledgerWrite';
+import { isUniqueViolation } from '../lib/postgresErrors';
 import { parseListPageQuery, readListPage, type KeysetOrder } from '../lib/listPage';
 import { getPensionStatementImportCapability } from '../lib/capabilities';
 import {
   parsePensionStatement,
+  PensionParserBusyError,
   type PensionParserResult,
   type PensionParserRow,
 } from '../lib/pensionParserClient';
@@ -24,6 +27,8 @@ import {
   asFile,
   buildPdfStorageKey,
   deleteStoredPdfSafely,
+  hasPdfSignature,
+  INVALID_PDF_ERROR,
   normalizePdfFileName,
   PDF_MIME_TYPE,
   validateUploadedPdf,
@@ -445,6 +450,8 @@ function earliestRowDate(rows: readonly ImportRowRecord[]): string | undefined {
 }
 
 const IMPORT_NOT_READY_FOR_COMMIT = 'Import is not ready for commit';
+const DUPLICATE_STATEMENT_COMMITTED =
+  'An exact duplicate statement has already been imported for this pension pot';
 
 class ImportNotReadyForCommit extends Error {
   constructor() {
@@ -452,19 +459,33 @@ class ImportNotReadyForCommit extends Error {
   }
 }
 
+class DuplicateStatementCommitted extends Error {
+  constructor() {
+    super(DUPLICATE_STATEMENT_COMMITTED);
+  }
+}
+
 // Claims the import before any row is written: a second commit of the same import waits here
-// and then finds it committed, so the statement reaches the ledger once.
+// and then finds it committed, so the statement reaches the ledger once. A unique index allows
+// one committed import per statement file and pot, so a commit of another import of the same
+// file waits here too and then fails instead of writing the rows again.
 async function claimImportForCommit(tx: DbTransaction, importId: number, now: Date) {
-  const [claimed] = await tx
-    .update(pensionStatementImports)
-    .set({ status: 'committed', committedAt: now, updatedAt: now, errorMessage: null })
-    .where(
-      and(
-        eq(pensionStatementImports.id, importId),
-        eq(pensionStatementImports.status, 'ready_for_review'),
-      ),
-    )
-    .returning({ id: pensionStatementImports.id });
+  let claimed: { id: number } | undefined;
+  try {
+    [claimed] = await tx
+      .update(pensionStatementImports)
+      .set({ status: 'committed', committedAt: now, updatedAt: now, errorMessage: null })
+      .where(
+        and(
+          eq(pensionStatementImports.id, importId),
+          eq(pensionStatementImports.status, 'ready_for_review'),
+        ),
+      )
+      .returning({ id: pensionStatementImports.id });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new DuplicateStatementCommitted();
+    throw error;
+  }
   if (!claimed) throw new ImportNotReadyForCommit();
 }
 
@@ -478,6 +499,8 @@ async function commitRowsToLedger(params: {
   const committedTransactionIds: number[] = [];
 
   await db.transaction(async (tx) => {
+    // The pot before the import and its rows, in the order a cascade archive of the pot uses.
+    await lockLedgerParents(tx, pensionPots, [params.importRecord.potId]);
     await claimImportForCommit(tx, params.importId, params.now);
     let annualStatementTransactionId: number | null = null;
 
@@ -688,20 +711,10 @@ async function persistParsedImport(
 ): Promise<void> {
   const existingTransactions = await loadExistingTransactionsForImport(importRecord);
   await db.transaction(async (tx) => {
-    await tx
-      .delete(pensionStatementImportRows)
-      .where(eq(pensionStatementImportRows.importId, importRecord.id));
-
     const now = new Date();
-    const values = buildParsedImportRowValues({
-      importId: importRecord.id,
-      rows: parsed.rows,
-      existingTransactions,
-      now,
-    });
-
-    await tx.insert(pensionStatementImportRows).values(values);
-    await tx
+    // Parsing can take minutes: an import cancelled or expired meanwhile stays that way, and
+    // its rows are written only by the worker that still holds it.
+    const [claimed] = await tx
       .update(pensionStatementImports)
       .set({
         status: 'ready_for_review',
@@ -712,7 +725,26 @@ async function persistParsedImport(
         updatedAt: now,
         errorMessage: null,
       })
-      .where(eq(pensionStatementImports.id, importRecord.id));
+      .where(
+        and(
+          eq(pensionStatementImports.id, importRecord.id),
+          eq(pensionStatementImports.status, 'processing'),
+        ),
+      )
+      .returning({ id: pensionStatementImports.id });
+    if (!claimed) return;
+
+    await tx
+      .delete(pensionStatementImportRows)
+      .where(eq(pensionStatementImportRows.importId, importRecord.id));
+    await tx.insert(pensionStatementImportRows).values(
+      buildParsedImportRowValues({
+        importId: importRecord.id,
+        rows: parsed.rows,
+        existingTransactions,
+        now,
+      }),
+    );
   });
 }
 
@@ -724,7 +756,12 @@ async function markImportAsFailed(importId: number, error: unknown): Promise<voi
       updatedAt: new Date(),
       errorMessage: error instanceof Error ? error.message : 'Failed to process import',
     })
-    .where(eq(pensionStatementImports.id, importId));
+    .where(
+      and(
+        eq(pensionStatementImports.id, importId),
+        eq(pensionStatementImports.status, 'processing'),
+      ),
+    );
 }
 
 app.get('/', async (c) => {
@@ -744,6 +781,16 @@ app.get('/', async (c) => {
   });
 });
 
+function parseImportUploadFields(form: FormData): ParseResult<{ potId: number; file: File }> {
+  const potId = parseId(String(form.get('potId') ?? ''));
+  if (potId === null) return err('Invalid pension pot id');
+  const file = asFile(form.get('file'));
+  if (!file) return err('A PDF file is required');
+  const validation = validateUploadedPdf(file);
+  if (!validation.valid) return err(validation.error);
+  return ok({ potId, file });
+}
+
 app.post('/', async (c) => {
   const user = getAuthUser(c);
   const capability = await getPensionStatementImportCapability();
@@ -754,19 +801,16 @@ app.post('/', async (c) => {
     );
   }
 
-  const formData = await c.req.formData();
-  const potId = parseId(String(formData.get('potId') ?? ''));
-  if (potId === null) return c.json({ error: 'Invalid pension pot id' }, HTTP_STATUS.BAD_REQUEST);
-
-  const file = asFile(formData.get('file'));
-  if (!file) return c.json({ error: 'A PDF file is required' }, HTTP_STATUS.BAD_REQUEST);
-
-  const validation = validateUploadedPdf(file);
-  if (!validation.valid) return c.json({ error: validation.error }, HTTP_STATUS.BAD_REQUEST);
+  const upload = await readUploadForm(c);
+  if (!upload.ok) return upload.response;
+  const fields = parseImportUploadFields(upload.form);
+  if (!fields.ok) return c.json({ error: fields.error }, HTTP_STATUS.BAD_REQUEST);
+  const { potId, file } = fields.value;
   if (!(await assertOwnedPot(user.id, potId)))
     return c.json({ error: 'Pension pot not found' }, HTTP_STATUS.NOT_FOUND);
 
   const bytes = Buffer.from(await file.arrayBuffer());
+  if (!hasPdfSignature(bytes)) return c.json({ error: INVALID_PDF_ERROR }, HTTP_STATUS.BAD_REQUEST);
   const fileHashSha256 = createHash('sha256').update(bytes).digest('hex');
   const duplicate = await hasDuplicateImport({ userId: user.id, potId, fileHashSha256 });
   if (duplicate) {
@@ -999,10 +1043,7 @@ app.post('/:id/commit', async (c) => {
     excludingImportId: importRecord.id,
   });
   if (duplicate) {
-    return c.json(
-      { error: 'An exact duplicate statement has already been imported for this pension pot' },
-      HTTP_STATUS.CONFLICT,
-    );
+    return c.json({ error: DUPLICATE_STATEMENT_COMMITTED }, HTTP_STATUS.CONFLICT);
   }
 
   const rows = await loadCommitRows(importId);
@@ -1023,6 +1064,9 @@ app.post('/:id/commit', async (c) => {
   } catch (error) {
     if (error instanceof ImportNotReadyForCommit) {
       return c.json({ error: IMPORT_NOT_READY_FOR_COMMIT }, HTTP_STATUS.BAD_REQUEST);
+    }
+    if (error instanceof DuplicateStatementCommitted) {
+      return c.json({ error: DUPLICATE_STATEMENT_COMMITTED }, HTTP_STATUS.CONFLICT);
     }
     console.error('Failed to commit pension import', error);
     return c.json({ error: 'Failed to commit import' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
@@ -1067,6 +1111,19 @@ app.delete('/:id', async (c) => {
   return c.json({ data: normalizeImportResponse(updated) });
 });
 
+// The parser's queue was full: the import waits for the next tick instead of failing.
+async function returnImportToQueue(importId: number): Promise<void> {
+  await db
+    .update(pensionStatementImports)
+    .set({ status: 'queued', updatedAt: new Date() })
+    .where(
+      and(
+        eq(pensionStatementImports.id, importId),
+        eq(pensionStatementImports.status, 'processing'),
+      ),
+    );
+}
+
 async function processQueuedImport(): Promise<void> {
   const lockedImport = await lockNextQueuedImport();
   if (!lockedImport) return;
@@ -1076,6 +1133,13 @@ async function processQueuedImport(): Promise<void> {
     await ensureNoParsedDuplicate(lockedImport, parsed);
     await persistParsedImport(lockedImport, parsed);
   } catch (error) {
+    if (error instanceof PensionParserBusyError) {
+      console.warn('[PensionImportWorker] the parser is busy; the import stays queued', {
+        importId: lockedImport.id,
+      });
+      await returnImportToQueue(lockedImport.id);
+      return;
+    }
     console.error('Failed to process pension statement import', {
       importId: lockedImport.id,
       error,

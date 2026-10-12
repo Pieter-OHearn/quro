@@ -2,9 +2,10 @@
 # Clean-install test. Installs Quro from empty directories the way docs/install.md describes,
 # with docs/compose.example.yaml, and checks what an operator relies on:
 #
-#   1. Compose install: `quro init` (dry run, repeat, preserved edits), first start, local sign-in,
-#      a ledger write, a document upload and download, maintenance commands, concurrent
-#      `quro migrate` runs, restart and stop/start with the data intact.
+#   1. Compose install: `quro init` (dry run, repeat, preserved edits), first start under the
+#      example's container restrictions, local sign-in, a ledger write, a document upload and
+#      download, maintenance commands including a backup, concurrent `quro migrate` runs, restart
+#      and stop/start with the data intact.
 #   2. Existing PostgreSQL and S3 endpoints with `docker run` only: an owner role without
 #      CREATEROLE and a runtime role created by the database administrator, an S3 store, readiness
 #      for a schema behind and ahead of the image, an interrupted migration and a restart.
@@ -73,11 +74,11 @@ trap 'exit 130' INT TERM
 
 on_linux_as_other_uid() { [ "$(uname -s)" = Linux ] && [ "$(id -u)" != 1000 ]; }
 
-# The documented preparation: on Linux the backend's UID owns the configuration and documents
-# directories (Docker Desktop on macOS does not enforce bind-mount ownership).
+# The documented preparation: on Linux the backend's UID owns the configuration, documents and
+# backups directories (Docker Desktop on macOS does not enforce bind-mount ownership).
 prepare_directories() {
-  mkdir -p "$1/config" "$1/data/documents"
-  if on_linux_as_other_uid; then sudo chown 1000:1000 "$1/config" "$1/data/documents"; fi
+  mkdir -p "$1/config" "$1/data/documents" "$1/backups"
+  if on_linux_as_other_uid; then sudo chown 1000:1000 "$1/config" "$1/data/documents" "$1/backups"; fi
 }
 
 # Runs a command as the owner of the configuration files, as an operator would with sudo.
@@ -157,7 +158,26 @@ step "docker compose up from empty volumes"
 compose up -d
 wait_ready "http://127.0.0.1:$QURO_INSTALL_PORT"
 [ "$(compose exec -T backend id -u)" = 1000 ] || fail "the backend does not run as UID 1000"
+[ "$(compose exec -T frontend id -u)" != 0 ] || fail "nginx runs as root"
 contains "$(compose ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}')" "migrate exited 0"
+step "The services run with the example's restrictions"
+# Read-only root filesystem, no capabilities, no privilege gain, memory and process limits, and a
+# health check from the image (the frontend's) or the Compose file (the backend's).
+for service in backend frontend; do
+  id=$(compose ps -q "$service")
+  restrictions=$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}} {{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}}' "$id")
+  [ "$restrictions" = "true [ALL] [no-new-privileges:true]" ] || fail "$service runs with: $restrictions"
+  # shellcheck disable=SC2046
+  set -- $(docker inspect -f '{{.HostConfig.Memory}} {{.HostConfig.PidsLimit}}' "$id")
+  [ "$1" -gt 0 ] && [ "${2:-0}" -gt 0 ] || fail "$service has no memory or process limit"
+  if compose exec -T "$service" touch /quro-write-test 2>/dev/null; then fail "$service can write to its root filesystem"; fi
+done
+tries=0
+until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(compose ps -q frontend)")" = healthy ]; do
+  tries=$((tries + 1))
+  [ "$tries" -le 30 ] || fail "the frontend's health check did not pass"
+  sleep 1
+done
 
 step "First account, local sign-in, ledger write, document upload and download"
 code=$(compose exec -T backend quro user invite | grep -Eo "$CODE_PATTERN" | head -n 1)
@@ -179,6 +199,10 @@ contains "$out" "Dry run: nothing was changed."
 out=$(compose run --rm -T migrate migrate)
 contains "$out" "No migrations to apply."
 contains "$out" "quro_app signs in; apply grants only."
+out=$(compose run --rm -T migrate backup)
+echo "$out"
+contains "$out" "Archive written and verified: /var/lib/quro/backups/quro-backup-"
+[ "$(find backups -name 'quro-backup-*.tar' | wc -l)" -eq 1 ] || fail "expected one archive in ./backups"
 compose exec -T backend quro health
 compose exec -T backend quro version --json
 compose exec -T backend quro user status

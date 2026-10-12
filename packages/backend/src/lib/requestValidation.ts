@@ -269,6 +269,63 @@ export function parseOptionalNormalizedDecimalField(
   return parseNormalizedDecimalField(value, error, min);
 }
 
+// ── Unit prices (docs/financial-invariants.md) ───────────────────────────────
+
+/** Decimals a price per share keeps: the scale of the price columns. */
+export const UNIT_PRICE_DECIMALS = 6;
+const SMALLEST_UNIT_PRICE = 1e-6;
+const HALF_SMALLEST_UNIT_PRICE = 5e-7;
+// From here on a number's shortest text has no decimals (and uses an exponent).
+const NO_DECIMALS_FROM = 1e21;
+
+/**
+ * Rounds a unit price to six decimals, half away from zero. It works on the number's shortest
+ * decimal text, which is the text the database receives, so the result is exactly what the
+ * price columns store. Unit prices are not money and are never rounded to cents.
+ */
+export function roundUnitPrice(value: number): number {
+  const magnitude = Math.abs(value);
+  if (!Number.isFinite(value) || magnitude >= NO_DECIMALS_FROM) return value;
+  // Below 10^-6 the shortest text uses an exponent; only 0 and 0.000001 are candidates.
+  if (magnitude < SMALLEST_UNIT_PRICE) {
+    return magnitude >= HALF_SMALLEST_UNIT_PRICE ? Math.sign(value) * SMALLEST_UNIT_PRICE : 0;
+  }
+  const [whole = '0', fraction = ''] = String(magnitude).split('.');
+  if (fraction.length <= UNIT_PRICE_DECIMALS) return value;
+  // The first dropped digit decides; a digit of 5 or more rounds away from zero.
+  const roundUp = BigInt(fraction.charAt(UNIT_PRICE_DECIMALS) >= '5');
+  const millionths = BigInt(whole + fraction.slice(0, UNIT_PRICE_DECIMALS)) + roundUp;
+  const digits = millionths.toString().padStart(UNIT_PRICE_DECIMALS + 1, '0');
+  const rounded = Number(
+    `${digits.slice(0, -UNIT_PRICE_DECIMALS)}.${digits.slice(-UNIT_PRICE_DECIMALS)}`,
+  );
+  return value < 0 ? -rounded : rounded;
+}
+
+/**
+ * A price per share: localized decimal text or a number (see `parseNormalizedDecimal`), rounded
+ * to six decimals, with the minimum applied after rounding.
+ */
+export function parseUnitPriceField(
+  value: unknown,
+  error: string,
+  min = Number.NEGATIVE_INFINITY,
+): ParseResult<number> {
+  const parsed = parseNormalizedDecimal(value);
+  if (parsed === null) return err(error);
+  const price = roundUnitPrice(parsed);
+  return price < min ? err(error) : ok(price);
+}
+
+export function parseOptionalUnitPriceField(
+  value: unknown,
+  error: string,
+  min = Number.NEGATIVE_INFINITY,
+): ParseResult<number | null> {
+  if (value == null || value === '') return ok(null);
+  return parseUnitPriceField(value, error, min);
+}
+
 // Integers and integral numeric strings such as `"40"`, `"40.0"` or `"4e1"`.
 export function parseWholeNumber(value: unknown): number | null {
   const parsed = parseNumber(value);

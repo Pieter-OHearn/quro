@@ -163,6 +163,8 @@ Each connect attempt is recorded on the server for the initiating user and desti
 
 ## Optional Pension Import Development
 
+Statement OCR is experimental and opt-in. The core app never needs it, and the example Compose file operators copy does not contain it.
+
 Run the worker in a second terminal:
 
 ```bash
@@ -174,15 +176,43 @@ Run the parser locally in a third terminal, with Python 3.12 as `python3`:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r services/pension-parser/requirements.txt ruff pip-audit
+pip install -r services/pension-parser/requirements-dev.txt ruff pip-audit
 uvicorn app.main:app --app-dir services/pension-parser --host 0.0.0.0 --port 8080
 ```
 
-If you want the full Dockerized AI stack instead, use:
+`PARSER_REGEX_ONLY=true` skips the model and uses the deterministic extractor, which needs no GPU. The parser's tests build synthetic PDFs (malformed, truncated, encrypted, huge pages, decompression bombs, slow pages) and need poppler and tesseract; the process-limit and timeout tests run on Linux only and are skipped elsewhere:
 
 ```bash
-docker compose --profile pension-import up --build -d
+bun run check:python:test
 ```
+
+If you want the full Dockerized stack instead, use the `ocr` profile:
+
+```bash
+docker compose --profile ocr up --build -d
+```
+
+The model server runs as UID 1000 and keeps its model in `./data/vllm-cache`. Give that directory to the user once, also when it holds a model downloaded by an earlier release as root: `sudo chown -R 1000:1000 data/vllm-cache`. Once the model is there, `VLLM_HF_HUB_OFFLINE=1` stops the model server from contacting Hugging Face. The parser runs as UID 10001 with a read-only root filesystem and a 256 MB `/tmp`.
+
+### Bounds on document processing
+
+The parser reads each document in a new child process in its own process group. The process limits its address space, CPU time and file size before it reads the PDF, and the renderer (`pdftoppm`) and OCR (`tesseract`, one thread) processes it starts inherit those limits. When the wall-clock bound runs out, or the import worker closes the connection at its own `PENSION_PARSER_TIMEOUT_MS`, the parser kills the whole group. The text layer is read page by page; OCR renders and reads one page at a time. Every bound is a whole number set on the `pension-parser` service; an invalid value stops the parser at startup.
+
+| Setting                  | Default    | Bound                                                                             |
+| ------------------------ | ---------- | --------------------------------------------------------------------------------- |
+| `PARSER_MAX_FILE_MB`     | `20`       | Upload size. Larger bodies answer 413 before they are read                        |
+| `PARSER_MAX_PAGES`       | `30`       | Pages in one PDF                                                                  |
+| `PARSER_MAX_PAGE_PIXELS` | `40000000` | Pixels of one page rendered for OCR at 250 dpi; checked before anything is drawn  |
+| `PARSER_MAX_TEXT_CHARS`  | `80000`    | Characters of text kept and sent to the model                                     |
+| `PARSER_TIMEOUT_SECONDS` | `100`      | Wall-clock time for one extraction                                                |
+| `PARSER_CPU_SECONDS`     | `100`      | CPU time of each process of an extraction                                         |
+| `PARSER_MEMORY_MB`       | `1024`     | Address space of each process of an extraction                                    |
+| `PARSER_MAX_CONCURRENCY` | `1`        | Extractions running at once                                                       |
+| `PARSER_MAX_QUEUE`       | `2`        | Extractions waiting for a slot. More answer 503, and the worker retries next tick |
+
+Compose also caps the containers: `PARSER_CPUS` (`2`), `PARSER_MEM_LIMIT` (`2g`) and 256 processes for the parser, `VLLM_CPUS` (`4`), `VLLM_MEM_LIMIT` (`24g`) and 2048 processes for the model server. `PARSER_MEMORY_MB` bounds address space, which runs ahead of the memory a process actually uses; the container limit caps what the service and its extraction processes use together. Keep `PARSER_TIMEOUT_SECONDS` plus `VLLM_TIMEOUT_SECONDS` below `PENSION_PARSER_TIMEOUT_MS` (in seconds), so the parser gives up before the worker does.
+
+A refused document fails its import with a fixed message, such as "The PDF is password protected". Encrypted PDFs that open without a password (protected only against changes) are read; others are refused.
 
 ## Contributor DB Commands
 
@@ -286,10 +316,10 @@ role needs to be a superuser, as it is in the throwaway container.
 ### Clean-install test
 
 `scripts/clean-install/run.sh` installs Quro from empty directories the way
-[Install Quro](install.md) describes, with `docs/compose.example.yaml`, and exercises it: sign-in,
-a ledger write, a document upload and download, maintenance commands, concurrent and interrupted
-migrations, restarts, an existing PostgreSQL server with an S3-compatible test store, and the
-image as another UID. CI runs it on amd64 and arm64. Locally it needs Docker, Bun and `curl`, and
+[Install Quro](install.md) describes, with `docs/compose.example.yaml` and its container
+restrictions, and exercises it: sign-in, a ledger write, a document upload and download,
+maintenance commands including a backup, concurrent and interrupted migrations, restarts, an
+existing PostgreSQL server with an S3-compatible test store, and the image as another UID. CI runs it on amd64 and arm64. Locally it needs Docker, Bun and `curl`, and
 builds the images when the tags it is given do not exist:
 
 ```bash
@@ -323,6 +353,34 @@ its own; only endpoints a test calls directly, such as a price refresh, could. S
 variable for any other local backend that must not run background jobs; leave it unset in
 production.
 
+### Security scans
+
+CI scans every change as [SECURITY.md](../SECURITY.md#how-findings-are-handled) describes, through
+`scripts/lib/security-scan.ts`. The scanners run from container images pinned by digest (Trivy and
+gitleaks), so locally they need only Docker and Bun. Output names the rule, file and line of a
+finding, never the matched text, and only files git tracks or would track are scanned:
+
+```bash
+bun scripts/lib/security-scan.ts image quro-backend:local   # vulnerabilities and secrets in an image
+bun scripts/lib/security-scan.ts config                     # misconfigured Dockerfiles
+bun scripts/lib/security-scan.ts secrets origin/main..HEAD  # secrets in commits; no range: all refs
+bun scripts/lib/security-scan.ts exceptions --strict        # security-exceptions.yaml, expiry included
+```
+
+A critical vulnerability or misconfiguration, or any secret, makes the command exit 1. Trivy keeps
+its vulnerability database in the Docker volume `quro-trivy-cache`; remove it with
+`docker volume rm quro-trivy-cache`. To accept a finding, add an entry to
+`security-exceptions.yaml` with a statement, an owner and an expiry at most 90 days ahead.
+
+The licence inventory needs installed dependencies; for the parser's packages, install
+`services/pension-parser/requirements.txt` into a virtual environment and pass its interpreter:
+
+```bash
+bun scripts/lib/licence-inventory.ts
+python3 -m venv /tmp/quro-parser && /tmp/quro-parser/bin/pip install -r services/pension-parser/requirements.txt
+bun scripts/lib/licence-inventory.ts --python /tmp/quro-parser/bin/python
+```
+
 ### Synthetic data
 
 Tests and screenshots use synthetic data only. The demo seed
@@ -330,7 +388,57 @@ Tests and screenshots use synthetic data only. The demo seed
 deterministic: it creates or resets the `demo@quro.local` user to a fixed profile and,
 when the currency-rate table is empty, adds a fixed set of approximate EUR rates dated
 on the seeding day so they count as fresh. Its values live in
-`packages/backend/src/db/demoSeed.ts`.
+`packages/backend/src/db/demoSeed.ts`. It adds no accounts or transactions, so the demo
+profile is empty.
+
+#### Demo household
+
+For screenshots and manual checks that need a lived-in profile, seed the household into a
+migrated, throwaway database (see [DB-backed tests](#db-backed-tests)):
+
+```bash
+bun run --filter '@quro/backend' db:seed-household
+```
+
+It does everything the plain seed does, then adds `demo-partner@quro.local` as the demo user's
+accepted partner and fills both accounts. Sign in as either; the password is the one of the plain
+seed (`DEMO_USER_PASSWORD`, or its fixed default). The household has:
+
+- Private and joint rows on both sides: seven savings accounts in EUR, GBP, USD and CHF with
+  deposits, withdrawals and interest (the partners write to the joint ones), a joint home with a
+  linked mortgage and monthly repayments, and a buy-to-let flat in pounds that is worth less than
+  its debt.
+- Holdings with buys, sells, dividends and a monthly price history, one of them at a loss.
+- Two pension pots with contributions, fees and annual statements, two debts with payments, two
+  employments with payslips (no documents), five goals, and a budget from July to the start of
+  October 2026 with a payment in pounds converted at the stored rate.
+- A monthly exchange-rate history (provider `seed`, the first of each month from January 2025 to
+  October 2026, a few per mille around the seeded rates), so the net worth chart has stored rates
+  for its whole range and no point is marked estimated.
+- Every bank confirmed as a licensed entity through the app's own route, under fictional deposit
+  protection schemes, so the plan page lists no bank awaiting review.
+- Non-ASCII text in some names, and amounts of at most two decimals.
+
+The seed writes through the application's own routes, in the process, with a short-lived session
+of its own. Balances, joint attribution and ledger effects are therefore what the app stores for
+the same input, and the seed stops with an error if a route rejects a row or the dashboard or
+runway cannot be read afterwards. The synthetic tickers are excluded from price sync, so no
+provider is asked about them. The seed also stops if any chart point is estimated or any bank
+is unconfirmed. Everything is dated up to 2026-10-09, so the budget page shows October as a
+partial month.
+
+Running it again resets the two demo users' rows and the rate history it wrote (rates a provider stored are kept) and writes the same household again; rows have
+new ids but the same content, and only the rate dates and the users' creation times follow the
+clock. It refuses to run, writing nothing and exiting with an error, when the database holds any
+user other than the two demo users, so it cannot add synthetic rows to a real household. A backup
+or restore in progress also stops it. Each route call is its own transaction, so a seed that
+fails part-way leaves a partial household; run it again to reset and complete it. It is not part of `test:smoke`, whose
+backend keeps the plain seed: the smoke tests sign up users of their own, which the household
+seed would then refuse, and the [upgrade fixture](upgrade-fixture.md) and the recovery drill start
+from a demo user without rows.
+
+The household is defined in `packages/backend/src/db/demoHousehold.ts` and written by
+`packages/backend/src/db/seedHousehold.ts`.
 
 ## Packages and versions
 
