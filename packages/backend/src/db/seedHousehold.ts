@@ -1,4 +1,4 @@
-import { inArray, notInArray, sql } from 'drizzle-orm';
+import { eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { createApp } from '../app';
 import { runUnlessMaintenance } from '../lib/maintenanceMode';
 import { db, type DbExecutor } from './client';
@@ -18,15 +18,19 @@ import {
   SAVINGS_ACCOUNTS,
   budgetCategoryMonths,
   budgetTransactions,
+  buildSeedRateHistory,
+  DEPOSIT_PROTECTION,
   expectedSavingsBalance,
   type GoalSpec,
   type Member,
 } from './demoHousehold';
+import { buildSeedCurrencyRates, SEED_RATE_PROVIDER } from './demoSeed';
 import { openHouseholdApi, type HouseholdApi } from './householdApi';
 import {
   budgetCategories,
   budgetTransactions as budgetTransactionRows,
   categoryMappings,
+  currencyRateHistory,
   debtPayments,
   debts,
   employments,
@@ -125,6 +129,10 @@ async function resetHousehold(userIds: readonly number[]): Promise<void> {
     await tx.delete(goals).where(inArray(goals.userId, ids));
     await tx.delete(planAssumptions).where(inArray(planAssumptions.userId, ids));
     await tx.delete(netWorthSnapshots).where(inArray(netWorthSnapshots.userId, ids));
+    // Rate history is not tied to a user: only the rows this seed wrote are removed.
+    await tx
+      .delete(currencyRateHistory)
+      .where(eq(currencyRateHistory.provider, SEED_RATE_PROVIDER));
     // Members go with the link (cascade).
     await tx.delete(partnerLinks).where(inArray(partnerLinks.requesterId, ids));
   });
@@ -140,6 +148,40 @@ async function linkPartners(context: Context, partnerEmail: string): Promise<voi
     createdAt: new Date(HOUSEHOLD_TIMESTAMPS.partnerInvitedAt),
     respondedAt: new Date(HOUSEHOLD_TIMESTAMPS.partnerAcceptedAt),
   });
+}
+
+async function seedRateHistory(): Promise<void> {
+  // The seed's own rates, not whatever the table holds, so the history is the same everywhere.
+  const base = buildSeedCurrencyRates(new Date(HOUSEHOLD_TIMESTAMPS.ratesRecordedAt));
+  const rows = buildSeedRateHistory(base).map((row) => ({
+    ...row,
+    provider: SEED_RATE_PROVIDER,
+    updatedAt: new Date(HOUSEHOLD_TIMESTAMPS.ratesRecordedAt),
+  }));
+  // A rate a provider already stored for a day wins; the unique index keeps one per day.
+  await db.insert(currencyRateHistory).values(rows).onConflictDoNothing();
+}
+
+/** Confirms each account's bank as a licensed entity, so no bank waits for review in the plan. */
+async function confirmBankingEntities(context: Context): Promise<void> {
+  for (const account of SAVINGS_ACCOUNTS) {
+    const protection = DEPOSIT_PROTECTION[account.bank];
+    if (!protection) throw new Error(`No deposit protection is defined for ${account.bank}`);
+    await context.api[account.owner].patch(
+      `/api/savings/accounts/${idOf(context, `savings:${account.key}`)}/banking-entity`,
+      { mode: 'manual', entityName: account.bank, ...protection },
+    );
+  }
+  // The route stamps the clock; the household states when the entities were confirmed.
+  await db
+    .update(savingsAccounts)
+    .set({ bankingEntityConfirmedAt: new Date(HOUSEHOLD_TIMESTAMPS.bankingEntitiesConfirmedAt) })
+    .where(
+      inArray(
+        savingsAccounts.id,
+        SAVINGS_ACCOUNTS.map((account) => idOf(context, `savings:${account.key}`)),
+      ),
+    );
 }
 
 async function seedSavings(context: Context): Promise<void> {
@@ -452,9 +494,20 @@ async function seedBudget(context: Context): Promise<void> {
 async function verifyHousehold(context: Context): Promise<void> {
   for (const member of ['demo', 'partner'] as const) {
     const api = context.api[member];
-    await api.get('/api/dashboard/summary');
+    const summary = await api.get<{ netWorth: { isEstimated: boolean }[] }>(
+      '/api/dashboard/summary',
+    );
     await api.get('/api/dashboard/allocations');
-    await api.get('/api/plan/runway');
+    const runway = await api.get<{ depositGuarantee: { confidence: string }[] }>(
+      '/api/plan/runway',
+    );
+    // The chart rests on stored rates and prices, and no bank waits for review.
+    if (summary.netWorth.some((point) => point.isEstimated)) {
+      throw new Error(`The seeded net worth history of the ${member} user is marked estimated`);
+    }
+    if (runway.depositGuarantee.some((entry) => entry.confidence !== 'verified')) {
+      throw new Error(`A bank of the ${member} user still needs entity review`);
+    }
   }
 }
 
@@ -473,7 +526,9 @@ async function writeHousehold(
   const context: Context = { api, userIds, ids: new Map() };
   try {
     await linkPartners(context, partnerEmail);
+    await seedRateHistory();
     await seedSavings(context);
+    await confirmBankingEntities(context);
     await seedHoldings(context);
     await seedProperties(context);
     await seedMortgage(context);

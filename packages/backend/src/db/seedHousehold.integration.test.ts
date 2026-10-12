@@ -10,12 +10,15 @@ import {
   MORTGAGE,
   PENSION_POTS,
   PROPERTIES,
+  RATE_HISTORY_FIRST_DAY,
+  RATE_HISTORY_LAST_DAY,
   SAVINGS_ACCOUNTS,
   expectedDebtBalance,
   expectedMortgageBalance,
   expectedPensionBalance,
   expectedPropertyDebt,
   expectedSavingsBalance,
+  rateHistoryDays,
 } from './demoHousehold';
 import { DEMO_PARTNER_EMAIL, DEMO_USER_EMAIL } from './maintenance';
 
@@ -112,6 +115,7 @@ afterAll(async () => {
 // by the row's position in its table and each reference by the position of the row it points to.
 const TABLES = [
   'users',
+  'currency_rate_history',
   'partner_links',
   'partner_link_members',
   'savings_accounts',
@@ -222,6 +226,7 @@ describe('the household seed on a database with someone else in it', () => {
         expect(await count(sql, table)).toBe(0);
       }
       expect(await count(sql, 'currency_rates')).toBe(0);
+      expect(await count(sql, 'currency_rate_history')).toBe(0);
     });
   });
 
@@ -232,6 +237,8 @@ describe('the household seed on a database with someone else in it', () => {
       expect(await count(sql, 'users')).toBe(2);
       expect(await count(sql, 'savings_accounts')).toBe(0);
       expect(await count(sql, 'partner_links')).toBe(0);
+      // The plain seed writes rates, never a history of them.
+      expect(await count(sql, 'currency_rate_history')).toBe(0);
     });
   });
 
@@ -294,10 +301,20 @@ describe('the seeded household', () => {
     await withDatabase(database, async (sql) => {
       await sql`update savings_accounts set balance = 1, is_joint = false where name = 'Joint Household'`;
       await sql`delete from goals`;
+      await sql`delete from currency_rate_history where source_date = '2025-03-01'`;
+      await sql`insert into currency_rate_history (from_currency, to_currency, rate, provider, source_date)
+        values ('GBP', 'EUR', 1.2, 'provider-fixture', '2024-12-01')`;
       await sql`insert into goals (user_id, name, current_amount, target_amount, deadline, category,
         monthly_contribution) select id, 'Stray', 1, 2, 'Dec 2030', 'x', 0 from users limit 1`;
     });
     expect((await seed(database, '--household')).exitCode).toBe(0);
+    // Everything but the provider's row is back; that row is not the seed's to remove.
+    await withDatabase(database, async (sql) => {
+      const [kept] = await sql<{ n: number }[]>`
+        select count(*)::int as n from currency_rate_history where provider = 'provider-fixture'`;
+      expect(kept!.n).toBe(1);
+      await sql`delete from currency_rate_history where provider = 'provider-fixture'`;
+    });
     expect(await fingerprint(database)).toEqual(firstFingerprint);
   });
 
@@ -335,6 +352,36 @@ describe('the seeded household', () => {
       const nonAscii = await sql<{ n: number }[]>`
         select count(*)::int as n from savings_accounts where name ~ '[^\\x01-\\x7F]'`;
       expect(nonAscii[0]!.n).toBeGreaterThan(0);
+    });
+  });
+
+  test('stores a monthly rate history of its own for every currency, and confirms every bank', async () => {
+    await withDatabase(database, async (sql) => {
+      const perCurrency = await sql<{ currency: string; n: number; first: string; last: string }[]>`
+        select from_currency::text as currency, count(*)::int as n,
+               min(source_date)::text as first, max(source_date)::text as last
+        from currency_rate_history where provider = 'seed' group by 1 order by 1`;
+      expect(perCurrency.map((row) => row.currency)).toEqual([
+        'AUD',
+        'CAD',
+        'CHF',
+        'GBP',
+        'NZD',
+        'SGD',
+        'USD',
+      ]);
+      for (const row of perCurrency) {
+        expect(row.n).toBe(rateHistoryDays().length);
+        expect([row.first, row.last]).toEqual([RATE_HISTORY_FIRST_DAY, RATE_HISTORY_LAST_DAY]);
+      }
+      const [others] = await sql<{ n: number }[]>`
+        select count(*)::int as n from currency_rate_history where provider <> 'seed'`;
+      expect(others!.n).toBe(0);
+      const [unconfirmed] = await sql<{ n: number }[]>`
+        select count(*)::int as n from savings_accounts
+        where banking_entity_confirmed_at is null or banking_entity_id is null
+          or deposit_guarantee_cap is null`;
+      expect(unconfirmed!.n).toBe(0);
     });
   });
 
@@ -549,6 +596,31 @@ describe('the seeded household through the application', () => {
       const runway = probe[member]['/api/plan/runway'] as { baseCurrency: string; burn: object };
       expect(runway.baseCurrency).toBe('EUR');
       expect(runway.burn).toBeDefined();
+    }
+  });
+
+  test('shows a net worth history none of whose points is estimated', () => {
+    for (const member of ['demo', 'partner'] as const) {
+      const summary = probe[member]['/api/dashboard/summary'] as {
+        netWorth: { isEstimated: boolean }[];
+      };
+      expect(summary.netWorth.length).toBeGreaterThan(6);
+      expect(summary.netWorth.filter((point) => point.isEstimated)).toEqual([]);
+      const history = probe[member]['/api/dashboard/net-worth'] as { isEstimated: boolean }[];
+      expect(history.filter((point) => point.isEstimated)).toEqual([]);
+    }
+  });
+
+  test('reports no bank awaiting entity review', () => {
+    for (const member of ['demo', 'partner'] as const) {
+      const runway = probe[member]['/api/plan/runway'] as {
+        depositGuarantee: { confidence: string; accountIds: number[]; cap: number | null }[];
+      };
+      expect(runway.depositGuarantee.length).toBeGreaterThan(0);
+      expect(runway.depositGuarantee.filter((entry) => entry.confidence !== 'verified')).toEqual(
+        [],
+      );
+      for (const entry of runway.depositGuarantee) expect(entry.cap).toBeGreaterThan(0);
     }
   });
 
