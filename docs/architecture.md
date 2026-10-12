@@ -11,7 +11,7 @@ Quro is a self-hosted personal finance app intended for home/LAN use over plain 
 | Profile                   | Services included                                      |
 | ------------------------- | ------------------------------------------------------ |
 | default (no profile flag) | `frontend`, `backend`, `db`, `migrate`                 |
-| `pension-import`          | adds `pension-import-worker`, `vllm`, `pension-parser` |
+| `ocr` (experimental)      | adds `pension-import-worker`, `vllm`, `pension-parser` |
 | `maintenance`             | adds `db-tools`                                        |
 
 ### Host-exposed ports
@@ -23,7 +23,7 @@ Quro is a self-hosted personal finance app intended for home/LAN use over plain 
 
 ### Network map
 
-Three Docker bridge networks isolate traffic. Services are only placed on networks they need.
+Docker bridge networks isolate traffic. Services are only placed on networks they need. `ocr-net` is internal: it has no route out of the host. `ocr-egress` exists only so the model server can download its model.
 
 ```mermaid
 graph LR
@@ -39,31 +39,32 @@ graph LR
     backend -->|volume| documents
   end
 
-  subgraph "pension-import profile"
+  subgraph "ocr profile"
     worker["pension-import-worker"]
     parser["pension-parser (FastAPI)"]
     vllm["vllm (Qwen 2.5)"]
     worker -->|backend-net| db
     worker -->|volume| documents
-    worker -->|ai-net| parser
-    parser -->|ai-net| vllm
+    worker -->|ocr-net| parser
+    parser -->|ocr-net| vllm
+    vllm -->|ocr-egress| internet["model download"]
   end
 ```
 
 **Network membership summary:**
 
-| Service               | frontend-net | backend-net | ai-net |
-| --------------------- | ------------ | ----------- | ------ |
-| frontend              | yes          | no          | no     |
-| backend               | yes          | yes         | no     |
-| db                    | no           | yes         | no     |
-| migrate               | no           | yes         | no     |
-| pension-import-worker | no           | yes         | yes    |
-| pension-parser        | no           | no          | yes    |
-| vllm                  | no           | no          | yes    |
-| db-tools              | no           | yes         | no     |
+| Service               | frontend-net | backend-net | ocr-net | ocr-egress |
+| --------------------- | ------------ | ----------- | ------- | ---------- |
+| frontend              | yes          | no          | no      | no         |
+| backend               | yes          | yes         | no      | no         |
+| db                    | no           | yes         | no      | no         |
+| migrate               | no           | yes         | no      | no         |
+| pension-import-worker | no           | yes         | yes     | no         |
+| pension-parser        | no           | no          | yes     | no         |
+| vllm                  | no           | no          | yes     | yes        |
+| db-tools              | no           | yes         | no      | no         |
 
-The frontend can reach the backend (via `frontend-net`) but cannot directly reach the database, the documents directory or the AI services. The pension import worker bridges `backend-net` (for the database) and `ai-net` (for the parser), and mounts the same documents directory as the backend. The parser and vLLM are isolated on `ai-net` and are unreachable from the browser or the Hono API server directly.
+The frontend can reach the backend (via `frontend-net`) but cannot directly reach the database, the documents directory or the AI services. The pension import worker bridges `backend-net` (for the database) and `ocr-net` (for the parser), and mounts the same documents directory as the backend. The parser and vLLM are isolated on `ocr-net` and are unreachable from the browser or the Hono API server directly. Both run as non-root users with dropped capabilities and CPU, memory and process limits; the parser also has a read-only root filesystem.
 
 Uploaded documents are stored on the filesystem (`./data/documents`, mounted at `/var/lib/quro/documents`) by default. An S3-compatible store the operator runs is the alternative; the backend then reaches it over the network instead of the volume. See [document storage](document-storage.md).
 
@@ -193,7 +194,7 @@ stateDiagram-v2
 
 The user selects a PDF on the Pension page in the frontend and submits it with a `potId`. The frontend `POST`s to `/api/pensions/imports` as `multipart/form-data`.
 
-The backend (`pension-imports.ts`) validates the file (PDF MIME type, size), hashes it with SHA-256 to detect duplicates, stores the bytes in the document store under the key `users/{userId}/pensions/{potId}/imports/{uuid}.pdf`, then inserts a row into `pension_statement_imports` with `status = 'queued'`. The PDF storage key is stored in the DB record; the actual bytes never touch the DB.
+The backend (`pension-imports.ts`) reads the form through `readUploadForm()` (`lib/uploadForm.ts`, shared by every PDF upload route: a body that is not a readable form answers 400 `Invalid upload`, a body declared above the PDF limit 413), validates the file (PDF MIME type, size, `%PDF` signature), hashes it with SHA-256 to detect duplicates, stores the bytes in the document store under the key `users/{userId}/pensions/{potId}/imports/{uuid}.pdf`, then inserts a row into `pension_statement_imports` with `status = 'queued'`. The PDF storage key is stored in the DB record; the actual bytes never touch the DB.
 
 **2. Worker picks up the job**
 
@@ -206,7 +207,7 @@ The `pension-import-worker` container runs the backend's `worker:pension-imports
 
 Once locked, the worker reads the PDF bytes from the document store and calls `parsePensionStatement()` in `pensionParserClient.ts`. This posts the PDF as a multipart form to the `pension-parser` service at `POST /v1/extract`, passing `provider`, `currency`, and `languageHints`.
 
-The `pension-parser` is a FastAPI service that uses pdf2image/OCR to extract text from the PDF. It optionally calls vLLM (running Qwen 2.5 by default) for structured extraction when the regex-only fallback is insufficient. The parser response includes:
+The `pension-parser` is a FastAPI service. It reads the PDF's text layer and, when that holds too little text, renders and OCRs the pages one at a time (pdf2image, tesseract). Extraction never runs on the event loop: each document goes to a fresh child process in its own process group, with address-space, CPU-time and file-size limits that the renderer and OCR processes inherit. The service kills the whole group when the wall-clock bound runs out or when the client disconnects, so a backend timeout also stops the work. File size, page count, rendered page size, extracted text, concurrent and queued extractions are bounded too; see [bounds on document processing](development.md#bounds-on-document-processing). Failures answer a fixed code and message, never the PDF library's text. It optionally calls vLLM (running Qwen 2.5 by default) for structured extraction when the regex-only fallback is insufficient. The parser response includes:
 
 - `statementPeriodStart` / `statementPeriodEnd` — ISO date strings
 - `modelName` / `modelVersion` — which model was used (null for regex-only)
@@ -217,9 +218,11 @@ The parser can be configured via environment variables:
 - `PARSER_ALLOW_REGEX_FALLBACK=true` — fall back to regex if the LLM fails
 - `PARSER_REGEX_ONLY=true` — skip the LLM entirely
 
+When the parser's queue is full it answers 503; the worker puts the import back in the queue for its next tick. Any other parser failure, and the backend's own `PENSION_PARSER_TIMEOUT_MS`, fail the import with a fixed message.
+
 **4. Persisting results**
 
-The worker checks for duplicate statements (same file hash + period against `ACTIVE_IMPORT_STATUSES`). If none, it inserts all rows into `pension_statement_import_rows` (with collision warnings for any row that matches an existing transaction by type, date, and amount within 0.01), and updates the import record to `status = 'ready_for_review'`. On any error, `status` becomes `'failed'` with an error message.
+The worker checks for duplicate statements (same file hash + period against `ACTIVE_IMPORT_STATUSES`). If none, it inserts all rows into `pension_statement_import_rows` (with collision warnings for any row that matches an existing transaction by type, date, and amount within 0.01), and updates the import record to `status = 'ready_for_review'`, in one transaction and only while the import is still `processing`: an import cancelled or expired during parsing stays that way. Rows from an earlier attempt are replaced, never added to. On any error, `status` becomes `'failed'` with an error message.
 
 **5. User review**
 
