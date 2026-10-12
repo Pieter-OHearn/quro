@@ -27,6 +27,8 @@ export const HOUSEHOLD_TIMESTAMPS = {
   partnerAcceptedAt: '2025-01-05T11:30:00.000Z',
   employmentsRecordedAt: '2025-01-02T09:00:00.000Z',
   pricesSyncedAt: '2026-10-09T18:00:00.000Z',
+  ratesRecordedAt: '2026-10-09T18:00:00.000Z',
+  bankingEntitiesConfirmedAt: '2025-01-06T09:00:00.000Z',
 } as const;
 
 export const DEMO_PARTNER_PROFILE = {
@@ -281,6 +283,29 @@ export function expectedSavingsBalance(account: SavingsAccountSpec): number {
     ),
   );
 }
+
+/**
+ * The deposit protection each bank's accounts are confirmed under: fictional licensed entities and
+ * schemes, so the plan shows no bank awaiting review.
+ */
+export const DEPOSIT_PROTECTION: Record<
+  string,
+  { scheme: string; cap: number; currency: CurrencyCode }
+> = {
+  'Example Bank': { scheme: 'Example Deposit Guarantee Scheme', cap: 100000, currency: 'EUR' },
+  'Voorbeeld Spaarbank': {
+    scheme: 'Example Deposit Guarantee Scheme',
+    cap: 100000,
+    currency: 'EUR',
+  },
+  'Sample Building Society': {
+    scheme: 'Sample Deposit Protection Scheme',
+    cap: 85000,
+    currency: 'GBP',
+  },
+  'Sample Credit Union': { scheme: 'Sample Share Insurance Fund', cap: 250000, currency: 'USD' },
+  'Beispiel Kantonalbank': { scheme: 'Beispiel Einlagensicherung', cap: 100000, currency: 'CHF' },
+};
 
 // ── Investments ──────────────────────────────────────────────────────────────
 
@@ -1361,6 +1386,57 @@ export function budgetTransactions(): BudgetTransactionSpec[] {
             currency: entry.currency ?? ('EUR' as const),
           })),
     ),
+  );
+}
+
+// ── Exchange-rate history ────────────────────────────────────────────────────
+
+export const RATE_HISTORY_FIRST_DAY = '2025-01-01';
+export const RATE_HISTORY_LAST_DAY = '2026-10-01';
+
+// Per-mille moves around each currency's seeded rate, so the history is plausible and fixed.
+const RATE_WAVE_PER_MILLE = [0, 4, -3, 6, 2, -5, 1, 7, -2, 3, -6, 5];
+
+export type SeedRateHistoryRow = {
+  fromCurrency: CurrencyCode;
+  toCurrency: 'EUR';
+  rate: number;
+  sourceDate: string;
+};
+
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+/** The first of every month from RATE_HISTORY_FIRST_DAY to RATE_HISTORY_LAST_DAY. */
+export function rateHistoryDays(): string[] {
+  const days: string[] = [];
+  let year = Number(RATE_HISTORY_FIRST_DAY.slice(0, 4));
+  let month = Number(RATE_HISTORY_FIRST_DAY.slice(5, 7));
+  while (`${year}-${pad2(month)}-01` <= RATE_HISTORY_LAST_DAY) {
+    days.push(`${year}-${pad2(month)}-01`);
+    year += month === 12 ? 1 : 0;
+    month = month === 12 ? 1 : month + 1;
+  }
+  return days;
+}
+
+/**
+ * A monthly rate for each currency the seed holds a rate for, in the seed's own terms (to EUR). It
+ * moves a few per mille around the seeded rate and is the same every time.
+ */
+export function buildSeedRateHistory(
+  baseRates: readonly { fromCurrency: CurrencyCode; rate: number }[],
+): SeedRateHistoryRow[] {
+  return rateHistoryDays().flatMap((sourceDate, monthIndex) =>
+    baseRates.map(({ fromCurrency, rate }, currencyIndex) => {
+      const move =
+        RATE_WAVE_PER_MILLE[(monthIndex * 3 + currencyIndex * 5) % RATE_WAVE_PER_MILLE.length]!;
+      return {
+        fromCurrency,
+        toCurrency: 'EUR' as const,
+        rate: Number(((rate * (1000 + move)) / 1000).toFixed(6)),
+        sourceDate,
+      };
+    }),
   );
 }
 

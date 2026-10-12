@@ -82,6 +82,10 @@ With a digest in the image reference, Docker pulls only an image with that diges
 
 Instead of giving the directories to UID 1000, you can run the backend as your own user. Add `user: "<uid>:<gid>"` (from `id -u` and `id -g`) to the `migrate` and `backend` services, and run `quro init` with `--user "$(id -u):$(id -g)"`. Use bind mounts you own for every data directory: a new named volume is prepared for UID 1000.
 
+### Container restrictions
+
+The example Compose file runs every service without the Linux capabilities it does not need, with `no-new-privileges` and a memory and process limit, and runs the backend and the frontend with a read-only root filesystem and a tmpfs at `/tmp`. Keep these settings when you adapt the file; they work with your own `user:` too. If a backup or restore of a large database stops with exit code 137, raise `mem_limit` of the `migrate` service. The [security model](security.md#container-hardening) lists each setting and what it does not cover.
+
 ## Existing PostgreSQL server
 
 PostgreSQL 16, 17 and 18 are supported. Do steps 1 to 3 of [Install](#install), then:

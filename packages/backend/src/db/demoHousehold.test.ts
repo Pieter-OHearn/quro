@@ -2,6 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import { toCents } from '@quro/shared';
 import {
   BUDGET_CATEGORIES,
+  DEPOSIT_PROTECTION,
+  RATE_HISTORY_FIRST_DAY,
+  RATE_HISTORY_LAST_DAY,
+  buildSeedRateHistory,
+  rateHistoryDays,
   BUDGET_MONTHS,
   DEBTS,
   DEMO_PARTNER_PROFILE,
@@ -24,7 +29,7 @@ import {
   expectedSavingsBalance,
   expectedShares,
 } from './demoHousehold';
-import { DEMO_USER_PROFILE } from './demoSeed';
+import { buildSeedCurrencyRates, DEMO_USER_PROFILE } from './demoSeed';
 import { DEMO_PARTNER_EMAIL, DEMO_USER_EMAIL, DEMO_USER_EMAILS } from './maintenance';
 
 // The household is data, so its shape is checked without a database: what it contains, that it is
@@ -290,5 +295,68 @@ describe('demo household data', () => {
       GOALS,
     ]);
     expect(text).not.toMatch(/document|\.pdf/i);
+  });
+});
+
+describe('demo household rate history', () => {
+  const base = buildSeedCurrencyRates(new Date('2026-10-09T12:00:00Z'));
+  const history = buildSeedRateHistory(base);
+  const currencies = new Set<string>([
+    ...SAVINGS_ACCOUNTS.map((a) => a.currency),
+    ...HOLDINGS.map((h) => h.currency),
+    ...PROPERTIES.map((p) => p.currency),
+    ...PENSION_POTS.map((p) => p.currency),
+    ...DEBTS.map((d) => d.currency),
+    ...EMPLOYMENTS.map((e) => e.currency),
+    ...budgetTransactions().map((t) => t.currency),
+  ]);
+
+  test('has a rate on the first of every month, for every currency the seed holds a rate for', () => {
+    const days = rateHistoryDays();
+    expect(days[0]).toBe(RATE_HISTORY_FIRST_DAY);
+    expect(days.at(-1)).toBe(RATE_HISTORY_LAST_DAY);
+    expect(days).toHaveLength(22);
+    expect(history).toHaveLength(days.length * base.length);
+    for (const { fromCurrency } of base) {
+      const own = history.filter((row) => row.fromCurrency === fromCurrency);
+      expect(own.map((row) => row.sourceDate)).toEqual(days);
+    }
+  });
+
+  test('covers the household date range for every currency it uses', () => {
+    const earliest = datedRows()
+      .map((row) => row.date)
+      .sort()[0]!;
+    expect(RATE_HISTORY_FIRST_DAY <= earliest).toBe(true);
+    expect(RATE_HISTORY_LAST_DAY >= `${HOUSEHOLD_AS_OF.slice(0, 7)}-01`).toBe(true);
+    for (const currency of currencies) {
+      if (currency === 'EUR') continue;
+      expect(history.some((row) => row.fromCurrency === currency)).toBe(true);
+    }
+  });
+
+  test('is plausible: within one percent of the seeded rate, six decimals, to EUR', () => {
+    for (const row of history) {
+      const seeded = base.find((rate) => rate.fromCurrency === row.fromCurrency)!.rate;
+      expect(Math.abs(row.rate / seeded - 1)).toBeLessThan(0.01);
+      expect(hasAtMostDecimals(row.rate, MAX_SHARE_DECIMALS)).toBe(true);
+      expect(row.toCurrency).toBe('EUR');
+    }
+  });
+
+  test('is the same every time', () => {
+    expect(buildSeedRateHistory(base)).toEqual(history);
+    expect(buildSeedRateHistory(buildSeedCurrencyRates(new Date('2031-01-01T00:00:00Z')))).toEqual(
+      history,
+    );
+  });
+
+  test('confirms every bank of the household under a fictional scheme', () => {
+    for (const account of SAVINGS_ACCOUNTS) {
+      const protection = DEPOSIT_PROTECTION[account.bank];
+      expect(protection).toBeDefined();
+      expect(protection!.cap).toBeGreaterThan(0);
+      expect(protection!.currency).toBe(account.currency);
+    }
   });
 });
