@@ -624,7 +624,12 @@ const smokeCases: readonly SmokeCase[] = [
         <div>Details</div>
       </PageStack>
     ),
-    includes: ['data-smoke="page-stack"', 'p-6 space-y-6', 'Overview', 'Details'],
+    includes: [
+      'data-smoke="page-stack"',
+      'p-4 sm:p-6 space-y-4 sm:space-y-6',
+      'Overview',
+      'Details',
+    ],
   },
   {
     name: 'ContentSection renders section spacing classes',
@@ -633,7 +638,25 @@ const smokeCases: readonly SmokeCase[] = [
         <div>Performance</div>
       </ContentSection>
     ),
-    includes: ['data-smoke="content-section"', 'space-y-6', 'Performance'],
+    includes: ['data-smoke="content-section"', 'space-y-4 sm:space-y-6', 'Performance'],
+    excludes: ['<h2'],
+  },
+  {
+    name: 'ContentSection renders a titled section with the section title style',
+    element: (
+      <ContentSection data-smoke="titled-section" title="Performance" contentClassName="grid gap-4">
+        <div>Chart</div>
+      </ContentSection>
+    ),
+    includes: [
+      'data-smoke="titled-section"',
+      'flex flex-col gap-3',
+      'aria-labelledby=',
+      'text-title-section',
+      '>Performance</h2>',
+      'grid gap-4',
+      'Chart',
+    ],
   },
 ];
 

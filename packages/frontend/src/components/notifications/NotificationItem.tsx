@@ -13,7 +13,7 @@ const STATUS_META = {
     labelCls: 'bg-surface-muted text-fg-subtle',
   },
   processing: {
-    bar: 'bg-brand-disabled',
+    bar: 'bg-brand',
     bgTint: 'bg-brand-soft/30',
     iconBg: 'bg-brand-soft',
     iconColor: 'text-brand-accent',
@@ -97,10 +97,7 @@ function renderFooter(item: NotificationItemType) {
           <span className="text-[10px] text-fg-faint">AI reading your PDF…</span>
         </div>
         <div className="h-1 bg-surface-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-brand-disabled rounded-full animate-pulse"
-            style={{ width: '62%' }}
-          />
+          <div className="h-full bg-brand rounded-full animate-pulse" style={{ width: '62%' }} />
         </div>
       </div>
     );

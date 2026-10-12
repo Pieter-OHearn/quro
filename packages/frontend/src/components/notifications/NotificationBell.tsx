@@ -71,23 +71,23 @@ function BellButton({
     <button
       type="button"
       onClick={onToggle}
-      className={`relative p-2 rounded-md transition-colors ${
+      className={`relative inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-fast max-sm:h-11 max-sm:w-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring ${
         open
-          ? 'bg-surface-muted text-fg-strong'
-          : 'hover:bg-surface-muted text-fg-subtle hover:text-fg-strong'
+          ? 'bg-surface-muted text-fg'
+          : 'text-fg-subtle hover:bg-surface-muted hover:text-fg active:bg-surface-muted'
       }`}
       title="Notifications"
     >
-      <Bell size={18} className={ring ? 'animate-bounce' : ''} />
+      <Bell size={16} className={ring ? 'animate-bounce' : ''} />
 
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-danger rounded-sm flex items-center justify-center text-[9px] font-bold text-fg-inverted border-2 border-fg-inverted px-0.5 tabular-nums">
+        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm border-2 border-surface-sunken bg-danger px-0.5 text-[11px] leading-none font-semibold text-fg-inverted tabular-nums">
           {unreadCount > BADGE_OVERFLOW_LIMIT ? '9+' : unreadCount}
         </span>
       )}
 
       {unreadCount === 0 && hasActiveJobs && (
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-disabled rounded-full border border-fg-inverted animate-pulse" />
+        <span className="absolute top-1.5 right-1.5 h-2 w-2 animate-pulse rounded-full border border-surface-sunken bg-brand" />
       )}
     </button>
   );
