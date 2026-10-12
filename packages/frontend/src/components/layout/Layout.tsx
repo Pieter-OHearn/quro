@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router';
+import { useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router';
 import {
   LayoutDashboard,
   PiggyBank,
@@ -17,16 +17,15 @@ import {
   LogOut,
   User,
   ShieldCheck,
-  ChevronDown,
-  Check,
   Compass,
 } from 'lucide-react';
-import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContext';
-import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { useAuth } from '@/lib/AuthContext';
 import { getUserDisplayName } from '@/lib/user';
-import { QuroLogo } from '@/components/ui';
+import { cn } from '@/lib/utils';
+import { IconButton, QuroLogo } from '@/components/ui';
 import { NotificationBell } from '@/components/notifications';
+import { CurrencySelector } from './CurrencySelector';
+import { SidebarButton, SidebarLink } from './SidebarItem';
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -41,183 +40,56 @@ const navItems = [
   { label: 'Budget', path: '/budget', icon: Wallet },
 ];
 
-// ─── Currency Selector ────────────────────────────────────────────────────────
-
-type CurrencyDropdownProps = {
-  baseCurrency: CurrencyCode;
-  onSelect: (code: CurrencyCode) => void;
-};
-
-function formatRatesUpdatedAt(updatedAt: string | null): string {
-  if (!updatedAt) return 'Synced FX rates';
-
-  const parsed = new Date(updatedAt);
-  if (Number.isNaN(parsed.getTime())) return 'Synced FX rates';
-
-  return `Rates updated ${parsed.toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })}`;
-}
-
-type CurrencyDropdownWithRatesProps = CurrencyDropdownProps & {
-  ratesUpdatedAt: string | null;
-};
-
-function CurrencyDropdown({
-  baseCurrency,
-  onSelect,
-  ratesUpdatedAt,
-}: CurrencyDropdownWithRatesProps) {
-  return (
-    <div className="absolute right-0 top-full mt-2 w-56 bg-surface rounded-lg border border-border-default shadow-popover z-50 overflow-hidden">
-      <div className="px-3 py-2.5 border-b border-border-subtle">
-        <p className="text-[10px] font-semibold text-fg-faint uppercase tracking-widest">
-          Base Currency
-        </p>
-        <p className="text-xs text-fg-subtle mt-0.5">All totals convert to this currency</p>
-      </div>
-      <div className="py-1.5 max-h-72 overflow-y-auto">
-        {CURRENCY_CODES.map((code: CurrencyCode) => {
-          const m = CURRENCY_META[code];
-          const isSelected = code === baseCurrency;
-          return (
-            <button
-              key={code}
-              onClick={() => onSelect(code)}
-              className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-surface-sunken transition-colors ${isSelected ? 'text-brand' : 'text-fg-strong'}`}
-            >
-              <span className="text-base">{m.flag}</span>
-              <span className="flex-1 text-left">
-                <span className="font-medium">{code}</span>
-                <span className="text-fg-faint ml-2 text-xs">{m.name}</span>
-              </span>
-              {isSelected && <Check size={14} className="text-brand" />}
-            </button>
-          );
-        })}
-      </div>
-      <div className="border-t border-border-subtle px-3 py-2 text-[11px] text-fg-faint">
-        {formatRatesUpdatedAt(ratesUpdatedAt)}
-      </div>
-    </div>
-  );
-}
-
-function CurrencySelector() {
-  const { baseCurrency, setBaseCurrency, ratesUpdatedAt } = useCurrency();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const meta = CURRENCY_META[baseCurrency];
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border-default hover:bg-surface-sunken text-sm font-medium text-fg-strong transition-colors"
-      >
-        <span className="text-base leading-none">{meta.flag}</span>
-        <span>{baseCurrency}</span>
-        <ChevronDown
-          size={13}
-          className={`text-fg-faint transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <CurrencyDropdown
-          baseCurrency={baseCurrency}
-          ratesUpdatedAt={ratesUpdatedAt}
-          onSelect={(code) => {
-            setBaseCurrency(code);
-            setOpen(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-type NavItemsProps = { collapsed: boolean; pathname: string; onNavigate: () => void };
+type NavItemsProps = { collapsed: boolean; onNavigate: () => void };
 
-function SidebarNav({ collapsed, pathname, onNavigate }: NavItemsProps) {
+function SidebarNav({ collapsed, onNavigate }: NavItemsProps) {
+  // The negative margin and padding leave room for the focus outline of the items at the edges,
+  // which the scroll container would otherwise clip. The collapsed sidebar does not scroll,
+  // because a scroll container would also clip the label tooltips beside the icons.
   return (
-    <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-      {!collapsed && (
-        <p className="px-3 text-[10px] font-semibold tracking-widest text-fg-subtle uppercase mb-2">
-          Menu
-        </p>
-      )}
-      {navItems.map(({ label, path, icon: Icon }) => {
-        const isActive = path === '/' ? pathname === '/' : pathname.startsWith(path);
-        return (
-          <NavLink
+    <nav
+      aria-label="Main"
+      className={cn('-m-1 flex-1 p-1', collapsed ? 'overflow-visible' : 'overflow-y-auto')}
+    >
+      {!collapsed && <p className="px-2 pb-1 text-label text-fg-subtle">Menu</p>}
+      <div className="space-y-0.5">
+        {navItems.map(({ label, path, icon }) => (
+          <SidebarLink
             key={path}
             to={path}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-150 relative group
-              ${isActive ? 'bg-brand text-fg-inverted' : 'text-fg-faint hover:bg-surface/5 hover:text-fg-inverted'}
-              ${collapsed ? 'justify-center' : ''}`}
-          >
-            <Icon size={18} className="flex-shrink-0" />
-            {!collapsed && <span className="text-sm font-medium">{label}</span>}
-            {collapsed && (
-              <div className="absolute left-14 bg-fg-emphasis text-fg-inverted text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 transition-opacity shadow-popover">
-                {label}
-              </div>
-            )}
-          </NavLink>
-        );
-      })}
+            icon={icon}
+            label={label}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </div>
     </nav>
   );
 }
 
-type SidebarBottomProps = {
-  collapsed: boolean;
-  pathname: string;
-  onNavigate: () => void;
-};
-
-function SidebarBottom({ collapsed, pathname, onNavigate }: SidebarBottomProps) {
+function SidebarBottom({ collapsed, onNavigate }: NavItemsProps) {
   const { signOut } = useAuth();
-  const settingsActive = pathname.startsWith('/settings');
 
   return (
-    <div className="border-t border-fg-inverted/10 px-2 py-3 space-y-1">
-      <NavLink
+    <div className="space-y-0.5 border-t border-border-subtle pt-2">
+      <SidebarLink
         to="/settings"
-        onClick={onNavigate}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all ${
-          settingsActive
-            ? 'bg-brand text-fg-inverted'
-            : 'text-fg-faint hover:bg-surface/5 hover:text-fg-inverted'
-        } ${collapsed ? 'justify-center' : ''}`}
-      >
-        <Settings size={18} />
-        {!collapsed && <span className="text-sm font-medium">Settings</span>}
-      </NavLink>
-      <button
+        icon={Settings}
+        label="Settings"
+        collapsed={collapsed}
+        onNavigate={onNavigate}
+      />
+      <SidebarButton
+        icon={LogOut}
+        label="Sign out"
+        collapsed={collapsed}
         onClick={() => {
           void signOut();
         }}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-fg-faint hover:bg-surface/5 hover:text-fg-inverted transition-all ${collapsed ? 'justify-center' : ''}`}
-      >
-        <LogOut size={18} />
-        {!collapsed && <span className="text-sm font-medium">Sign out</span>}
-      </button>
+      />
     </div>
   );
 }
@@ -227,54 +99,68 @@ type SidebarProps = {
   mobileOpen: boolean;
   setCollapsed: (v: boolean) => void;
   setMobileOpen: (v: boolean) => void;
-  pathname: string;
 };
 
-function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen, pathname }: SidebarProps) {
+function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen }: SidebarProps) {
+  const ToggleIcon = collapsed ? ChevronRight : ChevronLeft;
+
   return (
     <aside
-      className={`fixed lg:relative z-50 h-full flex flex-col bg-surface-inverse text-fg-inverted transition-all duration-300
-        ${collapsed ? 'w-[72px]' : 'w-64'}
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+      className={cn(
+        'fixed lg:relative z-50 h-full flex flex-col gap-2 p-2 border-r border-border-default bg-surface-nav transition-[width,transform] duration-base ease-standard',
+        collapsed ? 'w-[72px]' : 'w-52',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+      )}
     >
       <div
-        className={`flex items-center gap-3 px-4 py-5 border-b border-fg-inverted/10 ${collapsed ? 'justify-center' : ''}`}
-      >
-        <QuroLogo size={36} className="flex-shrink-0" />
-        {!collapsed && (
-          <div>
-            <span className="text-xl font-bold tracking-tight text-fg-inverted">Quro</span>
-            <span className="block text-[10px] text-brand-disabled tracking-widest uppercase">
-              Finance
-            </span>
-          </div>
+        className={cn(
+          'flex h-10 flex-shrink-0 items-center gap-2 px-2',
+          collapsed && 'justify-center',
         )}
+      >
+        <QuroLogo size={20} className="flex-shrink-0" />
+        {!collapsed && <span className="text-title-section text-fg">Quro</span>}
       </div>
-      <SidebarNav
-        collapsed={collapsed}
-        pathname={pathname}
-        onNavigate={() => setMobileOpen(false)}
-      />
-      <SidebarBottom
-        collapsed={collapsed}
-        pathname={pathname}
-        onNavigate={() => setMobileOpen(false)}
-      />
+      <SidebarNav collapsed={collapsed} onNavigate={() => setMobileOpen(false)} />
+      <SidebarBottom collapsed={collapsed} onNavigate={() => setMobileOpen(false)} />
       <button
+        type="button"
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         onClick={() => setCollapsed(!collapsed)}
-        className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-brand rounded-md border border-border-default items-center justify-center hover:bg-brand-accent transition-colors"
+        className="hidden lg:flex absolute -right-3 top-4 h-6 w-6 items-center justify-center rounded-md border border-border-default bg-surface text-fg-muted transition-colors duration-fast hover:bg-surface-muted hover:text-fg active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       >
-        {collapsed ? (
-          <ChevronRight size={12} className="text-fg-inverted" />
-        ) : (
-          <ChevronLeft size={12} className="text-fg-inverted" />
-        )}
+        <ToggleIcon size={14} aria-hidden="true" />
       </button>
     </aside>
   );
 }
 
 // ─── App Header ───────────────────────────────────────────────────────────────
+
+function ProfileButton() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const userDisplayName = getUserDisplayName(user);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigate('/settings?tab=profile');
+      }}
+      className="flex h-8 max-sm:h-11 items-center gap-2 rounded-md pl-1 pr-2 max-sm:w-11 max-sm:justify-center max-sm:px-0 text-left transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+      aria-label="Open profile settings"
+    >
+      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-fg">
+        <User size={14} aria-hidden="true" />
+      </span>
+      <span className="hidden sm:block">
+        <span className="block text-label text-fg">{userDisplayName}</span>
+        <span className="block text-caption text-fg-subtle">{user?.email}</span>
+      </span>
+    </button>
+  );
+}
 
 type AppHeaderProps = {
   mobileOpen: boolean;
@@ -284,47 +170,26 @@ type AppHeaderProps = {
 };
 
 function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHeaderProps) {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const userDisplayName = getUserDisplayName(user);
-
   return (
-    <header className="bg-surface border-b border-border-default px-6 py-4 flex items-center justify-between flex-shrink-0">
-      <div className="flex items-center gap-3">
-        <button
+    <header className="flex h-12 flex-shrink-0 items-center justify-between gap-2 border-b border-border-default bg-surface-sunken px-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <IconButton
+          icon={mobileOpen ? X : Menu}
+          label={mobileOpen ? 'Close navigation' : 'Open navigation'}
+          variant="subtle"
+          size="md"
+          className="lg:hidden text-fg-muted"
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden p-2 rounded-md hover:bg-surface-muted text-fg-muted"
-        >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-        <div>
-          <h1 className="font-bold text-fg">{currentPageLabel}</h1>
-          <p className="text-xs text-fg-faint">{today}</p>
+        />
+        <div className="flex min-w-0 items-baseline sm:gap-3">
+          <h1 className="truncate text-title-page text-fg">{currentPageLabel}</h1>
+          <p className="hidden truncate text-caption text-fg-subtle sm:block">{today}</p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
         <CurrencySelector />
         <NotificationBell />
-        <button
-          type="button"
-          onClick={() => {
-            void navigate('/settings?tab=profile');
-          }}
-          className="group flex items-center gap-2 rounded-md border-l border-border-default pl-3 text-left transition-colors hover:bg-surface-sunken"
-          aria-label="Open profile settings"
-        >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-accent to-accent-premium flex items-center justify-center">
-            <User size={14} className="text-fg-inverted" />
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-xs font-semibold text-fg-emphasis transition-colors group-hover:text-brand">
-              {userDisplayName}
-            </p>
-            <p className="text-[10px] text-fg-faint transition-colors group-hover:text-fg-subtle">
-              {user?.email}
-            </p>
-          </div>
-        </button>
+        <ProfileButton />
       </div>
     </header>
   );
@@ -354,7 +219,7 @@ export function Layout() {
     <div className="flex h-screen bg-surface-sunken overflow-hidden">
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-overlay/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-scrim z-40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -363,7 +228,6 @@ export function Layout() {
         mobileOpen={mobileOpen}
         setCollapsed={setCollapsed}
         setMobileOpen={setMobileOpen}
-        pathname={location.pathname}
       />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <AppHeader

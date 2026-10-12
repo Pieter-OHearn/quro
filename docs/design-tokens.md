@@ -7,8 +7,11 @@ the V1 light and dark colour tokens, type scale, shadows, motion and radius scal
 `src/components/` uses that radius scale without resting shadows. The atoms in
 `src/components/ui/atoms/` (buttons, icon buttons, form fields, badges, cards, progress meters and
 spinners) use the V1 density and type scale: 32px controls on desktop and at least 44px on phones. The
-rest of the shared UI follows in later steps, and until a value has moved `theme.css` and this
-page describe what the app renders today.
+desktop shell does too: a 208px `surface-nav` sidebar with 32px items and a `brand-soft` active item, a
+48px header, and the `PageStack` and `ContentSection` templates (24px gutter and section gap on desktop,
+16px below 640px; `ContentSection` takes an optional `title` in the section title style). The rest of the
+shared UI follows in later steps, and until a value has moved `theme.css` and this page describe what the
+app renders today.
 
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
