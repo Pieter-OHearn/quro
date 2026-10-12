@@ -11,7 +11,7 @@ const STATUS_META: Array<{
   pulse?: boolean;
 }> = [
   { key: 'queuing', label: 'Queuing', dotClass: 'bg-border-strong' },
-  { key: 'processing', label: 'Processing', dotClass: 'bg-brand-disabled', pulse: true },
+  { key: 'processing', label: 'Processing', dotClass: 'bg-brand', pulse: true },
   { key: 'ready', label: 'Ready', dotClass: 'bg-warning-muted' },
   { key: 'failed', label: 'Failed', dotClass: 'bg-danger-muted' },
   { key: 'reminder', label: 'Reminders', dotClass: 'bg-warning-muted' },
