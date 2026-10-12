@@ -8,9 +8,13 @@ const ISO_DATE_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 type ParsedExpiry = {
   value: Date;
   monthPrecision: boolean;
+  /** The trimmed text it was parsed from. */
+  text: string;
 };
 
-function parseFixedUntil(raw: string): ParsedExpiry | null {
+function parseFixedUntil(raw: string | null): ParsedExpiry | null {
+  // The column is nullable: older rows and some API writes leave it unset.
+  if (raw === null) return null;
   const value = raw.trim();
   const match = YEAR_MONTH_PATTERN.exec(value) ?? ISO_DATE_PATTERN.exec(value);
   if (!match) return null;
@@ -26,7 +30,7 @@ function parseFixedUntil(raw: string): ParsedExpiry | null {
   ) {
     return null;
   }
-  return { value: parsed, monthPrecision: match[3] === undefined };
+  return { value: parsed, monthPrecision: match[3] === undefined, text: value };
 }
 
 function startOfUtcMonth(date: Date): Date {
@@ -67,7 +71,7 @@ export function buildMortgageExpiryNotification(
   if (comparisonToday < actionWindowStart || comparisonToday > expiry.value) return null;
 
   const expiryLabel = formatExpiry(expiry);
-  const eventVersion = `${mortgage.fixedUntil.trim()}:${mortgage.interestRate}`;
+  const eventVersion = `${expiry.text}:${mortgage.interestRate}`;
   return {
     id: `mortgage-expiry-${mortgage.id}-${eventVersion}`,
     kind: 'mortgage_expiry',

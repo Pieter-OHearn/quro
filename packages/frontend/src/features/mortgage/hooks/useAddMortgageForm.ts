@@ -137,7 +137,7 @@ function buildInitialMortgageState(
     interestRate: formatFixedInputValue(existing.interestRate),
     rateType: existing.rateType,
     repaymentType: existing.repaymentType,
-    fixedUntil: existing.fixedUntil,
+    fixedUntil: existing.fixedUntil ?? '',
     termYears: String(existing.termYears ?? ''),
     startDate: existing.startDate,
     endDate: existing.endDate,

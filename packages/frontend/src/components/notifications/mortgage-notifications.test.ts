@@ -91,6 +91,17 @@ describe('mortgage expiry notifications', () => {
     expect(changed?.dismissalKey).not.toBe(initial.dismissalKey);
   });
 
+  it('skips a fixed-rate mortgage whose fixed_until is NULL without failing the others', () => {
+    const today = new Date('2030-03-15T12:00:00Z');
+    const unset: Mortgage = { ...mortgage, id: 43, fixedUntil: null };
+    expect(buildMortgageExpiryNotification(unset, today)).toBeNull();
+    expect(
+      buildMortgageExpiryNotifications([unset, mortgage], new Set(), today).map(
+        (notification) => notification.mortgageId,
+      ),
+    ).toEqual([mortgage.id]);
+  });
+
   it('stores dismissals separately per user and safely parses persisted keys', () => {
     expect(mortgageDismissalStorageKey(1)).not.toBe(mortgageDismissalStorageKey(2));
     expect([...parseDismissedNotificationKeys('["one",2,"two"]')]).toEqual(['one', 'two']);

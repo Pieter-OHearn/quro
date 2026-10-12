@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToString } from 'react-dom/server';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { APP_CAPABILITIES_QUERY_KEY, DEFAULT_APP_CAPABILITIES } from '@/lib/useAppCapabilities';
 import { useBunqConnection } from './useBunqConnection';
 
 const clients: QueryClient[] = [];
@@ -17,9 +18,13 @@ afterEach(() => {
   clients.length = 0;
 });
 
-function connectionQuery() {
+function connectionQuery(bunqEnabled = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
+  client.setQueryData(APP_CAPABILITIES_QUERY_KEY, {
+    ...DEFAULT_APP_CAPABILITIES,
+    bunq: { ...DEFAULT_APP_CAPABILITIES.bunq, enabled: bunqEnabled, reason: null },
+  });
   function ConnectionProbe() {
     useBunqConnection();
     return null;
@@ -87,4 +92,31 @@ test('Bunq server errors are not treated as disconnected accounts', async () => 
   const query = connectionQuery();
   await expect(query.fetch()).rejects.toBe(error);
   expect(query.client.getQueryState(queryKeys.bunqConnection)?.status).toBe('error');
+});
+
+test('without bunq configured the connection is null and its route is never called', async () => {
+  const get = spyOn(api, 'get');
+  const query = connectionQuery(false);
+  expect(await query.fetch()).toBeNull();
+  expect(get).not.toHaveBeenCalled();
+});
+
+test('the capabilities are fetched first when none are cached', async () => {
+  const get = spyOn(api, 'get').mockResolvedValue({ data: { data: DEFAULT_APP_CAPABILITIES } });
+  const query = connectionQuery();
+  query.client.removeQueries({ queryKey: APP_CAPABILITIES_QUERY_KEY });
+  expect(await query.fetch()).toBeNull();
+  expect(get.mock.calls.map(([url]) => url)).toEqual(['/api/capabilities']);
+});
+
+test('an unreadable capabilities response still asks for the connection', async () => {
+  const get = spyOn(api, 'get').mockImplementation((url: string) =>
+    url === '/api/capabilities'
+      ? Promise.reject(new Error('Capabilities unavailable'))
+      : Promise.resolve({ data: { data: null } }),
+  );
+  const query = connectionQuery();
+  query.client.removeQueries({ queryKey: APP_CAPABILITIES_QUERY_KEY });
+  expect(await query.fetch()).toBeNull();
+  expect(get.mock.calls.map(([url]) => url)).toEqual(['/api/capabilities', '/api/bunq/connection']);
 });

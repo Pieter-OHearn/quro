@@ -6,6 +6,7 @@ import type { PensionStatementImportFeedItem } from '@quro/shared';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidatePensionImport } from '@/lib/queryInvalidation';
+import { APP_CAPABILITIES_QUERY_KEY, DEFAULT_APP_CAPABILITIES } from '@/lib/useAppCapabilities';
 import { usePensionImportNotifications } from './usePensionImportNotifications';
 
 afterEach(() => mock.restore());
@@ -16,9 +17,19 @@ const feedItem = (
   pot: { id: 1, name: 'Pension', provider: 'Provider', emoji: null },
 });
 
-test('polls only active jobs and restarts when a new import invalidates the idle feed', async () => {
+const key = queryKeys.pensions.notificationList('queued,processing,ready_for_review,failed', 30);
+
+// The import service is configured; its worker is down, as in DEFAULT_APP_CAPABILITIES.
+function notificationQuery(importReason: 'worker_unavailable' | 'not_configured') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  client.setQueryData(APP_CAPABILITIES_QUERY_KEY, {
+    ...DEFAULT_APP_CAPABILITIES,
+    pensionStatementImport: {
+      ...DEFAULT_APP_CAPABILITIES.pensionStatementImport,
+      reason: importReason,
+    },
   });
   function Probe() {
     usePensionImportNotifications();
@@ -29,9 +40,24 @@ test('polls only active jobs and restarts when a new import invalidates the idle
       <Probe />
     </QueryClientProvider>,
   );
-  const key = queryKeys.pensions.notificationList('queued,processing,ready_for_review,failed', 30);
   const query = client.getQueryCache().find<PensionStatementImportFeedItem[]>({ queryKey: key });
   if (!query) throw new Error('Notification query not registered');
+  return { client, query };
+}
+
+test('without a configured import service the feed is empty and its route is never called', async () => {
+  const get = spyOn(api, 'get');
+  const { client, query } = notificationQuery('not_configured');
+  try {
+    expect(await client.fetchQuery({ ...query.options, queryKey: key })).toEqual([]);
+    expect(get).not.toHaveBeenCalled();
+  } finally {
+    client.clear();
+  }
+});
+
+test('polls only active jobs and restarts when a new import invalidates the idle feed', async () => {
+  const { client, query } = notificationQuery('worker_unavailable');
   const interval = query.options.refetchInterval;
   if (typeof interval !== 'function') throw new Error('Expected data-driven polling');
   expect(interval(query)).toBe(false);

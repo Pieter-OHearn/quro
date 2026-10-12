@@ -21,11 +21,12 @@ afterEach(() => {
   mock.restore();
 });
 
-function hangFetch() {
+function hangFetch(onRequest: () => void = () => {}) {
   let signal: AbortSignal | undefined;
   let finish: (response: Response) => void = () => {};
   globalThis.fetch = mock((_url: unknown, init?: RequestInit) => {
     signal = init?.signal ?? undefined;
+    queueMicrotask(onRequest);
     return new Promise<Response>((resolve) => {
       finish = resolve;
     });
@@ -76,7 +77,9 @@ test('Yahoo ticker lookup request returns its existing error response on timeout
 test('real scheduled lock is released after bunq timeout and the next run succeeds', async () => {
   const name = `outbound-timeout-${crypto.randomUUID()}`;
   const key = `scheduler:${name}`;
-  const { signal, finish } = hangFetch();
+  // The deadline expires once the bunq request is in flight, however long the job took to send it.
+  const deadline = new AbortController();
+  const { signal, finish } = hangFetch(() => deadline.abort());
   let writes = 0;
   try {
     await expect(
@@ -87,7 +90,7 @@ test('real scheduled lock is released after bunq timeout and the next run succee
           await fetchMonetaryAccounts('synthetic', '42');
           writes += 1;
         },
-        30,
+        deadline.signal,
       ),
     ).rejects.toThrow('deadline exceeded');
     expect(signal()?.aborted).toBe(true);
