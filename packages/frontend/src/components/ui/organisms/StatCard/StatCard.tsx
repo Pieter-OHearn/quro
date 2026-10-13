@@ -22,11 +22,11 @@ export type StatCardTextChange = { value: string; positive: boolean; details?: s
  */
 export type StatCardNumericChange = {
   amount: number;
-  format: ChangeProps['format'];
-  currency?: string;
   label?: string;
   details?: string;
-};
+} & (
+  { format: 'amount'; currency?: ChangeProps['currency'] } | { format: 'percent'; currency?: never }
+);
 
 export type StatCardChangeProp = StatCardTextChange | StatCardNumericChange;
 

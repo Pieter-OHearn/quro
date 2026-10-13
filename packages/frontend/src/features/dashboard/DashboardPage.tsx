@@ -306,7 +306,7 @@ function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPa
 
   return (
     <PageStack>
-      <ContentSection>
+      <ContentSection as="div">
         <NetWorthHero
           netWorth={netWorth}
           monthChange={monthChange}
