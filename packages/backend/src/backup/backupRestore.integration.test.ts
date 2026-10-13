@@ -1,3 +1,7 @@
+import { describeIntegrationKeys } from '../cli/backup';
+import { secretPlace } from '../lib/integrationSecrets';
+import { SecretsKey } from '../lib/secretEnvelope';
+import { generateTestSecretsKey } from '../test/config';
 import {
   afterAll,
   beforeAll,
@@ -50,6 +54,7 @@ setDefaultTimeout(60_000);
 
 const MIGRATIONS_FOLDER = resolve(import.meta.dir, '../db/migrations');
 const KEY = new Secret('synthetic-backup-key-for-tests-0123456789');
+const SECRETS_KEY = SecretsKey.parse(generateTestSecretsKey());
 const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
 const SOURCE = `quro_backup_src_${suffix}`;
 const TARGET = `quro_backup_dst_${suffix}`;
@@ -84,6 +89,11 @@ async function seedSource(): Promise<void> {
     insert into savings_accounts (user_id, name, bank, balance, currency, interest_rate, account_type)
     values (1, 'Everyday', 'Synthetic Bank', 1234.56, 'EUR', 1.5, 'savings'),
            (2, 'Rainy day', 'Synthetic Bank', -0.01, 'GBP', 0, 'savings')`;
+  // A bank link with one secret encrypted and one stored the way releases before 0.9.0 did.
+  await source`
+    insert into bunq_connections (user_id, access_token, session_token)
+    values (1, ${SECRETS_KEY.seal('synthetic-backup-access', secretPlace('access_token', 1))},
+      'synthetic-unencrypted-session')`;
   for (const [id, key] of [
     [1, PAYSLIP_KEY],
     [2, MISSING_KEY],
@@ -281,6 +291,17 @@ describe('quro backup', () => {
     );
     expect(manifest.documents.missing).toEqual([MISSING_KEY]);
     expect(manifest.secrets.notInArchive.join(' ')).toContain('QRO_BACKUP_ENCRYPTION_KEY_FILE');
+    expect(manifest.secrets.notInArchive.join(' ')).toContain('QRO_SECRETS_KEY_FILE');
+    // Which secrets key the bank links need, by key id; never a key or a value.
+    expect(manifest.secrets.integrationKeys).toEqual({
+      keyIds: [SECRETS_KEY.id],
+      unencrypted: 1,
+    });
+    expect(describeIntegrationKeys(manifest.secrets.integrationKeys)).toEqual([
+      `Bank-link secrets: encrypted with secrets key ${SECRETS_KEY.id}. Keep that key file (QRO_SECRETS_KEY_FILE) apart from this archive: a restore without it keeps the data, but connected bunq accounts must be connected again.`,
+      'Warning: 1 bank-link secret(s) in this archive are not encrypted. Run `quro secrets encrypt`.',
+    ]);
+    expect(JSON.stringify(manifest)).not.toContain('synthetic-unencrypted-session');
 
     const listed = Bun.spawnSync(['tar', '-tf', archive.path]).stdout.toString().trim().split('\n');
     expect(listed).toEqual([

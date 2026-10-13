@@ -4,6 +4,8 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import postgres from 'postgres';
+import { secretPlace } from '../lib/integrationSecrets';
+import { SecretsKey } from '../lib/secretEnvelope';
 import { migrateDatabase } from '../db/migrateDatabase';
 import { applyTestSettings } from '../test/config';
 import type { DoctorReport } from './doctor';
@@ -39,6 +41,8 @@ function settingsFor(database: string, extra: Record<string, string | undefined>
     QRO_DOCUMENT_STORAGE: 'filesystem',
     QRO_DOCUMENTS_DIR: documents,
     QRO_PG_DUMP_BIN: fakePgDump,
+    QRO_SECRETS_KEY_FILE: undefined,
+    QRO_SECRETS_PREVIOUS_KEY_FILE: undefined,
     ...extra,
   };
 }
@@ -108,6 +112,7 @@ describe('quro doctor', () => {
       'database.runtime',
       'backup.tools',
       'documents',
+      'secrets',
     ]) {
       expect(statusOf(run.report, id)).toBe('ok');
     }
@@ -186,6 +191,63 @@ describe('quro doctor', () => {
     );
     expect(noDocuments.exitCode).toBe(EXIT_FAILURE);
     expect(statusOf(noDocuments.report, 'documents')).toBe('fail');
+  });
+
+  test('reports stored bank-link secrets by state and key id, never their values', async () => {
+    const keyHex = randomBytes(32).toString('hex');
+    const keyFile = join(scratch, 'secrets_key');
+    const otherKeyFile = join(scratch, 'other_secrets_key');
+    writeFileSync(keyFile, `${keyHex}\n`);
+    writeFileSync(otherKeyFile, `${randomBytes(32).toString('hex')}\n`);
+    const key = SecretsKey.parse(keyHex);
+    const marker = `synthetic-doctor-access-${suffix}`;
+    const sql = postgres(urlFor(migrated, owner), { max: 1, onnotice: () => undefined });
+    try {
+      const [user] = await sql<{ id: number }[]>`
+        insert into users (first_name, last_name, email, password_hash)
+        values ('Synthetic', 'Doctor', ${`doctor-${suffix}@doctor.quro.test`}, 'synthetic-hash')
+        returning id`;
+      await sql`insert into bunq_connections (user_id, access_token) values (${user!.id}, ${marker})`;
+      const secretsCheck = (doctorReport: DoctorReport) =>
+        doctorReport.checks.find((check) => check.id === 'secrets')!;
+
+      const withoutKey = await report(settingsFor(migrated));
+      expect(withoutKey.exitCode).toBe(EXIT_OK);
+      expect(secretsCheck(withoutKey.report)).toMatchObject({
+        status: 'warn',
+        message:
+          '1 of 1 bank-link secret(s) are stored unencrypted. Set QRO_SECRETS_KEY_FILE, then run `quro secrets encrypt`.',
+      });
+      const withKey = await report(settingsFor(migrated, { QRO_SECRETS_KEY_FILE: keyFile }));
+      expect(secretsCheck(withKey.report).message).toContain('Run `quro secrets encrypt`.');
+
+      const sealed = key.seal(marker, secretPlace('access_token', user!.id));
+      await sql`update bunq_connections set access_token = ${sealed} where user_id = ${user!.id}`;
+      const encrypted = await report(settingsFor(migrated, { QRO_SECRETS_KEY_FILE: keyFile }));
+      expect(encrypted.exitCode).toBe(EXIT_OK);
+      expect(secretsCheck(encrypted.report)).toMatchObject({
+        status: 'ok',
+        message: `1 bank-link secret(s), all encrypted with key ${key.id}.`,
+      });
+
+      const wrongKey = await report(settingsFor(migrated, { QRO_SECRETS_KEY_FILE: otherKeyFile }));
+      expect(wrongKey.exitCode).toBe(EXIT_FAILURE);
+      expect(secretsCheck(wrongKey.report).status).toBe('fail');
+      expect(secretsCheck(wrongKey.report).message).toContain(`(users ${user!.id})`);
+
+      const invalidKey = await doctor(settingsFor(migrated, { QRO_SECRETS_KEY_FILE: fakePgDump }));
+      expect(invalidKey.exitCode).toBe(EXIT_USAGE);
+      expect(invalidKey.out).toContain('QRO_SECRETS_KEY_FILE: the key in');
+
+      for (const run of [withoutKey, withKey, encrypted, wrongKey, invalidKey]) {
+        expect(run.out).not.toContain(marker);
+        expect(run.out).not.toContain(keyHex);
+      }
+    } finally {
+      await sql`delete from bunq_connections`;
+      await sql`delete from users where email like '%@doctor.quro.test'`;
+      await sql.end({ timeout: 5 });
+    }
   });
 
   test('a wrong runtime password is a settings problem pointing at quro migrate', async () => {

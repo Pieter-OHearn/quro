@@ -8,6 +8,7 @@ import {
   fetchMonetaryAccounts,
   fetchPayments,
   generateKeyPair,
+  withoutQuery,
 } from './bunqClient';
 import { withWorkDeadline } from './workDeadline';
 
@@ -105,6 +106,31 @@ describe('bunqClient', () => {
     await expect(exchangeCodeForTokens('expired-code')).rejects.toThrow(
       'authorization code expired',
     );
+  });
+
+  test('a failed token exchange without a reason names the path, not the code or client secret', async () => {
+    setBunqTestEnv();
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response('', { status: 500 })),
+    ) as unknown as typeof fetch;
+
+    const error = await exchangeCodeForTokens('synthetic-auth-code').catch(
+      (caught: Error) => caught,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe(
+      'Bunq request failed (500): https://api.oauth.bunq.com/v1/token',
+    );
+    expect((error as Error).message).not.toContain('synthetic-auth-code');
+    expect((error as Error).message).not.toContain('test-secret');
+  });
+
+  test('withoutQuery drops the query string and fragment', () => {
+    expect(withoutQuery('https://api.example/v1/token?code=a&client_secret=b')).toBe(
+      'https://api.example/v1/token',
+    );
+    expect(withoutQuery('https://api.example/v1/user/1#x')).toBe('https://api.example/v1/user/1');
+    expect(withoutQuery('https://api.example/v1/user/1')).toBe('https://api.example/v1/user/1');
   });
 
   test('createSession sends a Bunq client request id header', async () => {
