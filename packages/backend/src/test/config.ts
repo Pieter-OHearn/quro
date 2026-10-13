@@ -19,9 +19,11 @@ export function writeTestSecret(name: string, value: string): string {
   return path;
 }
 
+const SECRETS_KEY_BYTES = 32;
+
 /** A random secrets key in the format QRO_SECRETS_KEY_FILE requires. Synthetic; never reused. */
 export function generateTestSecretsKey(): string {
-  return randomBytes(32).toString('hex');
+  return randomBytes(SECRETS_KEY_BYTES).toString('hex');
 }
 
 let secretsKeyFile: string | undefined;
