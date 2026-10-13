@@ -123,7 +123,7 @@ function PropertyTxnRow({
         fmtNative(amount, property.currency, true),
       )}
       date={transaction.date}
-      badge={transaction.note ? { text: meta.label, className: '' } : undefined}
+      badge={transaction.note ? { text: meta.label, className: 'max-sm:hidden' } : undefined}
       amount={
         <PropertyTxnAmount
           transaction={transaction}

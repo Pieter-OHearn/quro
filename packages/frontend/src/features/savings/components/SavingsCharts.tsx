@@ -24,6 +24,8 @@ import type { SavingsChartDatum, SavingsContributionDatum, SavingsFormatFn } fro
 const SAVINGS_SERIES = 'var(--viz-1)';
 const INTEREST_OPACITY = 0.45;
 const CHART_HEIGHT = 200;
+const BAR_CORNER = 2;
+const BAR_RADIUS: [number, number, number, number] = [BAR_CORNER, BAR_CORNER, 0, 0];
 
 type SavingsChartsProps = {
   growthChartData: SavingsChartDatum[];
@@ -108,12 +110,12 @@ function ContribChart({ contribChartData, baseCurrency, fmtBase }: Readonly<Cont
               />
             )}
           />
-          <Bar dataKey="contribution" fill={SAVINGS_SERIES} radius={[2, 2, 0, 0]} />
+          <Bar dataKey="contribution" fill={SAVINGS_SERIES} radius={BAR_RADIUS} />
           <Bar
             dataKey="interest"
             fill={SAVINGS_SERIES}
             fillOpacity={INTEREST_OPACITY}
-            radius={[2, 2, 0, 0]}
+            radius={BAR_RADIUS}
           />
         </BarChart>
       </ResponsiveContainer>

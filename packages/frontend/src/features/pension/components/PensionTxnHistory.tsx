@@ -45,7 +45,7 @@ function PensionTxnRow({
         ? -transaction.amount
         : transaction.amount;
   const isEmployerContribution = transaction.type === 'contribution' && transaction.isEmployer;
-  // The type moves to a badge when a note takes the label.
+  // The type moves to a badge when a note takes the label; phones hide it for the label.
   const badgeText = [
     isEmployerContribution ? 'Employer' : null,
     transaction.note ? meta.label : null,
@@ -59,7 +59,7 @@ function PensionTxnRow({
       iconColor={meta.color}
       label={transaction.note || meta.label}
       date={transaction.date}
-      badge={badgeText ? { text: badgeText, className: '' } : undefined}
+      badge={badgeText ? { text: badgeText, className: 'max-sm:hidden' } : undefined}
       amount={
         <TxnAmount value={signedAmount} format={(amount) => fmtNative(amount, currency, true)} />
       }

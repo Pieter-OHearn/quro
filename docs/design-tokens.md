@@ -156,6 +156,13 @@ feature component.
 - Render an amount or percentage that went up, down or did not change with `Change`
   instead of hand-written signs and colours. It applies the sign, arrow, `gain` / `loss` /
   `flat` colour and zero rule from [V1 design](design-v1.md#7-content-rules).
+- Feature pages share a few finance display helpers in `src/components/finance/`: `TxnAmount`
+  signs a transaction amount (money in reads `+` in the `gain` colour, money out reads a true
+  minus in the figure colour), `PreviewPanel` and `PreviewRow` show a calculated result under a
+  form, and `chartTheme` holds the axis, gridline, tooltip and legend settings for Recharts
+  charts (series colours come from the `viz-*` tokens by asset class).
+- Unit prices (price per share, current, manual and historical prices) use `formatUnitPrice`
+  from `@quro/shared`: two to four decimals in the user's number format. Money keeps two.
 - `Button` supports `loading` and disables itself while loading; use it instead of
   a separate submitting-button pattern.
 - Keep loading, empty, error, disabled and submitting states, labels, keyboard

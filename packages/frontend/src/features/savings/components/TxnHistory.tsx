@@ -56,7 +56,7 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
     >
       {paginatedTransactions.map((t) => {
         const m = TXN_META[t.type as TxnType];
-        // The type moves to a badge when a note takes the label.
+        // The type moves to a badge when a note takes the label; phones hide it for the label.
         const badgeText = [t.bunqTransactionId ? 'Bunq' : null, t.note ? m.label : null]
           .filter(Boolean)
           .join(' · ');
@@ -67,7 +67,7 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
             iconColor={m.color}
             label={t.note || m.label}
             date={t.date}
-            badge={badgeText ? { text: badgeText, className: '' } : undefined}
+            badge={badgeText ? { text: badgeText, className: 'max-sm:hidden' } : undefined}
             amount={
               <TxnAmount
                 value={signedSavingsAmount(t.type as TxnType, t.amount)}

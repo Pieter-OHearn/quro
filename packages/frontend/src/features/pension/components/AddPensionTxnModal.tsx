@@ -176,11 +176,11 @@ function resolveAmountLabel(params: {
   currency: string;
   annualStatementDirection: AnnualStatementDirection;
 }): string {
-  if (params.type === 'contribution') return `Contribution Amount (${params.currency})`;
-  if (params.type === 'fee') return `Fee Amount (${params.currency})`;
+  if (params.type === 'contribution') return `Contribution amount (${params.currency})`;
+  if (params.type === 'fee') return `Fee amount (${params.currency})`;
   return params.annualStatementDirection === 'gain'
-    ? `Investment Gain (${params.currency})`
-    : `Investment Loss (${params.currency})`;
+    ? `Investment gain (${params.currency})`
+    : `Investment loss (${params.currency})`;
 }
 
 function PensionTxnDateNoteFields({

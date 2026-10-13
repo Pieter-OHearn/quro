@@ -123,7 +123,7 @@ export function HoldingTxnHistory({
             iconColor={meta.color}
             label={`${transaction.note || meta.label}${trade}`}
             date={transaction.date}
-            badge={transaction.note ? { text: meta.label, className: '' } : undefined}
+            badge={transaction.note ? { text: meta.label, className: 'max-sm:hidden' } : undefined}
             amount={
               <TxnAmount
                 value={signedHoldingCashflow(transaction)}

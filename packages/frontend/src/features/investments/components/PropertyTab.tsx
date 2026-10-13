@@ -199,7 +199,7 @@ function MortgageLinkRow({ property, linkedMortgage, fmtNative }: MortgageLinkRo
         </div>
         <Link
           to="/mortgage"
-          className="flex shrink-0 items-center gap-1 rounded-sm text-label text-brand hover:underline active:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+          className="flex shrink-0 items-center justify-center gap-1 rounded-sm text-label text-brand hover:underline max-sm:min-h-11 max-sm:min-w-11 active:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
         >
           View <ExternalLink size={12} aria-hidden />
         </Link>
