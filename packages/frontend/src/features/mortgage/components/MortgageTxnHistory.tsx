@@ -25,22 +25,30 @@ function describeMortgageTxn(t: MortgageTransaction, fmt: (n: number) => string)
   if (t.type === 'repayment') {
     return {
       amount: formatAsNegative(fmt, t.amount),
-      caption: `${fmt(t.interest ?? 0)} int · ${fmt(t.principal ?? 0)} prin`,
+      details: [`${fmt(t.interest ?? 0)} int`, `${fmt(t.principal ?? 0)} prin`],
     };
   }
-  if (t.type === 'valuation') return { amount: fmt(t.amount), caption: 'new value' };
+  if (t.type === 'valuation') return { amount: fmt(t.amount), details: ['new value'] };
   return {
     amount: `${t.amount}%`,
-    caption: t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate',
+    details: [t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate'],
   };
 }
 
-// One line on desktop with the detail before the amount; below 640px the detail sits under it.
+// One line on desktop with the details before the amount. Below 640px the details sit under the
+// amount, one per line, so the label keeps its width.
 function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
-  const { amount, caption } = describeMortgageTxn(t, fmt);
+  const { amount, details } = describeMortgageTxn(t, fmt);
   return (
     <span className="flex items-baseline justify-end gap-2 max-sm:flex-col max-sm:items-end max-sm:gap-0">
-      <span className="text-caption text-fg-subtle max-sm:order-last">{caption}</span>
+      <span className="text-caption text-fg-subtle max-sm:order-last max-sm:leading-4">
+        {details.map((detail, index) => (
+          <span key={detail} className="max-sm:block">
+            {index > 0 ? <span className="max-sm:hidden"> · </span> : null}
+            {detail}
+          </span>
+        ))}
+      </span>
       <span className="text-cell text-fg">{amount}</span>
     </span>
   );
@@ -53,6 +61,7 @@ function MortgageTxnRow({ t, fmt, onEdit, onDelete }: MortgageTxnRowProps) {
       icon={m.icon}
       iconColor="text-fg-muted"
       iconBg={m.bg}
+      iconContainerClassName="max-sm:hidden"
       label={t.note || m.label}
       date={t.date}
       amount={<MortgageTxnAmount t={t} fmt={fmt} />}
