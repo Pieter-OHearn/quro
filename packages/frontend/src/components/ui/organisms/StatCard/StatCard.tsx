@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { ArrowRight, CircleHelp } from 'lucide-react';
 import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
+import { Change, type ChangeProps } from '../../atoms';
 
 // The icon tile and its tint are gone; `icon`, `color` and `layout` stay for existing callers.
 type StatCardColor = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose';
@@ -12,6 +13,23 @@ const MINUS_SIGN = '\u2212';
 const CHANGE_CLASS_NAME = 'text-cell font-medium font-numeric';
 const CARD_CLASS_NAME = 'block rounded-lg border border-border-default bg-surface px-4 py-3';
 
+/** A change that arrives formatted; the zero rule and minus sign are applied to its text. */
+export type StatCardTextChange = { value: string; positive: boolean; details?: string };
+
+/**
+ * A signed number rendered through the `Change` atom: `+`, a true minus or no sign for zero,
+ * in the gain, loss or flat colour. `label` is a caption after the figure ("this month").
+ */
+export type StatCardNumericChange = {
+  amount: number;
+  format: ChangeProps['format'];
+  currency?: string;
+  label?: string;
+  details?: string;
+};
+
+export type StatCardChangeProp = StatCardTextChange | StatCardNumericChange;
+
 export type StatCardProps = {
   label: string;
   value: string;
@@ -19,7 +37,7 @@ export type StatCardProps = {
   layout?: 'stacked' | 'inline';
   icon: LucideIcon;
   color: StatCardColor;
-  change?: { value: string; positive: boolean; details?: string };
+  change?: StatCardChangeProp;
   href?: string;
   className?: string;
   testId?: string;
@@ -38,7 +56,7 @@ type ChangeText = { text: string; tone: 'text-gain' | 'text-loss' | 'text-flat' 
  * first figure is all zeros reads without a sign in the flat colour, and a leading hyphen
  * becomes a true minus sign.
  */
-function describeChangeText({ value, positive }: NonNullable<StatCardProps['change']>): ChangeText {
+function describeChangeText({ value, positive }: StatCardTextChange): ChangeText {
   const firstFigure = value.match(/\d[\d.,\s\u00a0\u202f']*/)?.[0] ?? '';
   if (firstFigure && !/[1-9]/.test(firstFigure)) {
     return { text: value.replace(/^\s*[+\-\u2212]\s*/, ''), tone: 'text-flat' };
@@ -49,19 +67,52 @@ function describeChangeText({ value, positive }: NonNullable<StatCardProps['chan
   };
 }
 
-function StatCardChange({ change }: { change: NonNullable<StatCardProps['change']> }) {
+function isNumericChange(change: StatCardChangeProp): change is StatCardNumericChange {
+  return 'amount' in change;
+}
+
+function StatCardChangeDetails({ details }: { details: string }) {
+  return (
+    <>
+      <CircleHelp size={12} className="text-fg-faint" aria-hidden />
+      <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 w-64 rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse opacity-0 shadow-popover transition-opacity duration-fast group-hover/trend:opacity-100">
+        {details}
+      </span>
+    </>
+  );
+}
+
+function StatCardNumericChangeContent({ change }: { change: StatCardNumericChange }) {
+  const figure =
+    change.format === 'amount' ? (
+      <Change value={change.amount} format="amount" currency={change.currency} />
+    ) : (
+      <Change value={change.amount} format="percent" />
+    );
+  return (
+    <>
+      {figure}
+      {change.label && <span className="text-caption text-fg-subtle">{change.label}</span>}
+    </>
+  );
+}
+
+function StatCardChange({ change }: { change: StatCardChangeProp }) {
+  if (isNumericChange(change)) {
+    return (
+      <span className="group/trend relative inline-flex items-baseline gap-1">
+        <StatCardNumericChangeContent change={change} />
+        {change.details && <StatCardChangeDetails details={change.details} />}
+      </span>
+    );
+  }
   const { text, tone } = describeChangeText(change);
   return (
     <span
       className={cn('group/trend relative inline-flex items-center gap-1', CHANGE_CLASS_NAME, tone)}
     >
       <span>{text}</span>
-      {change.details && <CircleHelp size={12} className="text-fg-faint" aria-hidden />}
-      {change.details && (
-        <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 w-64 rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse opacity-0 shadow-popover transition-opacity duration-fast group-hover/trend:opacity-100">
-          {change.details}
-        </span>
-      )}
+      {change.details && <StatCardChangeDetails details={change.details} />}
     </span>
   );
 }

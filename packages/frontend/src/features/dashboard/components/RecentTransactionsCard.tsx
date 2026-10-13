@@ -1,46 +1,65 @@
-import { ArrowRight, CreditCard } from 'lucide-react';
 import { Link } from 'react-router';
+import { DataTable, DataTableCell, DataTableRow, type DataTableColumn } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
+import { cn, formatDate } from '@/lib/utils';
 import type { DashboardFormatFn, DashboardTransaction } from '../types';
 
-const txIconClass = (type: string) => {
-  if (type === 'income') return 'bg-success-soft text-success';
-  if (type === 'transfer') return 'bg-brand-soft text-brand';
-  return 'bg-surface-muted text-fg-subtle';
+const MINUS_SIGN = '−';
+// Transaction dates are calendar dates: format them in UTC so they never shift a day.
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
 };
 
-function TransactionItem({
+const COLUMNS: readonly DataTableColumn[] = [
+  { key: 'date', header: 'Date', priority: 'secondary', width: 104, numeric: true, align: 'left' },
+  { key: 'name', header: 'Transaction', mobileLabel: '' },
+  { key: 'category', header: 'Category', priority: 'secondary' },
+  { key: 'amount', header: 'Amount', numeric: true },
+];
+
+/** Money in is a gain with a plus sign; money out keeps the figure colour with a true minus. */
+function TransactionAmount({
+  amount,
+  fmtBase,
+}: Readonly<{ amount: number; fmtBase: DashboardFormatFn }>) {
+  const sign = amount > 0 ? '+' : amount < 0 ? MINUS_SIGN : '';
+  return (
+    <span className={cn('whitespace-nowrap', amount > 0 ? 'text-gain' : 'text-fg')}>
+      {sign}
+      {fmtBase(Math.abs(amount), undefined, true)}
+    </span>
+  );
+}
+
+function TransactionRow({
   tx,
   fmtBase,
-}: Readonly<{
-  tx: DashboardTransaction;
-  fmtBase: DashboardFormatFn;
-}>) {
+}: Readonly<{ tx: DashboardTransaction; fmtBase: DashboardFormatFn }>) {
+  const date = formatDate(tx.date, DATE_OPTIONS);
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-9 h-9 rounded-xl flex items-center justify-center ${txIconClass(tx.type)}`}
-        >
-          <CreditCard size={15} />
+    <DataTableRow>
+      <DataTableCell columnKey="date" className="whitespace-nowrap text-fg-muted">
+        {date}
+      </DataTableCell>
+      <DataTableCell columnKey="name" contentClassName="max-md:w-full">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-fg">{tx.name}</span>
+          <JointBadge isJoint={tx.isJoint} size="xs" />
         </div>
-        <div>
-          <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-fg-emphasis">{tx.name}</p>
-            <JointBadge isJoint={tx.isJoint} size="xs" />
-          </div>
-          <p className="text-xs text-fg-faint">
-            {tx.category} · {tx.date}
-          </p>
-        </div>
-      </div>
-      <span
-        className={`text-sm font-semibold ${tx.amount > 0 ? 'text-success' : 'text-fg-strong'}`}
-      >
-        {tx.amount > 0 ? '+' : ''}
-        {fmtBase(Math.abs(tx.amount), undefined, true)}
-      </span>
-    </div>
+        <p className="text-caption text-fg-subtle md:hidden">
+          {tx.category} · {date}
+        </p>
+      </DataTableCell>
+      <DataTableCell columnKey="category" className="text-fg-muted">
+        {tx.category}
+      </DataTableCell>
+      <DataTableCell columnKey="amount">
+        <TransactionAmount amount={tx.amount} fmtBase={fmtBase} />
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -54,28 +73,26 @@ export function RecentTransactionsCard({
   fmtBase: DashboardFormatFn;
 }>) {
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h3 className="font-semibold text-fg">Recent Transactions</h3>
-          <p className="text-xs text-fg-faint mt-0.5">This month in {baseCurrency}</p>
-        </div>
+    <DataTable
+      title="Recent transactions"
+      subtitle={`This month in ${baseCurrency}`}
+      action={
         <Link
           to="/budget"
-          className="text-xs text-brand hover:text-brand-fg font-medium flex items-center gap-1"
+          className="rounded-sm text-cell font-medium text-brand transition-colors duration-fast hover:text-brand-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
         >
-          View all <ArrowRight size={12} />
+          View all
         </Link>
-      </div>
-      {transactions.length > 0 ? (
-        <div className="space-y-3">
-          {transactions.map((tx) => (
-            <TransactionItem key={tx.id} tx={tx} fmtBase={fmtBase} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-fg-faint py-8 text-center">No transactions yet.</p>
-      )}
-    </div>
+      }
+      columns={COLUMNS}
+      density="compact"
+      tableVariant="financial"
+      isEmpty={transactions.length === 0}
+      emptyState="No transactions yet."
+    >
+      {transactions.map((tx) => (
+        <TransactionRow key={tx.id} tx={tx} fmtBase={fmtBase} />
+      ))}
+    </DataTable>
   );
 }
