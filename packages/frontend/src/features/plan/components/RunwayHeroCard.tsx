@@ -8,26 +8,24 @@ export function RunwayHeroCard({
 }: Readonly<{ data: RunwayResponse; onReview: () => void }>) {
   const band = RUNWAY_BAND_META[data.runway.band];
   return (
-    <Card className="overflow-hidden border-brand-border bg-gradient-to-br from-brand-soft via-surface to-info-soft p-0">
-      <div className="grid gap-6 p-6 md:grid-cols-[1.25fr_1fr] md:p-8">
+    <Card>
+      <div className="grid gap-4 md:grid-cols-[1.25fr_1fr]">
         <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand">
-              Income-stop runway
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-label text-fg-muted">Income-stop runway</p>
             <Badge tone={band.badgeTone}>{band.label}</Badge>
           </div>
-          <p className="mt-4 text-4xl font-bold tracking-tight text-fg md:text-5xl">
+          <p className="mt-1 text-figure-hero font-numeric text-fg">
             {data.isEstimated ? '~' : ''}
             {formatMonths(data.runway.monthsWithIncomeSupport)}
           </p>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-muted">
+          <p className="mt-2 max-w-2xl text-body text-fg-muted">
             A month-by-month estimate using lean spending, accessible balances, notice pay,
             severance, and applicable income support.
           </p>
-          <p className="mt-4 text-xs text-fg-subtle">{RUNWAY_CITATIONS.band}</p>
+          <p className="mt-2 text-caption text-fg-subtle">{RUNWAY_CITATIONS.band}</p>
           <Button
-            className="mt-5"
+            className="mt-3"
             variant="secondary"
             size="sm"
             onClick={onReview}
@@ -36,32 +34,34 @@ export function RunwayHeroCard({
             Review calculation
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-3 self-stretch">
-          <div className="rounded-2xl border border-border-subtle bg-surface/85 p-4 shadow-card">
-            <p className="text-xs text-fg-subtle">Cash only</p>
-            <p className="mt-2 text-xl font-bold text-fg">
+        <dl className="grid grid-cols-2 content-start gap-x-4 gap-y-3 border-t border-border-subtle pt-3 md:border-t-0 md:border-l md:pt-0 md:pl-4">
+          <div>
+            <dt className="text-label text-fg-muted">Cash only</dt>
+            <dd className="mt-1 text-figure-lg font-numeric text-fg">
               {formatMonths(data.runway.monthsCashOnly)}
-            </p>
+            </dd>
           </div>
-          <div className="rounded-2xl border border-border-subtle bg-surface/85 p-4 shadow-card">
-            <p className="text-xs text-fg-subtle">All liquid</p>
-            <p className="mt-2 text-xl font-bold text-fg">
+          <div>
+            <dt className="text-label text-fg-muted">All liquid</dt>
+            <dd className="mt-1 text-figure-lg font-numeric text-fg">
               {formatMonths(data.runway.monthsAllLiquid)}
-            </p>
+            </dd>
           </div>
-          <div className="col-span-2 rounded-2xl border border-border-subtle bg-surface/85 p-4 shadow-card">
-            <p className="text-xs text-fg-subtle">Model basis</p>
-            <p className="mt-1 text-sm font-semibold text-fg-strong">
+          <div className="col-span-2">
+            <dt className="text-label text-fg-muted">Model basis</dt>
+            <dd className="mt-1 text-cell font-medium text-fg">
               {data.jurisdiction.code}
               {data.jurisdiction.rulesEffectiveFrom
                 ? ` · rates from ${data.jurisdiction.rulesEffectiveFrom}`
                 : ''}
-            </p>
+            </dd>
             {data.jurisdiction.isExtrapolated ? (
-              <p className="mt-1 text-xs text-warning-fg">Latest known rules carried forward.</p>
+              <dd className="mt-1 text-caption text-warning">
+                Latest known rules carried forward.
+              </dd>
             ) : null}
           </div>
-        </div>
+        </dl>
       </div>
     </Card>
   );

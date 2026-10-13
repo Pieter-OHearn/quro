@@ -65,22 +65,25 @@ export function Plan() {
   const fmtPlanMoney = (value: number) => fmtBase(convertToBase(value, data.baseCurrency));
 
   return (
-    <PageStack as="main">
+    <PageStack>
       {data.budgetCurrencyNeedsReview && (
-        <p role="status" className="rounded-lg bg-warning-soft p-4 text-sm text-warning-fg">
+        <p
+          role="status"
+          className="rounded-lg border border-warning bg-warning-soft p-3 text-cell text-warning"
+        >
           Some older budget amounts have no recorded currency and are treated as EUR. Review these
           records against your statements before relying on spending or runway estimates.
         </p>
       )}
-      <ContentSection className="flex flex-wrap items-start justify-between gap-4">
+      <ContentSection className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand">Plan</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-fg">Financial resilience</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-muted">
+          <p className="text-label text-fg-muted">Plan</p>
+          <h2 className="text-title-section text-fg">Financial resilience</h2>
+          <p className="mt-1 max-w-2xl text-cell text-fg-muted">
             A derived planning view built from the balances, spending, and income already in Quro.
           </p>
         </div>
-        <Button variant="ghost" onClick={() => setDrawerOpen(true)}>
+        <Button variant="secondary" onClick={() => setDrawerOpen(true)}>
           Advanced assumptions
         </Button>
       </ContentSection>
@@ -88,15 +91,15 @@ export function Plan() {
         options={PLAN_SECTIONS}
         value="runway"
         onChange={() => undefined}
-        variant="contained"
+        aria-label="Plan sections"
       />
       <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
       <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
-      <ContentSection spacing="lg">
+      <ContentSection spacing="md">
         <RunwayHeroCard data={data} onReview={() => setReviewOpen(true)} />
         <BurnRateCards burn={data.burn} fmtBase={fmtPlanMoney} />
       </ContentSection>
-      <ContentSection spacing="lg" className="grid gap-6 xl:grid-cols-2">
+      <ContentSection className="grid gap-4 xl:grid-cols-2">
         <LiquidityTierBar tiers={data.tiers} fmtBase={fmtPlanMoney} />
         <RunwayLedgerChart ledger={data.runway.ledger} fmtBase={fmtPlanMoney} />
       </ContentSection>
@@ -106,12 +109,12 @@ export function Plan() {
         onReview={() => setBankingReviewOpen(true)}
       />
       {data.incomeSupport.unemployment.status === 'unknown' ? (
-        <p className="text-xs leading-5 text-fg-subtle">
+        <p className="text-caption text-fg-subtle">
           {data.jurisdiction.labels.unemploymentShort} is not included yet:{' '}
           {data.incomeSupport.unemployment.reason}
         </p>
       ) : null}
-      <p className="text-xs leading-5 text-fg-faint">{RUNWAY_CITATIONS.advice}</p>
+      <p className="text-caption text-fg-subtle">{RUNWAY_CITATIONS.advice}</p>
       <AssumptionsDrawer
         open={drawerOpen}
         assumptions={assumptionsQuery.data ?? null}
