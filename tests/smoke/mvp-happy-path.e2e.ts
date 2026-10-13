@@ -46,7 +46,7 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await openSignIn.click();
   await signInDialog.getByTestId('signin-email-input').fill(smokeEmail);
   await signInDialog.getByTestId('signin-password-input').fill(smokePassword);
-  await signInDialog.getByRole('button', { name: 'Sign In' }).click();
+  await signInDialog.getByRole('button', { name: 'Sign in' }).click();
 
   await expect(page.getByTestId('dashboard-net-worth-value')).toBeVisible();
 

@@ -72,16 +72,16 @@ export type LandingPreviewBar = {
 
 export type LandingPreviewStat = {
   label: string;
-  value: string;
-  color: string;
+  /** Example balance in EUR. */
+  value: number;
+  /** The chart colour of the asset class, as a `bg-*` class. */
+  dotClassName: string;
 };
 
 export type LandingFeature = {
   icon: LucideIcon;
   label: string;
   desc: string;
-  color: string;
-  border: string;
 };
 
 export type LandingNavLink = {
@@ -99,12 +99,10 @@ export type LandingHowItWorksStep = {
   title: string;
   desc: string;
   icon: LucideIcon;
-  color: string;
 };
 
 export type LandingPillar = {
   icon: LucideIcon;
   title: string;
   desc: string;
-  color: string;
 };

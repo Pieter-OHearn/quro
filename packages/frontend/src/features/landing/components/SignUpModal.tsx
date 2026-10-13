@@ -1,9 +1,9 @@
-import { CalendarDays, Sparkles, Target } from 'lucide-react';
-import { FormField, Modal, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
+import { FormField, Modal, PasswordInput, TextInput } from '@/components/ui';
 import { useSignUpState } from '../hooks';
 import type { SignUpState } from '../types';
 import { InviteCodeField, RegistrationClosedNotice } from './RegistrationNotices';
 import { SubmitButton } from './SubmitButton';
+import { TextLinkButton } from './TextLinkButton';
 
 type SignUpModalProps = {
   onClose: () => void;
@@ -75,15 +75,7 @@ function EmailField({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) 
 function AgeFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) {
   return (
     <>
-      <FormField
-        label={
-          <span className="inline-flex items-center gap-2">
-            <CalendarDays size={14} className="text-fg-faint" />
-            <span>Current age</span>
-          </span>
-        }
-        error={errors.currentAge}
-      >
+      <FormField label="Current age" error={errors.currentAge}>
         <TextInput
           type="text"
           inputMode="numeric"
@@ -95,15 +87,7 @@ function AgeFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) {
           onChange={(value) => setField('currentAge', normalizeDigits(value))}
         />
       </FormField>
-      <FormField
-        label={
-          <span className="inline-flex items-center gap-2">
-            <Target size={14} className="text-fg-faint" />
-            <span>Retirement age</span>
-          </span>
-        }
-        error={errors.retirementAge}
-      >
+      <FormField label="Retirement age" error={errors.retirementAge}>
         <TextInput
           type="text"
           inputMode="numeric"
@@ -185,28 +169,16 @@ function SignUpForm({ state, onSwitchToSignIn }: Readonly<SignUpFormProps>) {
       onSubmit={(event) => {
         void handleSubmit(event);
       }}
-      className="space-y-4 px-8 py-7 text-fg"
+      className="space-y-4"
     >
       <SignUpFormFields state={state} />
       <SubmitButton
         loading={loading}
         loadingText="Creating account…"
-        idleContent={
-          <>
-            <Sparkles size={15} />
-            <span>Create Free Account</span>
-          </>
-        }
+        idleContent="Create free account"
       />
-      <p className="pb-1 text-center text-sm text-fg-subtle">
-        Already have an account?{' '}
-        <button
-          type="button"
-          onClick={onSwitchToSignIn}
-          className="font-semibold text-brand transition-colors hover:text-brand-strong"
-        >
-          Sign in
-        </button>
+      <p className="text-center text-cell text-fg-muted">
+        Already have an account? <TextLinkButton onClick={onSwitchToSignIn}>Sign in</TextLinkButton>
       </p>
     </form>
   );
@@ -221,19 +193,6 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
       subtitle="Start tracking your finances for free"
       onClose={onClose}
       scrollable
-      bodyClassName="space-y-0 p-0"
-      headerProps={{
-        align: 'center',
-        visual: (
-          <div className="mb-4 flex justify-center">
-            <QuroLogo size={52} />
-          </div>
-        ),
-        className: 'px-8 pb-10 pt-8',
-        titleClassName: 'text-2xl font-black tracking-tight',
-        subtitleClassName: 'mt-1 text-sm',
-        closeIconSize: 16,
-      }}
     >
       {state.policy?.signUp === 'closed' ? (
         <RegistrationClosedNotice onSwitchToSignIn={onSwitchToSignIn} />

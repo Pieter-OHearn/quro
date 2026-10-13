@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
-import { FormField, Modal, PasswordInput, QuroLogo, TextInput } from '@/components/ui';
+import { FormField, Modal, PasswordInput, TextInput } from '@/components/ui';
 import { useSignInState } from '../hooks';
 import type { SignInState } from '../types';
 import { PasswordResetForm } from './PasswordResetForm';
 import { SubmitButton } from './SubmitButton';
+import { TextLinkButton } from './TextLinkButton';
 
 type SignInModalProps = {
   onClose: () => void;
@@ -56,14 +56,8 @@ function SignInFormFields({
           error={Boolean(errors.password)}
         />
       </FormField>
-      <div className="-mt-2 text-right">
-        <button
-          type="button"
-          onClick={onForgotPassword}
-          className="text-xs font-semibold text-brand transition-colors hover:text-brand-strong"
-        >
-          Forgot password?
-        </button>
+      <div className="-mt-2 text-right text-label">
+        <TextLinkButton onClick={onForgotPassword}>Forgot password?</TextLinkButton>
       </div>
     </>
   );
@@ -77,28 +71,13 @@ function SignInForm({ state, onSwitchToSignUp, onForgotPassword }: Readonly<Sign
       onSubmit={(event) => {
         void handleSubmit(event);
       }}
-      className="space-y-4 px-8 py-7 text-fg"
+      className="space-y-4"
     >
       <SignInFormFields state={state} onForgotPassword={onForgotPassword} />
-      <SubmitButton
-        loading={loading}
-        loadingText="Signing in…"
-        idleContent={
-          <>
-            <span>Sign In</span>
-            <ArrowRight size={15} />
-          </>
-        }
-      />
-      <p className="pt-1 text-center text-sm text-fg-subtle">
+      <SubmitButton loading={loading} loadingText="Signing in…" idleContent="Sign in" />
+      <p className="text-center text-cell text-fg-muted">
         Don't have an account?{' '}
-        <button
-          type="button"
-          onClick={onSwitchToSignUp}
-          className="font-semibold text-brand transition-colors hover:text-brand-strong"
-        >
-          Sign up free
-        </button>
+        <TextLinkButton onClick={onSwitchToSignUp}>Sign up free</TextLinkButton>
       </p>
     </form>
   );
@@ -114,19 +93,6 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
       subtitle={resetting ? 'Use the code from your Quro operator' : 'Sign in to your Quro account'}
       onClose={onClose}
       maxWidth="md"
-      bodyClassName="space-y-0 p-0"
-      headerProps={{
-        align: 'center',
-        visual: (
-          <div className="mb-4 flex justify-center">
-            <QuroLogo size={52} />
-          </div>
-        ),
-        className: 'px-8 pb-10 pt-8',
-        titleClassName: 'text-2xl font-black tracking-tight',
-        subtitleClassName: 'mt-1 text-sm',
-        closeIconSize: 16,
-      }}
     >
       {resetting ? (
         <PasswordResetForm onBackToSignIn={() => setResetting(false)} />

@@ -1,6 +1,6 @@
-import { KeyRound, Lock } from 'lucide-react';
 import type { RegistrationPolicy } from '@quro/shared';
 import { FormField, TextInput } from '@/components/ui';
+import { TextLinkButton } from './TextLinkButton';
 
 type InviteCodeFieldProps = {
   policy: RegistrationPolicy | undefined;
@@ -28,12 +28,7 @@ export function InviteCodeField({
 }: Readonly<InviteCodeFieldProps>) {
   return (
     <FormField
-      label={
-        <span className="inline-flex items-center gap-2">
-          <KeyRound size={14} className="text-fg-faint" />
-          <span>{policy?.setupRequired ? 'Setup code' : 'Invite code'}</span>
-        </span>
-      }
+      label={policy?.setupRequired ? 'Setup code' : 'Invite code'}
       required={policy?.signUp === 'code'}
       error={error}
       className="sm:col-span-2"
@@ -50,7 +45,7 @@ export function InviteCodeField({
         value={value}
         onChange={onChange}
       />
-      <p className="mt-1.5 text-xs text-fg-subtle">{inviteCodeHelp(policy)}</p>
+      <p className="mt-1 text-caption text-fg-subtle">{inviteCodeHelp(policy)}</p>
     </FormField>
   );
 }
@@ -59,23 +54,13 @@ export function RegistrationClosedNotice({
   onSwitchToSignIn,
 }: Readonly<{ onSwitchToSignIn: () => void }>) {
   return (
-    <div className="space-y-4 px-8 py-7 text-center text-fg">
-      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-muted">
-        <Lock size={18} className="text-fg-muted" />
-      </div>
-      <p className="text-sm font-semibold">Registration is closed</p>
-      <p className="text-sm text-fg-subtle">
+    <div className="space-y-2">
+      <p className="text-title-section text-fg">Registration is closed</p>
+      <p className="text-body text-fg-muted">
         This Quro instance does not take new sign-ups. Ask its operator if you need an account.
       </p>
-      <p className="pb-1 text-sm text-fg-subtle">
-        Already have an account?{' '}
-        <button
-          type="button"
-          onClick={onSwitchToSignIn}
-          className="font-semibold text-brand transition-colors hover:text-brand-strong"
-        >
-          Sign in
-        </button>
+      <p className="text-cell text-fg-muted">
+        Already have an account? <TextLinkButton onClick={onSwitchToSignIn}>Sign in</TextLinkButton>
       </p>
     </div>
   );
