@@ -138,7 +138,7 @@ export function EmploymentEditorModal({
           />
         </FormField>
       </div>
-      {error ? <p className="text-sm text-danger-fg">{error}</p> : null}
+      {error ? <p className="text-cell text-danger">{error}</p> : null}
     </Modal>
   );
 }

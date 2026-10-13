@@ -44,24 +44,21 @@ export function EmploymentCard({
   const [editing, setEditing] = useState(false);
   return (
     <>
-      <Card className="border-brand-border bg-brand-soft/40">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-surface p-2 text-brand shadow-card">
-              <BriefcaseBusiness size={20} />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-fg">
-                Employment
-              </p>
-              <h2 className="mt-1 font-semibold text-fg">
+      <Card>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2">
+            <BriefcaseBusiness size={16} className="mt-0.5 shrink-0 text-fg-faint" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-label text-fg-muted">Employment</p>
+              <h2 className="text-title-section text-fg">
                 {employment?.employerName || 'Add your current employment'}
               </h2>
               {employment ? (
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fg-muted">
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-cell text-fg-muted">
                   <span className="capitalize">{employment.employmentType.replace('_', '-')}</span>
                   <span className="inline-flex items-center gap-1">
-                    <CalendarDays size={14} /> {tenureLabel(employment, asOf)} tenure
+                    <CalendarDays size={12} className="text-fg-faint" aria-hidden />{' '}
+                    {tenureLabel(employment, asOf)} tenure
                   </span>
                   {employment.endDate && employment.endDate < asOf ? (
                     <span>Ended {employment.endDate}</span>
@@ -73,7 +70,7 @@ export function EmploymentCard({
                   </span>
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-fg-muted">
+                <p className="mt-1 text-cell text-fg-muted">
                   One record powers Salary, notice pay, and severance calculations.
                 </p>
               )}

@@ -41,6 +41,8 @@ test('PayslipHistoryTable renders sortable headers and defaults to newest paysli
       payslips={[payslips[0], payslips[1]]}
       selected={null}
       fmtBase={fmtBase}
+      baseCurrency="EUR"
+      convertToBase={(value) => value}
       onSelect={noop}
       onAdd={noop}
       onEdit={noop}

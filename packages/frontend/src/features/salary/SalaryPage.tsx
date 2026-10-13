@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Payslip } from '@quro/shared';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { EmploymentCard, selectCurrentEmployment, useEmployments } from '@/features/employment';
-import { LoadingState, SegmentedControl } from '@/components/ui';
+import { LoadingState, PageStack, SegmentedControl } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
@@ -114,6 +114,7 @@ function useSalaryPageState() {
   return {
     fmtBase,
     baseCurrency,
+    convertToBase,
     createPayslip,
     updatePayslip,
     deletePayslip,
@@ -153,7 +154,7 @@ function SalaryPageContent({
   onCloseModal,
 }: Readonly<SalaryPageContentProps>) {
   return (
-    <div className="p-6 space-y-6">
+    <PageStack>
       {(state.showAdd || state.editingPayslip) && (
         <AddPayslipModal
           existing={state.editingPayslip ?? undefined}
@@ -165,30 +166,27 @@ function SalaryPageContent({
         />
       )}
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <SegmentedControl
-          options={state.years.map((year) => ({
-            value: year,
-            label: year,
-            badge:
-              year === state.currentYear ? (
-                <span className="text-[10px] opacity-70">current</span>
-              ) : undefined,
-          }))}
-          value={state.activeYear}
-          onChange={state.setActiveYear}
-          variant="pill"
-          tone="dark"
-          buttonClassName="px-5 font-semibold"
-        />
-      </div>
+      <SegmentedControl
+        aria-label="Salary year"
+        options={state.years.map((year) => ({
+          value: year,
+          label: year,
+          badge:
+            year === state.currentYear ? (
+              <span className="font-normal text-fg-subtle">current</span>
+            ) : undefined,
+        }))}
+        value={state.activeYear}
+        onChange={state.setActiveYear}
+        buttonClassName="font-numeric"
+      />
 
       <EmploymentCard employment={selectCurrentEmployment(state.employments)} />
 
       <SalaryStatsCards cards={state.statCards} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PayBreakdownPanel selected={state.selected} fmtBase={state.fmtBase} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PayBreakdownPanel selected={state.selected} />
         <SalaryHistoryChart
           data={state.salaryChartData}
           growthPct={state.salaryGrowthPct}
@@ -201,6 +199,8 @@ function SalaryPageContent({
         payslips={state.yearPayslips}
         selected={state.selected}
         fmtBase={state.fmtBase}
+        baseCurrency={state.baseCurrency}
+        convertToBase={state.convertToBase}
         onSelect={state.setSelectedId}
         onAdd={() => {
           state.setEditingPayslip(null);
@@ -213,7 +213,7 @@ function SalaryPageContent({
       />
 
       <PensionTrackerLink />
-    </div>
+    </PageStack>
   );
 }
 
