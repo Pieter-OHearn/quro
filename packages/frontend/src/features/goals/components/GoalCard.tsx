@@ -2,12 +2,16 @@ import {
   AlertCircle,
   ArrowUpRight,
   Check,
+  CalendarDays,
   CheckCircle2,
   Minus,
   Pencil,
   Trash2,
 } from 'lucide-react';
+import { Badge, Card, IconButton, ProgressMeter } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { DATA_COLORS, dataColorToken } from '@/lib/dataColors';
+import { cn } from '@/lib/utils';
 import {
   getMonthAbbreviationIndex,
   MONTH_ABBREVIATIONS,
@@ -16,7 +20,7 @@ import {
   formatPercent,
 } from '@quro/shared';
 import type { GoalMeta, GoalProgressContext, GoalStatus } from '../types';
-import { GOAL_TYPE_META, STATUS_META } from '../utils/goals-constants';
+import { GOAL_CHIP_CLASS_NAME, GOAL_TYPE_META, STATUS_META } from '../utils/goals-constants';
 import {
   getGoalPct,
   getGoalStatus,
@@ -40,16 +44,15 @@ type GoalCardProps = {
   onToggleMissedMonth: (id: number, monthKey: string) => void;
 };
 
-function ProgressBar({ pct, color }: Readonly<{ pct: number; color: string }>) {
-  return (
-    <div className="w-full h-2.5 bg-surface-muted rounded-full overflow-hidden">
-      <div
-        className="h-full rounded-full transition-all duration-700"
-        style={{ width: `${pct}%`, backgroundColor: color }}
-      />
-    </div>
-  );
+// Goal meters are lilac `secondary`, the colour that marks goals.
+function ProgressBar({ pct, label }: Readonly<{ pct: number; label: string }>) {
+  return <ProgressMeter value={pct} label={label} />;
 }
+
+const LABEL = 'text-label text-fg-muted';
+const FIGURE = 'text-label font-numeric text-fg';
+const CAPTION = 'text-caption text-fg-subtle';
+const DONE = 'text-cell font-medium text-success';
 
 function SavingsDetailsRow({
   currentAmount,
@@ -69,26 +72,25 @@ function SavingsDetailsRow({
   return (
     <div className="flex items-end justify-between">
       <div>
-        <p className="font-bold text-fg">{fmtBase(currentAmount)}</p>
-        <p className="text-xs text-fg-faint">of {fmtBase(targetAmount)}</p>
+        <p className="text-figure-md font-numeric text-fg">{fmtBase(currentAmount)}</p>
+        <p className={CAPTION}>of {fmtBase(targetAmount)}</p>
       </div>
       {status !== 'complete' && (
-        <div className="text-right">
-          <p className="text-xs text-fg-subtle">{fmtBase(remaining)} to go</p>
+        <div className="text-right font-numeric">
+          <p className="text-caption text-fg-muted">{fmtBase(remaining)} to go</p>
           {monthlyContrib > 0 && (
-            <p className="text-xs text-fg-faint">
+            <p className={CAPTION}>
               ~{Math.ceil(remaining / monthlyContrib)}mo at {fmtBase(monthlyContrib)}/mo
             </p>
           )}
         </div>
       )}
-      {status === 'complete' && <p className="text-sm text-success font-semibold">Done!</p>}
+      {status === 'complete' && <p className={DONE}>Done!</p>}
     </div>
   );
 }
 
 function GoalCardSavings({
-  color,
   currentAmount,
   targetAmount,
   monthlyContrib,
@@ -96,7 +98,6 @@ function GoalCardSavings({
   status,
   fmtBase,
 }: Readonly<{
-  color: string;
   currentAmount: number;
   targetAmount: number;
   monthlyContrib: number;
@@ -108,13 +109,11 @@ function GoalCardSavings({
   return (
     <>
       <div>
-        <div className="flex justify-between mb-1.5">
-          <span className="text-xs text-fg-subtle">Progress</span>
-          <span className="text-xs font-semibold" style={{ color }}>
-            {formatPercent(clampedPct, numberFormat, 0)}
-          </span>
+        <div className="mb-1 flex justify-between">
+          <span className={LABEL}>Progress</span>
+          <span className={FIGURE}>{formatPercent(clampedPct, numberFormat, 0)}</span>
         </div>
-        <ProgressBar pct={clampedPct} color={color} />
+        <ProgressBar pct={clampedPct} label="Goal progress" />
       </div>
       <SavingsDetailsRow
         currentAmount={currentAmount}
@@ -128,33 +127,28 @@ function GoalCardSavings({
 }
 
 function SalaryComparisonGrid({
-  color,
   targetAmount,
   annualGross,
   fmtBase,
 }: Readonly<{
-  color: string;
   targetAmount: number;
   annualGross: number;
   fmtBase: (n: number) => string;
 }>) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <div className="bg-surface-sunken rounded-xl px-3 py-2.5">
-        <p className="text-[10px] text-fg-faint mb-0.5">Current Gross</p>
-        <p className="font-bold text-fg-emphasis">
+      <div className="rounded-md bg-surface-sunken px-3 py-2">
+        <p className={LABEL}>Current Gross</p>
+        <p className="text-figure-md font-numeric text-fg">
           {fmtBase(annualGross)}
-          <span className="text-xs font-normal text-fg-faint">/yr</span>
+          <span className={CAPTION}>/yr</span>
         </p>
       </div>
-      <div
-        className="rounded-xl px-3 py-2.5"
-        style={{ backgroundColor: `color-mix(in srgb, ${color} 9.4118%, transparent)` }}
-      >
-        <p className="text-[10px] text-fg-faint mb-0.5">Target Gross</p>
-        <p className="font-bold" style={{ color }}>
+      <div className="rounded-md bg-secondary-soft px-3 py-2">
+        <p className={LABEL}>Target Gross</p>
+        <p className="text-figure-md font-numeric text-secondary">
           {fmtBase(targetAmount)}
-          <span className="text-xs font-normal opacity-60">/yr</span>
+          <span className="text-caption">/yr</span>
         </p>
       </div>
     </div>
@@ -162,13 +156,11 @@ function SalaryComparisonGrid({
 }
 
 function GoalCardSalary({
-  color,
   targetAmount,
   annualGross,
   clampedPct,
   fmtBase,
 }: Readonly<{
-  color: string;
   targetAmount: number;
   annualGross: number;
   clampedPct: number;
@@ -178,26 +170,23 @@ function GoalCardSalary({
   return (
     <>
       <div>
-        <div className="flex justify-between mb-1.5">
-          <span className="text-xs text-fg-subtle">Current - Target</span>
-          <span className="text-xs font-semibold" style={{ color }}>
-            {formatPercent(clampedPct, numberFormat, 0)}
-          </span>
+        <div className="mb-1 flex justify-between">
+          <span className={LABEL}>Current - Target</span>
+          <span className={FIGURE}>{formatPercent(clampedPct, numberFormat, 0)}</span>
         </div>
-        <ProgressBar pct={clampedPct} color={color} />
+        <ProgressBar pct={clampedPct} label="Goal progress" />
       </div>
       <SalaryComparisonGrid
-        color={color}
         targetAmount={targetAmount}
         annualGross={annualGross}
         fmtBase={fmtBase}
       />
       <div className="flex items-center gap-2">
-        <ArrowUpRight size={13} className="text-success-accent flex-shrink-0" />
-        <p className="text-xs text-fg-muted">
+        <ArrowUpRight size={13} className="shrink-0 text-fg-faint" aria-hidden />
+        <p className="text-caption text-fg-muted font-numeric">
           {annualGross > 0 ? (
             <>
-              <strong>
+              <strong className="font-medium text-fg">
                 {formatPercent((targetAmount / annualGross - 1) * 100, numberFormat, 1)} raise
               </strong>{' '}
               - {fmtBase(Math.max(0, targetAmount - annualGross))} gap
@@ -241,9 +230,9 @@ function monthCellTitle(done: boolean, missed: boolean, isFuture: boolean): stri
   return 'Mark as missed';
 }
 
-function monthCellBg(done: boolean, missed: boolean, isFuture: boolean, color: string): string {
-  if (done) return color;
-  if (missed) return 'var(--data-forecast)';
+function monthCellBg(done: boolean, missed: boolean, isFuture: boolean): string {
+  if (done) return 'var(--secondary)';
+  if (missed) return 'var(--warning)';
   if (isFuture) return 'var(--border-subtle)';
   return 'var(--border-default)';
 }
@@ -252,13 +241,11 @@ function CalendarMonthGrid({
   monthKeys,
   completedKeys,
   missedMonths,
-  color,
   onToggle,
 }: Readonly<{
   monthKeys: string[];
   completedKeys: ReadonlySet<string>;
   missedMonths: readonly string[];
-  color: string;
   onToggle: (monthKey: string) => void;
 }>) {
   const now = new Date();
@@ -281,10 +268,11 @@ function CalendarMonthGrid({
               disabled={done || isFuture}
               onClick={() => !done && !isFuture && onToggle(key)}
               title={monthCellTitle(done, missed, isFuture)}
-              className={`w-full aspect-square rounded-sm transition-all ${isFuture || done ? 'cursor-default' : 'cursor-pointer hover:opacity-70'}`}
-              style={{ backgroundColor: monthCellBg(done, missed, isFuture, color) }}
+              aria-label={`${key}: ${monthCellTitle(done, missed, isFuture)}`}
+              className={`aspect-square w-full rounded-sm transition-opacity duration-fast focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring ${isFuture || done ? 'cursor-default' : 'cursor-pointer hover:opacity-70'}`}
+              style={{ backgroundColor: monthCellBg(done, missed, isFuture) }}
             />
-            <span className="text-[8px] text-fg-faint leading-none">{label}</span>
+            <span className="text-[11px] leading-none text-fg-subtle">{label}</span>
           </div>
         );
       })}
@@ -295,8 +283,7 @@ function CalendarMonthGrid({
 function InvestHabitMonthGrid({
   totalMonths,
   monthsCompleted,
-  color,
-}: Readonly<{ totalMonths: number; monthsCompleted: number; color: string }>) {
+}: Readonly<{ totalMonths: number; monthsCompleted: number }>) {
   return (
     <div className="grid grid-cols-12 gap-px">
       {MONTH_ABBREVIATIONS.slice(0, Math.max(1, Math.min(totalMonths, 12))).map((month, index) => {
@@ -304,10 +291,9 @@ function InvestHabitMonthGrid({
         return (
           <div key={month} className="flex flex-col items-center gap-1">
             <div
-              className={`w-full aspect-square rounded-sm transition-all ${done ? '' : 'bg-surface-muted'}`}
-              style={done ? { backgroundColor: color } : undefined}
+              className={`aspect-square w-full rounded-sm ${done ? 'bg-secondary' : 'bg-surface-muted'}`}
             />
-            <span className="text-[8px] text-fg-faint leading-none">{month[0]}</span>
+            <span className="text-[11px] leading-none text-fg-subtle">{month[0]}</span>
           </div>
         );
       })}
@@ -328,28 +314,33 @@ function InvestHabitControls({
 }>) {
   return (
     <div className="flex items-center gap-1">
-      <button
+      <IconButton
+        icon={Minus}
+        label="Remove a completed month"
+        title="Remove a completed month"
+        variant="subtle"
+        size="sm"
+        className="border border-border-control disabled:opacity-40"
         onClick={() => onUpdateMonths(goalId, PREVIOUS_MONTH_DELTA)}
         disabled={monthsCompleted <= 0}
-        className="w-7 h-7 rounded-lg border border-border-default flex items-center justify-center hover:bg-surface-sunken disabled:opacity-30 transition-colors"
-      >
-        <Minus size={11} />
-      </button>
-      <span className="text-xs text-fg-subtle px-1">{monthsCompleted}</span>
-      <button
+      />
+      <span className="px-1 text-cell font-numeric text-fg">{monthsCompleted}</span>
+      <IconButton
+        icon={Check}
+        label="Mark a month completed"
+        title="Mark a month completed"
+        variant="subtle"
+        size="sm"
+        className="border border-border-control disabled:opacity-40"
         onClick={() => onUpdateMonths(goalId, NEXT_MONTH_DELTA)}
         disabled={monthsCompleted >= totalMonths}
-        className="w-7 h-7 rounded-lg border border-brand-tint bg-brand-soft text-brand flex items-center justify-center hover:bg-brand-soft-strong disabled:opacity-30 transition-colors"
-      >
-        <Check size={11} />
-      </button>
+      />
     </div>
   );
 }
 
 type InvestHabitCardProps = {
   goal: Goal;
-  color: string;
   monthlyTarget: number;
   monthsCompleted: number;
   totalMonths: number;
@@ -363,7 +354,6 @@ type InvestHabitCardProps = {
 
 function InvestHabitProgress({
   goal,
-  color,
   monthlyTarget,
   monthsCompleted,
   totalMonths,
@@ -373,7 +363,6 @@ function InvestHabitProgress({
 }: Readonly<
   Pick<
     InvestHabitCardProps,
-    | 'color'
     | 'monthlyTarget'
     | 'monthsCompleted'
     | 'totalMonths'
@@ -387,9 +376,9 @@ function InvestHabitProgress({
 
   return (
     <div>
-      <div className="flex justify-between mb-2">
-        <span className="text-xs text-fg-subtle">Monthly hits</span>
-        <span className="text-xs font-semibold" style={{ color }}>
+      <div className="mb-2 flex justify-between">
+        <span className={LABEL}>Monthly hits</span>
+        <span className={FIGURE}>
           {monthsCompleted}/{totalMonths} months
         </span>
       </div>
@@ -398,21 +387,16 @@ function InvestHabitProgress({
           monthKeys={monthKeys}
           completedKeys={completedMonthKeys}
           missedMonths={goal.missedMonths ?? []}
-          color={color}
           onToggle={(key) => onToggleMissedMonth(goal.id, key)}
         />
       ) : (
-        <InvestHabitMonthGrid
-          totalMonths={totalMonths}
-          monthsCompleted={monthsCompleted}
-          color={color}
-        />
+        <InvestHabitMonthGrid totalMonths={totalMonths} monthsCompleted={monthsCompleted} />
       )}
       <div className="mt-3">
-        <p className="font-bold text-fg">{fmtBase(monthlyTarget * monthsCompleted)}</p>
-        <p className="text-xs text-fg-faint">
-          invested so far - {fmtBase(monthlyTarget)}/mo target
+        <p className="text-figure-md font-numeric text-fg">
+          {fmtBase(monthlyTarget * monthsCompleted)}
         </p>
+        <p className={CAPTION}>invested so far - {fmtBase(monthlyTarget)}/mo target</p>
       </div>
     </div>
   );
@@ -420,7 +404,6 @@ function InvestHabitProgress({
 
 function GoalCardInvestHabit({
   goal,
-  color,
   monthlyTarget,
   monthsCompleted,
   totalMonths,
@@ -435,7 +418,6 @@ function GoalCardInvestHabit({
     <>
       <InvestHabitProgress
         goal={goal}
-        color={color}
         monthlyTarget={monthlyTarget}
         monthsCompleted={monthsCompleted}
         totalMonths={totalMonths}
@@ -487,32 +469,31 @@ function AnnualAmountRow({
   return (
     <div className="flex items-end justify-between">
       <div>
-        <p className="font-bold text-fg">
+        <p className="text-figure-md font-numeric text-fg">
           {currentAmount}
-          {goal.unit && <span className="text-xs font-normal text-fg-faint ml-1">{goal.unit}</span>}
+          {goal.unit && <span className="ml-1 text-caption text-fg-subtle">{goal.unit}</span>}
         </p>
-        <p className="text-xs text-fg-faint">
+        <p className={CAPTION}>
           target: {targetAmount}
           {goal.unit ? ` ${goal.unit}` : ''}
         </p>
       </div>
       {lowerIsBetter && clampedPct < 100 && (
-        <div className="flex items-center gap-1.5 text-xs text-warning">
-          <AlertCircle size={12} />
+        <div className="flex items-center gap-1.5 text-caption text-warning">
+          <AlertCircle size={12} aria-hidden />
           <span>
             Reduce by {Math.max(0, currentAmount - targetAmount)}
             {goal.unit || ''}
           </span>
         </div>
       )}
-      {status === 'complete' && <p className="text-sm text-success font-semibold">Done!</p>}
+      {status === 'complete' && <p className={DONE}>Done!</p>}
     </div>
   );
 }
 
 function GoalCardAnnual({
   goal,
-  color,
   currentAmount,
   targetAmount,
   clampedPct,
@@ -520,7 +501,6 @@ function GoalCardAnnual({
   status,
 }: Readonly<{
   goal: Goal;
-  color: string;
   currentAmount: number;
   targetAmount: number;
   clampedPct: number;
@@ -528,27 +508,25 @@ function GoalCardAnnual({
   status: GoalStatus;
 }>) {
   const { numberFormat } = useCurrency();
-  const barColor = lowerIsBetter && clampedPct < 100 ? 'var(--data-forecast)' : color;
+  // A lower-is-better goal that is still above its target shows its meter in the warning colour.
+  const aboveTarget = lowerIsBetter && clampedPct < 100;
   const barWidth = getAnnualBarWidth(lowerIsBetter, clampedPct, currentAmount, targetAmount);
   return (
     <>
       <div>
-        <div className="flex justify-between mb-1.5">
-          <span className="text-xs text-fg-subtle">
-            Progress {goal.unit ? `(${goal.unit})` : ''}
-          </span>
-          <span className="text-xs font-semibold" style={{ color: barColor }}>
+        <div className="mb-1 flex justify-between">
+          <span className={LABEL}>Progress {goal.unit ? `(${goal.unit})` : ''}</span>
+          <span className={aboveTarget ? 'text-label font-numeric text-warning' : FIGURE}>
             {lowerIsBetter
               ? `${currentAmount} -> ${targetAmount}`
               : formatPercent(clampedPct, numberFormat, 0)}
           </span>
         </div>
-        <div className="w-full h-2.5 bg-surface-muted rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${barWidth}%`, backgroundColor: barColor }}
-          />
-        </div>
+        <ProgressMeter
+          value={barWidth}
+          label="Goal progress"
+          indicatorClassName={aboveTarget ? 'bg-warning' : undefined}
+        />
       </div>
       <AnnualAmountRow
         goal={goal}
@@ -577,53 +555,38 @@ function GoalNameAndBadges({
   const statusMeta = STATUS_META[status];
 
   return (
-    <div className="flex items-start gap-3 min-w-0">
-      <span className="text-2xl flex-shrink-0 leading-none mt-0.5">{goal.emoji}</span>
+    <div className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-xl leading-none" aria-hidden>
+        {goal.emoji}
+      </span>
       <div className="min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-semibold text-fg-emphasis leading-tight">{goal.name}</p>
+        <div className="flex items-start gap-1.5">
+          <span
+            className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: dataColorToken(goal.color || DATA_COLORS.primary) }}
+            aria-hidden
+          />
+          <p className="text-title-section text-fg">{goal.name}</p>
           {status === 'complete' && (
-            <CheckCircle2 size={14} className="text-success-accent flex-shrink-0" />
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-success" aria-hidden />
           )}
         </div>
-        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span
-            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusMeta.color}`}
-          >
-            <span className={`inline-block w-1.5 h-1.5 rounded-full ${statusMeta.dot} mr-1`} />
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <Badge size="sm" tone={statusMeta.tone}>
             {statusMeta.label}
-          </span>
-          <span
-            className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${meta.bg} ${meta.text}`}
-          >
-            <Icon size={10} className="inline-block mr-1" />
+          </Badge>
+          <Badge size="sm" className={GOAL_CHIP_CLASS_NAME}>
+            <Icon size={10} aria-hidden />
             {meta.label}
-          </span>
+          </Badge>
           {sourceResolution.status !== 'manual' && (
-            <span
-              className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                sourceResolution.status === 'linked'
-                  ? 'bg-success-soft text-success-fg'
-                  : 'bg-warning-soft text-warning-fg'
-              }`}
-            >
-              <Link2Icon status={sourceResolution.status} />
+            <Badge size="sm" tone={sourceResolution.status === 'linked' ? 'success' : 'warning'}>
               {sourceResolution.status === 'linked' ? sourceResolution.label : 'Source unavailable'}
-            </span>
+            </Badge>
           )}
         </div>
       </div>
     </div>
-  );
-}
-
-function Link2Icon({ status }: Readonly<{ status: GoalCurrentAmountResolution['status'] }>) {
-  return (
-    <span
-      className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${
-        status === 'linked' ? 'bg-success-accent' : 'bg-warning-accent'
-      }`}
-    />
   );
 }
 
@@ -643,27 +606,36 @@ function GoalCardHeader({
   onEdit: (id: number) => void;
 }>) {
   return (
-    <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
+    <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
       <GoalNameAndBadges
         goal={goal}
         status={status}
         meta={meta}
         sourceResolution={sourceResolution}
       />
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <span className="text-xs text-fg-faint mr-1">{`🗓 ${goal.deadline}`}</span>
-        <button
-          onClick={() => onEdit(goal.id)}
-          className="p-1.5 rounded-lg hover:bg-brand-soft text-fg-disabled hover:text-brand-accent transition-colors"
-        >
-          <Pencil size={13} />
-        </button>
-        <button
-          onClick={() => onDelete(goal.id)}
-          className="p-1.5 rounded-lg hover:bg-danger-soft text-fg-disabled hover:text-danger transition-colors"
-        >
-          <Trash2 size={13} />
-        </button>
+      <div className="flex shrink-0 flex-col-reverse items-end gap-1 sm:flex-row sm:items-center">
+        <span className="flex items-center gap-1 text-caption text-fg-subtle sm:mr-1">
+          <CalendarDays size={12} className="text-fg-faint" aria-hidden />
+          {goal.deadline}
+        </span>
+        <div className="flex items-center gap-1">
+          <IconButton
+            icon={Pencil}
+            label="Edit goal"
+            title="Edit goal"
+            variant="subtle"
+            size="sm"
+            onClick={() => onEdit(goal.id)}
+          />
+          <IconButton
+            icon={Trash2}
+            label="Delete goal"
+            title="Delete goal"
+            variant="danger"
+            size="sm"
+            onClick={() => onDelete(goal.id)}
+          />
+        </div>
       </div>
     </div>
   );
@@ -673,7 +645,6 @@ type GoalBodyContentProps = {
   goal: Goal;
   type: GoalType;
   status: GoalStatus;
-  color: string;
   clampedPct: number;
   currentAmount: number;
   annualGross: number;
@@ -700,13 +671,12 @@ const getGoalAmounts = (goal: Goal, currentAmount: number, toBase: (n: number) =
 });
 
 function renderAnnualGoal(props: GoalBodyContentProps) {
-  const { goal, color, clampedPct, status, currentAmount, toBase } = props;
+  const { goal, clampedPct, status, currentAmount, toBase } = props;
   const { targetAmount } = getGoalAmounts(goal, currentAmount, toBase);
 
   return (
     <GoalCardAnnual
       goal={goal}
-      color={color}
       currentAmount={currentAmount}
       targetAmount={targetAmount}
       clampedPct={clampedPct}
@@ -721,7 +691,6 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
     goal,
     type,
     status,
-    color,
     clampedPct,
     currentAmount,
     annualGross,
@@ -736,7 +705,6 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
   if (isSavingsLike(type)) {
     return (
       <GoalCardSavings
-        color={color}
         currentAmount={currentAmount}
         targetAmount={targetAmount}
         monthlyContrib={monthlyContrib}
@@ -750,7 +718,6 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
   if (type === 'salary') {
     return (
       <GoalCardSalary
-        color={color}
         targetAmount={targetAmount}
         annualGross={annualGross}
         clampedPct={clampedPct}
@@ -771,7 +738,6 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
     return (
       <GoalCardInvestHabit
         goal={goal}
-        color={color}
         monthlyTarget={toBase(monthlyTarget)}
         monthsCompleted={monthsCompleted}
         totalMonths={totalMonths}
@@ -792,10 +758,10 @@ function renderGoalTypeContent(props: GoalBodyContentProps) {
 
 function GoalCardBody(props: Readonly<GoalBodyContentProps>) {
   return (
-    <div className="px-5 pb-5 flex-1 flex flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-3 px-4 pb-4">
       {renderGoalTypeContent(props)}
       {props.goal.notes && (
-        <p className="text-[11px] text-fg-faint pt-3 border-t border-surface-sunken leading-relaxed">
+        <p className="border-t border-border-subtle pt-3 text-caption text-fg-subtle">
           {props.goal.notes}
         </p>
       )}
@@ -820,13 +786,10 @@ export function GoalCard({
   const status = getGoalStatus(goal, goalProgressContext, currentYear);
   const type = normalizeGoalType(goal);
   const meta = GOAL_TYPE_META[type];
-  const color = goal.color || 'var(--data-primary)';
   const clampedPct = Math.max(0, Math.min(pct, 100));
 
   return (
-    <div
-      className={`bg-surface rounded-2xl border shadow-sm transition-all hover:shadow-md flex flex-col ${status === 'complete' ? 'border-success-border' : 'border-border-subtle'}`}
-    >
+    <Card padding="none" className={cn('flex flex-col', status === 'complete' && 'border-success')}>
       <GoalCardHeader
         goal={goal}
         status={status}
@@ -839,7 +802,6 @@ export function GoalCard({
         goal={goal}
         type={type}
         status={status}
-        color={color}
         clampedPct={clampedPct}
         currentAmount={sourceResolution.currentAmount}
         annualGross={goalProgressContext.annualGross}
@@ -849,6 +811,6 @@ export function GoalCard({
         onUpdateMonths={onUpdateMonths}
         onToggleMissedMonth={onToggleMissedMonth}
       />
-    </div>
+    </Card>
   );
 }
