@@ -230,6 +230,12 @@ describe('quro doctor', () => {
         message: `1 bank-link secret(s), all encrypted with key ${key.id}.`,
       });
 
+      // A container without the key cannot check them: a warning, not a failure.
+      const noKeyHere = await report(settingsFor(migrated));
+      expect(noKeyHere.exitCode).toBe(EXIT_OK);
+      expect(secretsCheck(noKeyHere.report)).toMatchObject({ status: 'warn' });
+      expect(secretsCheck(noKeyHere.report).message).toContain(`encrypted with key ${key.id}`);
+
       const wrongKey = await report(settingsFor(migrated, { QRO_SECRETS_KEY_FILE: otherKeyFile }));
       expect(wrongKey.exitCode).toBe(EXIT_FAILURE);
       expect(secretsCheck(wrongKey.report).status).toBe('fail');
@@ -239,7 +245,7 @@ describe('quro doctor', () => {
       expect(invalidKey.exitCode).toBe(EXIT_USAGE);
       expect(invalidKey.out).toContain('QRO_SECRETS_KEY_FILE: the key in');
 
-      for (const run of [withoutKey, withKey, encrypted, wrongKey, invalidKey]) {
+      for (const run of [withoutKey, withKey, encrypted, noKeyHere, wrongKey, invalidKey]) {
         expect(run.out).not.toContain(marker);
         expect(run.out).not.toContain(keyHex);
       }

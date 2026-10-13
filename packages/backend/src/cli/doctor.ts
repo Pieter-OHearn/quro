@@ -300,6 +300,14 @@ function secretsCheckFor(report: SecretsReport, keyId: string | null): DoctorChe
         `${counts.unencrypted} of ${counts.total} bank-link secret(s) are stored unencrypted. ${keyId ? 'Run `quro secrets encrypt`.' : 'Set QRO_SECRETS_KEY_FILE, then run `quro secrets encrypt`.'}`,
       );
     default:
+      // This container has no key, so it cannot tell a wrong key from a missing one: the server's
+      // own settings check decides whether bunq can run.
+      if (!keyId && counts.unreadable === 0) {
+        return warn(
+          'secrets',
+          `${counts.unknownKey} bank-link secret(s) are encrypted with key ${report.unknownKeyIds.join(', ')}, and no secrets key is configured here, so they were not checked. Mount the key file to check them.`,
+        );
+      }
       return fail(
         'secrets',
         'failed',

@@ -1,4 +1,5 @@
 import { assertConfig, ConfigError, type SecretsConfig } from '../config';
+import { DEFAULT_SECRETS_KEY_FILE } from '../config/settings';
 import { classifyDatabaseError, describeDatabaseError, errorCode } from '../db/connectionErrors';
 import {
   readSecretRows,
@@ -178,7 +179,7 @@ function requireKeys(
     throw new ConfigError([
       {
         setting: 'QRO_SECRETS_KEY_FILE',
-        message: `required for \`quro secrets ${mode}\`: no key file at ${secrets.keyPath ?? '/run/secrets/secrets_key'}`,
+        message: `required for \`quro secrets ${mode}\`: no key file at ${DEFAULT_SECRETS_KEY_FILE}`,
       },
     ]);
   }

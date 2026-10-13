@@ -113,6 +113,20 @@ function requireShape(condition: boolean, what: string): asserts condition {
   if (!condition) throw new ArchiveFormatError(`The archive manifest is damaged (${what}).`);
 }
 
+const KEY_ID = /^[0-9a-f]{16}$/;
+
+/** Optional (archives before 0.9.0 lack it); when present, key ids only, as backups write them. */
+function checkIntegrationKeys(keys: unknown): void {
+  if (keys === undefined) return;
+  requireShape(
+    isObject(keys) &&
+      Array.isArray(keys.keyIds) &&
+      keys.keyIds.every((id) => typeof id === 'string' && KEY_ID.test(id)) &&
+      Number.isSafeInteger(keys.unencrypted),
+    'secrets.integrationKeys',
+  );
+}
+
 function checkDocuments(documents: unknown): void {
   requireShape(isObject(documents), 'documents');
   if (documents.driver === 'filesystem') {
@@ -159,6 +173,7 @@ export function parseManifest(text: string): Manifest {
   requireShape(isObject(database.fingerprint), 'database.fingerprint');
   checkDocuments(value.documents);
   requireShape(isObject(value.secrets), 'secrets');
+  checkIntegrationKeys(value.secrets.integrationKeys);
   return value as unknown as Manifest;
 }
 
