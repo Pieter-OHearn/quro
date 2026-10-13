@@ -1,43 +1,36 @@
-import { dataColorToken, DATA_COLORS } from '@/lib/dataColors';
+import {
+  CATEGORY_COLOR_NAMES,
+  CATEGORY_COLORS,
+  categoryColorFor,
+  dataColorToken,
+} from '@/lib/dataColors';
+import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { EmojiPickerField, FormField, Modal, ModalFooter, TextInput } from '@/components/ui';
 import type { BudgetCategory, EditCategoryForm } from '../types';
 
-const PRESET_COLORS = [
-  DATA_COLORS['growth'],
-  DATA_COLORS['property'],
-  DATA_COLORS['link'],
-  DATA_COLORS['alert'],
-  DATA_COLORS['premium'],
-  DATA_COLORS['primary'],
-  DATA_COLORS['milestone'],
-  DATA_COLORS['recurring'],
-  DATA_COLORS['sun'],
-  DATA_COLORS['expense'],
-  DATA_COLORS['cash'],
-  DATA_COLORS['neutral'],
-];
-
 type ColorSwatchesProps = { selected: string; onSelect: (color: string) => void };
 
+// The six category colours; a saved legacy colour selects the swatch it displays as.
 function ColorSwatches({ selected, onSelect }: Readonly<ColorSwatchesProps>) {
+  const selectedSwatch = categoryColorFor(selected);
   return (
-    <div className="flex flex-wrap gap-2 pt-1">
-      {PRESET_COLORS.map((color) => (
+    <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Colour">
+      {CATEGORY_COLORS.map((color) => (
         <button
           key={color}
           type="button"
           onClick={() => onSelect(color)}
           style={{ backgroundColor: dataColorToken(color) }}
-          className="h-7 w-7 rounded-full transition-transform hover:scale-110"
-          aria-label={color}
-        >
-          {selected === color && (
-            <span className="flex items-center justify-center text-fg-inverted text-xs font-bold">
-              ✓
-            </span>
+          aria-label={CATEGORY_COLOR_NAMES[color]}
+          aria-pressed={selectedSwatch === color}
+          title={CATEGORY_COLOR_NAMES[color]}
+          className={cn(
+            'h-6 w-6 rounded-full transition-shadow duration-fast max-sm:h-11 max-sm:w-11',
+            'focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus-ring',
+            selectedSwatch === color && 'ring-2 ring-fg ring-offset-2 ring-offset-surface',
           )}
-        </button>
+        />
       ))}
     </div>
   );
@@ -74,7 +67,10 @@ function getConfirmLabel(mode: 'create' | 'edit', isSaving: boolean) {
 function DialogError({ message }: Readonly<{ message: string | null }>) {
   if (!message) return null;
   return (
-    <div className="rounded-lg border border-danger-soft-strong bg-danger-soft px-3 py-2 text-sm text-danger-hover">
+    <div
+      role="alert"
+      className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-cell text-danger"
+    >
       {message}
     </div>
   );

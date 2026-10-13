@@ -1,4 +1,7 @@
 import { Cell, Pie, PieChart, Tooltip } from 'recharts';
+import { ChartCard } from '@/components/ui';
+import { CHART_TOOLTIP_PROPS } from '@/lib/chartStyles';
+import { dataColorToken } from '@/lib/dataColors';
 import type { BudgetFormatFn, PieEntry } from '../types';
 
 type SpendingPieChartProps = {
@@ -6,52 +9,49 @@ type SpendingPieChartProps = {
   fmtDec: BudgetFormatFn;
 };
 
+// Each slice keeps its category's colour, so the chart matches the category list.
 export function SpendingPieChart({ pieData, fmtDec }: Readonly<SpendingPieChartProps>) {
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <h3 className="font-semibold text-fg mb-1">Spending Breakdown</h3>
-      <p className="text-xs text-fg-faint mb-4">Current month</p>
-      {pieData.length > 0 ? (
-        <>
-          <div className="flex justify-center">
-            <PieChart width={180} height={180}>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                innerRadius={50}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {pieData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value) => fmtDec(Number(value) || 0)}
-                contentStyle={{ borderRadius: '12px', fontSize: '12px' }}
-              />
-            </PieChart>
-          </div>
-          <div className="space-y-1.5 mt-2">
-            {pieData.slice(0, 5).map((item) => (
-              <div key={item.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span className="text-xs text-fg-muted">{item.name}</span>
-                </div>
-                <span className="text-xs font-semibold text-fg-emphasis">{fmtDec(item.value)}</span>
-              </div>
+    <ChartCard
+      title="Spending Breakdown"
+      subtitle="Current month"
+      hasData={pieData.length > 0}
+      emptyMessage="No spending data yet."
+    >
+      <div className="flex justify-center">
+        <PieChart width={180} height={180}>
+          <Pie
+            data={pieData}
+            cx="50%"
+            cy="50%"
+            outerRadius={80}
+            innerRadius={50}
+            paddingAngle={2}
+            dataKey="value"
+            stroke="var(--surface)"
+          >
+            {pieData.map((entry) => (
+              <Cell key={entry.name} fill={dataColorToken(entry.color)} />
             ))}
-          </div>
-        </>
-      ) : (
-        <p className="text-sm text-fg-faint py-12 text-center">No spending data yet.</p>
-      )}
-    </div>
+          </Pie>
+          <Tooltip {...CHART_TOOLTIP_PROPS} formatter={(value) => fmtDec(Number(value) || 0)} />
+        </PieChart>
+      </div>
+      <ul className="mt-2 space-y-1">
+        {pieData.slice(0, 5).map((item) => (
+          <li key={item.name} className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: dataColorToken(item.color) }}
+                aria-hidden
+              />
+              <span className="truncate text-cell text-fg-muted">{item.name}</span>
+            </div>
+            <span className="text-cell font-medium font-numeric text-fg">{fmtDec(item.value)}</span>
+          </li>
+        ))}
+      </ul>
+    </ChartCard>
   );
 }

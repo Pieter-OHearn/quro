@@ -16,7 +16,7 @@ export function BudgetChartsRow({
   fmt,
 }: Readonly<BudgetChartsRowProps>) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <SpendingPieChart pieData={pieData} fmtDec={fmtDec} />
       <BudgetVsSpentChart categories={categories} fmt={fmt} />
     </div>

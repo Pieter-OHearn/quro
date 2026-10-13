@@ -21,7 +21,10 @@ export function Budget() {
   return (
     <PageStack>
       {page.currencyNeedsReview && (
-        <p role="status" className="rounded-lg bg-warning-soft p-4 text-sm text-warning-fg">
+        <p
+          role="status"
+          className="rounded-lg border border-warning bg-warning-soft p-3 text-cell text-warning"
+        >
           Some older budget amounts have no recorded currency and are treated as EUR. Review these
           records against your statements before relying on spending or runway estimates.
         </p>
