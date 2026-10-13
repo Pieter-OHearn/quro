@@ -49,6 +49,7 @@ export const PROFILES = {
     'documentStorage',
     'documents',
     'bunq',
+    'secrets',
     'pensionImport',
     'tracing',
   ],
@@ -61,6 +62,8 @@ export const PROFILES = {
     'tracing',
   ],
   cli: ['runtimeDatabase', 'documentStorage'],
+  /** `quro secrets`: reads and re-encrypts integration secrets as the runtime role. */
+  secrets: ['runtimeDatabase', 'documentStorage', 'secrets'],
   documentsMigration: ['runtimeDatabase', 'documentStorage', 's3'],
   migrate: ['adminDatabase', 'runtimeDatabase', 'documentStorage'],
   /** `quro migrate --status`: reads the migration history as the owner role. */
@@ -87,6 +90,7 @@ export const PROFILES = {
     'documentStorage',
     'documents',
     'bunq',
+    'secrets',
     'pensionImport',
     'tracing',
     'tools',

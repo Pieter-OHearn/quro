@@ -13,6 +13,12 @@ import {
   type BunqOAuthDestination,
 } from '../lib/bunqOAuthAttempts';
 import { buildOAuthAuthorizeUrl, deleteSession, exchangeCodeForTokens } from '../lib/bunqClient';
+import {
+  BUNQ_REAUTHORIZE_MESSAGE,
+  BunqCredentialsUnavailableError,
+  readStoredSession,
+  sealBunqSecret,
+} from '../lib/bunqCredentials';
 import { describeSyncFailure } from '../lib/syncFailure';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
@@ -41,9 +47,17 @@ function unavailable(c: Context) {
   return c.json({ error: BUNQ_UNAVAILABLE_MESSAGE }, HTTP_STATUS.SERVICE_UNAVAILABLE);
 }
 
+// A failed statement's message repeats its parameters, so only bank and own messages are logged.
 function logBunqError(label: string, error: unknown): void {
-  const message = error instanceof Error ? error.message : 'Unknown Bunq error';
-  console.error(label, { message });
+  console.error(label, { message: describeSyncFailure(error, 'database or unknown error') });
+}
+
+/** The answer when the stored credentials cannot be opened: the user has to connect again. */
+function reauthorizationRequired(c: Context) {
+  return c.json(
+    { error: BUNQ_REAUTHORIZE_MESSAGE, code: 'bunq_reauthorization_required' },
+    HTTP_STATUS.CONFLICT,
+  );
 }
 
 function mergeSyncResults(
@@ -101,18 +115,20 @@ app.get('/oauth/callback', async (c) => {
 
   try {
     const tokens = await exchangeCodeForTokens(code);
+    // Stored only encrypted, bound to this user's row (lib/bunqCredentials.ts).
+    const accessToken = sealBunqSecret('access_token', userId, tokens.accessToken);
 
     await db.transaction(async (tx) => {
       await tx
         .insert(bunqConnections)
         .values({
           userId,
-          accessToken: tokens.accessToken,
+          accessToken,
         })
         .onConflictDoUpdate({
           target: bunqConnections.userId,
           set: {
-            accessToken: tokens.accessToken,
+            accessToken,
             privateKey: null,
             installationToken: null,
             serverPublicKey: null,
@@ -161,17 +177,10 @@ app.get('/connection', async (c) => {
 app.delete('/connection', async (c) => {
   const user = getAuthUser(c);
 
-  const [connection] = await db
-    .select({
-      sessionToken: bunqConnections.sessionToken,
-      sessionId: bunqConnections.sessionId,
-    })
-    .from(bunqConnections)
-    .where(eq(bunqConnections.userId, user.id));
-
-  if (connection?.sessionToken && connection.sessionId !== null) {
+  const session = await readStoredSession(user.id);
+  if (session) {
     try {
-      await deleteSession(connection.sessionToken, connection.sessionId);
+      await deleteSession(session.sessionToken, session.sessionId);
     } catch (error) {
       logBunqError('[bunq session delete error]', error);
     }
@@ -204,6 +213,7 @@ app.post('/sync/savings', async (c) => {
       HTTP_STATUS.OK,
     );
   } catch (e) {
+    if (e instanceof BunqCredentialsUnavailableError) return reauthorizationRequired(c);
     logBunqError('[bunq savings sync error]', e);
     const message = describeSyncFailure(e, 'Bunq savings sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
@@ -229,6 +239,7 @@ app.post('/sync/budget', async (c) => {
       HTTP_STATUS.OK,
     );
   } catch (e) {
+    if (e instanceof BunqCredentialsUnavailableError) return reauthorizationRequired(c);
     logBunqError('[bunq budget sync error]', e);
     const message = describeSyncFailure(e, 'Bunq budget sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
@@ -271,6 +282,7 @@ app.post('/sync', async (c) => {
       HTTP_STATUS.OK,
     );
   } catch (e) {
+    if (e instanceof BunqCredentialsUnavailableError) return reauthorizationRequired(c);
     logBunqError('[bunq sync error]', e);
     const message = describeSyncFailure(e, 'Bunq sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);

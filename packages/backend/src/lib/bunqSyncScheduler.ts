@@ -4,6 +4,7 @@ import { bunqConnections } from '../db/schema';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { createRotatingWork } from './rotatingWork';
+import { describeSyncFailure } from './syncFailure';
 import { startIntervalJob } from './intervalJob';
 
 const SYNC_INTERVAL_MS = HOUR_MS;
@@ -35,7 +36,8 @@ async function syncUserAccounts(userId: number): Promise<void> {
 
     console.log(`[bunq-sync] userId=${userId} savings=${savingsStatus} budget=${budgetStatus}`);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    // A failed statement's message repeats its parameters; describeSyncFailure withholds it.
+    const message = describeSyncFailure(error, 'database or unknown error');
     console.error(`[bunq-sync] userId=${userId} error: ${message}`);
   }
 }

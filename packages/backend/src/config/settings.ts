@@ -19,6 +19,7 @@ export type SettingGroup =
   | 'Database'
   | 'Document storage'
   | 'bunq'
+  | 'Integration secrets'
   | 'Statement import'
   | 'Tracing'
   | 'Maintenance'
@@ -178,6 +179,8 @@ export type DocumentStorageDriver = (typeof DOCUMENT_STORAGE_DRIVERS)[number];
 export const DEFAULT_DOCUMENTS_DIR = '/var/lib/quro/documents';
 
 export const DEFAULT_BACKUP_DIR = '/var/lib/quro/backups';
+
+export const DEFAULT_SECRETS_KEY_FILE = '/run/secrets/secrets_key';
 
 export const DEFAULT_CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173'] as const;
 
@@ -492,6 +495,24 @@ export const SETTINGS = defineSettings({
     default: false,
   }),
 
+  // ── Integration secrets ──────────────────────────────────────────────────
+  QRO_SECRETS_KEY_FILE: path({
+    group: 'Integration secrets',
+    audience: 'operator',
+    description:
+      'File holding the key that encrypts integration secrets (the bank-link tokens and keys of connected bunq accounts) in the database: 64 hexadecimal characters, for example from `openssl rand -hex 32`. `quro init` writes one. Required once bunq linking is configured. Never in a backup: keep a copy with your secret files, because without it every connected bunq account has to be connected again.',
+    secret: 'file',
+    default: DEFAULT_SECRETS_KEY_FILE,
+    requirement: { kind: 'feature', feature: 'bunq' },
+  }),
+  QRO_SECRETS_PREVIOUS_KEY_FILE: path({
+    group: 'Integration secrets',
+    audience: 'operator',
+    description:
+      'Only while rotating the secrets key: the file holding the key that was in use before. Secrets encrypted with it stay readable until `quro secrets rotate` has encrypted them with QRO_SECRETS_KEY_FILE; remove it afterwards.',
+    secret: 'file',
+  }),
+
   // ── Statement import ─────────────────────────────────────────────────────
   PENSION_PARSER_URL: httpUrl({
     group: 'Statement import',
@@ -659,7 +680,14 @@ export const FEATURES = {
       'BUNQ_CLIENT_SECRET_FILE',
       'BUNQ_REDIRECT_URI',
     ],
-    requires: ['BUNQ_CLIENT_ID', 'BUNQ_CLIENT_SECRET', 'BUNQ_REDIRECT_URI', 'FRONTEND_ORIGIN'],
+    // Bank-link tokens are only ever stored encrypted, so linking needs the secrets key.
+    requires: [
+      'BUNQ_CLIENT_ID',
+      'BUNQ_CLIENT_SECRET',
+      'BUNQ_REDIRECT_URI',
+      'FRONTEND_ORIGIN',
+      'QRO_SECRETS_KEY_FILE',
+    ],
   },
 } as const satisfies Record<
   FeatureName,
