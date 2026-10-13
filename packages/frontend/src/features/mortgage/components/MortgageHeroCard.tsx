@@ -3,7 +3,7 @@ import type { Mortgage as MortgageType } from '@quro/shared';
 import { Button, Card } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
 import type { MortgageFormatFn } from '../types';
-import { formatAsNegative } from '../utils/liability';
+import { formatAsNegative } from '@/lib/liability';
 
 type MortgageHeroCardProps = {
   mortgage: MortgageType;

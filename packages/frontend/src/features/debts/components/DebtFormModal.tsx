@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react';
 import { CURRENCY_CODES, type CurrencyCode, type Debt, type DebtType } from '@quro/shared';
-import { Banknote } from 'lucide-react';
 import {
   Button,
   CurrencyInput,
@@ -8,11 +7,12 @@ import {
   EmojiPickerField,
   FormField,
   Modal,
-  ModalHeader,
   SelectInput,
   TextInput,
   Textarea,
 } from '@/components/ui';
+import { CATEGORY_COLOR_NAMES, categoryColorFor, dataColorToken } from '@/lib/dataColors';
+import { cn } from '@/lib/utils';
 import { DEBT_COLORS, DEBT_TYPE_META, DEFAULT_EMOJI_BY_TYPE, EMPTY_DEBT_FORM } from '../constants';
 import type { CreateDebtPayload, DebtFormState } from '../types';
 import {
@@ -173,18 +173,24 @@ function DebtDateFields({ form, errors, onChange }: Readonly<DebtFormFieldsProps
 }
 
 function DebtColorPicker({ form, errors, onChange }: Readonly<DebtFormFieldsProps>) {
+  const selected = categoryColorFor(form.color);
   return (
     <FormField label="Colour Tag" required error={errors.color}>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Colour tag">
         {DEBT_COLORS.map((color) => (
           <button
             key={color}
             type="button"
+            aria-label={CATEGORY_COLOR_NAMES[color]}
+            aria-pressed={selected === color}
+            title={CATEGORY_COLOR_NAMES[color]}
             onClick={() => onChange('color', color)}
-            className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${
-              form.color === color ? 'border-fg-emphasis' : 'border-transparent'
-            }`}
-            style={{ backgroundColor: color }}
+            className={cn(
+              'h-6 w-6 rounded-full transition-shadow duration-fast max-sm:h-11 max-sm:w-11',
+              'focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus-ring',
+              selected === color && 'ring-2 ring-fg ring-offset-2 ring-offset-surface',
+            )}
+            style={{ backgroundColor: dataColorToken(color) }}
           />
         ))}
       </div>
@@ -220,30 +226,15 @@ function DebtFormModalShell({
       onClose={onClose}
       maxWidth="lg"
       scrollable
-      header={
-        <ModalHeader
-          title={editing ? 'Edit Debt' : 'Add New Debt'}
-          subtitle="Track a liability"
-          onClose={onClose}
-          scrollable
-          visual={
-            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-danger/20 text-danger-border">
-              <Banknote size={18} />
-            </div>
-          }
-        />
-      }
       footer={
         <>
-          <Button onClick={onClose} variant="secondary" size="lg" className="flex-1">
+          <Button onClick={onClose} variant="secondary">
             Cancel
           </Button>
           <Button
             onClick={onSubmit}
-            size="lg"
             loading={submitting}
             loadingLabel={editing ? 'Saving Changes...' : 'Adding Debt...'}
-            className="flex-1 bg-danger-hover hover:bg-danger-fg"
           >
             {editing ? 'Save Changes' : 'Add Debt'}
           </Button>
@@ -320,7 +311,7 @@ export function DebtFormModal({ debt, onClose, onSubmit }: Readonly<DebtFormModa
       <DebtDateFields form={form} errors={errors} onChange={handleChange} />
       <DebtColorPicker form={form} errors={errors} onChange={handleChange} />
       <DebtNotesField form={form} errors={errors} onChange={handleChange} />
-      {errors.submit ? <p className="text-sm text-danger">{errors.submit}</p> : null}
+      {errors.submit ? <p className="text-cell text-danger">{errors.submit}</p> : null}
     </DebtFormModalShell>
   );
 }

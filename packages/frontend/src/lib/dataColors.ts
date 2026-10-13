@@ -49,6 +49,16 @@ export const CATEGORY_COLORS = [
 
 export type CategoryColor = (typeof CATEGORY_COLORS)[number];
 
+/** Accessible names for the offered swatches, in the order of `CATEGORY_COLORS`. */
+export const CATEGORY_COLOR_NAMES: Record<CategoryColor, string> = {
+  [DATA_COLORS.income]: 'Green',
+  [DATA_COLORS.primary]: 'Blue',
+  [DATA_COLORS.forecast]: 'Amber',
+  [DATA_COLORS.property]: 'Terracotta',
+  [DATA_COLORS.milestone]: 'Plum',
+  [DATA_COLORS.neutral]: 'Grey',
+};
+
 // The offered swatch each saved identity shows as selected: the swatch with the same display
 // colour, and the warm terracotta swatch for the identities that display in the loss colour.
 const CATEGORY_COLOR_BY_NAME: Record<DataColorName, CategoryColor> = {

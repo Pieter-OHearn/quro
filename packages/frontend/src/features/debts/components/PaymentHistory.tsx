@@ -7,6 +7,7 @@ import {
   DataTable,
   DataTableCell,
   DataTableRow,
+  IconButton,
   type DataTableSortState,
   type DataTableColumn,
 } from '@/components/ui';
@@ -24,6 +25,13 @@ type PaymentHistoryTableProps = Omit<PaymentHistoryProps, 'onLogPayment' | 'paym
   sortedPayments: DebtPayment[];
   sort: DataTableSortState;
   onSortChange: (sort: DataTableSortState) => void;
+};
+
+// Dates read "01 Oct 2026".
+const PAYMENT_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
 };
 
 const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
@@ -44,7 +52,7 @@ const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'font-semibold text-fg-emphasis',
+    cellClassName: 'font-medium text-fg',
   },
   {
     key: 'principal',
@@ -55,7 +63,6 @@ const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'font-medium text-success',
   },
   {
     key: 'interest',
@@ -67,16 +74,15 @@ const PAYMENT_COLUMNS: readonly DataTableColumn<DebtPayment>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'text-danger',
   },
-  { key: 'actions', header: '', priority: 'actions', width: 40 },
+  { key: 'actions', header: '', priority: 'actions', width: 44 },
 ];
 
 function PaymentHistoryEmpty() {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-sunken px-4 py-4 text-fg-faint">
-      <Clock size={16} className="flex-shrink-0" />
-      <span className="text-sm">No payments recorded yet.</span>
+    <div className="flex items-center gap-2 rounded-md border border-dashed border-border-control px-3 py-3 text-fg-muted">
+      <Clock size={14} className="shrink-0 text-fg-faint" aria-hidden />
+      <span className="text-cell">No payments recorded yet.</span>
     </div>
   );
 }
@@ -98,14 +104,13 @@ function PaymentHistoryTable({
       columns={PAYMENT_COLUMNS}
       sort={sort}
       onSortChange={onSortChange}
-      className="rounded-xl border border-border-subtle"
-      tableClassName="text-xs"
+      className="rounded-md border border-border-default"
       bodyClassName="md:overflow-hidden"
     >
       {sortedPayments.map((payment) => (
         <DataTableRow key={payment.id} interactive>
           <DataTableCell columnKey="date" className="text-fg-muted">
-            {formatDate(payment.date, { day: 'numeric', month: 'short' })}
+            {formatDate(payment.date, PAYMENT_DATE_OPTIONS)}
           </DataTableCell>
           <DataTableCell columnKey="amount">
             {fmtNative(payment.amount, debt.currency, true)}
@@ -117,13 +122,15 @@ function PaymentHistoryTable({
             {fmtNative(payment.interest, debt.currency, true)}
           </DataTableCell>
           <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
-            <button
-              type="button"
+            <IconButton
+              icon={Trash2}
+              label="Delete payment"
+              title="Delete payment"
+              variant="danger"
+              size="sm"
+              className="opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
               onClick={() => onDeletePayment(payment.id)}
-              className="rounded-md p-1 text-fg-disabled opacity-0 transition-all hover:bg-danger-soft hover:text-danger group-hover:opacity-100 max-md:opacity-100"
-            >
-              <Trash2 size={12} />
-            </button>
+            />
           </DataTableCell>
         </DataTableRow>
       ))}
@@ -141,15 +148,13 @@ export function PaymentHistory({
   const sortedPayments = useSortedRows(payments, PAYMENT_COLUMNS, sort, newestFirst);
 
   return (
-    <div className="mt-4 border-t border-border-subtle pt-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-subtle">
-          Payment History
-        </p>
+    <div className="border-t border-border-subtle pt-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h4 className="text-cell font-semibold text-fg">Payment History</h4>
         <Button
           size="sm"
-          className="bg-success hover:bg-success-fg"
-          leadingIcon={<Plus size={12} />}
+          variant="secondary"
+          leadingIcon={<Plus size={12} aria-hidden />}
           onClick={onLogPayment}
         >
           Log Payment

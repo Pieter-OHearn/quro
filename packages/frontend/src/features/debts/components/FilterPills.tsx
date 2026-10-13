@@ -1,4 +1,5 @@
 import type { Debt } from '@quro/shared';
+import { SegmentedControl } from '@/components/ui';
 import type { DebtFilterValue } from '../types';
 import { FILTER_OPTIONS } from '../constants';
 
@@ -18,37 +19,24 @@ export function FilterPills({ debts, value, onChange }: Readonly<FilterPillsProp
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {visibleOptions.map((option) => {
+    <SegmentedControl
+      aria-label="Filter debts"
+      value={value}
+      onChange={onChange}
+      options={visibleOptions.map((option) => {
         const Icon = option.icon;
-        const isActive = option.key === value;
-        const count = getFilterCount(option.key, debts);
-
-        return (
-          <button
-            key={option.key}
-            type="button"
-            onClick={() => onChange(option.key)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-              isActive
-                ? 'border-fg bg-fg text-fg-inverted'
-                : 'border-border-default bg-surface text-fg-muted hover:border-border-strong hover:bg-surface-sunken'
-            }`}
-          >
-            <Icon size={11} />
-            {option.label}
-            {option.key !== 'all' ? (
-              <span
-                className={`rounded-full px-1 text-[9px] font-semibold ${
-                  isActive ? 'bg-surface/20 text-fg-inverted' : 'bg-surface-muted text-fg-subtle'
-                }`}
-              >
-                {count}
+        return {
+          value: option.key,
+          label: option.label,
+          icon: <Icon size={12} aria-hidden />,
+          badge:
+            option.key === 'all' ? undefined : (
+              <span className="font-numeric text-fg-subtle">
+                {getFilterCount(option.key, debts)}
               </span>
-            ) : null}
-          </button>
-        );
+            ),
+        };
       })}
-    </div>
+    />
   );
 }

@@ -3,7 +3,7 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import type { MortgageTxnType } from '../types';
-import { formatAsNegative } from '../utils/liability';
+import { formatAsNegative } from '@/lib/liability';
 import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
 
 type MortgageTxnHistoryProps = {
