@@ -66,3 +66,10 @@ export function getPropertyMortgageBalance(
 export function getPropertyOwnershipShare(property: Property): number {
   return householdShare(property.isJoint);
 }
+
+const SHARE_DECIMALS = 4;
+
+/** A share count with up to four decimals and no trailing zeros (`12.5`, `40`). */
+export function formatShares(shares: number): string {
+  return shares.toFixed(SHARE_DECIMALS).replace(/\.?0+$/, '');
+}

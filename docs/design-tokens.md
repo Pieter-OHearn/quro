@@ -441,11 +441,11 @@ filter value, pagination state, and handlers.
   filter={filter}
   onFilterChange={setFilter}
   stats={[
-    { label: 'In', value: fmt(inflow), color: 'text-success-fg' },
-    { label: 'Out', value: fmt(outflow), color: 'text-danger-fg' },
+    { label: 'In', value: <TxnAmount value={inflow} format={fmt} /> },
+    { label: 'Out', value: <TxnAmount value={-outflow} format={fmt} /> },
   ]}
   onAdd={onAddTransaction}
-  addLabel="Add Transaction"
+  addLabel="Add transaction"
   emptyMessage="No transactions match this filter."
   footer={
     <Pagination
@@ -463,11 +463,10 @@ filter value, pagination state, and handlers.
     <TxnRow
       key={transaction.id}
       icon={transaction.type === 'deposit' ? ArrowUpRight : ArrowDownRight}
-      iconColor={transaction.type === 'deposit' ? 'text-success-fg' : 'text-danger-fg'}
-      iconBg={transaction.type === 'deposit' ? 'bg-success-soft' : 'bg-danger-soft'}
+      iconColor={transaction.type === 'deposit' ? 'text-gain' : 'text-fg-muted'}
       date={transaction.date}
       label={transaction.note ?? 'Transaction'}
-      amount={fmt(transaction.amount)}
+      amount={<TxnAmount value={signedAmount(transaction)} format={fmt} />}
       onEdit={() => onEdit(transaction)}
       onDelete={() => onDelete(transaction.id)}
     />

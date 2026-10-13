@@ -1,5 +1,5 @@
 import { useSortedRows } from '@/hooks/useSortedRows';
-import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Archive, ChevronDown, ChevronUp, Edit3, Plus, RefreshCcw } from 'lucide-react';
 import {
   formatItemType,
@@ -21,8 +21,9 @@ import {
   type DataTableColumn,
   type DataTableSortState,
 } from '@/components/ui';
+import { stopRowClick } from '@/components/finance/stopRowClick';
 import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
-import { groupHoldingTransactions, type Position } from '../utils/position';
+import { formatShares, groupHoldingTransactions, type Position } from '../utils/position';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
 type FormatBaseFn = (value: number, currency?: string, compact?: boolean) => string;
@@ -85,24 +86,11 @@ function getEffectivePrice(holding: Holding): number {
   return manual != null && Number.isFinite(manual) ? manual : holding.currentPrice;
 }
 
-const SHARE_DECIMALS = 4;
-
-function formatShares(shares: number): string {
-  return shares.toFixed(SHARE_DECIMALS).replace(/\.?0+$/, '');
-}
-
 function formatSyncDate(priceUpdatedAt: string | null | undefined): string | null {
   if (!priceUpdatedAt) return null;
   const date = new Date(priceUpdatedAt);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-}
-
-function stopRowClick(handler: () => void) {
-  return (event: MouseEvent) => {
-    event.stopPropagation();
-    handler();
-  };
 }
 
 function buildBrokerageHoldingColumns(

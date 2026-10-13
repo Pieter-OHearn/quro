@@ -1,4 +1,3 @@
-import type { MouseEvent } from 'react';
 import { ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { monthlyInterest } from '@quro/shared';
@@ -12,6 +11,7 @@ import {
   RowActions,
   type DataTableColumn,
 } from '@/components/ui';
+import { stopRowClick } from '@/components/finance/stopRowClick';
 import { dataColorToken } from '@/lib/dataColors';
 import { JointBadge } from '@/features/partner';
 import { attributedSavingsBalanceInBase } from '../utils/savings-data';
@@ -75,13 +75,6 @@ function buildAccountColumns(baseCurrency: string): readonly DataTableColumn[] {
 }
 
 const COLUMN_COUNT = 8;
-
-function stopRowClick(handler: () => void) {
-  return (event: MouseEvent) => {
-    event.stopPropagation();
-    handler();
-  };
-}
 
 function AccountNameCell({ acc, foreign }: Readonly<{ acc: SavingsAccount; foreign: boolean }>) {
   return (

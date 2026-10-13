@@ -23,7 +23,7 @@ import { TxnAmount } from '@/components/finance/TxnAmount';
 import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import type { SaveHoldingTxnInput } from '../types';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
-import type { HoldingTxnType, Position } from '../utils/position';
+import { formatShares, type HoldingTxnType, type Position } from '../utils/position';
 
 type AddHoldingTxnModalProps = {
   holding: Holding;
@@ -44,12 +44,6 @@ type InitialHoldingTxnFormValues = {
 const TXN_TYPES = ['buy', 'sell', 'dividend'] as const satisfies HoldingTxnType[];
 
 type FmtNative = (value: number, currency: string, compact?: boolean) => string;
-
-const SHARE_DECIMALS = 4;
-
-function formatShares(shares: number): string {
-  return shares.toFixed(SHARE_DECIMALS).replace(/\.?0+$/, '');
-}
 
 type BuyPreviewProps = {
   parsedShares: number;

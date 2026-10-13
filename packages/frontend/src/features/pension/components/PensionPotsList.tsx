@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronUp, Edit3, Info, Lock, Plus, Trash2 } from 'lucide-react';
 import type { AppCapabilityStatus, PensionPot, PensionTransaction } from '@quro/shared';
 import {
@@ -12,6 +12,7 @@ import {
   RowActions,
   type DataTableColumn,
 } from '@/components/ui';
+import { stopRowClick } from '@/components/finance/stopRowClick';
 import type {
   ConvertToBaseFn,
   DeletePotMutation,
@@ -93,13 +94,6 @@ function buildPotColumns(baseCurrency: string): readonly DataTableColumn[] {
 }
 
 const POT_COLUMN_COUNT = 6;
-
-function stopRowClick(handler: () => void) {
-  return (event: MouseEvent) => {
-    event.stopPropagation();
-    handler();
-  };
-}
 
 function PensionPotNotes({ pot }: Readonly<{ pot: PensionPot }>) {
   const metadataEntries = Object.entries(pot.metadata ?? {});
