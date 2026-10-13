@@ -6,6 +6,7 @@ import { readOwnerFacts, type OwnerFacts } from '../db/runtimeRole';
 import { compareSchema, describeSchema, readLatestAppliedWhen } from '../db/schemaVersion';
 import { getBuildInfo, type BuildInfo } from '../lib/buildInfo';
 import { createDocumentStore } from '../lib/documentStorage';
+import { summarizeSecrets, type SecretRow, type SecretsReport } from '../lib/integrationSecrets';
 import { postgresMajorProblem, runtimeProblems } from '../lib/platformSupport';
 import {
   EXIT_FAILURE,
@@ -24,7 +25,8 @@ import {
 export const DOCTOR_USAGE = `Usage: quro doctor [--json]
 
 Read-only checks: host and runtime, settings, both database roles, the schema against this
-image, the backup tool version and the document store. Changes nothing.
+image, the backup tool version, the document store and the encryption of stored bank-link
+secrets. Changes nothing.
 
 Options:
   --json   Print one JSON report instead of text
@@ -249,6 +251,63 @@ async function documentStoreCheck(): Promise<DoctorCheck> {
   }
 }
 
+const UNDEFINED_TABLE = '42P01';
+
+function readSecretRowsWith(sql: AnySql): Promise<SecretRow[]> {
+  return sql<SecretRow[]>`
+    select id, user_id as "userId", access_token as "accessToken", private_key as "privateKey",
+      installation_token as "installationToken", session_token as "sessionToken"
+    from bunq_connections order by id
+  `;
+}
+
+/** Whether stored bank-link secrets are encrypted with the configured key. Prints counts only. */
+async function integrationSecretsCheck(): Promise<DoctorCheck> {
+  const runtime = section(() => getConfig().runtimeDatabase);
+  const secrets = section(() => getConfig().secrets);
+  if (!runtime || !secrets) return skip('secrets', 'Not checked: invalid settings.');
+  let rows: SecretRow[];
+  try {
+    rows = await withConnection(runtime, readSecretRowsWith);
+  } catch (error) {
+    if ((error as { code?: unknown }).code === UNDEFINED_TABLE) {
+      return skip('secrets', 'Not checked: the schema is not migrated yet.');
+    }
+    return skip('secrets', 'Not checked: the runtime role cannot read the database.');
+  }
+  return secretsCheckFor(
+    summarizeSecrets(rows, { current: secrets.key, previous: secrets.previousKey }),
+    secrets.key?.id ?? null,
+  );
+}
+
+function secretsCheckFor(report: SecretsReport, keyId: string | null): DoctorCheck {
+  const keyText = keyId ? `key ${keyId}` : 'no secrets key configured';
+  const { secrets: counts } = report;
+  switch (report.status) {
+    case 'none':
+      return ok('secrets', `No bank-link secrets are stored (${keyText}).`);
+    case 'current':
+      return ok('secrets', `${counts.total} bank-link secret(s), all encrypted with ${keyText}.`);
+    case 'rotation_pending':
+      return warn(
+        'secrets',
+        `${counts.previous} of ${counts.total} bank-link secret(s) are encrypted with the previous key. Run \`quro secrets rotate\`.`,
+      );
+    case 'unencrypted':
+      return warn(
+        'secrets',
+        `${counts.unencrypted} of ${counts.total} bank-link secret(s) are stored unencrypted. ${keyId ? 'Run `quro secrets encrypt`.' : 'Set QRO_SECRETS_KEY_FILE, then run `quro secrets encrypt`.'}`,
+      );
+    default:
+      return fail(
+        'secrets',
+        'failed',
+        `${counts.unknownKey + counts.unreadable} of ${counts.total} bank-link secret(s) cannot be opened with ${keyText} (users ${report.reconnectUserIds.join(', ')}). Configure the key they were encrypted with, or have those users connect bunq again. \`quro secrets status\` shows the details.`,
+      );
+  }
+}
+
 const EXIT_BY_FAILURE: ReadonlyArray<[FailureKind, number]> = [
   ['settings', EXIT_USAGE],
   ['unreachable', EXIT_UNAVAILABLE],
@@ -271,6 +330,7 @@ export async function runDoctor(): Promise<DoctorReport> {
     await runtimeRoleCheck(),
     await backupToolCheck(owner.serverMajor),
     await documentStoreCheck(),
+    await integrationSecretsCheck(),
   ];
   const exitCode = exitCodeFor(checks);
   return { status: exitCode === EXIT_OK ? 'ok' : 'fail', exitCode, build, checks };

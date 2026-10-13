@@ -139,7 +139,8 @@ out=$(docker run --rm -v "$INSTALL/config:/config" "$IMAGE" init)
 echo "$out"
 contains "$out" "Created /config/quro.env."
 contains "$out" "Created /config/secrets/postgres_admin_password (generated, mode 0600; value not shown)."
-SECRETS="$(read_secret "$INSTALL/config" postgres_admin_password) $(read_secret "$INSTALL/config" postgres_app_password)"
+contains "$out" "Created /config/secrets/secrets_key (generated, mode 0600; value not shown)."
+SECRETS="$(read_secret "$INSTALL/config" postgres_admin_password) $(read_secret "$INSTALL/config" postgres_app_password) $(read_secret "$INSTALL/config" secrets_key)"
 no_secret_in "$out" "the init output"
 out=$(docker run --rm -v "$INSTALL/config:/config" "$IMAGE" init)
 contains "$out" "Nothing to do"
@@ -191,6 +192,9 @@ contains "$out" "All checks passed."
 no_secret_in "$out" "doctor output"
 compose run --rm -T migrate doctor --json | bun -e \
   'const r = await Bun.stdin.json(); if (r.status !== "ok" || r.exitCode !== 0) process.exit(1)'
+out=$(compose run --rm -T migrate secrets status)
+contains "$out" "Status: none."
+no_secret_in "$out" "the secrets status output"
 out=$(compose run --rm -T migrate migrate --dry-run)
 contains "$out" "Dry run: nothing was changed."
 out=$(compose run --rm -T migrate migrate)

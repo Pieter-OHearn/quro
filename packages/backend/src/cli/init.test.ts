@@ -1,3 +1,4 @@
+import { SecretsKey } from '../lib/secretEnvelope';
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
   chmodSync,
@@ -70,7 +71,7 @@ afterEach(() => {
 });
 
 describe('quro init', () => {
-  test('creates the settings file and one generated secret per role, never printing a value', () => {
+  test('creates the settings file, a password per role and the secrets key, never printing a value', () => {
     const dir = configDir();
     const run = init('--dir', dir);
     expect(run.exitCode).toBe(EXIT_OK);
@@ -78,17 +79,20 @@ describe('quro init', () => {
     expect(mode(join(dir, SECRETS_DIR))).toBe(0o700);
     for (const name of GENERATED_SECRETS) {
       const value = readFileSync(secretPath(dir, name), 'utf8');
-      expect(value).toMatch(/^[0-9a-f]{48}\n$/);
+      // Passwords are 24 random bytes; the secrets key is a 32-byte AES key.
+      expect(value).toMatch(name === 'secrets_key' ? /^[0-9a-f]{64}\n$/ : /^[0-9a-f]{48}\n$/);
       expect(mode(secretPath(dir, name))).toBe(0o600);
       expect(run.out).not.toContain(value.trim());
       expect(run.out).toContain(
         `Created ${secretPath(dir, name)} (generated, mode 0600; value not shown).`,
       );
     }
-    const [admin, app] = GENERATED_SECRETS.map((name) =>
+    const [admin, app, key] = GENERATED_SECRETS.map((name) =>
       readFileSync(secretPath(dir, name), 'utf8'),
     );
     expect(admin).not.toBe(app);
+    // The generated key is one the backend accepts as QRO_SECRETS_KEY_FILE.
+    expect(SecretsKey.parse(key!.trim()).id).toMatch(/^[0-9a-f]{16}$/);
     // No temporary files are left behind.
     expect(readdirSync(dir).sort()).toEqual([SECRETS_DIR, SETTINGS_FILE].sort());
     expect(readdirSync(join(dir, SECRETS_DIR)).sort()).toEqual([...GENERATED_SECRETS].sort());
