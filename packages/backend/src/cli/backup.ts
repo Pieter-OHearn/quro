@@ -11,7 +11,7 @@ import {
 } from '../backup/createBackup';
 import { FileSink, fileChunks, publishFile, removeQuietly, sha256OfFile } from '../backup/files';
 import { totalRows } from '../backup/fingerprint';
-import type { Manifest } from '../backup/manifest';
+import type { IntegrationKeys, Manifest } from '../backup/manifest';
 import { firstFew } from '../backup/problems';
 import { applyRetention } from '../backup/retention';
 import { scanArchive } from '../backup/verifyArchive';
@@ -87,6 +87,23 @@ function parseBackupOptions(args: readonly string[]): BackupOptions {
 
 const megabytes = (bytes: number) => `${(bytes / MEBIBYTE).toFixed(1)} MiB`;
 
+/** Which secrets key file keeps the archive's bank links usable after a restore. */
+export function describeIntegrationKeys(keys: IntegrationKeys | undefined): string[] {
+  if (!keys) return [];
+  const lines: string[] = [];
+  if (keys.keyIds.length > 0) {
+    lines.push(
+      `Bank-link secrets: encrypted with secrets key ${keys.keyIds.join(', ')}. Keep that key file (QRO_SECRETS_KEY_FILE) apart from this archive: a restore without it keeps the data, but connected bunq accounts must be connected again.`,
+    );
+  }
+  if (keys.unencrypted > 0) {
+    lines.push(
+      `Warning: ${keys.unencrypted} bank-link secret(s) in this archive are not encrypted. Run \`quro secrets encrypt\`.`,
+    );
+  }
+  return lines;
+}
+
 function describeManifest(manifest: Manifest): string[] {
   const { database, documents } = manifest;
   const migration = database.lastMigration?.tag ?? 'none';
@@ -109,8 +126,9 @@ function describeManifest(manifest: Manifest): string[] {
   lines.push(
     manifest.secrets.encrypted
       ? 'Encrypted. Keep the key file elsewhere: without it this archive cannot be restored.'
-      : 'Not encrypted. It holds financial records and bank-link tokens: store it like the live data.',
+      : 'Not encrypted. It holds financial records and encrypted bank-link tokens: store it like the live data.',
   );
+  lines.push(...describeIntegrationKeys(manifest.secrets.integrationKeys));
   return lines;
 }
 

@@ -41,13 +41,14 @@ The project name is `quro` unless you set another, so the volume is `quro_postgr
 
 Each secret is one value in one file. A trailing newline is ignored; an empty file is an error. Compose mounts each file listed under a service's `secrets` at `/run/secrets/<name>`.
 
-| File in `config/secrets/`              | Used by              | Written by  | Needed for                                                                                                    |
-| -------------------------------------- | -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------- |
-| `postgres_admin_password`              | `db`, `migrate`      | `quro init` | Always: the owner role                                                                                        |
-| `postgres_app_password`                | `migrate`, `backend` | `quro init` | Always: the runtime role                                                                                      |
-| `s3_secret_access_key`                 | `migrate`, `backend` | You         | S3 document storage                                                                                           |
-| `backup_encryption_key`                | `migrate`            | You         | Encrypted backups ([backup and restore](backup-and-restore.md#encrypt-archives-and-copy-them-off-the-device)) |
-| `bunq_client_id`, `bunq_client_secret` | `backend`            | You         | bunq linking, unless the values are set directly                                                              |
+| File in `config/secrets/`              | Used by              | Written by  | Needed for                                                                                                         |
+| -------------------------------------- | -------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------ |
+| `postgres_admin_password`              | `db`, `migrate`      | `quro init` | Always: the owner role                                                                                             |
+| `postgres_app_password`                | `migrate`, `backend` | `quro init` | Always: the runtime role                                                                                           |
+| `secrets_key`                          | `migrate`, `backend` | `quro init` | bunq linking: encrypts the bank-link tokens and keys in the database ([integration secrets](#integration-secrets)) |
+| `s3_secret_access_key`                 | `migrate`, `backend` | You         | S3 document storage                                                                                                |
+| `backup_encryption_key`                | `migrate`            | You         | Encrypted backups ([backup and restore](backup-and-restore.md#encrypt-archives-and-copy-them-off-the-device))      |
+| `bunq_client_id`, `bunq_client_secret` | `backend`            | You         | bunq linking, unless the values are set directly                                                                   |
 
 ## How settings are read
 
@@ -132,7 +133,7 @@ These are set for one command, with `-e` on `docker compose run`, never in the s
 
 ### bunq
 
-Bank linking with [bunq](https://www.bunq.com/) is off until one of these settings is present; then all of `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET` (each as a value or a file), `BUNQ_REDIRECT_URI` and `FRONTEND_ORIGIN` are required, and a partial set stops the backend.
+Bank linking with [bunq](https://www.bunq.com/) is off until one of these settings is present; then all of `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET` (each as a value or a file), `BUNQ_REDIRECT_URI`, `FRONTEND_ORIGIN` and the [secrets key](#integration-secrets) are required, and a partial set stops the backend.
 
 | Setting                   | Default                           | Notes                                                                                     |
 | ------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -144,6 +145,17 @@ Bank linking with [bunq](https://www.bunq.com/) is off until one of these settin
 | `BUNQ_SANDBOX`            | `false`                           | `true` talks to the bunq sandbox instead of the production API                            |
 
 A secret file alone, at its default path, does not switch bunq on. To use the files, add the secrets to the `backend` service and declare them in the top-level `secrets` of `compose.yaml`, as for [S3](install.md#existing-s3-compatible-store).
+
+### Integration secrets
+
+Quro stores the bank-link tokens and keys of connected bunq accounts encrypted with a key that lives in a file, never in the database or a backup. [The security model](security.md#integration-secrets) describes the format; [backup and restore](backup-and-restore.md#what-an-archive-contains) says where to keep the key.
+
+| Setting                         | Default                    | Notes                                                                                                                                                                                                                       |
+| ------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QRO_SECRETS_KEY_FILE`          | `/run/secrets/secrets_key` | File with the key: 64 hexadecimal characters (32 random bytes), which `quro init` writes. Required once bunq is configured; without bunq it may be absent. A file that exists but holds anything else stops every container |
+| `QRO_SECRETS_PREVIOUS_KEY_FILE` | unset                      | Only while you [rotate the key](security.md#rotate-the-secrets-key): the file with the key in use before. Remove it once `quro secrets rotate` reports every secret on the new key                                          |
+
+Losing the key loses no financial data, but every connected bunq account has to be connected again in **Settings**. `quro secrets status` shows which key the stored secrets need, by key id.
 
 ### Statement import
 

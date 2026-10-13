@@ -293,6 +293,86 @@ What the operator does: add `healthcheck: disable: true` to services that run th
 - **The backend image ships production dependencies only.** TypeScript, `drizzle-kit`, the frontend's packages and the test files are no longer in it; no documented command uses them.
 - **Optional restrictions.** The [example Compose file](compose.example.yaml) now sets `read_only`, `tmpfs`, `cap_drop`, `security_opt`, `mem_limit` and `pids_limit` (and `cap_add` for `db`), described in [container hardening](security.md#container-hardening). Copy them into your `compose.yaml` together with the 0.9.0 image tags: the 0.8.0 frontend runs as root and does not start with them.
 
+#### Secrets key for bank links
+
+What the operator does: create a secrets key file and mount it into the `migrate` and `backend` services before you start 0.9.0, then encrypt the stored bank-link secrets once with `quro secrets encrypt` while the backend is stopped. An install that never connected bunq needs no encryption step; creating the key now still lets users connect bunq later.
+
+0.9.0 stores the bunq access tokens and keys in the database encrypted with a key that only you hold (see [integration secrets](security.md#integration-secrets)). Releases up to 0.8.0 stored them unencrypted. With bunq configured, the 0.9.0 backend does not start without the key: it stops with exit code 2 and `QRO_SECRETS_KEY_FILE: required because bunq linking is configured`, changing nothing. Losing the key later means every user reconnects bunq; no other data depends on it.
+
+These commands extend [Upgrade to a new release](#upgrade-to-a-new-release) for an install made with the install guide. Run them in the directory with `compose.yaml` and `config/`.
+
+1. Take the backup with 0.8.0, as in step 1 of the general procedure. It holds the bank-link secrets unencrypted: it is your way back, so keep it, protected, until 0.9.0 has synced bunq.
+
+   ```bash
+   docker compose run --rm migrate backup --label before-0.9.0
+   ```
+
+2. Create the key. `quro init` from the 0.9.0 image creates only the files that are missing, so on an existing `config/` it adds `config/secrets/secrets_key` (32 random bytes, mode `0600`) and nothing else, and never prints the value:
+
+   ```bash
+   docker run --rm -v "$PWD/config:/config" ghcr.io/pieter-ohearn/quro-backend:v0.9.0 init
+   ```
+
+   It prints `Created /config/secrets/secrets_key (generated, mode 0600; value not shown).` and `Kept` for every other file. Without `quro init`, `openssl rand -hex 32 > config/secrets/secrets_key && chmod 600 config/secrets/secrets_key` writes the same kind of key. On Linux the backend's UID must be able to read it (`sudo chown 1000:1000 config/secrets/secrets_key`, or your `user:`).
+
+3. Copy `config/secrets/secrets_key` somewhere safe, apart from your backups, for example into a password manager. Every archive written from now on needs it to keep the bank links.
+
+4. In `compose.yaml`, mount the key into the `migrate` and `backend` services and declare it, as the [example Compose file](compose.example.yaml) does:
+
+   ```yaml
+   services:
+     migrate:
+       secrets:
+         - postgres_admin_password
+         - postgres_app_password
+         - secrets_key
+     backend:
+       secrets:
+         - postgres_app_password
+         - secrets_key
+
+   secrets:
+     secrets_key:
+       file: ./config/secrets/secrets_key
+   ```
+
+   Keep your other entries. The key is read from `/run/secrets/secrets_key`; with a different path, set `QRO_SECRETS_KEY_FILE` in `config/quro.env`.
+
+5. Pin and pull the 0.9.0 images (step 2 of the general procedure). Then check what will change. `secrets status` reads the stored secrets with the 0.9.0 image and changes nothing; before encryption it reports the unencrypted ones and exits 1:
+
+   ```bash
+   docker compose run --rm migrate secrets status
+   docker compose run --rm migrate migrate --status
+   ```
+
+   The first line names the key id, for example `Secrets key: <16 hexadecimal characters> (from /run/secrets/secrets_key).`; `Secrets key: not configured` means the file is not mounted (step 4). `Status: unencrypted` with your connection count is expected.
+
+6. Stop the backend, apply the migrations, encrypt, and start everything:
+
+   ```bash
+   docker compose stop backend
+   docker compose run --rm migrate
+   docker compose run --rm migrate secrets encrypt
+   docker compose up -d --wait
+   ```
+
+   `secrets encrypt` prints `Encrypted N secret(s) in M bank connection(s) with key …` and ends with `Status: current.` It converts one connection per transaction: if it is interrupted, run it again; it continues where it stopped and never encrypts a value twice.
+
+7. Check the result:
+
+   ```bash
+   docker compose run --rm migrate secrets status
+   docker compose run --rm migrate doctor
+   ```
+
+   `secrets status` exits 0 with `Status: current.` and the same key id as in step 5; `doctor` ends with `All checks passed.` and its `secrets` line says every bank-link secret is encrypted. Then sign in, open **Settings → Connected accounts** and press **Sync**: it succeeds without asking you to reconnect. The next `quro backup` prints `Bank-link secrets: encrypted with secrets key …`.
+
+If the sync answers _The stored bunq credentials cannot be read with this instance's secrets key_, the backend runs with a different key than the one that encrypted them: compare the key ids from `secrets status` and mount the right file. If that key is lost, reconnect bunq in **Settings**.
+
+To go back to 0.8.0, restore the `before-0.9.0` archive with the 0.8.0 images as in [Restore the snapshot taken before the upgrade](#restore-the-snapshot-taken-before-the-upgrade). 0.8.0 cannot use encrypted bank links, and 0.9.0's migrations keep it from running on the upgraded database anyway.
+
+With your own Compose file, mount a file with 64 hexadecimal characters into every container that runs the server or `quro secrets` (at `/run/secrets/secrets_key`, or set `QRO_SECRETS_KEY_FILE`). Interface changes: `quro doctor` has a new check `secrets`; the backup manifest has a new field `secrets.integrationKeys`; `POST /api/bunq/sync`, `/sync/savings` and `/sync/budget` answer `409` with `code: bunq_reauthorization_required` when stored credentials cannot be opened.
+
 #### PostgreSQL 18 only
 
 What the operator does: nothing on PostgreSQL 18. A database on PostgreSQL 16 or 17 moves to 18 while 0.8.0 still runs, before you pin 0.9.0.

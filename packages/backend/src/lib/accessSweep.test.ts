@@ -49,6 +49,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
     pensionTransactions: 1,
   },
   'lib/authCodes.ts': { authCodes: 1 },
+  'lib/bunqCredentials.ts': { bunqConnections: 2 },
   'lib/bunqOAuthAttempts.ts': { bunqOauthAttempts: 1 },
   'lib/bunqPaymentProgress.ts': { bunqPaymentProgress: 1 },
   'lib/dashboardInsights.ts': { holdingTransactions: 1, payslips: 2 },
@@ -69,7 +70,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
   'lib/sessions.ts': { sessions: 4 },
   'middleware/auth.ts': { sessions: 1 },
   'routes/budget.ts': { budgetCategories: 6, budgetTransactions: 4, categoryMappings: 2 },
-  'routes/bunq.ts': { bunqConnections: 4, bunqPaymentProgress: 2 },
+  'routes/bunq.ts': { bunqConnections: 3, bunqPaymentProgress: 2 },
   'routes/debts.ts': { debtPayments: 3, debts: 5 },
   'routes/employments.ts': { employments: 9 },
   'routes/goals.ts': { goals: 3, savingsAccounts: 1 },
@@ -95,10 +96,9 @@ const INLINE_OWNER_PREDICATES: Inventory = {
   'services/bunqBudgetSync.ts': {
     budgetCategories: 3,
     budgetTransactions: 5,
-    bunqConnections: 1,
     categoryMappings: 2,
   },
-  'services/bunqSavingsSync.ts': { bunqConnections: 1, savingsAccounts: 4 },
+  'services/bunqSavingsSync.ts': { savingsAccounts: 4 },
 };
 
 /** Tables whose rows an accepted partner can reach. Their access must go through the helpers. */

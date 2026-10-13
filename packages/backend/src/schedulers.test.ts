@@ -1,3 +1,4 @@
+import { testSecretsKeyFile } from './test/config';
 import { describe, expect, test } from 'bun:test';
 import { loadConfig, type Environment } from './config';
 import { activeSchedulers, SCHEDULERS, startSchedulers, type SchedulerEntry } from './schedulers';
@@ -8,6 +9,7 @@ const BUNQ: Environment = {
   BUNQ_CLIENT_SECRET: 'secret',
   BUNQ_REDIRECT_URI: 'https://quro.example/api/bunq/oauth/callback',
   FRONTEND_ORIGIN: 'https://quro.example',
+  QRO_SECRETS_KEY_FILE: testSecretsKeyFile(),
 };
 
 const names = (entries: readonly SchedulerEntry[]) => entries.map((entry) => entry.name);
