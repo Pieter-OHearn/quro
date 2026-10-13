@@ -24,12 +24,17 @@ export function MortgageStatCards({
   paidPct,
 }: Readonly<MortgageStatCardsProps>) {
   const { numberFormat } = useCurrency();
+  const valueChange = mortgage.propertyValue - mortgage.originalAmount;
   return (
     <StatsGrid>
       <StatCard
         label="Property Value"
         value={fmt(mortgage.propertyValue)}
-        subtitle={`+${fmt(mortgage.propertyValue - mortgage.originalAmount)} since purchase`}
+        change={{
+          value: valueChange >= 0 ? `+${fmt(valueChange)}` : fmt(valueChange),
+          positive: valueChange >= 0,
+        }}
+        subtitle="since purchase"
         icon={Home}
         color="emerald"
       />

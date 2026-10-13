@@ -3,6 +3,7 @@ import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
 import type { MortgageTxnType } from '../types';
+import { formatAsNegative } from '../utils/liability';
 import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
 
 type MortgageTxnHistoryProps = {
@@ -20,36 +21,28 @@ type MortgageTxnRowProps = {
   onEdit: (transaction: MortgageTransaction) => void;
   onDelete: (id: number) => void;
 };
-function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
+function describeMortgageTxn(t: MortgageTransaction, fmt: (n: number) => string) {
   if (t.type === 'repayment') {
-    return (
-      <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-fg-strong">-{fmt(t.amount)}</p>
-        <p className="text-[10px] text-fg-faint">
-          <span className="text-danger-muted">{fmt(t.interest ?? 0)} int</span>
-          {' · '}
-          <span className="text-brand-accent">{fmt(t.principal ?? 0)} prin</span>
-        </p>
-      </div>
-    );
+    return {
+      amount: formatAsNegative(fmt, t.amount),
+      caption: `${fmt(t.interest ?? 0)} int · ${fmt(t.principal ?? 0)} prin`,
+    };
   }
+  if (t.type === 'valuation') return { amount: fmt(t.amount), caption: 'new value' };
+  return {
+    amount: `${t.amount}%`,
+    caption: t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate',
+  };
+}
 
-  if (t.type === 'valuation') {
-    return (
-      <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-success">{fmt(t.amount)}</p>
-        <p className="text-[10px] text-fg-faint">new value</p>
-      </div>
-    );
-  }
-
+// One line on desktop with the detail before the amount; below 640px the detail sits under it.
+function MortgageTxnAmount({ t, fmt }: Pick<MortgageTxnRowProps, 't' | 'fmt'>) {
+  const { amount, caption } = describeMortgageTxn(t, fmt);
   return (
-    <div className="text-right flex-shrink-0">
-      <p className="text-sm font-semibold text-warning">{t.amount}%</p>
-      <p className="text-[10px] text-fg-faint">
-        {t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate'}
-      </p>
-    </div>
+    <span className="flex items-baseline justify-end gap-2 max-sm:flex-col max-sm:items-end max-sm:gap-0">
+      <span className="text-caption text-fg-subtle max-sm:order-last">{caption}</span>
+      <span className="text-cell text-fg">{amount}</span>
+    </span>
   );
 }
 
@@ -58,18 +51,13 @@ function MortgageTxnRow({ t, fmt, onEdit, onDelete }: MortgageTxnRowProps) {
   return (
     <TxnRow
       icon={m.icon}
-      iconColor={m.color}
+      iconColor="text-fg-muted"
       iconBg={m.bg}
-      iconContainerClassName="w-9 h-9 rounded-xl"
-      iconSize={14}
       label={t.note || m.label}
-      labelClassName="text-sm font-medium text-fg-strong"
       date={t.date}
-      dateClassName="text-xs text-fg-faint"
       amount={<MortgageTxnAmount t={t} fmt={fmt} />}
       onEdit={() => onEdit(t)}
       onDelete={() => onDelete(t.id)}
-      className="rounded-none border-0 bg-transparent px-5 py-3 hover:bg-surface-sunken/60"
     />
   );
 }
@@ -85,10 +73,10 @@ function buildMortgageTxnStats({ transactions, fmt }: MortgageSummaryStatsProps)
   const totalInterest = repayments.reduce((s, t) => s + (t.interest ?? 0), 0);
   const rateChanges = transactions.filter((t) => t.type === 'rate_change').length;
   return [
-    { label: 'Total Repaid', value: fmt(totalRepaid), color: 'text-fg-emphasis' },
-    { label: 'Principal Paid', value: fmt(totalPrincipal), color: 'text-brand' },
-    { label: 'Interest Paid', value: fmt(totalInterest), color: 'text-danger' },
-    { label: 'Rate Changes', value: String(rateChanges), color: 'text-warning' },
+    { label: 'Total Repaid', value: fmt(totalRepaid) },
+    { label: 'Principal Paid', value: fmt(totalPrincipal) },
+    { label: 'Interest Paid', value: fmt(totalInterest) },
+    { label: 'Rate Changes', value: String(rateChanges) },
   ];
 }
 

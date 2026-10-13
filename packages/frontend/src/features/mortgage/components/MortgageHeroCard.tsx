@@ -1,7 +1,9 @@
-import { Edit3, Home } from 'lucide-react';
+import { Edit3 } from 'lucide-react';
 import type { Mortgage as MortgageType } from '@quro/shared';
+import { Button, Card } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
 import type { MortgageFormatFn } from '../types';
+import { formatAsNegative } from '../utils/liability';
 
 type MortgageHeroCardProps = {
   mortgage: MortgageType;
@@ -20,11 +22,6 @@ function buildMortgageMetrics(
   const annualAllowance = (mortgage.outstandingBalance * mortgage.overpaymentLimit) / 100;
   const hasAllowance = Number.isFinite(annualAllowance) && annualAllowance > 0;
   return [
-    {
-      label: 'Outstanding Balance',
-      value: fmt(mortgage.outstandingBalance),
-      sub: `of ${fmt(mortgage.originalAmount)} original`,
-    },
     {
       label: mortgage.repaymentType === 'Linear' ? 'Current Payment' : 'Monthly Payment',
       value: fmt(mortgage.monthlyPayment),
@@ -55,39 +52,44 @@ export function MortgageHeroCard({
   const metrics = buildMortgageMetrics(mortgage, fmt, yearsRemaining, monthsRemaining);
 
   return (
-    <div className="bg-gradient-to-br from-surface-inverse to-surface-mortgage-end rounded-2xl p-6 text-fg-inverted">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-surface/10 flex items-center justify-center flex-shrink-0">
-            <Home size={22} />
+    <Card>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-title-section text-fg">{mortgage.propertyAddress}</h2>
+            <JointBadge isJoint={mortgage.isJoint} ownerUserId={mortgage.userId} />
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-bold text-lg">{mortgage.propertyAddress}</h2>
-              <JointBadge isJoint={mortgage.isJoint} ownerUserId={mortgage.userId} />
-            </div>
-            <p className="text-fg-faint text-sm">
-              {mortgage.lender} · {mortgage.repaymentType} · {mortgage.rateType} Rate · Fixed until{' '}
-              {mortgage.fixedUntil ?? 'N/A'}
-            </p>
-          </div>
+          <p className="text-caption text-fg-subtle">
+            {mortgage.lender} · {mortgage.repaymentType} · {mortgage.rateType} Rate · Fixed until{' '}
+            {mortgage.fixedUntil ?? 'N/A'}
+          </p>
         </div>
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onEdit}
-          className="flex items-center gap-1.5 text-xs text-fg-faint hover:text-fg-inverted border border-fg-inverted/20 hover:border-fg-inverted/40 px-3 py-1.5 rounded-xl transition-all flex-shrink-0"
+          leadingIcon={<Edit3 size={12} aria-hidden />}
+          className="shrink-0"
         >
-          <Edit3 size={12} /> Edit
-        </button>
+          Edit
+        </Button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="mt-4">
+        <p className="text-label text-fg-muted">Outstanding Balance</p>
+        <p className="mt-1 text-figure-hero font-numeric text-fg">
+          {formatAsNegative(fmt, mortgage.outstandingBalance)}
+        </p>
+        <p className="text-caption text-fg-subtle">of {fmt(mortgage.originalAmount)} original</p>
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border-subtle pt-3 lg:grid-cols-4">
         {metrics.map(({ label, value, sub }) => (
-          <div key={label} className="bg-surface/10 rounded-xl p-4">
-            <p className="text-xs text-fg-faint mb-1">{label}</p>
-            <p className="font-bold text-fg-inverted">{value}</p>
-            <p className="text-xs text-fg-faint mt-0.5">{sub}</p>
+          <div key={label} className="min-w-0">
+            <dt className="text-label text-fg-muted">{label}</dt>
+            <dd className="mt-0.5 text-figure-md font-numeric text-fg">{value}</dd>
+            <dd className="text-caption text-fg-subtle">{sub}</dd>
           </div>
         ))}
-      </div>
-    </div>
+      </dl>
+    </Card>
   );
 }

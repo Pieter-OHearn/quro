@@ -1,6 +1,6 @@
 import { Home, Plus } from 'lucide-react';
 import type { Mortgage as MortgageType } from '@quro/shared';
-import { SegmentedControl } from '@/components/ui';
+import { Button, SegmentedControl } from '@/components/ui';
 
 type MortgageTabSelectorProps = {
   mortgages: MortgageType[];
@@ -18,27 +18,29 @@ export function MortgageTabSelector({
   addLabel = 'Add Mortgage',
 }: Readonly<MortgageTabSelectorProps>) {
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex flex-wrap items-center gap-2">
       <SegmentedControl
+        aria-label="Mortgages"
         options={mortgages.map((entry) => ({
           value: entry.id,
           label: (
             <span className="max-w-[180px] truncate">{entry.propertyAddress.split(',')[0]}</span>
           ),
-          icon: <Home size={13} />,
+          icon: <Home size={13} aria-hidden />,
         }))}
         value={activeMortgage.id}
         onChange={onSelect}
-        variant="pill"
-        tone="indigo"
+        className="max-sm:w-full"
       />
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={onAddClick}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-border-strong text-fg-subtle hover:border-brand-disabled hover:text-brand text-sm font-medium transition-all"
+        leadingIcon={<Plus size={12} aria-hidden />}
+        className="max-sm:w-full"
       >
-        <Plus size={14} /> {addLabel}
-      </button>
+        {addLabel}
+      </Button>
     </div>
   );
 }
