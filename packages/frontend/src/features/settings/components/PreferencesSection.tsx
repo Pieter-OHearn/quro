@@ -79,7 +79,7 @@ function ChoiceText({ title, note }: Readonly<{ title: ReactNode; note: ReactNod
   return (
     <>
       <span className="block text-cell font-medium">{title}</span>
-      <span className="block text-caption text-fg-subtle">{note}</span>
+      <span className="block text-caption text-fg-muted">{note}</span>
     </>
   );
 }

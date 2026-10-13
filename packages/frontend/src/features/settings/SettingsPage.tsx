@@ -108,7 +108,7 @@ function AccountSummary({ initials, fullName, details }: Readonly<AccountSummary
       </span>
       <div className="min-w-0 flex-1">
         <h2 className="truncate text-title-section text-fg">{fullName}</h2>
-        <p className="truncate text-caption text-fg-subtle">{details}</p>
+        <p className="text-caption text-fg-subtle">{details}</p>
       </div>
       <Badge tone="brand" size="md">
         <ShieldCheck size={12} aria-hidden="true" />

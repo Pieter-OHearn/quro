@@ -115,7 +115,7 @@ function Dropdown({
   onRetry,
 }: Readonly<DropdownProps>) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-[360px] max-w-[92vw] bg-surface rounded-lg border border-border-default shadow-popover z-50 overflow-hidden">
+    <div className="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[92vw] overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:top-14 max-sm:w-auto max-sm:max-w-none">
       <NotificationPanelHeader totalCount={notifications.length} isFetching={isFetching} />
       <NotificationStatusRow counts={counts} />
 

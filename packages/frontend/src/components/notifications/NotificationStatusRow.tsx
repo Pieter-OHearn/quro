@@ -20,7 +20,7 @@ const STATUS_META: Array<{
 
 export function NotificationStatusRow({ counts }: Readonly<NotificationStatusRowProps>) {
   return (
-    <div className="flex items-center gap-3 overflow-x-auto border-b border-border-default bg-surface-sunken px-3 py-1.5">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border-default bg-surface-sunken px-3 py-1.5">
       {STATUS_META.map((statusMeta) => {
         const count = counts[statusMeta.key];
         return (
