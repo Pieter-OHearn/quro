@@ -17,7 +17,8 @@ const COLUMNS: readonly DataTableColumn[] = [
   { key: 'date', header: 'Date', priority: 'secondary', width: 104, numeric: true, align: 'left' },
   { key: 'name', header: 'Transaction', mobileLabel: '' },
   { key: 'category', header: 'Category', priority: 'secondary' },
-  { key: 'amount', header: 'Amount', numeric: true },
+  // Below the medium breakpoint the amount moves into the transaction cell, one line per row.
+  { key: 'amount', header: 'Amount', numeric: true, priority: 'secondary' },
 ];
 
 /** Money in is a gain with a plus sign; money out keeps the figure colour with a true minus. */
@@ -40,18 +41,25 @@ function TransactionRow({
 }: Readonly<{ tx: DashboardTransaction; fmtBase: DashboardFormatFn }>) {
   const date = formatDate(tx.date, DATE_OPTIONS);
   return (
-    <DataTableRow>
+    <DataTableRow mobileCard={false} className="max-md:last:border-b-0">
       <DataTableCell columnKey="date" className="whitespace-nowrap text-fg-muted">
         {date}
       </DataTableCell>
       <DataTableCell columnKey="name" contentClassName="max-md:w-full">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-fg">{tx.name}</span>
-          <JointBadge isJoint={tx.isJoint} size="xs" />
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-fg">{tx.name}</span>
+              {tx.isJoint ? <JointBadge isJoint size="xs" /> : null}
+            </div>
+            <p className="text-caption text-fg-subtle md:hidden">
+              {tx.category} · {date}
+            </p>
+          </div>
+          <span className="font-numeric md:hidden">
+            <TransactionAmount amount={tx.amount} fmtBase={fmtBase} />
+          </span>
         </div>
-        <p className="text-caption text-fg-subtle md:hidden">
-          {tx.category} · {date}
-        </p>
       </DataTableCell>
       <DataTableCell columnKey="category" className="text-fg-muted">
         {tx.category}
