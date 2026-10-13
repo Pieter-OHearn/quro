@@ -1,17 +1,6 @@
 import { useSortedRows } from '@/hooks/useSortedRows';
-import { useCurrency } from '@/lib/CurrencyContext';
-import { useMemo, useState } from 'react';
-import {
-  Archive,
-  ArrowDownRight,
-  ArrowUpRight,
-  ChevronDown,
-  ChevronUp,
-  Edit3,
-  Loader2,
-  Plus,
-  RefreshCcw,
-} from 'lucide-react';
+import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { Archive, ChevronDown, ChevronUp, Edit3, Plus, RefreshCcw } from 'lucide-react';
 import {
   formatItemType,
   holdingValue,
@@ -19,17 +8,26 @@ import {
   type Holding,
   type HoldingPriceSyncResult,
   type HoldingTransaction,
-  formatPercent,
 } from '@quro/shared';
 import {
+  Badge,
+  Button,
+  Change,
   DataTable,
   DataTableCell,
   DataTableRow,
+  IconButton,
+  RowActions,
   type DataTableColumn,
   type DataTableSortState,
 } from '@/components/ui';
+import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import { groupHoldingTransactions, type Position } from '../utils/position';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
+
+type FormatBaseFn = (value: number, currency?: string, compact?: boolean) => string;
+type FormatNativeFn = (value: number, currency: string, compact?: boolean) => string;
+type ConvertFn = (value: number, currency: string) => number;
 
 type BrokerageTabProps = {
   activeHoldings: Holding[];
@@ -43,9 +41,9 @@ type BrokerageTabProps = {
   totalGainBase: number;
   gainPct: number;
   expandedHoldingId: number | null;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  convertToBase: (value: number, currency: string) => number;
+  fmtBase: FormatBaseFn;
+  fmtNative: FormatNativeFn;
+  convertToBase: ConvertFn;
   isForeign: (currency: string) => boolean;
   onAddHolding: () => void;
   onEditHolding: (holding: Holding) => void;
@@ -58,22 +56,10 @@ type BrokerageTabProps = {
   syncSummary: HoldingPriceSyncResult | null;
 };
 
-type HoldingRowProps = {
-  metrics: HoldingRowMetrics;
-  holding: Holding;
-  holdingTxns: HoldingTransaction[];
-  position: Position;
-  isExpanded: boolean;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  convertToBase: (value: number, currency: string) => number;
-  isForeign: (currency: string) => boolean;
-  onEditHolding: (holding: Holding) => void;
-  onToggleExpanded: (id: number) => void;
-  onAddTxnForHolding: (holding: Holding) => void;
-  onEditTxn: (transaction: HoldingTransaction) => void;
-  onDeleteTxn: (id: number) => void;
-};
+type HoldingHistoryHandlers = Pick<
+  BrokerageTabProps,
+  'onAddTxnForHolding' | 'onEditTxn' | 'onDeleteTxn'
+>;
 
 type HoldingRowMetrics = {
   nativeValue: number;
@@ -83,6 +69,41 @@ type HoldingRowMetrics = {
   foreign: boolean;
   txnCount: number;
 };
+
+type ClosedHoldingMetrics = {
+  txnCount: number;
+  lastSellPrice: number | null;
+  costBasis: number;
+  realizedPct: number;
+};
+
+const ACTIVE_COLUMN_COUNT = 7;
+const CLOSED_COLUMN_COUNT = 5;
+
+function getEffectivePrice(holding: Holding): number {
+  const manual = holding.manualPrice != null ? Number(holding.manualPrice) : null;
+  return manual != null && Number.isFinite(manual) ? manual : holding.currentPrice;
+}
+
+const SHARE_DECIMALS = 4;
+
+function formatShares(shares: number): string {
+  return shares.toFixed(SHARE_DECIMALS).replace(/\.?0+$/, '');
+}
+
+function formatSyncDate(priceUpdatedAt: string | null | undefined): string | null {
+  if (!priceUpdatedAt) return null;
+  const date = new Date(priceUpdatedAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+function stopRowClick(handler: () => void) {
+  return (event: MouseEvent) => {
+    event.stopPropagation();
+    handler();
+  };
+}
 
 function buildBrokerageHoldingColumns(
   baseCurrency: string,
@@ -94,66 +115,56 @@ function buildBrokerageHoldingColumns(
       key: 'asset',
       sortValue: (row) => row.name,
       header: 'Asset',
-      mobileLabel: 'Asset',
-      width: '25%',
+      width: '28%',
       sortable: true,
-      cellClassName: 'px-6 py-3.5',
     },
     {
-      key: 'position',
+      key: 'units',
       sortValue: (row) => positions[row.id].shares,
-      header: 'Position',
-      align: 'right',
-      mobileLabel: 'Position',
-      width: '16%',
+      header: 'Units',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
-      cellClassName: 'px-6 py-3.5',
+      width: '9%',
+    },
+    {
+      key: 'avgCost',
+      sortValue: (row) => positions[row.id].avgCost,
+      header: 'Avg cost',
+      numeric: true,
+      priority: 'secondary',
+      sortable: true,
+      defaultSortDirection: 'desc',
+      width: '11%',
     },
     {
       key: 'current',
       sortValue: (row) => getEffectivePrice(row),
-      header: 'Current',
-      align: 'right',
-      mobileLabel: 'Current',
-      width: '16%',
+      header: 'Price',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
-      cellClassName: 'px-6 py-3.5',
+      width: '13%',
     },
     {
       key: 'value',
       sortValue: (row) => metricsById[row.id].valueInBase,
       header: `Value (${baseCurrency})`,
-      align: 'right',
-      mobileLabel: 'Value',
-      width: '16%',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
-      cellClassName: 'px-6 py-3.5',
+      width: '14%',
     },
     {
       key: 'gain',
       sortValue: (row) => metricsById[row.id].gain,
-      header: 'Gain / Loss',
-      align: 'right',
-      mobileLabel: 'Gain / Loss',
-      width: '18%',
+      header: 'Gain / loss',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
-      cellClassName: 'px-6 py-3.5',
+      width: '15%',
     },
-    {
-      key: 'actions',
-      header: '',
-      priority: 'actions',
-      width: '9%',
-      cellClassName: 'px-6 py-3.5',
-    },
+    { key: 'actions', header: '', priority: 'actions', width: 72 },
   ];
 }
 
@@ -162,78 +173,43 @@ function buildClosedHoldingColumns(
   metricsById: Record<number, ClosedHoldingMetrics>,
 ): readonly DataTableColumn<Holding>[] {
   return [
-    {
-      key: 'asset',
-      sortValue: (row) => row.name,
-      header: 'Asset',
-      mobileLabel: 'Asset',
-      width: '40%',
-      sortable: true,
-      cellClassName: 'px-6 py-3.5',
-    },
+    { key: 'asset', sortValue: (row) => row.name, header: 'Asset', width: '40%', sortable: true },
     {
       key: 'sold',
       sortValue: (row) => metricsById[row.id].lastSellPrice ?? 0,
-      header: 'Sold Price',
-      align: 'right',
-      mobileLabel: 'Sold Price',
-      width: '18%',
+      header: 'Last sell price',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
-      cellClassName: 'px-6 py-3.5',
+      width: '18%',
     },
     {
       key: 'dividends',
       sortValue: (row) => positions[row.id].totalDividends,
       header: 'Dividends',
-      align: 'right',
-      mobileLabel: 'Dividends',
-      width: '18%',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
-      cellClassName: 'px-6 py-3.5',
+      width: '18%',
     },
     {
       key: 'realized',
       sortValue: (row) => positions[row.id].realizedGain,
       header: 'Realized P&L',
-      align: 'right',
-      mobileLabel: 'Realized P&L',
-      width: '18%',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
-      cellClassName: 'px-6 py-3.5',
+      width: '18%',
     },
-    {
-      key: 'actions',
-      header: '',
-      priority: 'actions',
-      width: '6%',
-      cellClassName: 'px-6 py-3.5',
-    },
+    { key: 'actions', header: '', priority: 'actions', width: 72 },
   ];
-}
-
-function getEffectivePrice(holding: Holding): number {
-  const manual = holding.manualPrice != null ? Number(holding.manualPrice) : null;
-  return manual != null && Number.isFinite(manual) ? manual : holding.currentPrice;
-}
-
-function formatSyncDate(priceUpdatedAt: string | null | undefined): string | null {
-  if (!priceUpdatedAt) return null;
-  const date = new Date(priceUpdatedAt);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 function computeHoldingRowMetrics(
   holding: Holding,
   holdingTxns: readonly HoldingTransaction[],
   position: Position,
-  convertToBase: (value: number, currency: string) => number,
+  convertToBase: ConvertFn,
   isForeign: (currency: string) => boolean,
 ): HoldingRowMetrics {
   const price = getEffectivePrice(holding);
@@ -247,222 +223,203 @@ function computeHoldingRowMetrics(
   return { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount };
 }
 
-type HoldingAssetCellProps = {
-  holding: Holding;
-  foreign: boolean;
-  txnCount: number;
-};
-
-function HoldingAssetCell({ holding, foreign, txnCount }: HoldingAssetCellProps) {
+/** Name on the first line; ticker, type, sector, currency and the count as a caption. */
+function HoldingAssetCell({
+  holding,
+  txnCount,
+  closed = false,
+}: Readonly<{ holding: Holding; txnCount: number; closed?: boolean }>) {
   const itemTypeLabel = formatItemType(holding.itemType);
   const sectorLabel = holding.sector?.trim();
+  const meta = [
+    holding.ticker,
+    itemTypeLabel,
+    sectorLabel && sectorLabel !== itemTypeLabel ? sectorLabel : null,
+    holding.currency,
+    `${txnCount} transactions`,
+  ].filter(Boolean);
   return (
-    <div className="col-span-3 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-xl bg-brand-soft flex items-center justify-center text-xs font-bold text-brand-fg flex-shrink-0">
-        {holding.ticker.slice(0, 2)}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-fg-emphasis truncate">{holding.name}</p>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-fg-faint">{holding.ticker}</span>
-          {itemTypeLabel && (
-            <span className="text-[10px] bg-surface-muted text-fg-subtle px-1.5 rounded-full">
-              {itemTypeLabel}
-            </span>
-          )}
-          {sectorLabel && sectorLabel !== itemTypeLabel && (
-            <span className="text-[10px] bg-surface-muted text-fg-subtle px-1.5 rounded-full">
-              {sectorLabel}
-            </span>
-          )}
-          <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full ${foreign ? 'bg-warning-soft text-warning-fg' : 'bg-surface-muted text-fg-subtle'}`}
-          >
-            {holding.currency}
-          </span>
-        </div>
-        <p className="text-[10px] text-fg-faint mt-0.5">{txnCount} transactions</p>
-      </div>
-    </div>
-  );
-}
-
-type HoldingGainCellProps = {
-  gain: number;
-  gainPctHolding: number;
-  holding: Holding;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-};
-
-function HoldingGainCell({ gain, gainPctHolding, holding, fmtNative }: HoldingGainCellProps) {
-  const { numberFormat } = useCurrency();
-  return (
-    <div className={`col-span-2 text-right ${gain >= 0 ? 'text-success' : 'text-danger'}`}>
-      <div className="flex items-center justify-end gap-0.5">
-        {gain >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-        <p className="text-sm font-semibold">
-          {gain >= 0 ? '+' : ''}
-          {fmtNative(gain, holding.currency, true)}
+    <div className="min-w-0">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <p className={closed ? 'truncate text-fg-muted' : 'truncate font-medium text-fg'}>
+          {holding.name}
         </p>
+        {closed && <Badge className="shrink-0">Closed</Badge>}
       </div>
-      <p className="text-xs">
-        {gainPctHolding >= 0 ? '+' : ''}
-        {formatPercent(gainPctHolding, numberFormat, 1)}
-      </p>
+      <p className="truncate text-caption text-fg-subtle">{meta.join(' · ')}</p>
     </div>
   );
 }
 
-type HoldingValueCellsProps = {
-  holding: Holding;
-  position: Position;
-  nativeValue: number;
-  valueInBase: number;
-  foreign: boolean;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-};
-
-function HoldingValueCells({
-  holding,
-  position,
-  nativeValue,
-  valueInBase,
-  foreign,
-  fmtBase,
-  fmtNative,
-}: HoldingValueCellsProps) {
+/** A figure with an optional caption under it, right-aligned in a numeric column. */
+function FigureWithCaption({
+  figure,
+  caption,
+}: Readonly<{ figure: ReactNode; caption?: ReactNode }>) {
   return (
-    <>
-      <DataTableCell columnKey="position">
-        <div>
-          <p className="text-sm font-semibold text-fg-emphasis">
-            {position.shares.toFixed(4).replace(/\.?0+$/, '')}
-          </p>
-          <p className="text-xs text-fg-faint">
-            @ {fmtNative(position.avgCost, holding.currency, true)}
-          </p>
-        </div>
-      </DataTableCell>
-      <DataTableCell columnKey="current">
-        <div>
-          <div className="flex items-center justify-end gap-1">
-            <p className="text-sm font-semibold text-fg-emphasis">
-              {fmtNative(getEffectivePrice(holding), holding.currency, true)}
-            </p>
-            {holding.manualPrice != null && (
-              <span className="text-[9px] bg-warning-soft-strong text-warning-fg px-1 py-0.5 rounded font-medium">
-                M
-              </span>
-            )}
-          </div>
-          <p className="text-[10px] text-fg-faint">
-            {holding.excludeFromSync
-              ? 'sync off'
-              : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency)}
-          </p>
-        </div>
-      </DataTableCell>
-      <DataTableCell columnKey="value">
-        <div>
-          <p className="text-sm font-semibold text-fg-emphasis">{fmtBase(valueInBase)}</p>
-          {foreign && (
-            <p className="text-xs text-warning">{fmtNative(nativeValue, holding.currency, true)}</p>
-          )}
-        </div>
-      </DataTableCell>
-    </>
+    <div>
+      <div>{figure}</div>
+      {caption ? <div className="text-caption text-fg-subtle">{caption}</div> : null}
+    </div>
   );
 }
 
-type HoldingRowActionsProps = {
-  holding: Holding;
-  isExpanded: boolean;
-  onEditHolding: (holding: Holding) => void;
-  onToggleExpanded: (id: number) => void;
-};
+function ExpandToggle({
+  isExpanded,
+  onToggle,
+}: Readonly<{ isExpanded: boolean; onToggle: () => void }>) {
+  const label = isExpanded ? 'Collapse' : 'View transactions';
+  return (
+    <IconButton
+      onClick={stopRowClick(onToggle)}
+      icon={isExpanded ? ChevronUp : ChevronDown}
+      label={label}
+      title={label}
+      aria-expanded={isExpanded}
+      size="sm"
+      variant="subtle"
+    />
+  );
+}
 
 function HoldingRowActions({
   holding,
   isExpanded,
   onEditHolding,
   onToggleExpanded,
-}: HoldingRowActionsProps) {
+}: Readonly<{
+  holding: Holding;
+  isExpanded: boolean;
+  onEditHolding: (holding: Holding) => void;
+  onToggleExpanded: (id: number) => void;
+}>) {
   return (
-    <div className="col-span-1 flex items-center justify-end gap-0.5">
-      <button
-        onClick={() => onEditHolding(holding)}
-        className="p-1.5 rounded-lg hover:bg-surface-muted text-fg-faint hover:text-fg-muted transition-colors"
+    <RowActions>
+      <IconButton
+        onClick={stopRowClick(() => onEditHolding(holding))}
+        icon={Edit3}
+        label="Edit holding"
         title="Edit holding"
-      >
-        <Edit3 size={13} />
-      </button>
-      <button
-        onClick={() => onToggleExpanded(holding.id)}
-        className="p-1.5 rounded-lg hover:bg-surface-muted text-fg-faint transition-colors"
-        title={isExpanded ? 'Collapse' : 'View transactions'}
-      >
-        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </button>
-    </div>
+        size="sm"
+        variant="subtle"
+      />
+      <ExpandToggle isExpanded={isExpanded} onToggle={() => onToggleExpanded(holding.id)} />
+    </RowActions>
   );
 }
 
-type HoldingHistoryProps = {
-  holding: Holding;
-  holdingTxns: HoldingTransaction[];
-  position: Position;
-  onAddTxnForHolding: (holding: Holding) => void;
-  onEditTxn: (transaction: HoldingTransaction) => void;
-  onDeleteTxn: (id: number) => void;
-};
-
-function HoldingHistory({
+function HoldingHistoryRow({
   holding,
   holdingTxns,
   position,
+  colSpan,
   onAddTxnForHolding,
   onEditTxn,
   onDeleteTxn,
-}: HoldingHistoryProps) {
+}: Readonly<
+  HoldingHistoryHandlers & {
+    holding: Holding;
+    holdingTxns: HoldingTransaction[];
+    position: Position;
+    colSpan: number;
+  }
+>) {
   return (
-    <HoldingTxnHistory
-      holding={holding}
-      position={position}
-      transactions={holdingTxns}
-      onAdd={() => onAddTxnForHolding(holding)}
-      onEdit={onEditTxn}
-      onDelete={onDeleteTxn}
+    <DataTableRow mobileCard={false} className="md:hover:bg-transparent">
+      <DataTableCell
+        colSpan={colSpan}
+        className="p-0 max-md:block max-md:py-0"
+        contentClassName="w-full"
+      >
+        <HoldingTxnHistory
+          holding={holding}
+          position={position}
+          transactions={holdingTxns}
+          onAdd={() => onAddTxnForHolding(holding)}
+          onEdit={onEditTxn}
+          onDelete={onDeleteTxn}
+        />
+      </DataTableCell>
+    </DataTableRow>
+  );
+}
+
+/** The effective price (a manual price is marked M) over its sync date or "sync off". */
+function HoldingPriceCell({
+  holding,
+  fmtPrice,
+}: Readonly<{ holding: Holding; fmtPrice: UnitPriceFormatFn }>) {
+  const syncCaption = holding.excludeFromSync
+    ? 'sync off'
+    : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency);
+  return (
+    <FigureWithCaption
+      figure={
+        <span className="inline-flex items-center gap-1">
+          {holding.manualPrice != null && (
+            <Badge tone="warning" size="xs" title="Manual price">
+              M
+            </Badge>
+          )}
+          {fmtPrice(getEffectivePrice(holding), holding.currency)}
+        </span>
+      }
+      caption={syncCaption}
     />
   );
 }
 
-function HoldingRow(props: HoldingRowProps) {
-  const { holding, holdingTxns, position, isExpanded, fmtBase, fmtNative } = props;
-  const { onEditHolding, onToggleExpanded } = props;
-  const { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount } = props.metrics;
+type HoldingRowProps = HoldingHistoryHandlers & {
+  metrics: HoldingRowMetrics;
+  holding: Holding;
+  holdingTxns: HoldingTransaction[];
+  position: Position;
+  isExpanded: boolean;
+  fmtBase: FormatBaseFn;
+  fmtNative: FormatNativeFn;
+  fmtPrice: UnitPriceFormatFn;
+  onEditHolding: (holding: Holding) => void;
+  onToggleExpanded: (id: number) => void;
+};
+
+function HoldingRow({
+  metrics,
+  holding,
+  holdingTxns,
+  position,
+  isExpanded,
+  fmtBase,
+  fmtNative,
+  fmtPrice,
+  onEditHolding,
+  onToggleExpanded,
+  ...handlers
+}: Readonly<HoldingRowProps>) {
+  const { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount } = metrics;
 
   return (
     <>
-      <DataTableRow interactive>
+      <DataTableRow interactive selected={isExpanded} onClick={() => onToggleExpanded(holding.id)}>
         <DataTableCell columnKey="asset">
-          <HoldingAssetCell holding={holding} foreign={foreign} txnCount={txnCount} />
+          <HoldingAssetCell holding={holding} txnCount={txnCount} />
         </DataTableCell>
-        <HoldingValueCells
-          holding={holding}
-          position={position}
-          nativeValue={nativeValue}
-          valueInBase={valueInBase}
-          foreign={foreign}
-          fmtBase={fmtBase}
-          fmtNative={fmtNative}
-        />
+        <DataTableCell columnKey="units">{formatShares(position.shares)}</DataTableCell>
+        <DataTableCell columnKey="avgCost">
+          {fmtPrice(position.avgCost, holding.currency)}
+        </DataTableCell>
+        <DataTableCell columnKey="current">
+          <HoldingPriceCell holding={holding} fmtPrice={fmtPrice} />
+        </DataTableCell>
+        <DataTableCell columnKey="value">
+          <FigureWithCaption
+            figure={<span className="font-medium text-fg">{fmtBase(valueInBase)}</span>}
+            caption={foreign ? fmtNative(nativeValue, holding.currency, true) : undefined}
+          />
+        </DataTableCell>
         <DataTableCell columnKey="gain">
-          <HoldingGainCell
-            gain={gain}
-            gainPctHolding={gainPctHolding}
-            holding={holding}
-            fmtNative={fmtNative}
+          <FigureWithCaption
+            figure={<Change value={gain} format="amount" currency={holding.currency} />}
+            caption={<Change value={gainPctHolding} format="percent" className="text-caption" />}
           />
         </DataTableCell>
         <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
@@ -475,82 +432,70 @@ function HoldingRow(props: HoldingRowProps) {
         </DataTableCell>
       </DataTableRow>
       {isExpanded && (
-        <DataTableRow mobileCard={false}>
-          <DataTableCell colSpan={6} className="p-0">
-            <HoldingHistory
-              holding={holding}
-              holdingTxns={holdingTxns}
-              position={position}
-              onAddTxnForHolding={props.onAddTxnForHolding}
-              onEditTxn={props.onEditTxn}
-              onDeleteTxn={props.onDeleteTxn}
-            />
-          </DataTableCell>
-        </DataTableRow>
+        <HoldingHistoryRow
+          holding={holding}
+          holdingTxns={holdingTxns}
+          position={position}
+          colSpan={ACTIVE_COLUMN_COUNT}
+          {...handlers}
+        />
       )}
     </>
   );
 }
 
-type BrokerageSummaryProps = {
-  totalBrokerageBase: number;
-  totalDividendsBase: number;
-  totalRealizedBase: number;
-  totalGainBase: number;
-  gainPct: number;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-};
+type BrokerageTotalRowProps = Pick<
+  BrokerageTabProps,
+  | 'totalBrokerageBase'
+  | 'totalDividendsBase'
+  | 'totalRealizedBase'
+  | 'totalGainBase'
+  | 'gainPct'
+  | 'baseCurrency'
+  | 'fmtBase'
+>;
 
-function BrokerageSummary({
+function BrokerageTotalRow({
   totalBrokerageBase,
   totalDividendsBase,
   totalRealizedBase,
   totalGainBase,
   gainPct,
+  baseCurrency,
   fmtBase,
-}: BrokerageSummaryProps) {
-  const { numberFormat } = useCurrency();
+}: Readonly<BrokerageTotalRowProps>) {
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-border-subtle bg-surface-sunken/60">
-      <div>
-        <p className="text-sm font-semibold text-fg-strong">Total Portfolio</p>
-        <p className="text-xs text-fg-faint">
-          +{fmtBase(totalDividendsBase)} dividends · {totalRealizedBase >= 0 ? '+' : ''}
-          {fmtBase(totalRealizedBase)} realized
-        </p>
-      </div>
-      <div className="flex items-center gap-6">
-        <p className="font-bold text-fg">{fmtBase(totalBrokerageBase)}</p>
-        <div
-          className={`flex items-center gap-1 ${totalGainBase >= 0 ? 'text-success' : 'text-danger'}`}
-        >
-          {totalGainBase >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-          <p className="font-bold">
-            {totalGainBase >= 0 ? '+' : ''}
-            {fmtBase(Math.abs(totalGainBase))} ({formatPercent(gainPct, numberFormat, 1)})
+    <DataTableRow data-total>
+      <DataTableCell columnKey="asset">
+        <div className="min-w-0">
+          <p>Total portfolio</p>
+          <p className="truncate text-caption font-normal text-fg-subtle">
+            +{fmtBase(totalDividendsBase)} dividends ·{' '}
+            <Change
+              value={totalRealizedBase}
+              format="amount"
+              currency={baseCurrency}
+              showArrow={false}
+              className="text-caption font-normal"
+            />{' '}
+            realized
           </p>
         </div>
-      </div>
-    </div>
+      </DataTableCell>
+      <DataTableCell columnKey="units" className="max-md:hidden" />
+      <DataTableCell columnKey="avgCost" />
+      <DataTableCell columnKey="current" className="max-md:hidden" />
+      <DataTableCell columnKey="value">{fmtBase(totalBrokerageBase)}</DataTableCell>
+      <DataTableCell columnKey="gain">
+        <FigureWithCaption
+          figure={<Change value={totalGainBase} format="amount" currency={baseCurrency} />}
+          caption={<Change value={gainPct} format="percent" className="text-caption" />}
+        />
+      </DataTableCell>
+      <DataTableCell columnKey="actions" className="max-md:hidden" />
+    </DataTableRow>
   );
 }
-
-type BrokerageHoldingsListProps = {
-  holdings: Holding[];
-  holdingTxns: HoldingTransaction[];
-  positions: Record<number, Position>;
-  baseCurrency: string;
-  expandedHoldingId: number | null;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  convertToBase: (value: number, currency: string) => number;
-  isForeign: (currency: string) => boolean;
-  onEditHolding: (holding: Holding) => void;
-  onToggleExpanded: (id: number) => void;
-  onAddTxnForHolding: (holding: Holding) => void;
-  onEditTxn: (transaction: HoldingTransaction) => void;
-  onDeleteTxn: (id: number) => void;
-};
 
 function holdingNameOrder(left: Holding, right: Holding) {
   return left.name.localeCompare(right.name) || left.id - right.id;
@@ -560,10 +505,10 @@ function useHoldingRowMetrics(
   holdings: Holding[],
   holdingTxns: HoldingTransaction[],
   positions: Record<number, Position>,
-  convertToBase: BrokerageTabProps['convertToBase'],
-  isForeign: BrokerageTabProps['isForeign'],
+  convertToBase: ConvertFn,
+  isForeign: (currency: string) => boolean,
 ) {
-  const metricsById = useMemo(() => {
+  return useMemo(() => {
     const grouped = groupHoldingTransactions(holdingTxns);
     return Object.fromEntries(
       holdings.map((holding) => [
@@ -578,16 +523,27 @@ function useHoldingRowMetrics(
       ]),
     );
   }, [holdings, holdingTxns, positions, convertToBase, isForeign]);
-  return metricsById;
 }
+
+type BrokerageHoldingsListProps = HoldingHistoryHandlers &
+  BrokerageTotalRowProps & {
+    holdings: Holding[];
+    holdingTxns: HoldingTransaction[];
+    positions: Record<number, Position>;
+    expandedHoldingId: number | null;
+    fmtNative: FormatNativeFn;
+    convertToBase: ConvertFn;
+    isForeign: (currency: string) => boolean;
+    onEditHolding: (holding: Holding) => void;
+    onToggleExpanded: (id: number) => void;
+    toolbar: ReactNode;
+  };
 
 function BrokerageHoldingsList({
   holdings,
   holdingTxns,
   positions,
-  baseCurrency,
   expandedHoldingId,
-  fmtBase,
   fmtNative,
   convertToBase,
   isForeign,
@@ -596,7 +552,10 @@ function BrokerageHoldingsList({
   onAddTxnForHolding,
   onEditTxn,
   onDeleteTxn,
-}: BrokerageHoldingsListProps) {
+  toolbar,
+  ...totals
+}: Readonly<BrokerageHoldingsListProps>) {
+  const fmtPrice = useUnitPriceFormatter();
   const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'value', direction: 'desc' });
   const metricsById = useHoldingRowMetrics(
     holdings,
@@ -606,8 +565,8 @@ function BrokerageHoldingsList({
     isForeign,
   );
   const columns = useMemo(
-    () => buildBrokerageHoldingColumns(baseCurrency, positions, metricsById),
-    [baseCurrency, positions, metricsById],
+    () => buildBrokerageHoldingColumns(totals.baseCurrency, positions, metricsById),
+    [totals.baseCurrency, positions, metricsById],
   );
   const sortedHoldings = useSortedRows(holdings, columns, sort, holdingNameOrder);
 
@@ -615,24 +574,27 @@ function BrokerageHoldingsList({
     <DataTable
       variant="plain"
       tableVariant="expandable"
+      density="default"
+      toolbar={toolbar}
       columns={columns}
       sort={sort}
       onSortChange={setSort}
       tableLayout="fixed"
       minWidth={960}
+      isEmpty={holdings.length === 0}
+      emptyState="No active holdings yet."
     >
       {sortedHoldings.map((holding) => (
         <HoldingRow
-          metrics={metricsById[holding.id]}
           key={holding.id}
+          metrics={metricsById[holding.id]}
           holding={holding}
           holdingTxns={holdingTxns}
           position={positions[holding.id]}
           isExpanded={expandedHoldingId === holding.id}
-          fmtBase={fmtBase}
+          fmtBase={totals.fmtBase}
           fmtNative={fmtNative}
-          convertToBase={convertToBase}
-          isForeign={isForeign}
+          fmtPrice={fmtPrice}
           onEditHolding={onEditHolding}
           onToggleExpanded={onToggleExpanded}
           onAddTxnForHolding={onAddTxnForHolding}
@@ -640,16 +602,10 @@ function BrokerageHoldingsList({
           onDeleteTxn={onDeleteTxn}
         />
       ))}
+      {holdings.length > 0 && <BrokerageTotalRow {...totals} />}
     </DataTable>
   );
 }
-
-type ClosedHoldingMetrics = {
-  txnCount: number;
-  lastSellPrice: number | null;
-  costBasis: number;
-  realizedPct: number;
-};
 
 function computeClosedHoldingMetrics(
   holding: Holding,
@@ -671,231 +627,20 @@ function computeClosedHoldingMetrics(
   return { txnCount, lastSellPrice, costBasis, realizedPct };
 }
 
-type ClosedHoldingRowProps = {
+type ClosedHoldingRowProps = HoldingHistoryHandlers & {
   metrics: ClosedHoldingMetrics;
   holding: Holding;
   holdingTxns: HoldingTransaction[];
   position: Position;
   isExpanded: boolean;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  convertToBase: (value: number, currency: string) => number;
+  fmtBase: FormatBaseFn;
+  fmtNative: FormatNativeFn;
+  fmtPrice: UnitPriceFormatFn;
+  convertToBase: ConvertFn;
   isForeign: (currency: string) => boolean;
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
-  onAddTxnForHolding: (holding: Holding) => void;
-  onEditTxn: (transaction: HoldingTransaction) => void;
-  onDeleteTxn: (id: number) => void;
 };
-
-function ClosedHoldingPriceCell({
-  lastSellPrice,
-  holding,
-  fmtNative,
-}: {
-  lastSellPrice: number | null;
-  holding: Holding;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-}) {
-  if (lastSellPrice === null) {
-    return (
-      <DataTableCell columnKey="sold">
-        <div>
-          <p className="text-sm text-fg-disabled">—</p>
-          <p className="text-xs text-fg-disabled">no sells</p>
-        </div>
-      </DataTableCell>
-    );
-  }
-
-  return (
-    <DataTableCell columnKey="sold">
-      <div>
-        <p className="text-sm text-fg-subtle">{fmtNative(lastSellPrice, holding.currency, true)}</p>
-        <p className="text-xs text-fg-disabled">last sell</p>
-      </div>
-    </DataTableCell>
-  );
-}
-
-function ClosedHoldingDividendsCell({
-  totalDividends,
-  holding,
-  fmtBase,
-  fmtNative,
-  convertToBase,
-  foreign,
-}: {
-  totalDividends: number;
-  holding: Holding;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  convertToBase: (value: number, currency: string) => number;
-  foreign: boolean;
-}) {
-  if (totalDividends <= 0) {
-    return (
-      <DataTableCell columnKey="dividends">
-        <p className="text-sm text-fg-disabled">—</p>
-      </DataTableCell>
-    );
-  }
-
-  return (
-    <DataTableCell columnKey="dividends">
-      <div>
-        <p className="text-sm font-semibold text-fg-subtle">
-          +{fmtBase(convertToBase(totalDividends, holding.currency))}
-        </p>
-        {foreign && (
-          <p className="text-xs text-warning">
-            +{fmtNative(totalDividends, holding.currency, true)}
-          </p>
-        )}
-      </div>
-    </DataTableCell>
-  );
-}
-
-function ClosedHoldingRealizedCell({
-  realizedGain,
-  realizedPct,
-  costBasis,
-  holding,
-  fmtNative,
-}: {
-  realizedGain: number;
-  realizedPct: number;
-  costBasis: number;
-  holding: Holding;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-}) {
-  const { numberFormat } = useCurrency();
-  return (
-    <DataTableCell
-      columnKey="realized"
-      className={realizedGain >= 0 ? 'text-success-accent' : 'text-danger-muted'}
-    >
-      <div>
-        <div className="flex items-center justify-end gap-0.5">
-          {realizedGain >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
-          <p className="text-sm font-semibold">
-            {realizedGain >= 0 ? '+' : ''}
-            {fmtNative(realizedGain, holding.currency, true)}
-          </p>
-        </div>
-        <p className="text-xs">
-          {costBasis > 0
-            ? `${realizedPct >= 0 ? '+' : ''}${formatPercent(realizedPct, numberFormat, 1)}`
-            : '—'}
-        </p>
-      </div>
-    </DataTableCell>
-  );
-}
-
-function ClosedHoldingAssetCell({
-  holding,
-  txnCount,
-  isForeign,
-}: {
-  holding: Holding;
-  txnCount: number;
-  isForeign: boolean;
-}) {
-  const itemTypeLabel = formatItemType(holding.itemType);
-  const sectorLabel = holding.sector?.trim();
-
-  return (
-    <div className="col-span-5 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-xl bg-border-default/80 flex items-center justify-center text-xs font-bold text-fg-subtle flex-shrink-0">
-        {holding.ticker.slice(0, 2)}
-      </div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="text-sm font-medium text-fg-subtle truncate">{holding.name}</p>
-          <span className="text-[10px] bg-border-default text-fg-subtle px-1.5 py-0.5 rounded-full">
-            Closed
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-xs text-fg-faint">{holding.ticker}</span>
-          {itemTypeLabel && (
-            <span className="text-[10px] bg-surface-muted text-fg-faint px-1.5 rounded-full">
-              {itemTypeLabel}
-            </span>
-          )}
-          {sectorLabel && sectorLabel !== itemTypeLabel && (
-            <span className="text-[10px] bg-surface-muted text-fg-faint px-1.5 rounded-full">
-              {sectorLabel}
-            </span>
-          )}
-          <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full ${isForeign ? 'bg-warning-soft text-warning' : 'bg-surface-muted text-fg-faint'}`}
-          >
-            {holding.currency}
-          </span>
-        </div>
-        <p className="text-[10px] text-fg-disabled mt-0.5">{txnCount} transactions</p>
-      </div>
-    </div>
-  );
-}
-
-function ClosedHoldingActionCell({
-  holding,
-  isExpanded,
-  onEditHolding,
-  onToggleExpanded,
-}: Pick<ClosedHoldingRowProps, 'holding' | 'isExpanded' | 'onEditHolding' | 'onToggleExpanded'>) {
-  return (
-    <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
-      <div className="flex items-center justify-end gap-0.5">
-        <button
-          onClick={() => onEditHolding(holding)}
-          className="p-1.5 rounded-lg hover:bg-border-default text-fg-disabled hover:text-fg-subtle transition-colors"
-          title="Edit holding"
-        >
-          <Edit3 size={13} />
-        </button>
-        <button
-          onClick={() => onToggleExpanded(holding.id)}
-          className="p-1.5 rounded-lg hover:bg-border-default text-fg-disabled hover:text-fg-subtle transition-colors"
-          title={isExpanded ? 'Collapse' : 'View transactions'}
-        >
-          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-      </div>
-    </DataTableCell>
-  );
-}
-
-function ClosedHoldingExpandedRow({
-  holding,
-  holdingTxns,
-  position,
-  onAddTxnForHolding,
-  onEditTxn,
-  onDeleteTxn,
-}: Pick<
-  ClosedHoldingRowProps,
-  'holding' | 'holdingTxns' | 'onAddTxnForHolding' | 'onDeleteTxn' | 'onEditTxn' | 'position'
->) {
-  return (
-    <DataTableRow mobileCard={false}>
-      <DataTableCell colSpan={5} className="p-0">
-        <HoldingHistory
-          holding={holding}
-          holdingTxns={holdingTxns}
-          position={position}
-          onAddTxnForHolding={onAddTxnForHolding}
-          onEditTxn={onEditTxn}
-          onDeleteTxn={onDeleteTxn}
-        />
-      </DataTableCell>
-    </DataTableRow>
-  );
-}
 
 function ClosedHoldingRow({
   metrics,
@@ -905,118 +650,113 @@ function ClosedHoldingRow({
   isExpanded,
   fmtBase,
   fmtNative,
+  fmtPrice,
   convertToBase,
   isForeign,
   onEditHolding,
   onToggleExpanded,
-  onAddTxnForHolding,
-  onEditTxn,
-  onDeleteTxn,
-}: ClosedHoldingRowProps) {
-  const isForeignHolding = isForeign(holding.currency);
+  ...handlers
+}: Readonly<ClosedHoldingRowProps>) {
+  const foreign = isForeign(holding.currency);
   const { txnCount, lastSellPrice, costBasis, realizedPct } = metrics;
+  const { totalDividends, realizedGain } = position;
 
   return (
     <>
-      <DataTableRow interactive>
+      <DataTableRow interactive selected={isExpanded} onClick={() => onToggleExpanded(holding.id)}>
         <DataTableCell columnKey="asset">
-          <ClosedHoldingAssetCell
-            holding={holding}
-            txnCount={txnCount}
-            isForeign={isForeignHolding}
+          <HoldingAssetCell holding={holding} txnCount={txnCount} closed />
+        </DataTableCell>
+        <DataTableCell columnKey="sold" className="text-fg-muted">
+          {lastSellPrice === null ? (
+            <FigureWithCaption figure="—" caption="no sells" />
+          ) : (
+            fmtPrice(lastSellPrice, holding.currency)
+          )}
+        </DataTableCell>
+        <DataTableCell columnKey="dividends" className="text-fg-muted">
+          {totalDividends > 0 ? (
+            <FigureWithCaption
+              figure={`+${fmtBase(convertToBase(totalDividends, holding.currency))}`}
+              caption={
+                foreign ? `+${fmtNative(totalDividends, holding.currency, true)}` : undefined
+              }
+            />
+          ) : (
+            '—'
+          )}
+        </DataTableCell>
+        <DataTableCell columnKey="realized">
+          <FigureWithCaption
+            figure={<Change value={realizedGain} format="amount" currency={holding.currency} />}
+            caption={
+              costBasis > 0 ? (
+                <Change value={realizedPct} format="percent" className="text-caption" />
+              ) : (
+                '—'
+              )
+            }
           />
         </DataTableCell>
-
-        <ClosedHoldingPriceCell
-          lastSellPrice={lastSellPrice}
-          holding={holding}
-          fmtNative={fmtNative}
-        />
-        <ClosedHoldingDividendsCell
-          totalDividends={position.totalDividends}
-          holding={holding}
-          fmtBase={fmtBase}
-          fmtNative={fmtNative}
-          convertToBase={convertToBase}
-          foreign={isForeignHolding}
-        />
-        <ClosedHoldingRealizedCell
-          realizedGain={position.realizedGain}
-          realizedPct={realizedPct}
-          costBasis={costBasis}
-          holding={holding}
-          fmtNative={fmtNative}
-        />
-
-        <ClosedHoldingActionCell
-          holding={holding}
-          isExpanded={isExpanded}
-          onEditHolding={onEditHolding}
-          onToggleExpanded={onToggleExpanded}
-        />
+        <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+          <HoldingRowActions
+            holding={holding}
+            isExpanded={isExpanded}
+            onEditHolding={onEditHolding}
+            onToggleExpanded={onToggleExpanded}
+          />
+        </DataTableCell>
       </DataTableRow>
-
       {isExpanded && (
-        <ClosedHoldingExpandedRow
+        <HoldingHistoryRow
           holding={holding}
           holdingTxns={holdingTxns}
           position={position}
-          onAddTxnForHolding={onAddTxnForHolding}
-          onEditTxn={onEditTxn}
-          onDeleteTxn={onDeleteTxn}
+          colSpan={CLOSED_COLUMN_COUNT}
+          {...handlers}
         />
       )}
     </>
   );
 }
 
-type ClosedHoldingsSectionProps = {
-  closedHoldings: Holding[];
-  holdingTxns: HoldingTransaction[];
-  positions: Record<number, Position>;
-  expandedHoldingId: number | null;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  convertToBase: (value: number, currency: string) => number;
-  isForeign: (currency: string) => boolean;
-  onEditHolding: (holding: Holding) => void;
-  onToggleExpanded: (id: number) => void;
-  onAddTxnForHolding: (holding: Holding) => void;
-  onEditTxn: (transaction: HoldingTransaction) => void;
-  onDeleteTxn: (id: number) => void;
-  showClosed: boolean;
-  onToggleClosed: () => void;
-};
-
 type ClosedHoldingsSummary = {
-  realized: string;
+  realized: ReactNode;
   dividends: string;
 };
 
 function buildClosedHoldingsSummary(
   closedHoldings: Holding[],
   positions: Record<number, Position>,
-  convertToBase: (value: number, currency: string) => number,
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string,
-  fmtNative: (value: number, currency: string, compact?: boolean) => string,
+  convertToBase: ConvertFn,
+  fmtBase: FormatBaseFn,
+  fmtNative: FormatNativeFn,
+  baseCurrency: string,
 ): ClosedHoldingsSummary {
   const uniqueCurrencies = [...new Set(closedHoldings.map((holding) => holding.currency))];
   const singleCurrency = uniqueCurrencies.length === 1 ? uniqueCurrencies[0] : null;
 
-  const totalClosedRealizedBase = sumMoney(
-    closedHoldings.map((holding) =>
-      convertToBase(positions[holding.id].realizedGain, holding.currency),
-    ),
-  );
-  const totalClosedDividendsBase = sumMoney(
-    closedHoldings.map((holding) =>
-      convertToBase(positions[holding.id].totalDividends, holding.currency),
-    ),
-  );
-
   if (!singleCurrency) {
+    const totalClosedRealizedBase = sumMoney(
+      closedHoldings.map((holding) =>
+        convertToBase(positions[holding.id].realizedGain, holding.currency),
+      ),
+    );
+    const totalClosedDividendsBase = sumMoney(
+      closedHoldings.map((holding) =>
+        convertToBase(positions[holding.id].totalDividends, holding.currency),
+      ),
+    );
     return {
-      realized: `${totalClosedRealizedBase >= 0 ? '+' : ''}${fmtBase(totalClosedRealizedBase)}`,
+      realized: (
+        <Change
+          value={totalClosedRealizedBase}
+          format="amount"
+          currency={baseCurrency}
+          showArrow={false}
+          className="text-caption"
+        />
+      ),
       dividends: fmtBase(totalClosedDividendsBase),
     };
   }
@@ -1029,40 +769,17 @@ function buildClosedHoldingsSummary(
   );
 
   return {
-    realized: `${totalClosedRealizedNative >= 0 ? '+' : ''}${fmtNative(totalClosedRealizedNative, singleCurrency)}`,
+    realized: (
+      <Change
+        value={totalClosedRealizedNative}
+        format="amount"
+        currency={singleCurrency}
+        showArrow={false}
+        className="text-caption"
+      />
+    ),
     dividends: fmtNative(totalClosedDividendsNative, singleCurrency),
   };
-}
-
-function ClosedHoldingsHeader({
-  closedCount,
-  showClosed,
-  onToggleClosed,
-}: {
-  closedCount: number;
-  showClosed: boolean;
-  onToggleClosed: () => void;
-}) {
-  return (
-    <button
-      onClick={onToggleClosed}
-      className="w-full flex items-center gap-3 px-6 py-3.5 bg-surface-sunken/70 hover:bg-surface-sunken transition-colors"
-    >
-      <Archive size={14} className="text-fg-faint flex-shrink-0" />
-      <p className="text-sm font-semibold text-fg-subtle">Closed Holdings</p>
-      <span className="text-[11px] bg-surface-muted text-fg-subtle px-2 py-0.5 rounded-full font-medium">
-        {closedCount}
-      </span>
-      <span className="text-xs text-fg-faint">positions no longer held</span>
-      <div className="flex-1" />
-      <span className="text-xs text-fg-faint">{showClosed ? 'Hide' : 'Show'}</span>
-      {showClosed ? (
-        <ChevronUp size={14} className="text-fg-faint" />
-      ) : (
-        <ChevronDown size={14} className="text-fg-faint" />
-      )}
-    </button>
-  );
 }
 
 function useClosedHoldingMetrics(
@@ -1070,7 +787,7 @@ function useClosedHoldingMetrics(
   holdingTxns: HoldingTransaction[],
   positions: Record<number, Position>,
 ) {
-  const metricsById = useMemo(() => {
+  return useMemo(() => {
     const grouped = groupHoldingTransactions(holdingTxns);
     return Object.fromEntries(
       closedHoldings.map((holding) => [
@@ -1079,38 +796,82 @@ function useClosedHoldingMetrics(
       ]),
     );
   }, [closedHoldings, holdingTxns, positions]);
-  return metricsById;
 }
 
-function ClosedHoldingsTable({
+type ClosedHoldingsSectionProps = HoldingHistoryHandlers & {
+  closedHoldings: Holding[];
+  holdingTxns: HoldingTransaction[];
+  positions: Record<number, Position>;
+  expandedHoldingId: number | null;
+  baseCurrency: string;
+  fmtBase: FormatBaseFn;
+  fmtNative: FormatNativeFn;
+  convertToBase: ConvertFn;
+  isForeign: (currency: string) => boolean;
+  onEditHolding: (holding: Holding) => void;
+  onToggleExpanded: (id: number) => void;
+  showClosed: boolean;
+  onToggleClosed: () => void;
+};
+
+function ClosedHoldingsHeader({
+  closedCount,
+  showClosed,
+  onToggleClosed,
+}: Readonly<{ closedCount: number; showClosed: boolean; onToggleClosed: () => void }>) {
+  return (
+    <button
+      type="button"
+      onClick={onToggleClosed}
+      aria-expanded={showClosed}
+      className="flex min-h-9 w-full items-center gap-2 px-3 text-left transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring max-sm:min-h-11 max-sm:px-4"
+    >
+      <Archive size={14} className="shrink-0 text-fg-faint" aria-hidden />
+      <span className="text-title-section text-fg">Closed holdings</span>
+      <Badge>{closedCount}</Badge>
+      <span className="truncate text-caption text-fg-subtle max-sm:hidden">
+        positions no longer held
+      </span>
+      <span className="ml-auto flex shrink-0 items-center gap-1 text-caption text-fg-subtle">
+        {showClosed ? 'Hide' : 'Show'}
+        {showClosed ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+      </span>
+    </button>
+  );
+}
+
+function ClosedHoldingsFooter({
+  closedCount,
+  summary,
+}: Readonly<{ closedCount: number; summary: ClosedHoldingsSummary }>) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-caption text-fg-subtle">
+      <p>
+        {closedCount} closed positions · total realized {summary.realized} · dividends{' '}
+        {summary.dividends}
+      </p>
+      <p>excluded from active portfolio totals</p>
+    </div>
+  );
+}
+
+function ClosedHoldingsSection({
   closedHoldings,
   holdingTxns,
   positions,
   expandedHoldingId,
+  baseCurrency,
   fmtBase,
   fmtNative,
   convertToBase,
   isForeign,
   onEditHolding,
   onToggleExpanded,
-  onAddTxnForHolding,
-  onEditTxn,
-  onDeleteTxn,
-}: {
-  closedHoldings: Holding[];
-  holdingTxns: HoldingTransaction[];
-  positions: Record<number, Position>;
-  expandedHoldingId: number | null;
-  fmtBase: (value: number, currency?: string, compact?: boolean) => string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  convertToBase: (value: number, currency: string) => number;
-  isForeign: (currency: string) => boolean;
-  onEditHolding: (holding: Holding) => void;
-  onToggleExpanded: (id: number) => void;
-  onAddTxnForHolding: (holding: Holding) => void;
-  onEditTxn: (transaction: HoldingTransaction) => void;
-  onDeleteTxn: (id: number) => void;
-}) {
+  showClosed,
+  onToggleClosed,
+  ...handlers
+}: Readonly<ClosedHoldingsSectionProps>) {
+  const fmtPrice = useUnitPriceFormatter();
   const [sort, setSort] = useState<DataTableSortState>({
     columnKey: 'realized',
     direction: 'desc',
@@ -1122,75 +883,6 @@ function ClosedHoldingsTable({
   );
   const sortedClosedHoldings = useSortedRows(closedHoldings, columns, sort, holdingNameOrder);
 
-  return (
-    <DataTable
-      variant="plain"
-      tableVariant="expandable"
-      columns={columns}
-      sort={sort}
-      onSortChange={setSort}
-      tableLayout="fixed"
-      minWidth={900}
-      className="bg-surface-sunken/50"
-    >
-      {sortedClosedHoldings.map((holding) => (
-        <ClosedHoldingRow
-          metrics={metricsById[holding.id]}
-          key={holding.id}
-          holding={holding}
-          holdingTxns={holdingTxns}
-          position={positions[holding.id]}
-          isExpanded={expandedHoldingId === holding.id}
-          fmtBase={fmtBase}
-          fmtNative={fmtNative}
-          convertToBase={convertToBase}
-          isForeign={isForeign}
-          onEditHolding={onEditHolding}
-          onToggleExpanded={onToggleExpanded}
-          onAddTxnForHolding={onAddTxnForHolding}
-          onEditTxn={onEditTxn}
-          onDeleteTxn={onDeleteTxn}
-        />
-      ))}
-    </DataTable>
-  );
-}
-
-function ClosedHoldingsFooter({
-  closedCount,
-  summary,
-}: {
-  closedCount: number;
-  summary: ClosedHoldingsSummary;
-}) {
-  return (
-    <div className="flex items-center justify-between px-6 py-3 bg-surface-sunken/80 border-t border-border-subtle">
-      <p className="text-xs text-fg-faint">
-        {closedCount} closed positions · total realized {summary.realized} · dividends{' '}
-        {summary.dividends}
-      </p>
-      <p className="text-xs text-fg-faint">excluded from active portfolio totals</p>
-    </div>
-  );
-}
-
-function ClosedHoldingsSection({
-  closedHoldings,
-  holdingTxns,
-  positions,
-  expandedHoldingId,
-  fmtBase,
-  fmtNative,
-  convertToBase,
-  isForeign,
-  onEditHolding,
-  onToggleExpanded,
-  onAddTxnForHolding,
-  onEditTxn,
-  onDeleteTxn,
-  showClosed,
-  onToggleClosed,
-}: ClosedHoldingsSectionProps) {
   if (closedHoldings.length === 0) return null;
   const summary = buildClosedHoldingsSummary(
     closedHoldings,
@@ -1198,40 +890,54 @@ function ClosedHoldingsSection({
     convertToBase,
     fmtBase,
     fmtNative,
+    baseCurrency,
   );
 
   return (
-    <div className="border-t-2 border-dashed border-border-default">
+    <div className="border-t border-border-default">
       <ClosedHoldingsHeader
         closedCount={closedHoldings.length}
         showClosed={showClosed}
         onToggleClosed={onToggleClosed}
       />
       {showClosed && (
-        <>
-          <ClosedHoldingsTable
-            closedHoldings={closedHoldings}
-            holdingTxns={holdingTxns}
-            positions={positions}
-            expandedHoldingId={expandedHoldingId}
-            fmtBase={fmtBase}
-            fmtNative={fmtNative}
-            convertToBase={convertToBase}
-            isForeign={isForeign}
-            onEditHolding={onEditHolding}
-            onToggleExpanded={onToggleExpanded}
-            onAddTxnForHolding={onAddTxnForHolding}
-            onEditTxn={onEditTxn}
-            onDeleteTxn={onDeleteTxn}
-          />
-          <ClosedHoldingsFooter closedCount={closedHoldings.length} summary={summary} />
-        </>
+        <DataTable
+          variant="plain"
+          tableVariant="expandable"
+          density="default"
+          columns={columns}
+          sort={sort}
+          onSortChange={setSort}
+          tableLayout="fixed"
+          minWidth={900}
+          className="border-t border-border-default"
+          footer={<ClosedHoldingsFooter closedCount={closedHoldings.length} summary={summary} />}
+        >
+          {sortedClosedHoldings.map((holding) => (
+            <ClosedHoldingRow
+              key={holding.id}
+              metrics={metricsById[holding.id]}
+              holding={holding}
+              holdingTxns={holdingTxns}
+              position={positions[holding.id]}
+              isExpanded={expandedHoldingId === holding.id}
+              fmtBase={fmtBase}
+              fmtNative={fmtNative}
+              fmtPrice={fmtPrice}
+              convertToBase={convertToBase}
+              isForeign={isForeign}
+              onEditHolding={onEditHolding}
+              onToggleExpanded={onToggleExpanded}
+              {...handlers}
+            />
+          ))}
+        </DataTable>
       )}
     </div>
   );
 }
 
-type BrokerageHeaderProps = {
+type BrokerageToolbarProps = {
   activeHoldingsCount: number;
   totalHoldingsCount: number;
   onAddHolding: () => void;
@@ -1240,66 +946,58 @@ type BrokerageHeaderProps = {
   syncSummary: HoldingPriceSyncResult | null;
 };
 
-function BrokerageHeader({
+function BrokerageToolbar({
   activeHoldingsCount,
   totalHoldingsCount,
   onAddHolding,
   onSyncPrices,
   isSyncingPrices,
   syncSummary,
-}: BrokerageHeaderProps) {
+}: Readonly<BrokerageToolbarProps>) {
   const syncSummaryText = syncSummary
     ? `${syncSummary.updatedHoldings}/${syncSummary.requestedHoldings} updated · ${syncSummary.skippedHoldings} skipped`
     : null;
+  const closedCount = totalHoldingsCount - activeHoldingsCount;
 
   return (
-    <>
-      <div className="flex justify-between items-center px-6 pt-5 pb-3">
-        <div>
-          <p className="text-xs text-fg-faint">
-            {activeHoldingsCount} active holdings · click row to view & record transactions
-          </p>
-          {syncSummaryText && (
-            <p className="text-[11px] text-fg-subtle mt-1">Last sync: {syncSummaryText}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onSyncPrices}
-            disabled={isSyncingPrices || activeHoldingsCount === 0}
-            className="flex items-center gap-2 text-sm bg-surface-muted hover:bg-border-default disabled:bg-surface-muted disabled:text-fg-faint text-fg-strong px-4 py-2 rounded-xl transition-colors"
-            title={
-              activeHoldingsCount === 0
-                ? 'No active holdings to sync'
-                : `Sync prices for ${activeHoldingsCount} active holdings`
-            }
-          >
-            {isSyncingPrices ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <RefreshCcw size={15} />
-            )}
-            Sync Prices
-          </button>
-          <button
-            onClick={onAddHolding}
-            className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover text-fg-inverted px-4 py-2 rounded-xl transition-colors"
-          >
-            <Plus size={15} /> Add Holding
-          </button>
-        </div>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0 text-caption text-fg-subtle">
+        <p>{activeHoldingsCount} active holdings · click a row to view and record transactions</p>
+        {syncSummaryText && <p>Last sync: {syncSummaryText}</p>}
+        {closedCount > 0 && (
+          <p>{closedCount} closed holdings excluded from sync and active portfolio totals</p>
+        )}
       </div>
-      {totalHoldingsCount > activeHoldingsCount && (
-        <p className="px-6 pb-2 text-[11px] text-fg-faint">
-          {totalHoldingsCount - activeHoldingsCount} closed holdings excluded from sync and active
-          portfolio totals
-        </p>
-      )}
-    </>
+      <div className="flex items-center gap-2 max-sm:w-full max-sm:*:flex-1">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onSyncPrices}
+          disabled={activeHoldingsCount === 0}
+          loading={isSyncingPrices}
+          leadingIcon={<RefreshCcw size={12} aria-hidden />}
+          title={
+            activeHoldingsCount === 0
+              ? 'No active holdings to sync'
+              : `Sync prices for ${activeHoldingsCount} active holdings`
+          }
+        >
+          Sync prices
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={onAddHolding}
+          leadingIcon={<Plus size={12} aria-hidden />}
+        >
+          Add holding
+        </Button>
+      </div>
+    </div>
   );
 }
 
-export function BrokerageTab(props: BrokerageTabProps) {
+export function BrokerageTab(props: Readonly<BrokerageTabProps>) {
   const {
     activeHoldings,
     closedHoldings,
@@ -1308,65 +1006,72 @@ export function BrokerageTab(props: BrokerageTabProps) {
     baseCurrency,
     totalDividendsBase,
     totalRealizedBase,
+    totalBrokerageBase,
+    totalGainBase,
+    gainPct,
+    expandedHoldingId,
+    fmtBase,
+    fmtNative,
+    convertToBase,
+    isForeign,
+    onAddHolding,
+    onEditHolding,
+    onToggleExpanded,
+    onAddTxnForHolding,
+    onEditTxn,
+    onDeleteTxn,
+    onSyncPrices,
+    isSyncingPrices,
+    syncSummary,
   } = props;
-  const { totalBrokerageBase, totalGainBase, gainPct, expandedHoldingId, fmtBase, fmtNative } =
-    props;
-  const { convertToBase, isForeign, onAddHolding, onEditHolding, onToggleExpanded } = props;
-  const { onAddTxnForHolding, onEditTxn, onDeleteTxn, onSyncPrices, isSyncingPrices, syncSummary } =
-    props;
   const [showClosed, setShowClosed] = useState(true);
+  const handlers = { onAddTxnForHolding, onEditTxn, onDeleteTxn };
   return (
     <div>
-      <BrokerageHeader
-        activeHoldingsCount={activeHoldings.length}
-        totalHoldingsCount={activeHoldings.length + closedHoldings.length}
-        onAddHolding={onAddHolding}
-        onSyncPrices={onSyncPrices}
-        isSyncingPrices={isSyncingPrices}
-        syncSummary={syncSummary}
-      />
       <BrokerageHoldingsList
         holdings={activeHoldings}
         holdingTxns={holdingTxns}
         positions={positions}
-        baseCurrency={baseCurrency}
         expandedHoldingId={expandedHoldingId}
-        fmtBase={fmtBase}
         fmtNative={fmtNative}
         convertToBase={convertToBase}
         isForeign={isForeign}
         onEditHolding={onEditHolding}
         onToggleExpanded={onToggleExpanded}
-        onAddTxnForHolding={onAddTxnForHolding}
-        onEditTxn={onEditTxn}
-        onDeleteTxn={onDeleteTxn}
+        baseCurrency={baseCurrency}
+        totalBrokerageBase={totalBrokerageBase}
+        totalDividendsBase={totalDividendsBase}
+        totalRealizedBase={totalRealizedBase}
+        totalGainBase={totalGainBase}
+        gainPct={gainPct}
+        fmtBase={fmtBase}
+        toolbar={
+          <BrokerageToolbar
+            activeHoldingsCount={activeHoldings.length}
+            totalHoldingsCount={activeHoldings.length + closedHoldings.length}
+            onAddHolding={onAddHolding}
+            onSyncPrices={onSyncPrices}
+            isSyncingPrices={isSyncingPrices}
+            syncSummary={syncSummary}
+          />
+        }
+        {...handlers}
       />
-      {activeHoldings.length > 0 && (
-        <BrokerageSummary
-          totalBrokerageBase={totalBrokerageBase}
-          totalDividendsBase={totalDividendsBase}
-          totalRealizedBase={totalRealizedBase}
-          totalGainBase={totalGainBase}
-          gainPct={gainPct}
-          fmtBase={fmtBase}
-        />
-      )}
       <ClosedHoldingsSection
         closedHoldings={closedHoldings}
         holdingTxns={holdingTxns}
         positions={positions}
         expandedHoldingId={expandedHoldingId}
+        baseCurrency={baseCurrency}
         fmtBase={fmtBase}
         fmtNative={fmtNative}
         convertToBase={convertToBase}
         isForeign={isForeign}
         onEditHolding={onEditHolding}
         onToggleExpanded={onToggleExpanded}
-        onAddTxnForHolding={onAddTxnForHolding}
-        onEditTxn={onEditTxn}
-        onDeleteTxn={onDeleteTxn}
         showClosed={showClosed}
         onToggleClosed={() => setShowClosed((open) => !open)}
+        {...handlers}
       />
     </div>
   );

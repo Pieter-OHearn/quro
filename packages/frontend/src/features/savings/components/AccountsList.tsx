@@ -1,8 +1,20 @@
-import { Calendar, ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
-import { attributedSavingsBalanceInBase } from '../utils/savings-data';
-import { Badge, Button, Card, IconButton, PanelHeader } from '@/components/ui';
+import { monthlyInterest } from '@quro/shared';
+import {
+  Badge,
+  Button,
+  DataTable,
+  DataTableCell,
+  DataTableRow,
+  IconButton,
+  RowActions,
+  type DataTableColumn,
+} from '@/components/ui';
+import { dataColorToken } from '@/lib/dataColors';
 import { JointBadge } from '@/features/partner';
+import { attributedSavingsBalanceInBase } from '../utils/savings-data';
 import { TxnHistory } from './TxnHistory';
 import type {
   ConvertToBaseFn,
@@ -10,37 +22,6 @@ import type {
   SavingsFormatFn,
   SavingsNativeFormatFn,
 } from '../types';
-import { monthlyInterest } from '@quro/shared';
-
-type AccountRowProps = {
-  acc: SavingsAccount;
-  transactions: SavingsTransaction[];
-  totalInBase: number;
-  isExpanded: boolean;
-  convertToBase: ConvertToBaseFn;
-  isForeign: IsForeignFn;
-  fmtBase: SavingsFormatFn;
-  fmtNative: SavingsNativeFormatFn;
-  onToggleExpand: () => void;
-  onEdit: () => void;
-  onAddTxn: () => void;
-  onEditTxn: (transaction: SavingsTransaction) => void;
-  onDeleteTxn: (id: number) => void;
-};
-
-type AccountRowHeaderProps = {
-  acc: SavingsAccount;
-  accTxns: SavingsTransaction[];
-  pct: number;
-  foreign: boolean;
-  balanceInBase: number;
-  monthlyInterest: number;
-  isExpanded: boolean;
-  fmtBase: SavingsFormatFn;
-  fmtNative: SavingsNativeFormatFn;
-  onToggleExpand: () => void;
-  onEdit: () => void;
-};
 
 type AccountsListProps = {
   accounts: SavingsAccount[];
@@ -52,6 +33,7 @@ type AccountsListProps = {
   isForeign: IsForeignFn;
   fmtBase: SavingsFormatFn;
   fmtNative: SavingsNativeFormatFn;
+  baseCurrency: string;
   onToggleExpand: (id: number) => void;
   onEdit: (account: SavingsAccount) => void;
   onAddAccount: () => void;
@@ -60,123 +42,101 @@ type AccountsListProps = {
   onDeleteTxn: (id: number) => void;
 };
 
-function AccountRowMeta({
-  acc,
-  accTxns,
-  pct,
-  foreign,
-}: {
+type AccountRowProps = Pick<
+  AccountsListProps,
+  'transactions' | 'totalInBase' | 'convertToBase' | 'isForeign' | 'fmtBase' | 'fmtNative'
+> & {
   acc: SavingsAccount;
-  accTxns: SavingsTransaction[];
-  pct: number;
-  foreign: boolean;
-}) {
-  return (
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-        <p className="text-sm font-semibold text-fg-emphasis">{acc.name}</p>
-        {acc.bunqAccountId && (
-          <Badge tone="info" size="sm">
-            Bunq
-          </Badge>
-        )}
-        <JointBadge isJoint={acc.isJoint} ownerUserId={acc.userId} />
-        <Badge tone="neutral" size="sm">
-          {acc.accountType}
-        </Badge>
-        <Badge tone={foreign ? 'warningSoft' : 'muted'} size="sm">
-          {acc.currency}
-        </Badge>
-      </div>
-      <p className="text-xs text-fg-faint">
-        {acc.bank} · {accTxns.length} transactions
-      </p>
-      <div className="mt-2 w-full bg-surface-muted h-1.5 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${pct}%`, backgroundColor: acc.color }}
-        />
-      </div>
-    </div>
-  );
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onEdit: () => void;
+  onAddTxn: () => void;
+  onEditTxn: (transaction: SavingsTransaction) => void;
+  onDeleteTxn: (id: number) => void;
+};
+
+function buildAccountColumns(baseCurrency: string): readonly DataTableColumn[] {
+  return [
+    { key: 'account', header: 'Account', width: '29%' },
+    { key: 'bank', header: 'Bank', priority: 'secondary', width: '17%' },
+    { key: 'rate', header: 'Rate (APY)', numeric: true, priority: 'secondary', width: '9%' },
+    {
+      key: 'interest',
+      header: 'Interest / month',
+      numeric: true,
+      priority: 'secondary',
+      width: '12%',
+    },
+    { key: 'share', header: 'Share', priority: 'tertiary', width: '7%' },
+    { key: 'balance', header: 'Balance', numeric: true, width: '13%' },
+    { key: 'value', header: `Value (${baseCurrency})`, numeric: true, width: '13%' },
+    { key: 'actions', header: '', priority: 'actions', width: 72 },
+  ];
 }
 
-function AccountRowBalance({
-  acc,
-  foreign,
-  balanceInBase,
-  monthlyInterest,
-  fmtBase,
-  fmtNative,
-}: {
-  acc: SavingsAccount;
-  foreign: boolean;
-  balanceInBase: number;
-  monthlyInterest: number;
-  fmtBase: SavingsFormatFn;
-  fmtNative: SavingsNativeFormatFn;
-}) {
-  return (
-    <div className="text-right flex-shrink-0">
-      <p className="font-bold text-fg">{fmtNative(acc.balance, acc.currency)}</p>
-      {foreign && (
-        <p className="text-xs text-brand font-medium">{`\u2248 ${fmtBase(balanceInBase)}`}</p>
-      )}
-      <p className="text-xs text-success">{acc.interestRate}% APY</p>
-      <p className="text-xs text-fg-faint">
-        {fmtNative(monthlyInterest, acc.currency, true)}/mo interest
-      </p>
-    </div>
-  );
+const COLUMN_COUNT = 8;
+
+function stopRowClick(handler: () => void) {
+  return (event: MouseEvent) => {
+    event.stopPropagation();
+    handler();
+  };
 }
 
-function AccountRowHeader({
-  acc,
-  accTxns,
-  pct,
-  foreign,
-  balanceInBase,
-  monthlyInterest,
-  isExpanded,
-  fmtBase,
-  fmtNative,
-  onToggleExpand,
-  onEdit,
-}: Readonly<AccountRowHeaderProps>) {
+function AccountNameCell({ acc, foreign }: Readonly<{ acc: SavingsAccount; foreign: boolean }>) {
   return (
-    <div className="flex items-center gap-4 px-6 py-4 hover:bg-surface-sunken/60 transition-colors group">
-      <button
-        onClick={onToggleExpand}
-        className="w-11 h-11 rounded-xl flex items-center justify-center text-xl bg-surface border border-border-subtle shadow-sm flex-shrink-0 hover:shadow-md transition-shadow"
-      >
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 leading-none" aria-hidden>
         {acc.emoji}
-      </button>
-      <AccountRowMeta acc={acc} accTxns={accTxns} pct={pct} foreign={foreign} />
-      <AccountRowBalance
-        acc={acc}
-        foreign={foreign}
-        balanceInBase={balanceInBase}
-        monthlyInterest={monthlyInterest}
-        fmtBase={fmtBase}
-        fmtNative={fmtNative}
-      />
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <IconButton
-          onClick={onEdit}
-          icon={Edit3}
-          label="Edit account"
-          title="Edit account"
-          variant="subtle"
-        />
-        <IconButton
-          onClick={onToggleExpand}
-          icon={isExpanded ? ChevronUp : ChevronDown}
-          label={isExpanded ? 'Hide transactions' : 'Show transactions'}
-          title={isExpanded ? 'Hide transactions' : 'Show transactions'}
-          variant="subtle"
-        />
-      </div>
+      </span>
+      <span className="min-w-0 truncate font-medium text-fg">{acc.name}</span>
+      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+        {acc.bunqAccountId && <Badge tone="info">Bunq</Badge>}
+        <JointBadge isJoint={acc.isJoint} ownerUserId={acc.userId} />
+        {foreign && <Badge>{acc.currency}</Badge>}
+      </span>
     </div>
+  );
+}
+
+/** The account's part of your savings as a meter in the account's saved colour. */
+function AccountShareMeter({ acc, pct }: Readonly<{ acc: SavingsAccount; pct: number }>) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted" aria-hidden>
+      <div
+        className="h-full rounded-full"
+        style={{ width: `${pct}%`, backgroundColor: dataColorToken(acc.color) }}
+      />
+    </div>
+  );
+}
+
+function AccountRowActions({
+  isExpanded,
+  onEdit,
+  onToggleExpand,
+}: Readonly<{ isExpanded: boolean; onEdit: () => void; onToggleExpand: () => void }>) {
+  const toggleLabel = isExpanded ? 'Hide transactions' : 'Show transactions';
+  return (
+    <RowActions>
+      <IconButton
+        onClick={stopRowClick(onEdit)}
+        icon={Edit3}
+        label="Edit account"
+        title="Edit account"
+        size="sm"
+        variant="subtle"
+      />
+      <IconButton
+        onClick={stopRowClick(onToggleExpand)}
+        icon={isExpanded ? ChevronUp : ChevronDown}
+        label={toggleLabel}
+        title={toggleLabel}
+        aria-expanded={isExpanded}
+        size="sm"
+        variant="subtle"
+      />
+    </RowActions>
   );
 }
 
@@ -200,81 +160,74 @@ function AccountRow({
   const pct =
     totalInBase > 0 ? (attributedSavingsBalanceInBase(acc, convertToBase) / totalInBase) * 100 : 0;
   const foreign = isForeign(acc.currency);
-  const accTxns = transactions.filter((transaction) => transaction.accountId === acc.id);
+  const txnCount = transactions.filter((transaction) => transaction.accountId === acc.id).length;
   const accMonthlyInterest = monthlyInterest(acc.balance, acc.interestRate);
 
   return (
-    <div>
-      <AccountRowHeader
-        acc={acc}
-        accTxns={accTxns}
-        pct={pct}
-        foreign={foreign}
-        balanceInBase={balanceInBase}
-        monthlyInterest={accMonthlyInterest}
-        isExpanded={isExpanded}
-        fmtBase={fmtBase}
-        fmtNative={fmtNative}
-        onToggleExpand={onToggleExpand}
-        onEdit={onEdit}
-      />
+    <>
+      <DataTableRow interactive selected={isExpanded} onClick={onToggleExpand}>
+        <DataTableCell columnKey="account">
+          <AccountNameCell acc={acc} foreign={foreign} />
+        </DataTableCell>
+        <DataTableCell columnKey="bank" contentClassName="truncate text-fg-muted">
+          {acc.bank} · {acc.accountType} · {txnCount} transactions
+        </DataTableCell>
+        <DataTableCell columnKey="rate">{acc.interestRate}%</DataTableCell>
+        <DataTableCell columnKey="interest">
+          {fmtNative(accMonthlyInterest, acc.currency, true)}
+        </DataTableCell>
+        <DataTableCell columnKey="share">
+          <AccountShareMeter acc={acc} pct={pct} />
+        </DataTableCell>
+        <DataTableCell columnKey="balance" className="font-medium text-fg">
+          {fmtNative(acc.balance, acc.currency)}
+        </DataTableCell>
+        <DataTableCell columnKey="value">{fmtBase(balanceInBase)}</DataTableCell>
+        <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+          <AccountRowActions
+            isExpanded={isExpanded}
+            onEdit={onEdit}
+            onToggleExpand={onToggleExpand}
+          />
+        </DataTableCell>
+      </DataTableRow>
       {isExpanded && (
-        <TxnHistory
-          account={acc}
-          transactions={transactions}
-          onAdd={onAddTxn}
-          onEdit={onEditTxn}
-          onDelete={onDeleteTxn}
-        />
+        <DataTableRow mobileCard={false} className="md:hover:bg-transparent">
+          <DataTableCell
+            colSpan={COLUMN_COUNT}
+            className="p-0 max-md:block max-md:py-0"
+            contentClassName="w-full"
+          >
+            <TxnHistory
+              account={acc}
+              transactions={transactions}
+              onAdd={onAddTxn}
+              onEdit={onEditTxn}
+              onDelete={onDeleteTxn}
+            />
+          </DataTableCell>
+        </DataTableRow>
       )}
-    </div>
+    </>
   );
 }
 
-function AccountsListHeader({
-  accounts,
-  onAddAccount,
-}: {
-  accounts: SavingsAccount[];
-  onAddAccount: () => void;
-}) {
-  return (
-    <PanelHeader
-      title="Savings Accounts"
-      subtitle={`${accounts.length} accounts · click a row to view & record transactions`}
-      action={
-        <Button
-          onClick={onAddAccount}
-          variant="primary"
-          size="md"
-          leadingIcon={<Plus size={15} />}
-          data-testid="savings-add-account-button"
-        >
-          Add Account
-        </Button>
-      }
-    />
-  );
-}
-
-function AnnualProjection({
+function AccountsTotalRow({
+  totalInBase,
   totalInterest,
   fmtBase,
-}: {
-  totalInterest: number;
-  fmtBase: SavingsFormatFn;
-}) {
+}: Readonly<{ totalInBase: number; totalInterest: number; fmtBase: SavingsFormatFn }>) {
   return (
-    <div className="mx-6 mb-6 mt-2 p-4 bg-gradient-to-r from-success-soft to-accent-secondary-soft rounded-xl border border-success-soft-strong flex items-center gap-4">
-      <Calendar size={20} className="text-success flex-shrink-0" />
-      <div>
-        <p className="text-sm font-semibold text-success-strong">Annual Interest Projection</p>
-        <p className="text-xs text-success mt-0.5">
-          At current balances and rates you'll earn approximately{' '}
-          <strong>{fmtBase(totalInterest * 12)}</strong> in interest over the next 12 months.
-        </p>
-      </div>
-    </div>
+    <DataTableRow data-total>
+      <DataTableCell columnKey="account">Total (your share)</DataTableCell>
+      <DataTableCell columnKey="bank" />
+      <DataTableCell columnKey="rate" />
+      <DataTableCell columnKey="interest">{fmtBase(totalInterest, undefined, true)}</DataTableCell>
+      <DataTableCell columnKey="share" />
+      <DataTableCell columnKey="balance" className="max-md:hidden" />
+      <DataTableCell columnKey="value">{fmtBase(totalInBase)}</DataTableCell>
+      <DataTableCell columnKey="actions" className="max-md:hidden" />
+    </DataTableRow>
   );
 }
 
@@ -288,6 +241,7 @@ export function AccountsList({
   isForeign,
   fmtBase,
   fmtNative,
+  baseCurrency,
   onToggleExpand,
   onEdit,
   onAddAccount,
@@ -296,34 +250,64 @@ export function AccountsList({
   onDeleteTxn,
 }: Readonly<AccountsListProps>) {
   return (
-    <Card padding="none" className="overflow-hidden">
-      <AccountsListHeader accounts={accounts} onAddAccount={onAddAccount} />
-      {accounts.length === 0 && (
-        <p className="text-center py-10 text-fg-faint text-sm">
-          No accounts yet. Click <strong>Add Account</strong> to get started.
-        </p>
+    <DataTable
+      title="Savings accounts"
+      subtitle={`${accounts.length} accounts · click a row to view and record transactions`}
+      action={
+        <Button
+          onClick={onAddAccount}
+          variant="primary"
+          size="sm"
+          leadingIcon={<Plus size={12} />}
+          data-testid="savings-add-account-button"
+        >
+          Add account
+        </Button>
+      }
+      columns={buildAccountColumns(baseCurrency)}
+      tableLayout="fixed"
+      minWidth={960}
+      isEmpty={accounts.length === 0}
+      emptyState={
+        <>
+          No accounts yet. Click <strong>Add account</strong> to get started.
+        </>
+      }
+      footer={
+        accounts.length > 0 ? (
+          <p className="text-caption text-fg-subtle">
+            At current balances and rates you&apos;ll earn approximately{' '}
+            <span className="font-numeric text-fg">{fmtBase(totalInterest * 12)}</span> in interest
+            over the next 12 months.
+          </p>
+        ) : undefined
+      }
+    >
+      {accounts.map((account) => (
+        <AccountRow
+          key={account.id}
+          acc={account}
+          transactions={transactions}
+          totalInBase={totalInBase}
+          isExpanded={expandedId === account.id}
+          convertToBase={convertToBase}
+          isForeign={isForeign}
+          fmtBase={fmtBase}
+          fmtNative={fmtNative}
+          onToggleExpand={() => onToggleExpand(account.id)}
+          onEdit={() => onEdit(account)}
+          onAddTxn={() => onAddTxn(account)}
+          onEditTxn={onEditTxn}
+          onDeleteTxn={onDeleteTxn}
+        />
+      ))}
+      {accounts.length > 0 && (
+        <AccountsTotalRow
+          totalInBase={totalInBase}
+          totalInterest={totalInterest}
+          fmtBase={fmtBase}
+        />
       )}
-      <div className="divide-y divide-surface-sunken">
-        {accounts.map((account) => (
-          <AccountRow
-            key={account.id}
-            acc={account}
-            transactions={transactions}
-            totalInBase={totalInBase}
-            isExpanded={expandedId === account.id}
-            convertToBase={convertToBase}
-            isForeign={isForeign}
-            fmtBase={fmtBase}
-            fmtNative={fmtNative}
-            onToggleExpand={() => onToggleExpand(account.id)}
-            onEdit={() => onEdit(account)}
-            onAddTxn={() => onAddTxn(account)}
-            onEditTxn={onEditTxn}
-            onDeleteTxn={onDeleteTxn}
-          />
-        ))}
-      </div>
-      {accounts.length > 0 && <AnnualProjection totalInterest={totalInterest} fmtBase={fmtBase} />}
-    </Card>
+    </DataTable>
   );
 }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Check, Loader2, Search, Trash2 } from 'lucide-react';
+import { Check, Search, Trash2 } from 'lucide-react';
 import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import {
   ArchiveOrDeleteDialog,
+  Button,
   Modal,
   ModalFooter,
   FormField,
@@ -19,6 +20,7 @@ import {
   type TickerLookupResult,
   todayIsoDate,
 } from '@quro/shared';
+import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import { useTickerLookup } from '../hooks/useTickerLookup';
 import type { DeleteHoldingMode } from '../hooks/mutations';
 
@@ -187,7 +189,7 @@ function TickerSearch({
   foundName,
 }: TickerSearchProps) {
   return (
-    <FormField label="Lookup Ticker" className="mb-4" labelClassName="mb-2">
+    <FormField label="Look up ticker">
       <div className="flex gap-2">
         <TextInput
           value={searchTicker}
@@ -201,21 +203,27 @@ function TickerSearch({
           placeholder="e.g. NDQ.AX, AAPL"
           className="flex-1 min-w-0"
         />
-        <button
+        <Button
+          variant="secondary"
           onClick={onFind}
-          disabled={isLoading || !searchTicker.trim()}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-border-strong text-fg-inverted text-sm font-medium transition-colors"
+          disabled={!searchTicker.trim()}
+          loading={isLoading}
+          leadingIcon={<Search size={14} aria-hidden />}
+          className="shrink-0"
         >
-          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           Find
-        </button>
+        </Button>
       </div>
-      {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-1 text-caption text-danger">
+          {error}
+        </p>
+      )}
       {foundName && (
-        <div className="mt-2 bg-success-soft border border-success-soft-strong rounded-xl p-2.5 flex items-center gap-2">
-          <Check size={13} className="text-success flex-shrink-0" />
-          <span className="text-xs text-success-fg">Found: {foundName}</span>
-        </div>
+        <p className="mt-1 flex items-center gap-1.5 text-caption text-success">
+          <Check size={12} className="shrink-0" aria-hidden />
+          Found: {foundName}
+        </p>
       )}
     </FormField>
   );
@@ -230,9 +238,9 @@ type InitialBuySectionProps = {
 
 function InitialBuySection({ form, errors, currency, onChange }: InitialBuySectionProps) {
   return (
-    <div className="border-t border-dashed border-border-default pt-4">
-      <p className="text-xs font-semibold text-fg-muted mb-3">Initial Buy Transaction</p>
-      <div className="grid grid-cols-3 gap-3">
+    <div className="border-t border-border-subtle pt-4">
+      <p className="mb-3 text-title-section text-fg">Initial buy transaction</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormField label="Shares" required error={errors.initShares}>
           <TextInput
             type="number"
@@ -243,7 +251,7 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
             placeholder="50"
           />
         </FormField>
-        <FormField label="Buy Price" required error={errors.initPrice}>
+        <FormField label="Buy price" required error={errors.initPrice}>
           <TextInput
             type="text"
             inputMode="decimal"
@@ -259,15 +267,14 @@ function InitialBuySection({ form, errors, currency, onChange }: InitialBuySecti
       </div>
 
       {form.initShares && form.initPrice && (
-        <div className="mt-3 bg-success-soft border border-success-soft-strong rounded-xl p-3 flex items-center gap-2">
-          <Check size={13} className="text-success" />
-          <span className="text-xs text-success-fg">
-            Initial position: {form.initShares} shares @ {currency} {form.initPrice} = {currency}{' '}
+        <PreviewPanel className="mt-3">
+          <PreviewRow label="Initial position">
+            {form.initShares} shares @ {currency} {form.initPrice} = {currency}{' '}
             {(
               (toNormalizedNumber(form.initShares) ?? 0) * (toNormalizedNumber(form.initPrice) ?? 0)
             ).toFixed(2)}
-          </span>
-        </div>
+          </PreviewRow>
+        </PreviewPanel>
       )}
     </div>
   );
@@ -282,7 +289,7 @@ type HoldingBaseFieldsProps = {
 function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
   return (
     <div className="grid grid-cols-2 gap-4">
-      <FormField label="Security Name" required error={errors.name} className="col-span-2">
+      <FormField label="Security name" required error={errors.name} className="col-span-2">
         <TextInput
           value={form.name}
           onChange={(value) => onChange('name', value)}
@@ -305,7 +312,7 @@ function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
           options={[...CURRENCY_CODES]}
         />
       </FormField>
-      <FormField label="Current Price" required error={errors.currentPrice}>
+      <FormField label="Current price" required error={errors.currentPrice}>
         <TextInput
           type="text"
           inputMode="decimal"
@@ -315,7 +322,7 @@ function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
           placeholder="112.50"
         />
       </FormField>
-      <FormField label="Item Type">
+      <FormField label="Item type">
         <SelectInput
           value={form.itemType}
           onChange={(value) => onChange('itemType', value)}
@@ -399,7 +406,6 @@ function buildDeleteButton(
       label="Remove holding"
       variant="danger"
       size="lg"
-      className="border border-danger-border text-danger"
       onClick={onRequestConfirm}
     />
   );
@@ -460,9 +466,9 @@ function PriceControlsSection({
   onToggleExcludeFromSync,
 }: PriceControlsSectionProps) {
   return (
-    <div className="border-t border-dashed border-border-default pt-4 mt-1">
-      <p className="text-xs font-semibold text-fg-muted mb-3">Price Controls</p>
-      <FormField label="Manual Price" hint="Overrides the synced price when set">
+    <div className="border-t border-border-subtle pt-4">
+      <p className="mb-3 text-title-section text-fg">Price controls</p>
+      <FormField label="Manual price" hint="Overrides the synced price when set">
         <TextInput
           type="text"
           inputMode="decimal"
@@ -471,14 +477,14 @@ function PriceControlsSection({
           placeholder="Leave blank to use synced price"
         />
       </FormField>
-      <label className="flex items-center gap-2.5 mt-3 cursor-pointer select-none">
+      <label className="mt-3 flex min-h-8 cursor-pointer select-none items-center gap-2 max-sm:min-h-11">
         <input
           type="checkbox"
           checked={form.excludeFromSync}
           onChange={(e) => onToggleExcludeFromSync(e.target.checked)}
-          className="w-4 h-4 rounded border-border-strong accent-brand"
+          className="h-4 w-4 rounded-sm border-border-control accent-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
         />
-        <span className="text-sm text-fg-strong">Exclude from price sync</span>
+        <span className="text-cell text-fg">Exclude from price sync</span>
       </label>
     </div>
   );
@@ -619,14 +625,14 @@ export function EditHoldingModal({
 
   return (
     <Modal
-      title={isNew ? 'Add Holding' : 'Edit Holding'}
+      title={isNew ? 'Add holding' : 'Edit holding'}
       subtitle={isNew ? 'Add a stock, ETF or fund' : 'Update details'}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel={isNew ? 'Add Holding' : 'Save Changes'}
+          confirmLabel={isNew ? 'Add holding' : 'Save changes'}
           danger={buildDeleteButton(existing, onDelete, () => setConfirmingDelete(true))}
         />
       }

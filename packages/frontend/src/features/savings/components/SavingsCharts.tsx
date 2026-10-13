@@ -4,13 +4,26 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { ChartCard } from '@/components/ui';
+import {
+  CHART_AXIS_PROPS,
+  CHART_BAR_CURSOR,
+  CHART_CURSOR,
+  CHART_GRID_PROPS,
+  ChartLegend,
+  ChartTooltipContent,
+} from '@/components/finance/chartTheme';
 import type { SavingsChartDatum, SavingsContributionDatum, SavingsFormatFn } from '../types';
+
+// Savings is the first chart series colour; interest is the same colour at a lighter weight.
+const SAVINGS_SERIES = 'var(--viz-1)';
+const INTEREST_OPACITY = 0.45;
+const CHART_HEIGHT = 200;
 
 type SavingsChartsProps = {
   growthChartData: SavingsChartDatum[];
@@ -23,95 +36,94 @@ type GrowthChartProps = Pick<SavingsChartsProps, 'growthChartData' | 'baseCurren
 
 function GrowthChart({ growthChartData, baseCurrency, fmtBase }: Readonly<GrowthChartProps>) {
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <h3 className="font-semibold text-fg mb-1">Savings Growth</h3>
-      <p className="text-xs text-fg-faint mb-5">Total balance in {baseCurrency}</p>
-      <ResponsiveContainer width="100%" height={200}>
+    <ChartCard
+      title="Savings growth"
+      subtitle={`Total balance in ${baseCurrency}`}
+      hasData={growthChartData.length > 0}
+    >
+      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <AreaChart data={growthChartData}>
-          <defs>
-            <linearGradient id="savingsGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--data-primary)" stopOpacity={0.15} />
-              <stop offset="95%" stopColor="var(--data-primary)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-          <XAxis
-            dataKey="month"
-            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-          />
+          <CartesianGrid {...CHART_GRID_PROPS} />
+          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
+          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
           <Tooltip
-            formatter={(value) => [fmtBase(Number(value) || 0), 'Total Savings']}
-            contentStyle={{
-              borderRadius: '12px',
-              border: '1px solid var(--border-default)',
-              fontSize: '12px',
-            }}
+            cursor={CHART_CURSOR}
+            content={(props) => (
+              <ChartTooltipContent
+                active={props.active}
+                label={props.label as string | undefined}
+                payload={props.payload}
+                formatEntry={(entry) => ({
+                  name: 'Total savings',
+                  value: fmtBase(Number(entry.value) || 0),
+                })}
+              />
+            )}
           />
           <Area
             type="monotone"
             dataKey="savings"
-            stroke="var(--data-primary)"
-            strokeWidth={2.5}
-            fill="url(#savingsGrad)"
-            dot={{ r: 3, fill: 'var(--data-primary)' }}
-            activeDot={{ r: 5 }}
+            stroke={SAVINGS_SERIES}
+            strokeWidth={2}
+            fill={SAVINGS_SERIES}
+            fillOpacity={0.12}
+            dot={false}
+            activeDot={{ r: 4, fill: SAVINGS_SERIES, stroke: 'var(--surface)', strokeWidth: 2 }}
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </ChartCard>
   );
 }
 
 type ContribChartProps = Pick<SavingsChartsProps, 'contribChartData' | 'baseCurrency' | 'fmtBase'>;
 
+function contribSeriesName(dataKey: unknown): string {
+  return dataKey === 'contribution' ? 'Net contributions' : 'Interest';
+}
+
 function ContribChart({ contribChartData, baseCurrency, fmtBase }: Readonly<ContribChartProps>) {
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <h3 className="font-semibold text-fg mb-1">Contributions vs Interest</h3>
-      <p className="text-xs text-fg-faint mb-5">Monthly totals in {baseCurrency}</p>
-      <ResponsiveContainer width="100%" height={200}>
+    <ChartCard
+      title="Contributions vs interest"
+      subtitle={`Monthly totals in ${baseCurrency}`}
+      hasData={contribChartData.length > 0}
+    >
+      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <BarChart data={contribChartData} barSize={18}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-          <XAxis
-            dataKey="month"
-            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(value) => `${(value / 1000).toFixed(1)}k`}
-          />
+          <CartesianGrid {...CHART_GRID_PROPS} />
+          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
+          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(value) => `${(value / 1000).toFixed(1)}k`} />
           <Tooltip
-            formatter={(value, name) => [
-              fmtBase(Number(value) || 0),
-              String(name) === 'contribution' ? 'Net Contributions' : 'Interest',
-            ]}
-            contentStyle={{
-              borderRadius: '12px',
-              border: '1px solid var(--border-default)',
-              fontSize: '12px',
-            }}
+            cursor={CHART_BAR_CURSOR}
+            content={(props) => (
+              <ChartTooltipContent
+                active={props.active}
+                label={props.label as string | undefined}
+                payload={props.payload}
+                formatEntry={(entry) => ({
+                  name: contribSeriesName(entry.dataKey),
+                  value: fmtBase(Number(entry.value) || 0),
+                })}
+              />
+            )}
           />
-          <Legend
-            wrapperStyle={{ fontSize: '11px' }}
-            formatter={(value) => (value === 'contribution' ? 'Net Contributions' : 'Interest')}
+          <Bar dataKey="contribution" fill={SAVINGS_SERIES} radius={[2, 2, 0, 0]} />
+          <Bar
+            dataKey="interest"
+            fill={SAVINGS_SERIES}
+            fillOpacity={INTEREST_OPACITY}
+            radius={[2, 2, 0, 0]}
           />
-          <Bar dataKey="contribution" fill="var(--data-primary)" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="interest" fill="var(--data-income)" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
-    </div>
+      <ChartLegend
+        items={[
+          { label: 'Net contributions', color: SAVINGS_SERIES },
+          { label: 'Interest', color: SAVINGS_SERIES, opacity: INTEREST_OPACITY },
+        ]}
+      />
+    </ChartCard>
   );
 }
 
@@ -122,7 +134,7 @@ export function SavingsCharts({
   fmtBase,
 }: Readonly<SavingsChartsProps>) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <GrowthChart
         growthChartData={growthChartData}
         baseCurrency={baseCurrency}

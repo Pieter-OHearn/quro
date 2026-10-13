@@ -1,5 +1,5 @@
-import { ShieldCheck } from 'lucide-react';
 import type { PensionPot } from '@quro/shared';
+import { Card } from '@/components/ui';
 import type { PensionFormatBaseFn } from '../types';
 
 type PensionHeroBannerProps = {
@@ -11,6 +11,7 @@ type PensionHeroBannerProps = {
   baseCurrency: string;
 };
 
+/** The page's headline: the total balance, with the projection at retirement beside it. */
 export function PensionHeroBanner({
   pensions,
   totalInBase,
@@ -19,43 +20,25 @@ export function PensionHeroBanner({
   fmtBase,
   baseCurrency,
 }: Readonly<PensionHeroBannerProps>) {
+  const currencyCount = new Set(pensions.map((pot) => pot.currency)).size;
   return (
-    <div className="rounded-2xl bg-gradient-to-r from-surface-inverse via-surface-pension-middle to-surface-pension-end p-6 text-fg-inverted relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-56 h-56 bg-warning-accent/10 rounded-full -translate-y-1/3 translate-x-1/4" />
-      <div className="absolute bottom-0 right-32 w-32 h-32 bg-brand-accent/10 rounded-full translate-y-1/2" />
-      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <ShieldCheck size={18} className="text-warning-muted" />
-            <p className="text-warning-border-strong text-sm">Retirement Planning</p>
-          </div>
-          <h2 className="text-2xl font-bold">Pension Tracker</h2>
-          <p className="text-fg-faint text-sm mt-1">
-            {pensions.length} pension pots across{' '}
-            {new Set(pensions.map((pot) => pot.currency)).size} currencies
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <div className="bg-surface/10 backdrop-blur-sm rounded-2xl px-5 py-4 text-center">
-            <p className="text-warning-border-strong text-[10px] uppercase tracking-widest mb-1">
-              Total Balance
-            </p>
-            <p className="text-2xl font-bold">{fmtBase(totalInBase)}</p>
-            <p className="text-fg-faint text-xs mt-0.5">in {baseCurrency}</p>
-          </div>
-          <div className="bg-surface/10 backdrop-blur-sm rounded-2xl px-5 py-4 text-center">
-            <p className="text-warning-border-strong text-[10px] uppercase tracking-widest mb-1">
-              {yearsToRetirement == null ? 'Projection' : `In ${yearsToRetirement} Years`}
-            </p>
-            <p className="text-2xl font-bold">{projected == null ? '—' : fmtBase(projected)}</p>
-            <p className="text-fg-faint text-xs mt-0.5">
-              {projected == null
-                ? 'Needs profile retirement settings'
-                : 'Projected from current data'}
-            </p>
-          </div>
-        </div>
+    <Card className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <p className="text-label text-fg-muted">Total balance</p>
+        <p className="text-figure-hero text-fg">{fmtBase(totalInBase)}</p>
+        <p className="text-caption text-fg-subtle">
+          in {baseCurrency} · {pensions.length} pension pots across {currencyCount} currencies
+        </p>
       </div>
-    </div>
+      <div className="min-w-0 sm:text-right">
+        <p className="text-label text-fg-muted">
+          {yearsToRetirement == null ? 'Projection' : `In ${yearsToRetirement} years`}
+        </p>
+        <p className="text-figure-lg text-fg">{projected == null ? '—' : fmtBase(projected)}</p>
+        <p className="text-caption text-fg-subtle">
+          {projected == null ? 'Needs profile retirement settings' : 'Projected from current data'}
+        </p>
+      </div>
+    </Card>
   );
 }

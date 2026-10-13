@@ -2,37 +2,14 @@ import { DATA_COLORS } from '@/lib/dataColors';
 import { ArrowUpRight, CircleMinus, Landmark } from 'lucide-react';
 import type { PensionTxnType } from './types';
 
+// Icon colours follow the amounts: contributions are money in, fees and statements are not.
 export const PENSION_TXN_META: Record<
   PensionTxnType,
-  {
-    label: string;
-    icon: typeof Landmark;
-    color: string;
-    bg: string;
-    borderColor: string;
-  }
+  { label: string; icon: typeof Landmark; color: string }
 > = {
-  contribution: {
-    label: 'Contribution',
-    icon: ArrowUpRight,
-    color: 'text-success',
-    bg: 'bg-success-soft',
-    borderColor: 'border-success-border-strong',
-  },
-  fee: {
-    label: 'Fee',
-    icon: CircleMinus,
-    color: 'text-danger',
-    bg: 'bg-danger-soft',
-    borderColor: 'border-danger-border-strong',
-  },
-  annual_statement: {
-    label: 'Annual Statement',
-    icon: Landmark,
-    color: 'text-warning-fg',
-    bg: 'bg-warning-soft',
-    borderColor: 'border-warning-border-strong',
-  },
+  contribution: { label: 'Contribution', icon: ArrowUpRight, color: 'text-gain' },
+  fee: { label: 'Fee', icon: CircleMinus, color: 'text-fg-muted' },
+  annual_statement: { label: 'Annual statement', icon: Landmark, color: 'text-fg-muted' },
 };
 
 export const PENSION_TYPES = [
@@ -41,13 +18,6 @@ export const PENSION_TYPES = [
   'State Pension',
   'Other',
 ] as const;
-
-export const TYPE_COLORS: Record<string, string> = {
-  'Workplace Pension': 'bg-brand-soft-strong text-brand-fg',
-  'Personal Pension': 'bg-info-soft-strong text-info-fg',
-  'State Pension': 'bg-warning-soft-strong text-warning-fg',
-  Other: 'bg-surface-muted text-fg-muted',
-};
 
 export const PALETTE = [
   DATA_COLORS['primary'],

@@ -1,14 +1,27 @@
 import { ChartCard } from '@/components/ui';
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
+import {
+  CHART_AXIS_PROPS,
+  CHART_CURSOR,
+  CHART_GRID_PROPS,
+  ChartLegend,
+  ChartTooltipContent,
+  type ChartTooltipEntry,
+} from '@/components/finance/chartTheme';
 import type { PortfolioHistoryPoint } from '../types';
+
+// Series colours by asset class: investments and property.
+const BROKERAGE_SERIES = 'var(--viz-2)';
+const PROPERTY_SERIES = 'var(--viz-4)';
+const SERIES_FILL_OPACITY = 0.08;
 
 type PortfolioChartProps = {
   data: PortfolioHistoryPoint[];
@@ -21,37 +34,18 @@ type PortfolioAreaChartProps = {
   fmtBase: (value: number, currency?: string, compact?: boolean) => string;
 };
 
-function PortfolioChartDefs() {
-  return (
-    <defs>
-      <linearGradient id="investmentsBrokerageGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%" stopColor="var(--data-primary)" stopOpacity={0.16} />
-        <stop offset="95%" stopColor="var(--data-primary)" stopOpacity={0} />
-      </linearGradient>
-      <linearGradient id="investmentsPropertyGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%" stopColor="var(--data-income)" stopOpacity={0.16} />
-        <stop offset="95%" stopColor="var(--data-income)" stopOpacity={0} />
-      </linearGradient>
-    </defs>
-  );
+function isEstimatedPoint(entry: ChartTooltipEntry): boolean {
+  const payload = entry.payload as { isEstimated?: boolean } | undefined;
+  return Boolean(payload?.isEstimated);
 }
 
-function PortfolioChartLegend() {
-  return (
-    <div className="flex flex-wrap items-center gap-8 mt-4 text-sm text-fg-muted">
-      <div className="flex items-center gap-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-brand-accent" />
-        Brokerage
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-success-accent" />
-        Your Property Equity
-      </div>
-      <div className="text-xs text-fg-subtle">
-        Estimated where historical market prices are unavailable.
-      </div>
-    </div>
-  );
+function seriesName(entry: ChartTooltipEntry): string {
+  if (entry.dataKey !== 'brokerage') return 'Your property equity';
+  return isEstimatedPoint(entry) ? 'Brokerage (estimated)' : 'Brokerage';
+}
+
+function activeDot(color: string) {
+  return { r: 4, fill: color, stroke: 'var(--surface)', strokeWidth: 2 };
 }
 
 function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
@@ -59,64 +53,55 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
     <>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
-          <PortfolioChartDefs />
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" />
-          <XAxis
-            dataKey="month"
-            tick={{ fontSize: 12, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
-          />
+          <CartesianGrid {...CHART_GRID_PROPS} />
+          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
           <YAxis
-            tick={{ fontSize: 12, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
+            {...CHART_AXIS_PROPS}
             tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
           />
           <Tooltip
-            formatter={(value, name, item) => {
-              const isEstimated =
-                name === 'brokerage' &&
-                Boolean(
-                  item &&
-                  typeof item === 'object' &&
-                  'payload' in item &&
-                  (item as { payload?: { isEstimated?: boolean } }).payload?.isEstimated,
-                );
-              return [
-                fmtBase(Number(value) || 0),
-                name === 'brokerage'
-                  ? `Brokerage${isEstimated ? ' (estimated)' : ''}`
-                  : 'Your Property Equity',
-              ];
-            }}
-            contentStyle={{
-              borderRadius: '12px',
-              border: '1px solid var(--border-default)',
-              fontSize: '12px',
-            }}
+            cursor={CHART_CURSOR}
+            content={(props) => (
+              <ChartTooltipContent
+                active={props.active}
+                label={props.label as string | undefined}
+                payload={props.payload}
+                formatEntry={(entry) => ({
+                  name: seriesName(entry),
+                  value: fmtBase(Number(entry.value) || 0),
+                })}
+              />
+            )}
           />
           <Area
             type="monotone"
             dataKey="propertyEquity"
-            stroke="var(--data-income)"
-            strokeWidth={3}
-            fill="url(#investmentsPropertyGrad)"
+            stroke={PROPERTY_SERIES}
+            strokeWidth={2}
+            fill={PROPERTY_SERIES}
+            fillOpacity={SERIES_FILL_OPACITY}
             dot={false}
-            activeDot={{ r: 4, fill: 'var(--data-income)' }}
+            activeDot={activeDot(PROPERTY_SERIES)}
           />
           <Area
             type="monotone"
             dataKey="brokerage"
-            stroke="var(--data-primary)"
-            strokeWidth={3}
-            fill="url(#investmentsBrokerageGrad)"
+            stroke={BROKERAGE_SERIES}
+            strokeWidth={2}
+            fill={BROKERAGE_SERIES}
+            fillOpacity={SERIES_FILL_OPACITY}
             dot={false}
-            activeDot={{ r: 4, fill: 'var(--data-primary)' }}
+            activeDot={activeDot(BROKERAGE_SERIES)}
           />
         </AreaChart>
       </ResponsiveContainer>
-      <PortfolioChartLegend />
+      <ChartLegend
+        items={[
+          { label: 'Brokerage', color: BROKERAGE_SERIES },
+          { label: 'Your property equity', color: PROPERTY_SERIES },
+        ]}
+        note="Estimated where historical market prices are unavailable."
+      />
     </>
   );
 }
@@ -124,7 +109,7 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
 export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartProps) {
   return (
     <ChartCard
-      title="Portfolio Performance"
+      title="Portfolio performance"
       subtitle={`Brokerage + your property equity in ${baseCurrency}`}
       hasData={data.length > 0}
       emptyMessage="Add transactions to generate portfolio history."

@@ -1,8 +1,17 @@
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { ChevronDown, ChevronUp, Edit3, Info, Lock, Plus, Trash2 } from 'lucide-react';
 import type { AppCapabilityStatus, PensionPot, PensionTransaction } from '@quro/shared';
-import { ArchiveOrDeleteDialog, Badge, IconButton } from '@/components/ui';
-import { TYPE_COLORS } from '../constants';
+import {
+  ArchiveOrDeleteDialog,
+  Badge,
+  Button,
+  DataTable,
+  DataTableCell,
+  DataTableRow,
+  IconButton,
+  RowActions,
+  type DataTableColumn,
+} from '@/components/ui';
 import type {
   ConvertToBaseFn,
   DeletePotMutation,
@@ -25,6 +34,7 @@ type PensionPotsListProps = {
   setEditingTxn: (value: PensionTransaction | null) => void;
   deletePot: DeletePotMutation;
   handleDeletePensionTxn: (id: number) => void;
+  totalInBase: number;
   fmtBase: PensionFormatBaseFn;
   fmtNative: PensionFormatNativeFn;
   convertToBase: ConvertToBaseFn;
@@ -33,7 +43,7 @@ type PensionPotsListProps = {
   pensionImportCapability: AppCapabilityStatus;
 };
 
-type PensionPotCardProps = {
+type PensionPotRowProps = {
   pot: PensionPot;
   isOpen: boolean;
   pensionTxns: PensionTransaction[];
@@ -52,23 +62,6 @@ type PensionPotCardProps = {
   pensionImportCapability: AppCapabilityStatus;
 };
 
-type PensionPotExpandedProps = {
-  pot: PensionPot;
-  pensionTxns: PensionTransaction[];
-  currentBalance: number;
-  foreign: boolean;
-  balanceInBase: number;
-  baseCurrency: string;
-  fmtBase: PensionFormatBaseFn;
-  fmtNative: PensionFormatNativeFn;
-  onDelete: (id: number) => void;
-  onAddTxn: (pot: PensionPot) => void;
-  onImportStatement: (pot: PensionPot) => void;
-  onEditTxn: (transaction: PensionTransaction) => void;
-  onDeleteTxn: (id: number) => void;
-  pensionImportCapability: AppCapabilityStatus;
-};
-
 type PensionPotDetailsProps = {
   pot: PensionPot;
   currentBalance: number;
@@ -78,7 +71,61 @@ type PensionPotDetailsProps = {
   fmtBase: PensionFormatBaseFn;
   fmtNative: PensionFormatNativeFn;
   onDelete: (id: number) => void;
+  onImportStatement: (pot: PensionPot) => void;
+  pensionImportCapability: AppCapabilityStatus;
 };
+
+function buildPotColumns(baseCurrency: string): readonly DataTableColumn[] {
+  return [
+    { key: 'pot', header: 'Pot', width: '30%' },
+    { key: 'provider', header: 'Provider', priority: 'secondary', width: '26%' },
+    {
+      key: 'contributions',
+      header: 'Contributions / year',
+      numeric: true,
+      priority: 'secondary',
+      width: '15%',
+    },
+    { key: 'balance', header: 'Balance', numeric: true, width: '14%' },
+    { key: 'value', header: `Value (${baseCurrency})`, numeric: true, width: '15%' },
+    { key: 'actions', header: '', priority: 'actions', width: 72 },
+  ];
+}
+
+const POT_COLUMN_COUNT = 6;
+
+function stopRowClick(handler: () => void) {
+  return (event: MouseEvent) => {
+    event.stopPropagation();
+    handler();
+  };
+}
+
+function PensionPotNotes({ pot }: Readonly<{ pot: PensionPot }>) {
+  const metadataEntries = Object.entries(pot.metadata ?? {});
+  return (
+    <>
+      {pot.notes && (
+        <p className="flex items-start gap-1.5 text-caption text-fg-subtle">
+          <Info size={12} className="mt-0.5 shrink-0 text-fg-faint" aria-hidden />
+          {pot.notes}
+        </p>
+      )}
+      {metadataEntries.length > 0 && (
+        <div>
+          <p className="mb-1 text-label text-fg-muted">Metadata</p>
+          <div className="flex flex-wrap gap-1.5">
+            {metadataEntries.map(([key, value]) => (
+              <Badge key={key} size="md">
+                <strong className="font-medium text-fg">{key}:</strong> {value || '—'}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function PensionPotDetails({
   pot,
@@ -89,115 +136,57 @@ function PensionPotDetails({
   fmtBase,
   fmtNative,
   onDelete,
+  onImportStatement,
+  pensionImportCapability,
 }: Readonly<PensionPotDetailsProps>) {
-  const metadataEntries = Object.entries(pot.metadata ?? {});
   const detailStats = [
-    { label: 'Balance (Native)', value: fmtNative(currentBalance, pot.currency) },
+    { label: 'Balance (native)', value: fmtNative(currentBalance, pot.currency) },
     { label: `Balance (${baseCurrency})`, value: fmtBase(balanceInBase) },
-    { label: 'Your Contribution', value: `${fmtNative(pot.employeeMonthly, pot.currency)}/mo` },
+    { label: 'Your contribution', value: `${fmtNative(pot.employeeMonthly, pot.currency)}/mo` },
     {
-      label: 'Employer Contributions',
+      label: 'Employer contributions',
       value: `${fmtNative(pot.employerMonthly, pot.currency)}/mo`,
     },
     {
       label: 'Strategy',
-      value: pot.investmentStrategy ?? '\u2014',
+      value: pot.investmentStrategy ?? '—',
     },
   ];
 
   return (
-    <div className="border-t border-border-subtle px-6 py-4 bg-surface-sunken/30">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
+    <div className="space-y-3 border-t border-border-default px-3 py-3 max-sm:px-4">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-5">
         {detailStats.map(({ label, value }) => (
-          <div key={label} className="bg-surface rounded-xl p-3 border border-border-subtle">
-            <p className="text-xs text-fg-faint mb-1">{label}</p>
-            <p className="text-sm font-semibold text-fg-emphasis">{value}</p>
+          <div key={label} className="min-w-0">
+            <dt className="text-label text-fg-muted">{label}</dt>
+            <dd className="truncate text-figure-md text-fg">{value}</dd>
           </div>
         ))}
-      </div>
+      </dl>
       {foreign && (
-        <div className="mb-3 p-2.5 bg-warning-soft border border-warning-soft-strong rounded-xl flex items-start gap-2 text-xs text-warning-fg">
-          <Info size={13} className="mt-0.5 flex-shrink-0" />
+        <p className="flex items-start gap-2 rounded-md border border-info bg-info-soft px-3 py-2 text-caption text-info">
+          <Info size={12} className="mt-0.5 shrink-0" aria-hidden />
           <span>
             This pot is held in <strong>{pot.currency}</strong>. The {baseCurrency} equivalent uses
             the synced FX rates currently loaded in Quro.
           </span>
-        </div>
-      )}
-      {pot.notes && (
-        <p className="text-xs text-fg-subtle flex items-start gap-1.5">
-          <Info size={12} className="text-fg-faint mt-0.5 flex-shrink-0" />
-          {pot.notes}
         </p>
       )}
-      {metadataEntries.length > 0 && (
-        <div className="mt-3 text-xs text-fg-subtle">
-          <p className="font-semibold text-fg-muted mb-1">Metadata</p>
-          <div className="flex flex-wrap gap-1.5">
-            {metadataEntries.map(([key, value]) => (
-              <span
-                key={key}
-                className="inline-flex items-center gap-1 rounded-md border border-border-default bg-surface px-2 py-1"
-              >
-                <strong className="text-fg-strong">{key}:</strong> {value || '\u2014'}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="flex gap-2 mt-3">
-        <button
-          onClick={() => onDelete(pot.id)}
-          className="flex items-center gap-1.5 text-xs border border-danger-soft-strong rounded-lg px-3 py-1.5 text-danger hover:bg-danger-soft transition-colors"
-        >
-          <Trash2 size={12} /> Remove Pot
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PensionPotExpanded({
-  pot,
-  pensionTxns,
-  currentBalance,
-  foreign,
-  balanceInBase,
-  baseCurrency,
-  fmtBase,
-  fmtNative,
-  onDelete,
-  onAddTxn,
-  onImportStatement,
-  onEditTxn,
-  onDeleteTxn,
-  pensionImportCapability,
-}: Readonly<PensionPotExpandedProps>) {
-  return (
-    <div>
-      <PensionPotDetails
-        pot={pot}
-        currentBalance={currentBalance}
-        foreign={foreign}
-        balanceInBase={balanceInBase}
-        baseCurrency={baseCurrency}
-        fmtBase={fmtBase}
-        fmtNative={fmtNative}
-        onDelete={onDelete}
-      />
-      <PensionTxnHistory
-        pot={pot}
-        transactions={pensionTxns}
-        onAdd={() => onAddTxn(pot)}
-        onEdit={onEditTxn}
-        onDelete={onDeleteTxn}
-      />
-      <div className="px-6 pb-5 -mt-2">
+      <PensionPotNotes pot={pot} />
+      <div className="flex flex-wrap gap-2">
         <PensionImportButton
           pot={pot}
           capability={pensionImportCapability}
           onImportStatement={onImportStatement}
         />
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={() => onDelete(pot.id)}
+          leadingIcon={<Trash2 size={12} aria-hidden />}
+        >
+          Remove pot
+        </Button>
       </div>
     </div>
   );
@@ -219,14 +208,14 @@ function DisabledPensionImportButton({
       {showHint && (
         <div
           role="tooltip"
-          className="absolute bottom-full left-1/2 z-20 mb-3 w-[320px] max-w-[calc(100vw-4rem)] -translate-x-1/2 rounded-[26px] bg-surface-tooltip px-5 py-4 text-sm font-medium text-fg-inverted shadow-[0_18px_40px_rgba(10,20,48,0.28)]"
+          className="absolute bottom-full left-0 z-20 mb-1 w-80 max-w-[calc(100vw-2rem)] rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover"
         >
           {capability.message}
-          <span className="absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-surface-tooltip" />
         </div>
       )}
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         aria-disabled="true"
         onClick={(event) => {
           event.preventDefault();
@@ -236,14 +225,12 @@ function DisabledPensionImportButton({
         onMouseLeave={() => setShowHint(false)}
         onFocus={() => setShowHint(true)}
         onBlur={() => setShowHint(false)}
-        className="inline-flex max-w-full items-center gap-2 rounded-xl border border-border-default bg-surface-sunken px-3 py-2 text-sm font-medium text-fg-faint shadow-sm shadow-border-subtle transition-colors focus:outline-none focus:ring-2 focus:ring-border-strong/70"
+        leadingIcon={<Lock size={12} className="shrink-0 text-fg-faint" aria-hidden />}
+        trailingIcon={<Badge size="xs">AI off</Badge>}
+        className="max-w-full text-fg-subtle"
       >
-        <Lock size={14} className="flex-shrink-0 text-fg-disabled" />
-        <span className="truncate">Import Annual Statement PDF</span>
-        <span className="rounded-full bg-border-default px-2.5 py-0.5 text-[11px] font-semibold text-fg-subtle">
-          AI off
-        </span>
-      </button>
+        <span className="truncate">Import annual statement PDF</span>
+      </Button>
     </div>
   );
 }
@@ -258,105 +245,72 @@ function PensionImportButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => onImportStatement(pot)}
-      className="inline-flex items-center gap-2 rounded-lg border border-brand-tint bg-brand-soft px-3 py-1.5 text-xs font-medium text-brand-fg hover:bg-brand-soft-strong transition-colors"
-    >
-      Import Annual Statement PDF
-    </button>
+    <Button variant="secondary" size="sm" onClick={() => onImportStatement(pot)}>
+      Import annual statement PDF
+    </Button>
   );
 }
 
-type PensionPotCardLeftProps = {
-  pot: PensionPot;
-  totalMonthly: number;
-  txnCount: number;
-  fmtNative: PensionFormatNativeFn;
-};
-
-function PensionPotCardLeft({
-  pot,
-  totalMonthly,
-  txnCount,
-  fmtNative,
-}: Readonly<PensionPotCardLeftProps>) {
-  return (
-    <>
-      <span className="text-2xl flex-shrink-0">{pot.emoji}</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-          <p className="font-semibold text-fg-emphasis text-sm">{pot.name}</p>
-          <Badge size="sm" className={TYPE_COLORS[pot.type]}>
-            {pot.type}
-          </Badge>
-          <Badge tone="muted" size="sm">
-            {pot.currency}
-          </Badge>
-        </div>
-        <p className="text-xs text-fg-faint">
-          {pot.provider} · {fmtNative(totalMonthly, pot.currency)}/mo · {txnCount} transactions
-        </p>
-      </div>
-    </>
-  );
-}
-
-type PensionPotCardRightProps = {
-  pot: PensionPot;
-  currentBalance: number;
-  totalMonthly: number;
-  balanceInBase: number;
-  foreign: boolean;
-  isOpen: boolean;
-  fmtBase: PensionFormatBaseFn;
-  fmtNative: PensionFormatNativeFn;
-  onEdit: (pot: PensionPot) => void;
-  onToggle: (id: number | null) => void;
-};
-
-function PensionPotCardRight({
-  pot,
-  currentBalance,
-  totalMonthly,
-  balanceInBase,
-  foreign,
+function PensionPotActions({
   isOpen,
-  fmtBase,
-  fmtNative,
   onEdit,
   onToggle,
-}: Readonly<PensionPotCardRightProps>) {
+}: Readonly<{ isOpen: boolean; onEdit: () => void; onToggle: () => void }>) {
+  const toggleLabel = isOpen ? 'Collapse' : 'View transactions';
   return (
-    <>
-      <div className="text-right flex-shrink-0 mr-3">
-        <p className="font-bold text-fg">{fmtNative(currentBalance, pot.currency)}</p>
-        {foreign && (
-          <p className="text-xs text-warning font-medium">&asymp; {fmtBase(balanceInBase)}</p>
-        )}
-        <p className="text-xs text-success">+{fmtNative(totalMonthly * 12, pot.currency)}/yr</p>
-      </div>
-      <div className="flex items-center gap-0.5 flex-shrink-0">
-        <IconButton
-          onClick={() => onEdit(pot)}
-          icon={Edit3}
-          label="Edit pot"
-          title="Edit pot"
-          variant="subtle"
-        />
-        <IconButton
-          onClick={() => onToggle(isOpen ? null : pot.id)}
-          icon={isOpen ? ChevronUp : ChevronDown}
-          label={isOpen ? 'Collapse' : 'View transactions'}
-          title={isOpen ? 'Collapse' : 'View transactions'}
-          variant="subtle"
-        />
-      </div>
-    </>
+    <RowActions>
+      <IconButton
+        onClick={stopRowClick(onEdit)}
+        icon={Edit3}
+        label="Edit pot"
+        title="Edit pot"
+        size="sm"
+        variant="subtle"
+      />
+      <IconButton
+        onClick={stopRowClick(onToggle)}
+        icon={isOpen ? ChevronUp : ChevronDown}
+        label={toggleLabel}
+        title={toggleLabel}
+        aria-expanded={isOpen}
+        size="sm"
+        variant="subtle"
+      />
+    </RowActions>
   );
 }
 
-function PensionPotCard({
+type PensionPotExpandedRowProps = PensionPotDetailsProps &
+  Pick<PensionPotRowProps, 'pensionTxns' | 'onAddTxn' | 'onEditTxn' | 'onDeleteTxn'>;
+
+function PensionPotExpandedRow({
+  pensionTxns,
+  onAddTxn,
+  onEditTxn,
+  onDeleteTxn,
+  ...details
+}: Readonly<PensionPotExpandedRowProps>) {
+  return (
+    <DataTableRow mobileCard={false} className="md:hover:bg-transparent">
+      <DataTableCell
+        colSpan={POT_COLUMN_COUNT}
+        className="p-0 max-md:block max-md:py-0"
+        contentClassName="w-full"
+      >
+        <PensionPotDetails {...details} />
+        <PensionTxnHistory
+          pot={details.pot}
+          transactions={pensionTxns}
+          onAdd={() => onAddTxn(details.pot)}
+          onEdit={onEditTxn}
+          onDelete={onDeleteTxn}
+        />
+      </DataTableCell>
+    </DataTableRow>
+  );
+}
+
+function PensionPotRow({
   pot,
   isOpen,
   pensionTxns,
@@ -373,38 +327,46 @@ function PensionPotCard({
   onEditTxn,
   onDeleteTxn,
   pensionImportCapability,
-}: Readonly<PensionPotCardProps>) {
+}: Readonly<PensionPotRowProps>) {
   const potTxns = pensionTxns.filter((txn) => txn.potId === pot.id);
   const currentBalance = computeCurrentPensionBalance(pot, potTxns);
   const totalMonthly = pot.employeeMonthly + pot.employerMonthly;
   const balanceInBase = convertToBase(currentBalance, pot.currency);
   const foreign = isForeign(pot.currency);
-  const txnCount = potTxns.length;
+  const toggle = () => onToggle(isOpen ? null : pot.id);
 
   return (
-    <div className="overflow-hidden">
-      <div className="flex items-center gap-4 px-6 py-4 hover:bg-surface-sunken/60 transition-colors">
-        <PensionPotCardLeft
-          pot={pot}
-          totalMonthly={totalMonthly}
-          txnCount={txnCount}
-          fmtNative={fmtNative}
-        />
-        <PensionPotCardRight
-          pot={pot}
-          currentBalance={currentBalance}
-          totalMonthly={totalMonthly}
-          balanceInBase={balanceInBase}
-          foreign={foreign}
-          isOpen={isOpen}
-          fmtBase={fmtBase}
-          fmtNative={fmtNative}
-          onEdit={onEdit}
-          onToggle={onToggle}
-        />
-      </div>
+    <>
+      <DataTableRow interactive selected={isOpen} onClick={toggle}>
+        <DataTableCell columnKey="pot">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 leading-none" aria-hidden>
+              {pot.emoji}
+            </span>
+            <span className="min-w-0 truncate font-medium text-fg">{pot.name}</span>
+            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+              <Badge>{pot.type}</Badge>
+              {foreign && <Badge>{pot.currency}</Badge>}
+            </span>
+          </div>
+        </DataTableCell>
+        <DataTableCell columnKey="provider" contentClassName="truncate text-fg-muted">
+          {pot.provider} · {fmtNative(totalMonthly, pot.currency)}/mo · {potTxns.length}{' '}
+          transactions
+        </DataTableCell>
+        <DataTableCell columnKey="contributions">
+          +{fmtNative(totalMonthly * 12, pot.currency)}/yr
+        </DataTableCell>
+        <DataTableCell columnKey="balance" className="font-medium text-fg">
+          {fmtNative(currentBalance, pot.currency)}
+        </DataTableCell>
+        <DataTableCell columnKey="value">{fmtBase(balanceInBase)}</DataTableCell>
+        <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+          <PensionPotActions isOpen={isOpen} onEdit={() => onEdit(pot)} onToggle={toggle} />
+        </DataTableCell>
+      </DataTableRow>
       {isOpen && (
-        <PensionPotExpanded
+        <PensionPotExpandedRow
           pot={pot}
           pensionTxns={pensionTxns}
           currentBalance={currentBalance}
@@ -421,7 +383,7 @@ function PensionPotCard({
           pensionImportCapability={pensionImportCapability}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -460,97 +422,95 @@ function PensionPotDeleteDialog({
   );
 }
 
-function PensionPotsListItems({
-  pensions,
-  pensionTxns,
-  expanded,
-  setExpanded,
-  setEditing,
-  setAddTxnForPot,
-  openImportModal,
-  setEditingTxn,
-  deletePot,
-  handleDeletePensionTxn,
+function PensionTotalRow({
+  totalInBase,
   fmtBase,
-  fmtNative,
-  convertToBase,
-  isForeign,
-  baseCurrency,
-  pensionImportCapability,
-}: Readonly<PensionPotsListProps>) {
-  const [potPendingDelete, setPotPendingDelete] = useState<PensionPot | null>(null);
+}: Readonly<{ totalInBase: number; fmtBase: PensionFormatBaseFn }>) {
   return (
-    <div className="divide-y divide-surface-sunken">
-      {pensions.length === 0 && (
-        <div className="text-center py-12 text-fg-faint text-sm p-6">
-          No pension pots yet. Click <strong>Add Pot</strong> to start tracking.
-        </div>
-      )}
-      {pensions.map((pot) => (
-        <PensionPotCard
-          key={pot.id}
-          pot={pot}
-          isOpen={expanded === pot.id}
-          pensionTxns={pensionTxns}
-          fmtBase={fmtBase}
-          fmtNative={fmtNative}
-          convertToBase={convertToBase}
-          isForeign={isForeign}
-          baseCurrency={baseCurrency}
-          onEdit={(item) => setEditing(item)}
-          onToggle={setExpanded}
-          onDelete={(id) => {
-            const target = pensions.find((entry) => entry.id === id);
-            if (target) setPotPendingDelete(target);
-          }}
-          onAddTxn={(pot) => {
-            setEditingTxn(null);
-            setAddTxnForPot(pot);
-          }}
-          onImportStatement={(pot) => {
-            openImportModal(pot);
-          }}
-          onEditTxn={(transaction) => {
-            setAddTxnForPot(null);
-            setEditingTxn(transaction);
-          }}
-          onDeleteTxn={handleDeletePensionTxn}
-          pensionImportCapability={pensionImportCapability}
-        />
-      ))}
+    <DataTableRow data-total>
+      <DataTableCell columnKey="pot">Total</DataTableCell>
+      <DataTableCell columnKey="provider" />
+      <DataTableCell columnKey="contributions" />
+      <DataTableCell columnKey="balance" className="max-md:hidden" />
+      <DataTableCell columnKey="value">{fmtBase(totalInBase)}</DataTableCell>
+      <DataTableCell columnKey="actions" className="max-md:hidden" />
+    </DataTableRow>
+  );
+}
+
+function PensionPotRows({
+  onRequestDelete,
+  ...props
+}: Readonly<PensionPotsListProps & { onRequestDelete: (pot: PensionPot) => void }>) {
+  const { pensions, setEditingTxn, setAddTxnForPot } = props;
+  return pensions.map((pot) => (
+    <PensionPotRow
+      key={pot.id}
+      pot={pot}
+      isOpen={props.expanded === pot.id}
+      pensionTxns={props.pensionTxns}
+      fmtBase={props.fmtBase}
+      fmtNative={props.fmtNative}
+      convertToBase={props.convertToBase}
+      isForeign={props.isForeign}
+      baseCurrency={props.baseCurrency}
+      onEdit={(item) => props.setEditing(item)}
+      onToggle={props.setExpanded}
+      onDelete={() => onRequestDelete(pot)}
+      onAddTxn={(item) => {
+        setEditingTxn(null);
+        setAddTxnForPot(item);
+      }}
+      onImportStatement={(item) => props.openImportModal(item)}
+      onEditTxn={(transaction) => {
+        setAddTxnForPot(null);
+        setEditingTxn(transaction);
+      }}
+      onDeleteTxn={props.handleDeletePensionTxn}
+      pensionImportCapability={props.pensionImportCapability}
+    />
+  ));
+}
+
+export function PensionPotsList(props: Readonly<PensionPotsListProps>) {
+  const { pensions, pensionTxns, setEditing, setShowModal, totalInBase, fmtBase } = props;
+  const [potPendingDelete, setPotPendingDelete] = useState<PensionPot | null>(null);
+
+  return (
+    <>
+      <DataTable
+        title="Pension pots"
+        subtitle="Click a pot to view transactions"
+        action={
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setEditing(undefined);
+              setShowModal(true);
+            }}
+            leadingIcon={<Plus size={12} aria-hidden />}
+          >
+            Add pot
+          </Button>
+        }
+        columns={buildPotColumns(props.baseCurrency)}
+        tableLayout="fixed"
+        minWidth={880}
+        isEmpty={pensions.length === 0}
+        emptyState="No pension pots yet. Click Add pot to start tracking."
+      >
+        <PensionPotRows {...props} onRequestDelete={setPotPendingDelete} />
+        {pensions.length > 0 && <PensionTotalRow totalInBase={totalInBase} fmtBase={fmtBase} />}
+      </DataTable>
       {potPendingDelete ? (
         <PensionPotDeleteDialog
           pot={potPendingDelete}
           pensionTxns={pensionTxns}
-          deletePot={deletePot}
+          deletePot={props.deletePot}
           onClose={() => setPotPendingDelete(null)}
         />
       ) : null}
-    </div>
-  );
-}
-
-export function PensionPotsList(props: Readonly<PensionPotsListProps>) {
-  const { setEditing, setShowModal } = props;
-
-  return (
-    <div className="bg-surface rounded-2xl border border-border-subtle shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-5 border-b border-border-subtle">
-        <div>
-          <h3 className="font-semibold text-fg">Pension Pots</h3>
-          <p className="text-xs text-fg-faint mt-0.5">Click a pot to view transactions</p>
-        </div>
-        <button
-          onClick={() => {
-            setEditing(undefined);
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 text-sm bg-warning-accent hover:bg-warning text-fg-inverted px-4 py-2 rounded-xl transition-colors"
-        >
-          <Plus size={15} /> Add Pot
-        </button>
-      </div>
-      <PensionPotsListItems {...props} />
-    </div>
+    </>
   );
 }

@@ -159,7 +159,7 @@ test('pension import traps keyboard focus, closes on Escape, and restores the tr
   await expect(dialog).toHaveAttribute('aria-modal', 'true');
   await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  await expect(dialog.getByRole('button', { name: 'Upload & Process', exact: true })).toBeFocused();
+  await expect(dialog.getByRole('button', { name: 'Upload & process', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeFocused();
   await page.keyboard.press('Escape');
@@ -171,7 +171,7 @@ test('archive warnings use the saved number format and keep deletion gated by th
   page,
 }) => {
   await mockPensionUi(page);
-  await page.getByRole('button', { name: 'Remove Pot', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove pot', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Remove Pension pot' });
   await expect(dialog.getByText(/still has a balance of/)).toContainText('1.234,56');
   const remove = dialog.getByRole('button', { name: 'Delete pension pot', exact: true });
@@ -219,7 +219,7 @@ test('wide pension review keeps compact fields editable and the footer visible o
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-1.4\n%%EOF'),
   });
-  await dialog.getByRole('button', { name: 'Upload & Process', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Upload & process', exact: true }).click();
   await expect(dialog.getByPlaceholder('Add note...')).toHaveCount(12);
   await dialog.getByPlaceholder('Add note...').first().fill('Updated note');
   await expect(dialog.getByPlaceholder('Add note...').first()).toHaveValue('Updated note');
@@ -227,12 +227,12 @@ test('wide pension review keeps compact fields editable and the footer visible o
   await expect(dialog.getByRole('combobox').first()).toHaveValue('fee');
   await expect(dialog).toHaveClass(/max-w-3xl/);
   await expect(
-    dialog.getByRole('button', { name: 'Commit Transactions', exact: true }),
+    dialog.getByRole('button', { name: 'Commit transactions', exact: true }),
   ).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath('import-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
-    dialog.getByRole('button', { name: 'Commit Transactions', exact: true }),
+    dialog.getByRole('button', { name: 'Commit transactions', exact: true }),
   ).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath('import-mobile.png') });
   await page.keyboard.press('Escape');

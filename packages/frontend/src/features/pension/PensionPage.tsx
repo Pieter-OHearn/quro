@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type { PensionPot } from '@quro/shared';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
-import { LoadingSpinner } from '@/components/ui';
+import { LoadingSpinner, PageStack } from '@/components/ui';
 import { useAuth } from '@/lib/AuthContext';
 import {
   PensionArchivedSection,
@@ -115,7 +115,7 @@ export function Pension() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <PageStack>
       <PensionModals state={state} />
       <PensionHeroBanner
         pensions={state.pensions}
@@ -150,6 +150,7 @@ export function Pension() {
         setEditingTxn={state.setEditingTxn}
         deletePot={state.deletePot}
         handleDeletePensionTxn={state.handleDeletePensionTxn}
+        totalInBase={state.totalInBase}
         fmtBase={state.fmtBase}
         fmtNative={state.fmtNative}
         convertToBase={state.convertToBase}
@@ -168,6 +169,6 @@ export function Pension() {
         fmtBase={state.fmtBase}
         baseCurrency={state.baseCurrency}
       />
-    </div>
+    </PageStack>
   );
 }

@@ -1,3 +1,4 @@
+import { Card, PanelHeader } from '@/components/ui';
 import type { PensionFormatBaseFn } from '../types';
 
 type PensionRetirementProjectionProps = {
@@ -22,47 +23,44 @@ export function PensionRetirementProjection({
   baseCurrency,
 }: Readonly<PensionRetirementProjectionProps>) {
   const items = [
-    { label: 'Current Total', value: fmtBase(totalInBase), note: `in ${baseCurrency}` },
+    { label: 'Current total', value: fmtBase(totalInBase), note: `in ${baseCurrency}` },
     {
-      label: 'Years to Retirement',
+      label: 'Years to retirement',
       value: yearsToRetirement == null ? '—' : `${yearsToRetirement} years`,
       note:
         yearsToRetirement == null ? 'Update your profile settings' : 'Calculated from your profile',
     },
     {
-      label: 'Projected Value',
+      label: 'Projected value',
       value: projected == null ? '—' : fmtBase(projected),
       note: projected == null ? 'Needs profile retirement data' : 'Based on current trend',
     },
     {
-      label: 'Est. Monthly Income',
+      label: 'Est. monthly income',
       value: monthlyDrawdown == null ? '—' : fmtBase(monthlyDrawdown),
       note: monthlyDrawdown == null ? 'Needs profile retirement data' : 'Over 25-year drawdown',
     },
   ];
 
   return (
-    <div className="bg-gradient-to-br from-warning-soft to-accent-warm-soft rounded-2xl p-6 border border-warning-soft-strong">
-      <h3 className="font-semibold text-fg mb-4">Retirement Projection</h3>
-      <div className="mb-4 rounded-xl border border-warning-border bg-surface/80 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-warning-fg">
-          Profile Retirement Target
-        </p>
-        <p className="mt-1 text-sm text-fg-muted">
-          {currentAge == null || targetRetirementAge == null
-            ? 'Set your current age and target retirement age in Settings.'
-            : `Using age ${currentAge} and retirement age ${targetRetirementAge} from your profile.`}
-        </p>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <Card padding="none">
+      <PanelHeader
+        title="Retirement projection"
+        subtitle={
+          currentAge == null || targetRetirementAge == null
+            ? 'Profile retirement target: set your current age and target retirement age in Settings.'
+            : `Profile retirement target: using age ${currentAge} and retirement age ${targetRetirementAge} from your profile.`
+        }
+      />
+      <dl className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
         {items.map(({ label, value, note }) => (
-          <div key={label} className="bg-surface/80 rounded-xl p-4">
-            <p className="text-xs text-fg-subtle mb-1">{label}</p>
-            <p className="font-bold text-warning-fg">{value}</p>
-            <p className="text-[10px] text-fg-faint mt-0.5">{note}</p>
+          <div key={label} className="min-w-0">
+            <dt className="text-label text-fg-muted">{label}</dt>
+            <dd className="text-figure-md text-fg">{value}</dd>
+            <dd className="text-caption text-fg-subtle">{note}</dd>
           </div>
         ))}
-      </div>
-    </div>
+      </dl>
+    </Card>
   );
 }

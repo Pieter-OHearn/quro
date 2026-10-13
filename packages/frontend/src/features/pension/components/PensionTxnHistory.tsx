@@ -1,6 +1,7 @@
 import { usePagination } from '@/hooks/usePagination';
 import { useState } from 'react';
 import { Pagination, TxnHistoryPanel, TxnRow } from '@/components/ui';
+import { TxnAmount } from '@/components/finance/TxnAmount';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { PensionPot, PensionTransaction } from '@quro/shared';
 import { PENSION_TXN_META } from '../constants';
@@ -19,7 +20,7 @@ const FILTER_OPTIONS = [
   { key: 'all', label: 'All' },
   { key: 'contribution', label: 'Contributions' },
   { key: 'fee', label: 'Fees' },
-  { key: 'annual_statement', label: 'Annual Statements' },
+  { key: 'annual_statement', label: 'Annual statements' },
 ];
 const PAGE_SIZE = 6;
 
@@ -43,29 +44,24 @@ function PensionTxnRow({
       : transaction.type === 'fee'
         ? -transaction.amount
         : transaction.amount;
-  const isDeduction = signedAmount < 0;
-  const displayAmount = Math.abs(signedAmount);
+  const isEmployerContribution = transaction.type === 'contribution' && transaction.isEmployer;
+  // The type moves to a badge when a note takes the label.
+  const badgeText = [
+    isEmployerContribution ? 'Employer' : null,
+    transaction.note ? meta.label : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <TxnRow
-      key={transaction.id}
       icon={meta.icon}
       iconColor={meta.color}
-      iconBg={meta.bg}
       label={transaction.note || meta.label}
       date={transaction.date}
-      badge={
-        transaction.type === 'contribution' && transaction.isEmployer
-          ? { text: 'Employer', className: 'bg-brand-soft-strong text-brand' }
-          : undefined
-      }
+      badge={badgeText ? { text: badgeText, className: '' } : undefined}
       amount={
-        <div className="text-right flex-shrink-0">
-          <p className={`text-sm font-semibold ${isDeduction ? 'text-danger' : 'text-success'}`}>
-            {isDeduction ? '\u2212' : '+'}
-            {fmtNative(displayAmount, currency, true)}
-          </p>
-        </div>
+        <TxnAmount value={signedAmount} format={(amount) => fmtNative(amount, currency, true)} />
       }
       onEdit={onEdit}
       onDelete={onDelete}
@@ -106,7 +102,7 @@ export function PensionTxnHistory({
       stats={stats}
       statsColumns={5}
       onAdd={onAdd}
-      accentColor="bg-warning-accent hover:bg-warning"
+      addLabel="Add transaction"
       emptyMessage="No transactions."
       isEmpty={sortedTransactions.length === 0}
       footer={
@@ -118,7 +114,6 @@ export function PensionTxnHistory({
             rangeEnd={rangeEnd}
             totalCount={sortedTransactions.length}
             onChange={handlePageChange}
-            activePageClassName="bg-warning-accent text-fg-inverted"
           />
         ) : undefined
       }

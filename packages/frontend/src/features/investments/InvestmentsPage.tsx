@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { LoadingSpinner } from '@/components/ui';
+import { Card, LoadingSpinner, PageStack } from '@/components/ui';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type {
@@ -89,7 +89,7 @@ function InvestmentPageBody({
   syncSummary,
 }: Readonly<InvestmentPageBodyProps>) {
   return (
-    <div className="p-6 space-y-6">
+    <PageStack>
       <InvestmentModals
         holdingModals={buildHoldingModalsProps(
           ui,
@@ -102,7 +102,7 @@ function InvestmentPageBody({
       />
       <InvestmentStatCards {...stats} trends={statTrends} fmtBase={fmtBase} />
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />
-      <div className="bg-surface rounded-2xl border border-border-subtle shadow-sm overflow-hidden">
+      <Card padding="none" className="overflow-hidden">
         <TabSwitcher tab={ui.tab} onSetTab={ui.setTab} />
         <InvestmentTabPanel
           tab={ui.tab}
@@ -125,8 +125,8 @@ function InvestmentPageBody({
           isSyncingPrices={isSyncingPrices}
           syncSummary={syncSummary}
         />
-      </div>
-    </div>
+      </Card>
+    </PageStack>
   );
 }
 

@@ -12,13 +12,13 @@ export function TabSwitcher({ tab, onSetTab }: TabSwitcherProps) {
   const options = [
     {
       value: 'brokerage',
-      label: 'Brokerage Holdings',
-      icon: <BarChart2 size={16} />,
+      label: 'Brokerage holdings',
+      icon: <BarChart2 size={14} aria-hidden />,
     },
     {
       value: 'property',
-      label: 'Property Portfolio',
-      icon: <Building2 size={16} />,
+      label: 'Property portfolio',
+      icon: <Building2 size={14} aria-hidden />,
     },
   ] satisfies readonly SegmentedControlOption<Tab>[];
 

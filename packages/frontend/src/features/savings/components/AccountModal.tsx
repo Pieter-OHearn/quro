@@ -1,6 +1,6 @@
 import { DATA_COLORS } from '@/lib/dataColors';
 import { useState } from 'react';
-import { Trash2, Check } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
@@ -98,12 +98,9 @@ function InterestPreview({
   if (!balance || !rate) return null;
   const monthly = monthlyInterest(parseFloat(balance), parseFloat(rate)).toFixed(2);
   return (
-    <div className="bg-success-soft border border-success-soft-strong rounded-xl p-3 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <Check size={14} className="text-success" />
-        <span className="text-sm text-success-fg">Monthly interest preview</span>
-      </div>
-      <span className="text-sm font-bold text-success-fg">
+    <div className="flex items-baseline justify-between gap-3 rounded-lg border border-border-default px-3 py-2">
+      <span className="text-label text-fg-muted">Monthly interest preview</span>
+      <span className="text-figure-md text-fg">
         {currency} {monthly}/mo
       </span>
     </div>
@@ -126,7 +123,7 @@ function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
           onChange={(emoji) => set('emoji', emoji)}
           error={errors.emoji}
         />
-        <FormField label="Account Name" required error={errors.name} className="flex-1">
+        <FormField label="Account name" required error={errors.name} className="flex-1">
           <TextInput
             data-testid="savings-account-name-input"
             value={form.name}
@@ -136,7 +133,7 @@ function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
           />
         </FormField>
       </div>
-      <FormField label="Bank / Provider" required error={errors.bank}>
+      <FormField label="Bank / provider" required error={errors.bank}>
         <TextInput
           data-testid="savings-account-bank-input"
           value={form.bank}
@@ -186,7 +183,7 @@ function AccountAmountFields({
         </FormField>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Interest Rate (% APY)" required error={errors.rate}>
+        <FormField label="Interest rate (% APY)" required error={errors.rate}>
           <TextInput
             data-testid="savings-account-rate-input"
             type="number"
@@ -197,7 +194,7 @@ function AccountAmountFields({
             placeholder="3.50"
           />
         </FormField>
-        <FormField label="Account Type">
+        <FormField label="Account type">
           <SelectInput value={form.type} onChange={(v) => set('type', v)} options={ACCOUNT_TYPES} />
         </FormField>
       </div>
@@ -219,7 +216,7 @@ function AccountFormBody({
         form={form}
         errors={errors}
         set={set}
-        balanceLabel={isEdit ? 'Balance' : 'Opening Balance'}
+        balanceLabel={isEdit ? 'Balance' : 'Opening balance'}
         isBunqSynced={isBunqSynced}
       />
       <JointToggleField checked={form.isJoint} onChange={(checked) => set('isJoint', checked)} />
@@ -279,7 +276,10 @@ function useAccountModalForm(
 function SubmitError({ message }: Readonly<{ message: string | null }>) {
   if (!message) return null;
   return (
-    <div className="mb-4 rounded-lg border border-danger-soft-strong bg-danger-soft px-3 py-2 text-sm text-danger-hover">
+    <div
+      role="alert"
+      className="mb-4 rounded-md border border-danger bg-danger-soft px-3 py-2 text-cell text-danger"
+    >
       {message}
     </div>
   );
@@ -302,7 +302,6 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
         label="Remove account"
         variant="danger"
         size="lg"
-        className="border border-danger-border text-danger"
         onClick={() => setConfirmingDelete(true)}
       />
     ) : undefined;
@@ -322,7 +321,7 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
 
   return (
     <Modal
-      title={isEdit ? 'Edit Account' : 'Add Savings Account'}
+      title={isEdit ? 'Edit account' : 'Add savings account'}
       subtitle={isEdit ? 'Update account details' : 'Link a new account'}
       onClose={onClose}
       footer={
@@ -331,7 +330,7 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
           onConfirm={() => {
             void handleSave();
           }}
-          confirmLabel={isEdit ? 'Save Changes' : 'Add Account'}
+          confirmLabel={isEdit ? 'Save changes' : 'Add account'}
           danger={deleteButton}
         />
       }

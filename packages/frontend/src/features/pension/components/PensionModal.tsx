@@ -4,6 +4,7 @@ import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
 import { isSingleEmoji } from '@/lib/emoji';
 import { formatFixedInputValue } from '@/lib/utils';
 import {
+  Button,
   EmojiPickerField,
   FormField,
   Modal,
@@ -104,7 +105,7 @@ function PensionEmojiNameRow({ form, errors, set }: Readonly<PensionFormFields>)
         containerClassName="w-20 flex-shrink-0"
         buttonClassName="w-full"
       />
-      <FormField label="Pension Name" required error={errors.name} className="flex-1">
+      <FormField label="Pension name" required error={errors.name} className="flex-1">
         <TextInput
           value={form.name}
           onChange={(v) => set('name', v)}
@@ -141,7 +142,7 @@ function PensionProviderTypeRow({ form, errors, set }: Readonly<PensionFormField
 function PensionBalanceCurrencyRow({ form, errors, set }: Readonly<PensionFormFields>) {
   return (
     <div className="grid grid-cols-2 gap-4">
-      <FormField label="Current Balance" required error={errors.balance}>
+      <FormField label="Current balance" required error={errors.balance}>
         <TextInput
           type="number"
           inputMode="decimal"
@@ -166,7 +167,7 @@ function PensionBalanceCurrencyRow({ form, errors, set }: Readonly<PensionFormFi
 function PensionContributionsRow({ form, set }: Readonly<Omit<PensionFormFields, 'errors'>>) {
   return (
     <div className="grid grid-cols-2 gap-4">
-      <FormField label="Your Contribution /mo">
+      <FormField label="Your contribution /mo">
         <TextInput
           type="number"
           inputMode="decimal"
@@ -176,7 +177,7 @@ function PensionContributionsRow({ form, set }: Readonly<Omit<PensionFormFields,
           placeholder="325.00"
         />
       </FormField>
-      <FormField label="Employer Match /mo">
+      <FormField label="Employer match /mo">
         <TextInput
           type="number"
           inputMode="decimal"
@@ -195,7 +196,7 @@ function PensionStrategyField({
   onChange,
 }: Readonly<{ value: string; onChange: (value: string) => void }>) {
   return (
-    <FormField label="Investment Strategy" hint="optional">
+    <FormField label="Investment strategy" hint="optional">
       <TextInput value={value} onChange={onChange} placeholder="e.g. High growth" />
     </FormField>
   );
@@ -213,10 +214,10 @@ function PensionMetadataEditor({
   onRemoveEntry: (index: number) => void;
 }>) {
   return (
-    <FormField label="Additional Metadata" hint="optional key/value pairs">
+    <FormField label="Additional metadata" hint="optional key/value pairs">
       <div className="space-y-2">
         {entries.map((entry, index) => (
-          <div key={entry.id} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <div key={entry.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
             <TextInput
               value={entry.key}
               onChange={(value) => onChangeEntry(index, 'key', value)}
@@ -227,22 +228,14 @@ function PensionMetadataEditor({
               onChange={(value) => onChangeEntry(index, 'value', value)}
               placeholder="Value"
             />
-            <button
-              type="button"
-              onClick={() => onRemoveEntry(index)}
-              className="rounded-lg border border-border-default px-2 text-xs text-fg-subtle hover:bg-surface-muted transition-colors"
-            >
+            <Button variant="secondary" size="sm" onClick={() => onRemoveEntry(index)}>
               Remove
-            </button>
+            </Button>
           </div>
         ))}
-        <button
-          type="button"
-          onClick={onAddEntry}
-          className="rounded-lg border border-border-default px-3 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-muted transition-colors"
-        >
+        <Button variant="secondary" size="sm" onClick={onAddEntry}>
           Add metadata row
-        </button>
+        </Button>
       </div>
     </FormField>
   );
@@ -356,7 +349,7 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps) {
 
   return (
     <Modal
-      title={isEdit ? 'Edit Pension Pot' : 'Add Pension Pot'}
+      title={isEdit ? 'Edit pension pot' : 'Add pension pot'}
       subtitle="Track your pension balance across currencies"
       onClose={onClose}
       scrollable
@@ -364,7 +357,7 @@ export function PensionModal({ existing, onClose, onSave }: PensionModalProps) {
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel={isEdit ? 'Save Changes' : 'Add Pot'}
+          confirmLabel={isEdit ? 'Save changes' : 'Add pot'}
         />
       }
     >
