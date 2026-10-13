@@ -57,8 +57,13 @@ function StatCardChange({ change }: { change: NonNullable<StatCardProps['change'
     >
       <span>{text}</span>
       {change.details && <CircleHelp size={12} className="text-fg-faint" aria-hidden />}
+      {change.details && <span className="sr-only">{change.details}</span>}
       {change.details && (
-        <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 w-64 rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse opacity-0 shadow-popover transition-opacity duration-fast group-hover/trend:opacity-100">
+        // Not laid out until hovered, so the 256px tooltip cannot widen the page on a phone.
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover group-hover/trend:block"
+        >
           {change.details}
         </span>
       )}
