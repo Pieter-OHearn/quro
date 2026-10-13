@@ -1,5 +1,7 @@
-import { AlertTriangle, ChevronDown, ChevronUp, Home, RefreshCw } from 'lucide-react';
+import { useId } from 'react';
+import { ChevronDown, ChevronUp, Home, RefreshCw } from 'lucide-react';
 import { Badge, Button, QuroLogo } from '@/components/ui';
+import { ErrorBadge } from './ErrorBadge';
 
 export type ErrorDisplayProps = {
   title?: string;
@@ -17,8 +19,6 @@ const reassuranceItems = [
   'Your finances are intact',
   'Entirely our fault',
 ];
-
-const DETAILS_ID = 'error-technical-details';
 
 // The header sits on the page ground like the app header, so the evergreen mark keeps its contrast.
 function ErrorHeader() {
@@ -66,6 +66,7 @@ function ReassuranceStrip() {
 type DetailsPanelProps = Pick<ErrorDisplayProps, 'detail' | 'showDetails' | 'onToggleDetails'>;
 
 function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProps) {
+  const detailsId = useId();
   if (!detail) return null;
 
   return (
@@ -73,7 +74,7 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
       <button
         type="button"
         aria-expanded={Boolean(showDetails)}
-        aria-controls={DETAILS_ID}
+        aria-controls={detailsId}
         onClick={onToggleDetails}
         className="flex min-h-8 w-full items-center justify-between gap-3 rounded-md border border-border-default bg-surface px-3 py-1.5 text-cell text-fg transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       >
@@ -91,7 +92,7 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
 
       {showDetails && (
         <div
-          id={DETAILS_ID}
+          id={detailsId}
           className="mt-2 overflow-hidden rounded-md border border-border-default bg-surface"
         >
           <p className="border-b border-border-default px-3 py-1.5 text-caption text-fg-subtle">
@@ -129,10 +130,9 @@ export function ErrorDisplay({
       <ErrorHeader />
 
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-12">
-        <span className="mb-4 inline-flex w-fit items-center gap-1.5 rounded-sm border border-danger bg-danger-soft px-1.5 py-px text-[11px] leading-4 font-medium text-danger">
-          <AlertTriangle size={12} aria-hidden="true" />
-          Unexpected error
-        </span>
+        <div className="mb-4">
+          <ErrorBadge>Unexpected error</ErrorBadge>
+        </div>
 
         <h1 className="mb-2 text-title-page text-fg">{title}</h1>
 

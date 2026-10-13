@@ -24,18 +24,12 @@ function normalizeDigits(value: string) {
   return value.replaceAll(/\D/g, '');
 }
 
-function NameFields({
-  form,
-  setField,
-  errors,
-  autoFocus,
-}: Readonly<BaseSignUpFieldProps & { autoFocus: boolean }>) {
+function NameFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) {
   return (
     <>
       <FormField label="First name" error={errors.firstName}>
         <TextInput
           type="text"
-          autoFocus={autoFocus}
           autoComplete="given-name"
           placeholder="John"
           error={Boolean(errors.firstName)}
@@ -153,7 +147,7 @@ function SignUpFormFields({ state }: Readonly<{ state: SignUpState }>) {
           onChange={(value) => setField('inviteCode', value)}
         />
       ) : null}
-      <NameFields {...state} autoFocus={!showCode} />
+      <NameFields {...state} />
       <EmailField {...state} />
       <AgeFields {...state} />
       <PasswordFields {...state} />

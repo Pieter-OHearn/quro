@@ -5,13 +5,14 @@ import { cn } from '@/lib/utils';
 import { toRelativeTime } from './notification-utils';
 import type { NotificationItem as NotificationItemType } from './types';
 
-// Each status shows as an icon colour and, while a job runs, a badge; the action reads as a link.
-const STATUS_META = {
-  queuing: { iconColor: 'text-fg-subtle', label: 'In queue', tone: 'neutral' },
-  processing: { iconColor: 'text-brand', label: 'Processing', tone: 'brand' },
-  ready: { iconColor: 'text-warning', label: 'Ready', tone: 'success' },
-  failed: { iconColor: 'text-danger', label: 'Failed', tone: 'neutral' },
-  reminder: { iconColor: 'text-warning', label: 'Reminder', tone: 'warning' },
+// Each status shows as an icon colour; a waiting or running job also gets a badge, and the
+// action of a finished one reads as a link.
+const ICON_COLORS = {
+  queuing: 'text-fg-subtle',
+  processing: 'text-brand',
+  ready: 'text-warning',
+  failed: 'text-danger',
+  reminder: 'text-warning',
 } as const;
 
 const ACTION_CLASS_NAME = 'inline-flex items-center gap-1 text-label';
@@ -23,7 +24,7 @@ type NotificationItemProps = {
 };
 
 function renderStatusIcon(item: NotificationItemType) {
-  const { iconColor } = STATUS_META[item.status];
+  const iconColor = ICON_COLORS[item.status];
   if (item.kind === 'mortgage_expiry')
     return <Home size={16} className={iconColor} aria-hidden="true" />;
   if (item.status === 'queuing')
@@ -36,17 +37,15 @@ function renderStatusIcon(item: NotificationItemType) {
 }
 
 function renderFooter(item: NotificationItemType) {
-  const meta = STATUS_META[item.status];
-
   if (item.status === 'queuing') {
-    return <Badge tone={meta.tone}>{meta.label}</Badge>;
+    return <Badge>In queue</Badge>;
   }
 
   if (item.status === 'processing') {
     return (
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
-          <Badge tone={meta.tone}>{meta.label}</Badge>
+          <Badge tone="brand">Processing</Badge>
           <span className="text-caption text-fg-subtle">AI reading your PDF…</span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-surface-muted">

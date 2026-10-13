@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { Button, Card, ContentSection, PageStack } from '@/components/ui';
 import {
   formatRouteQueryErrorDetail,
@@ -7,6 +7,7 @@ import {
   retryFailedRouteQueries,
   type FailedRouteQuery,
 } from '@/lib/routeQueryErrors';
+import { ErrorBadge } from './ErrorBadge';
 
 type RouteQueryErrorStateProps = {
   routeName: string;
@@ -20,7 +21,7 @@ type RouteQueryActionsProps = {
 
 function RouteQueryActions({ failedQueries, retrying }: Readonly<RouteQueryActionsProps>) {
   return (
-    <div className="flex flex-wrap gap-2 max-sm:*:flex-1">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
       <Button
         loading={retrying}
         loadingLabel="Retrying failed requests"
@@ -109,10 +110,7 @@ export function RouteQueryErrorState({
       <ContentSection>
         <Card padding="none" className="overflow-hidden" role="alert">
           <div className="flex min-h-9 items-center border-b border-border-default px-3 py-1 max-sm:min-h-11 max-sm:px-4">
-            <span className="inline-flex items-center gap-1.5 rounded-sm border border-danger bg-danger-soft px-1.5 py-px text-[11px] leading-4 font-medium text-danger">
-              <AlertTriangle size={12} aria-hidden="true" />
-              Route data unavailable
-            </span>
+            <ErrorBadge>Route data unavailable</ErrorBadge>
           </div>
 
           <div className="space-y-4 p-4">

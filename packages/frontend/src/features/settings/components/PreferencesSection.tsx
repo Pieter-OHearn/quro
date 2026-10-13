@@ -152,7 +152,7 @@ function PreferencesForm({
         <ChoiceGroup
           label="Base currency"
           description="Cross-currency balances and charts convert into this currency across the app."
-          className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
+          className="grid grid-cols-2 gap-2 xl:grid-cols-4"
         >
           {CURRENCY_CODES.map((code) => {
             const currency = CURRENCY_META[code];

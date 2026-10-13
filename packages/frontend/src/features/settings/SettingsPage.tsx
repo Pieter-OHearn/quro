@@ -57,7 +57,7 @@ function SectionNav({ activeTab, onSelect, appVersion }: Readonly<SectionNavProp
               <li key={key}>
                 <button
                   type="button"
-                  aria-current={isActive ? 'page' : undefined}
+                  aria-current={isActive ? 'true' : undefined}
                   onClick={() => onSelect(key)}
                   className={cn(
                     NAV_ITEM_CLASS_NAME,

@@ -30,7 +30,6 @@ function SignInFormFields({
         <TextInput
           data-testid="signin-email-input"
           type="email"
-          autoFocus
           autoComplete="email"
           placeholder="you@example.com"
           error={Boolean(errors.email)}

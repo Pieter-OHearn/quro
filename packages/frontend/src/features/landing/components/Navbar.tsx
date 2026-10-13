@@ -45,6 +45,7 @@ function NavMobileMenu({ onSignIn, onSignUp, onClose }: Readonly<NavMobileMenuPr
           Sign in
         </Button>
         <Button
+          variant="secondary"
           fullWidth
           onClick={() => {
             onSignUp();

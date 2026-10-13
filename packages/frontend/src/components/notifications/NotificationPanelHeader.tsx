@@ -23,6 +23,7 @@ export function NotificationPanelHeader({
           <Loader2
             size={14}
             className="animate-spin text-fg-subtle"
+            role="img"
             aria-label="Refreshing notifications"
           />
         ) : undefined
