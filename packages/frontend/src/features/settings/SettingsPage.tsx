@@ -1,17 +1,9 @@
-/* eslint-disable max-lines-per-function */
 import { useEffect } from 'react';
 import type { ElementType } from 'react';
 import { useSearchParams } from 'react-router';
 
-import {
-  ChevronRight,
-  Link2,
-  Lock,
-  SlidersHorizontal,
-  User as UserIcon,
-  Users,
-} from 'lucide-react';
-import { Card, ContentSection, PageStack } from '@/components/ui';
+import { Link2, Lock, ShieldCheck, SlidersHorizontal, User as UserIcon, Users } from 'lucide-react';
+import { Badge, Card, ContentSection, PageStack, SegmentedControl } from '@/components/ui';
 import { useAuth } from '@/lib/AuthContext';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
@@ -23,27 +15,12 @@ import { PreferencesSection } from './components/PreferencesSection';
 import { ConnectionsSection } from './components/ConnectionsSection';
 type TabKey = 'profile' | 'security' | 'preferences' | 'partner' | 'connections';
 
-const TABS: ReadonlyArray<{ key: TabKey; label: string; icon: ElementType; subtitle: string }> = [
-  { key: 'profile', label: 'Profile', icon: UserIcon, subtitle: 'Name, age, and location' },
-  { key: 'security', label: 'Security', icon: Lock, subtitle: 'Password and sessions' },
-  {
-    key: 'preferences',
-    label: 'Preferences',
-    icon: SlidersHorizontal,
-    subtitle: 'Currency and display defaults',
-  },
-  {
-    key: 'partner',
-    label: 'Partner',
-    icon: Users,
-    subtitle: 'Share joint assets with your partner',
-  },
-  {
-    key: 'connections',
-    label: 'Connections',
-    icon: Link2,
-    subtitle: 'Bank account integrations',
-  },
+const TABS: ReadonlyArray<{ key: TabKey; label: string; icon: ElementType }> = [
+  { key: 'profile', label: 'Profile', icon: UserIcon },
+  { key: 'security', label: 'Security', icon: Lock },
+  { key: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
+  { key: 'partner', label: 'Partner', icon: Users },
+  { key: 'connections', label: 'Connections', icon: Link2 },
 ];
 
 const DEFAULT_TAB: TabKey = 'profile';
@@ -51,6 +28,94 @@ const DEFAULT_TAB: TabKey = 'profile';
 function resolveActiveTab(value: string | null): TabKey {
   const candidate = TABS.find((tab) => tab.key === value);
   return candidate?.key ?? DEFAULT_TAB;
+}
+
+// A settings section row in the side list: 32px high, the current section a `brand-soft` tint.
+const NAV_ITEM_CLASS_NAME =
+  'flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-cell transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring';
+const NAV_ITEM_REST_CLASS_NAME =
+  'text-fg-muted hover:bg-surface-muted hover:text-fg active:bg-surface-muted active:text-fg';
+const NAV_ITEM_ACTIVE_CLASS_NAME = 'bg-brand-soft font-semibold text-brand-fg';
+
+const PHONE_TAB_OPTIONS = TABS.map(({ key, label }) => ({ value: key, label }));
+
+type SectionNavProps = {
+  activeTab: TabKey;
+  onSelect: (tab: TabKey) => void;
+  appVersion: string;
+};
+
+/** Laptop: a list of sections beside the content. Narrower: underline tabs that scroll sideways. */
+function SectionNav({ activeTab, onSelect, appVersion }: Readonly<SectionNavProps>) {
+  return (
+    <div className="lg:w-52 lg:flex-shrink-0">
+      <nav aria-label="Settings sections" className="hidden lg:sticky lg:top-6 lg:block">
+        <ul className="space-y-0.5">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const isActive = activeTab === key;
+            return (
+              <li key={key}>
+                <button
+                  type="button"
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => onSelect(key)}
+                  className={cn(
+                    NAV_ITEM_CLASS_NAME,
+                    isActive ? NAV_ITEM_ACTIVE_CLASS_NAME : NAV_ITEM_REST_CLASS_NAME,
+                  )}
+                >
+                  <Icon size={16} className="flex-shrink-0" aria-hidden="true" />
+                  <span className="truncate">{label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-4 border-t border-border-default px-2 pt-3">
+          <p className="text-label text-fg-muted">App version</p>
+          <p className="mt-0.5 font-numeric text-cell text-fg">{appVersion}</p>
+        </div>
+      </nav>
+
+      <SegmentedControl
+        aria-label="Settings sections"
+        variant="underline"
+        options={PHONE_TAB_OPTIONS}
+        value={activeTab}
+        onChange={onSelect}
+        className="overflow-x-auto lg:hidden"
+        buttonClassName="flex-none"
+      />
+    </div>
+  );
+}
+
+type AccountSummaryProps = {
+  initials: string;
+  fullName: string;
+  details: string;
+};
+
+/** Who is signed in: avatar, name and the profile facts the planning uses. */
+function AccountSummary({ initials, fullName, details }: Readonly<AccountSummaryProps>) {
+  return (
+    <Card className="flex flex-wrap items-center gap-3">
+      <span
+        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-soft text-label text-brand-fg"
+        aria-hidden="true"
+      >
+        {initials}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate text-title-section text-fg">{fullName}</h2>
+        <p className="truncate text-caption text-fg-subtle">{details}</p>
+      </div>
+      <Badge tone="brand" size="md">
+        <ShieldCheck size={12} aria-hidden="true" />
+        Secure account
+      </Badge>
+    </Card>
+  );
 }
 
 export function Settings() {
@@ -75,120 +140,24 @@ export function Settings() {
 
   const initials = getUserInitials(user);
   const fullName = getUserDisplayName(user);
-  const activeTabConfig = TABS.find((tab) => tab.key === activeTab) ?? TABS[0]!;
 
   return (
     <PageStack className="mx-auto max-w-6xl">
       <ContentSection>
-        <Card
-          padding="none"
-          className="overflow-hidden border-0 bg-gradient-to-r from-surface-inverse via-surface-settings-middle to-surface-settings-end text-fg-inverted shadow-xl shadow-border-strong/40"
-        >
-          <div className="relative overflow-hidden px-6 py-7 lg:px-8">
-            <div className="absolute right-0 top-0 h-56 w-56 -translate-y-1/3 translate-x-1/5 rounded-full bg-surface/8 blur-3xl" />
-            <div className="absolute bottom-0 left-24 h-40 w-40 translate-y-1/2 rounded-full bg-info-muted/10 blur-3xl" />
-            <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-disabled to-info-accent text-xl font-bold text-fg-inverted shadow-lg shadow-overlay/20">
-                  {initials}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-info-border">
-                    Account Settings
-                  </p>
-                  <h2 className="mt-1 text-3xl font-semibold tracking-tight">{fullName}</h2>
-                  <p className="mt-1 text-sm text-fg-disabled">
-                    {user.email} · Age {user.age} · {user.location || 'Location not set'}
-                  </p>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-fg-inverted/10 bg-surface/5 px-4 py-3 text-sm text-border-default backdrop-blur">
-                <p className="font-medium text-fg-inverted">{activeTabConfig.label}</p>
-                <p className="mt-1 text-xs text-fg-disabled">{activeTabConfig.subtitle}</p>
-              </div>
-            </div>
-          </div>
-        </Card>
+        <AccountSummary
+          initials={initials}
+          fullName={fullName}
+          details={`${user.email} · Age ${user.age} · ${user.location || 'Location not set'}`}
+        />
       </ContentSection>
 
       <ContentSection>
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="lg:w-64 lg:flex-shrink-0">
-            <nav className="hidden lg:flex lg:flex-col lg:gap-2 lg:sticky lg:top-6">
-              {TABS.map(({ key, label, icon: Icon, subtitle }) => {
-                const isActive = activeTab === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setActiveTab(key)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-3xl border px-4 py-4 text-left transition-all',
-                      isActive
-                        ? 'border-brand bg-brand text-fg-inverted shadow-md shadow-brand-tint'
-                        : 'border-border-default bg-surface text-fg-muted hover:border-border-strong hover:bg-surface-sunken',
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'flex h-10 w-10 items-center justify-center rounded-2xl',
-                        isActive ? 'bg-surface/15' : 'bg-surface-muted',
-                      )}
-                    >
-                      <Icon
-                        size={16}
-                        className={isActive ? 'text-fg-inverted' : 'text-fg-subtle'}
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">{label}</p>
-                      <p
-                        className={cn(
-                          'truncate text-xs',
-                          isActive ? 'text-brand-soft-strong' : 'text-fg-faint',
-                        )}
-                      >
-                        {subtitle}
-                      </p>
-                    </div>
-                    {isActive ? (
-                      <ChevronRight size={16} className="ml-auto text-fg-inverted/70" />
-                    ) : null}
-                  </button>
-                );
-              })}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+          <SectionNav activeTab={activeTab} onSelect={setActiveTab} appVersion={appVersion} />
 
-              <div className="mt-6 rounded-2xl border border-border-subtle bg-surface-sunken px-4 py-3">
-                <p className="mb-1 text-[10px] uppercase tracking-widest text-fg-faint">
-                  App Version
-                </p>
-                <p className="text-sm font-semibold text-fg-strong">{appVersion}</p>
-              </div>
-            </nav>
-
-            <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
-              {TABS.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActiveTab(key)}
-                  className={cn(
-                    'flex flex-shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium transition-colors',
-                    activeTab === key
-                      ? 'border-brand bg-brand text-fg-inverted'
-                      : 'border-border-default bg-surface text-fg-muted',
-                  )}
-                >
-                  <Icon size={14} />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Card className="flex-1 p-6 lg:p-8">
+          <div className="min-w-0 flex-1">
             {activeTab === 'profile' ? (
-              <ProfileSection user={user} replaceUser={replaceUser} initials={initials} />
+              <ProfileSection user={user} replaceUser={replaceUser} />
             ) : null}
             {activeTab === 'security' ? (
               <SecuritySection user={user} replaceUser={replaceUser} />
@@ -196,9 +165,13 @@ export function Settings() {
             {activeTab === 'preferences' ? (
               <PreferencesSection user={user} replaceUser={replaceUser} />
             ) : null}
-            {activeTab === 'partner' ? <PartnerSection /> : null}
+            {activeTab === 'partner' ? (
+              <Card>
+                <PartnerSection />
+              </Card>
+            ) : null}
             {activeTab === 'connections' ? <ConnectionsSection /> : null}
-          </Card>
+          </div>
         </div>
       </ContentSection>
     </PageStack>

@@ -1,5 +1,5 @@
-import { AlertTriangle, ChevronDown, ChevronUp, Home, RefreshCw, TrendingDown } from 'lucide-react';
-import { QuroLogo } from '@/components/ui';
+import { AlertTriangle, ChevronDown, ChevronUp, Home, RefreshCw } from 'lucide-react';
+import { Badge, Button, QuroLogo } from '@/components/ui';
 
 export type ErrorDisplayProps = {
   title?: string;
@@ -18,30 +18,18 @@ const reassuranceItems = [
   'Entirely our fault',
 ];
 
+const DETAILS_ID = 'error-technical-details';
+
+// The header sits on the page ground like the app header, so the evergreen mark keeps its contrast.
 function ErrorHeader() {
   return (
-    <header className="bg-gradient-to-r from-surface-inverse to-surface-inverse-panel px-6 py-4 flex items-center justify-between flex-shrink-0 border-b border-border-default">
-      <QuroLogo className="h-7 w-auto" />
-      <span className="text-[10px] text-fg-subtle tracking-widest uppercase font-semibold">
-        System Error
-      </span>
-    </header>
-  );
-}
-
-function ErrorIconCluster() {
-  return (
-    <div className="relative mb-8 select-none">
-      <div className="absolute inset-0 rounded-full bg-brand-tint/25 blur-3xl scale-[2]" />
-      <div className="relative w-28 h-28 rounded-full bg-surface border-2 border-border-subtle flex items-center justify-center">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-soft via-surface to-danger-soft flex items-center justify-center">
-          <TrendingDown size={38} className="text-danger-muted" strokeWidth={1.5} />
-        </div>
-        <div className="absolute -top-1.5 -right-1.5 w-9 h-9 rounded-full bg-warning-muted border-[3px] border-fg-inverted flex items-center justify-center">
-          <AlertTriangle size={14} className="text-fg-inverted" strokeWidth={2.5} />
-        </div>
+    <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-border-default bg-surface-sunken px-4 sm:px-6">
+      <div className="flex items-center gap-2">
+        <QuroLogo size={20} />
+        <span className="text-title-section text-fg">Quro</span>
       </div>
-    </div>
+      <span className="text-label text-fg-muted">System error</span>
+    </header>
   );
 }
 
@@ -49,36 +37,29 @@ type ErrorActionsProps = Pick<ErrorDisplayProps, 'onGoHome' | 'onReload'>;
 
 function ErrorActions({ onGoHome, onReload }: ErrorActionsProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3 mb-10">
-      <button
-        type="button"
-        onClick={onGoHome}
-        className="flex items-center justify-center gap-2.5 bg-gradient-to-r from-surface-inverse to-surface-inverse-panel hover:from-surface-inverse-hover hover:to-surface-inverse-panel-hover text-fg-inverted border border-border-default px-7 py-3 rounded-md transition-all font-medium"
-      >
-        <Home size={15} />
+    <div className="mb-6 flex flex-col gap-2 sm:flex-row">
+      <Button size="lg" leadingIcon={<Home size={16} />} onClick={onGoHome}>
         Back to Dashboard
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        size="lg"
+        variant="secondary"
+        leadingIcon={<RefreshCw size={16} />}
         onClick={onReload}
-        className="flex items-center justify-center gap-2.5 bg-surface hover:bg-surface-sunken text-fg-strong border border-border-default px-7 py-3 rounded-md transition-all font-medium"
       >
-        <RefreshCw size={15} />
-        Try Again
-      </button>
+        Try again
+      </Button>
     </div>
   );
 }
 
 function ReassuranceStrip() {
   return (
-    <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-xs text-fg-faint mb-8">
+    <ul className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-caption text-fg-subtle">
       {reassuranceItems.map((label) => (
-        <div key={label} className="flex items-center gap-1.5">
-          <span>{label}</span>
-        </div>
+        <li key={label}>{label}</li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -88,39 +69,35 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
   if (!detail) return null;
 
   return (
-    <div className="w-full max-w-lg">
+    <div className="w-full">
       <button
         type="button"
+        aria-expanded={Boolean(showDetails)}
+        aria-controls={DETAILS_ID}
         onClick={onToggleDetails}
-        className="w-full flex items-center justify-between px-4 py-3 bg-surface border border-border-default rounded-md hover:bg-surface-sunken transition-colors text-fg-subtle text-sm group"
+        className="flex min-h-8 w-full items-center justify-between gap-3 rounded-md border border-border-default bg-surface px-3 py-1.5 text-cell text-fg transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       >
-        <span className="flex items-center gap-2.5">
-          <span className="text-[10px] bg-surface-muted group-hover:bg-brand-soft group-hover:text-brand-accent text-fg-subtle px-2 py-0.5 rounded-sm transition-colors font-semibold tracking-wider">
-            DEV
-          </span>
-          <span className="text-fg-muted">Technical details</span>
-          <span className="text-fg-disabled text-xs font-normal hidden sm:block">
-            for the curious
-          </span>
+        <span className="flex items-center gap-2">
+          <Badge>Dev</Badge>
+          <span>Technical details</span>
+          <span className="hidden text-caption text-fg-subtle sm:block">for the curious</span>
         </span>
         {showDetails ? (
-          <ChevronUp size={15} className="text-fg-faint" />
+          <ChevronUp size={16} className="text-fg-muted" aria-hidden="true" />
         ) : (
-          <ChevronDown size={15} className="text-fg-faint" />
+          <ChevronDown size={16} className="text-fg-muted" aria-hidden="true" />
         )}
       </button>
 
       {showDetails && (
-        <div className="mt-2 bg-surface-code border border-fg-strong/60 rounded-lg overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-fg-strong/60 bg-surface-code-header">
-            <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-danger/80" />
-              <div className="w-3 h-3 rounded-full bg-warning-accent/80" />
-              <div className="w-3 h-3 rounded-full bg-success-accent/80" />
-            </div>
-            <span className="text-xs text-fg-subtle ml-2">error.log - quro</span>
-          </div>
-          <pre className="p-4 text-xs text-danger-border-strong/90 overflow-auto max-h-56 leading-relaxed whitespace-pre-wrap break-all">
+        <div
+          id={DETAILS_ID}
+          className="mt-2 overflow-hidden rounded-md border border-border-default bg-surface"
+        >
+          <p className="border-b border-border-default px-3 py-1.5 text-caption text-fg-subtle">
+            error.log - quro
+          </p>
+          <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all p-3 text-caption text-fg">
             {detail}
           </pre>
         </div>
@@ -131,12 +108,9 @@ function DetailsPanel({ detail, showDetails, onToggleDetails }: DetailsPanelProp
 
 function ErrorFooter() {
   return (
-    <footer className="flex-shrink-0 border-t border-border-default bg-surface px-6 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-2.5">
-        <QuroLogo className="h-5 w-auto opacity-40" />
-        <span className="text-xs text-fg-faint">Quro · Personal Finance</span>
-      </div>
-      <p className="text-xs text-fg-faint">Apologies for the inconvenience</p>
+    <footer className="flex flex-shrink-0 flex-col items-center justify-between gap-2 border-t border-border-default px-4 py-3 text-caption text-fg-subtle sm:flex-row sm:px-6">
+      <span>Quro · Personal finance</span>
+      <p>Apologies for the inconvenience</p>
     </footer>
   );
 }
@@ -151,22 +125,18 @@ export function ErrorDisplay({
   onToggleDetails,
 }: ErrorDisplayProps) {
   return (
-    <div className="min-h-screen bg-surface-sunken flex flex-col">
+    <div className="flex min-h-screen flex-col bg-surface-sunken text-fg">
       <ErrorHeader />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
-        <ErrorIconCluster />
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-12">
+        <span className="mb-4 inline-flex w-fit items-center gap-1.5 rounded-sm border border-danger bg-danger-soft px-1.5 py-px text-[11px] leading-4 font-medium text-danger">
+          <AlertTriangle size={12} aria-hidden="true" />
+          Unexpected error
+        </span>
 
-        <div className="flex items-center gap-2 bg-danger-soft border border-danger-border text-danger-hover px-3 py-1.5 rounded-sm text-[11px] font-semibold mb-5 tracking-widest uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse flex-shrink-0" />
-          Unexpected Error
-        </div>
+        <h1 className="mb-2 text-title-page text-fg">{title}</h1>
 
-        <h1 className="text-3xl font-bold text-fg text-center mb-3 max-w-lg leading-tight">
-          {title}
-        </h1>
-
-        <p className="text-fg-subtle text-center max-w-md mb-2 leading-relaxed">
+        <p className="mb-2 text-body text-fg-muted">
           {message ?? (
             <>
               Quro&apos;s brain momentarily forgot how finance works. That&apos;s on us, not you -
@@ -174,7 +144,7 @@ export function ErrorDisplay({
             </>
           )}
         </p>
-        <p className="text-fg-faint text-sm text-center max-w-sm mb-10 leading-relaxed">
+        <p className="mb-6 text-cell text-fg-subtle">
           A very intense internal meeting is probably being scheduled about this right now.
           We&apos;re sorry, and we owe you a coffee.
         </p>
@@ -182,9 +152,8 @@ export function ErrorDisplay({
         <ErrorActions onGoHome={onGoHome} onReload={onReload} />
         <ReassuranceStrip />
 
-        <div className="w-full max-w-md border-t border-border-default mb-6" />
         <DetailsPanel detail={detail} showDetails={showDetails} onToggleDetails={onToggleDetails} />
-      </div>
+      </main>
 
       <ErrorFooter />
     </div>

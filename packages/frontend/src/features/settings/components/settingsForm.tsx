@@ -1,6 +1,6 @@
 /* eslint-disable complexity */
 import { useEffect, useRef, useState } from 'react';
-import type { ComponentProps, ElementType } from 'react';
+import type { ReactNode } from 'react';
 import type { UpdateUserProfileInput, User } from '@quro/shared';
 import {
   MAX_RETIREMENT_AGE,
@@ -10,7 +10,7 @@ import {
   MIN_USER_AGE,
 } from '@quro/shared';
 import { Check, Save } from 'lucide-react';
-import { Button, TextInput } from '@/components/ui';
+import { Button, Card, PanelHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 export const DEFAULT_ERROR_MESSAGE = 'Failed to save your changes';
@@ -46,7 +46,6 @@ export type PasswordFormState = {
 export type ProfileSectionProps = {
   user: User;
   replaceUser: (nextUser: User | null) => void;
-  initials: string;
 };
 
 export type SecuritySectionProps = {
@@ -57,12 +56,6 @@ export type SecuritySectionProps = {
 export type PreferencesSectionProps = {
   user: User;
   replaceUser: (nextUser: User | null) => void;
-};
-
-export type IconTextInputProps = Omit<ComponentProps<typeof TextInput>, 'value' | 'onChange'> & {
-  icon: ElementType;
-  value: string;
-  onChange: (value: string) => void;
 };
 
 export function toProfileFormState(user: User): ProfileFormState {
@@ -102,8 +95,8 @@ export function getPasswordStrength(password: string): StrengthState {
     return {
       score: 0,
       label: '',
-      textClassName: 'text-fg-faint',
-      barClassName: 'bg-border-default',
+      textClassName: 'text-fg-subtle',
+      barClassName: 'bg-surface-muted',
     };
   }
 
@@ -119,7 +112,7 @@ export function getPasswordStrength(password: string): StrengthState {
       score,
       label: 'Weak',
       textClassName: 'text-danger',
-      barClassName: 'bg-danger-muted',
+      barClassName: 'bg-danger',
     };
   }
 
@@ -127,8 +120,8 @@ export function getPasswordStrength(password: string): StrengthState {
     return {
       score,
       label: 'Fair',
-      textClassName: 'text-warning-accent',
-      barClassName: 'bg-warning-muted',
+      textClassName: 'text-warning',
+      barClassName: 'bg-warning',
     };
   }
 
@@ -136,16 +129,16 @@ export function getPasswordStrength(password: string): StrengthState {
     return {
       score,
       label: 'Good',
-      textClassName: 'text-info-accent',
-      barClassName: 'bg-info-muted',
+      textClassName: 'text-info',
+      barClassName: 'bg-info',
     };
   }
 
   return {
     score,
     label: 'Strong',
-    textClassName: 'text-success-accent',
-    barClassName: 'bg-success-muted',
+    textClassName: 'text-success',
+    barClassName: 'bg-success',
   };
 }
 
@@ -175,12 +168,73 @@ export function useSavedState(durationMs = 2400) {
   return { saved, showSaved };
 }
 
-export function SectionHeader({ title, subtitle }: Readonly<{ title: string; subtitle: string }>) {
+type SettingsCardProps = {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+  /** Shown under the content, aligned to the end, such as the save button. */
+  footer?: ReactNode;
+  /** Drops the body padding for content that runs to the card edges, such as a list of rows. */
+  flush?: boolean;
+  children: ReactNode;
+};
+
+/** One settings section: a plain card with a card header, 16px padding and an optional footer. */
+export function SettingsCard({
+  title,
+  subtitle,
+  action,
+  footer,
+  flush = false,
+  children,
+}: Readonly<SettingsCardProps>) {
   return (
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold text-fg-deep">{title}</h3>
-      <p className="mt-1 text-sm text-fg-subtle">{subtitle}</p>
-    </div>
+    <Card padding="none">
+      <PanelHeader title={title} subtitle={subtitle} action={action} />
+      <div className={flush ? undefined : 'space-y-4 p-4'}>{children}</div>
+      {footer ? (
+        <div className="flex justify-end border-t border-border-default px-4 py-3">{footer}</div>
+      ) : null}
+    </Card>
+  );
+}
+
+/** A request failure under a form. */
+export function FormErrorNotice({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <p
+      role="alert"
+      className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-cell text-danger"
+    >
+      {children}
+    </p>
+  );
+}
+
+type ChoiceButtonProps = {
+  selected: boolean;
+  onSelect: () => void;
+  children: ReactNode;
+};
+
+/** One option of a choice group: a bordered row whose selection is a `brand-soft` tint. */
+export function ChoiceButton({ selected, onSelect, children }: Readonly<ChoiceButtonProps>) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      className={cn(
+        'flex min-h-11 w-full items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors duration-fast',
+        'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+        selected
+          ? 'border-brand bg-brand-soft text-brand-fg'
+          : 'border-border-default bg-surface text-fg hover:bg-surface-muted active:bg-surface-muted',
+      )}
+    >
+      <span className="min-w-0 flex-1">{children}</span>
+      {selected ? <Check size={16} className="shrink-0 text-brand" aria-hidden="true" /> : null}
+    </button>
   );
 }
 
@@ -196,28 +250,9 @@ export function SaveActionButton({
       disabled={disabled}
       loading={loading}
       leadingIcon={saved ? <Check size={14} /> : <Save size={14} />}
-      className={cn(saved && 'bg-success-accent hover:bg-success-accent')}
     >
       {saved ? 'Saved' : 'Save changes'}
     </Button>
-  );
-}
-
-export function IconTextInput({
-  className,
-  icon: Icon,
-  value,
-  onChange,
-  ...props
-}: Readonly<IconTextInputProps>) {
-  return (
-    <div className="relative">
-      <Icon
-        size={16}
-        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-faint"
-      />
-      <TextInput {...props} value={value} onChange={onChange} className={cn('pl-10', className)} />
-    </div>
   );
 }
 

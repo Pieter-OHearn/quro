@@ -3,10 +3,9 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { UpdateUserProfileInput, User } from '@quro/shared';
 import { MAX_RETIREMENT_AGE, MAX_USER_AGE, MIN_RETIREMENT_AGE, MIN_USER_AGE } from '@quro/shared';
-import { Calendar, Mail, MapPin, ShieldCheck, Target } from 'lucide-react';
-import { Badge, FormField, TextInput } from '@/components/ui';
+import { CalendarClock, Hourglass, TrendingUp } from 'lucide-react';
+import { FormField, StatCard, TextInput } from '@/components/ui';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
-import { getUserDisplayName } from '@/lib/user';
 
 import {
   type ProfileSectionProps,
@@ -15,9 +14,9 @@ import {
   parseWholeNumber,
   buildProfilePayload,
   useSavedState,
-  SectionHeader,
+  SettingsCard,
+  FormErrorNotice,
   SaveActionButton,
-  IconTextInput,
   DEFAULT_ERROR_MESSAGE,
 } from './settingsForm';
 function useProfileSectionMutation(
@@ -36,7 +35,6 @@ function useProfileSectionMutation(
 
 function ProfileForm({
   user,
-  initials,
   saved,
   save,
 }: Readonly<
@@ -73,29 +71,20 @@ function ProfileForm({
   };
 
   return (
-    <div>
-      <SectionHeader
-        title="Profile"
-        subtitle="How Quro identifies you and personalises your planning assumptions."
-      />
-
-      <div className="mb-6 flex items-center gap-5 rounded-3xl border border-brand-soft-strong bg-gradient-to-r from-brand-soft via-surface to-info-soft p-5">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-accent to-info-accent text-xl font-bold text-fg-inverted shadow-lg shadow-brand-tint">
-          {initials}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-fg">{getUserDisplayName(user)}</p>
-          <p className="truncate text-sm text-fg-subtle">{user.email}</p>
-          <div className="mt-2">
-            <Badge tone="brand" size="md">
-              <ShieldCheck size={12} />
-              Secure account
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4 grid gap-4 sm:grid-cols-2">
+    <SettingsCard
+      title="Profile"
+      subtitle="How Quro identifies you and personalises your planning assumptions."
+      footer={
+        <SaveActionButton
+          saved={saved}
+          loading={isSaving}
+          onClick={() => {
+            void handleSave();
+          }}
+        />
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="First name" required error={errors.firstName}>
           <TextInput
             placeholder="John"
@@ -120,31 +109,27 @@ function ProfileForm({
         </FormField>
       </div>
 
-      <div className="mb-4">
-        <FormField label="Email address" required error={errors.email}>
-          <IconTextInput
-            icon={Mail}
-            type="email"
-            placeholder="you@example.com"
-            value={form.email}
-            error={Boolean(errors.email)}
-            onChange={(value) => {
-              setForm((current) => ({ ...current, email: value }));
-              setErrors((current) => ({ ...current, email: '' }));
-            }}
-          />
-        </FormField>
-      </div>
+      <FormField label="Email address" required error={errors.email}>
+        <TextInput
+          type="email"
+          placeholder="you@example.com"
+          value={form.email}
+          error={Boolean(errors.email)}
+          onChange={(value) => {
+            setForm((current) => ({ ...current, email: value }));
+            setErrors((current) => ({ ...current, email: '' }));
+          }}
+        />
+      </FormField>
 
-      <div className="mb-3 grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           label="Current age"
           hint="Used for pension projections"
           required
           error={errors.age}
         >
-          <IconTextInput
-            icon={Calendar}
+          <TextInput
             type="number"
             inputMode="numeric"
             min={MIN_USER_AGE}
@@ -158,8 +143,7 @@ function ProfileForm({
           />
         </FormField>
         <FormField label="Target retirement age" required error={errors.retirementAge}>
-          <IconTextInput
-            icon={Target}
+          <TextInput
             type="number"
             inputMode="numeric"
             min={MIN_RETIREMENT_AGE}
@@ -175,51 +159,40 @@ function ProfileForm({
       </div>
 
       {yearsAway > 0 ? (
-        <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-3xl bg-fg-deep px-4 py-4 text-center">
-            <p className="text-3xl font-semibold text-fg-inverted">{yearsAway}</p>
-            <p className="mt-1 text-xs text-fg-faint">Years remaining to retirement</p>
-          </div>
-          <div className="rounded-3xl border border-border-default bg-surface-sunken px-4 py-4 text-center">
-            <p className="text-3xl font-semibold text-fg-deep">{elapsedPercent}%</p>
-            <p className="mt-1 text-xs text-fg-subtle">Career timeline already elapsed</p>
-          </div>
-          <div className="rounded-3xl bg-brand px-4 py-4 text-center">
-            <p className="text-3xl font-semibold text-fg-inverted">{remainingPercent}%</p>
-            <p className="mt-1 text-xs text-brand-soft-strong">Runway left to keep contributing</p>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard
+            label="Years remaining to retirement"
+            value={String(yearsAway)}
+            icon={Hourglass}
+            color="indigo"
+          />
+          <StatCard
+            label="Career timeline already elapsed"
+            value={`${elapsedPercent}%`}
+            icon={CalendarClock}
+            color="indigo"
+          />
+          <StatCard
+            label="Runway left to keep contributing"
+            value={`${remainingPercent}%`}
+            icon={TrendingUp}
+            color="indigo"
+          />
         </div>
       ) : null}
 
-      <div className="mb-8">
-        <FormField label="Location">
-          <IconTextInput
-            icon={MapPin}
-            placeholder="Amsterdam, Netherlands"
-            value={form.location}
-            onChange={(value) => {
-              setForm((current) => ({ ...current, location: value }));
-            }}
-          />
-        </FormField>
-      </div>
-
-      {formError ? (
-        <p className="mb-4 rounded-2xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
-          {formError}
-        </p>
-      ) : null}
-
-      <div className="flex justify-end">
-        <SaveActionButton
-          saved={saved}
-          loading={isSaving}
-          onClick={() => {
-            void handleSave();
+      <FormField label="Location">
+        <TextInput
+          placeholder="Amsterdam, Netherlands"
+          value={form.location}
+          onChange={(value) => {
+            setForm((current) => ({ ...current, location: value }));
           }}
         />
-      </div>
-    </div>
+      </FormField>
+
+      {formError ? <FormErrorNotice>{formError}</FormErrorNotice> : null}
+    </SettingsCard>
   );
 }
 

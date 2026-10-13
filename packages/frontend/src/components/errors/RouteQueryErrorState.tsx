@@ -20,7 +20,7 @@ type RouteQueryActionsProps = {
 
 function RouteQueryActions({ failedQueries, retrying }: Readonly<RouteQueryActionsProps>) {
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap gap-2 max-sm:*:flex-1">
       <Button
         loading={retrying}
         loadingLabel="Retrying failed requests"
@@ -40,20 +40,18 @@ function RouteQueryActions({ failedQueries, retrying }: Readonly<RouteQueryActio
 
 function FailedRequestList({ failedLabels }: { failedLabels: readonly string[] }) {
   return (
-    <div className="rounded-lg border border-border-default bg-surface-sunken p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-subtle">
-        Failed requests
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
+    <div>
+      <p className="text-label text-fg-muted">Failed requests</p>
+      <ul className="mt-2 flex flex-wrap gap-2">
         {failedLabels.map((label) => (
-          <span
+          <li
             key={label}
-            className="rounded-sm border border-border-default bg-surface px-3 py-1 text-sm text-fg-strong"
+            className="rounded-sm border border-border-default bg-surface-sunken px-2 py-0.5 text-cell text-fg"
           >
             {label}
-          </span>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -75,15 +73,20 @@ function RouteQueryErrorDetails({
     <div>
       <button
         type="button"
+        aria-expanded={showDetails}
         onClick={onToggle}
-        className="flex w-full items-center justify-between rounded-md border border-border-default bg-surface px-4 py-3 text-left text-sm text-fg-muted transition-colors hover:bg-surface-sunken"
+        className="flex min-h-8 w-full items-center justify-between rounded-md border border-border-default bg-surface px-3 py-1.5 text-left text-cell text-fg transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       >
         <span>Technical details</span>
-        {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        {showDetails ? (
+          <ChevronUp size={16} className="text-fg-muted" aria-hidden="true" />
+        ) : (
+          <ChevronDown size={16} className="text-fg-muted" aria-hidden="true" />
+        )}
       </button>
 
       {showDetails ? (
-        <pre className="mt-3 overflow-auto rounded-lg border border-fg-emphasis bg-fg-deep p-4 text-xs leading-6 text-danger-border">
+        <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border-default bg-surface-sunken p-3 text-caption text-fg">
           {detail}
         </pre>
       ) : null}
@@ -104,30 +107,25 @@ export function RouteQueryErrorState({
   return (
     <PageStack as="main">
       <ContentSection>
-        <Card padding="none" className="overflow-hidden border-danger-soft-strong" role="alert">
-          <div className="border-b border-danger-soft-strong bg-gradient-to-r from-danger-soft via-surface to-warning-soft px-6 py-4">
-            <span className="inline-flex items-center gap-2 rounded-sm border border-danger-border bg-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-danger-hover">
-              <AlertTriangle size={14} />
-              Route Data Unavailable
+        <Card padding="none" className="overflow-hidden" role="alert">
+          <div className="flex min-h-9 items-center border-b border-border-default px-3 py-1 max-sm:min-h-11 max-sm:px-4">
+            <span className="inline-flex items-center gap-1.5 rounded-sm border border-danger bg-danger-soft px-1.5 py-px text-[11px] leading-4 font-medium text-danger">
+              <AlertTriangle size={12} aria-hidden="true" />
+              Route data unavailable
             </span>
           </div>
 
-          <div className="space-y-6 p-6 sm:p-8">
+          <div className="space-y-4 p-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-danger-soft-strong text-danger-hover">
-                  <AlertTriangle size={26} strokeWidth={1.8} />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-semibold text-fg">
-                    {routeName} data is temporarily unavailable
-                  </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-muted">
-                    Quro paused this page because {failedSummary} could not be fetched safely. This
-                    is not the same as an empty state, and retrying will refetch only the failed
-                    requests.
-                  </p>
-                </div>
+              <div>
+                <h1 className="text-title-page text-fg">
+                  {routeName} data is temporarily unavailable
+                </h1>
+                <p className="mt-1 max-w-2xl text-body text-fg-muted">
+                  Quro paused this page because {failedSummary} could not be fetched safely. This is
+                  not the same as an empty state, and retrying will refetch only the failed
+                  requests.
+                </p>
               </div>
 
               <RouteQueryActions failedQueries={failedQueries} retrying={retrying} />

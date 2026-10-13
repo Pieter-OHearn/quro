@@ -1,9 +1,9 @@
-import { useSavedState } from './settingsForm';
+import { FormErrorNotice, SettingsCard, useSavedState } from './settingsForm';
 /* eslint-disable max-lines-per-function */
 import { useState } from 'react';
 
 import { Check, Link2, RefreshCw, Unlink } from 'lucide-react';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, LoadingState, TextInput } from '@/components/ui';
 import { buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
 import { useBunqAvailability } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
@@ -40,21 +40,21 @@ function MappingRow({ mapping }: Readonly<{ mapping: CategoryMapping }>) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5 border-b border-border-subtle last:border-0">
-      <span className="text-xs text-fg-faint shrink-0">
+    <li className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
+      <span className="min-w-0 shrink truncate text-cell text-fg-muted">
         {mapping.source.toUpperCase()} {mapping.sourceKey}
       </span>
-      <input
-        className="flex-1 text-sm text-fg-emphasis bg-transparent border-b border-transparent hover:border-border-default focus:border-brand-disabled focus:outline-none px-1 py-0.5 text-right transition-colors"
+      <TextInput
+        className="max-w-56 text-right"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={setValue}
         onBlur={save}
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
         }}
         aria-label={`Category name for ${mapping.sourceKey}`}
       />
-    </div>
+    </li>
   );
 }
 
@@ -65,18 +65,17 @@ function CategoryMappingsSection() {
   if (mappings.length === 0) return null;
 
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-fg mb-1">Bank category rules</h4>
-      <p className="text-xs text-fg-subtle mb-3">
-        These rules map your bank's categories to Quro's budget categories. Changes apply to future
-        syncs only.
-      </p>
-      <div className="rounded-xl border border-border-default px-4 py-1">
+    <SettingsCard
+      title="Bank category rules"
+      subtitle="These rules map your bank's categories to Quro's budget categories. Changes apply to future syncs only."
+      flush
+    >
+      <ul className="divide-y divide-border-subtle">
         {mappings.map((mapping) => (
           <MappingRow key={mapping.id} mapping={mapping} />
         ))}
-      </div>
-    </div>
+      </ul>
+    </SettingsCard>
   );
 }
 
@@ -113,45 +112,35 @@ export function ConnectionsSection() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12 text-sm text-fg-faint">Loading...</div>
-    );
+    return <LoadingState compact className="min-h-0 py-12" label="Loading connections" />;
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-fg">Connected accounts</h3>
-        <p className="mt-1 text-sm text-fg-subtle">
-          Link external bank accounts to sync your financial data automatically.
-        </p>
-      </div>
+    <div className="space-y-4">
+      <SettingsCard
+        title="Connected accounts"
+        subtitle="Link external bank accounts to sync your financial data automatically."
+      >
+        {error ? <FormErrorNotice>{error}</FormErrorNotice> : null}
 
-      {error ? (
-        <div className="rounded-xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="rounded-xl border border-border-default p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <img src="/bunq-icon.png" alt="bunq" className="h-10 w-10 rounded-lg" />
-            <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <img src="/bunq-icon.png" alt="bunq" className="h-8 w-8 shrink-0 rounded-md" />
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-fg">Bunq</p>
+                <p className="text-body font-medium text-fg">Bunq</p>
                 {connection ? <Badge tone="success">Connected</Badge> : null}
               </div>
               {connection ? (
-                <div className="mt-1 space-y-0.5 text-xs text-fg-subtle">
-                  <p>Last synced: {formatSyncTime(connection.lastSyncAt)}</p>
-                </div>
+                <p className="text-caption text-fg-subtle">
+                  Last synced: {formatSyncTime(connection.lastSyncAt)}
+                </p>
               ) : (
-                <p className="mt-1 text-sm text-fg-subtle">{disconnectedMessage}</p>
+                <p className="text-caption text-fg-subtle">{disconnectedMessage}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 max-sm:*:flex-1">
             {connection ? (
               <>
                 <Button
@@ -172,7 +161,6 @@ export function ConnectionsSection() {
                   size="sm"
                   leadingIcon={saved ? <Check size={14} /> : <Unlink size={14} />}
                   loading={disconnect.isPending}
-                  className={cn(saved && 'bg-success-accent hover:bg-success-accent')}
                   onClick={() => {
                     void handleDisconnect();
                   }}
@@ -193,7 +181,7 @@ export function ConnectionsSection() {
             )}
           </div>
         </div>
-      </div>
+      </SettingsCard>
 
       <CategoryMappingsSection />
     </div>

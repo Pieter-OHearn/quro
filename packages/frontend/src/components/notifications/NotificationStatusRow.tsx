@@ -1,3 +1,5 @@
+import { Badge } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { NotificationStatusCounts } from './types';
 
 type NotificationStatusRowProps = {
@@ -8,30 +10,30 @@ const STATUS_META: Array<{
   key: keyof NotificationStatusCounts;
   label: string;
   dotClass: string;
-  pulse?: boolean;
 }> = [
   { key: 'queuing', label: 'Queuing', dotClass: 'bg-border-strong' },
-  { key: 'processing', label: 'Processing', dotClass: 'bg-brand', pulse: true },
-  { key: 'ready', label: 'Ready', dotClass: 'bg-warning-muted' },
-  { key: 'failed', label: 'Failed', dotClass: 'bg-danger-muted' },
-  { key: 'reminder', label: 'Reminders', dotClass: 'bg-warning-muted' },
+  { key: 'processing', label: 'Processing', dotClass: 'bg-brand' },
+  { key: 'ready', label: 'Ready', dotClass: 'bg-warning' },
+  { key: 'failed', label: 'Failed', dotClass: 'bg-danger' },
+  { key: 'reminder', label: 'Reminders', dotClass: 'bg-warning' },
 ];
 
 export function NotificationStatusRow({ counts }: Readonly<NotificationStatusRowProps>) {
   return (
-    <div className="px-4 py-2 bg-surface-sunken border-b border-border-subtle flex items-center gap-3 overflow-x-auto">
+    <div className="flex items-center gap-3 overflow-x-auto border-b border-border-default bg-surface-sunken px-3 py-1.5">
       {STATUS_META.map((statusMeta) => {
         const count = counts[statusMeta.key];
         return (
-          <div key={statusMeta.key} className="flex items-center gap-1.5">
+          <div key={statusMeta.key} className="flex shrink-0 items-center gap-1.5">
             <span
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${statusMeta.dotClass} ${statusMeta.pulse ? 'animate-pulse' : ''}`}
+              className={cn('h-2 w-2 flex-shrink-0 rounded-full', statusMeta.dotClass)}
+              aria-hidden="true"
             />
-            <span className="text-[10px] text-fg-subtle">{statusMeta.label}</span>
+            <span className="text-caption text-fg-muted">{statusMeta.label}</span>
             {count > 0 && (
-              <span className="text-[9px] bg-border-default text-fg-subtle min-w-3.5 h-3.5 rounded-sm px-1 inline-flex items-center justify-center font-medium">
+              <Badge size="xs" className="font-numeric">
                 {count}
-              </span>
+              </Badge>
             )}
           </div>
         );

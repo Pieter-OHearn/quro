@@ -130,12 +130,12 @@ function Dropdown({
       )}
 
       {isError && (
-        <div className="px-4 py-2.5 border-t border-border-subtle bg-danger-soft/60 flex items-center justify-between gap-3">
-          <p className="text-[11px] text-danger-fg">Couldn&apos;t refresh notifications.</p>
+        <div className="flex items-center justify-between gap-3 border-t border-border-default bg-danger-soft px-3 py-1.5">
+          <p className="text-caption text-danger">Couldn&apos;t refresh notifications.</p>
           <button
             type="button"
             onClick={onRetry}
-            className="text-[11px] font-medium text-danger-fg hover:text-danger-strong"
+            className="rounded-sm text-label text-danger hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
           >
             Retry
           </button>
