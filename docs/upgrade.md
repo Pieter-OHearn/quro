@@ -304,7 +304,7 @@ These commands extend [Upgrade to a new release](#upgrade-to-a-new-release) for 
 1. Take the backup with 0.8.0, as in step 1 of the general procedure. It holds the bank-link secrets unencrypted: it is your way back, so keep it, protected, until 0.9.0 has synced bunq.
 
    ```bash
-   docker compose run --rm migrate backup --label before-0.9.0
+   docker compose run --rm migrate backup --label before-upgrade
    ```
 
 2. Create the key. `quro init` from the 0.9.0 image creates only the files that are missing, so on an existing `config/` it adds `config/secrets/secrets_key` (32 random bytes, mode `0600`) and nothing else, and never prints the value:
@@ -369,7 +369,7 @@ These commands extend [Upgrade to a new release](#upgrade-to-a-new-release) for 
 
 If the sync answers _The stored bunq credentials cannot be read with this instance's secrets key_, the backend runs with a different key than the one that encrypted them: compare the key ids from `secrets status` and mount the right file. If that key is lost, reconnect bunq in **Settings**.
 
-To go back to 0.8.0, restore the `before-0.9.0` archive with the 0.8.0 images as in [Restore the snapshot taken before the upgrade](#restore-the-snapshot-taken-before-the-upgrade). 0.8.0 cannot use encrypted bank links, and 0.9.0's migrations keep it from running on the upgraded database anyway.
+To go back to 0.8.0, restore the `before-upgrade` archive with the 0.8.0 images as in [Restore the snapshot taken before the upgrade](#restore-the-snapshot-taken-before-the-upgrade). 0.8.0 cannot use encrypted bank links, and 0.9.0's migrations keep it from running on the upgraded database anyway.
 
 With your own Compose file, mount a file with 64 hexadecimal characters into every container that runs the server or `quro secrets` (at `/run/secrets/secrets_key`, or set `QRO_SECRETS_KEY_FILE`). Interface changes: `quro doctor` has a new check `secrets`; the backup manifest has a new field `secrets.integrationKeys`; `POST /api/bunq/sync`, `/sync/savings` and `/sync/budget` answer `409` with `code: bunq_reauthorization_required` when stored credentials cannot be opened.
 
