@@ -59,6 +59,25 @@ Dashboard allocations return `netWorth`, `portfolioTotal`, `totalAssets`, `curre
 `savings`, `brokerage`, `property_equity`, and `pension`. Names are presentation text;
 chart colours live on the frontend.
 
+Net worth history (`GET /api/dashboard/net-worth`) returns points of `id`, `month`, `year`,
+`date` (the point's as-of date), `totalValue`, `currency` and `isEstimated`, oldest first and
+ending with today. `range` selects the period:
+
+| `range`       | Points                                                                       |
+| ------------- | ---------------------------------------------------------------------------- |
+| `6m` (absent) | The last six month ends, then today. `/api/dashboard/summary` uses this one. |
+| `1y`          | The last twelve month ends, then today.                                      |
+| `1m`          | One point per day for the last 30 days, then today.                          |
+| `all`         | Month ends from the household's first dated record, at most 360 months back. |
+
+Any other `range` answers 400. The first dated record is the earliest ledger row the history
+replays (the caller's rows and the partner's joint savings and property rows) or stored
+snapshot; a partner's private rows never move it. Month-end points use a stored snapshot when one
+exists; daily points and today are always rebuilt from the ledgers and the stored rate and price
+history, because snapshots are month-end figures. A household with no history answers one point
+for today in every range. The dashboard's range control changes only the chart: the hero keeps
+comparing with the previous month.
+
 Derived dashboard and runway amounts are in EUR, labelled by their response
 currency. Native asset and transaction endpoints keep their own currencies. Inputs
 are converted to EUR before aggregation; the frontend converts aggregate EUR values

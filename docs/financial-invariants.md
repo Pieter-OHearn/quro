@@ -189,7 +189,7 @@ be negative; Quro keeps negative equity rather than flooring it.
 - Dashboard, snapshot and runway figures are computed in EUR on the backend and converted once
   for display.
 - Current figures use the current rate for each currency; history uses the last rate at or before
-  each month's cut-off.
+  each point's cut-off (a month end, or a day in the one-month range).
 - A month before the first stored rate uses the earliest rate and is marked `isEstimated`.
 - A missing or invalid rate fails the request (`503`). Quro never assumes 1:1 for a foreign
   currency and never infers an unknown historical rate.
@@ -202,6 +202,8 @@ be negative; Quro keeps negative equity rather than flooring it.
   `packages/backend/src/lib/requestValidation.ts`. A ledger date is treated as UTC midnight.
 - A completed month ends at 23:59:59.999 UTC on its last day; the current month's cut-off is now.
   A transaction dated today counts in the current month; one dated later does not count yet.
+  The daily points of the one-month history range end at 23:59:59.999 UTC on their day, today's
+  at now.
 - A write deletes the stored snapshots from the month of the earliest affected date onward, so
   they are recomputed. Completed months are otherwise not rewritten.
 - `todayIsoDate` gives the local calendar date (for forms); `toIsoDate` and `toDateOnly` give UTC
@@ -284,7 +286,7 @@ Every derived figure says where its inputs came from and whether any input is a 
 | Indicator | Meaning                                                       | Exposed today                                                                                                                                                                                                       |
 | --------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Source    | Who supplied a value                                          | FX `provider`; holding `manualPrice` and `excludeFromSync`; budget `sourceProvider`, `sourceAmount`, `sourceCurrency`; runway `taxRateSource`, `salaryBasis.status`, `durationSource`, `burnSource`; rule `sources` |
-| As-of     | When a value was true                                         | FX `sourceDate` and `updatedAt`; holding `priceUpdatedAt`; runway `asOf` and `jurisdiction.rulesEffectiveFrom`; history points by month; rule `effectiveFrom`, `effectiveTo`, `reviewedAt`                          |
+| As-of     | When a value was true                                         | FX `sourceDate` and `updatedAt`; holding `priceUpdatedAt`; runway `asOf` and `jurisdiction.rulesEffectiveFrom`; history point `date`; rule `effectiveFrom`, `effectiveTo`, `reviewedAt`                             |
 | Estimated | A fallback, unreviewed, stale or unknown input fed the figure | `isEstimated` on history points and the runway; `isExtrapolated` on rules and the runway jurisdiction; budget `currencyNeedsReview`                                                                                 |
 | Missing   | An input is absent                                            | Missing FX fails with `503`; runway `employment.missingFields`, `setupComplete`, `salaryBasis.status = "missing"`, component `status = "unknown"`; deposit guarantee `confidence = "unverified"`                    |
 

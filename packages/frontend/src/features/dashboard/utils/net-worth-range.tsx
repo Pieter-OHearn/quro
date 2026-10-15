@@ -1,12 +1,28 @@
+import type { ReactNode } from 'react';
 import type { NetWorthRange, NetWorthSnapshot } from '@quro/shared';
 import type { NetWorthChartPoint } from '../types';
 
-export const NET_WORTH_RANGE_OPTIONS: ReadonlyArray<{ value: NetWorthRange; label: string }> = [
-  { value: '1m', label: '1M' },
-  { value: '6m', label: '6M' },
-  { value: '1y', label: '1Y' },
-  { value: 'all', label: 'All' },
+const RANGE_NAMES: ReadonlyArray<{ value: NetWorthRange; short: string; spoken: string }> = [
+  { value: '1m', short: '1M', spoken: '1 month' },
+  { value: '6m', short: '6M', spoken: '6 months' },
+  { value: '1y', short: '1Y', spoken: '1 year' },
+  { value: 'all', short: 'All', spoken: 'All' },
 ];
+
+// The short label is shown; screen readers hear the period in words instead of "1 M".
+export const NET_WORTH_RANGE_OPTIONS: ReadonlyArray<{ value: NetWorthRange; label: ReactNode }> =
+  RANGE_NAMES.map(({ value, short, spoken }) => ({
+    value,
+    label:
+      short === spoken ? (
+        short
+      ) : (
+        <>
+          <span aria-hidden="true">{short}</span>
+          <span className="sr-only">{spoken}</span>
+        </>
+      ),
+  }));
 
 const SHORT_YEAR_DIGITS = 2;
 const DAY_START = 8;
