@@ -23,7 +23,7 @@ utilities, the rules for using them and the shared components. The
 
 ## 2. Colour tokens
 
-The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" were added with V1. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`; rows marked "Legacy alias" are kept only so that old utility names keep compiling, are not used by the shared UI and are removed before the V1 release.
+The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" were added with V1. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`; rows marked "Legacy alias" are kept only so that old utility names keep compiling, must not be used in new code and are removed before the V1 release.
 
 | Variable                   | Light                    | Dark                     | Use                                                                                                         |
 | -------------------------- | ------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------- |
