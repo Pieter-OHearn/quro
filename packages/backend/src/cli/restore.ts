@@ -19,6 +19,7 @@ changed) unless:
   - no other session is connected to the database (stop the backend and the worker),
   - the database is new and empty, or at the archive's migration and, when it holds data,
     QRO_RESTORE_ALLOW_NON_EMPTY=1 is set,
+  - the database server is PostgreSQL 18, the only supported major,
   - the archive is not from a newer release than this image.
 Before it replaces anything it writes a pre-restore archive into QRO_BACKUP_DIR. The database is
 restored in one transaction; afterwards every table and document is compared with the archive.

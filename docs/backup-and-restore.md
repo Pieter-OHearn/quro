@@ -74,13 +74,13 @@ Options:
 
 The archive is written under a hidden temporary name, read back and checked, and only then renamed into place. A backup that fails or is interrupted leaves nothing behind. Archive names use UTC time, so they sort in the order they were taken.
 
-| Exit code | Meaning                                                                                                                                                 |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0         | The archive is written and checked (and copied, and older ones pruned, when configured)                                                                 |
-| 1         | The backup failed, for example running changes did not finish in time, the off-device copy failed or retention could not delete a file. Read the output |
-| 2         | A setting or option is wrong, for example the backup or documents directory does not exist, or `pg_dump` is older than the server. Nothing was written  |
-| 3         | The database was migrated by a newer Quro than this image. Back up with the image that matches the database                                             |
-| 4         | The database cannot be reached                                                                                                                          |
+| Exit code | Meaning                                                                                                                                                                            |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0         | The archive is written and checked (and copied, and older ones pruned, when configured)                                                                                            |
+| 1         | The backup failed, for example running changes did not finish in time, the off-device copy failed or retention could not delete a file. Read the output                            |
+| 2         | A setting or option is wrong, for example the backup or documents directory does not exist, or `pg_dump` is older than the server. Nothing was written                             |
+| 3         | The database server is not PostgreSQL 18 (`PostgreSQL 17 is not supported; use PostgreSQL 18.`), or the database was migrated by a newer Quro than this image. Nothing was written |
+| 4         | The database cannot be reached                                                                                                                                                     |
 
 With filesystem storage, the output warns when the database refers to a document that is not in the documents directory. That document was already missing; the archive is still written.
 
@@ -164,12 +164,13 @@ A restore replaces the database and the documents with the archive's. It refuses
 | `Refusing to restore over a non-empty database or documents directory`                                          | Set `QRO_RESTORE_ALLOW_NON_EMPTY=1` if replacing the current data is what you want                          |
 | `The database's schema is not the archive's`                                                                    | The database was migrated to another version. Restore into a new, empty database, before any `quro migrate` |
 | `The archive was written by Quro …, which is newer than this image` or `… a migration this image does not know` | Restore with the release that wrote the archive, or a newer one                                             |
+| `PostgreSQL 17 is not supported; use PostgreSQL 18.` (or another major)                                         | Restore into a PostgreSQL 18 server                                                                         |
 
 Other exit codes: 1 when the archive is damaged, cut off or the key is wrong (nothing is changed), or when the restored data does not match the archive; 2 when the archive does not exist, an encrypted archive has no key configured, a directory is missing, or an archive with documents meets `QRO_DOCUMENT_STORAGE=s3`; 4 when the database cannot be reached.
 
 What `quro restore` does, in order:
 
-1. Reads the whole archive and checks every checksum (and decrypts it), before it connects anywhere.
+1. Checks the confirmation and that the database server is PostgreSQL 18, then reads the whole archive and checks every checksum (and decrypts it). Nothing is locked or written yet.
 2. Checks the guards above and turns maintenance mode on.
 3. If the database or the documents directory holds anything, writes a pre-restore archive of it into `QRO_BACKUP_DIR` (`quro-backup-…-pre-restore.tar`, encrypted when a key is configured). That archive is your way back.
 4. Reads the archive again into a staging area, checking every checksum again.
@@ -270,7 +271,7 @@ Limits:
 - Changes are refused for as long as the dump and the documents copy take; that grows with the data (about a second for the reference dataset, five for the large one). Schedule backups when nobody uses Quro.
 - A backup needs free space for the archive and a temporary copy of the dump; a restore needs space for the pre-restore archive, a staged copy of the archive's content and, briefly, the previous documents.
 - One encrypted archive can hold up to 64 GiB.
-- Backup and restore are tested on PostgreSQL 18, the only supported server. The drill passes on 18.6.
+- Backup and restore are tested on PostgreSQL 18, the only supported server, and refuse any other major with exit code 3 before they pause changes or write anything. The drill passes on 18.6.
 - Not measured: amd64, a Raspberry Pi or a NAS, network storage for the documents or the off-device directory, and restoring an S3 bucket.
 
 ## Restore a database dump

@@ -28,9 +28,17 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres, { type Sql } from 'postgres';
 import { getConfig, Secret, type BackupConfig } from '../config';
+import { readServerMajor } from '../db/pgTools';
 import { BUNDLED_MIGRATIONS } from '../db/schemaVersion';
 import { runUnlessMaintenance } from '../lib/maintenanceMode';
-import { SchemaNewerThanImageError, writeBackupArchive, type BackupRequest } from './createBackup';
+import { SUPPORTED_POSTGRES_MAJOR } from '../lib/platformSupport';
+import {
+  SchemaNewerThanImageError,
+  defaultBackupDependencies,
+  UnsupportedServerError,
+  writeBackupArchive,
+  type BackupRequest,
+} from './createBackup';
 import { ArchiveDecryptionError } from './encryption';
 import { ArchiveVersionError, parseManifest } from './manifest';
 import {
@@ -171,6 +179,7 @@ function dependencies(overrides: Partial<RestoreDependencies> = {}): RestoreDepe
       return outputPath!;
     },
     checkDump: () => Promise.resolve(),
+    readServerMajor: () => Promise.resolve(SUPPORTED_POSTGRES_MAJOR),
     now: () => new Date(),
     appVersion: 'v0.8.0',
     revision: 'synthetic-revision',
@@ -352,6 +361,41 @@ describe('quro backup', () => {
     expect(dumped.snapshots).toEqual([]);
   });
 
+  test('refuses a PostgreSQL major other than 18 before pausing, dumping or writing', async () => {
+    for (const major of [15, 16, 17, 19]) {
+      let checked = 0;
+      const refused = writeBackupArchive(
+        backupRequest(),
+        dependencies({
+          readServerMajor: () => Promise.resolve(major),
+          checkDump: () => {
+            checked += 1;
+            return Promise.resolve();
+          },
+        }),
+      );
+      await expect(refused).rejects.toThrow(UnsupportedServerError);
+      await expect(refused).rejects.toThrow(
+        `PostgreSQL ${major} is not supported; use PostgreSQL 18.`,
+      );
+      // The dump check runs after the session is open and before changes are paused.
+      expect(checked).toBe(0);
+    }
+    expect(readdirSync(backups)).toEqual([]);
+    expect(dumped.snapshots).toEqual([]);
+    expect((await runUnlessMaintenance(() => Promise.resolve(), source)).ran).toBe(true);
+  });
+
+  test('reads the real server major and proceeds on PostgreSQL 18', async () => {
+    expect(await readServerMajor(sourceUrl)).toBe(SUPPORTED_POSTGRES_MAJOR);
+    const { readServerMajor: real } = defaultBackupDependencies();
+    const archive = await writeBackupArchive(
+      backupRequest(),
+      dependencies({ readServerMajor: real }),
+    );
+    expect(readdirSync(backups)).toEqual([archive.name]);
+  });
+
   test('refuses a database migrated by a newer release', async () => {
     await expect(
       writeBackupArchive(
@@ -510,6 +554,45 @@ describe('quro restore', () => {
       restoreArchive(restoreRequest(unknownMigration, { allowNonEmpty: true }), dependencies()),
     ).rejects.toThrow('does not know (9999_future)');
     expect(await targetRows('users')).toBe(before);
+  });
+
+  test('refuses a PostgreSQL major other than 18 before reading the archive or changing anything', async () => {
+    const archive = await writeBackupArchive(backupRequest(), dependencies({ now: distinctClock }));
+    writeDocument(targetDocuments, 'users/1/kept.pdf', pdf('kept'));
+    const before = await targetRows('users');
+    const targetListing = readdirSync(targetDocuments, { recursive: true });
+    for (const major of [15, 16, 17, 19]) {
+      const calls: string[] = [];
+      const refused = restoreArchive(
+        restoreRequest(archive.path, { allowNonEmpty: true }),
+        dependencies({
+          readServerMajor: () => Promise.resolve(major),
+          checkRestore: () => {
+            calls.push('checkRestore');
+            return Promise.resolve();
+          },
+          restore: () => {
+            calls.push('restore');
+            return Promise.resolve();
+          },
+        }),
+      );
+      await expect(refused).rejects.toThrow(UnsupportedServerError);
+      await expect(refused).rejects.toThrow(
+        `PostgreSQL ${major} is not supported; use PostgreSQL 18.`,
+      );
+      expect(calls).toEqual([]);
+    }
+    // No pre-restore archive, no staging files, no maintenance lock, rows and documents as before.
+    expect(readdirSync(backups)).toEqual([archive.name]);
+    expect(readdirSync(targetDocuments, { recursive: true })).toEqual(targetListing);
+    expect(await targetRows('users')).toBe(before);
+    const probe = postgres(targetUrl, { max: 1 });
+    try {
+      expect((await runUnlessMaintenance(() => Promise.resolve(), probe)).ran).toBe(true);
+    } finally {
+      await probe.end();
+    }
   });
 
   test('refuses a damaged archive before touching anything', async () => {

@@ -88,7 +88,7 @@ The example Compose file runs every service without the Linux capabilities it do
 
 ## Existing PostgreSQL server
 
-PostgreSQL 18 is the only supported server; `quro migrate` refuses any other major with exit code 3. Do steps 1 to 3 of [Install](#install), then:
+PostgreSQL 18 is the only supported server; `quro migrate`, `quro backup` and `quro restore` refuse any other major with exit code 3. Do steps 1 to 3 of [Install](#install), then:
 
 1. In `compose.yaml`, delete the `db` service and the `depends_on` block of the `migrate` service, which waits for it. The `postgres` volume is then unused; delete it too, or leave it.
 2. Point the settings in `config/quro.env` at your server: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_ADMIN_USER` and `POSTGRES_APP_USER`, and `POSTGRES_SSLMODE` (for example `require`) for a server on another machine. The containers reach the host through `POSTGRES_HOST`, so use an address they can reach: a name or IP address on your network, not `localhost`. For a server on the Docker host itself, Docker Desktop provides `host.docker.internal`; on Linux, use the host's address on your network, and make sure PostgreSQL listens on it and `pg_hba.conf` allows the Docker network.

@@ -104,13 +104,13 @@ Rules for every command:
 
 Exit codes:
 
-| Code | Meaning                                                                                                                                               | What automation should do |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| 0    | Done, or nothing to do                                                                                                                                | Continue                  |
-| 1    | The operation failed                                                                                                                                  | Stop; read the output     |
-| 2    | Usage or settings are invalid. Nothing was changed                                                                                                    | Fix the settings          |
-| 3    | A safety guard refused: missing confirmation, non-empty restore target, schema newer than the image, missing database privileges. Nothing was changed | Needs a person            |
-| 4    | The database or document store is unreachable                                                                                                         | Retry later               |
+| Code | Meaning                                                                                                                                                                       | What automation should do |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| 0    | Done, or nothing to do                                                                                                                                                        | Continue                  |
+| 1    | The operation failed                                                                                                                                                          | Stop; read the output     |
+| 2    | Usage or settings are invalid. Nothing was changed                                                                                                                            | Fix the settings          |
+| 3    | A safety guard refused: missing confirmation, non-empty restore target, schema newer than the image, missing database privileges, unsupported PostgreSQL. Nothing was changed | Needs a person            |
+| 4    | The database or document store is unreachable                                                                                                                                 | Retry later               |
 
 The JSON output of `quro version --json`, `quro migrate --status --json` and `quro doctor --json`, and the readiness report, may change in any 0.x release; the upgrade notes list each change. They are stable from 1.0.0. `quro migrate --status` exits 1 while migrations are pending. [Interfaces for automation](upgrade.md#interfaces-for-automation) describes the fields.
 
@@ -196,7 +196,7 @@ Optional features (bunq, tracing, statement OCR) keep their current settings, li
 
 ### PostgreSQL
 
-PostgreSQL 18 is the only supported server. `quro migrate` and `quro doctor` refuse any other major with exit code 3. Backup and restore need client tools of the same or a newer major version than the server, so the backend image ships PostgreSQL 18 client tools.
+PostgreSQL 18 is the only supported server. `quro migrate`, `quro doctor`, `quro backup` and `quro restore` refuse any other major with exit code 3, before anything is written or locked. Backup and restore also need client tools of the same or a newer major version than the server, so the backend image ships PostgreSQL 18 client tools.
 
 Two roles:
 
@@ -268,8 +268,8 @@ The backend container's health check is `quro health`. The server never migrates
 - A backup is one archive in `QRO_BACKUP_DIR`: a custom-format database dump, the documents directory (filesystem) or an object manifest (S3), and a manifest with the application version and image revision, the last applied migration, the SHA-256 of every entry, a row count and checksum of every table, what the archive leaves out (settings, secret files, the backup and secrets keys), and the key id of every secrets key the dump's bank-link secrets are encrypted with. The archive is written under a temporary name, read back and checked, and renamed when complete. **0.7.0:** a failed dump leaves an empty file with the final name.
 - While the dump and the documents are copied, maintenance mode holds a database advisory lock: the server answers changes with 503 and background jobs skip their turn; running changes finish first. The lock ends with the command's connection, so a killed backup cannot leave the instance paused. The server finishes open requests on `SIGTERM` before it exits.
 - Optional: archives encrypted with a key file (AES-256-GCM, scrypt), a checked copy in an off-device directory, and retention that deletes older unlabelled archives only after the new one and its copy are checked.
-- A backup refuses to run with client tools older than the server, and refuses a database migrated by a newer release (exit code 3).
-- A restore keeps the current guards: explicit confirmation, a refusal to overwrite a non-empty database or documents directory unless allowed, a refusal while other sessions are connected, and an automatic pre-restore archive. It reads the whole archive and checks every checksum before it changes anything, refuses an archive from a newer application version or with a migration the image does not bundle, and compares every table and document with the manifest afterwards.
+- A backup refuses a server other than PostgreSQL 18 and a database migrated by a newer release (exit code 3), and refuses to run with client tools older than the server, all before it pauses changes or writes anything.
+- A restore refuses a server other than PostgreSQL 18 (exit code 3) before it reads the archive, and keeps the current guards: explicit confirmation, a refusal to overwrite a non-empty database or documents directory unless allowed, a refusal while other sessions are connected, and an automatic pre-restore archive. It reads the whole archive and checks every checksum before it changes anything, refuses an archive from a newer application version or with a migration the image does not bundle, and compares every table and document with the manifest afterwards.
 - A restore needs a database that is new and empty, or at the archive's migration. On a new machine with an image of the archive's version, `quro migrate` may run before or after `quro restore`; with a newer image, run `quro restore` into the empty database first, then `quro migrate`.
 - Bare dumps (`.dump`) from earlier releases are restored with the image's `db:restore` script, not with `quro restore` (see [Restore a database dump](backup-and-restore.md#restore-a-database-dump)).
 
