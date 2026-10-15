@@ -373,14 +373,6 @@ To go back to 0.8.0, restore the `before-upgrade` archive with the 0.8.0 images 
 
 With your own Compose file, mount a file with 64 hexadecimal characters into every container that runs the server or `quro secrets` (at `/run/secrets/secrets_key`, or set `QRO_SECRETS_KEY_FILE`). Interface changes: `quro doctor` has a new check `secrets`; the backup manifest has a new field `secrets.integrationKeys`; `POST /api/bunq/sync`, `/sync/savings` and `/sync/budget` answer `409` with `code: bunq_reauthorization_required` when stored credentials cannot be opened.
 
-#### PostgreSQL 18 only
-
-What the operator does: nothing on PostgreSQL 18. A database on PostgreSQL 16 or 17 moves to 18 while 0.8.0 still runs, before you pin 0.9.0.
-
-- PostgreSQL 18 is the only supported server. `quro migrate` and `quro doctor` refuse 16 and 17 with exit code 3 (`PostgreSQL 16 is not supported; use PostgreSQL 18.`), so the `migrate` service fails and the backend does not start. 0.8.0 still ran on them.
-- To move, take a backup with 0.8.0, then follow [Restore the snapshot taken before the upgrade](#restore-the-snapshot-taken-before-the-upgrade) with the 0.8.0 images still pinned, and in its step 2 also change the `db` image to `postgres:18.6-alpine3.23`. PostgreSQL 18 keeps its data under `/var/lib/postgresql`; never point it at a directory an older major wrote. Then upgrade to 0.9.0.
-- Restoring a backup into a PostgreSQL 16 or 17 server is not supported.
-
 #### Settings of releases before 0.8.0
 
 What the operator does: before upgrading, run `docker compose run --rm migrate doctor` with 0.8.0 and remove every setting it reports as no longer read. Nothing else changes for an install that 0.8.0 already accepted.

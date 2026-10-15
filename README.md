@@ -191,7 +191,7 @@ Quro is pre-1.0. What it does not do yet, or does only partly:
 - **Bank linking supports bunq only.** Other banks need manual entry.
 - **No data export or CSV import yet.** Both are planned for 1.0. Until then, `quro backup` is the way to take your data with you.
 - **Statement import is not part of the example install.** It needs a GPU and images built from a checkout.
-- **PostgreSQL 18 only.** `quro migrate` refuses PostgreSQL 16, 17 and any other major.
+- **PostgreSQL 18 only.** `quro migrate`, `quro doctor`, `quro backup` and `quro restore` refuse any other major.
 - **Tested in CI and containers,** on amd64 and arm64 runners and Docker Desktop, not on a Raspberry Pi or a NAS. Measured times are in [backup and restore](docs/backup-and-restore.md#recovery-objectives).
 - **Breaking changes between minor versions** are possible before 1.0. Each release's upgrade notes say what to change.
 

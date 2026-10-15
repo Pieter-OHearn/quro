@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runUnlessMaintenance } from '../lib/maintenanceMode';
 import type { BackupDependencies } from '../backup/createBackup';
+import { defaultRestoreDependencies } from '../backup/restoreArchive';
+import { SUPPORTED_POSTGRES_MAJOR } from '../lib/platformSupport';
 import { BUNDLED_MIGRATIONS } from '../db/schemaVersion';
 import { applyTestSettings, writeTestSecret } from '../test/config';
 import { runBackupCommand } from './backup';
@@ -41,6 +43,7 @@ const fakes = (): BackupDependencies => ({
     return Promise.resolve(outputPath!);
   },
   checkDump: () => Promise.resolve(),
+  readServerMajor: () => Promise.resolve(SUPPORTED_POSTGRES_MAJOR),
   now: () => new Date(Date.UTC(2026, 9, 10, 3, 0, tick++)),
   appVersion: 'v0.8.0',
   revision: null,
@@ -63,9 +66,26 @@ async function backup(...args: string[]) {
   return { exitCode, out: output.out(), err: output.err() };
 }
 
+async function backupOnServer(major: number, ...args: string[]) {
+  const output = capture();
+  const dependencies = { ...fakes(), readServerMajor: () => Promise.resolve(major) };
+  const exitCode = await runBackupCommand(args, output.io, dependencies);
+  return { exitCode, out: output.out(), err: output.err() };
+}
+
 async function restore(...args: string[]) {
   const output = capture();
   const exitCode = await runRestoreCommand(args, output.io);
+  return { exitCode, out: output.out(), err: output.err() };
+}
+
+async function restoreOnServer(major: number, ...args: string[]) {
+  const output = capture();
+  const dependencies = {
+    ...defaultRestoreDependencies(),
+    readServerMajor: () => Promise.resolve(major),
+  };
+  const exitCode = await runRestoreCommand(args, output.io, dependencies);
   return { exitCode, out: output.out(), err: output.err() };
 }
 
@@ -204,6 +224,18 @@ describe('quro backup', () => {
     expect(readdirSync(backups)).toEqual([]);
   });
 
+  test('a PostgreSQL major other than 18 is exit code 3 and writes nothing', async () => {
+    for (const major of [16, 17]) {
+      const result = await backupOnServer(major);
+      expect(result.exitCode).toBe(EXIT_REFUSED);
+      expect(result.err).toBe(`PostgreSQL ${major} is not supported; use PostgreSQL 18.`);
+      expect(result.out).toBe('');
+      expect(readdirSync(backups)).toEqual([]);
+    }
+    expect((await backupOnServer(SUPPORTED_POSTGRES_MAJOR)).exitCode).toBe(EXIT_OK);
+    expect(readdirSync(backups)).toHaveLength(1);
+  });
+
   test('an off-device directory without encryption is refused as a setting', async () => {
     settings({ QRO_BACKUP_OFFSITE_DIR: offsite });
     const result = await backup();
@@ -233,6 +265,22 @@ describe('archive problems and restore guards', () => {
     const result = await restore(archive);
     expect(result.exitCode).toBe(EXIT_REFUSED);
     expect(result.err).toContain('QRO_RESTORE_CONFIRM=restore-db');
+  });
+
+  test('restore on a PostgreSQL major other than 18 is exit code 3 and changes nothing', async () => {
+    expect((await backup()).exitCode).toBe(EXIT_OK);
+    const archives = readdirSync(backups);
+    const documentsBefore = readdirSync(documents, { recursive: true });
+    settings({ QRO_RESTORE_CONFIRM: 'restore-db', QRO_RESTORE_ALLOW_NON_EMPTY: '1' });
+    for (const major of [16, 17]) {
+      const result = await restoreOnServer(major, join(backups, archives[0]!));
+      expect(result.exitCode).toBe(EXIT_REFUSED);
+      expect(result.err).toBe(`PostgreSQL ${major} is not supported; use PostgreSQL 18.`);
+      expect(result.out).toBe('');
+    }
+    // No pre-restore archive and no staging files.
+    expect(readdirSync(backups)).toEqual(archives);
+    expect(readdirSync(documents, { recursive: true })).toEqual(documentsBefore);
   });
 
   test('an encrypted archive needs its key: none is exit code 2, a wrong one exit code 1', async () => {

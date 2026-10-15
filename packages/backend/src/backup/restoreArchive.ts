@@ -20,6 +20,7 @@ import {
 } from '../lib/maintenanceMode';
 import { PRE_RESTORE_LABEL } from './archiveNames';
 import {
+  assertSupportedServer,
   assertWritableDirectory,
   BackupDirectoryError,
   defaultBackupDependencies,
@@ -331,6 +332,8 @@ async function checkPrerequisites(
   if (request.documentStorage.driver === 'filesystem') {
     await assertWritableDirectory(request.documentStorage.directory, 'documents directory');
   }
+  // Before the archive is read and before any connection takes a lock or a file is written.
+  await assertSupportedServer(request.adminUrl, dependencies);
   request.log(`Checking ${request.archivePath}`);
   const { manifest } = await scanArchive(request.archivePath, request.backup.encryptionKey);
   assertRestorableBy(manifest, {

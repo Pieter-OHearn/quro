@@ -4,7 +4,7 @@ import { access, open, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type Sql, type TransactionSql } from 'postgres';
 import type { DocumentStorageConfig, Secret } from '../config';
-import { checkPgDump, createDatabaseBackup } from '../db/pgTools';
+import { checkPgDump, createDatabaseBackup, readServerMajor } from '../db/pgTools';
 import {
   BUNDLED_MIGRATIONS,
   compareSchema,
@@ -18,6 +18,7 @@ import {
   leaveMaintenance,
   openMaintenanceSession,
 } from '../lib/maintenanceMode';
+import { postgresMajorProblem } from '../lib/platformSupport';
 import { archiveName, partialName } from './archiveNames';
 import { EncryptingSink } from './encryption';
 import {
@@ -77,6 +78,14 @@ export class SchemaNewerThanImageError extends Error {
   }
 }
 
+/** The database server is a PostgreSQL major Quro does not support (the message says which). */
+export class UnsupportedServerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnsupportedServerError';
+  }
+}
+
 export type BackupRequest = {
   adminUrl: string;
   documentStorage: DocumentStorageConfig;
@@ -94,6 +103,7 @@ export type BackupRequest = {
 export type BackupDependencies = {
   dump: typeof createDatabaseBackup;
   checkDump: (connectionString: string) => Promise<void>;
+  readServerMajor: (connectionString: string) => Promise<number>;
   now: () => Date;
   appVersion: string | null;
   revision: string | null;
@@ -107,6 +117,7 @@ export function defaultBackupDependencies(): BackupDependencies {
   return {
     dump: createDatabaseBackup,
     checkDump: checkPgDump,
+    readServerMajor,
     now: () => new Date(),
     appVersion: known(build.version),
     revision: known(build.revision),
@@ -152,6 +163,18 @@ async function assertDocumentsDirectory(directory: string): Promise<void> {
       `The documents directory ${directory} (QRO_DOCUMENTS_DIR) does not exist, so the documents cannot be backed up. Nothing was written.`,
     );
   }
+}
+
+/**
+ * Refuses a PostgreSQL major other than the supported one, with the message `quro migrate` and
+ * `quro doctor` print. Run before anything is written, paused or locked.
+ */
+export async function assertSupportedServer(
+  connectionString: string,
+  dependencies: Pick<BackupDependencies, 'readServerMajor'>,
+): Promise<void> {
+  const problem = postgresMajorProblem(await dependencies.readServerMajor(connectionString));
+  if (problem) throw new UnsupportedServerError(problem);
 }
 
 function planPaths(request: BackupRequest, createdAt: Date): Paths {
@@ -452,6 +475,7 @@ export async function writeBackupArchive(
   if (request.documentStorage.driver === 'filesystem') {
     await assertDocumentsDirectory(request.documentStorage.directory);
   }
+  await assertSupportedServer(request.adminUrl, dependencies);
   const session = openMaintenanceSession(request.adminUrl, 'quro-backup');
   const planned: { paths: Paths | null } = { paths: null };
   try {

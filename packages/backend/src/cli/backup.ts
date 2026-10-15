@@ -26,6 +26,7 @@ list of documents the database refers to (S3 storage), and a manifest with versi
 checksums. While the database and the documents are copied, changes are paused: the server
 answers them with 503 and background jobs wait. The archive is read back and checked before it
 is kept. Settings files and secret files are never in an archive; keep a copy of them elsewhere.
+It refuses (exit code 3, nothing written) a database server other than PostgreSQL 18.
 
 Options:
   --output <dir>     Write into this directory instead of QRO_BACKUP_DIR.
