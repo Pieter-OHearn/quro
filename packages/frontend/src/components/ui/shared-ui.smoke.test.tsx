@@ -415,7 +415,6 @@ const smokeCases: readonly SmokeCase[] = [
     element: (
       <SegmentedControl
         variant="pill"
-        tone="dark"
         value="month"
         onChange={noop}
         options={[

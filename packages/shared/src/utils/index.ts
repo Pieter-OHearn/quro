@@ -16,13 +16,14 @@ const CACHEABLE_OPTION_KEYS = new Set([
   'currency',
   'minimumFractionDigits',
   'maximumFractionDigits',
+  'signDisplay',
 ]);
 
 function getNumberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
   for (const key in options) {
     if (!CACHEABLE_OPTION_KEYS.has(key)) return new Intl.NumberFormat(locale, options);
   }
-  const key = `${locale}|${options.style}|${options.currency}|${options.minimumFractionDigits}|${options.maximumFractionDigits}`;
+  const key = `${locale}|${options.style}|${options.currency}|${options.minimumFractionDigits}|${options.maximumFractionDigits}|${options.signDisplay}`;
   let formatter = numberFormatCache.get(key);
   if (!formatter) {
     formatter = new Intl.NumberFormat(locale, options);
@@ -59,18 +60,28 @@ export function formatPercent(
   })}%`;
 }
 
+const TRUE_MINUS = '\u2212';
+
+/**
+ * Formats a money amount in the user's number format. A negative amount reads with a true minus
+ * sign (U+2212), as `−€612.75` or `−612,75 €`; an amount that rounds to zero has no sign.
+ */
 export function formatCurrency(
   amount: number,
   currency: string,
   decimals = true,
   numberFormat: NumberFormatPreference = DEFAULT_NUMBER_FORMAT,
 ): string {
-  return formatNumber(amount, numberFormat, {
+  return getNumberFormat(resolveNumberFormat(numberFormat), {
     style: 'currency',
     currency,
     minimumFractionDigits: decimals ? 2 : 0,
     maximumFractionDigits: decimals ? 2 : 0,
-  });
+    signDisplay: 'negative',
+  })
+    .formatToParts(amount)
+    .map((part) => (part.type === 'minusSign' ? TRUE_MINUS : part.value))
+    .join('');
 }
 
 const UNIT_PRICE_MIN_DECIMALS = 2;

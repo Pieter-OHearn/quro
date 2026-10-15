@@ -16,7 +16,6 @@ import {
 } from './mortgage-notifications';
 import type { NotificationItem, NotificationStatusCounts } from './types';
 
-const RING_DURATION_MS = 700;
 const BADGE_OVERFLOW_LIMIT = 9;
 
 function useMortgageReminders(
@@ -54,19 +53,12 @@ function useMortgageReminders(
 
 type BellButtonProps = {
   open: boolean;
-  ring: boolean;
   unreadCount: number;
   hasActiveJobs: boolean;
   onToggle: () => void;
 };
 
-function BellButton({
-  open,
-  ring,
-  unreadCount,
-  hasActiveJobs,
-  onToggle,
-}: Readonly<BellButtonProps>) {
+function BellButton({ open, unreadCount, hasActiveJobs, onToggle }: Readonly<BellButtonProps>) {
   return (
     <button
       type="button"
@@ -77,8 +69,11 @@ function BellButton({
           : 'text-fg-subtle hover:bg-surface-muted hover:text-fg active:bg-surface-muted'
       }`}
       title="Notifications"
+      aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} new` : 'Notifications'}
+      aria-expanded={open}
     >
-      <Bell size={16} className={ring ? 'animate-bounce' : ''} />
+      {/* No ring or bounce when a notification arrives: the count badge is the signal. */}
+      <Bell size={16} aria-hidden />
 
       {unreadCount > 0 && (
         <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm border-2 border-surface-sunken bg-danger px-0.5 text-[11px] leading-none font-semibold text-fg-inverted tabular-nums">
@@ -87,7 +82,7 @@ function BellButton({
       )}
 
       {unreadCount === 0 && hasActiveJobs && (
-        <span className="absolute top-1.5 right-1.5 h-2 w-2 animate-pulse rounded-full border border-surface-sunken bg-brand" />
+        <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full motion-safe:animate-pulse border border-surface-sunken bg-brand" />
       )}
     </button>
   );
@@ -149,9 +144,7 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [ring, setRing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  const previousUnreadCountRef = useRef(0);
   const notificationsQuery = usePensionImportNotifications();
   const mortgagesQuery = useMortgages();
   const mortgageReminders = useMortgageReminders(user?.id, mortgagesQuery.data ?? []);
@@ -163,18 +156,6 @@ export function NotificationBell() {
   const counts = useMemo(() => buildNotificationStatusCounts(notifications), [notifications]);
   const unreadCount = counts.ready + counts.failed + counts.reminder;
   const hasActiveJobs = counts.queuing > 0 || counts.processing > 0;
-
-  useEffect(() => {
-    if (unreadCount <= previousUnreadCountRef.current) {
-      previousUnreadCountRef.current = unreadCount;
-      return undefined;
-    }
-
-    setRing(true);
-    const timeoutId = setTimeout(() => setRing(false), RING_DURATION_MS);
-    previousUnreadCountRef.current = unreadCount;
-    return () => clearTimeout(timeoutId);
-  }, [unreadCount]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -207,7 +188,6 @@ export function NotificationBell() {
     <div className="relative" ref={panelRef}>
       <BellButton
         open={open}
-        ring={ring}
         unreadCount={unreadCount}
         hasActiveJobs={hasActiveJobs}
         onToggle={() => {

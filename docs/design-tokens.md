@@ -7,16 +7,16 @@ design itself (principles, every colour with its reason, type, density, shape, m
 and the logo) is specified in [V1 design](design-v1.md). Read that page for what the design is and
 this one for how to build with it.
 
-| Source                                                  | What it holds                                                                                        |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| [V1 design](design-v1.md)                               | The values and the reasons for them. Code implements them and does not round or rename them          |
-| `packages/frontend/src/styles/theme.css`                | Every token, light and dark, the Tailwind mapping, the type utilities and the element defaults       |
-| `packages/frontend/src/styles/theme.test.ts`            | Fails when a dark value, a shadow or a duration differs from the V1 design page                      |
-| `packages/frontend/src/lib/utils.ts`                    | `cn()` and `TYPE_SCALE_UTILITIES`, which lets class merging keep a type style next to a colour class |
-| `packages/frontend/src/components/ui/`                  | Shared atoms, molecules, organisms and page templates, exported from `index.ts`                      |
-| `packages/frontend/src/components/layout/`              | The shell: sidebar, header, phone tab bar                                                            |
-| `packages/frontend/src/components/finance/`             | Display helpers shared by finance pages                                                              |
-| `scripts/eslint/no-raw-palette.mjs`, `no-monospace.mjs` | The `quro-ui/no-raw-palette` and `quro-ui/no-monospace` lint rules                                   |
+| Source                                                  | What it holds                                                                                                             |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [V1 design](design-v1.md)                               | The values and the reasons for them. Code implements them and does not round or rename them                               |
+| `packages/frontend/src/styles/theme.css`                | Every token, light and dark, the Tailwind mapping, the type utilities and the element defaults                            |
+| `packages/frontend/src/styles/theme.test.ts`            | Fails when a dark value, a shadow or a duration differs from the V1 design page, or a colour token differs from this page |
+| `packages/frontend/src/lib/utils.ts`                    | `cn()` and `TYPE_SCALE_UTILITIES`, which lets class merging keep a type style next to a colour class                      |
+| `packages/frontend/src/components/ui/`                  | Shared atoms, molecules, organisms and page templates, exported from `index.ts`                                           |
+| `packages/frontend/src/components/layout/`              | The shell: sidebar, header, phone tab bar                                                                                 |
+| `packages/frontend/src/components/finance/`             | Display helpers shared by finance pages                                                                                   |
+| `scripts/eslint/no-raw-palette.mjs`, `no-monospace.mjs` | The `quro-ui/no-raw-palette` and `quro-ui/no-monospace` lint rules                                                        |
 
 ## Rules
 
@@ -78,7 +78,7 @@ generates `bg-<token>`, `text-<token>`, `border-<token>` and the other colour ut
 ### Values
 
 Tokens with a literal value. Light is the `:root` value and dark is the `.dark` override; both live
-in `theme.css`, and the dark column is checked against [V1 design](design-v1.md) by `theme.test.ts`.
+in `theme.css`. `theme.test.ts` checks both columns and the alias table below against `theme.css`, and the dark column against [V1 design](design-v1.md).
 
 | Token            | Light       | Dark        |
 | ---------------- | ----------- | ----------- |
@@ -145,9 +145,9 @@ pair must keep, is in [V1 design, section 2](design-v1.md#2-colour-tokens).
   `var(--chart-axis)` and never hard-codes them.
 - `DATA_COLORS` in `packages/frontend/src/lib/dataColors.ts` holds the categorical colours saved in
   API payloads. Their hex values are identities and never change; `dataColorToken()` displays a
-  saved preset through the matching `--data-*` variable, and `--data-*` points at a `--viz-*` colour
-  (an expense or alert identity points at `loss`), so several identities share one colour. Custom
-  user colours pass through unchanged.
+  saved preset through the matching `--data-*` variable, and `--data-*` points at a `--viz-*` colour,
+  so several identities share one colour; the legacy expense and alert identities display in
+  terracotta (`viz-4`), never in the loss red. Custom user colours pass through unchanged.
 - Category colour pickers (goals, budget categories, debts) offer only the six `CATEGORY_COLORS`, one
   canonical identity per `viz-*` colour. A saved value that is no longer offered is not rewritten:
   `categoryColorFor()` picks the swatch the picker shows as selected, and the value keeps displaying
@@ -155,16 +155,15 @@ pair must keep, is in [V1 design, section 2](design-v1.md#2-colour-tokens).
 - A liability balance or an outgoing payment reads as a negative amount with a true minus sign
   through `formatAsNegative()` in `packages/frontend/src/lib/liability.ts`.
 
-### Legacy aliases
+### Removed names
 
-`theme.css` still defines a block of older names so that existing utilities keep compiling: the
-`accent-*` families, `brand-accent`, `brand-deep`, `brand-strong`, `brand-tint`, `brand-disabled`,
-`brand-border`, `brand-soft-strong`, the `-fg`, `-border`, `-muted`, `-strong`, `-accent` and
-`-soft-strong` variants of the status tokens, `fg-strong`, `fg-emphasis`, `fg-disabled`, `fg-deep`,
-`overlay`, `surface-inverse-raised` and the gradient and code surfaces. Each is a `var()` reference
-to a token above, so none of them has a colour of its own. Do not use them in new code; they are
-removed before the V1 release. The same goes for the `data-*` colour utilities: use `var(--viz-*)`
-or `dataColorToken()`.
+The names used before V1 are no longer defined, so a utility built from one of them compiles to
+nothing: the `accent-*` families, `brand-accent`, `brand-deep`, `brand-strong`, `brand-tint`,
+`brand-disabled`, `brand-border`, `brand-soft-strong`, the `-fg`, `-border`, `-muted`, `-strong`,
+`-accent` and `-soft-strong` variants of the status tokens, `fg-strong`, `fg-emphasis`,
+`fg-disabled`, `fg-deep`, `overlay`, `surface-inverse-raised` and the gradient and code surfaces.
+Use the tokens above. The `--data-*` variables have no Tailwind utility; read a saved colour with
+`dataColorToken()` and a chart colour as `var(--viz-*)`.
 
 ## Type
 
@@ -174,21 +173,23 @@ One family, Geist (variable, weights 400 to 600), self-hosted through `@fontsour
 utility sets size, line height, weight and letter spacing together; add a colour class next to
 it (`text-label text-fg-muted`).
 
-| Utility              | Size / line height                    | Weight | Tracking | Use                                               |
-| -------------------- | ------------------------------------- | ------ | -------- | ------------------------------------------------- |
-| `text-figure-hero`   | 30px / 36px (34px / 40px below 640px) | 600    | -0.02em  | The one headline figure of a page                 |
-| `text-figure-lg`     | 20px / 24px                           | 600    | -0.01em  | Stat cards                                        |
-| `text-figure-md`     | 14px / 20px (15px below 640px)        | 500    | 0        | Figures outside tables: list rows, meter captions |
-| `text-figure-cell`   | 13px / 18px                           | 400    | 0        | Table cells, right-aligned                        |
-| `text-title-page`    | 20px / 28px                           | 600    | -0.01em  | Page title                                        |
-| `text-title-section` | 15px / 20px                           | 600    | 0        | Card and dialog titles                            |
-| `text-body`          | 14px / 20px (15px below 640px)        | 400    | 0        | Prose                                             |
-| `text-cell`          | 13px / 18px                           | 400    | 0        | Tables and controls                               |
-| `text-field`         | 13px / 18px (16px / 20px below 640px) | 400    | 0        | Text in inputs, selects and text areas            |
-| `text-label`         | 12px / 16px                           | 500    | 0        | Field labels, column headers, stat labels         |
-| `text-caption`       | 12px / 16px                           | 400    | 0        | Captions and timestamps                           |
+| Utility               | Size / line height                    | Weight | Tracking | Use                                               |
+| --------------------- | ------------------------------------- | ------ | -------- | ------------------------------------------------- |
+| `text-figure-display` | 48px / 52px (36px / 40px below 640px) | 600    | -0.025em | The landing page headline only                    |
+| `text-figure-hero`    | 30px / 36px (34px / 40px below 640px) | 600    | -0.02em  | The one headline figure of a page                 |
+| `text-figure-lg`      | 20px / 24px                           | 600    | -0.01em  | Stat cards                                        |
+| `text-figure-md`      | 14px / 20px (15px below 640px)        | 500    | 0        | Figures outside tables: list rows, meter captions |
+| `text-figure-cell`    | 13px / 18px                           | 400    | 0        | Table cells, right-aligned                        |
+| `text-title-page`     | 20px / 28px                           | 600    | -0.01em  | Page title                                        |
+| `text-title-section`  | 15px / 20px                           | 600    | 0        | Card and dialog titles                            |
+| `text-body`           | 14px / 20px (15px below 640px)        | 400    | 0        | Prose                                             |
+| `text-cell`           | 13px / 18px                           | 400    | 0        | Tables and controls                               |
+| `text-field`          | 13px / 18px (16px / 20px below 640px) | 400    | 0        | Text in inputs, selects and text areas            |
+| `text-label`          | 12px / 16px                           | 500    | 0        | Field labels, column headers, stat labels         |
+| `text-caption`        | 12px / 16px                           | 400    | 0        | Captions and timestamps                           |
 
-- The four `figure` styles also lock tabular, lining numerals. Every number that can be compared with
+- The four `figure` styles from `figure-hero` down also lock tabular, lining numerals;
+  `figure-display` is a headline, not a figure, and keeps proportional numerals. Every number that can be compared with
   another uses them or `font-numeric`, right-aligned in columns.
 - `text-field` is 16px below 640px because iOS Safari zooms into a focused field whose text is
   smaller. Style fields with `getFieldChrome` and do not pass a smaller text size to one.
@@ -215,13 +216,13 @@ it (`text-label text-fg-muted`).
 | Sidebar item               | 32px                                            | 44px (in the drawer)               |
 | Header                     | 48px                                            | 56px                               |
 
-| Utility        | Value | Use                                                                                                      |
-| -------------- | ----- | -------------------------------------------------------------------------------------------------------- |
-| `rounded-sm`   | 4px   | Badges and chips                                                                                         |
-| `rounded-md`   | 6px   | Buttons, inputs and table controls                                                                       |
-| `rounded-lg`   | 10px  | Cards, dialogs, menus and touch buttons                                                                  |
-| `rounded-xl`   | 12px  | The top corners of a bottom sheet (the design page also lists phone cards, which are `rounded-lg` today) |
-| `rounded-full` | 999px | Avatars, status dots and progress meters only                                                            |
+| Utility        | Value | Use                                                                                                              |
+| -------------- | ----- | ---------------------------------------------------------------------------------------------------------------- |
+| `rounded-sm`   | 4px   | Badges and chips                                                                                                 |
+| `rounded-md`   | 6px   | Buttons, inputs and table controls                                                                               |
+| `rounded-lg`   | 10px  | Cards, dialogs, menus and touch buttons                                                                          |
+| `rounded-xl`   | 12px  | Cards below 640px (`Card`, `StatCard` and the phone card rows of `DataTable`); the top corners of a bottom sheet |
+| `rounded-full` | 999px | Avatars, status dots and progress meters only                                                                    |
 
 `--radius-sm`, `--radius-md`, `--radius-lg` and `--radius-xl` are set to these values inside
 `@theme inline` and have no raw variable on `:root`. Borders are always 1px and table rows are square.
@@ -287,14 +288,14 @@ in the account, so each device can differ; other open tabs follow it at once.
 All of it is exported from `packages/frontend/src/components/ui/index.ts`. The sizes are the laptop
 sizes of [density](#density-and-shape); every interactive element is at least 44px on a phone.
 
-| Layer     | Components                                                                                                                                                                                                       | V1 rules they carry                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Atoms     | `Button`, `IconButton`, `TextInput`, `CurrencyInput`, `DateInput`, `MonthInput`, `PasswordInput`, `SelectInput`, `Textarea`, `Badge`, `Card`, `Change`, `ProgressMeter`, `Spinner`, `LoadingSpinner`, `QuroLogo` | `Button` variants `primary` (the one `brand` fill), `secondary` (bordered), `danger` (outlined) and `ghost`; sizes `sm` 28px, `md` 32px, `lg` 44px, `xl` 48px; fields share `getFieldChrome` (32px, `border-control`, 2px focus ring); `Badge` is a 1px edge on a soft fill, 11px; `Card` is a bordered `rounded-lg` surface with no shadow; `ProgressMeter` is a 6px rounded track; `QuroLogo` draws in `currentColor` (`text-brand`) |
-| Molecules | `FormField`, `SegmentedControl`, `Pagination`, `PanelHeader`, `EmptyState`, `LoadingState`, `RowActions`, `DateNoteRow`, `TxnTypeSelector`, `EmojiPickerField`, `PdfAttachmentField`                             | `FormField` labels use `text-label text-fg-muted`; `SegmentedControl` is one bordered group whose selected option is a `brand-soft` tint (the `underline` variant selects with a 2px `brand` underline); `Pagination` marks the current page with the same tint; `PanelHeader` is the 36px card header; `EmptyState` is a dashed, left-aligned box with a title, one line and at most one button                                       |
-| Organisms | `DataTable`, `TxnHistoryPanel`, `StatCard`, `StatsGrid`, `ChartCard`, `AreaChartCard`, `Modal`, `ArchiveOrDeleteDialog`, `ArchivedItemsSection`                                                                  | 28px table rows with a plain sentence-case header; `StatCard` is label, figure and change, with its change either a formatted string (`{ value, positive }`) or a signed number (`{ amount, format, currency, label }`) rendered through `Change`, and the number is preferred; chart cards are a card header over one `brand` series; `Modal` is a dialog on `scrim` that becomes a bottom sheet below 640px                          |
-| Templates | `PageStack`, `ContentSection`                                                                                                                                                                                    | `PageStack` pads the page (24px, 16px on a phone) and spaces sections 24px (16px); `ContentSection` takes an optional `title` in the section title style                                                                                                                                                                                                                                                                               |
-| Layout    | `Layout`, `SidebarItem`, `TabBar`, `navItems` in `components/layout/`                                                                                                                                            | A 208px `surface-nav` sidebar (72px collapsed) from 1024px with 32px items and a `brand-soft` active item; a 48px header; below 1024px the sidebar is a drawer opened by the header menu button (from 640px) or by "More" on the phone; below 640px a 56px header and a `surface-nav` tab bar (Dashboard, Savings, Investments, Budget, More) fixed to the bottom, padded by the bar's height and the safe area                        |
-| Finance   | `TxnAmount`, `PreviewPanel`, `PreviewRow`, `chartTheme`, `stopRowClick` in `components/finance/`                                                                                                                 | `TxnAmount` signs a transaction amount: money in reads `+` in the `gain` colour, money out reads a true minus in the figure colour (gains and losses of a value use `Change`); `PreviewPanel` and `PreviewRow` show a calculated result under a form; `chartTheme` holds the axis, gridline, tooltip and legend settings for Recharts charts                                                                                           |
+| Layer     | Components                                                                                                                                                                                                       | V1 rules they carry                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Atoms     | `Button`, `IconButton`, `TextInput`, `CurrencyInput`, `DateInput`, `MonthInput`, `PasswordInput`, `SelectInput`, `Textarea`, `Badge`, `Card`, `Change`, `ProgressMeter`, `Spinner`, `LoadingSpinner`, `QuroLogo` | `Button` variants `primary` (the one `brand` fill), `secondary` (bordered), `danger` (outlined), `dangerSolid` (filled, only in the confirm step of a destructive action) and `ghost`; sizes `sm` 28px, `md` 32px, `lg` 44px, `xl` 48px; fields share `getFieldChrome` (32px, `border-control`, 2px focus ring); `Badge` is a 1px edge on a soft fill, 11px; `Card` is a bordered `rounded-lg` surface with no shadow (`rounded-xl` below 640px); `ProgressMeter` is a 6px rounded track; `QuroLogo` draws in `currentColor` (`text-brand`) |
+| Molecules | `FormField`, `SegmentedControl`, `Pagination`, `PanelHeader`, `EmptyState`, `LoadingState`, `RowActions`, `DateNoteRow`, `TxnTypeSelector`, `EmojiPickerField`, `PdfAttachmentField`                             | `FormField` labels use `text-label text-fg-muted`; `SegmentedControl` is one bordered group whose selected option is a `brand-soft` tint (the `underline` variant selects with a 2px `brand` underline); `Pagination` marks the current page with the same tint and draws no rule of its own, because the table or panel footer it sits in does; `PanelHeader` is the 36px card header; `EmptyState` is a dashed, left-aligned box with a title, one line and at most one button                                                            |
+| Organisms | `DataTable`, `TxnHistoryPanel`, `StatCard`, `StatsGrid`, `ChartCard`, `AreaChartCard`, `Modal`, `ArchiveOrDeleteDialog`, `ArchivedItemsSection`                                                                  | 28px table rows with a plain sentence-case header; `StatCard` is label, figure and change, with its change either a formatted string (`{ value, positive }`) or a signed number (`{ amount, format, currency, label }`) rendered through `Change`, and the number is preferred; chart cards are a card header over one `brand` series; `Modal` is a dialog on `scrim` that becomes a bottom sheet below 640px                                                                                                                               |
+| Templates | `PageStack`, `ContentSection`                                                                                                                                                                                    | `PageStack` pads the page (24px, 16px on a phone) and spaces sections 24px (16px); `ContentSection` takes an optional `title` in the section title style                                                                                                                                                                                                                                                                                                                                                                                    |
+| Layout    | `Layout`, `SidebarItem`, `TabBar`, `navItems` in `components/layout/`                                                                                                                                            | A 208px `surface-nav` sidebar (72px collapsed) from 1024px with 32px items and a `brand-soft` active item; a 48px header; below 1024px the sidebar is a drawer opened by the header menu button (from 640px) or by "More" on the phone; below 640px a 56px header and a `surface-nav` tab bar (Dashboard, Savings, Investments, Budget, More) fixed to the bottom, padded by the bar's height and the safe area                                                                                                                             |
+| Finance   | `TxnAmount`, `PreviewPanel`, `PreviewRow`, `chartTheme`, `stopRowClick` in `components/finance/`                                                                                                                 | `TxnAmount` signs a transaction amount: money in reads `+` in the `gain` colour, money out reads a true minus in the figure colour (gains and losses of a value use `Change`); `PreviewPanel` and `PreviewRow` show a calculated result under a form; `chartTheme` holds the axis, gridline, tooltip and legend settings for Recharts charts                                                                                                                                                                                                |
 
 The page-level pieces (settings sections, the signed-out landing page with its sign-in, sign-up and
 password reset dialogs, the error screens, the notification panel) are built from these components

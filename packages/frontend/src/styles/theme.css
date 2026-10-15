@@ -432,6 +432,13 @@
     -webkit-user-select: text;
   }
 
+  /* Every keyboard-focused element shows the 2px focus ring at a 1px offset, including ones
+   * that bring no focus classes of their own, such as a chart surface. */
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
   /* Native checkboxes and radios take the action colour when checked. */
   input[type='checkbox'],
   input[type='radio'] {

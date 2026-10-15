@@ -1,14 +1,8 @@
 import type { ReactNode } from 'react';
 
-/** Axis labels: 11px tabular figures in the chart axis colour, without axis or tick lines. */
-export const CHART_AXIS_PROPS = {
-  tick: { fontSize: 11, fill: 'var(--chart-axis)', className: 'font-numeric' },
-  axisLine: false,
-  tickLine: false,
-} as const;
-
-/** Horizontal gridlines only. */
-export const CHART_GRID_PROPS = { vertical: false, stroke: 'var(--chart-grid)' } as const;
+// Axis labels (11px tabular figures, no axis or tick lines) and horizontal-only gridlines are
+// shared with the chart cards in `lib/chartStyles.ts`.
+export { CHART_AXIS_PROPS, CHART_GRID_PROPS } from '@/lib/chartStyles';
 
 export const CHART_CURSOR = { stroke: 'var(--border-default)' } as const;
 export const CHART_BAR_CURSOR = { fill: 'var(--surface-muted)' } as const;

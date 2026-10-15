@@ -23,73 +23,54 @@ utilities, the rules for using them and the shared components. The
 
 ## 2. Colour tokens
 
-The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" were added with V1. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`; rows marked "Legacy alias" are kept only so that old utility names keep compiling, must not be used in new code and are removed before the V1 release.
+The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" were added with V1. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`.
 
-| Variable                   | Light                    | Dark                     | Use                                                                                                         |
-| -------------------------- | ------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `--brand`                  | `#17503A`                | `#7FD6A8`                | Primary action, links, focus ring, single-series chart line ("primary" in the design system)                |
-| `--brand-hover`            | `#0F3D2B`                | `#A3E4C2`                | Hover and press on brand; text on brand-soft ("primary-hover")                                              |
-| `--brand-fg`               | `var(--brand-hover)`     | `var(--brand-hover)`     | Text on brand-soft; the same value as brand-hover                                                           |
-| `--brand-soft`             | `#E3F0E9`                | `#173326`                | Every selection: active nav item, selected row, selected segment, current page; chart fill ("primary-soft") |
-| `--brand-disabled`         | `var(--surface-muted)`   | `var(--surface-muted)`   | Legacy alias, removed before the V1 release                                                                 |
-| `--brand-border`           | `var(--border-default)`  | `var(--border-default)`  | Legacy alias, removed before the V1 release                                                                 |
-| `--brand-soft-strong`      | `var(--brand-soft)`      | `var(--brand-soft)`      | Legacy alias, removed before the V1 release                                                                 |
-| `--secondary (new)`        | `#6B4FD8`                | `#B5A4FF`                | Goals, projections (dashed lines), highlights. Never a button colour, never a chart series                  |
-| `--secondary-soft (new)`   | `#ECE8FC`                | `#2A2350`                | Behind goal and projection chips                                                                            |
-| `--surface`                | `#FFFFFF`                | `#161D19`                | Cards, tables, inputs                                                                                       |
-| `--surface-sunken`         | `#F6F5F1`                | `#0E1411`                | Page background ("ground")                                                                                  |
-| `--surface-muted`          | `#EEEDE7`                | `#1E2722`                | Hover and press fill, disabled controls, progress track                                                     |
-| `--surface-nav (new)`      | `#FBFAF7`                | `#121915`                | Sidebar and phone tab bar                                                                                   |
-| `--surface-inverse`        | `var(--fg)`              | `var(--fg)`              | Tooltip fill                                                                                                |
-| `--surface-inverse-raised` | `var(--surface-inverse)` | `var(--surface-inverse)` | Legacy alias, removed before the V1 release                                                                 |
-| `--scrim (new)`            | `#15201B66`              | `#00000099`              | Behind dialogs and sheets; no blur                                                                          |
-| `--border-subtle`          | `#E9E7E0`                | `#232D27`                | Row dividers ("rule")                                                                                       |
-| `--border-default`         | `#DAD7CE`                | `#2E3A33`                | Card and table edges ("border")                                                                             |
-| `--border-control (new)`   | `#8F8C82`                | `#6C7A72`                | Inputs and secondary buttons                                                                                |
-| `--border-strong`          | `#7A8078`                | `#8B978F`                | Rule above total rows                                                                                       |
-| `--fg`                     | `#15201B`                | `#EDF1EE`                | Figures and primary text                                                                                    |
-| `--fg-muted`               | `#535C56`                | `#A9B4AD`                | Labels, column headers                                                                                      |
-| `--fg-subtle`              | `#667069`                | `#8A968E`                | Captions, timestamps, disabled control text                                                                 |
-| `--fg-faint`               | `#879089`                | `#5E6A63`                | Placeholders and resting icons only                                                                         |
-| `--fg-inverted`            | `#FFFFFF`                | `#0E1411`                | Text on brand and danger fills ("fg-on-primary")                                                            |
-| `--fg-on-inverse (new)`    | `var(--surface-sunken)`  | `var(--surface-sunken)`  | Text on surface-inverse (tooltips)                                                                          |
-| `--fg-strong`              | `var(--fg)`              | `var(--fg)`              | Legacy alias, removed before the V1 release                                                                 |
-| `--fg-emphasis`            | `var(--fg)`              | `var(--fg)`              | Legacy alias, removed before the V1 release                                                                 |
-| `--fg-disabled`            | `var(--fg-faint)`        | `var(--fg-faint)`        | Legacy alias, removed before the V1 release                                                                 |
-| `--gain (new)`             | `#167242`                | `#5FD39A`                | Positive change                                                                                             |
-| `--gain-soft (new)`        | `#E1F3E8`                | `#153324`                | Behind gain chips                                                                                           |
-| `--loss (new)`             | `#C2372B`                | `#FF8F85`                | Negative change                                                                                             |
-| `--loss-soft (new)`        | `#FBE7E4`                | `#3D1A17`                | Behind loss chips                                                                                           |
-| `--flat (new)`             | `var(--fg-muted)`        | `var(--fg-muted)`        | No change                                                                                                   |
-| `--success`                | `var(--gain)`            | `var(--gain)`            | Saved, synced, connected: the gain colour under its status name                                             |
-| `--success-soft`           | `var(--gain-soft)`       | `var(--gain-soft)`       | Success badge and banner fill                                                                               |
-| `--success-fg`             | `var(--success)`         | `var(--success)`         | Legacy alias, removed before the V1 release                                                                 |
-| `--success-border`         | `var(--success)`         | `var(--success)`         | Legacy alias, removed before the V1 release                                                                 |
-| `--success-soft-strong`    | `var(--success-soft)`    | `var(--success-soft)`    | Legacy alias, removed before the V1 release                                                                 |
-| `--warning`                | `#8A5300`                | `#F0B34A`                | Stale data, limits near: text and border                                                                    |
-| `--warning-soft`           | `#FBF0D9`                | `#33260C`                | Warning badge and banner fill                                                                               |
-| `--warning-fg`             | `var(--warning)`         | `var(--warning)`         | Legacy alias, removed before the V1 release                                                                 |
-| `--warning-border`         | `var(--warning)`         | `var(--warning)`         | Legacy alias, removed before the V1 release                                                                 |
-| `--warning-soft-strong`    | `var(--warning-soft)`    | `var(--warning-soft)`    | Legacy alias, removed before the V1 release                                                                 |
-| `--danger`                 | `var(--loss)`            | `var(--loss)`            | Errors, invalid fields, destructive actions: the loss colour under its status name                          |
-| `--danger-soft`            | `var(--loss-soft)`       | `var(--loss-soft)`       | Error banner and danger badge fill                                                                          |
-| `--danger-fg`              | `var(--danger)`          | `var(--danger)`          | Legacy alias, removed before the V1 release                                                                 |
-| `--danger-border`          | `var(--danger)`          | `var(--danger)`          | Legacy alias, removed before the V1 release                                                                 |
-| `--danger-soft-strong`     | `var(--danger-soft)`     | `var(--danger-soft)`     | Legacy alias, removed before the V1 release                                                                 |
-| `--info`                   | `#23618E`                | `#6FB4E6`                | Neutral notices and third-party labels such as a linked bank: text and border                               |
-| `--info-soft`              | `#E6F0F8`                | `#142A3A`                | Info badge and banner fill                                                                                  |
-| `--info-fg`                | `var(--info)`            | `var(--info)`            | Legacy alias, removed before the V1 release                                                                 |
-| `--info-border`            | `var(--info)`            | `var(--info)`            | Legacy alias, removed before the V1 release                                                                 |
-| `--info-soft-strong`       | `var(--info-soft)`       | `var(--info-soft)`       | Legacy alias, removed before the V1 release                                                                 |
-| `--focus-ring`             | `var(--brand)`           | `var(--brand)`           | 2px ring at 1px offset on every control                                                                     |
-| `--viz-1 (new)`            | `#2E8B62`                | `#5FC796`                | Chart: savings (green)                                                                                      |
-| `--viz-2 (new)`            | `#2F7FB8`                | `#6FB4E6`                | Chart: investments (blue)                                                                                   |
-| `--viz-3 (new)`            | `#B87A1A`                | `#EDB95A`                | Chart: pension (amber)                                                                                      |
-| `--viz-4 (new)`            | `#B2583A`                | `#E09A78`                | Chart: property (terracotta)                                                                                |
-| `--viz-5 (new)`            | `#8E4A8A`                | `#CF95CB`                | Chart: other assets (plum)                                                                                  |
-| `--viz-6 (new)`            | `#8A9189`                | `#7C877F`                | Chart: debt (grey), drawn below zero                                                                        |
-| `--chart-grid (new)`       | `var(--border-subtle)`   | `var(--border-subtle)`   | Horizontal gridlines only                                                                                   |
-| `--chart-axis (new)`       | `var(--fg-subtle)`       | `var(--fg-subtle)`       | Axis labels, 11px                                                                                           |
+| Variable                 | Light                   | Dark                    | Use                                                                                                         |
+| ------------------------ | ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `--brand`                | `#17503A`               | `#7FD6A8`               | Primary action, links, focus ring, single-series chart line ("primary" in the design system)                |
+| `--brand-hover`          | `#0F3D2B`               | `#A3E4C2`               | Hover and press on brand; text on brand-soft ("primary-hover")                                              |
+| `--brand-fg`             | `var(--brand-hover)`    | `var(--brand-hover)`    | Text on brand-soft; the same value as brand-hover                                                           |
+| `--brand-soft`           | `#E3F0E9`               | `#173326`               | Every selection: active nav item, selected row, selected segment, current page; chart fill ("primary-soft") |
+| `--secondary (new)`      | `#6B4FD8`               | `#B5A4FF`               | Goals, projections (dashed lines), highlights. Never a button colour, never a chart series                  |
+| `--secondary-soft (new)` | `#ECE8FC`               | `#2A2350`               | Behind goal and projection chips                                                                            |
+| `--surface`              | `#FFFFFF`               | `#161D19`               | Cards, tables, inputs                                                                                       |
+| `--surface-sunken`       | `#F6F5F1`               | `#0E1411`               | Page background ("ground")                                                                                  |
+| `--surface-muted`        | `#EEEDE7`               | `#1E2722`               | Hover and press fill, disabled controls, progress track                                                     |
+| `--surface-nav (new)`    | `#FBFAF7`               | `#121915`               | Sidebar and phone tab bar                                                                                   |
+| `--surface-inverse`      | `var(--fg)`             | `var(--fg)`             | Tooltip fill                                                                                                |
+| `--scrim (new)`          | `#15201B66`             | `#00000099`             | Behind dialogs and sheets; no blur                                                                          |
+| `--border-subtle`        | `#E9E7E0`               | `#232D27`               | Row dividers ("rule")                                                                                       |
+| `--border-default`       | `#DAD7CE`               | `#2E3A33`               | Card and table edges ("border")                                                                             |
+| `--border-control (new)` | `#8F8C82`               | `#6C7A72`               | Inputs and secondary buttons                                                                                |
+| `--border-strong`        | `#7A8078`               | `#8B978F`               | Rule above total rows                                                                                       |
+| `--fg`                   | `#15201B`               | `#EDF1EE`               | Figures and primary text                                                                                    |
+| `--fg-muted`             | `#535C56`               | `#A9B4AD`               | Labels, column headers                                                                                      |
+| `--fg-subtle`            | `#667069`               | `#8A968E`               | Captions, timestamps, disabled control text                                                                 |
+| `--fg-faint`             | `#879089`               | `#5E6A63`               | Placeholders and resting icons only                                                                         |
+| `--fg-inverted`          | `#FFFFFF`               | `#0E1411`               | Text on brand and danger fills ("fg-on-primary")                                                            |
+| `--fg-on-inverse (new)`  | `var(--surface-sunken)` | `var(--surface-sunken)` | Text on surface-inverse (tooltips)                                                                          |
+| `--gain (new)`           | `#167242`               | `#5FD39A`               | Positive change                                                                                             |
+| `--gain-soft (new)`      | `#E1F3E8`               | `#153324`               | Behind gain chips                                                                                           |
+| `--loss (new)`           | `#C2372B`               | `#FF8F85`               | Negative change                                                                                             |
+| `--loss-soft (new)`      | `#FBE7E4`               | `#3D1A17`               | Behind loss chips                                                                                           |
+| `--flat (new)`           | `var(--fg-muted)`       | `var(--fg-muted)`       | No change                                                                                                   |
+| `--success`              | `var(--gain)`           | `var(--gain)`           | Saved, synced, connected: the gain colour under its status name                                             |
+| `--success-soft`         | `var(--gain-soft)`      | `var(--gain-soft)`      | Success badge and banner fill                                                                               |
+| `--warning`              | `#8A5300`               | `#F0B34A`               | Stale data, limits near: text and border                                                                    |
+| `--warning-soft`         | `#FBF0D9`               | `#33260C`               | Warning badge and banner fill                                                                               |
+| `--danger`               | `var(--loss)`           | `var(--loss)`           | Errors, invalid fields, destructive actions: the loss colour under its status name                          |
+| `--danger-soft`          | `var(--loss-soft)`      | `var(--loss-soft)`      | Error banner and danger badge fill                                                                          |
+| `--info`                 | `#23618E`               | `#6FB4E6`               | Neutral notices and third-party labels such as a linked bank: text and border                               |
+| `--info-soft`            | `#E6F0F8`               | `#142A3A`               | Info badge and banner fill                                                                                  |
+| `--focus-ring`           | `var(--brand)`          | `var(--brand)`          | 2px ring at 1px offset on every control                                                                     |
+| `--viz-1 (new)`          | `#2E8B62`               | `#5FC796`               | Chart: savings (green)                                                                                      |
+| `--viz-2 (new)`          | `#2F7FB8`               | `#6FB4E6`               | Chart: investments (blue)                                                                                   |
+| `--viz-3 (new)`          | `#B87A1A`               | `#EDB95A`               | Chart: pension (amber)                                                                                      |
+| `--viz-4 (new)`          | `#B2583A`               | `#E09A78`               | Chart: property (terracotta)                                                                                |
+| `--viz-5 (new)`          | `#8E4A8A`               | `#CF95CB`               | Chart: other assets (plum)                                                                                  |
+| `--viz-6 (new)`          | `#8A9189`               | `#7C877F`               | Chart: debt (grey), drawn below zero                                                                        |
+| `--chart-grid (new)`     | `var(--border-subtle)`  | `var(--border-subtle)`  | Horizontal gridlines only                                                                                   |
+| `--chart-axis (new)`     | `var(--fg-subtle)`      | `var(--fg-subtle)`      | Axis labels, 11px                                                                                           |
 
 Rules:
 
@@ -107,19 +88,20 @@ One family: Geist (variable, weights 400 to 600), self-hosted through `@fontsour
 
 Field text is 16px below 640px because iOS Safari zooms the page into a focused field whose text is smaller than 16px; on desktop it stays the 13px `cell` style.
 
-| Style           | Size / line height                    | Weight | Letter spacing | Use                                                                       |
-| --------------- | ------------------------------------- | ------ | -------------- | ------------------------------------------------------------------------- |
-| `figure-hero`   | 30px / 36px (34px / 40px below 640px) | 600    | -0.02em        | The one headline figure of a page                                         |
-| `figure-lg`     | 20px / 24px                           | 600    | -0.01em        | Stat cards                                                                |
-| `figure-md`     | 14px / 20px (15px / 20px below 640px) | 500    | 0              | Figures outside tables: list rows, meter captions                         |
-| `figure-cell`   | 13px / 18px                           | 400    | 0              | Table cells, right-aligned; total rows at weight 600                      |
-| `title-page`    | 20px / 28px                           | 600    | -0.01em        | Page title                                                                |
-| `title-section` | 15px / 20px                           | 600    | 0              | Card and dialog titles                                                    |
-| `body`          | 14px / 20px (15px / 20px below 640px) | 400    | 0              | Prose                                                                     |
-| `cell`          | 13px / 18px                           | 400    | 0              | Tables and controls                                                       |
-| `field`         | 13px / 18px (16px / 20px below 640px) | 400    | 0              | Text in inputs, selects and text areas: `cell` on desktop                 |
-| `label`         | 12px / 16px                           | 500    | 0              | Field labels, column headers, stat labels. Sentence case, `text-fg-muted` |
-| `caption`       | 12px / 16px                           | 400    | 0              | Captions. 11px is the floor: badges, tab-bar labels and chart axes only   |
+| Style            | Size / line height                    | Weight | Letter spacing | Use                                                                       |
+| ---------------- | ------------------------------------- | ------ | -------------- | ------------------------------------------------------------------------- |
+| `figure-display` | 48px / 52px (36px / 40px below 640px) | 600    | -0.025em       | The landing page headline only; never inside the app                      |
+| `figure-hero`    | 30px / 36px (34px / 40px below 640px) | 600    | -0.02em        | The one headline figure of a page                                         |
+| `figure-lg`      | 20px / 24px                           | 600    | -0.01em        | Stat cards                                                                |
+| `figure-md`      | 14px / 20px (15px / 20px below 640px) | 500    | 0              | Figures outside tables: list rows, meter captions                         |
+| `figure-cell`    | 13px / 18px                           | 400    | 0              | Table cells, right-aligned; total rows at weight 600                      |
+| `title-page`     | 20px / 28px                           | 600    | -0.01em        | Page title                                                                |
+| `title-section`  | 15px / 20px                           | 600    | 0              | Card and dialog titles                                                    |
+| `body`           | 14px / 20px (15px / 20px below 640px) | 400    | 0              | Prose                                                                     |
+| `cell`           | 13px / 18px                           | 400    | 0              | Tables and controls                                                       |
+| `field`          | 13px / 18px (16px / 20px below 640px) | 400    | 0              | Text in inputs, selects and text areas: `cell` on desktop                 |
+| `label`          | 12px / 16px                           | 500    | 0              | Field labels, column headers, stat labels. Sentence case, `text-fg-muted` |
+| `caption`        | 12px / 16px                           | 400    | 0              | Captions. 11px is the floor: badges, tab-bar labels and chart axes only   |
 
 ## 4. Density
 
@@ -185,7 +167,7 @@ A rounded-square Q with a round-capped tail, one colour (evergreen on light, min
 | `fg-on-primary`     | `--fg-inverted`               |
 | everything else     | the same name                 |
 
-`DATA_COLORS` keeps its persisted hex identities; the `--data-*` display variables map onto `--viz-*`. The legacy aliases in section 2 are removed before the V1 release.
+`DATA_COLORS` keeps its persisted hex identities; the `--data-*` display variables map onto `--viz-*`. The legacy names the redesign started from (`brand-disabled`, `brand-border`, `brand-soft-strong`, `fg-strong`, `fg-emphasis`, `fg-disabled`, `surface-inverse-raised` and each status `-fg`, `-border` and `-soft-strong`) are no longer defined; use the tokens in section 2.
 
 ## 10. Reference screenshots
 
