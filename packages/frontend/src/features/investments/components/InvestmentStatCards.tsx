@@ -1,7 +1,13 @@
 import { BarChart2, Building2, DollarSign, TrendingUp } from 'lucide-react';
-import { Change, StatCard, StatsGrid } from '@/components/ui';
+import { toCents } from '@quro/shared';
+import { Change, StatCard, StatsGrid, type StatCardNumericChange } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
-import type { InvestmentFormatFn, InvestmentPortfolioStats, InvestmentStatTrends } from '../types';
+import type {
+  InvestmentFormatFn,
+  InvestmentPortfolioStats,
+  InvestmentStatTrend,
+  InvestmentStatTrends,
+} from '../types';
 
 type InvestmentStatCardsProps = InvestmentPortfolioStats & {
   fmtBase: InvestmentFormatFn;
@@ -11,13 +17,22 @@ type InvestmentStatCardsProps = InvestmentPortfolioStats & {
 const MINUS_SIGN = '\u2212';
 
 /**
- * A gain as stat card text: a plus or a true minus sign, none when it formats as zero. The card
- * value is text, so `Change` cannot render it; the change line under it carries the colour.
+ * The card value is text, so the sign is written here: a gain reads "Unrealized gain" with a plus,
+ * a loss "Unrealized loss" with a true minus, and zero (to the cent) has no sign.
  */
-function formatSignedFigure(value: number, fmtBase: InvestmentFormatFn): string {
-  const magnitude = fmtBase(Math.abs(value));
-  if (magnitude === fmtBase(0)) return magnitude;
-  return `${value > 0 ? '+' : MINUS_SIGN}${magnitude}`;
+function describeUnrealized(totalGainBase: number, fmtBase: InvestmentFormatFn) {
+  const cents = toCents(totalGainBase);
+  let sign = '';
+  if (cents > 0) sign = '+';
+  else if (cents < 0) sign = MINUS_SIGN;
+  return {
+    label: cents < 0 ? 'Unrealized loss' : 'Unrealized gain',
+    value: `${sign}${fmtBase(Math.abs(totalGainBase))}`,
+  };
+}
+
+function toCardChange(trend: InvestmentStatTrend, currency: string): StatCardNumericChange {
+  return { ...trend, format: 'amount', currency };
 }
 
 export function InvestmentStatCards({
@@ -32,6 +47,7 @@ export function InvestmentStatCards({
   trends,
 }: InvestmentStatCardsProps) {
   const { baseCurrency } = useCurrency();
+  const unrealized = describeUnrealized(totalGainBase, fmtBase);
   return (
     <StatsGrid>
       <StatCard
@@ -41,15 +57,15 @@ export function InvestmentStatCards({
         subtitle="Total portfolio value in base currency"
         icon={BarChart2}
         color="indigo"
-        change={trends.brokerageValue}
+        change={toCardChange(trends.brokerageValue, baseCurrency)}
       />
       <StatCard
-        label="Unrealized gain"
-        value={formatSignedFigure(totalGainBase, fmtBase)}
+        label={unrealized.label}
+        value={unrealized.value}
         subtitle={`Cost basis ${fmtBase(totalCostBase)}`}
         icon={TrendingUp}
         color="emerald"
-        change={trends.unrealizedGain}
+        change={toCardChange(trends.unrealizedGain, baseCurrency)}
       />
       <StatCard
         label="Dividends received"
@@ -68,7 +84,7 @@ export function InvestmentStatCards({
         }
         icon={DollarSign}
         color="sky"
-        change={trends.dividendsReceived}
+        change={toCardChange(trends.dividendsReceived, baseCurrency)}
       />
       <StatCard
         label="Your property equity"
@@ -76,7 +92,7 @@ export function InvestmentStatCards({
         subtitle={`Your share after mortgages · ${fmtBase(totalRentalBase)}/mo rental`}
         icon={Building2}
         color="amber"
-        change={trends.propertyEquity}
+        change={toCardChange(trends.propertyEquity, baseCurrency)}
       />
     </StatsGrid>
   );

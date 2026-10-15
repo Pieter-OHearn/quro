@@ -1,4 +1,3 @@
-import { DATA_COLORS } from '@/lib/dataColors';
 import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
 import {
   householdAmount,
@@ -21,12 +20,6 @@ import type {
 
 const ROLLING_SALARY_WINDOW_MONTHS = 12;
 
-export const getGreeting = (hour: number): string => {
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-};
-
 export const buildDashboardCards = (
   allocationByKey: Record<string, number>,
   monthlySalaryValue: number,
@@ -34,7 +27,7 @@ export const buildDashboardCards = (
   monthlyCategoryChange: (category: string) => number,
 ): DashboardCard[] => [
   {
-    label: 'Total Savings',
+    label: 'Total savings',
     value: allocationByKey.savings ?? 0,
     change: {
       amount: monthlyCategoryChange('Savings'),
@@ -67,7 +60,7 @@ export const buildDashboardCards = (
     color: 'amber',
   },
   {
-    label: 'Monthly Salary',
+    label: 'Monthly salary',
     value: monthlySalaryValue,
     change: {
       amount: salaryTrendChange,
@@ -91,11 +84,13 @@ export function normalizeNetWorthSnapshots(
   }));
 }
 
+// Chart colours are fixed per asset class (docs/design-v1.md): savings, investments, pension,
+// property. Debt is drawn in `--viz-6` by the allocation card.
 const ALLOCATION_COLORS: Record<AllocationKey, string> = {
-  savings: DATA_COLORS['primary'],
-  brokerage: DATA_COLORS['cash'],
-  property_equity: DATA_COLORS['income'],
-  pension: DATA_COLORS['forecast'],
+  savings: 'var(--viz-1)',
+  brokerage: 'var(--viz-2)',
+  pension: 'var(--viz-3)',
+  property_equity: 'var(--viz-4)',
 };
 
 export function normalizeAssetAllocations(
@@ -218,30 +213,9 @@ export const buildMonthlySummaryItems = (
   savingsDeposited: number,
   fmtBase: DashboardFormatFn,
 ): MonthlySummaryItem[] => [
-  {
-    label: 'Monthly Income',
-    value: fmtBase(income, undefined, true),
-    icon: '\ud83d\udcb0',
-    bg: 'bg-success-soft',
-    text: 'text-success-fg',
-    border: 'border-success-soft-strong',
-  },
-  {
-    label: 'Monthly Expenses',
-    value: fmtBase(expenses, undefined, true),
-    icon: '\ud83d\udce4',
-    bg: 'bg-danger-soft',
-    text: 'text-danger-fg',
-    border: 'border-danger-soft-strong',
-  },
-  {
-    label: 'Monthly Savings',
-    value: fmtBase(savingsDeposited, undefined, true),
-    icon: '\ud83c\udfe6',
-    bg: 'bg-brand-soft',
-    text: 'text-brand-fg',
-    border: 'border-brand-soft-strong',
-  },
+  { label: 'Monthly income', value: fmtBase(income, undefined, true) },
+  { label: 'Monthly expenses', value: fmtBase(expenses, undefined, true) },
+  { label: 'Monthly savings', value: fmtBase(savingsDeposited, undefined, true) },
 ];
 
 // Joint-account transactions count at the household share in the monthly summary so the two

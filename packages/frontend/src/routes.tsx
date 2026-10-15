@@ -12,11 +12,7 @@ function RequireAuth() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-surface-sunken">
-        <div className="w-8 h-8 border-3 border-brand-tint border-t-brand rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner className="h-screen" label="Loading" />;
   }
 
   if (!user) {
@@ -30,11 +26,7 @@ function PublicOnly() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-surface-inverse">
-        <div className="w-8 h-8 border-3 border-brand-tint/20 border-t-brand-disabled rounded-full animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner className="h-screen" label="Loading" />;
   }
 
   if (user) {

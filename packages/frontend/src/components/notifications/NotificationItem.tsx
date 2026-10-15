@@ -1,50 +1,21 @@
 import type { MouseEvent } from 'react';
-import { AlertCircle, ArrowRight, Clock, Home, Loader2, Sparkles, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, Clock, Home, Loader2, X } from 'lucide-react';
+import { Badge, IconButton } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import { toRelativeTime } from './notification-utils';
 import type { NotificationItem as NotificationItemType } from './types';
 
-const STATUS_META = {
-  queuing: {
-    bar: 'bg-border-strong',
-    bgTint: '',
-    iconBg: 'bg-surface-muted',
-    iconColor: 'text-fg-faint',
-    label: 'In queue',
-    labelCls: 'bg-surface-muted text-fg-subtle',
-  },
-  processing: {
-    bar: 'bg-brand',
-    bgTint: 'bg-brand-soft/30',
-    iconBg: 'bg-brand-soft',
-    iconColor: 'text-brand-accent',
-    label: 'Processing',
-    labelCls: 'bg-brand-soft text-brand border border-brand-soft-strong',
-  },
-  ready: {
-    bar: 'bg-warning-muted',
-    bgTint: 'bg-warning-soft/20',
-    iconBg: 'bg-warning-soft',
-    iconColor: 'text-warning',
-    label: 'Ready',
-    labelCls: 'bg-success-soft text-success border border-success-soft-strong',
-  },
-  failed: {
-    bar: 'bg-danger-muted',
-    bgTint: 'bg-danger-soft/30',
-    iconBg: 'bg-danger-soft',
-    iconColor: 'text-danger-hover',
-    label: 'Failed',
-    labelCls: 'bg-danger-soft text-danger-hover border border-danger-soft-strong',
-  },
-  reminder: {
-    bar: 'bg-warning-muted',
-    bgTint: 'bg-warning-soft/20',
-    iconBg: 'bg-warning-soft',
-    iconColor: 'text-warning',
-    label: 'Reminder',
-    labelCls: 'bg-warning-soft text-warning-fg border border-warning-soft-strong',
-  },
+// Each status shows as an icon colour; a waiting or running job also gets a badge, and the
+// action of a finished one reads as a link.
+const ICON_COLORS = {
+  queuing: 'text-fg-subtle',
+  processing: 'text-brand',
+  ready: 'text-warning',
+  failed: 'text-danger',
+  reminder: 'text-warning',
 } as const;
+
+const ACTION_CLASS_NAME = 'inline-flex items-center gap-1 text-label';
 
 type NotificationItemProps = {
   item: NotificationItemType;
@@ -53,51 +24,32 @@ type NotificationItemProps = {
 };
 
 function renderStatusIcon(item: NotificationItemType) {
-  const meta = STATUS_META[item.status];
-  if (item.kind === 'mortgage_expiry') return <Home size={16} className={meta.iconColor} />;
-  if (item.status === 'queuing') return <Clock size={16} className={meta.iconColor} />;
+  const iconColor = ICON_COLORS[item.status];
+  if (item.kind === 'mortgage_expiry')
+    return <Home size={16} className={iconColor} aria-hidden="true" />;
+  if (item.status === 'queuing')
+    return <Clock size={16} className={iconColor} aria-hidden="true" />;
   if (item.status === 'processing')
-    return <Loader2 size={16} className={`${meta.iconColor} animate-spin`} />;
-  if (item.status === 'failed') return <AlertCircle size={16} className={meta.iconColor} />;
-  return <span className="text-sm leading-none">{item.potEmoji}</span>;
+    return <Loader2 size={16} className={cn(iconColor, 'animate-spin')} aria-hidden="true" />;
+  if (item.status === 'failed')
+    return <AlertCircle size={16} className={iconColor} aria-hidden="true" />;
+  return <span className="text-body leading-none">{item.potEmoji}</span>;
 }
 
 function renderFooter(item: NotificationItemType) {
-  const meta = STATUS_META[item.status];
-
   if (item.status === 'queuing') {
-    return (
-      <div className="flex items-center gap-2">
-        <span className={`text-[10px] px-2 py-0.5 rounded-sm font-medium ${meta.labelCls}`}>
-          {meta.label}
-        </span>
-        <div className="flex items-center gap-0.5">
-          {[0, 150, 300].map((delay) => (
-            <span
-              key={delay}
-              className="w-1 h-1 rounded-full bg-fg-faint animate-bounce"
-              style={{ animationDelay: `${delay}ms` }}
-            />
-          ))}
-        </div>
-      </div>
-    );
+    return <Badge>In queue</Badge>;
   }
 
   if (item.status === 'processing') {
     return (
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded-sm font-medium inline-flex items-center gap-1 ${meta.labelCls}`}
-          >
-            <Loader2 size={8} className="animate-spin" />
-            {meta.label}
-          </span>
-          <span className="text-[10px] text-fg-faint">AI reading your PDF…</span>
+          <Badge tone="brand">Processing</Badge>
+          <span className="text-caption text-fg-subtle">AI reading your PDF…</span>
         </div>
-        <div className="h-1 bg-surface-muted rounded-full overflow-hidden">
-          <div className="h-full bg-brand rounded-full animate-pulse" style={{ width: '62%' }} />
+        <div className="h-1 overflow-hidden rounded-full bg-surface-muted">
+          <div className="h-full animate-pulse rounded-full bg-brand" style={{ width: '62%' }} />
         </div>
       </div>
     );
@@ -105,35 +57,22 @@ function renderFooter(item: NotificationItemType) {
 
   if (item.status === 'failed') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[10px] bg-danger-hover text-fg-inverted px-2.5 py-1 rounded-md font-medium">
-        <AlertCircle size={9} />
+      <span className={cn(ACTION_CLASS_NAME, 'text-danger')}>
         View error
-        <ArrowRight size={9} />
-      </span>
-    );
-  }
-
-  if (item.status === 'reminder') {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-[10px] bg-warning text-fg-inverted px-2.5 py-1 rounded-md font-medium">
-        Review mortgage
-        <ArrowRight size={9} />
+        <ArrowRight size={12} aria-hidden="true" />
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] bg-brand text-fg-inverted px-2.5 py-1 rounded-md font-medium">
-      <Sparkles size={9} />
-      Review now
-      <ArrowRight size={9} />
+    <span className={cn(ACTION_CLASS_NAME, 'text-brand')}>
+      {item.status === 'reminder' ? 'Review mortgage' : 'Review now'}
+      <ArrowRight size={12} aria-hidden="true" />
     </span>
   );
 }
 
 export function NotificationItem({ item, onAction, onDismiss }: Readonly<NotificationItemProps>) {
-  const meta = STATUS_META[item.status];
-
   const handleClick = (event: MouseEvent<HTMLLIElement>): void => {
     event.preventDefault();
     if (!item.actionable) return;
@@ -143,46 +82,40 @@ export function NotificationItem({ item, onAction, onDismiss }: Readonly<Notific
   return (
     <li
       onClick={handleClick}
-      className={`relative flex items-start gap-3 px-4 py-3.5 transition-colors select-none ${
-        item.actionable ? 'cursor-pointer' : 'cursor-default'
-      } ${meta.bgTint || 'hover:bg-surface-sunken/60'}`}
+      className={cn(
+        'flex items-start gap-2 px-3 py-2 transition-colors duration-fast select-none',
+        item.actionable
+          ? 'cursor-pointer hover:bg-surface-muted active:bg-surface-muted'
+          : 'cursor-default',
+      )}
     >
-      <div
-        className={`absolute left-0 inset-y-0 w-[3px] rounded-r-full ${meta.bar} ${
-          item.status === 'processing' ? 'animate-pulse' : ''
-        }`}
-      />
-
-      <div
-        className={`w-9 h-9 rounded-lg ${meta.iconBg} flex items-center justify-center flex-shrink-0 mt-0.5 border border-fg-inverted/60`}
-      >
+      <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center">
         {renderStatusIcon(item)}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 mb-0.5">
-          <p className="text-xs leading-snug font-semibold text-fg-emphasis">{item.title}</p>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-[10px] text-fg-faint mt-px tabular-nums whitespace-nowrap">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-cell font-medium text-fg">{item.title}</p>
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <span className="whitespace-nowrap font-numeric text-caption text-fg-subtle">
               {item.timeLabel ?? toRelativeTime(item.updatedAt)}
             </span>
             {item.dismissible && (
-              <button
-                type="button"
-                aria-label="Dismiss notification"
+              <IconButton
+                icon={X}
+                label="Dismiss notification"
+                size="sm"
+                className="-my-1"
                 onClick={(event) => {
                   event.stopPropagation();
                   onDismiss(item);
                 }}
-                className="p-0.5 rounded-md text-fg-faint hover:text-fg-strong hover:bg-surface-muted"
-              >
-                <X size={12} />
-              </button>
+              />
             )}
           </div>
         </div>
 
-        <p className="text-[11px] text-fg-subtle leading-relaxed truncate mb-2">{item.body}</p>
+        <p className="mb-1.5 truncate text-caption text-fg-muted">{item.body}</p>
         {renderFooter(item)}
       </div>
     </li>

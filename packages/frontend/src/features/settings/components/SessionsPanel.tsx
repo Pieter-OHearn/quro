@@ -1,6 +1,7 @@
 import { Monitor } from 'lucide-react';
 import type { UserSession } from '@quro/shared';
-import { Badge, Button, LoadingState } from '@/components/ui';
+import type { ReactNode } from 'react';
+import { Badge, Button, Card, LoadingState, PanelHeader } from '@/components/ui';
 import { resolveApiErrorMessage } from '@/lib/api';
 import { useRevokeOtherSessions, useRevokeSession, useSessions } from '../hooks';
 import { describeUserAgent, formatSessionTime } from '../utils/sessionDisplay';
@@ -21,15 +22,15 @@ function SessionRow({
 }: Readonly<{ session: UserSession; revoking: boolean; onRevoke: (id: string) => void }>) {
   const browser = describeUserAgent(session.userAgent);
   return (
-    <li className="flex items-center justify-between gap-3 px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <Monitor size={16} className="flex-shrink-0 text-fg-faint" />
+    <li className="flex min-h-12 items-center justify-between gap-3 px-4 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <Monitor size={16} className="flex-shrink-0 text-fg-faint" aria-hidden="true" />
         <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-fg">
+          <p className="flex flex-wrap items-center gap-2 text-cell font-medium text-fg">
             {browser}
             {session.current ? <Badge tone="success">This browser</Badge> : null}
           </p>
-          <p className="text-xs text-fg-subtle">
+          <p className="text-caption text-fg-subtle">
             Last active {formatSessionTime(session.lastUsedAt)} · Signed in{' '}
             {formatSessionTime(session.createdAt)}
           </p>
@@ -62,22 +63,19 @@ export function SessionsList({
   const hasOthers = sessions.some((session) => !session.current);
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h4 className="text-sm font-semibold text-fg">Signed-in browsers</h4>
-          <p className="text-xs text-fg-subtle">
-            Each sign-in lasts 30 days. Sign out any browser you no longer use or do not recognise.
-          </p>
-        </div>
+    <SessionsCard>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <p className="max-w-md text-caption text-fg-subtle">
+          Each sign-in lasts 30 days. Sign out any browser you no longer use or do not recognise.
+        </p>
         {hasOthers ? (
           <Button variant="secondary" size="sm" loading={revokingOthers} onClick={onRevokeOthers}>
             Sign out all other browsers
           </Button>
         ) : null}
       </div>
-      {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
-      <ul className="divide-y divide-border-default rounded-2xl border border-border-default">
+      {error ? <p className="px-4 pb-3 text-cell text-danger">{error}</p> : null}
+      <ul className="divide-y divide-border-subtle border-t border-border-default">
         {sessions.map((session) => (
           <SessionRow
             key={session.id}
@@ -87,7 +85,16 @@ export function SessionsList({
           />
         ))}
       </ul>
-    </div>
+    </SessionsCard>
+  );
+}
+
+function SessionsCard({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <Card padding="none">
+      <PanelHeader title="Signed-in browsers" />
+      {children}
+    </Card>
   );
 }
 
@@ -97,13 +104,19 @@ export function SessionsPanel() {
   const revokeOthers = useRevokeOtherSessions();
 
   if (sessions.isPending) {
-    return <LoadingState compact className="min-h-0 py-6" label="Loading signed-in browsers" />;
+    return (
+      <SessionsCard>
+        <LoadingState compact className="min-h-0 py-6" label="Loading signed-in browsers" />
+      </SessionsCard>
+    );
   }
   if (sessions.isError) {
     return (
-      <p className="text-sm text-danger">
-        {resolveApiErrorMessage(sessions.error, 'Could not load your signed-in browsers')}
-      </p>
+      <SessionsCard>
+        <p className="p-4 text-cell text-danger">
+          {resolveApiErrorMessage(sessions.error, 'Could not load your signed-in browsers')}
+        </p>
+      </SessionsCard>
     );
   }
 

@@ -1,6 +1,7 @@
 import { invalidateDomain } from '@/lib/queryInvalidation';
 /* eslint-disable max-lines-per-function */
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type {
   CurrencyCode,
@@ -10,17 +11,17 @@ import type {
   User,
 } from '@quro/shared';
 import { formatNumber, NUMBER_FORMATS, JURISDICTION_CODES } from '@quro/shared';
-import { Check, MapPin, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui';
 import { CURRENCY_CODES, CURRENCY_META } from '@/lib/CurrencyContext';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
-import { cn } from '@/lib/utils';
 
 import { AppearanceSetting } from './AppearanceSetting';
 import {
   type PreferencesSectionProps,
   useSavedState,
-  SectionHeader,
+  SettingsCard,
+  ChoiceButton,
+  FormErrorNotice,
   SaveActionButton,
   DEFAULT_ERROR_MESSAGE,
 } from './settingsForm';
@@ -39,6 +40,63 @@ function usePreferencesSectionMutation(
     },
   });
   return save;
+}
+
+const JURISDICTION_LABELS: Record<JurisdictionCode, { name: string; note: string }> = {
+  NL: { name: 'Netherlands', note: 'Dutch benefit and severance rules' },
+  AU: { name: 'Australia', note: 'Australian employment and redundancy rules' },
+  GENERIC: { name: 'Generic', note: 'Conservative international defaults' },
+};
+
+const COMING_SOON_ITEMS = [
+  'Email and push notifications',
+  'Two-factor authentication',
+  'CSV and PDF export packs',
+];
+
+type ChoiceGroupProps = {
+  label: string;
+  description: string;
+  className: string;
+  children: ReactNode;
+};
+
+/** A labelled group of choices with a line of help under it. */
+function ChoiceGroup({ label, description, className, children }: Readonly<ChoiceGroupProps>) {
+  const labelId = useId();
+  return (
+    <div role="group" aria-labelledby={labelId}>
+      <p id={labelId} className="mb-2 text-label text-fg-muted">
+        {label}
+      </p>
+      <div className={className}>{children}</div>
+      <p className="mt-2 text-caption text-fg-subtle">{description}</p>
+    </div>
+  );
+}
+
+function ChoiceText({ title, note }: Readonly<{ title: ReactNode; note: ReactNode }>) {
+  return (
+    <>
+      <span className="block text-cell font-medium">{title}</span>
+      <span className="block text-caption text-fg-muted">{note}</span>
+    </>
+  );
+}
+
+function ComingSoonCard() {
+  return (
+    <SettingsCard title="Coming soon" flush>
+      <ul className="divide-y divide-border-subtle">
+        {COMING_SOON_ITEMS.map((item) => (
+          <li key={item} className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
+            <span className="text-cell text-fg-muted">{item}</span>
+            <Badge tone="muted">Soon</Badge>
+          </li>
+        ))}
+      </ul>
+    </SettingsCard>
+  );
 }
 
 function PreferencesForm({
@@ -76,174 +134,100 @@ function PreferencesForm({
   };
 
   return (
-    <div>
-      <SectionHeader
+    <div className="space-y-4">
+      <SettingsCard
         title="Preferences"
         subtitle="Choose the app-wide defaults that drive balances, charts, and totals."
-      />
-
-      <div className="mb-8">
-        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
-          <SlidersHorizontal size={14} className="text-brand-accent" />
-          Base Currency
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        footer={
+          <SaveActionButton
+            saved={saved}
+            loading={isSaving}
+            disabled={!hasChanges}
+            onClick={() => {
+              void handleSave();
+            }}
+          />
+        }
+      >
+        <ChoiceGroup
+          label="Base currency"
+          description="Cross-currency balances and charts convert into this currency across the app."
+          className="grid grid-cols-2 gap-2 xl:grid-cols-4"
+        >
           {CURRENCY_CODES.map((code) => {
             const currency = CURRENCY_META[code];
-            const isSelected = code === selectedCurrency;
-
             return (
-              <button
+              <ChoiceButton
                 key={code}
-                type="button"
-                onClick={() => setSelectedCurrency(code)}
-                className={cn(
-                  'flex items-center gap-3 rounded-2xl border px-4 py-4 text-left transition-all',
-                  isSelected
-                    ? 'border-brand-border bg-brand-soft text-brand-fg shadow-sm shadow-brand-soft-strong'
-                    : 'border-border-default bg-surface text-fg-muted hover:border-brand-tint hover:bg-surface-sunken',
-                )}
+                selected={code === selectedCurrency}
+                onSelect={() => setSelectedCurrency(code)}
               >
-                <span className="text-2xl leading-none">{currency.flag}</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">{code}</p>
-                  <p className="text-xs text-fg-faint">{currency.name}</p>
-                </div>
-                {isSelected ? <Check size={16} className="ml-auto text-brand" /> : null}
-              </button>
+                <span className="flex items-center gap-2">
+                  <span className="text-title-section leading-none" aria-hidden="true">
+                    {currency.flag}
+                  </span>
+                  <span className="min-w-0">
+                    <ChoiceText title={code} note={currency.name} />
+                  </span>
+                </span>
+              </ChoiceButton>
             );
           })}
-        </div>
-        <p className="mt-3 text-sm text-fg-subtle">
-          Cross-currency balances and charts convert into this currency across the app.
-        </p>
-      </div>
+        </ChoiceGroup>
 
-      <div className="mb-8 border-t border-border-subtle pt-6">
-        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
-          <MapPin size={14} className="text-brand" />
-          Planning jurisdiction
-        </p>
-        <div className="grid gap-3 md:grid-cols-3">
-          {JURISDICTION_CODES.map((code) => {
-            const isSelected = code === selectedJurisdiction;
-            const labels: Record<JurisdictionCode, { name: string; note: string }> = {
-              NL: { name: 'Netherlands', note: 'Dutch benefit and severance rules' },
-              AU: { name: 'Australia', note: 'Australian employment and redundancy rules' },
-              GENERIC: { name: 'Generic', note: 'Conservative international defaults' },
-            };
-            return (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setSelectedJurisdiction(code)}
-                className={cn(
-                  'rounded-2xl border px-4 py-4 text-left transition-all duration-base ease-standard',
-                  isSelected
-                    ? 'border-brand-border bg-brand-soft text-brand-fg shadow-brand'
-                    : 'border-border-default bg-surface text-fg-muted hover:border-brand-border hover:bg-surface-sunken',
-                )}
-              >
-                <div className="flex items-start gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">{labels[code].name}</p>
-                    <p className="mt-1 text-xs text-fg-faint">{labels[code].note}</p>
-                  </div>
-                  {isSelected ? <Check size={16} className="ml-auto text-brand" /> : null}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-3 text-sm text-fg-subtle">
-          Planning rules are independent from the currency used to display balances.
-        </p>
-      </div>
+        <ChoiceGroup
+          label="Planning jurisdiction"
+          description="Planning rules are independent from the currency used to display balances."
+          className="grid gap-2 md:grid-cols-3"
+        >
+          {JURISDICTION_CODES.map((code) => (
+            <ChoiceButton
+              key={code}
+              selected={code === selectedJurisdiction}
+              onSelect={() => setSelectedJurisdiction(code)}
+            >
+              <ChoiceText
+                title={JURISDICTION_LABELS[code].name}
+                note={JURISDICTION_LABELS[code].note}
+              />
+            </ChoiceButton>
+          ))}
+        </ChoiceGroup>
 
-      <div className="mb-8 border-t border-border-subtle pt-6">
-        <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
-          <SlidersHorizontal size={14} className="text-brand-accent" />
-          Number Format
-        </p>
-        <div className="grid gap-3 md:grid-cols-2">
+        <ChoiceGroup
+          label="Number format"
+          description="Controls decimal and thousands separators anywhere Quro formats amounts."
+          className="grid gap-2 md:grid-cols-2"
+        >
           {NUMBER_FORMATS.map((numberFormat) => {
-            const isSelected = numberFormat === selectedNumberFormat;
             const sample = formatNumber(1000, numberFormat, {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             });
-
             return (
-              <button
+              <ChoiceButton
                 key={numberFormat}
-                type="button"
-                onClick={() => setSelectedNumberFormat(numberFormat)}
-                className={cn(
-                  'rounded-2xl border px-4 py-4 text-left transition-all',
-                  isSelected
-                    ? 'border-brand-border bg-brand-soft text-brand-fg shadow-sm shadow-brand-soft-strong'
-                    : 'border-border-default bg-surface text-fg-muted hover:border-brand-tint hover:bg-surface-sunken',
-                )}
+                selected={numberFormat === selectedNumberFormat}
+                onSelect={() => setSelectedNumberFormat(numberFormat)}
               >
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">
-                      {numberFormat === 'en-US' ? '1,000.00 style' : '1.000,00 style'}
-                    </p>
-                    <p className="mt-1 text-xs text-fg-faint">
-                      Example: <span className="font-semibold text-fg-muted">{sample}</span>
-                    </p>
-                  </div>
-                  {isSelected ? <Check size={16} className="ml-auto text-brand" /> : null}
-                </div>
-              </button>
+                <ChoiceText
+                  title={numberFormat === 'en-US' ? '1,000.00 style' : '1.000,00 style'}
+                  note={
+                    <>
+                      Example: <span className="font-numeric font-medium text-fg">{sample}</span>
+                    </>
+                  }
+                />
+              </ChoiceButton>
             );
           })}
-        </div>
-        <p className="mt-3 text-sm text-fg-subtle">
-          Controls decimal and thousands separators anywhere Quro formats amounts.
-        </p>
-      </div>
+        </ChoiceGroup>
+
+        {formError ? <FormErrorNotice>{formError}</FormErrorNotice> : null}
+      </SettingsCard>
 
       <AppearanceSetting />
-
-      <div className="mb-8 border-t border-border-subtle pt-6">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-fg-subtle">
-          Coming Soon
-        </p>
-        <div className="space-y-2">
-          {[
-            'Email and push notifications',
-            'Two-factor authentication',
-            'CSV and PDF export packs',
-          ].map((item) => (
-            <div
-              key={item}
-              className="flex items-center justify-between rounded-2xl border border-border-subtle bg-surface-sunken px-4 py-3"
-            >
-              <span className="text-sm text-fg-subtle">{item}</span>
-              <Badge tone="muted">Soon</Badge>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {formError ? (
-        <p className="mb-4 rounded-2xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
-          {formError}
-        </p>
-      ) : null}
-
-      <div className="flex justify-end">
-        <SaveActionButton
-          saved={saved}
-          loading={isSaving}
-          disabled={!hasChanges}
-          onClick={() => {
-            void handleSave();
-          }}
-        />
-      </div>
+      <ComingSoonCard />
     </div>
   );
 }

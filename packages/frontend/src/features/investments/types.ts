@@ -65,9 +65,10 @@ export type InvestmentPortfolioStats = {
   totalRentalBase: number;
 };
 
+/** A signed change in the display currency, rendered by the stat card through `Change`. */
 export type InvestmentStatTrend = {
-  value: string;
-  positive: boolean;
+  amount: number;
+  label: string;
   details: string;
 };
 

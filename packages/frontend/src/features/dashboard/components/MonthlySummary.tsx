@@ -1,3 +1,5 @@
+import { CalendarDays } from 'lucide-react';
+import { StatCard } from '@/components/ui';
 import type { MonthlySummaryItem } from '../types';
 
 export function MonthlySummary({
@@ -6,18 +8,15 @@ export function MonthlySummary({
   items: readonly MonthlySummaryItem[];
 }>) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       {items.map((item) => (
-        <div
+        <StatCard
           key={item.label}
-          className={`rounded-2xl p-5 border ${item.bg} ${item.border} flex items-center gap-4`}
-        >
-          <span className="text-3xl">{item.icon}</span>
-          <div>
-            <p className="text-xs text-fg-subtle mb-0.5">{item.label}</p>
-            <p className={`font-bold ${item.text}`}>{item.value}</p>
-          </div>
-        </div>
+          label={item.label}
+          value={item.value}
+          icon={CalendarDays}
+          color="indigo"
+        />
       ))}
     </div>
   );

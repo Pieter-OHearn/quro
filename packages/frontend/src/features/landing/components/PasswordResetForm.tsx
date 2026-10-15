@@ -1,9 +1,9 @@
-import { KeyRound } from 'lucide-react';
 import { MIN_PASSWORD_LENGTH } from '@quro/shared';
 import { FormField, PasswordInput, TextInput } from '@/components/ui';
 import { usePasswordResetState } from '../hooks';
 import type { PasswordResetState } from '../types';
 import { SubmitButton } from './SubmitButton';
+import { TextLinkButton } from './TextLinkButton';
 
 type PasswordResetFormProps = {
   onBackToSignIn: () => void;
@@ -11,10 +11,10 @@ type PasswordResetFormProps = {
 
 export function PasswordResetHelp() {
   return (
-    <p className="rounded-2xl border border-border-default bg-surface-sunken px-4 py-3 text-sm text-fg-subtle">
+    <p className="rounded-md border border-border-default bg-surface-sunken p-3 text-cell text-fg-muted">
       Quro does not send email. Ask the operator of this Quro instance to run{' '}
-      <code className="text-xs text-fg-muted">quro user reset-password</code> with your email
-      address. They give you a one-time code that expires after an hour.
+      <code className="font-medium text-fg">quro user reset-password</code> with your email address.
+      They give you a one-time code that expires after an hour.
     </p>
   );
 }
@@ -23,15 +23,7 @@ function PasswordResetFields({ state }: Readonly<{ state: PasswordResetState }>)
   const { form, setField, errors, showPw, toggleShowPw } = state;
   return (
     <>
-      <FormField
-        label={
-          <span className="inline-flex items-center gap-2">
-            <KeyRound size={14} className="text-fg-faint" />
-            <span>Reset code</span>
-          </span>
-        }
-        error={errors.code}
-      >
+      <FormField label="Reset code" error={errors.code}>
         <TextInput
           data-testid="password-reset-code-input"
           type="text"
@@ -81,7 +73,7 @@ export function PasswordResetForm({ onBackToSignIn }: Readonly<PasswordResetForm
       onSubmit={(event) => {
         void state.handleSubmit(event);
       }}
-      className="space-y-4 px-8 py-7 text-fg"
+      className="space-y-4"
     >
       <PasswordResetHelp />
       <PasswordResetFields state={state} />
@@ -90,15 +82,8 @@ export function PasswordResetForm({ onBackToSignIn }: Readonly<PasswordResetForm
         loadingText="Saving password…"
         idleContent={<span>Set new password and sign in</span>}
       />
-      <p className="pt-1 text-center text-sm text-fg-subtle">
-        Remembered it?{' '}
-        <button
-          type="button"
-          onClick={onBackToSignIn}
-          className="font-semibold text-brand transition-colors hover:text-brand-strong"
-        >
-          Back to sign in
-        </button>
+      <p className="text-center text-cell text-fg-muted">
+        Remembered it? <TextLinkButton onClick={onBackToSignIn}>Back to sign in</TextLinkButton>
       </p>
     </form>
   );

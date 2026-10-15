@@ -115,7 +115,7 @@ function Dropdown({
   onRetry,
 }: Readonly<DropdownProps>) {
   return (
-    <div className="absolute right-0 top-full mt-2 w-[360px] max-w-[92vw] bg-surface rounded-lg border border-border-default shadow-popover z-50 overflow-hidden">
+    <div className="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[92vw] overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:top-14 max-sm:w-auto max-sm:max-w-none">
       <NotificationPanelHeader totalCount={notifications.length} isFetching={isFetching} />
       <NotificationStatusRow counts={counts} />
 
@@ -130,12 +130,12 @@ function Dropdown({
       )}
 
       {isError && (
-        <div className="px-4 py-2.5 border-t border-border-subtle bg-danger-soft/60 flex items-center justify-between gap-3">
-          <p className="text-[11px] text-danger-fg">Couldn&apos;t refresh notifications.</p>
+        <div className="flex items-center justify-between gap-3 border-t border-border-default bg-danger-soft px-3 py-1.5">
+          <p className="text-caption text-danger">Couldn&apos;t refresh notifications.</p>
           <button
             type="button"
             onClick={onRetry}
-            className="text-[11px] font-medium text-danger-fg hover:text-danger-strong"
+            className="rounded-sm text-label text-danger hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
           >
             Retry
           </button>
