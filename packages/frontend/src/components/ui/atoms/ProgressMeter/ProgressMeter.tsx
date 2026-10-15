@@ -28,7 +28,7 @@ export function ProgressMeter({
       {...props}
     >
       <div
-        className={cn('h-full rounded-full bg-secondary transition-[width]', indicatorClassName)}
+        className={cn('h-full rounded-full bg-secondary', indicatorClassName)}
         style={{ width: `${percentage}%` }}
       />
     </div>

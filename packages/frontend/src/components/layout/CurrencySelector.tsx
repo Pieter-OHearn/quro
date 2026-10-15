@@ -94,7 +94,10 @@ export function CurrencySelector() {
         <ChevronDown
           size={14}
           aria-hidden="true"
-          className={cn('text-fg-subtle transition-transform duration-fast', open && 'rotate-180')}
+          className={cn(
+            'text-fg-subtle transition-transform duration-fast motion-reduce:transition-none',
+            open && 'rotate-180',
+          )}
         />
       </Button>
       {open && (

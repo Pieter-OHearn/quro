@@ -153,6 +153,8 @@ const smokeCases: readonly SmokeCase[] = [
       'bg-secondary',
       'width:40%',
     ],
+    // The fill does not animate.
+    excludes: ['transition'],
   },
   {
     name: 'StatCard link renders a bordered card without a shadow',

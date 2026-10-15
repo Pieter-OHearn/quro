@@ -49,7 +49,10 @@ function renderFooter(item: NotificationItemType) {
           <span className="text-caption text-fg-subtle">AI reading your PDF…</span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-surface-muted">
-          <div className="h-full animate-pulse rounded-full bg-brand" style={{ width: '62%' }} />
+          <div
+            className="h-full rounded-full bg-brand motion-safe:animate-pulse"
+            style={{ width: '62%' }}
+          />
         </div>
       </div>
     );
