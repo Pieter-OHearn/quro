@@ -9,7 +9,7 @@
  *
  * Prefer semantic tokens (bg-brand, text-fg-muted, border-border-subtle, etc.)
  * in shared primitives. Do not introduce raw Tailwind palette values
- * (bg-blue-600, text-slate-500, …) when a token already covers the use case.
+ * (a numbered blue or slate, for example) when a token already covers the use case.
  *
  * Dark mode: the `.dark { … }` block below overrides the raw colour and shadow
  * variables when `dark` is on <html> (set by public/theme-init.js before the
