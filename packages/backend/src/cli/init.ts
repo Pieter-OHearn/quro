@@ -16,25 +16,39 @@ import { settingsManifest, type ManifestEntry } from '../config/manifest';
 import { SETTINGS } from '../config/settings';
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, UsageError, type CommandIo } from './io';
 
-// `quro init` prepares a configuration directory: one settings file and a generated password
-// file per database role. It only ever creates missing files. An existing file is never opened
-// for writing, so edits survive any number of runs, and secret values are never printed.
+// `quro init` prepares a configuration directory: one settings file, a generated password file per
+// database role and the key that encrypts bank-link secrets. It only ever creates missing files. An
+// existing file is never opened for writing, so edits survive any number of runs, and secret
+// values are never printed.
 
 export const DEFAULT_CONFIG_DIR = '/config';
 export const SETTINGS_FILE = 'quro.env';
 export const SECRETS_DIR = 'secrets';
-export const GENERATED_SECRETS = ['postgres_admin_password', 'postgres_app_password'] as const;
+export const GENERATED_SECRETS = [
+  'postgres_admin_password',
+  'postgres_app_password',
+  'secrets_key',
+] as const;
 
-const SECRET_BYTES = 24;
+export type GeneratedSecret = (typeof GENERATED_SECRETS)[number];
+
+// Passwords are 24 random bytes. The secrets key is an AES-256 key: 32 bytes, the format
+// QRO_SECRETS_KEY_FILE requires (64 hexadecimal characters).
+const SECRET_BYTES: Record<GeneratedSecret, number> = {
+  postgres_admin_password: 24,
+  postgres_app_password: 24,
+  secrets_key: 32,
+};
 const SECRET_FILE_MODE = 0o600;
 const SECRETS_DIR_MODE = 0o700;
 const SETTINGS_FILE_MODE = 0o644;
 
 export const INIT_USAGE = `Usage: quro init [--dir <path>] [--dry-run]
 
-Writes a settings file (${SETTINGS_FILE}) and one generated password file per database role
-(${SECRETS_DIR}/${GENERATED_SECRETS.join(`, ${SECRETS_DIR}/`)}) into a mounted directory.
-Creates only missing files and never changes an existing one. Secret values are never printed.
+Writes a settings file (${SETTINGS_FILE}), one generated password file per database role and
+the key that encrypts bank-link secrets (${SECRETS_DIR}/${GENERATED_SECRETS.join(`, ${SECRETS_DIR}/`)})
+into a mounted directory. Creates only missing files and never changes an existing one, so
+running it on an existing directory adds only what is missing. Secret values are never printed.
 
 Options:
   --dir <path>   Configuration directory (default ${DEFAULT_CONFIG_DIR}); it must exist
@@ -108,8 +122,8 @@ export function renderSettingsFile(now = new Date()): string {
   return `${lines.join('\n').trimEnd()}\n`;
 }
 
-export function generateSecret(): string {
-  return randomBytes(SECRET_BYTES).toString('hex');
+export function generateSecret(name: GeneratedSecret): string {
+  return randomBytes(SECRET_BYTES[name]).toString('hex');
 }
 
 /**
@@ -165,7 +179,8 @@ export function parseInitArgs(args: readonly string[]): { dir: string; dryRun: b
   return { dir: resolve(dir), dryRun };
 }
 
-type PlannedFile = { path: string; kind: 'settings' | 'secret' };
+type PlannedFile =
+  { path: string; kind: 'settings' } | { path: string; kind: 'secret'; name: GeneratedSecret };
 
 function plannedFiles(dir: string): PlannedFile[] {
   return [
@@ -173,6 +188,7 @@ function plannedFiles(dir: string): PlannedFile[] {
     ...GENERATED_SECRETS.map((name) => ({
       path: join(dir, SECRETS_DIR, name),
       kind: 'secret' as const,
+      name,
     })),
   ];
 }
@@ -205,7 +221,7 @@ function createFile(file: PlannedFile): boolean {
   if (file.kind === 'settings') {
     return createFileExclusively(file.path, renderSettingsFile(), SETTINGS_FILE_MODE);
   }
-  return createFileExclusively(file.path, `${generateSecret()}\n`, SECRET_FILE_MODE);
+  return createFileExclusively(file.path, `${generateSecret(file.name)}\n`, SECRET_FILE_MODE);
 }
 
 function ensureSecretsDirectory(dir: string, io: CommandIo) {

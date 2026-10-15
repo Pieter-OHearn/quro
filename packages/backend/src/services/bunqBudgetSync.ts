@@ -18,15 +18,15 @@ import {
   categoryMappings,
 } from '../db/schema';
 import {
-  createInstallation,
-  createSession,
   fetchMonetaryAccounts,
-  generateKeyPair,
-  registerDevice,
   type BunqMonetaryAccount,
   type BunqPayment,
-  type BunqSessionResult,
 } from '../lib/bunqClient';
+import {
+  ensureBunqSession,
+  loadBunqConnection,
+  type OpenBunqConnection,
+} from '../lib/bunqCredentials';
 import { syncPaymentBatch } from '../lib/bunqPaymentProgress';
 import { toBunqNewerThanCursor } from '../lib/bunqSyncCursor';
 import {
@@ -38,7 +38,6 @@ import {
 
 const MCC_SOURCE = 'mcc';
 
-type BunqConnectionRow = typeof bunqConnections.$inferSelect;
 type BudgetCategoryTemplate = {
   budgeted: number;
   currencyNeedsReview: boolean;
@@ -55,75 +54,6 @@ export type BunqSyncResult = {
   syncedAt: Date | null;
   issues: BunqSyncIssue[];
 };
-
-async function loadConnection(userId: number): Promise<BunqConnectionRow | null> {
-  const [connection] = await db
-    .select()
-    .from(bunqConnections)
-    .where(eq(bunqConnections.userId, userId));
-  return connection ?? null;
-}
-
-function isSessionValid(connection: BunqConnectionRow): boolean {
-  if (!connection.sessionToken || !connection.sessionExpiresAt) return false;
-  return connection.sessionExpiresAt.getTime() > Date.now();
-}
-
-async function bootstrapApiContext(
-  connection: BunqConnectionRow,
-): Promise<{ installationToken: string; privateKey: string }> {
-  if (connection.installationToken && connection.privateKey) {
-    return {
-      installationToken: connection.installationToken,
-      privateKey: connection.privateKey,
-    };
-  }
-
-  const keyPair = generateKeyPair();
-  const installation = await createInstallation(keyPair.publicKey);
-
-  await db
-    .update(bunqConnections)
-    .set({
-      privateKey: keyPair.privateKey,
-      installationToken: installation.installationToken,
-      serverPublicKey: installation.serverPublicKey,
-    })
-    .where(eq(bunqConnections.id, connection.id));
-
-  await registerDevice(installation.installationToken, connection.accessToken, keyPair.privateKey);
-
-  return {
-    installationToken: installation.installationToken,
-    privateKey: keyPair.privateKey,
-  };
-}
-
-async function ensureSession(connection: BunqConnectionRow): Promise<BunqSessionResult> {
-  if (isSessionValid(connection) && connection.bunqUserId) {
-    return {
-      sessionToken: connection.sessionToken!,
-      sessionId: connection.sessionId,
-      bunqUserId: connection.bunqUserId,
-      expiresAt: connection.sessionExpiresAt!,
-    };
-  }
-
-  const { installationToken, privateKey } = await bootstrapApiContext(connection);
-  const session = await createSession(installationToken, connection.accessToken, privateKey);
-
-  await db
-    .update(bunqConnections)
-    .set({
-      sessionToken: session.sessionToken,
-      sessionId: session.sessionId,
-      sessionExpiresAt: session.expiresAt,
-      bunqUserId: session.bunqUserId,
-    })
-    .where(eq(bunqConnections.id, connection.id));
-
-  return session;
-}
 
 function isDebit(payment: BunqPayment): boolean {
   return payment.amount.value.trim().startsWith('-');
@@ -896,7 +826,7 @@ function importBudgetPaymentsForAccount(params: {
 }
 
 async function finishBudgetSync(params: {
-  connection: BunqConnectionRow;
+  connection: OpenBunqConnection;
   bunqUserId: string;
   syncedAt: Date;
   issues: BunqSyncIssue[];
@@ -924,7 +854,7 @@ export async function syncBunqBudget(
   newerThanOverride?: string,
   skipCursorUpdate = false,
 ): Promise<BunqSyncResult> {
-  const connection = await loadConnection(userId);
+  const connection = await loadBunqConnection(userId);
   if (!connection) return { status: 'skipped', syncedAt: null, issues: [] };
 
   const unregisterCleanup = registerDeadlineCleanup(() =>
@@ -934,7 +864,7 @@ export async function syncBunqBudget(
 
   try {
     await markSyncing(connection.id);
-    const session = await ensureSession(connection);
+    const session = await ensureBunqSession(connection);
     const accounts = await fetchMonetaryAccounts(session.sessionToken, session.bunqUserId);
     const ownIbans = collectOwnIbans(accounts);
     const bankAccounts = accounts.filter((a) => a.type === 'BANK' || a.type === 'JOINT');

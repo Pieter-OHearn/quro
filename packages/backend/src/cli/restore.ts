@@ -62,6 +62,12 @@ async function restore(path: string, io: CommandIo, dependencies: RestoreDepende
       `The archive does not contain documents (S3 storage). The database refers to ${documents.referenced.length} object(s): restore the bucket with your store tools.`,
     );
   }
+  const keyIds = result.manifest.secrets.integrationKeys?.keyIds ?? [];
+  if (keyIds.length > 0) {
+    io.out(
+      `Bank-link secrets in this archive are encrypted with secrets key ${keyIds.join(', ')}. Run \`quro secrets status\` with this instance's key: without that key, connected bunq accounts must be connected again.`,
+    );
+  }
   if (result.pendingMigrations > 0) {
     io.out(
       `This image has ${result.pendingMigrations} migration(s) newer than the archive: run the database migrations before starting the application (in Docker Compose: docker compose run --rm migrate).`,

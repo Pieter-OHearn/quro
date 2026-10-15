@@ -6,6 +6,7 @@
 //   bun recovery-drill-client.ts upload <base-url> <count> <kib>
 //   bun recovery-drill-client.ts snapshot <base-url>
 //   bun recovery-drill-client.ts write-loop <base-url> <seconds>
+//   bun recovery-drill-client.ts bunq-sync <base-url>
 //
 // Requires Bun; imports nothing from the repository.
 
@@ -190,8 +191,15 @@ async function writeLoop(base: string, seconds: number): Promise<void> {
   console.log(JSON.stringify({ statuses }));
 }
 
+/** Asks for a bunq sync as the demo user; prints the status code and the JSON answer. */
+async function bunqSync(base: string): Promise<void> {
+  const session = await signIn(base);
+  const response = await call(session, '/api/bunq/sync', { method: 'POST' });
+  console.log(JSON.stringify({ status: response.status, body: await response.json() }));
+}
+
 const [command, base, ...rest] = process.argv.slice(2);
-if (!command || !base) fail('usage: <wait|upload|snapshot|write-loop> <base-url> [...]');
+if (!command || !base) fail('usage: <wait|upload|snapshot|write-loop|bunq-sync> <base-url> [...]');
 switch (command) {
   case 'wait':
     await waitForHealth(base);
@@ -204,6 +212,9 @@ switch (command) {
     break;
   case 'write-loop':
     await writeLoop(base, Number(rest[0] ?? DEFAULTS.seconds));
+    break;
+  case 'bunq-sync':
+    await bunqSync(base);
     break;
   default:
     fail(`unknown command ${command}`);

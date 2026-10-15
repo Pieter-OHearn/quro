@@ -157,6 +157,8 @@ BUNQ_CLIENT_SECRET=<client secret>
 BUNQ_REDIRECT_URI=http://localhost:3000/api/bunq/oauth/callback
 ```
 
+bunq credentials are stored encrypted, so the backend also needs a secrets key once bunq is configured (see [integration secrets](security.md#integration-secrets)). Create one and point `QRO_SECRETS_KEY_FILE` at it: for a local Bun backend, `openssl rand -hex 32 > secrets/secrets_key.txt` and `QRO_SECRETS_KEY_FILE=../../secrets/secrets_key.txt` in `packages/backend/.env`; for the repository's Compose stack, mount the same file into the `backend` and `db-tools` services as a secret named `secrets_key` (it is then read from `/run/secrets/secrets_key`). The stack does not mount it by default, because Compose refuses to start a service whose secret file is missing.
+
 Setting any of `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET` or `BUNQ_REDIRECT_URI` without the rest stops the backend at startup. The error names every missing variable and never prints their values. There is no default for `FRONTEND_ORIGIN`. The client id and secret can also come from files named by `BUNQ_CLIENT_ID_FILE` and `BUNQ_CLIENT_SECRET_FILE` (defaults `/run/secrets/bunq_client_id` and `/run/secrets/bunq_client_secret`); a variable wins over its file. `BUNQ_SANDBOX=true` talks to the bunq sandbox instead of the production API.
 
 Each connect attempt is recorded on the server for the initiating user and destination. It expires after 10 minutes and works once; forged, expired and replayed callbacks are redirected to the error page without touching the stored connection.
@@ -319,7 +321,7 @@ ships an integration test that creates pre-existing synthetic rows in the shape 
 release stored, runs the migration's SQL against them and checks the result: values, nulls and
 negative amounts kept, rows that would break the constraint refused with an actionable message,
 nothing guessed. `packages/backend/src/db/holdingPriceScaleMigration.test.ts` (a type change)
-and `packages/backend/src/db/sessionHashMigration.test.ts` (a rewrite) are examples. A migration
+and `packages/backend/src/db/sessionHashMigration.test.ts` (a rewrite) are examples. A rewrite done by a command instead of SQL, such as `quro secrets encrypt`, is tested the same way: `packages/backend/src/lib/integrationSecrets.integration.test.ts` seeds bank links in the shape 0.8.0 stored them and interrupts, kills, resumes and repeats the command. A migration
 that only adds a table or a nullable column needs no such test; `bun run test` applies every
 migration to the throwaway database either way.
 

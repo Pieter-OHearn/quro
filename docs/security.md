@@ -258,23 +258,139 @@ administrators remain fully trusted.
 | The store's encryption key, if it has one | Your S3 store's configuration                   | No                  | The stored documents cannot be read                                  |
 | bunq OAuth client secret                  | `BUNQ_CLIENT_SECRET`                            | No                  | Issue a new one in bunq and update the configuration                 |
 | Backup encryption key                     | The file `QRO_BACKUP_ENCRYPTION_KEY_FILE` names | No                  | Encrypted archives cannot be restored; keep a copy apart from them   |
-| bunq access tokens and keys               | Database (`bunq_connections`)                   | **Yes**             | Reconnect bunq in Settings                                           |
+| Secrets key                               | The file `QRO_SECRETS_KEY_FILE` names           | No                  | Reconnect bunq in Settings; all other data stays intact              |
+| bunq access tokens and keys               | Database (`bunq_connections`), encrypted        | Encrypted only      | Reconnect bunq in Settings                                           |
 | User passwords                            | Database, as bcrypt hashes                      | Yes, as hashes      | `quro user reset-password`                                           |
 | Session tokens                            | Browser cookie; database holds the digest       | Digest only         | Sign in again                                                        |
 | Registration and reset codes              | Shown once; database holds the digest           | Digest only         | Issue a new code                                                     |
 
 Rules that follow from this table:
 
-- A database dump or backup archive contains bank tokens and financial records. Store it as
-  carefully as the live instance, and encrypt archives that leave the machine. See
-  [backup and restore](backup-and-restore.md).
-- The secret files are not in a dump. Back them up separately, somewhere only the operator can
-  read, and not next to the dumps.
+- A database dump or backup archive contains financial records, password hashes and the
+  encrypted bank-link secrets. Store it as carefully as the live instance, and encrypt archives
+  that leave the machine. See [backup and restore](backup-and-restore.md).
+- The secret files, including the secrets key, are not in a dump. Back them up separately,
+  somewhere only the operator can read, and not next to the dumps: whoever holds an archive and
+  the secrets key can use the bank links in it.
 - Restoring a dump restores the sessions that existed when it was taken. Run
   `quro user revoke-sessions` for affected accounts if that matters.
-- Integration secrets are to be encrypted at rest with one operator-held key (see the
-  [roadmap](../ROADMAP.md)). Keep that key with the secret files, never inside a dump. Losing it
-  means reconnecting bunq; all other data stays intact.
+
+## Integration secrets
+
+Integration secrets are the credentials Quro keeps to talk to a bank on a user's behalf: for each
+connected bunq account, the OAuth access token, the private key of the device Quro registers with
+bunq, the installation token and the current session token (`access_token`, `private_key`,
+`installation_token` and `session_token` of `bunq_connections`). The server's public key and the
+bunq user id in the same row are not secret. The bunq OAuth client id and secret are settings, not
+database rows; see [the configuration reference](configuration.md#bunq).
+
+Each of these values is stored encrypted with one key that the operator holds outside the
+database. The server opens a value only in memory, when it calls bunq, and seals every new or
+renewed value before it writes it. No API response, log line, trace or `quro` command shows a
+stored value; `quro secrets status` and `quro doctor` print counts and key ids only.
+
+### The secrets key
+
+- One key per instance, in the file `QRO_SECRETS_KEY_FILE` names (default
+  `/run/secrets/secrets_key`): 32 random bytes written as 64 hexadecimal characters. `quro init`
+  writes it with the database passwords (mode `0600`, never printed); `openssl rand -hex 32` makes
+  one by hand.
+- The backend checks the file when a container starts. A file that exists but holds anything else
+  stops every container with exit code 2 and a message that names the setting, never the content.
+  Once bunq linking is configured the key is required: without it the backend does not start.
+- The key never enters the database, a backup archive, a log or the settings file. Each key has a
+  key id, 16 hexadecimal characters derived from it, which `quro secrets status`, `quro doctor`,
+  `quro backup` and `quro restore` print so the operator can match a key file to the data that
+  needs it. A key id reveals nothing about the key.
+- Where it sits in the key hierarchy: the database passwords and the secrets key are both operator
+  secret files, independent of each other. The backup encryption key protects archives, which
+  contain the encrypted bank-link secrets but never the secrets key. Holding a database dump alone
+  gives no usable bank credential.
+
+### Envelope format
+
+Each value is one line of text in its own column:
+
+```text
+quro-secret:v1:aes-256-gcm:<key id>:<nonce>:<ciphertext>:<tag>
+```
+
+| Part                   | Meaning                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `quro-secret`, `v1`    | Marker and envelope version. A value with another version or algorithm is refused, never guessed at        |
+| `aes-256-gcm`          | AES-256 in GCM mode, through Node's crypto module                                                          |
+| key id                 | HKDF-SHA256 of the key under its own label, first 8 bytes in hexadecimal: which key sealed the value       |
+| nonce, ciphertext, tag | A random 12-byte nonce per value, the ciphertext and the 16-byte authentication tag, base64url, no padding |
+
+The AES key is derived from the operator's key with HKDF-SHA256 under a different label from the
+key id. The associated data is the envelope header up to the key id plus the value's place: table,
+column and the id of the user who owns the row (unique in `bunq_connections`). A value copied into
+another column or another user's row fails its tag check, exactly like a changed byte or a wrong
+key, and is reported as unreadable rather than used. The code is
+`packages/backend/src/lib/secretEnvelope.ts`; the list of secret columns is
+`packages/backend/src/lib/integrationSecrets.ts`.
+
+### Encrypting stored secrets
+
+`quro secrets encrypt` encrypts every stored value that is not yet encrypted. Releases up to 0.8.0
+stored them unencrypted; the [0.9.0 upgrade notes](upgrade.md#secrets-key-for-bank-links) say when
+to run it.
+
+- It works one bank connection at a time: a transaction locks the row, reads it again, and writes
+  every converted column in one `UPDATE`. A row is never left with some columns converted by a run
+  and others not; an interrupted run (a killed container, a lost connection) leaves each row as it
+  was or fully converted, and running the command again converts the rest. Values that are already
+  encrypted are skipped, so a second run changes nothing.
+- It holds the maintenance lock in shared mode, like any write: it waits for nothing and refuses
+  while `quro backup` or `quro restore` runs. Row locks keep it safe next to a running 0.9.0
+  server, which also writes only encrypted values. Stop older servers first: they would use the
+  encrypted text as a token.
+- Nulls stay null, and values it cannot open (sealed with an unknown key, or damaged) are left as
+  they are and reported.
+- The server does the same for a connection it is about to use that still holds unencrypted values
+  (for example after restoring an older backup), so a configured server never keeps using
+  plaintext. `quro doctor` warns while any value is unencrypted.
+
+`quro secrets status` (read-only) reports how many values are encrypted with the current key, with
+the previous key, with a key that is not configured, unencrypted or damaged, opening each encrypted
+value in memory to check its tag. It exits 0 when every stored value is on the current key (or none
+is stored) and 1 otherwise, with the command to run. `--json` gives the same report for scripts.
+
+### Rotate the secrets key
+
+Rotation is an offline procedure with the `migrate` service (or any `quro` container with both key
+files):
+
+1. Take a backup with `quro backup`, and keep a copy of the current key file.
+2. Create the new key next to the old one, for example
+   `openssl rand -hex 32 > config/secrets/secrets_key.new`, and keep a copy apart from your backups.
+3. Stop the backend (`docker compose stop backend`).
+4. Point `QRO_SECRETS_KEY_FILE` at the new key and `QRO_SECRETS_PREVIOUS_KEY_FILE` at the old one
+   (mount both files), then run `quro secrets rotate`. It re-encrypts, one connection per
+   transaction, every value the previous key opens (and any unencrypted value) with the new key.
+   An interrupted run leaves some rows on each key; both stay readable, and running it again
+   finishes the rest.
+5. `quro secrets status` with the new key alone must exit 0. Then remove
+   `QRO_SECRETS_PREVIOUS_KEY_FILE`, start the backend and run a bunq sync.
+
+Keep the old key for as long as you keep backups taken before the rotation: they need it.
+
+### If the secrets key is lost
+
+Nothing but the bank links is lost. Generate a new key (`quro init` writes one if the file is
+missing), start Quro, and have each user with a connected bunq account connect it again in
+**Settings**. Until then a sync answers that the stored credentials cannot be read and asks for a
+reconnect, without calling bunq; `quro secrets status` lists the affected user ids. Connecting
+again replaces every stored credential of that connection. Accounts and transactions imported
+earlier stay.
+
+### Backups and the secrets key
+
+An archive holds the encrypted values only. Its manifest records the key id of every key that
+sealed them, and `quro backup` prints it. To restore an archive with its bank links intact, the
+instance needs the key with that id: keep each key file for as long as you keep an archive that
+needs it, apart from the archives. A restore without it succeeds and keeps every other row; the
+users then reconnect bunq.
 
 ## Authorization and privacy tests
 
@@ -338,7 +454,7 @@ cannot reach a provider. No test uses real data or a provider.
 `lib/access.ts` and `lib/partner.ts` define access for rows that can be shared. Tables that cannot
 be shared are queried with `eq(table.userId, …)` directly, which is correct while sharing is
 limited to the tables above. `accessSweep.test.ts` records every such predicate by file and table
-(148 in 26 files) and fails when a new one appears or when one touches a shareable table without
+(147 in 27 files) and fails when a new one appears or when one touches a shareable table without
 a recorded reason. The three recorded exceptions are ending a link, a goal that follows a savings
 account its owner holds, and the bank sync writing the connected user's own accounts. Changing the
 sharing model means revisiting this list.
@@ -389,7 +505,7 @@ Passing tests and scanners is evidence for the listed controls only.
 | 7.5.2 View and end active sessions                         | Partial  | Settings → Security, without re-authentication                                                                                                    |
 | 13.2.2 Least-privilege database account                    | Met      | The backend uses an app role without DDL; see [Database role separation](#database-role-separation)                                               |
 | 13.2.3 No default service credentials                      | Met      | Every password is an operator-provided secret file                                                                                                |
-| 13.3.1 Secrets management                                  | Partial  | Docker secret files; no key vault                                                                                                                 |
+| 13.3.1 Secrets management                                  | Partial  | Docker secret files; no key vault. Stored bank-link secrets are encrypted with an operator-held key ([integration secrets](#integration-secrets)) |
 | 13.4.1 No source control metadata deployed                 | Met      | `.dockerignore` keeps `.git` out of the images                                                                                                    |
 | 15.1.1 Documented remediation time frames                  | Met      | [SECURITY.md](../SECURITY.md#how-findings-are-handled)                                                                                            |
 | 15.2.1 Components within their remediation time frames     | Partial  | Critical findings fail CI; high findings are listed for triage. Debian packages without a fixed version stay until Debian ships one               |

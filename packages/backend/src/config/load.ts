@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import type { RegistrationMode } from '@quro/shared';
 import type { TrustedProxies } from '../lib/clientAddress';
+import { SecretsKey, SecretsKeyFormatError } from '../lib/secretEnvelope';
 import { Secret } from './secret';
 import {
   DEFAULT_CORS_ORIGINS,
+  DEFAULT_SECRETS_KEY_FILE,
   FEATURES,
   S3_SELECTION_SIGNALS,
   SETTINGS,
@@ -141,6 +143,17 @@ export type MaintenanceConfig = {
 
 export type DemoConfig = { userPassword: Secret | null };
 
+/**
+ * The keys that encrypt integration secrets in the database. `key` is null when no key file is
+ * configured; `previousKey` is set only while the operator rotates to a new key.
+ */
+export type SecretsConfig = {
+  key: SecretsKey | null;
+  /** Where the current key was read from, for messages; null without a key. */
+  keyPath: string | null;
+  previousKey: SecretsKey | null;
+};
+
 /** Where `quro backup` writes archives, and how they are protected and pruned. */
 export type BackupConfig = {
   directory: string;
@@ -173,6 +186,7 @@ export type Config = {
   readonly maintenance: MaintenanceConfig;
   readonly backup: BackupConfig;
   readonly demo: DemoConfig;
+  readonly secrets: SecretsConfig;
   /** Non-fatal observations about the settings, such as a replaced wildcard CORS origin. */
   readonly notices: readonly ConfigNotice[];
 };
@@ -494,8 +508,71 @@ function buildS3Source(r: Reader): S3SourceConfig | undefined {
   return s3 && { enabled: true, ...s3 };
 }
 
+type KeyRead = { key: SecretsKey; path: string } | null | undefined;
+
+/**
+ * Reads a secrets key file. A file named explicitly must exist and hold a valid key; the default
+ * location may be empty (no key). Returns null without a key and undefined after a problem.
+ */
+function readSecretsKey(
+  r: Reader,
+  name: 'QRO_SECRETS_KEY_FILE' | 'QRO_SECRETS_PREVIOUS_KEY_FILE',
+): KeyRead {
+  const read = r.secretFile(name);
+  if (!read.ok) {
+    if (read.reason === 'missing' && !read.explicit) return null;
+    r.fail(name, `${SECRET_FILE_PROBLEMS[read.reason]} ${read.path}`);
+    return undefined;
+  }
+  try {
+    return { key: SecretsKey.parse(read.value.reveal()), path: read.path };
+  } catch (error) {
+    if (!(error instanceof SecretsKeyFormatError)) throw error;
+    r.fail(name, `the key in ${read.path} ${error.message}`);
+    return undefined;
+  }
+}
+
+/** A previous key is only meaningful next to a different current key. */
+function checkPreviousKey(r: Reader, current: KeyRead, previous: KeyRead): void {
+  if (current === null && previous) {
+    r.fail(
+      'QRO_SECRETS_PREVIOUS_KEY_FILE',
+      'needs QRO_SECRETS_KEY_FILE: the previous key is only read while rotating to a new one',
+    );
+  } else if (current && previous && current.key.id === previous.key.id) {
+    r.fail(
+      'QRO_SECRETS_PREVIOUS_KEY_FILE',
+      'holds the same key as QRO_SECRETS_KEY_FILE; it must be the key that was in use before',
+    );
+  }
+}
+
+function buildSecrets(r: Reader): SecretsConfig | undefined {
+  const current = readSecretsKey(r, 'QRO_SECRETS_KEY_FILE');
+  const previous = r.isSet('QRO_SECRETS_PREVIOUS_KEY_FILE')
+    ? readSecretsKey(r, 'QRO_SECRETS_PREVIOUS_KEY_FILE')
+    : null;
+  checkPreviousKey(r, current, previous);
+  if (current === undefined || previous === undefined) return undefined;
+  return {
+    key: current?.key ?? null,
+    keyPath: current?.path ?? null,
+    previousKey: previous?.key ?? null,
+  };
+}
+
 function buildBunq(r: Reader): BunqConfig {
   if (!r.featureConfigured('bunq')) return { enabled: false };
+  // Bank-link tokens are stored only in encrypted form, so linking needs the key. A key file that
+  // exists but is invalid is reported by readSecretsKey.
+  const secretsKey = readSecretsKey(r, 'QRO_SECRETS_KEY_FILE');
+  if (secretsKey === null) {
+    r.fail(
+      'QRO_SECRETS_KEY_FILE',
+      `required because bunq linking is configured: bank-link tokens are stored encrypted with it (no key file at ${r.raw('QRO_SECRETS_KEY_FILE') ?? DEFAULT_SECRETS_KEY_FILE}; \`quro init\` or \`openssl rand -hex 32\` creates one)`,
+    );
+  }
   const clientId = r.secretValueOrFile('BUNQ_CLIENT_ID', 'BUNQ_CLIENT_ID_FILE');
   const clientSecret = r.secretValueOrFile('BUNQ_CLIENT_SECRET', 'BUNQ_CLIENT_SECRET_FILE');
   const redirectUri = r.get('BUNQ_REDIRECT_URI');
@@ -505,6 +582,7 @@ function buildBunq(r: Reader): BunqConfig {
   if (clientSecret) present.add('BUNQ_CLIENT_SECRET');
   if (redirectUri) present.add('BUNQ_REDIRECT_URI');
   if (frontendOrigin) present.add('FRONTEND_ORIGIN');
+  if (secretsKey) present.add('QRO_SECRETS_KEY_FILE');
   if (!r.requireFeatureSettings('bunq', present)) return { enabled: false };
   return {
     enabled: true,
@@ -618,6 +696,7 @@ const BUILDERS: SectionBuilders = {
   maintenance: buildMaintenance,
   backup: buildBackup,
   demo: buildDemo,
+  secrets: buildSecrets,
 };
 
 export const SECTION_NAMES = Object.keys(BUILDERS) as SectionName[];
