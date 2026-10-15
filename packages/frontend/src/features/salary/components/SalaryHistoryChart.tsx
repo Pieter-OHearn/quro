@@ -28,7 +28,7 @@ function SalaryTooltip({ active, payload, fmtBase }: TooltipContentProps & { fmt
     <div className="rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover font-numeric">
       {payload.map((entry, index) => (
         <p key={`${entry.dataKey ?? entry.name ?? index}`}>
-          {entry.dataKey === 'net' ? 'Net Pay' : 'Deductions'}: {fmtBase(Number(entry.value) || 0)}
+          {entry.dataKey === 'net' ? 'Net pay' : 'Deductions'}: {fmtBase(Number(entry.value) || 0)}
         </p>
       ))}
       <p className="mt-0.5 border-t border-fg-on-inverse/20 pt-0.5">Gross: {fmtBase(gross)}</p>
@@ -40,7 +40,7 @@ function SalaryChartLegend() {
   return (
     <div className="mt-2 flex items-center gap-4">
       {[
-        { label: 'Net Pay', color: NET_COLOR },
+        { label: 'Net pay', color: NET_COLOR },
         { label: 'Deductions', color: DEDUCTIONS_COLOR },
       ].map((item) => (
         <div key={item.label} className="flex items-center gap-1.5">
@@ -63,7 +63,7 @@ export function SalaryHistoryChart({
 
   return (
     <ChartCard
-      title="Salary Growth History"
+      title="Salary growth history"
       subtitle={`Annual salary in ${baseCurrency}`}
       hasData={data.length > 0}
       emptyMessage="No salary history yet."

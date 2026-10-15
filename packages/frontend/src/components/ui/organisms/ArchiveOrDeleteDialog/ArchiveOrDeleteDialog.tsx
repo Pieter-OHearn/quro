@@ -125,7 +125,9 @@ export function ArchiveOrDeleteDialog({
 
   return (
     <Modal
-      title={hideArchive ? `Delete ${entityLabel}` : `Remove ${entityLabel}`}
+      title={
+        hideArchive ? `Delete ${entityLabel.toLowerCase()}` : `Remove ${entityLabel.toLowerCase()}`
+      }
       subtitle={subtitle}
       onClose={onCancel}
       footer={

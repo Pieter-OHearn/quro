@@ -9,13 +9,13 @@ export function SummaryBanner({ debts }: Readonly<{ debts: readonly Debt[] }>) {
   const { fmtBase, convertToBase, numberFormat } = useCurrency();
   const overview = useMemo(() => buildDebtOverview(debts, convertToBase), [debts, convertToBase]);
   const metrics = [
-    { label: 'Monthly Payments', value: fmtBase(overview.totalMonthlyPayment) },
+    { label: 'Monthly payments', value: fmtBase(overview.totalMonthlyPayment) },
     {
-      label: 'Avg Interest',
+      label: 'Average interest',
       value: `${formatPercent(overview.averageInterestRate, numberFormat, 2)} APR`,
     },
     {
-      label: 'Highest Rate',
+      label: 'Highest rate',
       value: `${formatPercent(overview.highestInterestRate, numberFormat, 2)} APR`,
     },
   ];
@@ -23,7 +23,7 @@ export function SummaryBanner({ debts }: Readonly<{ debts: readonly Debt[] }>) {
   return (
     <Card className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div>
-        <p className="text-label text-fg-muted">Liabilities Overview</p>
+        <p className="text-label text-fg-muted">Liabilities overview</p>
         <p className="mt-1 text-figure-hero font-numeric text-fg">
           {formatAsNegative(fmtBase, overview.totalBalance)}
         </p>

@@ -82,10 +82,10 @@ function buildMortgageTxnStats({ transactions, fmt }: MortgageSummaryStatsProps)
   const totalInterest = repayments.reduce((s, t) => s + (t.interest ?? 0), 0);
   const rateChanges = transactions.filter((t) => t.type === 'rate_change').length;
   return [
-    { label: 'Total Repaid', value: fmt(totalRepaid) },
-    { label: 'Principal Paid', value: fmt(totalPrincipal) },
-    { label: 'Interest Paid', value: fmt(totalInterest) },
-    { label: 'Rate Changes', value: String(rateChanges) },
+    { label: 'Total repaid', value: fmt(totalRepaid) },
+    { label: 'Principal paid', value: fmt(totalPrincipal) },
+    { label: 'Interest paid', value: fmt(totalInterest) },
+    { label: 'Rate changes', value: String(rateChanges) },
   ];
 }
 
@@ -106,7 +106,7 @@ export function MortgageTxnHistory({
 
   return (
     <TxnHistoryPanel
-      title="Transaction History"
+      title="Transaction history"
       subtitle={`${transactions.length} transactions recorded`}
       variant="card"
       addButtonPlacement="header"
@@ -119,7 +119,7 @@ export function MortgageTxnHistory({
       stats={buildMortgageTxnStats({ transactions, fmt })}
       statsColumns={4}
       onAdd={onAdd}
-      addLabel="Record Transaction"
+      addLabel="Record transaction"
       isEmpty={sorted.length === 0}
     >
       {sorted.map((t) => (

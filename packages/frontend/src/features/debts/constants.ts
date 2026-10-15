@@ -31,19 +31,19 @@ export const DEBT_TYPE_META: Record<
   }
 > = {
   car_loan: {
-    label: 'Car Loan',
+    label: 'Car loan',
     icon: Car,
   },
   student_loan: {
-    label: 'Student Loan',
+    label: 'Student loan',
     icon: GraduationCap,
   },
   personal_loan: {
-    label: 'Personal Loan',
+    label: 'Personal loan',
     icon: User,
   },
   credit_card: {
-    label: 'Credit Card',
+    label: 'Credit card',
     icon: CreditCard,
   },
   overdraft: {
@@ -60,7 +60,7 @@ export const FILTER_OPTIONS: Array<{ key: DebtFilterValue; label: string; icon: 
   { key: 'all', label: 'All', icon: Banknote },
   { key: 'car_loan', label: 'Car', icon: Car },
   { key: 'student_loan', label: 'Student', icon: GraduationCap },
-  { key: 'credit_card', label: 'Credit Card', icon: CreditCard },
+  { key: 'credit_card', label: 'Credit card', icon: CreditCard },
   { key: 'personal_loan', label: 'Personal', icon: User },
   { key: 'overdraft', label: 'Overdraft', icon: AlertTriangle },
   { key: 'other', label: 'Other', icon: MoreHorizontal },

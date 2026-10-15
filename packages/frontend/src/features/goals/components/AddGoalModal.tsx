@@ -109,7 +109,7 @@ function SavingsSourceSelector({
   const sourceOptions = buildSavingsSourceOptions(savingsAccounts, fmtBase);
 
   return (
-    <FormField label="Progress Source" hint="optional" className="col-span-2">
+    <FormField label="Progress source" hint="optional" className="col-span-2">
       <SelectInput
         value={form.sourceId}
         options={sourceOptions}
@@ -143,7 +143,7 @@ function LinkedCurrentAmountSummary({
 }>) {
   return (
     <div className={LINKED_BOX_CLASS_NAME}>
-      <p className="text-label text-fg-muted">Linked Current Amount</p>
+      <p className="text-label text-fg-muted">Linked current amount</p>
       <p className="mt-0.5 text-figure-md font-numeric text-fg">
         {fmtNative(selectedSource.balance, selectedSource.currency)}
       </p>
@@ -157,7 +157,7 @@ function ManualCurrentAmountField({
   baseCurrency,
 }: Readonly<Pick<AmountFieldsSavingsPortfolioProps, 'form' | 'setField' | 'baseCurrency'>>) {
   return (
-    <FormField label="Current Amount">
+    <FormField label="Current amount">
       <CurrencyInput
         currency={baseCurrency}
         inputMode="decimal"
@@ -176,7 +176,7 @@ function TargetAmountField({
   baseCurrency,
 }: Readonly<Pick<AmountFieldsSavingsPortfolioProps, 'form' | 'setField' | 'baseCurrency'>>) {
   return (
-    <FormField label="Target Amount" required>
+    <FormField label="Target amount" required>
       <CurrencyInput
         currency={baseCurrency}
         inputMode="decimal"
@@ -197,7 +197,7 @@ function MonthlyContributionField({
   Pick<AmountFieldsSavingsPortfolioProps, 'form' | 'setField'> & { baseCurrency: string }
 >) {
   return (
-    <FormField label={`Monthly Contribution (${baseCurrency})`}>
+    <FormField label={`Monthly contribution (${baseCurrency})`}>
       <CurrencyInput
         currency={baseCurrency}
         inputMode="decimal"
@@ -266,7 +266,7 @@ function AmountFieldsSavingsPortfolio(
       {type === 'savings' && <SavingsSourceSelector {...props} selectedSource={selectedSource} />}
       {type === 'portfolio' && (
         <AutoLinkedSourceSummary
-          label="Linked Portfolio Value"
+          label="Linked portfolio value"
           description="Auto-linked from your investments page."
           currentValue={portfolioTotal}
           fmtBase={fmtBase}
@@ -274,7 +274,7 @@ function AmountFieldsSavingsPortfolio(
       )}
       {type === 'net_worth' && (
         <AutoLinkedSourceSummary
-          label="Linked Net Worth"
+          label="Linked net worth"
           description="Auto-linked from your dashboard."
           currentValue={netWorth}
           fmtBase={fmtBase}
@@ -303,7 +303,7 @@ function AmountFieldsSalary({
 }: Readonly<{ form: GoalFormState; setField: SetField; baseCurrency: string }>) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <FormField label="Target Annual Gross" required>
+      <FormField label="Target annual gross" required>
         <CurrencyInput
           currency={baseCurrency}
           inputMode="decimal"
@@ -327,7 +327,7 @@ function AmountFieldsAnnual({
 }: Readonly<{ form: GoalFormState; setField: SetField }>) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <FormField label="Current Progress">
+      <FormField label="Current progress">
         <TextInput
           type="number"
           placeholder="0"
@@ -391,7 +391,7 @@ function AmountFieldsInvestHabit({
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      <FormField label={`Monthly Target (${baseCurrency})`} required className="col-span-2">
+      <FormField label={`Monthly target (${baseCurrency})`} required className="col-span-2">
         <CurrencyInput
           currency={baseCurrency}
           inputMode="decimal"
@@ -401,10 +401,10 @@ function AmountFieldsInvestHabit({
           onChange={(value) => setField('monthlyTarget', value)}
         />
       </FormField>
-      <FormField label="Start Month">
+      <FormField label="Start month">
         <MonthInput value={dateToMonthString(form.startMonth)} onChange={handleStartMonthChange} />
       </FormField>
-      <FormField label="End Month">
+      <FormField label="End month">
         <MonthInput value={deadlineToMonthString(form.deadline)} onChange={handleEndMonthChange} />
       </FormField>
       <div className={cn('col-span-2', LINKED_BOX_CLASS_NAME)}>
@@ -478,7 +478,7 @@ function GoalDetailsNameRow({
         pickerHeight={350}
         pickerWidth={280}
       />
-      <FormField label="Goal Name" required className="flex-1">
+      <FormField label="Goal name" required className="flex-1">
         <TextInput
           placeholder="e.g. Hit 100k salary"
           value={form.name}
@@ -677,7 +677,7 @@ export function AddGoalModal({ onClose, onSave, initialFilter }: Readonly<AddGoa
 
   return (
     <Modal
-      title="Add Goal"
+      title="Add goal"
       subtitle={subtitle}
       onClose={onClose}
       maxWidth="lg"
@@ -688,7 +688,7 @@ export function AddGoalModal({ onClose, onSave, initialFilter }: Readonly<AddGoa
           <ModalFooter
             onCancel={onClose}
             onConfirm={handleSave}
-            confirmLabel="Save Goal"
+            confirmLabel="Save goal"
             disabled={saveDisabled}
           />
         ) : undefined

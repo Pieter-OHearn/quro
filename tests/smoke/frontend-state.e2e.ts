@@ -153,9 +153,9 @@ test('pension import traps keyboard focus, closes on Escape, and restores the tr
   page,
 }) => {
   await mockPensionUi(page);
-  const trigger = page.getByRole('button', { name: 'Import Annual Statement PDF' });
+  const trigger = page.getByRole('button', { name: 'Import annual statement PDF' });
   await trigger.click();
-  const dialog = page.getByRole('dialog', { name: 'Import Annual Statement' });
+  const dialog = page.getByRole('dialog', { name: 'Import annual statement' });
   await expect(dialog).toHaveAttribute('aria-modal', 'true');
   await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
@@ -172,7 +172,7 @@ test('archive warnings use the saved number format and keep deletion gated by th
 }) => {
   await mockPensionUi(page);
   await page.getByRole('button', { name: 'Remove pot', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Remove Pension pot' });
+  const dialog = page.getByRole('dialog', { name: 'Remove pension pot' });
   await expect(dialog.getByText(/still has a balance of/)).toContainText('1.234,56');
   const remove = dialog.getByRole('button', { name: 'Delete pension pot', exact: true });
   await expect(remove).toBeDisabled();
@@ -212,8 +212,8 @@ test('wide pension review keeps compact fields editable and the footer visible o
   await page.route('**/api/pensions/imports/11/rows*', (route) =>
     route.fulfill({ json: { data: rows, nextCursor: null } }),
   );
-  await page.getByRole('button', { name: 'Import Annual Statement PDF' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Import Annual Statement' });
+  await page.getByRole('button', { name: 'Import annual statement PDF' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import annual statement' });
   await dialog.locator('input[type="file"]').setInputFiles({
     name: 'statement.pdf',
     mimeType: 'application/pdf',

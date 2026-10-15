@@ -51,7 +51,7 @@ function renderBudgetCategories({ items = categories }: { items?: BudgetCategory
 test('BudgetCategoriesSection renders shared table rows with mobile-critical category fields', () => {
   const markup = renderBudgetCategories();
 
-  expect(markup).toContain('Budget Categories');
+  expect(markup).toContain('Budget categories');
   expect(markup).not.toContain('<table');
   expect(markup).toContain('Dining');
   expect(markup).toContain('EUR 260.00 / EUR 200');
@@ -66,7 +66,7 @@ test('BudgetCategoriesSection renders over-budget messaging and tokenized empty 
   const emptyMarkup = renderBudgetCategories({ items: [] });
 
   expect(emptyMarkup).toContain('No budget categories yet');
-  expect(emptyMarkup).toContain('Click Add Category to get started.');
+  expect(emptyMarkup).toContain('Click Add category to get started.');
 });
 
 test('BudgetCategoriesSection renders add button with stable smoke-test id', () => {

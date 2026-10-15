@@ -20,7 +20,7 @@ export function MortgageRepaymentProgress({
   return (
     <Card>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-title-section text-fg">Mortgage Repayment Progress</h3>
+        <h3 className="text-title-section text-fg">Mortgage repayment progress</h3>
         <span className="text-figure-md font-numeric text-fg">
           {formatPercent(paidPct, numberFormat, 1)} paid off
         </span>

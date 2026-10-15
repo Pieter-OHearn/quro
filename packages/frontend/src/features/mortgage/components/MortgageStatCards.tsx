@@ -28,7 +28,7 @@ export function MortgageStatCards({
   return (
     <StatsGrid>
       <StatCard
-        label="Property Value"
+        label="Property value"
         value={fmt(mortgage.propertyValue)}
         change={{
           value: valueChange >= 0 ? `+${fmt(valueChange)}` : fmt(valueChange),
@@ -39,7 +39,7 @@ export function MortgageStatCards({
         color="emerald"
       />
       <StatCard
-        label="Equity Built"
+        label="Equity built"
         value={fmt(equity)}
         subtitle={`${formatPercent((equity / mortgage.propertyValue) * 100, numberFormat, 0)} of property value`}
         icon={TrendingDown}
@@ -53,7 +53,7 @@ export function MortgageStatCards({
         color="sky"
       />
       <StatCard
-        label="Capital Repaid"
+        label="Capital repaid"
         value={fmt(paid)}
         subtitle={`${formatPercent(paidPct, numberFormat, 0)} of original loan`}
         icon={Calendar}

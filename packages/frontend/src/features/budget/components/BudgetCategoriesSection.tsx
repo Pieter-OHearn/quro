@@ -137,7 +137,7 @@ function CategoryList({
         <EmptyState
           icon={WalletCards}
           title="No budget categories yet"
-          description="Click Add Category to get started."
+          description="Click Add category to get started."
           compact
           tone="neutral"
         />
@@ -179,7 +179,7 @@ export function BudgetCategoriesSection({
   return (
     <Card padding="none" className="overflow-hidden">
       <PanelHeader
-        title="Budget Categories"
+        title="Budget categories"
         subtitle={subtitle}
         className="max-md:flex-col max-md:items-stretch max-md:gap-2 max-md:py-2"
         action={
@@ -197,7 +197,7 @@ export function BudgetCategoriesSection({
               size="sm"
               leadingIcon={<Plus size={12} aria-hidden />}
             >
-              Add Category
+              Add category
             </Button>
           </div>
         }

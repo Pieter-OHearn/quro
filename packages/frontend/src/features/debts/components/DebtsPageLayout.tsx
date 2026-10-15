@@ -26,13 +26,13 @@ function DebtsHeader({ onAddDebt }: Readonly<{ onAddDebt: () => void }>) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 className="text-title-section text-fg">Debts & Liabilities</h2>
+        <h2 className="text-title-section text-fg">Debts & liabilities</h2>
         <p className="text-caption text-fg-subtle">
           Loans, credit cards, overdrafts, and other non-mortgage obligations.
         </p>
       </div>
       <Button onClick={onAddDebt} leadingIcon={<Plus size={14} aria-hidden />}>
-        Add Debt
+        Add debt
       </Button>
     </div>
   );

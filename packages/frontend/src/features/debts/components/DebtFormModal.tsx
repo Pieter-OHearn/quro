@@ -53,7 +53,7 @@ function DebtIdentityFields({ form, errors, onChange }: Readonly<DebtFormFieldsP
         onChange={(emoji) => onChange('emoji', emoji)}
         error={errors.emoji}
       />
-      <FormField label="Debt Name" required error={errors.name}>
+      <FormField label="Debt name" required error={errors.name}>
         <TextInput
           value={form.name}
           onChange={(value) => onChange('name', value)}
@@ -73,7 +73,7 @@ function DebtTypeFields({
 }: Readonly<DebtFormFieldsProps & { onTypeChange: (value: string) => void }>) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <FormField label="Debt Type" required error={errors.type}>
+      <FormField label="Debt type" required error={errors.type}>
         <SelectInput
           value={form.type}
           onChange={onTypeChange}
@@ -84,7 +84,7 @@ function DebtTypeFields({
           error={Boolean(errors.type)}
         />
       </FormField>
-      <FormField label="Lender / Provider" required error={errors.lender}>
+      <FormField label="Lender / provider" required error={errors.lender}>
         <TextInput
           value={form.lender}
           onChange={(value) => onChange('lender', value)}
@@ -99,7 +99,7 @@ function DebtTypeFields({
 function DebtAmountFields({ form, errors, onChange }: Readonly<DebtFormFieldsProps>) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <FormField label="Original Amount" required error={errors.originalAmount}>
+      <FormField label="Original amount" required error={errors.originalAmount}>
         <CurrencyInput
           currency={form.currency}
           value={form.originalAmount}
@@ -107,7 +107,7 @@ function DebtAmountFields({ form, errors, onChange }: Readonly<DebtFormFieldsPro
           error={Boolean(errors.originalAmount)}
         />
       </FormField>
-      <FormField label="Remaining Balance" required error={errors.remainingBalance}>
+      <FormField label="Remaining balance" required error={errors.remainingBalance}>
         <CurrencyInput
           currency={form.currency}
           value={form.remainingBalance}
@@ -132,7 +132,7 @@ function DebtTermsFields({ form, errors, onChange }: Readonly<DebtFormFieldsProp
           error={Boolean(errors.interestRate)}
         />
       </FormField>
-      <FormField label="Monthly Payment" required error={errors.monthlyPayment}>
+      <FormField label="Monthly payment" required error={errors.monthlyPayment}>
         <CurrencyInput
           currency={form.currency}
           value={form.monthlyPayment}
@@ -154,14 +154,14 @@ function DebtTermsFields({ form, errors, onChange }: Readonly<DebtFormFieldsProp
 function DebtDateFields({ form, errors, onChange }: Readonly<DebtFormFieldsProps>) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <FormField label="Start Date" required error={errors.startDate}>
+      <FormField label="Start date" required error={errors.startDate}>
         <DateInput
           value={form.startDate}
           onChange={(value) => onChange('startDate', value)}
           error={Boolean(errors.startDate)}
         />
       </FormField>
-      <FormField label="End Date" hint="optional" error={errors.endDate}>
+      <FormField label="End date" hint="optional" error={errors.endDate}>
         <DateInput
           value={form.endDate}
           onChange={(value) => onChange('endDate', value)}
@@ -175,7 +175,7 @@ function DebtDateFields({ form, errors, onChange }: Readonly<DebtFormFieldsProps
 function DebtColorPicker({ form, errors, onChange }: Readonly<DebtFormFieldsProps>) {
   const selected = categoryColorFor(form.color);
   return (
-    <FormField label="Colour Tag" required error={errors.color}>
+    <FormField label="Colour" required error={errors.color}>
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Colour tag">
         {DEBT_COLORS.map((color) => (
           <button
@@ -221,7 +221,7 @@ function DebtFormModalShell({
 }: Readonly<DebtFormModalShellProps>) {
   return (
     <Modal
-      title={editing ? 'Edit Debt' : 'Add New Debt'}
+      title={editing ? 'Edit debt' : 'Add debt'}
       subtitle="Track a liability"
       onClose={onClose}
       maxWidth="lg"
@@ -234,9 +234,9 @@ function DebtFormModalShell({
           <Button
             onClick={onSubmit}
             loading={submitting}
-            loadingLabel={editing ? 'Saving Changes...' : 'Adding Debt...'}
+            loadingLabel={editing ? 'Saving changes...' : 'Adding debt...'}
           >
-            {editing ? 'Save Changes' : 'Add Debt'}
+            {editing ? 'Save changes' : 'Add debt'}
           </Button>
         </>
       }

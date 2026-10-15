@@ -8,7 +8,7 @@ type TickerLookupState = {
   error: string | null;
 };
 
-const LOOKUP_TICKER_UNAVAILABLE_MESSAGE = 'Lookup Ticker feature is not available.';
+const LOOKUP_TICKER_UNAVAILABLE_MESSAGE = 'Ticker lookup is not available.';
 
 export function createLatestRequestTracker() {
   let latestRequestId = 0;

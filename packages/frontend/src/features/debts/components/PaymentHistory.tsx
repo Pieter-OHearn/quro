@@ -150,14 +150,14 @@ export function PaymentHistory({
   return (
     <div className="border-t border-border-subtle pt-3">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h4 className="text-cell font-semibold text-fg">Payment History</h4>
+        <h4 className="text-cell font-semibold text-fg">Payment history</h4>
         <Button
           size="sm"
           variant="secondary"
           leadingIcon={<Plus size={12} aria-hidden />}
           onClick={onLogPayment}
         >
-          Log Payment
+          Log payment
         </Button>
       </div>
 

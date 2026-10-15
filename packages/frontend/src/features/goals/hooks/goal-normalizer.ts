@@ -49,7 +49,7 @@ const resolveGoalYear = (goal: Goal): number =>
 
 const normalizeGoalMeta = (goal: Goal) => ({
   type: normalizeGoalTypeValue(goal.type),
-  name: goal.name?.trim() || 'Untitled Goal',
+  name: goal.name?.trim() || 'Untitled goal',
   emoji: goal.emoji || DEFAULT_EMOJI.goal,
   deadline: goal.deadline?.trim() || 'TBD',
   category: goal.category?.trim() || 'Other',

@@ -31,7 +31,7 @@ export function EditGoalModal({ goal, onClose, onSave }: Readonly<EditGoalModalP
 
   return (
     <Modal
-      title="Edit Goal"
+      title="Edit goal"
       subtitle={subtitle}
       onClose={onClose}
       maxWidth="lg"
@@ -41,7 +41,7 @@ export function EditGoalModal({ goal, onClose, onSave }: Readonly<EditGoalModalP
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel="Update Goal"
+          confirmLabel="Update goal"
           disabled={saveDisabled}
         />
       }

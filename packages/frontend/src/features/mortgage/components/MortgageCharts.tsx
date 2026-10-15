@@ -32,7 +32,7 @@ function MortgageBalanceChart({
 }: Readonly<MortgageBalanceChartProps>) {
   return (
     <ChartCard
-      title="Balance Projection"
+      title="Balance projection"
       subtitle={`Remaining balance using the ${repaymentType.toLowerCase()} repayment method`}
       hasData
     >
@@ -84,8 +84,8 @@ type MortgagePaymentChartProps = {
 function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymentChartProps>) {
   return (
     <ChartCard
-      title="Payment Breakdown"
-      subtitle="Principal vs Interest per month"
+      title="Payment breakdown"
+      subtitle="Principal and interest per month"
       hasData={paymentBreakdown.length > 0}
       emptyMessage="No repayment transactions yet."
       footer={<PaymentChartLegend />}

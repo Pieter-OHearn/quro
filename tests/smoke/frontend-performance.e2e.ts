@@ -113,8 +113,8 @@ test('dashboard uses compact insights and emoji runtime loads only when the pick
   expect(api.requests).not.toContain('/api/investments/holding-transactions');
   expect(emojiRequests).toEqual([]);
   await page.getByRole('link', { name: 'Goals', exact: true }).click();
-  await page.getByRole('button', { name: 'Add Goal', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button').filter({ hasText: 'Savings Goal' }).click();
+  await page.getByRole('button', { name: 'Add goal', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button').filter({ hasText: 'Savings goal' }).click();
   expect(emojiRequests).toEqual([]);
   await page.getByTitle('Pick an emoji', { exact: true }).click();
   await expect(page.locator('.EmojiPickerReact')).toBeVisible();

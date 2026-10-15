@@ -227,9 +227,9 @@ function TxnAmountField({
   setError,
 }: TxnAmountFieldProps) {
   const labels = {
-    repayment: `Total Repayment Amount (${mortgage.currency})`,
-    valuation: `New Estimated Value (${mortgage.currency})`,
-    rate_change: 'New Interest Rate (%)',
+    repayment: `Total repayment amount (${mortgage.currency})`,
+    valuation: `New estimated value (${mortgage.currency})`,
+    rate_change: 'New interest rate (%)',
   };
   return (
     <FormField label={labels[type]}>
@@ -264,7 +264,7 @@ function RateChangeFields({
   setError,
 }: RateChangeFieldsProps) {
   return (
-    <FormField label="Fixed Period" hint="— how long is this rate fixed for?">
+    <FormField label="Fixed period" hint="— how long is this rate fixed for?">
       <div className="relative">
         <TextInput
           type="number"
@@ -317,7 +317,7 @@ function RepaymentInterestField({
 }: RepaymentInterestFieldProps) {
   return (
     <FormField
-      label={`Interest Portion (${mortgage.currency})`}
+      label={`Interest portion (${mortgage.currency})`}
       hint="— principal is auto-calculated"
     >
       <CurrencyInput
@@ -382,7 +382,7 @@ function TxnConditionalFields({ state, mortgage, fmt }: TxnModalFormBodyProps) {
 function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
   return (
     <div className="space-y-4 p-4">
-      <FormField label="Transaction Type" labelClassName="mb-2">
+      <FormField label="Transaction type" labelClassName="mb-2">
         <TxnTypeSelector types={TXN_TYPES} value={state.type} onChange={state.handleTypeChange} />
       </FormField>
       <ContextPill type={state.type} mortgage={mortgage} fmt={fmt} />
@@ -429,7 +429,7 @@ export function AddMortgageTxnModal({
   const effectiveMortgage = buildEffectiveMortgage(mortgage, existing);
   const state = useMortgageTxnModal({ mortgage: effectiveMortgage, existing, onSave, onClose });
   const isEditing = Boolean(existing);
-  const title = isEditing ? 'Edit Transaction' : 'Record Transaction';
+  const title = isEditing ? 'Edit transaction' : 'Record transaction';
 
   return (
     <Modal
@@ -451,7 +451,7 @@ export function AddMortgageTxnModal({
         <ModalFooter
           onCancel={onClose}
           onConfirm={state.handleSave}
-          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+          confirmLabel={isEditing ? 'Save changes' : 'Record'}
         />
       }
     >

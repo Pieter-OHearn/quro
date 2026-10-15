@@ -89,7 +89,7 @@ function PropertySection({ form, errors, setField }: PropertySectionProps) {
     <div>
       <h3 className={SECTION_HEADING}>Property</h3>
       <div className="space-y-3">
-        <FormField label="Property Address">
+        <FormField label="Property address">
           <TextInput
             disabled
             readOnly
@@ -124,8 +124,8 @@ function PropertyLinkSection({
 }: PropertyLinkSectionProps) {
   return (
     <div>
-      <h3 className={SECTION_HEADING}>Property Link</h3>
-      <FormField label="Linked Property" error={errors.linkedPropertyId}>
+      <h3 className={SECTION_HEADING}>Property link</h3>
+      <FormField label="Linked property" error={errors.linkedPropertyId}>
         <SelectInput
           error={Boolean(errors.linkedPropertyId)}
           value={form.linkedPropertyId}
@@ -168,19 +168,19 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
     placeholder: string;
     readOnly?: boolean;
   }> = [
-    { field: 'originalAmount', label: 'Original Loan Amount', placeholder: '240000' },
-    { field: 'outstandingBalance', label: 'Outstanding Balance', placeholder: '218600' },
+    { field: 'originalAmount', label: 'Original loan amount', placeholder: '240000' },
+    { field: 'outstandingBalance', label: 'Outstanding balance', placeholder: '218600' },
     {
       field: 'propertyValue',
-      label: 'Current Property Value',
+      label: 'Current property value',
       placeholder: 'From linked property',
       readOnly: true,
     },
-    { field: 'monthlyPayment', label: 'Monthly Payment', placeholder: '1280' },
+    { field: 'monthlyPayment', label: 'Monthly payment', placeholder: '1280' },
   ];
   return (
     <div>
-      <h3 className={SECTION_HEADING}>Loan Financials</h3>
+      <h3 className={SECTION_HEADING}>Loan financials</h3>
       <div className="grid grid-cols-2 gap-3">
         {fields.map(({ field, label, placeholder, readOnly }) => (
           <FormField
@@ -210,7 +210,7 @@ type RateTermSectionProps = { form: FormState; errors: Errors; setField: SetFiel
 
 function InterestRateField({ form, errors, setField }: RateTermSectionProps) {
   return (
-    <FormField label="Interest Rate (%)" required error={errors.interestRate}>
+    <FormField label="Interest rate (%)" required error={errors.interestRate}>
       <CurrencyInput
         currency="%"
         className="pl-8 pr-3"
@@ -226,7 +226,7 @@ function InterestRateField({ form, errors, setField }: RateTermSectionProps) {
 
 function LoanTermField({ form, errors, setField }: RateTermSectionProps) {
   return (
-    <FormField label="Loan Term" required error={errors.termYears}>
+    <FormField label="Loan term" required error={errors.termYears}>
       <div className="relative">
         <TextInput
           type="number"
@@ -246,7 +246,7 @@ function LoanTermField({ form, errors, setField }: RateTermSectionProps) {
 
 function OverpaymentLimitField({ form, setField }: { form: FormState; setField: SetFieldFn }) {
   return (
-    <FormField label="Overpayment Limit (%)">
+    <FormField label="Overpayment limit (%)">
       <CurrencyInput
         currency="%"
         className="pl-8 pr-3"
@@ -262,9 +262,9 @@ function OverpaymentLimitField({ form, setField }: { form: FormState; setField: 
 function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
   return (
     <div>
-      <h3 className={SECTION_HEADING}>Rate & Term</h3>
+      <h3 className={SECTION_HEADING}>Rate & term</h3>
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Repayment Method">
+        <FormField label="Repayment method">
           <SelectInput
             value={form.repaymentType}
             onChange={(value) => setField('repaymentType', toMortgageRepaymentType(value))}
@@ -277,7 +277,7 @@ function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
           </p>
         </FormField>
         <InterestRateField form={form} errors={errors} setField={setField} />
-        <FormField label="Rate Type">
+        <FormField label="Rate type">
           <SelectInput
             value={form.rateType}
             onChange={(value) => setField('rateType', toMortgageRateType(value))}
@@ -298,21 +298,21 @@ function DatesSection({ form, setField }: DatesSectionProps) {
     <div>
       <h3 className={SECTION_HEADING}>Dates</h3>
       <div className="grid grid-cols-3 gap-3">
-        <FormField label="Start Date">
+        <FormField label="Start date">
           <TextInput
             placeholder="e.g. March 2022"
             value={form.startDate}
             onChange={(value) => setField('startDate', value)}
           />
         </FormField>
-        <FormField label="End Date">
+        <FormField label="End date">
           <TextInput
             placeholder="e.g. March 2047"
             value={form.endDate}
             onChange={(value) => setField('endDate', value)}
           />
         </FormField>
-        <FormField label="Fixed Until">
+        <FormField label="Fixed until">
           <TextInput
             placeholder={form.rateType === 'Fixed' ? 'e.g. March 2027' : 'N/A'}
             disabled={form.rateType !== 'Fixed'}
@@ -342,7 +342,7 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
   return (
     <div className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${border}`}>
       <div>
-        <p className="text-label text-fg">Loan-to-Value Preview</p>
+        <p className="text-label text-fg">Loan-to-value preview</p>
         <p className="mt-0.5 text-caption text-fg-muted font-numeric">
           {form.currency}{' '}
           {formatNumber(n(form.outstandingBalance), numberFormat, {
@@ -510,7 +510,7 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
           onConfirm={() => {
             void handleSave();
           }}
-          confirmLabel={existing ? 'Save Changes' : 'Add Mortgage'}
+          confirmLabel={existing ? 'Save changes' : 'Add Mortgage'}
           disabled={disableSave}
           loading={saving}
           danger={buildMortgageDeleteButton(existing, onDelete, () => setConfirmingDelete(true))}

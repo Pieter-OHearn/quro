@@ -72,7 +72,7 @@ test('RecentTransactionsList renders shared table rows with mobile-critical tran
     />,
   );
 
-  expect(markup).toContain('Monthly Transactions');
+  expect(markup).toContain('Monthly transactions');
   expect(markup).toContain('May 2026');
   expect(markup).toContain('<table');
   expect(markup).toContain('data-mobile-label="Transaction"');

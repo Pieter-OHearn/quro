@@ -18,7 +18,7 @@ export function JointBadge({ isJoint, ownerUserId, size = 'sm' }: JointBadgeProp
   return (
     <Badge tone="brand" size={size}>
       <Users size={11} />
-      {ownedByPartner ? "Joint · Partner's" : 'Joint'}
+      {ownedByPartner ? "Joint · partner's" : 'Joint'}
     </Badge>
   );
 }

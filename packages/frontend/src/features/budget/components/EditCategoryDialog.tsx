@@ -61,7 +61,7 @@ function toCategoryForm(category: BudgetCategory): EditCategoryForm {
 
 function getConfirmLabel(mode: 'create' | 'edit', isSaving: boolean) {
   if (isSaving) return 'Saving…';
-  return mode === 'create' ? 'Add Category' : 'Save';
+  return mode === 'create' ? 'Add category' : 'Save';
 }
 
 function DialogError({ message }: Readonly<{ message: string | null }>) {

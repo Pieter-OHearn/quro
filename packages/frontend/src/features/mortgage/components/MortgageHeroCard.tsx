@@ -23,17 +23,17 @@ function buildMortgageMetrics(
   const hasAllowance = Number.isFinite(annualAllowance) && annualAllowance > 0;
   return [
     {
-      label: mortgage.repaymentType === 'Linear' ? 'Current Payment' : 'Monthly Payment',
+      label: mortgage.repaymentType === 'Linear' ? 'Current payment' : 'Monthly payment',
       value: fmt(mortgage.monthlyPayment),
       sub:
         mortgage.repaymentType === 'Linear' ? 'Declines as interest falls' : 'Fixed total payment',
     },
     {
-      label: 'Interest Rate',
+      label: 'Interest rate',
       value: `${mortgage.interestRate}%`,
       sub: `${mortgage.rateType} (until ${mortgage.fixedUntil ?? 'N/A'})`,
     },
-    { label: 'Years Remaining', value: `${yearsRemaining} yrs`, sub: `~${monthsRemaining} months` },
+    { label: 'Years remaining', value: `${yearsRemaining} yrs`, sub: `~${monthsRemaining} months` },
     {
       label: 'Penalty-free allowance',
       value: hasAllowance ? `${mortgage.overpaymentLimit}% per year` : 'Not recorded',
@@ -75,7 +75,7 @@ export function MortgageHeroCard({
         </Button>
       </div>
       <div className="mt-4">
-        <p className="text-label text-fg-muted">Outstanding Balance</p>
+        <p className="text-label text-fg-muted">Outstanding balance</p>
         <p className="mt-1 text-figure-hero font-numeric text-fg">
           {formatAsNegative(fmt, mortgage.outstandingBalance)}
         </p>

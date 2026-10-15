@@ -46,7 +46,7 @@ function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
             : 'Add a property first, then create a mortgage linked to that property.'
         }
         action={{
-          label: hasProperties ? 'Set Up Mortgage' : 'Add Property First',
+          label: hasProperties ? 'Set up mortgage' : 'Add a property first',
           onClick: hasProperties
             ? () => state.setShowMortgageModal(true)
             : () => navigate('/investments'),

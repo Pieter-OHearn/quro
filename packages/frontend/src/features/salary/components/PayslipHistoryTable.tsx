@@ -81,7 +81,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
   {
     key: 'net',
     sortValue: (row) => row.net,
-    header: 'Net Pay',
+    header: 'Net pay',
     align: 'right',
     mobileLabel: 'Net pay',
     width: '15%',
@@ -239,7 +239,7 @@ export function PayslipHistoryTable({
 
   return (
     <DataTable
-      title="Payslip History"
+      title="Payslip history"
       subtitle={`${payslips.length} payslips · click a row to view breakdown`}
       action={
         <Button
@@ -249,7 +249,7 @@ export function PayslipHistoryTable({
           leadingIcon={<Plus size={12} aria-hidden />}
           data-testid="salary-add-payslip-button"
         >
-          Add Payslip
+          Add payslip
         </Button>
       }
       columns={PAYSLIP_COLUMNS}
@@ -258,7 +258,7 @@ export function PayslipHistoryTable({
       isEmpty={payslips.length === 0}
       emptyState={
         <>
-          No payslips yet. Click <strong>Add Payslip</strong> to get started.
+          No payslips yet. Click <strong>Add payslip</strong> to get started.
         </>
       }
       minWidth={860}

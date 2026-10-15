@@ -17,7 +17,7 @@ import type {
 } from '../types';
 
 const DEFAULT_STATEMENT_FILE_NAME = 'statement.pdf';
-const DEFAULT_POT_NAME = 'Pension Pot';
+const DEFAULT_POT_NAME = 'Pension pot';
 const DEFAULT_POT_PROVIDER = 'Unknown provider';
 
 const PENSION_TYPE_ALIASES: Record<string, PensionPot['type']> = {
