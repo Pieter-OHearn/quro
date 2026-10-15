@@ -43,17 +43,18 @@ export function NetWorthChartCard({
   initialRange?: NetWorthRange;
 }>) {
   const [range, setRange] = useState<NetWorthRange>(initialRange);
+  // The control follows the choice at once; the chart and its subtitle follow the series shown.
   const history = useNetWorthHistory(range, defaultHistory);
   const chartData = useMemo(
-    () => buildNetWorthChartData(history.data, range, convertToBase),
-    [history.data, range, convertToBase],
+    () => buildNetWorthChartData(history.points, history.range, convertToBase),
+    [history.points, history.range, convertToBase],
   );
 
   return (
     <AreaChartCard
       className="h-full"
       title="Net worth growth"
-      subtitle={netWorthRangeSubtitle(range, history.data, baseCurrency)}
+      subtitle={netWorthRangeSubtitle(history.range, history.points, baseCurrency)}
       badge={<NetWorthRangeControl value={range} onChange={setRange} />}
       headerClassName="max-sm:flex-wrap max-sm:py-2"
       headerActionClassName="max-sm:w-full"

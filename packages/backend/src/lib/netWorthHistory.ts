@@ -975,67 +975,67 @@ function hasNetWorthHistory(
 function buildNetWorthHistoryPoint(
   sourceData: NetWorthSourceData,
   context: NetWorthHistoryContext,
-  month: HistoryPeriod,
+  period: HistoryPeriod,
   index: number,
 ): NetWorthHistoryPoint {
   // Current-month snapshots can predate a price sync or direct holding edit.
   // Rebuild that point from source data; completed months remain immutable snapshots.
   const snapshot =
-    month.isCurrent || month.snapshotDate === null
+    period.isCurrent || period.snapshotDate === null
       ? undefined
-      : context.snapshotByDate.get(month.snapshotDate);
+      : context.snapshotByDate.get(period.snapshotDate);
   if (snapshot) {
     return {
       id: index + 1,
-      month: month.label,
-      year: month.year,
-      date: month.asOfDate,
+      month: period.label,
+      year: period.year,
+      date: period.asOfDate,
       totalValue: toNumberOrZero(snapshot.totalValue),
       currency: snapshot.baseCurrency,
       isEstimated: snapshot.isEstimated,
     };
   }
   const historicalRates = context.ratesAt
-    ? context.ratesAt(month.asOfDate)
+    ? context.ratesAt(period.asOfDate)
     : { rates: sourceData.rates, isEstimated: true };
   const savings = computeSavingsAtCutoff(
     sourceData.savings,
     context.savingsByAccount,
-    month.cutoff,
+    period.cutoff,
     historicalRates.rates,
   );
   const brokerage = computeBrokerageAtCutoff(
     sourceData.holdings,
     context.holdingsById,
     context.holdingPricesById,
-    month.cutoff,
-    month.asOfDate,
+    period.cutoff,
+    period.asOfDate,
     historicalRates.rates,
   );
   const propertyEquity = computePropertyEquityAtCutoff(
     sourceData.properties,
     context.propertiesById,
-    buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, month.cutoff),
-    month.cutoff,
+    buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, period.cutoff),
+    period.cutoff,
     historicalRates.rates,
   );
   const pension = computePensionAtCutoff(
     sourceData.pensions,
     context.pensionsByPotId,
-    month.cutoff,
+    period.cutoff,
     historicalRates.rates,
   );
   const liabilities = computeDebtLiabilitiesAtCutoff(
     sourceData.debts,
     context.debtPaymentsByDebtId,
-    month.cutoff,
+    period.cutoff,
     historicalRates.rates,
   );
   return {
     id: index + 1,
-    month: month.label,
-    year: month.year,
-    date: month.asOfDate,
+    month: period.label,
+    year: period.year,
+    date: period.asOfDate,
     totalValue: sumMoney([savings, brokerage.value, propertyEquity, pension, -liabilities]),
     currency: BASE_CURRENCY,
     isEstimated: historicalRates.isEstimated || brokerage.isEstimated,

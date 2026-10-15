@@ -81,13 +81,19 @@ describe('net worth range control', () => {
 
   test('a range read from the cache drives the subtitle and selection', () => {
     const client = new QueryClient();
-    client.setQueryData(queryKeys.dashboard.netWorthRange('all'), [
-      point({ month: 'Jan', year: 2019, date: '2019-01-31' }),
-      point({}),
-    ]);
+    client.setQueryData(queryKeys.dashboard.netWorthRange('all'), {
+      range: 'all',
+      points: [point({ month: 'Jan', year: 2019, date: '2019-01-31' }), point({})],
+    });
     const markup = renderCard('all', client);
     expect(markup).toContain('Since Jan 2019 in EUR');
     expect(buttons(markup).map((option) => option.pressed)).toEqual([false, false, false, true]);
+  });
+
+  test('until a range has loaded, the series on screen keeps its own subtitle', () => {
+    const markup = renderCard('1y');
+    expect(buttons(markup).map((option) => option.pressed)).toEqual([false, false, true, false]);
+    expect(markup).toContain('Last 6 months in EUR');
   });
 
   test('choosing an option reports its range', () => {
