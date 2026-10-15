@@ -13,6 +13,8 @@ import {
 import { db } from '../db/client';
 import {
   currencyRateHistory,
+  debtPayments,
+  debts,
   holdingPriceHistory,
   holdingTransactions,
   holdings,
@@ -302,5 +304,111 @@ describe('net worth history ranges', () => {
     }
     const oneMonth = await history(owner, '1m');
     expect(oneMonth.every((point) => point.totalValue === 1000)).toBe(true);
+  });
+});
+
+describe('year-to-date starting point in the summary', () => {
+  const thisYear = new Date().getUTCFullYear();
+  const january = `${thisYear}-01-01`;
+  const lastYearEnd = `${thisYear - 1}-12-31`;
+
+  async function summary(session: AuthSession) {
+    const response = await integration.request('/api/dashboard/summary', {
+      cookie: session.cookie,
+    });
+    expect(response.status).toBe(200);
+    return (
+      (await response.json()) as {
+        data: { netWorth: Point[]; yearStart: Record<string, unknown> | null };
+      }
+    ).data;
+  }
+
+  test('with data since last year it is the value at the previous year end', async () => {
+    const owner = await integration.signUp('ytd-last-year');
+    await addAccount(owner.user.id, 2000, [
+      { amount: 500, date: `${thisYear - 1}-06-01` },
+      { amount: 1000, date: january },
+    ]);
+    const data = await summary(owner);
+    expect(data.yearStart).toEqual({
+      from: 'previous-year-end',
+      month: 'Dec',
+      year: thisYear - 1,
+      date: lastYearEnd,
+      totalValue: 1000,
+      currency: 'EUR',
+      isEstimated: false,
+    });
+    // The series stays the default range.
+    expect(data.netWorth).toEqual(await history(owner));
+  });
+
+  test('a household that started this year measures from its first point', async () => {
+    const owner = await integration.signUp('ytd-this-year');
+    await addAccount(owner.user.id, 1500, [
+      { amount: 1000, date: january },
+      { amount: 500, date: daysAgo(0) },
+    ]);
+    const isJanuary = new Date().getUTCMonth() === 0;
+    expect((await summary(owner)).yearStart).toMatchObject({
+      from: 'first-point',
+      month: 'Jan',
+      year: thisYear,
+      date: isJanuary ? daysAgo(0) : `${thisYear}-01-31`,
+      totalValue: isJanuary ? 1500 : 1000,
+    });
+  });
+
+  test('an empty household has no starting point', async () => {
+    const owner = await integration.signUp('ytd-empty');
+    expect((await summary(owner)).yearStart).toBeNull();
+  });
+
+  test('joint rows count at the household share and a negative start is kept', async () => {
+    const owner = await integration.signUp('ytd-owner');
+    const partner = await integration.signUp('ytd-partner');
+    await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
+    await addAccount(
+      partner.user.id,
+      1000,
+      [
+        { amount: 200, date: `${thisYear - 1}-03-01` },
+        { amount: 400, date: january },
+      ],
+      true,
+    );
+    expect((await summary(owner)).yearStart).toMatchObject({
+      from: 'previous-year-end',
+      totalValue: 300,
+    });
+
+    const [debt] = await db
+      .insert(debts)
+      .values({
+        userId: owner.user.id,
+        name: 'Loan',
+        type: 'personal_loan',
+        lender: 'Test lender',
+        originalAmount: 2000,
+        remainingBalance: 500,
+        currency: 'EUR',
+        interestRate: 0,
+        monthlyPayment: 100,
+        startDate: `${thisYear - 1}-01-01`,
+        color: '#000000',
+        emoji: 'L',
+      })
+      .returning();
+    await db.insert(debtPayments).values({
+      userId: owner.user.id,
+      debtId: debt!.id,
+      amount: 100,
+      principal: 100,
+      interest: 0,
+      date: january,
+    });
+    // 31 December: half of 600 in the joint account, minus the 600 still owed then.
+    expect((await summary(owner)).yearStart).toMatchObject({ totalValue: 300 - 600 });
   });
 });

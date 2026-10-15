@@ -204,6 +204,9 @@ be negative; Quro keeps negative equity rather than flooring it.
   A transaction dated today counts in the current month; one dated later does not count yet.
   The daily points of the one-month history range end at 23:59:59.999 UTC on their day, today's
   at now.
+- The dashboard's "year to date" change measures from the previous year end (31 December,
+  23:59:59.999 UTC), or from the first month end of this year for a household whose records start
+  this year; a zero or negative starting value has no percentage.
 - A write deletes the stored snapshots from the month of the earliest affected date onward, so
   they are recomputed. Completed months are otherwise not rewritten.
 - `todayIsoDate` gives the local calendar date (for forms); `toIsoDate` and `toDateOnly` give UTC

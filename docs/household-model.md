@@ -78,6 +78,13 @@ history, because snapshots are month-end figures. A household with no history an
 for today in every range. The dashboard's range control changes only the chart: the hero keeps
 comparing with the previous month.
 
+The summary also returns `yearStart`, the point the hero's "year to date" change measures from,
+built like a history point (stored snapshot or ledger replay, FX at its cut-off, household share,
+`isEstimated`): the value at 31 December of the previous year (`from: "previous-year-end"`) when
+the household has a dated record before 1 January, otherwise its first month end of this year, or
+today when that is this month (`from: "first-point"`; the hero then reads "since Mar 2026"). It is
+`null` without any record. The hero shows no percentage when that value is zero or negative.
+
 Derived dashboard and runway amounts are in EUR, labelled by their response
 currency. Native asset and transaction endpoints keep their own currencies. Inputs
 are converted to EUR before aggregation; the frontend converts aggregate EUR values

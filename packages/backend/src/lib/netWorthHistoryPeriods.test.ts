@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { buildHistoryPeriods, NET_WORTH_ALL_MAX_MONTHS } from './netWorthHistory';
+import {
+  buildDashboardHistory,
+  buildHistoryPeriods,
+  buildNetWorthHistory,
+  buildYearStartPeriod,
+  NET_WORTH_ALL_MAX_MONTHS,
+} from './netWorthHistory';
 
 // 31 Mar 2028, mid-morning UTC: a leap year, and a month end, so day and month boundaries meet.
 const NOW = Date.UTC(2028, 2, 31, 10, 30);
@@ -73,5 +79,108 @@ describe('net worth history periods', () => {
     const periods = buildHistoryPeriods('all', NOW, '1900-01-01');
     expect(periods).toHaveLength(NET_WORTH_ALL_MAX_MONTHS + 1);
     expect(periods[0]!.asOfDate).toBe('1998-03-31');
+  });
+});
+
+describe('year-start period', () => {
+  const OCTOBER = Date.UTC(2026, 9, 15, 12);
+
+  test('a household with a record before 1 January measures from the previous year end', () => {
+    for (const first of ['2019-05-01', '2025-12-31']) {
+      expect(buildYearStartPeriod(OCTOBER, first)).toMatchObject({
+        from: 'previous-year-end',
+        asOfDate: '2025-12-31',
+        snapshotDate: '2025-12-31',
+        label: 'Dec',
+        year: 2025,
+        isCurrent: false,
+      });
+    }
+  });
+
+  test('a household that started this year measures from its first month end', () => {
+    expect(buildYearStartPeriod(OCTOBER, '2026-03-09')).toMatchObject({
+      from: 'first-point',
+      asOfDate: '2026-03-31',
+      label: 'Mar',
+      year: 2026,
+    });
+    expect(buildYearStartPeriod(OCTOBER, '2026-01-01')).toMatchObject({ asOfDate: '2026-01-31' });
+  });
+
+  test('a household that started this month measures from now; none without a record', () => {
+    expect(buildYearStartPeriod(OCTOBER, '2026-10-02')).toMatchObject({
+      from: 'first-point',
+      cutoff: OCTOBER,
+      isCurrent: true,
+    });
+    expect(buildYearStartPeriod(OCTOBER, null)).toBeNull();
+  });
+});
+
+describe('year-to-date baseline in the dashboard history', () => {
+  const OCTOBER = Date.UTC(2026, 9, 15, 12);
+  const source = (transactions: Array<{ amount: number; date: string }>, firstRecord: string) =>
+    ({
+      rates: new Map([['EUR', 1]]),
+      historicalRates: [],
+      savings: [{ id: 1, balance: 3000, currency: 'EUR' }],
+      savingsTransactions: transactions.map((row) => ({ accountId: 1, type: 'deposit', ...row })),
+      holdings: [],
+      holdingTransactions: [],
+      holdingPrices: [],
+      properties: [],
+      propertyTransactions: [],
+      pensions: [],
+      pensionTransactions: [],
+      mortgages: [],
+      debts: [],
+      debtPayments: [],
+      snapshots: [],
+      periods: buildHistoryPeriods('6m', OCTOBER),
+      yearStart: buildYearStartPeriod(OCTOBER, firstRecord),
+    }) as unknown as Parameters<typeof buildDashboardHistory>[0];
+
+  test('in October, with data since last year, it is the value at 31 December', () => {
+    const data = source(
+      [
+        { amount: 500, date: '2025-06-01' },
+        { amount: 1000, date: '2026-02-15' },
+        { amount: 700, date: '2026-05-20' },
+      ],
+      '2025-06-01',
+    );
+    const { netWorth, yearStart } = buildDashboardHistory(data);
+    expect(yearStart).toMatchObject({
+      from: 'previous-year-end',
+      date: '2025-12-31',
+      month: 'Dec',
+      year: 2025,
+      totalValue: 3000 - 1000 - 700,
+      currency: 'EUR',
+      isEstimated: true,
+    });
+    // The seven-month series starts in April, after the February deposit: its first point of the
+    // year was the old baseline. The series itself is the plain history.
+    expect(netWorth[0]).toMatchObject({ date: '2026-04-30', totalValue: 3000 - 700 });
+    expect(netWorth).toEqual(buildNetWorthHistory(data));
+  });
+
+  test('a household that started in March measures from 31 March', () => {
+    const { yearStart } = buildDashboardHistory(
+      source(
+        [
+          { amount: 1000, date: '2026-03-09' },
+          { amount: 500, date: '2026-06-01' },
+        ],
+        '2026-03-09',
+      ),
+    );
+    expect(yearStart).toMatchObject({ from: 'first-point', date: '2026-03-31', totalValue: 2500 });
+  });
+
+  test('without a record there is no year-start point', () => {
+    const none = { ...source([], '2026-01-01'), yearStart: buildYearStartPeriod(OCTOBER, null) };
+    expect(buildDashboardHistory(none).yearStart).toBeNull();
   });
 });

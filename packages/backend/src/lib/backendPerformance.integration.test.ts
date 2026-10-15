@@ -21,6 +21,7 @@ import {
 import { createIntegrationHelpers } from '../test/integration';
 import { useFixtureCurrencyRates } from '../test/currencyRates';
 import {
+  buildDashboardHistory,
   buildNetWorthHistory,
   buildAllocationsFromSource,
   loadNetWorthSourceData,
@@ -235,11 +236,23 @@ test('bounded history matches full ledgers with opening positions and future rep
   expect(bounded.holdingTransactions).toHaveLength(2);
   expect(bounded.savingsTransactions).toHaveLength(3);
   expect(bounded.holdingPrices).toHaveLength(2);
+  // With the year-start point the window reaches 31 December; the point matches the full ledger.
+  const withYearStart = await loadNetWorthSourceData(owner.user.id, null, '6m', {
+    yearStart: true,
+  });
+  const fullYearStart = buildDashboardHistory({
+    ...full,
+    periods: withYearStart.periods,
+    yearStart: withYearStart.yearStart,
+  }).yearStart;
+  expect(buildDashboardHistory(withYearStart).yearStart).toEqual(fullYearStart);
+  expect(fullYearStart).toMatchObject({ from: 'previous-year-end' });
   const response = await integration.request('/api/dashboard/summary', { cookie: owner.cookie });
   expect(response.status).toBe(200);
   expect((await response.json()).data).toEqual({
     netWorth: buildNetWorthHistory(full),
     allocations: buildAllocationsFromSource(full),
+    yearStart: fullYearStart,
   });
 });
 

@@ -12,6 +12,7 @@ import {
   toIsoDate,
   toUtcTimestamp,
   type NetWorthRange,
+  type NetWorthYearStart,
   type PensionTransactionType,
 } from '@quro/shared';
 import { and, desc, eq, getTableColumns, gte, lt, min, sql, type SQL } from 'drizzle-orm';
@@ -58,6 +59,7 @@ const RANGE_DAYS = 30;
 /** `all` starts at the first dated record, but never more than this many months back. */
 export const NET_WORTH_ALL_MAX_MONTHS = 360;
 const DAY_MS = 86_400_000;
+const DECEMBER = 11;
 
 function toOptionalTimestamp(value: Date | string | null | undefined): number | null {
   if (!value) return null;
@@ -520,19 +522,24 @@ export type HistoryPeriod = {
   year: number;
 };
 
+function buildMonthlyPeriod(month: number, now: number): HistoryPeriod {
+  const isCurrent = month === monthStartUtc(now);
+  const cutoff = isCurrent ? now : monthEndUtc(month);
+  return {
+    cutoff,
+    asOfDate: toIsoDate(new Date(cutoff)),
+    snapshotDate: toIsoDate(new Date(monthEndUtc(month))),
+    isCurrent,
+    label: formatMonthShort(month),
+    year: new Date(month).getUTCFullYear(),
+  };
+}
+
 function buildMonthlyPeriods(firstMonth: number, now: number): HistoryPeriod[] {
   const currentMonth = monthStartUtc(now);
   const periods: HistoryPeriod[] = [];
   for (let month = firstMonth; month <= currentMonth; month = addMonthsUtc(month, 1)) {
-    const cutoff = month === currentMonth ? now : monthEndUtc(month);
-    periods.push({
-      cutoff,
-      asOfDate: toIsoDate(new Date(cutoff)),
-      snapshotDate: toIsoDate(new Date(monthEndUtc(month))),
-      isCurrent: month === currentMonth,
-      label: formatMonthShort(month),
-      year: new Date(month).getUTCFullYear(),
-    });
+    periods.push(buildMonthlyPeriod(month, now));
   }
   return periods;
 }
@@ -574,6 +581,27 @@ export function buildHistoryPeriods(
   const firstRecord = firstRecordDate === null ? Number.NaN : toUtcTimestamp(firstRecordDate);
   const firstMonth = Number.isFinite(firstRecord) ? monthStartUtc(firstRecord) : currentMonth;
   return buildMonthlyPeriods(Math.min(currentMonth, Math.max(earliest, firstMonth)), now);
+}
+
+/**
+ * The point "year to date" measures from: the last month end before 1 January (the previous
+ * year end) when the household has a record before this year; otherwise the first point of this
+ * year, the month end of its first record (or now, when that is this month). Null without records.
+ */
+export function buildYearStartPeriod(
+  now: number,
+  firstRecordDate: string | null,
+): (HistoryPeriod & { from: NetWorthYearStart['from'] }) | null {
+  if (firstRecordDate === null) return null;
+  const firstRecord = toUtcTimestamp(firstRecordDate);
+  if (!Number.isFinite(firstRecord)) return null;
+  const yearStart = Date.UTC(new Date(now).getUTCFullYear(), 0, 1);
+  if (firstRecord < yearStart) {
+    const december = Date.UTC(new Date(now).getUTCFullYear() - 1, DECEMBER, 1);
+    return { ...buildMonthlyPeriod(december, now), from: 'previous-year-end' };
+  }
+  const month = Math.min(monthStartUtc(firstRecord), monthStartUtc(now));
+  return { ...buildMonthlyPeriod(month, now), from: 'first-point' };
 }
 
 function computeSavingsAtCutoff(
@@ -743,6 +771,8 @@ type NetWorthSourceData = {
   snapshots: Array<typeof netWorthSnapshots.$inferSelect>;
   /** The points to build; the default range when absent. */
   periods?: HistoryPeriod[];
+  /** The point "year to date" measures from, when it was asked for and the household has one. */
+  yearStart?: ReturnType<typeof buildYearStartPeriod>;
 };
 
 type NetWorthHistoryPoint = {
@@ -801,15 +831,26 @@ async function loadFirstRecordDate(userId: number, partnerId: number | null) {
   return dates.length > 0 ? dates.reduce((left, right) => (right < left ? right : left)) : null;
 }
 
-export async function loadNetWorthSourceData(
+/**
+ * The points to build (the range, plus the year-start point when asked for), the stored snapshots
+ * that can stand in for them, and the first date whose ledgers must be replayed.
+ */
+async function planHistoryWindow(
   userId: number,
   partnerId: number | null,
-  range: NetWorthRange = DEFAULT_NET_WORTH_RANGE,
-): Promise<NetWorthSourceData> {
+  range: NetWorthRange,
+  withYearStart: boolean,
+) {
   const now = Date.now();
-  const firstRecordDate = range === 'all' ? await loadFirstRecordDate(userId, partnerId) : null;
+  const needsFirstRecord = range === 'all' || withYearStart;
+  const firstRecordDate = needsFirstRecord ? await loadFirstRecordDate(userId, partnerId) : null;
   const periods = buildHistoryPeriods(range, now, firstRecordDate);
-  const firstPeriod = periods[0];
+  const yearStart = withYearStart ? buildYearStartPeriod(now, firstRecordDate) : null;
+  // Every point to compute, oldest first: the window and the snapshots must reach all of them.
+  const covered = [...periods, ...(yearStart ? [yearStart] : [])].sort(
+    (left, right) => left.cutoff - right.cutoff,
+  );
+  const firstPeriod = covered[0];
   // A failed read fails the request: a total never silently leaves out a whole asset class.
   const snapshots = await db
     .select()
@@ -821,11 +862,25 @@ export async function loadNetWorthSourceData(
       ),
     );
   const snapshotDates = new Set(snapshots.map((row) => row.snapshotDate));
-  const firstMissing = periods.find(
+  const firstMissing = covered.find(
     (period) =>
       period.isCurrent || period.snapshotDate === null || !snapshotDates.has(period.snapshotDate),
   )!;
-  const windowStart = firstMissing.asOfDate;
+  return { periods, yearStart, snapshots, windowStart: firstMissing.asOfDate };
+}
+
+export async function loadNetWorthSourceData(
+  userId: number,
+  partnerId: number | null,
+  range: NetWorthRange = DEFAULT_NET_WORTH_RANGE,
+  options: { yearStart?: boolean } = {},
+): Promise<NetWorthSourceData> {
+  const { periods, yearStart, snapshots, windowStart } = await planHistoryWindow(
+    userId,
+    partnerId,
+    range,
+    options.yearStart === true,
+  );
   const [
     rates,
     historicalRates,
@@ -876,6 +931,7 @@ export async function loadNetWorthSourceData(
     debtPayments: debtPaymentsData,
     snapshots,
     periods,
+    yearStart,
   };
 }
 
@@ -909,14 +965,48 @@ function buildFallbackNetWorthHistory(
 }
 
 export function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
+  return buildHistoryWithContext(sourceData, buildNetWorthHistoryContext(sourceData));
+}
+
+function buildHistoryWithContext(
+  sourceData: NetWorthSourceData,
+  context: NetWorthHistoryContext,
+): NetWorthHistoryPoint[] {
   const periods = sourceData.periods ?? buildHistoryPeriods();
-  const context = buildNetWorthHistoryContext(sourceData);
   if (!hasNetWorthHistory(context, sourceData.snapshots)) {
     return buildFallbackNetWorthHistory(sourceData, periods[periods.length - 1]);
   }
   return periods.map((period, index) =>
     buildNetWorthHistoryPoint(sourceData, context, period, index),
   );
+}
+
+/**
+ * The history and the year-start point of the dashboard summary, from one source and one
+ * context, so the year-start value is computed exactly like a point of the series.
+ */
+export function buildDashboardHistory(sourceData: NetWorthSourceData): {
+  netWorth: NetWorthHistoryPoint[];
+  yearStart: NetWorthYearStart | null;
+} {
+  const context = buildNetWorthHistoryContext(sourceData);
+  const period = sourceData.yearStart ?? null;
+  const point = period ? buildNetWorthHistoryPoint(sourceData, context, period, 0) : null;
+  return {
+    netWorth: buildHistoryWithContext(sourceData, context),
+    yearStart:
+      period && point
+        ? {
+            from: period.from,
+            month: point.month,
+            year: point.year,
+            date: point.date,
+            totalValue: point.totalValue,
+            currency: point.currency as NetWorthYearStart['currency'],
+            isEstimated: point.isEstimated,
+          }
+        : null,
+  };
 }
 
 type NetWorthHistoryContext = {

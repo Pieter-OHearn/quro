@@ -735,6 +735,21 @@ export type NetWorthRange = (typeof NET_WORTH_RANGES)[number];
 /** The range answered when none is given; `/api/dashboard/summary` always uses it. */
 export const DEFAULT_NET_WORTH_RANGE: NetWorthRange = '6m';
 
+/**
+ * The point the dashboard's "year to date" change measures from, in `/api/dashboard/summary`:
+ * the previous year end (`previous-year-end`) when the household has a record before 1 January,
+ * otherwise its first point of this year (`first-point`). Null when the household has no record.
+ */
+export type NetWorthYearStart = {
+  from: 'previous-year-end' | 'first-point';
+  month: string;
+  year: number;
+  date: string;
+  totalValue: number;
+  currency: CurrencyCode;
+  isEstimated: boolean;
+};
+
 export function isNetWorthRange(value: unknown): value is NetWorthRange {
   return typeof value === 'string' && (NET_WORTH_RANGES as readonly string[]).includes(value);
 }

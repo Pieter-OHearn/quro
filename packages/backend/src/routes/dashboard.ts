@@ -4,6 +4,7 @@ import { getAuthUser, getPartnerId } from '../lib/authUser';
 import {
   buildDerivedAllocations,
   buildAllocationsFromSource,
+  buildDashboardHistory,
   buildNetWorthHistory,
   loadNetWorthSourceData,
 } from '../lib/netWorthHistory';
@@ -18,12 +19,15 @@ export { buildActivityList, getActivityCutoff } from '../lib/activity';
 const app = new Hono();
 
 app.get('/summary', async (c) => {
-  const source = await loadNetWorthSourceData(getAuthUser(c).id, getPartnerId(c));
+  const source = await loadNetWorthSourceData(
+    getAuthUser(c).id,
+    getPartnerId(c),
+    DEFAULT_NET_WORTH_RANGE,
+    { yearStart: true },
+  );
+  const { netWorth, yearStart } = buildDashboardHistory(source);
   return c.json({
-    data: {
-      netWorth: buildNetWorthHistory(source),
-      allocations: buildAllocationsFromSource(source),
-    },
+    data: { netWorth, allocations: buildAllocationsFromSource(source), yearStart },
   });
 });
 
