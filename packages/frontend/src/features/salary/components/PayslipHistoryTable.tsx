@@ -14,7 +14,7 @@ import {
   type DataTableSortState,
 } from '@/components/ui';
 import { buildApiDownloadUrl } from '@/lib/pdfDocuments';
-import { formatDate } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { Download, Edit3, Plus } from 'lucide-react';
 import type { FmtFn } from '../types';
 
@@ -197,7 +197,10 @@ function PayslipTableRow({
             </Badge>
           )}
         </div>
-        <p className="text-caption text-fg-subtle">{formatDate(payslip.date)}</p>
+        {/* On the brand-soft tint of a selected row the caption takes fg-muted to keep 4.5:1. */}
+        <p className={cn('text-caption', isSelected ? 'text-fg-muted' : 'text-fg-subtle')}>
+          {formatDate(payslip.date)}
+        </p>
       </DataTableCell>
       <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
       <DataTableCell columnKey="tax">

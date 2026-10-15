@@ -173,7 +173,7 @@ function SalaryPageContent({
           label: year,
           badge:
             year === state.currentYear ? (
-              <span className="font-normal text-fg-subtle">current</span>
+              <span className="font-normal text-fg-muted">current</span>
             ) : undefined,
         }))}
         value={state.activeYear}

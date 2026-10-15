@@ -40,7 +40,7 @@ export function DepositGuaranteeNotice({
   const showCompactStatus = unverifiedAccountCount > 0 || !hasExcess;
 
   const compactStatus = showCompactStatus ? (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface px-4 py-3 max-sm:rounded-xl">
       <div className="flex min-w-0 items-center gap-3">
         <Landmark className="shrink-0 text-fg-faint" size={16} aria-hidden />
         <div>
