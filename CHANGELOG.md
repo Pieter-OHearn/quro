@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [v0.9.0] - 2026-10-15
+
+Quro 0.9.0 hardens the containers, encrypts bank-link secrets at rest, bounds statement processing, adds net worth chart ranges and brings the new design to every page, for laptop and phone, in light and dark mode. Read the [upgrade notes](docs/upgrade.md#upgrade-from-080-to-090) before you upgrade, and back up with 0.8.0 first.
+
+### Breaking changes
+
+Each item needs action from some operators and links to what to change in the upgrade notes.
+
+- **A secrets key is required when bunq is configured.** Create a key file, mount it into `migrate` and `backend` (`QRO_SECRETS_KEY_FILE`, default `/run/secrets/secrets_key`; `quro init` creates one) and run `quro secrets encrypt` once while the backend is stopped. Without the key the backend stops at startup with exit code 2. [Details](docs/upgrade.md#secrets-key-for-bank-links)
+- **PostgreSQL 18 is the only supported server.** `quro migrate`, `quro doctor`, `quro backup` and `quro restore` refuse any other major version with exit code 3, before they change anything. [Details](docs/upgrade.md#postgresql-18-required)
+- **Settings that 0.8.0 retired are no longer recognised.** `DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY` are ignored like any unknown variable, and `quro doctor` no longer lists them. Run `quro doctor` with 0.8.0 and remove what it reports. [Details](docs/upgrade.md#settings-of-releases-before-080)
+- **The statement import Compose profile is renamed from `pension-import` to `ocr`.** A checkout that starts statement import uses `docker compose --profile ocr`, and `data/vllm-cache` must be owned by UID 1000 because the model server no longer runs as root. The example install does not include statement import. [Details](docs/upgrade.md#statement-import-profile)
+- **The images declare health checks.** Services that run the backend image for something other than the server (the `migrate` service, the import worker, a scheduled backup or other one-off maintenance services) need `healthcheck: disable: true`, or Docker reports them unhealthy. [Details](docs/upgrade.md#container-hardening)
+- **The frontend runs as a non-root user and ignores files mounted over `/etc/nginx/conf.d`.** Its configuration is rendered into `/tmp/nginx/conf.d`. The restrictions in the example Compose file (read-only root filesystem, dropped capabilities, limits) need the 0.9.0 images. [Details](docs/upgrade.md#container-hardening)
+
+### Added
+
+- Bank-link secrets are encrypted at rest with a key that only you hold. New commands `quro secrets status`, `quro secrets encrypt` and `quro secrets rotate` check, encrypt and rotate it. `quro init` generates the key for new installs, the example Compose file mounts it, `quro doctor` has a `secrets` check, and a backup reports which key its bank links need.
+- When stored bank credentials cannot be opened, bunq sync asks you to reconnect (`409` with `code: bunq_reauthorization_required`) instead of failing, without calling bunq.
+- Container hardening in the [example Compose file](docs/compose.example.yaml): read-only root filesystems, dropped capabilities, `no-new-privileges`, and memory and process limits. The backend image contains production dependencies only and is smaller.
+- Net worth chart ranges: 1M with one point a day, 6M, 1Y and All, from your first dated record and at most 30 years back. `GET /api/dashboard/net-worth` takes a `range` (`1m`, `6m`, `1y` or `all`; `6m` when absent) and every point carries its `date`. See the [API changes](docs/upgrade.md#api-changes).
+- Limits on statement processing: file size, pages, page pixels, extracted text, concurrency and queue length, with fixed refusal messages. Each PDF is read in a resource-limited child process that is stopped at the time limit. The parser and model services run non-root on an internal network with resource limits. New optional settings `PARSER_MAX_FILE_MB`, `PARSER_MAX_PAGES`, `PARSER_MAX_PAGE_PIXELS`, `PARSER_MAX_TEXT_CHARS`, `PARSER_TIMEOUT_SECONDS`, `PARSER_CPU_SECONDS`, `PARSER_MEMORY_MB`, `PARSER_MAX_CONCURRENCY` and `PARSER_MAX_QUEUE`. [Details](docs/upgrade.md#statement-import-profile)
+- The new design: a denser, calmer look for every page, with a bottom tab bar and touch-sized controls on phones, light and dark themes, compact tables, and charts on one palette. See the [design guide](docs/design-v1.md) and the screenshots in the [README](README.md).
+- A synthetic demo household (`db:seed-household`) with a linked partner, private and joint rows, a monthly rate history and confirmed banks, for screenshots and manual checks.
+- Documentation: supported versions, severity targets and triage in `SECURITY.md`, the design token guide and reference screenshots.
+
+### Changed
+
+- Every page uses the new design. Copy is in sentence case; money in shows with a plus in the gain colour and money out or a negative amount with a true minus (`−€612.75`); percentages show two decimals in your number format; category colour pickers offer the six chart colours (saved colours still display, and the old alert and expense colours show as terracotta); over-target goals keep their warning colour; modals are a bottom sheet on phones; the chart range control sits below the chart on phones; the partner section in Settings and the landing headline are restyled. Colours are checked for contrast in both themes and every focusable control has a focus ring.
+- Disconnecting bunq in Settings asks for confirmation first.
+- The dashboard's year to date change measures from 1 January (the previous year end), or from your first month when your records start this year, and has no percentage when that starting value is zero or negative.
+- Holding prices (current, manual, transaction and price history) are stored with six decimals instead of two, and unit prices show up to four decimals. Dividend amounts and other money stay at two decimals. No operator action; `quro migrate` widens the columns.
+- Pages and the dashboard share one set of domain rules: a holding's shares never go below zero, an oversell nets against later buys, rental counts as an investment property, joint rows use one household share, and money totals are summed in whole cents so pages and dashboard agree to the cent.
+- A cancelled or failed statement import deletes its PDF when it ends. Imports that ended before the upgrade are not touched.
+- `GET /api/pensions/imports` answers 400 for an invalid `limit` instead of falling back to 30, and malformed upload bodies answer 400 `Invalid upload` instead of 500. See the [API changes](docs/upgrade.md#api-changes).
+- The JSON output of `quro version --json`, `quro migrate --status --json`, `quro doctor --json` and the readiness report carries no stability promise before 1.0.0.
+- Release notes link to the files of the tag they describe, and CI scans the images, Dockerfiles and commit history for known vulnerabilities and secrets, on every change and weekly for the published images.
+
+### Fixed
+
+- Editing or deleting a repayment that the zero-balance limit cut short restores exactly what it reduced, and a property repayment is reversed against the debt it paid, even after the property is linked to a mortgage or remortgaged.
+- A cascade archive no longer deadlocks with a concurrent edit of one of its transactions; the edit answers 404.
+- Two imports of the same pension statement can no longer both be committed; the second answers 409. `quro migrate` stops with a list of import ids if the database already holds such duplicates. [Details](docs/upgrade.md#duplicate-statement-imports)
+- The runway's tax rate is stable when payslips share a date, and its rule date lists the default tax rate only when that rate is used (`jurisdiction.rulesEffectiveFrom` can be `null`).
+- A mortgage without a fixed-until date no longer breaks its page, and the web app no longer calls bank or statement import routes that a deployment has switched off.
+- `quro backup` and `quro restore` check the PostgreSQL version before pausing writes or writing anything.
+
+### Security
+
+- Bank-link tokens and keys are stored as authenticated, encrypted values bound to their table, column and owner; backups hold only the encrypted form. Query strings and database error text no longer appear in bank-link error messages or logs.
+- The frontend runs without root privileges, the backend image contains production dependencies only, and the example Compose file restricts capabilities, privileges and resources.
+- Statement PDFs are read in an isolated, resource-limited process, and malformed uploads are refused with a fixed message.
+- CI scans images, Dockerfiles and commits and fails on critical findings or any secret; `SECURITY.md` states which versions are supported and how findings are triaged.
+
 ## [v0.8.0] - 2026-10-12
 
 Quro 0.8.0 is the first release that a new self-hoster can install from the published images, and the first with a tested upgrade path from 0.7.0. It changes how Quro is configured, started, stored and backed up, and moves the database to PostgreSQL 18. Read the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v0.8.0/docs/upgrade.md#upgrade-from-070-to-080) before you upgrade, and back up first.

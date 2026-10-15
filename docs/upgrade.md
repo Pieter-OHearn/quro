@@ -7,7 +7,7 @@ The commands assume an install made with [the install guide](install.md): they r
 ## How upgrades work
 
 - **Two images per release.** `ghcr.io/pieter-ohearn/quro-backend` (the server, the optional import worker and every `quro` command) and `ghcr.io/pieter-ohearn/quro-frontend`. Use both at the same version. Pulling them needs no registry account.
-- **Pin the version and the digest.** A tag can be moved; a digest cannot. Each release's notes list the digest of both images. Pin both in `compose.yaml`, for example `image: ghcr.io/pieter-ohearn/quro-backend:v0.8.0@sha256:<digest from the release notes>`, and the same tag and digest for the `migrate` service. Docker then refuses an image whose digest does not match.
+- **Pin the version and the digest.** A tag can be moved; a digest cannot. Each release's notes list the digest of both images. Pin both in `compose.yaml`, for example `image: ghcr.io/pieter-ohearn/quro-backend:v0.9.0@sha256:<digest from the release notes>`, and the same tag and digest for the `migrate` service. Docker then refuses an image whose digest does not match.
 - **Migrations only move forward.** `quro migrate` applies a release's schema migrations, all in one transaction, under a lock. The server never migrates by itself. An image refuses to run against a schema it does not know: readiness stays `503` and `quro migrate` stops with exit code 3. So going back to an older image works only while it ships every migration the database has (see [Roll back or restore](#roll-back-or-restore)).
 - **Readiness tells you when to route traffic.** `GET /api/health` answers `200` while the process runs. `GET /api/readiness` answers `200` only when the database answers, the schema matches the image and the document store is usable. The image's health check, `quro health`, uses readiness, so `docker compose ps` shows the backend as `healthy` only then.
 
@@ -168,9 +168,9 @@ Needs no settings and no database.
 
 ```json
 {
-  "version": "v0.8.0",
+  "version": "v0.9.0",
   "revision": "<commit the image was built from>",
-  "migrations": { "latest": "0038_session_hashes_and_auth_codes", "count": 39 },
+  "migrations": { "latest": "0040_ledger_correctness", "count": 41 },
   "runtime": { "bun": "1.4.2", "platform": "linux", "arch": "arm64" }
 }
 ```
@@ -284,11 +284,13 @@ Each release that needs action from operators, or changes an interface scripts r
 
 ### Upgrade from 0.8.0 to 0.9.0
 
+Back up with 0.8.0 first (step 1 of the general procedure), then work through the subsections that apply to your install. Every install needs [Container hardening](#container-hardening) and, with bunq configured, [Secrets key for bank links](#secrets-key-for-bank-links). The others apply only to some installs: [Statement import profile](#statement-import-profile) if you run statement import from a checkout, [Duplicate statement imports](#duplicate-statement-imports) only if `quro migrate` refuses, and [Settings of releases before 0.8.0](#settings-of-releases-before-080). [PostgreSQL 18 required](#postgresql-18-required) and [API changes](#api-changes) need no action from most installs.
+
 #### Container hardening
 
 What the operator does: add `healthcheck: disable: true` to services that run the backend image without the server, and optionally copy the new restrictions of the example Compose file. Nothing else changes for a Compose install on Docker Engine.
 
-- **The images declare health checks.** The backend image checks readiness with `quro health`, the frontend image `GET /healthz`. Services that run the backend image for something other than the server (the `migrate` service, `quro worker pension-imports`, one-off maintenance services) need `healthcheck: disable: true`; otherwise Docker reports them `unhealthy`, and a tool that restarts unhealthy containers would restart the import worker.
+- **The images declare health checks.** The backend image checks readiness with `quro health`, the frontend image `GET /healthz`. Services that run the backend image for something other than the server (the `migrate` service, `quro worker pension-imports`, a scheduled `quro backup` service or other one-off maintenance services) need `healthcheck: disable: true`; otherwise Docker reports them `unhealthy`, and a tool that restarts unhealthy containers would restart the import worker.
 - **nginx runs unprivileged.** The frontend image runs as UID 101 instead of root and writes only below `/tmp`. It still listens on port 80, so `ports:` stay as they are; Docker Engine lets unprivileged processes bind low ports inside a container's network namespace. With host networking or a runtime that does not, add `sysctls: { net.ipv4.ip_unprivileged_port_start: 0 }` to the frontend or publish it through a container network. The server configuration is now rendered into `/tmp/nginx/conf.d`, so files mounted over `/etc/nginx/conf.d` are no longer read.
 - **The backend image ships production dependencies only.** TypeScript, `drizzle-kit`, the frontend's packages and the test files are no longer in it; no documented command uses them.
 - **Optional restrictions.** The [example Compose file](compose.example.yaml) now sets `read_only`, `tmpfs`, `cap_drop`, `security_opt`, `mem_limit` and `pids_limit` (and `cap_add` for `db`), described in [container hardening](security.md#container-hardening). Copy them into your `compose.yaml` together with the 0.9.0 image tags: the 0.8.0 frontend runs as root and does not start with them.
@@ -373,6 +375,29 @@ To go back to 0.8.0, restore the `before-upgrade` archive with the 0.8.0 images 
 
 With your own Compose file, mount a file with 64 hexadecimal characters into every container that runs the server or `quro secrets` (at `/run/secrets/secrets_key`, or set `QRO_SECRETS_KEY_FILE`). Interface changes: `quro doctor` has a new check `secrets`; the backup manifest has a new field `secrets.integrationKeys`; `POST /api/bunq/sync`, `/sync/savings` and `/sync/budget` answer `409` with `code: bunq_reauthorization_required` when stored credentials cannot be opened.
 
+#### Statement import profile
+
+What the operator does: only if you run statement import from a checkout. Start it with `docker compose --profile ocr` instead of `--profile pension-import`, and give the model cache to UID 1000 once with `sudo chown -R 1000:1000 data/vllm-cache`. The [example install](install.md) has no statement import, so nothing changes there.
+
+- The import worker, the parser and the model server moved from the `pension-import` profile to `ocr`. A command that still names `--profile pension-import` starts none of them, so statement import stays off until you change it.
+- The model server no longer runs as root, so a cache directory that an earlier release filled as root must be handed over with the `chown` above. Its cache moved to `/var/cache/huggingface` inside the container; `./data/vllm-cache` on the host is the same directory. Once the model is cached, `VLLM_HF_HUB_OFFLINE=1` stops the model server from contacting Hugging Face.
+- The parser and the model server run as non-root users on an internal Compose network (`ocr-net`, replacing `ai-net`) with memory, CPU and process limits. Only the model server also joins an egress network, to download the model. If an override file refers to `ai-net`, point it at `ocr-net`.
+- The parser image starts with `python -m app`. A Compose file that overrides the command with `uvicorn app.main:app` still works, but without the connection limit.
+- New optional parser settings bound what one statement may use: `PARSER_MAX_FILE_MB`, `PARSER_MAX_PAGES`, `PARSER_MAX_PAGE_PIXELS`, `PARSER_MAX_TEXT_CHARS`, `PARSER_TIMEOUT_SECONDS`, `PARSER_CPU_SECONDS`, `PARSER_MEMORY_MB`, `PARSER_MAX_CONCURRENCY` and `PARSER_MAX_QUEUE`. Compose also reads `PARSER_CPUS`, `PARSER_MEM_LIMIT`, `VLLM_CPUS` and `VLLM_MEM_LIMIT`. An invalid value stops the parser at startup; the defaults and meanings are in [development](development.md#optional-pension-import-development). Keep `PARSER_TIMEOUT_SECONDS` plus `VLLM_TIMEOUT_SECONDS` below `PENSION_PARSER_TIMEOUT_MS` (in seconds); the defaults (100 and 180 against 300) do.
+- A cancelled or failed import deletes its PDF when it ends. Imports that ended before the upgrade keep theirs.
+
+#### Duplicate statement imports
+
+What the operator does: only if `quro migrate` stops with "The same pension statement file was committed more than once to one pot". Nothing else changes.
+
+Migration `0040` adds a unique index on committed statement imports, so a second import of one statement file into one pot cannot be committed and answers `409` from now on. It refuses to run while the database already holds the same statement committed twice to one pot: it changes nothing and lists the import ids per pot. For each group keep one import. For every other import in the group, with 0.8.0 delete the pension transactions it created (`pension_statement_import_rows.committed_transaction_id` lists them), then set that import's status to `cancelled`. Run `quro migrate` again afterwards. The backup you took before the upgrade is your way back.
+
+#### PostgreSQL 18 required
+
+What the operator does: nothing on PostgreSQL 18.
+
+`quro migrate`, `quro doctor`, `quro backup` and `quro restore` refuse any other PostgreSQL major version with exit code 3, before they change anything. `docker compose run --rm migrate doctor` names the server version it found.
+
 #### Settings of releases before 0.8.0
 
 What the operator does: before upgrading, run `docker compose run --rm migrate doctor` with 0.8.0 and remove every setting it reports as no longer read. Nothing else changes for an install that 0.8.0 already accepted.
@@ -383,3 +408,14 @@ What the operator does: before upgrading, run `docker compose run --rm migrate d
 #### JSON output before 1.0.0
 
 The JSON output of `quro version --json`, `quro migrate --status --json` and `quro doctor --json`, and the readiness report, carry no stability promise before 1.0.0: they may change in any 0.x release, and these notes list each change. See [Interfaces for automation](#interfaces-for-automation). `quro migrate --status` still exits 1 when migrations are pending.
+
+#### API changes
+
+What the operator does: nothing, unless a script or client of your own calls these endpoints. The JSON of the endpoints below may change in any 0.x release (see [JSON output before 1.0.0](#json-output-before-100)).
+
+- `GET /api/dashboard/net-worth` takes an optional `range` (`1m`, `6m`, `1y` or `all`; `6m` when absent) and every point has a `date`. Any other `range` answers `400`. `GET /api/dashboard/summary` returns `yearStart`, the point the year to date change measures from, or `null` without any record. See [household totals](household-model.md#api-contract).
+- `GET /api/pensions/imports` answers `400` for an invalid `limit` instead of using 30. Upload routes answer `400` with `Invalid upload` for a body that is not a readable form, where they answered `500`.
+- Committing a statement import whose file another import already committed to the same pension pot answers `409`; the second of two concurrent commits does too.
+- `jurisdiction.rulesEffectiveFrom` of the runway is `null` when the default tax rate is used.
+- `POST /api/bunq/sync`, `/sync/savings` and `/sync/budget` answer `409` with `code: bunq_reauthorization_required` when stored credentials cannot be opened (see [Secrets key for bank links](#secrets-key-for-bank-links)).
+- Holding prices (`currentPrice`, `manualPrice`, transaction prices and price history) carry up to six decimals. Money amounts keep two.
