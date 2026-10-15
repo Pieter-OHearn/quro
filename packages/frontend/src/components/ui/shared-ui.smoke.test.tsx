@@ -908,6 +908,21 @@ const smokeCases: readonly SmokeCase[] = [
     excludes: ['shadow-', 'mb-5'],
   },
   {
+    name: 'ChartCard passes header and action classes so a header control can wrap on phones',
+    element: (
+      <ChartCard
+        title="Net worth"
+        badge={<span>Range</span>}
+        headerClassName="max-sm:flex-wrap"
+        headerActionClassName="max-sm:w-full"
+        hasData
+      >
+        <div>Chart</div>
+      </ChartCard>
+    ),
+    includes: ['max-sm:px-4 max-sm:flex-wrap', 'gap-2 max-sm:w-full"><span>Range</span>'],
+  },
+  {
     name: 'TxnHistoryPanel filter fills the width on phones and rows are one line on desktop',
     element: (
       <TxnHistoryPanel

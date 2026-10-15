@@ -205,6 +205,7 @@ function deriveDashboardData({
   );
   return {
     chartData,
+    netWorthHistory: netWorthData,
     allocationData: allocationSummary.allocationData,
     totalAssets: allocationSummary.totalAssets,
     liabilitiesTotal: allocationSummary.liabilitiesTotal,
@@ -281,8 +282,10 @@ const getComparisonLabel = (chartData: DashboardData['chartData']): string | nul
 };
 
 function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPageBodyProps>) {
+  const { convertToBase } = useCurrency();
   const {
     chartData,
+    netWorthHistory,
     allocationData,
     totalAssets,
     liabilitiesTotal,
@@ -324,7 +327,8 @@ function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPa
       </ContentSection>
       <ContentSection>
         <DashboardChartsGrid
-          chartData={chartData}
+          netWorthHistory={netWorthHistory}
+          convertToBase={convertToBase}
           allocationData={allocationData}
           totalAlloc={totalAssets}
           netWorth={netWorth}
