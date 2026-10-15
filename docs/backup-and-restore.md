@@ -20,7 +20,7 @@ If you have no backup yet, do these steps today. They take a few minutes.
    The backend image runs as UID 1000. On Linux, `./backups` must exist and belong to that user; if the command says the backup directory does not exist or is not writable, run `mkdir -p backups && sudo chown 1000:1000 backups` (see [File ownership](install-contract.md#file-ownership)). An install made before `./backups` was in the example Compose file needs the line `- ./backups:/var/lib/quro/backups` under the `volumes` of its `migrate` service.
 
 3. Copy that file to another device: a USB disk, a NAS, another computer. A backup on the same disk does not survive the disk. [Encrypt](#encrypt-archives-and-copy-them-off-the-device) the archives before they leave the machine.
-4. Copy the `config/` directory (the settings file and the secrets) to a safe place as well, separately from the archives (see [what is not in an archive](#what-an-archive-contains)). Without the database passwords the archive still restores, but you will have to set new ones.
+4. Copy the `config/` directory (the settings file and the secrets) to a safe place as well, separately from the archives (see [what is not in an archive](#what-an-archive-contains)). Without the database passwords the archive still restores, but you will have to set new ones; without the secrets key (`config/secrets/secrets_key`) it restores too, but connected bunq accounts have to be connected again.
 5. [Schedule](#schedule-backups) a daily backup.
 6. [Rehearse a restore](#rehearse-a-restore) on another machine or in a separate checkout, so the first restore you ever run is not during an incident.
 
@@ -38,10 +38,13 @@ One archive is one file. It is a tar file (`.tar`), or an encrypted one (`.tar.e
 | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | The settings file (`config/quro.env`, or `.env` in a checkout)                                      | A copy next to your secrets copy                                                                                      |
 | `config/secrets/` (or `secrets/*.txt`): database passwords, the S3 secret key, the bunq credentials | A copy only you can read, not next to the archives                                                                    |
+| The secrets key (`config/secrets/secrets_key`), which encrypts the stored bank-link secrets         | With your secrets copy, not next to the archives. Keep every key an archive you keep still needs (below)              |
 | The backup encryption key                                                                           | Somewhere other than the archives, for example a password manager. Without it an encrypted archive cannot be restored |
 | Documents with S3 storage (`QRO_DOCUMENT_STORAGE=s3`)                                               | Copy the bucket with your store's tools; the manifest lists every object the database refers to                       |
 
-The manifest records this split under `secrets`. Treat every archive as sensitive: the dump holds your financial records, password hashes and the tokens of any connected bank account. Unencrypted archives are written readable by their owner only.
+The manifest records this split under `secrets`. Treat every archive as sensitive: the dump holds your financial records and password hashes. Unencrypted archives are written readable by their owner only.
+
+The bank-link tokens and keys of connected bunq accounts are in the dump only in encrypted form ([integration secrets](security.md#integration-secrets)). The manifest records the key id of the secrets key that encrypted them, and `quro backup` prints it: `Bank-link secrets: encrypted with secrets key <key id>`. Keep that key file for as long as you keep the archive. `quro secrets status` prints the key id of the key an instance has, so you can tell which file belongs to which archive; after a [key rotation](security.md#rotate-the-secrets-key), older archives need the old key. A restore without the matching key still restores everything; the users then connect bunq again in **Settings**.
 
 ## How a backup stays consistent
 
@@ -213,7 +216,7 @@ This is the case after losing the disk or the machine. You need the archive, the
    docker compose up -d
    ```
 
-If your secrets are lost too, run `quro init` to create new ones before step 2. The restore creates the runtime role, or sets its password, from the runtime password file. bunq has to be connected again only if its client credentials are lost.
+If your secrets are lost too, run `quro init` to create new ones before step 2. The restore creates the runtime role, or sets its password, from the runtime password file. bunq has to be connected again when its client credentials are lost, or when the secrets key the archive's bank links were encrypted with is lost: the restore prints that key id, and `docker compose run --rm migrate secrets status` after the restore says whether this instance's key opens them.
 
 ### With S3 storage
 
@@ -230,7 +233,7 @@ The restore puts back the database. Restore the bucket with your store's tools t
      'select id, status, expires_at, storage_deleted_at from pension_statement_imports order by id'
    ```
 
-2. Start Quro, sign in, open a few accounts and download a few documents.
+2. Start Quro, sign in, open a few accounts and download a few documents. With connected bunq accounts, run `docker compose run --rm migrate secrets status`: exit code 0 means the bank links open with this instance's key.
 3. Sessions from the time of the backup are valid again. Run `quro user revoke-sessions` for accounts where that matters (see [the security model](security.md)).
 
 If something is wrong, restore the pre-restore archive the command wrote, with the same steps.
@@ -239,7 +242,7 @@ If something is wrong, restore the pre-restore archive the command wrote, with t
 
 Restore your latest archive on another machine, or into a second install directory with its own `compose.yaml` (change the project `name:` and the published port), following [Restore on a new machine](#restore-on-a-new-machine) and [Verify a restore](#verify-a-restore). Do it once now and after every upgrade.
 
-The project runs the same rehearsal on every change: `scripts/recovery-drill.sh` (the `Recovery Drill` CI job) builds a synthetic instance with the demo seed, a partner with a joint and a private account, ledgers and uploaded PDFs, backs it up with `quro backup`, checks that missing, damaged, cut-off, wrong-key and newer-release archives are refused without changes, restores into an isolated PostgreSQL and documents volume, and compares every table, the ledger totals, the runtime role's privileges, every document's SHA-256, and sign-in and downloads through the API. It also takes a backup while a client keeps writing and checks retention and a restore over existing data. Run it with Docker:
+The project runs the same rehearsal on every change: `scripts/recovery-drill.sh` (the `Recovery Drill` CI job) builds a synthetic instance with the demo seed, a partner with a joint and a private account, ledgers and uploaded PDFs, backs it up with `quro backup`, checks that missing, damaged, cut-off, wrong-key and newer-release archives are refused without changes, restores into an isolated PostgreSQL and documents volume, and compares every table, the ledger totals, the runtime role's privileges, every document's SHA-256, and sign-in and downloads through the API. It also takes a backup while a client keeps writing and checks retention and a restore over existing data. A synthetic bunq connection is encrypted with `quro secrets encrypt` before the backup; the drill checks that neither the database nor the archive's dump contains its plaintext, that the restored connection opens with the key, and that without the key the restore still succeeds, `quro secrets status` reports the missing key, and a sync asks the user to reconnect instead of failing. Run it with Docker:
 
 ```bash
 sh scripts/recovery-drill.sh

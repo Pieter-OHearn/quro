@@ -29,13 +29,13 @@ The steps apply from 0.8.0. CI runs these steps from empty directories on amd64 
 
    Quro never creates the documents directory itself; when Docker creates a missing bind-mount source on Linux, it belongs to root and the backend cannot write to it.
 
-3. Write the settings file and the database passwords:
+3. Write the settings file, the database passwords and the secrets key:
 
    ```bash
    docker run --rm -v "$PWD/config:/config" ghcr.io/pieter-ohearn/quro-backend:v0.8.0 init
    ```
 
-   This creates `config/quro.env` and `config/secrets/postgres_admin_password` and `config/secrets/postgres_app_password` (24 random bytes each, mode `0600`). The passwords are never printed. Running it again changes nothing.
+   This creates `config/quro.env`, `config/secrets/postgres_admin_password` and `config/secrets/postgres_app_password` (24 random bytes each) and `config/secrets/secrets_key` (32 random bytes, the key that encrypts bank-link tokens in the database), all mode `0600`. The values are never printed. Running it again changes nothing; on an existing directory it creates only the files that are missing.
 
 4. Review `config/quro.env`. The defaults match the example Compose file. Set `SECURE_COOKIES=true` when browsers reach Quro over HTTPS (see the [security model](security.md)). On Linux the file belongs to UID 1000, so edit it with `sudo` unless that is you. If you change `POSTGRES_ADMIN_USER` or `POSTGRES_DB`, change them in the `db` service of `compose.yaml` too.
 
@@ -61,7 +61,7 @@ The steps apply from 0.8.0. CI runs these steps from empty directories on amd64 
    docker compose run --rm migrate doctor
    ```
 
-Keep a copy of `compose.yaml`, `config/quro.env` and `config/secrets/` somewhere safe and separately protected. Backups of the database do not include them.
+Keep a copy of `compose.yaml`, `config/quro.env` and `config/secrets/` somewhere safe and separately protected. Backups of the database do not include them. Without `config/secrets/secrets_key`, a restored instance keeps all its data but connected bunq accounts have to be connected again (see [integration secrets](security.md#integration-secrets)).
 
 ### Verify the images
 
@@ -137,7 +137,7 @@ Every command runs from the backend image: `docker run --rm [mounts and settings
 
 | Command                          | What it changes                                                                                                                                                                                                                                                                                                                                                                                          |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `quro init [--dir] [--dry-run]`  | Creates the settings file, the `secrets/` directory (mode `0700`) and each password file (mode `0600`) in the directory (default `/config`) when they are missing. Never opens an existing file for writing. `--dry-run` lists what it would create.                                                                                                                                                     |
+| `quro init [--dir] [--dry-run]`  | Creates the settings file, the `secrets/` directory (mode `0700`), each password file and the secrets key (mode `0600`) in the directory (default `/config`) when they are missing. Never opens an existing file for writing. `--dry-run` lists what it would create.                                                                                                                                    |
 | `quro migrate [--dry-run]`       | Applies pending migrations as the owner role, in one transaction. Creates the runtime role, or sets its password when the role exists and does not sign in with the password file, then grants it data access and read access to the migration history. `--dry-run` prints the plan. `--status [--json]` only compares the database with the image ([upgrade](upgrade.md#quro-migrate---status---json)). |
 | `quro doctor [--json]`           | Nothing. Reads the settings and secret files and connects as both roles.                                                                                                                                                                                                                                                                                                                                 |
 | `quro health`                    | Nothing. Asks the local server for `/api/readiness`.                                                                                                                                                                                                                                                                                                                                                     |
@@ -146,6 +146,7 @@ Every command runs from the backend image: `docker run --rm [mounts and settings
 | `quro worker pension-imports`    | Runs the optional statement import worker.                                                                                                                                                                                                                                                                                                                                                               |
 | `quro user …`                    | Registration and password reset codes, session revocation. See `quro user --help`.                                                                                                                                                                                                                                                                                                                       |
 | `quro documents migrate-from-s3` | Copies documents from S3 into the documents directory. See [document storage](document-storage.md).                                                                                                                                                                                                                                                                                                      |
+| `quro secrets …`                 | `status` changes nothing; `encrypt` and `rotate` encrypt the stored bank-link secrets with the secrets key, one connection per transaction. See [integration secrets](security.md#integration-secrets).                                                                                                                                                                                                  |
 
 `quro migrate` runs one at a time per database: a second run waits for the first (a PostgreSQL advisory lock) and then finds nothing to do. A run that is stopped part way applies none of its migrations, so running it again is always safe. Before it changes anything it checks the host, the PostgreSQL version, that the owner role owns the database, that the schema is not newer than the image, and the runtime role.
 

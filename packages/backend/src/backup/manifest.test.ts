@@ -69,6 +69,31 @@ describe('manifest', () => {
     expect(parsed.database.lastMigration?.tag).toBe('0001_second');
   });
 
+  test('accepts the secrets key ids of bank-link secrets, and archives written before them', () => {
+    const withKeys = manifest({
+      secrets: {
+        encrypted: false,
+        inArchive: [],
+        notInArchive: [],
+        integrationKeys: { keyIds: ['0123456789abcdef'], unencrypted: 0 },
+      },
+    });
+    expect(parseManifest(JSON.stringify(withKeys)).secrets.integrationKeys?.keyIds).toEqual([
+      '0123456789abcdef',
+    ]);
+    expect(parseManifest(JSON.stringify(manifest())).secrets.integrationKeys).toBeUndefined();
+  });
+
+  test.each([
+    ['not an object', 'keys'],
+    ['ids that are not key ids', { keyIds: ['<script>'], unencrypted: 0 }],
+    ['ids that are not a list', { keyIds: '0123456789abcdef', unencrypted: 0 }],
+    ['no count', { keyIds: [] }],
+  ])('rejects secrets key ids that are %s', (_label, integrationKeys) => {
+    const damaged = { ...manifest(), secrets: { ...manifest().secrets, integrationKeys } };
+    expect(() => parseManifest(JSON.stringify(damaged))).toThrow('secrets.integrationKeys');
+  });
+
   test('rejects damaged manifests by what is wrong, never by content', () => {
     expect(() => parseManifest('{not json')).toThrow(ArchiveFormatError);
     expect(() => parseManifest(JSON.stringify({ ...manifest(), format: 'other' }))).toThrow(

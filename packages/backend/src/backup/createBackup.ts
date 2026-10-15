@@ -30,6 +30,7 @@ import {
   removeQuietly,
   sha256Hex,
 } from './files';
+import { sealedKeyIds, type SecretRow } from '../lib/integrationSecrets';
 import { readDatabaseFingerprint, type DatabaseFingerprint } from './fingerprint';
 import {
   ARCHIVE_FORMAT,
@@ -39,6 +40,7 @@ import {
   MANIFEST_ENTRY,
   SECRETS_IN_ARCHIVE,
   SECRETS_NOT_IN_ARCHIVE,
+  type IntegrationKeys,
   type DocumentFile,
   type DocumentsSection,
   type Manifest,
@@ -125,6 +127,7 @@ type Snapshot = {
   fingerprint: DatabaseFingerprint;
   lastMigration: MigrationPoint | null;
   references: (ReferencedDocument & { needed: boolean })[] | null;
+  integrationKeys: IntegrationKeys | null;
 };
 
 type Paths = { name: string; final: string; partial: string; dump: string };
@@ -211,6 +214,24 @@ async function readLastMigration(
   return { tag: migrations.find((migration) => migration.when === when)?.tag ?? null, when };
 }
 
+/**
+ * The secrets key ids of the bank-link secrets in the snapshot (lib/integrationSecrets.ts), read
+ * from the envelopes without any key. Null for a database without the table.
+ */
+async function readIntegrationKeys(tx: TransactionSql): Promise<IntegrationKeys | null> {
+  // Checked first: a failing query would abort the snapshot's transaction.
+  const [table] = await tx<{ present: boolean }[]>`
+    select to_regclass('public.bunq_connections') is not null as present
+  `;
+  if (!table?.present) return null;
+  const rows = await tx<SecretRow[]>`
+    select id, user_id as "userId", access_token as "accessToken", private_key as "privateKey",
+      installation_token as "installationToken", session_token as "sessionToken"
+    from bunq_connections
+  `;
+  return sealedKeyIds(rows);
+}
+
 /** Reads what the manifest records and runs pg_dump, all from one exported snapshot. */
 function captureSnapshot(
   session: Sql,
@@ -225,6 +246,7 @@ function captureSnapshot(
     const fingerprint = await readDatabaseFingerprint(tx);
     const lastMigration = await readLastMigration(tx, dependencies.migrations);
     const references = await readReferences(tx, request.log);
+    const integrationKeys = await readIntegrationKeys(tx);
     request.log('Dumping the database');
     await createPrivateFile(dumpPath);
     await dependencies.dump({
@@ -234,7 +256,13 @@ function captureSnapshot(
       signal: request.signal,
       log: () => undefined,
     });
-    return { serverVersion: exported!.version, fingerprint, lastMigration, references };
+    return {
+      serverVersion: exported!.version,
+      fingerprint,
+      lastMigration,
+      references,
+      integrationKeys,
+    };
   });
 }
 
@@ -326,6 +354,7 @@ function buildManifest(
       encrypted: request.encryptionKey !== null,
       inArchive: SECRETS_IN_ARCHIVE,
       notInArchive: SECRETS_NOT_IN_ARCHIVE,
+      ...(snapshot.integrationKeys ? { integrationKeys: snapshot.integrationKeys } : {}),
     },
   };
 }

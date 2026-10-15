@@ -162,6 +162,12 @@ function performFetchOnce(
   });
 }
 
+// The OAuth token request carries the authorization code and the client secret in its query
+// string, so error messages, which reach logs and the stored sync error, name the path only.
+export function withoutQuery(url: string): string {
+  return url.replace(/[?#][\s\S]*$/, '');
+}
+
 async function performFetch(url: string, init: RequestInit): Promise<unknown> {
   let result = await performFetchOnce(url, init);
   if (result.response.status === RATE_LIMIT_STATUS) {
@@ -171,7 +177,7 @@ async function performFetch(url: string, init: RequestInit): Promise<unknown> {
   const { response, payload } = result;
   if (!response.ok) {
     const msg = extractErrorMessage(payload);
-    throw new Error(msg ?? `Bunq request failed (${response.status}): ${url}`);
+    throw new Error(msg ?? `Bunq request failed (${response.status}): ${withoutQuery(url)}`);
   }
   return payload;
 }

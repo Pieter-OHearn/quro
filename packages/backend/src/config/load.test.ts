@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { inspect } from 'node:util';
+import { generateTestSecretsKey } from '../test/config';
 import { ConfigError, loadConfig, type Environment, type SectionName } from './load';
 
 const CANARY = 'canary-secret-value-7f3a';
@@ -14,10 +15,21 @@ function files(contents: Record<string, string>) {
   };
 }
 
+// Random per run, so no key-shaped literal sits in the repository.
+const SECRETS_KEY = generateTestSecretsKey();
+const OTHER_SECRETS_KEY = generateTestSecretsKey();
+
 const SECRETS = {
   '/run/secrets/postgres_admin_password': `${CANARY}-admin\n`,
   '/run/secrets/postgres_app_password': `${CANARY}-app\n`,
+  '/run/secrets/secrets_key': `${SECRETS_KEY}\n`,
 };
+
+function withoutFile(contents: Record<string, string>, path: string): Record<string, string> {
+  return Object.fromEntries(Object.entries(contents).filter(([name]) => name !== path));
+}
+
+const SECRETS_WITHOUT_KEY = withoutFile(SECRETS, '/run/secrets/secrets_key');
 
 const DATABASE_ENV = { POSTGRES_HOST: 'db.internal' } satisfies Environment;
 
@@ -468,6 +480,118 @@ describe('bunq', () => {
     expect(config.bunq.enabled && config.bunq.sandbox).toBe(true);
     expect(problemsOf({ ...DATABASE_ENV, ...FULL, BUNQ_SANDBOX: 'ture' }, 'bunq')).toEqual([
       { setting: 'BUNQ_SANDBOX', message: 'must be true, false, 1, 0, yes or no' },
+    ]);
+  });
+});
+
+describe('integration secrets key', () => {
+  const BUNQ = {
+    BUNQ_CLIENT_ID: 'client-id-value',
+    BUNQ_CLIENT_SECRET: 'client-secret-value',
+    BUNQ_REDIRECT_URI: 'https://quro.example/api/bunq/oauth/callback',
+    FRONTEND_ORIGIN: 'https://quro.example',
+  };
+
+  test('is optional without bunq: no file at the default path means no key', () => {
+    const { config, problems } = load(DATABASE_ENV, SECRETS_WITHOUT_KEY);
+    expect(problems.secrets).toEqual([]);
+    expect(config.secrets).toEqual({ key: null, keyPath: null, previousKey: null });
+  });
+
+  test('is read from the default path and identified by a key id, never by its value', () => {
+    const { config } = load(DATABASE_ENV);
+    expect(config.secrets.keyPath).toBe('/run/secrets/secrets_key');
+    expect(config.secrets.key?.id).toMatch(/^[0-9a-f]{16}$/);
+    const rendered = [
+      JSON.stringify(config.secrets),
+      inspect(config.secrets),
+      `${config.secrets.key}`,
+    ];
+    for (const text of rendered) {
+      expect(text).not.toContain(SECRETS_KEY);
+      expect(text).toContain(config.secrets.key!.id);
+    }
+  });
+
+  test('the same key gives the same id, whatever its case', () => {
+    const lower = load(DATABASE_ENV).config.secrets.key!.id;
+    const upper = load(DATABASE_ENV, {
+      ...SECRETS,
+      '/run/secrets/secrets_key': SECRETS_KEY.toUpperCase(),
+    }).config.secrets.key!.id;
+    expect(upper).toBe(lower);
+  });
+
+  test('a file named explicitly must exist', () => {
+    expect(problemsOf({ ...DATABASE_ENV, QRO_SECRETS_KEY_FILE: '/nope' }, 'secrets')).toEqual([
+      { setting: 'QRO_SECRETS_KEY_FILE', message: 'secret file not found at /nope' },
+    ]);
+  });
+
+  test.each([
+    ['too short', SECRETS_KEY.slice(0, 63)],
+    ['too long', `${SECRETS_KEY}0`],
+    ['not hexadecimal', `${CANARY}${SECRETS_KEY}`.slice(0, 64)],
+    ['base64 of 32 bytes', Buffer.from(SECRETS_KEY, 'hex').toString('base64')],
+  ])('a key that is %s stops startup without echoing it', (_label, content) => {
+    const problems = problemsOf(DATABASE_ENV, 'secrets', {
+      ...SECRETS,
+      '/run/secrets/secrets_key': `${content}\n`,
+    });
+    expect(problems).toEqual([
+      {
+        setting: 'QRO_SECRETS_KEY_FILE',
+        message:
+          'the key in /run/secrets/secrets_key must be 64 hexadecimal characters (32 random bytes), for example from `openssl rand -hex 32`',
+      },
+    ]);
+    expect(JSON.stringify(problems)).not.toContain(content);
+  });
+
+  test('a placeholder key that repeats one byte is refused', () => {
+    const problems = problemsOf(DATABASE_ENV, 'secrets', {
+      ...SECRETS,
+      '/run/secrets/secrets_key': '0'.repeat(64),
+    });
+    expect(problems.map((p) => p.setting)).toEqual(['QRO_SECRETS_KEY_FILE']);
+    expect(problems[0]!.message).toContain('placeholder');
+  });
+
+  test('bunq linking needs the key', () => {
+    const problems = problemsOf({ ...DATABASE_ENV, ...BUNQ }, 'bunq', SECRETS_WITHOUT_KEY);
+    expect(problems).toEqual([
+      {
+        setting: 'QRO_SECRETS_KEY_FILE',
+        message:
+          'required because bunq linking is configured: bank-link tokens are stored encrypted with it (no key file at /run/secrets/secrets_key; `quro init` or `openssl rand -hex 32` creates one)',
+      },
+    ]);
+    expect(load({ ...DATABASE_ENV, ...BUNQ }).config.bunq.enabled).toBe(true);
+  });
+
+  test('an invalid key also stops bunq linking', () => {
+    const problems = problemsOf({ ...DATABASE_ENV, ...BUNQ }, 'bunq', {
+      ...SECRETS,
+      '/run/secrets/secrets_key': 'short\n',
+    });
+    expect(problems.map((p) => p.setting)).toEqual(['QRO_SECRETS_KEY_FILE']);
+  });
+
+  test('a previous key is read only next to a different current key', () => {
+    const withPrevious = { ...SECRETS, '/run/secrets/old_key': `${OTHER_SECRETS_KEY}\n` };
+    const env = { ...DATABASE_ENV, QRO_SECRETS_PREVIOUS_KEY_FILE: '/run/secrets/old_key' };
+    const { config } = load(env, withPrevious);
+    expect(config.secrets.previousKey?.id).toMatch(/^[0-9a-f]{16}$/);
+    expect(config.secrets.previousKey?.id).not.toBe(config.secrets.key?.id);
+
+    const noCurrent = withoutFile(withPrevious, '/run/secrets/secrets_key');
+    expect(problemsOf(env, 'secrets', noCurrent).map((p) => p.message)).toEqual([
+      'needs QRO_SECRETS_KEY_FILE: the previous key is only read while rotating to a new one',
+    ]);
+
+    const same = { ...SECRETS, '/run/secrets/old_key': `${SECRETS_KEY}\n` };
+    expect(problemsOf(env, 'secrets', same).map((p) => p.message)).toEqual([
+      'holds the same key as QRO_SECRETS_KEY_FILE; it must be the key that was in use before',
     ]);
   });
 });

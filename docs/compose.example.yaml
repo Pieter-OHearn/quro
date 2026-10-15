@@ -6,7 +6,8 @@
 #
 # Layout next to this file:
 #   config/quro.env    settings, written once by `quro init`; edit freely
-#   config/secrets/    generated database passwords, written once by `quro init`
+#   config/secrets/    generated database passwords and the secrets key, written once by
+#                      `quro init`; keep a copy of this directory apart from your backups
 #   data/documents/    uploaded documents (create it before the first start)
 #   backups/           archives written by `docker compose run --rm migrate backup`
 #   the `postgres` named volume holds the database
@@ -67,6 +68,7 @@ services:
     secrets:
       - postgres_admin_password
       - postgres_app_password
+      - secrets_key
     volumes:
       - ./data/documents:/var/lib/quro/documents
       - ./backups:/var/lib/quro/backups
@@ -94,6 +96,8 @@ services:
     env_file: ./config/quro.env
     secrets:
       - postgres_app_password
+      # Encrypts the bank-link tokens and keys stored in the database (QRO_SECRETS_KEY_FILE).
+      - secrets_key
     volumes:
       - ./data/documents:/var/lib/quro/documents
     networks:
@@ -155,3 +159,5 @@ secrets:
     file: ./config/secrets/postgres_admin_password
   postgres_app_password:
     file: ./config/secrets/postgres_app_password
+  secrets_key:
+    file: ./config/secrets/secrets_key

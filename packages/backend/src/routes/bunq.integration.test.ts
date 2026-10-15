@@ -6,6 +6,9 @@ import { consumeOAuthAttempt } from '../lib/bunqOAuthAttempts';
 import { BUNQ_TEST_ORIGIN, bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
 import { applyTestSettings } from '../test/config';
+import { getConfig } from '../config';
+import { secretPlace } from '../lib/integrationSecrets';
+import { classifySecret, openSecret, type SecretsKeyring } from '../lib/secretEnvelope';
 
 const integration = createIntegrationHelpers('bunq.integration.quro.test');
 const originalFetch = globalThis.fetch;
@@ -57,6 +60,12 @@ function connectionsFor(userId: number) {
 }
 
 const userIds: number[] = [];
+
+function keyring(): SecretsKeyring {
+  return { current: getConfig().secrets.key, previous: null };
+}
+
+const accessTokenPlace = (userId: number) => secretPlace('access_token', userId);
 
 async function newUser(label: string) {
   const session = await integration.signUp(label);
@@ -118,7 +127,12 @@ describe('bunq OAuth attempts', () => {
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(`${ORIGIN}/savings?bunq=connected`);
     const [connection] = await connectionsFor(user.user.id);
-    expect(connection.accessToken).toBe('fake-access-token');
+    // Stored only encrypted, bound to this user's row, and opened with the instance's key.
+    expect(connection.accessToken).not.toContain('fake-access-token');
+    expect(classifySecret(connection.accessToken, keyring())).toBe('current');
+    expect(
+      openSecret(connection.accessToken, accessTokenPlace(user.user.id), keyring()).value,
+    ).toBe('fake-access-token');
   });
 
   test('stores only a hash of the state', async () => {
@@ -254,5 +268,150 @@ describe('bunq OAuth attempts', () => {
     expect((await callback(second)).headers.get('location')).toBe(
       `${ORIGIN}/savings?bunq=connected`,
     );
+  });
+});
+
+describe('stored bunq credentials', () => {
+  const VALID_SESSION = {
+    sessionId: 1,
+    sessionExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    bunqUserId: '42',
+  };
+
+  // bunq answers every call with an empty list: a sync then has nothing to import.
+  function mockEmptyBank() {
+    const fetchMock = mock(() => Promise.resolve(Response.json({ Response: [] })));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
+  test('a connection stored unencrypted before is encrypted when the server next uses it', async () => {
+    const user = await newUser('legacy-plaintext');
+    await db.insert(bunqConnections).values({
+      userId: user.user.id,
+      accessToken: 'synthetic-legacy-access',
+      sessionToken: 'synthetic-legacy-session',
+      ...VALID_SESSION,
+    });
+    const fetchMock = mockEmptyBank();
+
+    const response = await integration.request('/api/bunq/sync', {
+      method: 'POST',
+      cookie: user.cookie,
+      headers: { 'X-CSRF-Token': user.csrfToken },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalled();
+    const [row] = await connectionsFor(user.user.id);
+    expect(classifySecret(row.accessToken, keyring())).toBe('current');
+    expect(classifySecret(row.sessionToken!, keyring())).toBe('current');
+    expect(row.privateKey).toBeNull();
+    expect(openSecret(row.accessToken, accessTokenPlace(user.user.id), keyring()).value).toBe(
+      'synthetic-legacy-access',
+    );
+  });
+
+  test('credentials the key cannot open ask for a reconnect and call no provider', async () => {
+    const user = await newUser('unreadable');
+    const other = await newUser('unreadable-other');
+    // A value sealed for another user's row: moving ciphertext between rows must fail.
+    const sealedForOther = getConfig().secrets.key!.seal(
+      'synthetic-moved-access',
+      accessTokenPlace(other.user.id),
+    );
+    await db.insert(bunqConnections).values({
+      userId: user.user.id,
+      accessToken: sealedForOther,
+      ...VALID_SESSION,
+    });
+    const fetchMock = mockEmptyBank();
+
+    const response = await integration.request('/api/bunq/sync', {
+      method: 'POST',
+      cookie: user.cookie,
+      headers: { 'X-CSRF-Token': user.csrfToken },
+    });
+
+    expect(response.status).toBe(409);
+    const body = (await response.json()) as { error: string; code: string };
+    expect(body.code).toBe('bunq_reauthorization_required');
+    expect(body.error).toContain('Reconnect bunq in Settings');
+    expect(fetchMock).not.toHaveBeenCalled();
+    const connection = await integration.request('/api/bunq/connection', { cookie: user.cookie });
+    const { data } = (await connection.json()) as {
+      data: { syncStatus: string; syncError: string };
+    };
+    expect(data).toMatchObject({ syncStatus: 'error' });
+    expect(data.syncError).toContain('Reconnect bunq in Settings');
+    // The stored value is left as it was: nothing is destroyed.
+    expect((await connectionsFor(user.user.id))[0]!.accessToken).toBe(sealedForOther);
+  });
+
+  test('a changed byte in a stored credential is refused like a wrong key', async () => {
+    const user = await newUser('tampered');
+    const sealed = getConfig().secrets.key!.seal(
+      'synthetic-tampered',
+      accessTokenPlace(user.user.id),
+    );
+    const parts = sealed.split(':');
+    const ciphertext = parts[5]!;
+    parts[5] = `${ciphertext[0] === 'A' ? 'B' : 'A'}${ciphertext.slice(1)}`;
+    await db.insert(bunqConnections).values({
+      userId: user.user.id,
+      accessToken: parts.join(':'),
+      ...VALID_SESSION,
+    });
+    mockEmptyBank();
+
+    const response = await integration.request('/api/bunq/sync/savings', {
+      method: 'POST',
+      cookie: user.cookie,
+      headers: { 'X-CSRF-Token': user.csrfToken },
+    });
+    expect(response.status).toBe(409);
+  });
+
+  test('disconnecting works when the stored session cannot be opened', async () => {
+    const user = await newUser('disconnect-unreadable');
+    await db.insert(bunqConnections).values({
+      userId: user.user.id,
+      accessToken:
+        'quro-secret:v1:aes-256-gcm:0000000000000000:AAAAAAAAAAAAAAAA:AA:AAAAAAAAAAAAAAAAAAAAAA',
+      sessionToken:
+        'quro-secret:v1:aes-256-gcm:0000000000000000:AAAAAAAAAAAAAAAA:AA:AAAAAAAAAAAAAAAAAAAAAA',
+      ...VALID_SESSION,
+    });
+    const fetchMock = mockEmptyBank();
+
+    const response = await integration.request('/api/bunq/connection', {
+      method: 'DELETE',
+      cookie: user.cookie,
+      headers: { 'X-CSRF-Token': user.csrfToken },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await connectionsFor(user.user.id)).toHaveLength(0);
+  });
+
+  test('reconnecting replaces credentials the key cannot open', async () => {
+    const user = await newUser('reauthorize');
+    await db.insert(bunqConnections).values({
+      userId: user.user.id,
+      accessToken:
+        'quro-secret:v1:aes-256-gcm:0000000000000000:AAAAAAAAAAAAAAAA:AA:AAAAAAAAAAAAAAAAAAAAAA',
+      ...VALID_SESSION,
+    });
+    mockTokenExchange();
+
+    const state = await startAttempt(user.cookie);
+    expect((await callback(state)).headers.get('location')).toContain('bunq=connected');
+
+    const [row] = await connectionsFor(user.user.id);
+    expect(openSecret(row.accessToken, accessTokenPlace(user.user.id), keyring()).value).toBe(
+      'fake-access-token',
+    );
+    expect(row).toMatchObject({ privateKey: null, sessionToken: null, syncStatus: 'idle' });
   });
 });

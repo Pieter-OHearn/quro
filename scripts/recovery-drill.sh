@@ -17,6 +17,10 @@
 #   5. A backup while a client keeps writing (maintenance mode), a third backup for retention,
 #      and a restore of the under-load archive over the restored target (pre-restore archive).
 #   6. Elapsed times for the recovery objectives.
+#   Bank-link secrets: a synthetic bunq connection is stored unencrypted, encrypted with
+#   `quro secrets encrypt`, and searched for in the database and in an archive's dump. After the
+#   restore it opens with the key; without the key the restore still succeeds, `quro secrets
+#   status` reports the missing key, and a sync asks the user to reconnect.
 #
 # Usage: sh scripts/recovery-drill.sh
 # Environment:
@@ -44,13 +48,18 @@ WORK=$(mktemp -d)
 DB=quro
 # Throwaway credentials for containers that live for a few minutes on a private network. The
 # files are world-readable so the backend can read them whatever user it runs as.
-mkdir -p "$WORK/secrets" "$WORK/other-key"
+mkdir -p "$WORK/secrets" "$WORK/other-key" "$WORK/secrets-key" "$WORK/other-secrets-key"
 od -An -N16 -tx1 /dev/urandom | tr -d ' \n' >"$WORK/secrets/postgres_admin_password"
 od -An -N16 -tx1 /dev/urandom | tr -d ' \n' >"$WORK/secrets/postgres_app_password"
 od -An -N32 -tx1 /dev/urandom | tr -d ' \n' >"$WORK/secrets/backup_key"
 od -An -N32 -tx1 /dev/urandom | tr -d ' \n' >"$WORK/other-key/backup_key"
-chmod 755 "$WORK/secrets" "$WORK/other-key"
-chmod 644 "$WORK/secrets/"* "$WORK/other-key/"*
+# Secrets keys sit apart from /run/secrets, so a container has one only when a step mounts it.
+od -An -N32 -tx1 /dev/urandom | tr -d ' \n' >"$WORK/secrets-key/secrets_key"
+od -An -N32 -tx1 /dev/urandom | tr -d ' \n' >"$WORK/other-secrets-key/secrets_key"
+chmod 755 "$WORK/secrets" "$WORK/other-key" "$WORK/secrets-key" "$WORK/other-secrets-key"
+chmod 644 "$WORK/secrets/"* "$WORK/other-key/"* "$WORK/secrets-key/"* "$WORK/other-secrets-key/"*
+# Synthetic bank-link secrets; no real token looks like this.
+BANK_MARKER="drill-bank-secret-$$"
 ADMIN_PASSWORD=$(cat "$WORK/secrets/postgres_admin_password")
 # The restrictions of docs/compose.example.yaml: backups and restores work under them.
 HARDENED="--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true --memory 1g --pids-limit 200"
@@ -125,14 +134,19 @@ quro() {
   backend "$host" "$documents" --entrypoint quro $options -- "$@"
 }
 
-# start_api NAME HOST DOCUMENTS_VOLUME: the API server, as `docker compose up` runs it.
+# start_api NAME HOST DOCUMENTS_VOLUME [docker run options...]: the API server, as
+# `docker compose up` runs it.
 start_api() {
+  name=$1
+  host=$2
+  documents=$3
+  shift 3
   # shellcheck disable=SC2086
-  docker run -d --name "$1" --network "$NET" --network-alias "$1" $HARDENED \
-    -v "$WORK/secrets:/run/secrets:ro" -v "$3:/var/lib/quro/documents" \
-    -e POSTGRES_HOST="$2" -e POSTGRES_DB="$DB" -e POSTGRES_APP_USER=quro_app \
-    -e QRO_DISABLE_SCHEDULERS=true -e QRO_DOCUMENT_STORAGE=filesystem "$IMAGE" >/dev/null
-  client wait "http://$1:3000"
+  docker run -d --name "$name" --network "$NET" --network-alias "$name" $HARDENED \
+    -v "$WORK/secrets:/run/secrets:ro" -v "$documents:/var/lib/quro/documents" \
+    -e POSTGRES_HOST="$host" -e POSTGRES_DB="$DB" -e POSTGRES_APP_USER=quro_app \
+    -e QRO_DISABLE_SCHEDULERS=true -e QRO_DOCUMENT_STORAGE=filesystem "$@" "$IMAGE" >/dev/null
+  client wait "http://$name:3000"
 }
 
 client() {
@@ -192,6 +206,15 @@ archives() {
 }
 
 KEY_OPTIONS="-e QRO_BACKUP_ENCRYPTION_KEY_FILE=/run/secrets/backup_key"
+SECRETS_KEY="-v $WORK/secrets-key:/run/quro-secrets:ro -e QRO_SECRETS_KEY_FILE=/run/quro-secrets/secrets_key"
+OTHER_SECRETS_KEY="-v $WORK/other-secrets-key:/run/quro-secrets:ro -e QRO_SECRETS_KEY_FILE=/run/quro-secrets/secrets_key"
+# bunq configured with synthetic client settings; the drill network has no route out.
+BUNQ_SETTINGS="-e BUNQ_CLIENT_ID=drill-client -e BUNQ_CLIENT_SECRET=drill-client-secret -e BUNQ_REDIRECT_URI=http://quro.drill.invalid/api/bunq/oauth/callback -e FRONTEND_ORIGIN=http://quro.drill.invalid"
+
+# bank_rows CONTAINER: every column of every bunq connection as text.
+bank_rows() {
+  psql_on "$1" -c "select t::text from bunq_connections t order by id"
+}
 ROUTINE="$KEY_OPTIONS -e QRO_BACKUP_OFFSITE_DIR=/var/lib/quro/offsite -e QRO_BACKUP_KEEP=2"
 
 step "Source instance on $PG_IMAGE: $ROWS ledger rows, $DOCUMENTS documents of $DOCUMENT_KIB KiB"
@@ -200,6 +223,30 @@ quro "$RUN-db-source" "$RUN-docs-source" -- migrate >/dev/null
 backend "$RUN-db-source" "$RUN-docs-source" --entrypoint bun -- run db:seed-demo >/dev/null
 psql_on "$RUN-db-source" <scripts/fixtures/edge-case-rows.sql >/dev/null
 psql_on "$RUN-db-source" -v rows="$ROWS" <scripts/fixtures/recovery-drill.sql >/dev/null
+
+step "Bank-link secrets: stored unencrypted as before 0.9.0, then encrypted"
+psql_on "$RUN-db-source" -c "insert into bunq_connections (user_id, access_token, private_key,
+  installation_token, session_token, session_id, session_expires_at, bunq_user_id)
+  select id, '$BANK_MARKER-access', '$BANK_MARKER-private', '$BANK_MARKER-installation',
+    '$BANK_MARKER-session', 1, now() + interval '1 day', '42'
+  from users where email = 'demo@quro.local'" >/dev/null
+# shellcheck disable=SC2086
+expect_exit 1 "secrets status before encryption" quro "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -- secrets status
+grep -q 'unencrypted: 4' "$WORK/out.txt" || fail "secrets status did not count the unencrypted secrets"
+# shellcheck disable=SC2086
+expect_exit 2 "secrets encrypt without a key" quro "$RUN-db-source" "$RUN-docs-source" -- secrets encrypt
+# shellcheck disable=SC2086
+expect_exit 0 "secrets encrypt" quro "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -- secrets encrypt
+grep -q 'Encrypted 4 secret(s) in 1 bank connection(s)' "$WORK/out.txt" || fail "secrets encrypt did not report its work"
+grep -q "$BANK_MARKER" "$WORK/out.txt" && fail "secrets encrypt printed a secret"
+SECRETS_KEY_ID=$(sed -n 's/^Secrets key: \([0-9a-f]*\) .*/\1/p' "$WORK/out.txt")
+[ -n "$SECRETS_KEY_ID" ] || fail "secrets encrypt printed no key id"
+# shellcheck disable=SC2086
+expect_exit 0 "secrets status after encryption" quro "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -- secrets status
+bank_rows "$RUN-db-source" | grep -q "$BANK_MARKER" && fail "the database still holds a bank-link secret in plaintext"
+bank_rows "$RUN-db-source" | grep -q "quro-secret:v1:aes-256-gcm:$SECRETS_KEY_ID:" || fail "the bank-link secrets are not envelopes of the key"
+echo "database: no plaintext bank-link secret; envelopes of key $SECRETS_KEY_ID"
+
 start_api "$RUN-api-source" "$RUN-db-source" "$RUN-docs-source"
 client upload "http://$RUN-api-source:3000" "$DOCUMENTS" "$DOCUMENT_KIB"
 client snapshot "http://$RUN-api-source:3000" >"$WORK/source-view.json"
@@ -218,10 +265,20 @@ ARCHIVE_A=$(sed -n 's|^Archive written and verified: /var/lib/quro/backups/\([^ 
 [ -n "$ARCHIVE_A" ] || fail "no archive name in the backup output"
 pause_seconds=$(sed -n 's/^Changes resumed after \([0-9.]*\) s$/\1/p' "$WORK/backup-a.txt")
 [ "$(archives "$RUN-offsite")" = "$ARCHIVE_A" ] || fail "the off-device copy is missing"
+grep -q "Bank-link secrets: encrypted with secrets key $SECRETS_KEY_ID\." "$WORK/backup-a.txt" || fail "the backup does not name the secrets key"
+grep -q "$BANK_MARKER" "$WORK/backup-a.txt" && fail "the backup output holds a bank-link secret"
 
 step "Unencrypted archive for the wrong-version case"
 quro "$RUN-db-source" "$RUN-docs-source" -- backup --label version-test >"$WORK/backup-plain.txt"
 PLAIN=$(sed -n 's|^Archive written and verified: /var/lib/quro/backups/\([^ ]*\) .*|\1|p' "$WORK/backup-plain.txt")
+# The dump is compressed; read its bunq_connections data back as text before searching it.
+docker run --rm -v "$RUN-backups:/backups:ro" --entrypoint sh "$IMAGE" -c "
+  set -e; mkdir /tmp/x && cd /tmp/x && tar -xf /backups/$PLAIN database.dump manifest.json
+  pg_restore --data-only --table=bunq_connections -f - database.dump; cat manifest.json" >"$WORK/plain-dump.txt"
+grep -q "quro-secret:v1:aes-256-gcm:$SECRETS_KEY_ID:" "$WORK/plain-dump.txt" || fail "the archive's dump holds no encrypted bank-link secret"
+grep -q "$BANK_MARKER" "$WORK/plain-dump.txt" && fail "the archive's dump holds a bank-link secret in plaintext"
+grep -q "\"$SECRETS_KEY_ID\"" "$WORK/plain-dump.txt" || fail "the manifest does not record the secrets key id"
+echo "archive: dump and manifest hold no plaintext bank-link secret; manifest names key $SECRETS_KEY_ID"
 # Rewrite its manifest as if a newer release had written it, entries in the same order.
 docker run --rm -v "$RUN-backups:/backups" --entrypoint sh "$IMAGE" -c "
   set -e; mkdir /tmp/x && cd /tmp/x && tar -xf /backups/$PLAIN
@@ -260,6 +317,7 @@ started=$(now)
 quro "$RUN-db-target" "$RUN-docs-target" $CONFIRM $KEY_OPTIONS -- restore "/var/lib/quro/backups/$ARCHIVE_A" | tee "$WORK/restore-a.txt"
 restore_seconds=$(elapsed "$started" "$(now)")
 grep -q 'Restored and verified' "$WORK/restore-a.txt" || fail "restore did not report verification"
+grep -q "encrypted with secrets key $SECRETS_KEY_ID" "$WORK/restore-a.txt" || fail "restore did not name the secrets key the bank links need"
 
 step "Compare the target with the source"
 fingerprint "$RUN-db-target" >"$WORK/target.fp"
@@ -280,6 +338,28 @@ grep -q '"Joint household"' "$WORK/target-view.json" || fail "the partner's join
 if grep -q '"Partner private"' "$WORK/target-view.json"; then fail "the partner's private account is visible"; fi
 echo "sign-in, accounts (joint visible, private hidden), payslips and $(grep -c '"[0-9]*": "' "$WORK/target-view.json") document downloads: identical"
 docker rm -f "$RUN-api-target" >/dev/null
+
+step "Bank links after the restore: with the secrets key, and without it"
+# shellcheck disable=SC2086
+expect_exit 0 "secrets status with the key" quro "$RUN-db-target" "$RUN-docs-target" $SECRETS_KEY -- secrets status
+grep -q 'encrypted with the current key: 4' "$WORK/out.txt" || fail "the restored bank-link secrets do not open with the key"
+# shellcheck disable=SC2086
+expect_exit 1 "secrets status without the key" quro "$RUN-db-target" "$RUN-docs-target" -- secrets status
+grep -q 'Secrets key: not configured' "$WORK/out.txt" || fail "secrets status did not report the missing key"
+grep -q "(key $SECRETS_KEY_ID)" "$WORK/out.txt" || fail "secrets status did not name the key the bank links need"
+# The server with bunq configured and a different key (the original is lost): no crash, and a
+# sync asks the user to reconnect without calling bunq.
+# shellcheck disable=SC2086
+start_api "$RUN-api-target" "$RUN-db-target" "$RUN-docs-target" $BUNQ_SETTINGS $OTHER_SECRETS_KEY
+reply=$(client bunq-sync "http://$RUN-api-target:3000")
+echo "sync without the original key: $reply"
+echo "$reply" | grep -q '"status":409' || fail "a sync without the key did not ask for a reconnect"
+echo "$reply" | grep -q 'bunq_reauthorization_required' || fail "a sync without the key gave no reconnect code"
+[ "$(docker inspect -f '{{.State.Running}}' "$RUN-api-target")" = "true" ] || fail "the server stopped"
+docker logs "$RUN-api-target" 2>&1 | grep -q "$BANK_MARKER" && fail "the server log holds a bank-link secret"
+docker rm -f "$RUN-api-target" >/dev/null
+bank_rows "$RUN-db-target" | grep -q "quro-secret:v1:aes-256-gcm:$SECRETS_KEY_ID:" || fail "the stored bank link changed"
+echo "without the key: restore kept the encrypted bank link, status names key $SECRETS_KEY_ID, the sync asks for a reconnect"
 
 step "Backup while a client keeps writing"
 docker run -d --name "$RUN-writer" --network "$NET" -v "$REPO_ROOT/scripts/recovery-drill-client.ts:/drill/client.ts:ro" \

@@ -1,7 +1,9 @@
+import { generateTestSecretsKey } from './test/config';
 import { describe, expect, test } from 'bun:test';
 import { createApp } from './app';
 import { loadConfig, type Environment } from './config';
 
+const SECRETS_KEY = generateTestSecretsKey();
 const BASE: Environment = { DATABASE_URL: 'postgres://u:p@h/db' };
 const FULL: Environment = {
   QRO_DOCUMENT_STORAGE: 's3',
@@ -19,6 +21,8 @@ const FULL: Environment = {
 function appFor(env: Environment) {
   const read = (path: string) => {
     if (path === '/run/secrets/s3_secret_access_key') return 'secret\n';
+    // bunq linking needs the secrets key at its default path.
+    if (path === '/run/secrets/secrets_key') return `${SECRETS_KEY}\n`;
     throw Object.assign(new Error('not found'), { code: 'ENOENT' });
   };
   return createApp(loadConfig({ ...BASE, ...env }, read).config);

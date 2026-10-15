@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +17,21 @@ export function writeTestSecret(name: string, value: string): string {
   const path = join(secretsDirectory, name);
   writeFileSync(path, `${value}\n`, { mode: 0o600 });
   return path;
+}
+
+const SECRETS_KEY_BYTES = 32;
+
+/** A random secrets key in the format QRO_SECRETS_KEY_FILE requires. Synthetic; never reused. */
+export function generateTestSecretsKey(): string {
+  return randomBytes(SECRETS_KEY_BYTES).toString('hex');
+}
+
+let secretsKeyFile: string | undefined;
+
+/** A secrets key file for tests that configure bunq, created once per test process. */
+export function testSecretsKeyFile(): string {
+  secretsKeyFile ??= writeTestSecret('secrets_key', generateTestSecretsKey());
+  return secretsKeyFile;
 }
 
 /**

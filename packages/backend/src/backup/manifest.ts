@@ -65,13 +65,21 @@ export type Manifest = {
     inArchive: string[];
     /** What a restore needs that is never in an archive. */
     notInArchive: string[];
+    /**
+     * Ids of the secrets keys the dump's bank-link secrets are encrypted with, and how many are
+     * unencrypted. Absent in archives written before integration secrets were encrypted.
+     */
+    integrationKeys?: IntegrationKeys;
   };
 };
+
+/** Which secrets key file a restore needs to keep bunq connected. Key ids, never key material. */
+export type IntegrationKeys = { keyIds: string[]; unencrypted: number };
 
 export const SECRETS_IN_ARCHIVE = [
   'password hashes (bcrypt)',
   'digests of session tokens and operator codes, which cannot be used as a cookie or a code',
-  'bank-link tokens and keys of connected bunq accounts (table bunq_connections)',
+  'bank-link tokens and keys of connected bunq accounts (table bunq_connections), encrypted with the secrets key',
 ];
 
 export const SECRETS_NOT_IN_ARCHIVE = [
@@ -80,6 +88,7 @@ export const SECRETS_NOT_IN_ARCHIVE = [
   'the S3 secret access key, with S3 storage',
   'the bunq client id and secret',
   'the backup encryption key (QRO_BACKUP_ENCRYPTION_KEY_FILE)',
+  'the secrets key that encrypts bank-link secrets (QRO_SECRETS_KEY_FILE)',
 ];
 
 export class ArchiveFormatError extends Error {
@@ -102,6 +111,20 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 function requireShape(condition: boolean, what: string): asserts condition {
   if (!condition) throw new ArchiveFormatError(`The archive manifest is damaged (${what}).`);
+}
+
+const KEY_ID = /^[0-9a-f]{16}$/;
+
+/** Optional (archives before 0.9.0 lack it); when present, key ids only, as backups write them. */
+function checkIntegrationKeys(keys: unknown): void {
+  if (keys === undefined) return;
+  requireShape(
+    isObject(keys) &&
+      Array.isArray(keys.keyIds) &&
+      keys.keyIds.every((id) => typeof id === 'string' && KEY_ID.test(id)) &&
+      Number.isSafeInteger(keys.unencrypted),
+    'secrets.integrationKeys',
+  );
 }
 
 function checkDocuments(documents: unknown): void {
@@ -150,6 +173,7 @@ export function parseManifest(text: string): Manifest {
   requireShape(isObject(database.fingerprint), 'database.fingerprint');
   checkDocuments(value.documents);
   requireShape(isObject(value.secrets), 'secrets');
+  checkIntegrationKeys(value.secrets.integrationKeys);
   return value as unknown as Manifest;
 }
 
