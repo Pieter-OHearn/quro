@@ -13,6 +13,28 @@ Lightweight verification path for shared frontend atoms and molecules under `pac
 - New shared atoms and molecules should add at least one smoke case before merge.
 - `EmojiPickerField` and `PdfAttachmentField` stay manual-only for now because they need richer DOM and file-input coverage than the static smoke suite provides.
 
+## Expected sizes
+
+Check these with the browser's element inspector at 1440px and at 390px wide. A control that is
+taller or shorter than its row is a regression. The values come from [V1 design](design-v1.md#4-density).
+
+| Element                        | Laptop (1024px and wider)        | Phone (below 640px)                        |
+| ------------------------------ | -------------------------------- | ------------------------------------------ |
+| Table row                      | 28px (36px with a second line)   | Card rows, each line at least 48px         |
+| `Button`, fields, `IconButton` | 32px (28px for `sm` in toolbars) | At least 44px; `xl` buttons 48px           |
+| Text in a field (`text-field`) | 13px                             | 16px, so iOS Safari does not zoom on focus |
+| `SegmentedControl`             | 28px                             | 44px options sharing the width             |
+| `Pagination` page button       | 28px square                      | 44px square                                |
+| Card header (`PanelHeader`)    | 36px                             | 44px                                       |
+| Sidebar item                   | 32px                             | 44px, in the drawer                        |
+| Header / tab bar               | 48px / not shown                 | 56px / 60px tabs above the safe area       |
+| Card padding                   | 16px                             | 16px                                       |
+
+Every interactive element is at least 44px high on a phone, including icon buttons, table row
+actions, dialog close buttons and tab bar tabs. Look at each change in the light and dark theme
+(Settings → Preferences → Appearance, or the operating system setting with System selected); a
+colour that is only right in one of them is a bug.
+
 ## Manual checklist
 
 Use a disposable synthetic local instance with frontend and backend running; for
