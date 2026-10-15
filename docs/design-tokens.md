@@ -24,6 +24,11 @@ sentence-case header, stat cards as label, figure and change, chart cards with a
 `duration-base`; the sheet rises from the bottom edge and leaves the same way, and only fades under
 reduced motion. `duration-fast`, `duration-base` and `duration-slow` resolve to the `--motion-*` tokens.
 
+Settings, the signed-out landing page with its sign-in, sign-up and password reset dialogs, the error
+screens and the notification panel use these components and V1 tokens only. Settings sections are cards
+with a card header and a footer for the save button; the landing page sits on the page ground with one
+filled button per view.
+
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
 to drive Tailwind utility classes. The goal is that shared UI primitives and
@@ -164,6 +169,9 @@ feature component.
 - Render an amount or percentage that went up, down or did not change with `Change`
   instead of hand-written signs and colours. It applies the sign, arrow, `gain` / `loss` /
   `flat` colour and zero rule from [V1 design](design-v1.md#7-content-rules).
+  `StatCard` takes its change either as a formatted string (`{ value, positive }`) or as a
+  signed number (`{ amount, format, currency, label }`) that it renders through `Change`;
+  prefer the number.
 - `Button` supports `loading` and disables itself while loading; use it instead of
   a separate submitting-button pattern.
 - Keep loading, empty, error, disabled and submitting states, labels, keyboard
@@ -197,7 +205,7 @@ Current audit status and default direction:
 | Pension statement import review | `DataTable`                  | Editable review table.                                  |
 | Transaction history panels      | `TxnHistoryPanel` / `TxnRow` | Event feeds; do not force into tables by default.       |
 | Budget categories               | Follow-up audit              | Likely table-like because budget/spent columns compare. |
-| Recent transactions             | Row list                     | Activity feed, not a comparative table.                 |
+| Dashboard recent transactions   | `DataTable`                  | Compact; one line per row on phones.                    |
 
 ## `DataTable` usage
 

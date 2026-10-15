@@ -1,5 +1,5 @@
-import { ArrowRight, Sparkles } from 'lucide-react';
-import { QuroLogo } from '@/components/ui';
+import { Button, QuroLogo } from '@/components/ui';
+import { LANDING_CONTAINER_CLASS_NAME, LANDING_SECTION_CLASS_NAME } from './landingStyles';
 
 type CtaSectionProps = {
   onSignUp: () => void;
@@ -8,39 +8,20 @@ type CtaSectionProps = {
 
 export function CtaSection({ onSignUp, onSignIn }: Readonly<CtaSectionProps>) {
   return (
-    <section className="relative bg-surface-inverse py-24 overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/3 w-96 h-96 bg-brand-fg/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-accent-premium-fg/20 rounded-full blur-3xl" />
-      </div>
-      <div className="relative max-w-3xl mx-auto px-6 text-center">
-        <div className="flex justify-center mb-8">
-          <QuroLogo size={64} />
-        </div>
-        <h2 className="font-black text-4xl lg:text-5xl tracking-tight mb-5">
-          Take control of your{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-disabled to-accent-premium-muted">
-            financial future
-          </span>
-        </h2>
-        <p className="text-fg-faint text-lg mb-8 max-w-xl mx-auto">
+    <section className={LANDING_SECTION_CLASS_NAME}>
+      <div className={`${LANDING_CONTAINER_CLASS_NAME} flex flex-col items-center text-center`}>
+        <QuroLogo size={40} className="mb-4" />
+        <h2 className="text-title-page text-fg">Take control of your financial future</h2>
+        <p className="mt-2 max-w-xl text-body text-fg-muted">
           Join Quro and get the clarity your finances deserve — completely free.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <button
-            onClick={onSignUp}
-            className="inline-flex items-center justify-center gap-2 bg-brand hover:bg-brand-accent text-fg-inverted px-8 py-4 rounded-xl font-semibold transition-all shadow-xl shadow-brand/30 hover:-translate-y-0.5"
-          >
-            <Sparkles size={16} />
+        <div className="mt-6 flex w-full flex-col justify-center gap-2 sm:w-auto sm:flex-row">
+          <Button size="lg" onClick={onSignUp} className="max-sm:h-12">
             Create free account
-            <ArrowRight size={16} />
-          </button>
-          <button
-            onClick={onSignIn}
-            className="inline-flex items-center justify-center gap-2 border border-fg-inverted/20 hover:border-fg-inverted/40 text-fg-disabled hover:text-fg-inverted px-8 py-4 rounded-xl font-medium transition-all hover:bg-surface/5"
-          >
+          </Button>
+          <Button size="lg" variant="secondary" onClick={onSignIn}>
             Sign in
-          </button>
+          </Button>
         </div>
       </div>
     </section>

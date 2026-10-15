@@ -84,7 +84,7 @@ test('welcome defers financial pages, charts and emoji runtime', async ({ page }
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   await page.goto('/welcome');
-  await expect(page.getByRole('button', { name: 'Sign In', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true }).first()).toBeVisible();
   expect(
     requests.filter((url) =>
       /recharts|CategoricalChart|CartesianChart|emoji-picker-react|DashboardPage|InvestmentsPage/.test(
@@ -92,7 +92,7 @@ test('welcome defers financial pages, charts and emoji runtime', async ({ page }
       ),
     ),
   ).toEqual([]);
-  await page.getByRole('button', { name: 'Sign In', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 

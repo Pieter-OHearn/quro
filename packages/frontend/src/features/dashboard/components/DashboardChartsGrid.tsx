@@ -1,53 +1,40 @@
 import { AreaChartCard } from '@/components/ui';
-import { useCurrency } from '@/lib/CurrencyContext';
 import type { AllocationItem, DashboardFormatFn, NetWorthMetricData } from '../types';
 import { AssetAllocationCard } from './AssetAllocationCard';
-import { formatPercent } from '@quro/shared';
 
 export function DashboardChartsGrid({
   chartData,
   allocationData,
   totalAlloc,
   liabilitiesTotal,
+  debtCount,
   netWorth,
   baseCurrency,
-  ytdPct,
   fmtBase,
 }: Readonly<{
   chartData: readonly NetWorthMetricData[];
   allocationData: readonly AllocationItem[];
   totalAlloc: number;
   liabilitiesTotal: number;
+  debtCount: number;
   netWorth: number;
   baseCurrency: string;
-  ytdPct: number;
   fmtBase: DashboardFormatFn;
 }>) {
-  const { numberFormat } = useCurrency();
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-      <div className="lg:col-span-2">
+    <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+      <div className="min-w-0 lg:col-span-2">
         <AreaChartCard
           className="h-full"
-          title="Net Worth Growth"
+          title="Net worth growth"
           subtitle={`Last 7 months in ${baseCurrency}`}
           data={chartData}
           dataKey="value"
           estimatedKey="isEstimated"
           xKey="month"
-          color="var(--data-primary)"
+          color="var(--brand)"
           height={220}
           formatValue={fmtBase}
-          badge={
-            ytdPct !== 0 ? (
-              <span
-                className={`text-xs px-3 py-1 rounded-full font-medium ${ytdPct >= 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg'}`}
-              >
-                {ytdPct >= 0 ? '+' : ''}
-                {formatPercent(ytdPct, numberFormat, 1)} YTD
-              </span>
-            ) : undefined
-          }
           emptyMessage="No net worth data yet."
         />
       </div>
@@ -55,6 +42,7 @@ export function DashboardChartsGrid({
         allocationData={allocationData}
         totalAlloc={totalAlloc}
         liabilitiesTotal={liabilitiesTotal}
+        debtCount={debtCount}
         netWorth={netWorth}
         baseCurrency={baseCurrency}
         fmtBase={fmtBase}

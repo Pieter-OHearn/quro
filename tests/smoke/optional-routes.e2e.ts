@@ -23,7 +23,7 @@ test('the demo user sees no 404s from routes of capabilities that are off', asyn
   const signInDialog = page.getByRole('dialog');
   await signInDialog.getByTestId('signin-email-input').fill(DEMO_EMAIL);
   await signInDialog.getByTestId('signin-password-input').fill(DEMO_PASSWORD);
-  await signInDialog.getByRole('button', { name: 'Sign In' }).click();
+  await signInDialog.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByTestId('dashboard-net-worth-value')).toBeVisible();
 
   // The smoke backend runs with default settings: no pension import service and no bunq.
