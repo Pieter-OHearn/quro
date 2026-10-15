@@ -79,7 +79,7 @@ const DETAILS_TOOLTIP_CLASS_NAME =
 /**
  * The help icon after a change and its tooltip, shown on hover and on keyboard focus. In a card
  * that is a link the card itself takes focus, so the tooltip follows the card's focus; otherwise
- * the icon is a button that also toggles the tooltip on a tap.
+ * the icon is a button that shows the tooltip while it has focus or after a tap, and Escape hides it.
  */
 function StatCardChangeDetails({ details, inLink }: { details: string; inLink: boolean }) {
   const tooltipId = useId();
@@ -109,9 +109,12 @@ function StatCardChangeDetails({ details, inLink }: { details: string; inLink: b
         type="button"
         aria-label="Change details"
         aria-describedby={tooltipId}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
         onBlur={() => setOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false);
+        }}
         className="inline-flex self-center rounded-sm text-fg-faint transition-colors duration-fast hover:text-fg-muted active:text-fg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:-m-4 max-sm:p-4"
       >
         <CircleHelp size={12} aria-hidden />
@@ -121,7 +124,7 @@ function StatCardChangeDetails({ details, inLink }: { details: string; inLink: b
         role="tooltip"
         className={cn(
           DETAILS_TOOLTIP_CLASS_NAME,
-          open ? 'block' : 'hidden group-hover/trend:block group-focus-within/trend:block',
+          open ? 'block' : 'hidden group-hover/trend:block',
         )}
       >
         {details}

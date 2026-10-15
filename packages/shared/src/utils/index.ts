@@ -16,14 +16,13 @@ const CACHEABLE_OPTION_KEYS = new Set([
   'currency',
   'minimumFractionDigits',
   'maximumFractionDigits',
-  'signDisplay',
 ]);
 
 function getNumberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
   for (const key in options) {
     if (!CACHEABLE_OPTION_KEYS.has(key)) return new Intl.NumberFormat(locale, options);
   }
-  const key = `${locale}|${options.style}|${options.currency}|${options.minimumFractionDigits}|${options.maximumFractionDigits}|${options.signDisplay}`;
+  const key = `${locale}|${options.style}|${options.currency}|${options.minimumFractionDigits}|${options.maximumFractionDigits}`;
   let formatter = numberFormatCache.get(key);
   if (!formatter) {
     formatter = new Intl.NumberFormat(locale, options);
@@ -72,15 +71,22 @@ export function formatCurrency(
   decimals = true,
   numberFormat: NumberFormatPreference = DEFAULT_NUMBER_FORMAT,
 ): string {
-  return getNumberFormat(resolveNumberFormat(numberFormat), {
+  const parts = getNumberFormat(resolveNumberFormat(numberFormat), {
     style: 'currency',
     currency,
     minimumFractionDigits: decimals ? 2 : 0,
     maximumFractionDigits: decimals ? 2 : 0,
-    signDisplay: 'negative',
-  })
-    .formatToParts(amount)
-    .map((part) => (part.type === 'minusSign' ? TRUE_MINUS : part.value))
+  }).formatToParts(amount);
+  // `-0` and amounts that round to zero format with a sign; drop it rather than rely on
+  // `signDisplay: 'negative'`, which older browsers reject.
+  const roundsToZero = parts.every(
+    (part) => (part.type !== 'integer' && part.type !== 'fraction') || /^0+$/.test(part.value),
+  );
+  return parts
+    .map((part) => {
+      if (part.type !== 'minusSign') return part.value;
+      return roundsToZero ? '' : TRUE_MINUS;
+    })
     .join('');
 }
 
