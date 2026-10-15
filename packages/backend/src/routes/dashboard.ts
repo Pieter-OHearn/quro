@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { DEFAULT_NET_WORTH_RANGE, isNetWorthRange } from '@quro/shared';
 import { getAuthUser, getPartnerId } from '../lib/authUser';
 import {
   buildDerivedAllocations,
@@ -27,7 +28,12 @@ app.get('/summary', async (c) => {
 });
 
 app.get('/net-worth', async (c) => {
-  const sourceData = await loadNetWorthSourceData(getAuthUser(c).id, getPartnerId(c));
+  // Absent means the default range; any other value outside the list is refused.
+  const range = c.req.query('range') ?? DEFAULT_NET_WORTH_RANGE;
+  if (!isNetWorthRange(range)) {
+    return c.json({ error: 'Invalid range' }, HTTP_STATUS.BAD_REQUEST);
+  }
+  const sourceData = await loadNetWorthSourceData(getAuthUser(c).id, getPartnerId(c), range);
   return c.json({ data: buildNetWorthHistory(sourceData) });
 });
 

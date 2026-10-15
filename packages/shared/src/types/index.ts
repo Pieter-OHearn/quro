@@ -718,10 +718,26 @@ export type NetWorthSnapshot = {
   id: number;
   month: string;
   year: number;
+  /** The as-of date of the point (`YYYY-MM-DD`, UTC): a month end, a day, or today. */
+  date: string;
   totalValue: number;
   currency: CurrencyCode;
   isEstimated: boolean;
 };
+
+/**
+ * Ranges of `GET /api/dashboard/net-worth?range=`. `1m` is one point per day for the last 30
+ * days; `6m` and `1y` are month-end points for the last 6 or 12 months plus today; `all` is
+ * month-end points from the household's first dated record, at most 30 years back.
+ */
+export const NET_WORTH_RANGES = ['1m', '6m', '1y', 'all'] as const;
+export type NetWorthRange = (typeof NET_WORTH_RANGES)[number];
+/** The range answered when none is given; `/api/dashboard/summary` always uses it. */
+export const DEFAULT_NET_WORTH_RANGE: NetWorthRange = '6m';
+
+export function isNetWorthRange(value: unknown): value is NetWorthRange {
+  return typeof value === 'string' && (NET_WORTH_RANGES as readonly string[]).includes(value);
+}
 
 export const EXPENSE_CLASSES = ['essential', 'discretionary', 'employment_linked'] as const;
 export type ExpenseClass = (typeof EXPENSE_CLASSES)[number];
