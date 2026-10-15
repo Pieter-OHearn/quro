@@ -29,6 +29,7 @@ export type AreaChartCardProps<T extends Record<string, unknown>> = {
   formatValue: (v: number) => string;
   formatYAxis?: (v: number) => string;
   badge?: React.ReactNode;
+  belowContent?: React.ReactNode;
   emptyMessage?: string;
   strokeWidth?: number;
   className?: string;
@@ -204,6 +205,7 @@ export function AreaChartCard<T extends Record<string, unknown>>({
   formatValue,
   formatYAxis,
   badge,
+  belowContent,
   emptyMessage = 'No data yet.',
   strokeWidth = 2,
   className,
@@ -216,6 +218,7 @@ export function AreaChartCard<T extends Record<string, unknown>>({
       title={title}
       subtitle={subtitle}
       badge={badge}
+      belowContent={belowContent}
       hasData={data.length > 0}
       emptyMessage={emptyMessage}
       className={cn(className)}

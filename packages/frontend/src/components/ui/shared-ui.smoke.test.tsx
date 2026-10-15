@@ -144,6 +144,16 @@ const smokeCases: readonly SmokeCase[] = [
     includes: ['rounded-lg', 'max-sm:rounded-xl', 'p-4'],
   },
   {
+    name: 'ChartCard keeps the row below the chart when there is no data',
+    element: (
+      <ChartCard title="Net worth" hasData={false} belowContent={<span>Range control</span>}>
+        <span>Chart</span>
+      </ChartCard>
+    ),
+    includes: ['No data yet.', 'border-t border-border-subtle px-4 py-2', 'Range control'],
+    excludes: ['Chart<'],
+  },
+  {
     name: 'ProgressMeter renders a thin secondary meter by default',
     element: <ProgressMeter value={40} label="Goal progress" />,
     includes: [
