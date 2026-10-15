@@ -13,7 +13,7 @@ type SpendingPieChartProps = {
 export function SpendingPieChart({ pieData, fmtDec }: Readonly<SpendingPieChartProps>) {
   return (
     <ChartCard
-      title="Spending Breakdown"
+      title="Spending breakdown"
       subtitle="Current month"
       hasData={pieData.length > 0}
       emptyMessage="No spending data yet."

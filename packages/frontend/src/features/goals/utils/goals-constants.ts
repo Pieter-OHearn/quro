@@ -24,7 +24,7 @@ export const GOAL_CHIP_CLASS_NAME = 'border-transparent bg-secondary-soft text-s
 
 export const GOAL_TYPE_META: Record<GoalType, GoalMeta> = {
   savings: {
-    label: 'Savings Goal',
+    label: 'Savings goal',
     Icon: PiggyBank,
     filterKey: 'savings',
     description: 'Save up to a target amount',
@@ -36,25 +36,25 @@ export const GOAL_TYPE_META: Record<GoalType, GoalMeta> = {
     description: 'Hit a gross salary milestone',
   },
   invest_habit: {
-    label: 'Invest Habit',
+    label: 'Invest habit',
     Icon: RefreshCw,
     filterKey: 'investing',
     description: 'Invest a set amount every month',
   },
   portfolio: {
-    label: 'Portfolio Value',
+    label: 'Portfolio value',
     Icon: BarChart2,
     filterKey: 'investing',
     description: 'Grow your portfolio to a target',
   },
   net_worth: {
-    label: 'Net Worth',
+    label: 'Net worth',
     Icon: Trophy,
     filterKey: 'annual',
     description: 'Reach a total net worth milestone',
   },
   annual: {
-    label: 'Annual Goal',
+    label: 'Annual goal',
     Icon: ClipboardList,
     filterKey: 'annual',
     description: 'Yearly financial habit or target',
@@ -63,9 +63,9 @@ export const GOAL_TYPE_META: Record<GoalType, GoalMeta> = {
 
 export const STATUS_META: Record<GoalStatus, { label: string; tone: GoalStatusTone }> = {
   complete: { label: 'Completed', tone: 'success' },
-  on_track: { label: 'On Track', tone: 'brand' },
-  at_risk: { label: 'At Risk', tone: 'warning' },
-  pending: { label: 'In Progress', tone: 'neutral' },
+  on_track: { label: 'On track', tone: 'brand' },
+  at_risk: { label: 'At risk', tone: 'warning' },
+  pending: { label: 'In progress', tone: 'neutral' },
 };
 
 export const FILTERS: { key: FilterKey; label: string; Icon: ElementType }[] = [

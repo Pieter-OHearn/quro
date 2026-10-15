@@ -41,21 +41,21 @@ export const buildGoalStatCards = (
   fmtBase: (n: number) => string,
 ): readonly GoalStatCard[] => [
   {
-    label: 'Total Goals',
+    label: 'Total goals',
     value: stats.total.toString(),
     sub: `${activeYear} plan`,
     icon: Target,
     color: 'indigo',
   },
   {
-    label: 'On Track',
+    label: 'On track',
     value: stats.onTrack.toString(),
     sub: `${stats.atRisk} need attention`,
     icon: CheckCircle2,
     color: 'emerald',
   },
   {
-    label: 'Monthly Commitment',
+    label: 'Monthly commitment',
     value: fmtBase(stats.monthly),
     sub: 'Savings + invest habits',
     icon: Calendar,

@@ -78,8 +78,8 @@ export function GoalsFilterBar({
         className="max-sm:w-full"
       >
         {FILTER_HAS_SINGLE_TYPE.has(activeFilter)
-          ? `Add ${FILTERS.find((f) => f.key === activeFilter)?.label ?? ''} Goal`
-          : 'Add Goal'}
+          ? `Add ${(FILTERS.find((f) => f.key === activeFilter)?.label ?? '').toLowerCase()} goal`
+          : 'Add goal'}
       </Button>
     </div>
   );

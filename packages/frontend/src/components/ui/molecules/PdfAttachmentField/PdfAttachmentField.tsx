@@ -109,8 +109,8 @@ function SelectedPdfState({
             {selectedActionLabel}
           </Button>
         )}
-        <ActionButton busy={busy} onClick={onChoosePdf} label="Choose Different PDF" />
-        <ActionButton busy={busy} onClick={onClearFile} label="Clear Selection" tone="danger" />
+        <ActionButton busy={busy} onClick={onChoosePdf} label="Choose a different PDF" />
+        <ActionButton busy={busy} onClick={onClearFile} label="Clear selection" tone="danger" />
       </div>
     </div>
   );

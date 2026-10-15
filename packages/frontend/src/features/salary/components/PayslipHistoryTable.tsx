@@ -14,7 +14,7 @@ import {
   type DataTableSortState,
 } from '@/components/ui';
 import { buildApiDownloadUrl } from '@/lib/pdfDocuments';
-import { formatDate } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { Download, Edit3, Plus } from 'lucide-react';
 import type { FmtFn } from '../types';
 
@@ -81,7 +81,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
   {
     key: 'net',
     sortValue: (row) => row.net,
-    header: 'Net Pay',
+    header: 'Net pay',
     align: 'right',
     mobileLabel: 'Net pay',
     width: '15%',
@@ -197,7 +197,10 @@ function PayslipTableRow({
             </Badge>
           )}
         </div>
-        <p className="text-caption text-fg-subtle">{formatDate(payslip.date)}</p>
+        {/* On the brand-soft tint of a selected row the caption takes fg-muted to keep 4.5:1. */}
+        <p className={cn('text-caption', isSelected ? 'text-fg-muted' : 'text-fg-subtle')}>
+          {formatDate(payslip.date)}
+        </p>
       </DataTableCell>
       <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
       <DataTableCell columnKey="tax">
@@ -239,7 +242,7 @@ export function PayslipHistoryTable({
 
   return (
     <DataTable
-      title="Payslip History"
+      title="Payslip history"
       subtitle={`${payslips.length} payslips · click a row to view breakdown`}
       action={
         <Button
@@ -249,7 +252,7 @@ export function PayslipHistoryTable({
           leadingIcon={<Plus size={12} aria-hidden />}
           data-testid="salary-add-payslip-button"
         >
-          Add Payslip
+          Add payslip
         </Button>
       }
       columns={PAYSLIP_COLUMNS}
@@ -258,7 +261,7 @@ export function PayslipHistoryTable({
       isEmpty={payslips.length === 0}
       emptyState={
         <>
-          No payslips yet. Click <strong>Add Payslip</strong> to get started.
+          No payslips yet. Click <strong>Add payslip</strong> to get started.
         </>
       }
       minWidth={860}

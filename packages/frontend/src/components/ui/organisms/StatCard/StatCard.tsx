@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowRight, CircleHelp } from 'lucide-react';
 import { Link } from 'react-router';
@@ -11,7 +11,8 @@ type StatCardColor = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose';
 const MINUS_SIGN = '\u2212';
 // Same look as the `Change` atom: tabular 13px figures in the gain, loss or flat colour.
 const CHANGE_CLASS_NAME = 'text-cell font-medium font-numeric';
-const CARD_CLASS_NAME = 'block rounded-lg border border-border-default bg-surface px-4 py-3';
+const CARD_CLASS_NAME =
+  'block rounded-lg border border-border-default bg-surface px-4 py-3 max-sm:rounded-xl';
 
 /** A change that arrives formatted; the zero rule and minus sign are applied to its text. */
 export type StatCardTextChange = { value: string; positive: boolean; details?: string };
@@ -71,15 +72,60 @@ function isNumericChange(change: StatCardChangeProp): change is StatCardNumericC
   return 'amount' in change;
 }
 
-function StatCardChangeDetails({ details }: { details: string }) {
+// Not laid out until shown, so the 256px tooltip cannot widen the page on a phone.
+const DETAILS_TOOLTIP_CLASS_NAME =
+  'pointer-events-none absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover';
+
+/**
+ * The help icon after a change and its tooltip, shown on hover and on keyboard focus. In a card
+ * that is a link the card itself takes focus, so the tooltip follows the card's focus; otherwise
+ * the icon is a button that shows the tooltip while it has focus or after a tap, and Escape hides it.
+ */
+function StatCardChangeDetails({ details, inLink }: { details: string; inLink: boolean }) {
+  const tooltipId = useId();
+  const [open, setOpen] = useState(false);
+
+  if (inLink) {
+    return (
+      <>
+        <CircleHelp size={12} className="text-fg-faint" aria-hidden />
+        <span className="sr-only">{details}</span>
+        <span
+          aria-hidden
+          className={cn(
+            DETAILS_TOOLTIP_CLASS_NAME,
+            'hidden group-hover/trend:block group-focus-visible:block',
+          )}
+        >
+          {details}
+        </span>
+      </>
+    );
+  }
+
   return (
     <>
-      <CircleHelp size={12} className="text-fg-faint" aria-hidden />
-      <span className="sr-only">{details}</span>
-      {/* Not laid out until hovered, so the 256px tooltip cannot widen the page on a phone. */}
+      <button
+        type="button"
+        aria-label="Change details"
+        aria-describedby={tooltipId}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false);
+        }}
+        className="inline-flex self-center rounded-sm text-fg-faint transition-colors duration-fast hover:text-fg-muted active:text-fg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:-m-4 max-sm:p-4"
+      >
+        <CircleHelp size={12} aria-hidden />
+      </button>
       <span
-        aria-hidden
-        className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover group-hover/trend:block"
+        id={tooltipId}
+        role="tooltip"
+        className={cn(
+          DETAILS_TOOLTIP_CLASS_NAME,
+          open ? 'block' : 'hidden group-hover/trend:block',
+        )}
       >
         {details}
       </span>
@@ -102,12 +148,12 @@ function StatCardNumericChangeContent({ change }: { change: StatCardNumericChang
   );
 }
 
-function StatCardChange({ change }: { change: StatCardChangeProp }) {
+function StatCardChange({ change, inLink }: { change: StatCardChangeProp; inLink: boolean }) {
   if (isNumericChange(change)) {
     return (
       <span className="group/trend relative inline-flex items-baseline gap-1">
         <StatCardNumericChangeContent change={change} />
-        {change.details && <StatCardChangeDetails details={change.details} />}
+        {change.details && <StatCardChangeDetails details={change.details} inLink={inLink} />}
       </span>
     );
   }
@@ -117,7 +163,7 @@ function StatCardChange({ change }: { change: StatCardChangeProp }) {
       className={cn('group/trend relative inline-flex items-center gap-1', CHANGE_CLASS_NAME, tone)}
     >
       <span>{text}</span>
-      {change.details && <StatCardChangeDetails details={change.details} />}
+      {change.details && <StatCardChangeDetails details={change.details} inLink={inLink} />}
     </span>
   );
 }
@@ -146,7 +192,7 @@ function StatCardContent({
       <p className={cn('mt-1 text-figure-lg text-fg', valueClassName)}>{value}</p>
       {change || subtitle ? (
         <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
-          {change && <StatCardChange change={change} />}
+          {change && <StatCardChange change={change} inLink={Boolean(href)} />}
           {subtitle && <div className="text-caption text-fg-subtle">{subtitle}</div>}
         </div>
       ) : null}

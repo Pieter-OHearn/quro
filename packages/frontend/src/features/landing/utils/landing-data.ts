@@ -56,7 +56,7 @@ export const LANDING_FEATURES: readonly LandingFeature[] = [
   {
     icon: PiggyBank,
     label: 'Savings',
-    desc: 'Track Easy Access accounts and Term Deposits across multiple banks.',
+    desc: 'Track easy-access accounts and term deposits across multiple banks.',
   },
   {
     icon: TrendingUp,

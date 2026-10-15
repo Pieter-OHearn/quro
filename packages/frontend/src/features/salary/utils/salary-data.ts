@@ -44,7 +44,7 @@ export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => 
 
   return [
     {
-      label: 'Gross Pay',
+      label: 'Gross pay',
       val: payslip.gross,
       color: 'bg-fg',
     },
@@ -58,19 +58,19 @@ export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => 
         ]
       : []),
     {
-      label: 'Take-Home Pay',
+      label: 'Take-home pay',
       val: payslip.net,
       color: 'bg-viz-1',
       pct: percentageOfTotal(Math.abs(payslip.net), totalPay),
     },
     {
-      label: hasTaxCorrection ? 'Tax Correction' : 'Income Tax',
+      label: hasTaxCorrection ? 'Tax correction' : 'Income tax',
       val: -payslip.tax,
       color: 'bg-viz-6',
       pct: percentageOfTotal(Math.abs(payslip.tax), totalPay),
     },
     {
-      label: hasPensionCorrection ? 'Pension Correction' : 'Pension',
+      label: hasPensionCorrection ? 'Pension correction' : 'Pension',
       val: -payslip.pension,
       color: 'bg-viz-3',
       pct: percentageOfTotal(Math.abs(payslip.pension), totalPay),
@@ -88,28 +88,28 @@ export const buildSalaryStatCards = (
   currentYear: number,
 ): SalaryStatCard[] => [
   {
-    label: 'Annual Gross',
+    label: 'Annual gross',
     value: fmtBase(gross),
     sub: activeYear === currentYear ? 'Total this year' : `Total in ${activeYear}`,
     icon: Briefcase,
     color: 'indigo',
   },
   {
-    label: 'Annual Net',
+    label: 'Annual net',
     value: fmtBase(net),
     sub: 'After all deductions',
     icon: ArrowUpRight,
     color: 'emerald',
   },
   {
-    label: `Tax Paid (${activeYear === currentYear ? 'YTD' : activeYear})`,
+    label: `Tax paid (${activeYear === currentYear ? 'YTD' : activeYear})`,
     value: fmtBase(tax),
     sub: activeYear === currentYear ? 'Income tax' : `Income tax in ${activeYear}`,
     icon: Calculator,
     color: 'rose',
   },
   {
-    label: 'Pension Contrib.',
+    label: 'Pension contributions',
     value: fmtBase(pension),
     sub:
       activeYear === currentYear ? 'Your contributions YTD' : `Your contributions in ${activeYear}`,

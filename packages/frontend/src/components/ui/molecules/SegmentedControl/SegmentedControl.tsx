@@ -47,8 +47,6 @@ const INACTIVE_CLASSES = {
 } as const;
 
 type SegmentedControlVariant = keyof typeof WRAPPER_CLASSES;
-// Both tones render the same `brand-soft` selection; the prop stays for existing callers.
-type SegmentedControlTone = 'dark' | 'indigo';
 
 export type SegmentedControlOption<T extends string | number> = {
   value: T;
@@ -67,7 +65,6 @@ export type SegmentedControlProps<T extends string | number> = Omit<
   value: T;
   onChange: (value: T) => void;
   variant?: SegmentedControlVariant;
-  tone?: SegmentedControlTone;
   buttonClassName?: string;
 };
 
@@ -76,7 +73,6 @@ export function SegmentedControl<T extends string | number>({
   value,
   onChange,
   variant = 'pill',
-  tone: _tone,
   className,
   buttonClassName,
   ...props

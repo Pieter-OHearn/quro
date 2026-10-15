@@ -28,6 +28,8 @@ const PANEL_VARIANTS = {
     listClassName: 'divide-y divide-border-subtle',
     emptyStateClassName: 'px-3 py-6 max-sm:px-4',
     addButtonSize: 'sm',
+    // Inside an expanded row the page keeps its own primary action, so this one is secondary.
+    addButtonVariant: 'secondary',
   },
   card: {
     bodyClassName: '',
@@ -36,6 +38,7 @@ const PANEL_VARIANTS = {
     listClassName: 'divide-y divide-border-subtle',
     emptyStateClassName: 'px-3 py-8 max-sm:px-4',
     addButtonSize: 'md',
+    addButtonVariant: 'primary',
   },
 } as const;
 
@@ -139,14 +142,16 @@ type AddButtonProps = Pick<
   'onAdd' | 'addLabel' | 'accentColor' | 'addButtonSize'
 > & {
   fallbackSize: ButtonProps['size'];
+  variant: ButtonProps['variant'];
 };
 
 function AddTransactionButton({
   onAdd,
-  addLabel = 'Add Transaction',
-  accentColor = 'bg-brand hover:bg-brand-hover',
+  addLabel = 'Add transaction',
+  accentColor,
   addButtonSize,
   fallbackSize,
+  variant,
 }: AddButtonProps) {
   const resolvedAddButtonSize = addButtonSize ?? fallbackSize;
   const addButtonIconSize = resolvedAddButtonSize === 'sm' ? 12 : 14;
@@ -154,7 +159,7 @@ function AddTransactionButton({
   return (
     <Button
       onClick={onAdd}
-      variant="primary"
+      variant={variant}
       size={resolvedAddButtonSize}
       leadingIcon={<Plus size={addButtonIconSize} />}
       className={accentColor}
@@ -198,14 +203,19 @@ function TxnHistoryBody({
   const resolvedStats = stats && stats.length > 0 ? stats : undefined;
   const content = isEmpty ? (
     <p className={cn('text-cell text-fg-subtle', variantStyles.emptyStateClassName)}>
-      {emptyMessage}{' '}
-      <button
-        type="button"
-        onClick={onAdd}
-        className="rounded-sm font-medium text-brand hover:underline active:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
-      >
-        Add one
-      </button>
+      {emptyMessage}
+      {onAdd ? (
+        <>
+          {' '}
+          <button
+            type="button"
+            onClick={onAdd}
+            className="rounded-sm font-medium text-brand hover:underline active:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+          >
+            Add one
+          </button>
+        </>
+      ) : null}
     </p>
   ) : (
     <>
@@ -272,8 +282,8 @@ export function TxnHistoryPanel({
   stats,
   statsColumns,
   onAdd,
-  addLabel = 'Add Transaction',
-  accentColor = 'bg-brand hover:bg-brand-hover',
+  addLabel = 'Add transaction',
+  accentColor,
   variant = 'embedded',
   addButtonPlacement = 'filterBar',
   addButtonSize,
@@ -290,6 +300,7 @@ export function TxnHistoryPanel({
       accentColor={accentColor}
       addButtonSize={addButtonSize}
       fallbackSize={variantStyles.addButtonSize}
+      variant={variantStyles.addButtonVariant}
     />
   ) : null;
   const filterBarAction = addButtonPlacement === 'filterBar' ? addButton : undefined;

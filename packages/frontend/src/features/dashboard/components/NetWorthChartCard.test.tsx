@@ -73,9 +73,13 @@ describe('net worth range control', () => {
       expect(option.html).toContain('max-sm:h-11');
       expect(option.html).toContain('max-sm:flex-1');
     }
-    // The header wraps on phones and the control takes the whole second row.
-    expect(markup).toMatch(/max-sm:flex-wrap[^"]*"/);
-    expect(markup).toContain('<div class="flex shrink-0 items-center gap-2 max-sm:w-full">');
+    // On a laptop (and in server rendering) the control sits in the card header; on a phone the
+    // card moves it under the chart, where it takes the full width.
+    expect(markup).toContain('max-sm:w-full');
+    expect(markup.indexOf('aria-label="Net worth range"')).toBeLessThan(
+      markup.indexOf('<div class="p-4">'),
+    );
+    expect(markup).not.toContain('border-t border-border-subtle px-4 py-2');
   });
 
   test('a range read from the cache drives the subtitle and selection', () => {

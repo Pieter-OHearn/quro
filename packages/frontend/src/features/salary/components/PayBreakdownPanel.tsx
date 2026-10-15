@@ -102,7 +102,7 @@ export function PayBreakdownPanel({ selected }: Readonly<PayBreakdownPanelProps>
   return (
     <Card padding="none">
       <PanelHeader
-        title="Pay Breakdown"
+        title="Pay breakdown"
         subtitle={`${selected?.month ?? '—'} — click a payslip row to switch month`}
       />
       <div className="p-4">

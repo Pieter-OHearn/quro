@@ -25,7 +25,7 @@ export function GoalsHeader({
           label: year,
           badge:
             year === currentYear ? (
-              <span className="font-normal text-fg-subtle">current</span>
+              <span className="font-normal text-fg-muted">current</span>
             ) : undefined,
         }))}
         value={activeYear}

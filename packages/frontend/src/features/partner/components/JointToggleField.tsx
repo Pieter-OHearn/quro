@@ -32,7 +32,7 @@ export function JointToggleField({ checked, onChange, hint, className }: JointTo
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded-sm border-border-control accent-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+        className="mt-0.5 h-4 w-4 rounded-sm border-border-control focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       />
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 text-cell font-medium text-fg">

@@ -3,7 +3,7 @@ import { FormErrorNotice, SettingsCard, useSavedState } from './settingsForm';
 import { useState } from 'react';
 
 import { Check, Link2, RefreshCw, Unlink } from 'lucide-react';
-import { Badge, Button, LoadingState, TextInput } from '@/components/ui';
+import { Badge, Button, LoadingState, Modal, TextInput } from '@/components/ui';
 import { buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
 import { useBunqAvailability } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
@@ -79,11 +79,48 @@ function CategoryMappingsSection() {
   );
 }
 
+type DisconnectBunqDialogProps = {
+  isPending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+// Disconnecting ends the bank link, so it asks first; the confirm button is the filled danger step.
+export function DisconnectBunqDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+}: Readonly<DisconnectBunqDialogProps>) {
+  return (
+    <Modal
+      title="Disconnect Bunq?"
+      onClose={onCancel}
+      maxWidth="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="dangerSolid" loading={isPending} onClick={onConfirm}>
+            Disconnect Bunq
+          </Button>
+        </>
+      }
+    >
+      <p className="text-body text-fg-muted">
+        Quro stops syncing your Bunq accounts. Accounts and transactions it already imported stay.
+        To sync again, connect Bunq again.
+      </p>
+    </Modal>
+  );
+}
+
 export function ConnectionsSection() {
   const { data: connection, isLoading } = useBunqConnection();
   const disconnect = useDisconnectBunq();
   const sync = useSyncBunq();
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const { saved, showSaved } = useSavedState();
 
   const handleDisconnect = async () => {
@@ -93,6 +130,8 @@ export function ConnectionsSection() {
       showSaved();
     } catch (e: unknown) {
       setError(resolveApiErrorMessage(e, 'Failed to disconnect Bunq'));
+    } finally {
+      setConfirmingDisconnect(false);
     }
   };
 
@@ -160,10 +199,7 @@ export function ConnectionsSection() {
                   variant="danger"
                   size="sm"
                   leadingIcon={saved ? <Check size={14} /> : <Unlink size={14} />}
-                  loading={disconnect.isPending}
-                  onClick={() => {
-                    void handleDisconnect();
-                  }}
+                  onClick={() => setConfirmingDisconnect(true)}
                 >
                   {saved ? 'Disconnected' : 'Disconnect'}
                 </Button>
@@ -184,6 +220,16 @@ export function ConnectionsSection() {
       </SettingsCard>
 
       <CategoryMappingsSection />
+
+      {confirmingDisconnect ? (
+        <DisconnectBunqDialog
+          isPending={disconnect.isPending}
+          onCancel={() => setConfirmingDisconnect(false)}
+          onConfirm={() => {
+            void handleDisconnect();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

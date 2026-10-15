@@ -19,7 +19,7 @@ function TotalBudgetCard({
 }: Readonly<{ totalBudgeted: number; fmt: BudgetFormatFn }>) {
   return (
     <StatCard
-      label="Total Budget"
+      label="Total budget"
       value={fmt(totalBudgeted)}
       subtitle="This month"
       icon={Wallet}
@@ -35,7 +35,7 @@ function TotalSpentCard({
 }: Readonly<{ totalBudgeted: number; totalSpent: number; fmt: BudgetFormatFn }>) {
   return (
     <StatCard
-      label="Total Spent"
+      label="Total spent"
       value={fmt(totalSpent)}
       subtitle={`${totalBudgeted > 0 ? ((totalSpent / totalBudgeted) * 100).toFixed(0) : 0}% of budget`}
       icon={TrendingDown}
@@ -71,7 +71,7 @@ function SavingsRateCard({ savingsRate }: Readonly<{ savingsRate: number }>) {
   const { numberFormat } = useCurrency();
   return (
     <StatCard
-      label="Savings Rate"
+      label="Savings rate"
       value={formatPercent(savingsRate, numberFormat, 1)}
       subtitle="of monthly budget"
       icon={CheckCircle2}

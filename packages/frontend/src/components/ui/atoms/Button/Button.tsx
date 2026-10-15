@@ -9,6 +9,9 @@ const VARIANT_CLASSES = {
     'border border-border-control bg-surface text-fg hover:bg-surface-muted active:bg-surface-muted disabled:bg-surface disabled:text-fg-subtle',
   danger:
     'border border-danger text-danger hover:bg-danger-soft active:bg-danger-soft disabled:border-border-default disabled:bg-transparent disabled:text-fg-subtle',
+  // The confirm step of a destructive action, the only place a destructive button fills.
+  dangerSolid:
+    'border border-danger bg-danger text-fg-inverted enabled:hover:opacity-90 enabled:active:opacity-90 disabled:border-border-default disabled:bg-surface-muted disabled:text-fg-subtle',
   ghost:
     'text-fg hover:bg-surface-muted active:bg-surface-muted disabled:bg-transparent disabled:text-fg-subtle',
 } as const;

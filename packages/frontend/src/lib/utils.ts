@@ -6,6 +6,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * `cn('text-label text-fg-muted')` would drop `text-label`.
  */
 const TYPE_SCALE_UTILITIES = [
+  'figure-display',
   'figure-hero',
   'figure-lg',
   'figure-md',

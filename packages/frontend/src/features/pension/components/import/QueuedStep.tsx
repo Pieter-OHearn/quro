@@ -70,7 +70,7 @@ function QueuedPipeline({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
         className="absolute left-[16.67%] right-[16.67%] top-3 h-px bg-border-default"
       >
         <span
-          className="block h-full bg-brand transition-[width] duration-slow"
+          className="block h-full bg-brand motion-safe:transition-[width] motion-safe:duration-slow"
           style={{ width: connectorWidth }}
         />
       </li>

@@ -65,7 +65,7 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await savingsDialog.getByTestId('savings-account-bank-input').fill('Smoke Bank');
   await savingsDialog.getByTestId('savings-account-balance-input').fill('3210');
   await savingsDialog.getByTestId('savings-account-rate-input').fill('2.75');
-  await savingsDialog.getByRole('button', { name: 'Add Account' }).click();
+  await savingsDialog.getByRole('button', { name: 'Add account' }).click();
 
   await expect(page.getByText(savingsName)).toBeVisible();
 
@@ -74,7 +74,7 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await savingsDialog.getByTestId('savings-account-bank-input').fill('Another Smoke Bank');
   await savingsDialog.getByTestId('savings-account-balance-input').fill('2100');
   await savingsDialog.getByTestId('savings-account-rate-input').fill('2.5');
-  await savingsDialog.getByRole('button', { name: 'Add Account' }).click();
+  await savingsDialog.getByRole('button', { name: 'Add account' }).click();
   await expect(page.getByText(secondSavingsName)).toBeVisible();
 
   await page.getByRole('link', { name: 'Plan', exact: true }).click();
@@ -115,7 +115,7 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   const budgetDialog = page.getByRole('dialog');
   await budgetDialog.getByTestId('budget-category-name-input').fill(budgetName);
   await budgetDialog.getByTestId('budget-category-budget-input').fill('321');
-  await budgetDialog.getByRole('button', { name: 'Add Category' }).click();
+  await budgetDialog.getByRole('button', { name: 'Add category' }).click();
 
   await expect(page.locator('p').filter({ hasText: budgetName }).first()).toBeVisible();
 
@@ -129,7 +129,7 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await payslipDialog.getByTestId('salary-payslip-bonus-input').fill('300');
   await payslipDialog.getByTestId('salary-payslip-tax-input').fill('2200');
   await payslipDialog.getByTestId('salary-payslip-pension-input').fill('400');
-  await payslipDialog.getByRole('button', { name: 'Save Payslip' }).click();
+  await payslipDialog.getByRole('button', { name: 'Save payslip' }).click();
 
   await expect(page.getByText(payslipMonth, { exact: true })).toBeVisible();
 

@@ -8,8 +8,9 @@ const typeScaleUtilities = [...theme.matchAll(/^@utility (text-[a-z-]+) \{/gm)].
 );
 
 describe('cn with the V1 type scale utilities', () => {
-  test('theme.css defines the eleven type styles of the V1 design', () => {
+  test('theme.css defines the twelve type styles of the V1 design', () => {
     expect(typeScaleUtilities).toEqual([
+      'text-figure-display',
       'text-figure-hero',
       'text-figure-lg',
       'text-figure-md',

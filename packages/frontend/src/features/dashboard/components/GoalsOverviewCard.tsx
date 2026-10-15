@@ -6,6 +6,7 @@ import type { GoalProgressContext } from '@/features/goals/types';
 import { GOAL_TYPE_META } from '@/features/goals/utils/goals-constants';
 import {
   getGoalPct,
+  isAboveLowerIsBetterTarget,
   normalizeGoalType,
   resolveGoalCurrentAmount,
   resolveInvestHabitMonthsCompleted,
@@ -206,7 +207,13 @@ function GoalProgressItem({
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <ProgressMeter value={clampedPct} label={goal.name} className="min-w-0 flex-1" />
+        {/* A "lower is better" goal still above its limit shows its meter in the warning colour. */}
+        <ProgressMeter
+          value={clampedPct}
+          label={goal.name}
+          className="min-w-0 flex-1"
+          indicatorClassName={isAboveLowerIsBetterTarget(goal) ? 'bg-warning' : undefined}
+        />
         <p className="shrink-0 whitespace-nowrap text-figure-md font-numeric">
           <span className="text-fg">{valueParts.primary}</span>
           {valueParts.secondary && <span className="text-fg-subtle">{valueParts.secondary}</span>}

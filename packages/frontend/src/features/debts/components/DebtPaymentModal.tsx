@@ -39,13 +39,13 @@ function DebtPaymentSummary({ debt }: Readonly<{ debt: Debt }>) {
   return (
     <div className="flex items-center gap-3 rounded-md border border-border-default bg-surface-sunken px-3 py-2">
       <div className="flex-1">
-        <p className="text-label text-fg-muted">Current Balance</p>
+        <p className="text-label text-fg-muted">Current balance</p>
         <p className="text-figure-md font-numeric text-fg">
           {formatAsNegative((value) => fmtNative(value, debt.currency), debt.remainingBalance)}
         </p>
       </div>
       <div className="text-right">
-        <p className="text-label text-fg-muted">Monthly Interest</p>
+        <p className="text-label text-fg-muted">Monthly interest</p>
         <p className="text-figure-md font-numeric text-fg">
           {fmtNative(monthlyInterest, debt.currency, true)}
         </p>
@@ -67,7 +67,7 @@ function DebtPaymentAmountFields({
 }>) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <FormField label="Total Payment" required error={errors.amount}>
+      <FormField label="Total payment" required error={errors.amount}>
         <CurrencyInput
           currency={debt.currency}
           value={form.amount}
@@ -75,7 +75,7 @@ function DebtPaymentAmountFields({
           error={Boolean(errors.amount)}
         />
       </FormField>
-      <FormField label="Interest Portion" required error={errors.interest}>
+      <FormField label="Interest portion" required error={errors.interest}>
         <CurrencyInput
           currency={debt.currency}
           value={form.interest}
@@ -112,7 +112,7 @@ function DebtPaymentModalShell({
 }: Readonly<DebtPaymentModalShellProps>) {
   return (
     <Modal
-      title="Log Payment"
+      title="Log payment"
       subtitle={`${debt.emoji} ${debt.name}`}
       onClose={onClose}
       maxWidth="sm"
@@ -121,8 +121,8 @@ function DebtPaymentModalShell({
           <Button onClick={onClose} variant="secondary">
             Cancel
           </Button>
-          <Button onClick={onSubmit} loading={submitting} loadingLabel="Logging Payment...">
-            Log Payment
+          <Button onClick={onSubmit} loading={submitting} loadingLabel="Logging payment...">
+            Log payment
           </Button>
         </>
       }

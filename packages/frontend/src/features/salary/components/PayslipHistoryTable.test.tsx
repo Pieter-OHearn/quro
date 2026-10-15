@@ -50,6 +50,6 @@ test('PayslipHistoryTable renders sortable headers and defaults to newest paysli
   );
 
   expect(markup).toContain('aria-sort="descending"');
-  expect(markup).toContain('aria-label="Sort by Gross"');
+  expect(markup).toContain('aria-label="Sort by gross"');
   expect(markup.indexOf('May 2026')).toBeLessThan(markup.indexOf('April 2026'));
 });

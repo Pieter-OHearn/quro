@@ -262,7 +262,7 @@ export function RecentTransactionsList({
   return (
     <>
       <DataTable
-        title="Monthly Transactions"
+        title="Monthly transactions"
         subtitle={`${selectedMonth} ${selectedYear}`}
         action={
           <Badge tone="neutral" size="md">

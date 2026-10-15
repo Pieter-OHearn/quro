@@ -138,14 +138,14 @@ function SalaryComparisonGrid({
   return (
     <div className="grid grid-cols-2 gap-2">
       <div className="rounded-md bg-surface-sunken px-3 py-2">
-        <p className={LABEL}>Current Gross</p>
+        <p className={LABEL}>Current gross</p>
         <p className="text-figure-md font-numeric text-fg">
           {fmtBase(annualGross)}
           <span className={CAPTION}>/yr</span>
         </p>
       </div>
       <div className="rounded-md bg-secondary-soft px-3 py-2">
-        <p className={LABEL}>Target Gross</p>
+        <p className={LABEL}>Target gross</p>
         <p className="text-figure-md font-numeric text-secondary">
           {fmtBase(targetAmount)}
           <span className="text-caption">/yr</span>
@@ -171,7 +171,7 @@ function GoalCardSalary({
     <>
       <div>
         <div className="mb-1 flex justify-between">
-          <span className={LABEL}>Current - Target</span>
+          <span className={LABEL}>Current - target</span>
           <span className={FIGURE}>{formatPercent(clampedPct, numberFormat, 0)}</span>
         </div>
         <ProgressBar pct={clampedPct} label="Goal progress" />

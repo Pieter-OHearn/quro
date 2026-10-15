@@ -59,18 +59,35 @@ export function formatPercent(
   })}%`;
 }
 
+const TRUE_MINUS = '\u2212';
+
+/**
+ * Formats a money amount in the user's number format. A negative amount reads with a true minus
+ * sign (U+2212), as `−€612.75` or `−612,75 €`; an amount that rounds to zero has no sign.
+ */
 export function formatCurrency(
   amount: number,
   currency: string,
   decimals = true,
   numberFormat: NumberFormatPreference = DEFAULT_NUMBER_FORMAT,
 ): string {
-  return formatNumber(amount, numberFormat, {
+  const parts = getNumberFormat(resolveNumberFormat(numberFormat), {
     style: 'currency',
     currency,
     minimumFractionDigits: decimals ? 2 : 0,
     maximumFractionDigits: decimals ? 2 : 0,
-  });
+  }).formatToParts(amount);
+  // `-0` and amounts that round to zero format with a sign; drop it rather than rely on
+  // `signDisplay: 'negative'`, which older browsers reject.
+  const roundsToZero = parts.every(
+    (part) => (part.type !== 'integer' && part.type !== 'fraction') || /^0+$/.test(part.value),
+  );
+  return parts
+    .map((part) => {
+      if (part.type !== 'minusSign') return part.value;
+      return roundsToZero ? '' : TRUE_MINUS;
+    })
+    .join('');
 }
 
 const UNIT_PRICE_MIN_DECIMALS = 2;

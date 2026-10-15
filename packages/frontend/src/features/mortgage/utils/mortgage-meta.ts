@@ -27,7 +27,7 @@ export const TXN_META: Record<
     borderColor: 'border-success',
   },
   rate_change: {
-    label: 'Rate Change',
+    label: 'Rate change',
     icon: Percent,
     color: 'text-warning',
     bg: 'bg-warning-soft',

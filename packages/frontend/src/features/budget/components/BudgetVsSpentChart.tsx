@@ -31,7 +31,7 @@ function BudgetVsSpentLegend() {
 export function BudgetVsSpentChart({ categories, fmt }: Readonly<BudgetVsSpentChartProps>) {
   return (
     <ChartCard
-      title="Budget vs Spent"
+      title="Budget vs spent"
       subtitle="Category breakdown"
       hasData={categories.length > 0}
       emptyMessage="No budget categories yet."

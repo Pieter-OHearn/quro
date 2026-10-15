@@ -86,3 +86,53 @@ test('duration-fast, -base and -slow set the transition duration from the motion
     expect(rule).toContain(`transition-duration: var(--motion-${name});`);
   }
 });
+
+const tokenGuide = readFileSync(
+  new URL('../../../../docs/design-tokens.md', import.meta.url),
+  'utf8',
+);
+
+/** Rows of the first Markdown table after `heading` whose cells are all code spans. */
+function guideTableRows(heading: string): string[][] {
+  const start = tokenGuide.indexOf(heading);
+  expect(start).toBeGreaterThan(-1);
+  const rows: string[][] = [];
+  for (const line of tokenGuide.slice(start).split('\n').slice(1)) {
+    if (line.startsWith('#')) break;
+    if (!line.startsWith('| `')) {
+      if (rows.length > 0 && !line.startsWith('|')) break;
+      continue;
+    }
+    rows.push(
+      line
+        .split('|')
+        .slice(1, -1)
+        .map((cell) => cell.trim()),
+    );
+  }
+  return rows;
+}
+
+const code = (cell: string) => cell.match(/^`([^`]+)`/)?.[1] ?? '';
+
+test('docs/design-tokens.md lists every literal colour token with its light and dark value', () => {
+  const rows = guideTableRows('### Values');
+  const documented = new Map(rows.map((row) => [`--${code(row[0]!)}`, row]));
+  const literal = [...root].filter(([, value]) => value.startsWith('#'));
+  expect(new Set(documented.keys())).toEqual(new Set(literal.map(([name]) => name)));
+  for (const [name, light] of literal) {
+    const row = documented.get(name)!;
+    expect(code(row[1]!)).toBe(light.toLowerCase());
+    expect(code(row[2]!)).toBe(dark.get(name)!.toLowerCase());
+  }
+});
+
+test('docs/design-tokens.md names the alias each aliased colour token points at', () => {
+  for (const row of guideTableRows('Tokens that are aliases follow the theme')) {
+    const names = [...row[0]!.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
+    const targets = [...row[1]!.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
+    names.forEach((name, index) => {
+      expect(root.get(`--${name}`)).toBe(`var(--${targets[index]})`);
+    });
+  }
+});

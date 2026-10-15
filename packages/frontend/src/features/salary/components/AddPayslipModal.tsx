@@ -95,7 +95,7 @@ function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Info size={14} className={net >= 0 ? 'text-fg-faint' : 'text-danger'} aria-hidden />
-          <p className="text-cell font-medium text-fg">Calculated Take-Home</p>
+          <p className="text-cell font-medium text-fg">Calculated take-home</p>
         </div>
         <p className={`text-figure-md font-numeric ${net >= 0 ? 'text-fg' : 'text-danger'}`}>
           {net >= 0 ? formatCurrencyValue(net, payCurrency, true, numberFormat) : 'Check values'}
@@ -125,7 +125,7 @@ function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps
 
 function PayslipCurrencyField({ form, errors, set, disabled }: Readonly<PayslipFormPartProps>) {
   return (
-    <FormField label="Pay Currency" required error={errors.currency}>
+    <FormField label="Pay currency" required error={errors.currency}>
       <SelectInput
         value={form.currency}
         onChange={(value) => set('currency', value as CurrencyCode)}
@@ -141,7 +141,7 @@ function PayslipCurrencyField({ form, errors, set, disabled }: Readonly<PayslipF
 
 function PayslipPeriodField({ form, errors, set, disabled }: Readonly<PayslipFormPartProps>) {
   return (
-    <FormField label="Pay Period" required error={errors.month}>
+    <FormField label="Pay period" required error={errors.month}>
       <TextInput
         data-testid="salary-payslip-month-input"
         value={form.month}
@@ -156,7 +156,7 @@ function PayslipPeriodField({ form, errors, set, disabled }: Readonly<PayslipFor
 
 function PayslipDateField({ form, errors, set, disabled }: Readonly<PayslipFormPartProps>) {
   return (
-    <FormField label="Pay Date" required error={errors.date}>
+    <FormField label="Pay date" required error={errors.date}>
       <TextInput
         data-testid="salary-payslip-date-input"
         type="date"
@@ -171,7 +171,7 @@ function PayslipDateField({ form, errors, set, disabled }: Readonly<PayslipFormP
 
 function PayslipGrossField({ form, errors, set, disabled }: Readonly<PayslipFormPartProps>) {
   return (
-    <FormField label={`Gross Pay (${form.currency})`} required error={errors.gross}>
+    <FormField label={`Gross pay (${form.currency})`} required error={errors.gross}>
       <CurrencyInput
         data-testid="salary-payslip-gross-input"
         currency={form.currency}
@@ -206,7 +206,7 @@ function PayslipDeductionsRow({ form, errors, set, disabled }: Readonly<PayslipF
         <div className="h-px flex-1 bg-border-subtle" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label={`Income Tax (${form.currency})`} required error={errors.tax}>
+        <FormField label={`Income tax (${form.currency})`} required error={errors.tax}>
           <CurrencyInput
             data-testid="salary-payslip-tax-input"
             currency={form.currency}
@@ -347,8 +347,8 @@ function getSelectedFileHint(documentOwnerId: number | null, isEdit: boolean): s
 }
 
 function getConfirmLabel(isEdit: boolean, savedPayslipId: number | null): string {
-  if (isEdit) return 'Save Changes';
-  return savedPayslipId === null ? 'Save Payslip' : 'Finish';
+  if (isEdit) return 'Save changes';
+  return savedPayslipId === null ? 'Save payslip' : 'Finish';
 }
 
 async function resolveSavedPayslipId(params: {
@@ -508,7 +508,7 @@ export function AddPayslipModal({
 
   return (
     <Modal
-      title={isEdit ? 'Edit Payslip' : 'Add Payslip'}
+      title={isEdit ? 'Edit payslip' : 'Add payslip'}
       subtitle={`Amounts in ${form.form.currency} · Base currency ${baseCurrency}`}
       onClose={onClose}
       maxWidth="lg"

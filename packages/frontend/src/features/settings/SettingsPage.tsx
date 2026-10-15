@@ -101,7 +101,7 @@ function AccountSummary({ initials, fullName, details }: Readonly<AccountSummary
   return (
     <Card className="flex flex-wrap items-center gap-3">
       <span
-        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-soft text-label text-brand-fg"
+        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-brand bg-brand-soft text-label text-brand-fg"
         aria-hidden="true"
       >
         {initials}
@@ -165,11 +165,7 @@ export function Settings() {
             {activeTab === 'preferences' ? (
               <PreferencesSection user={user} replaceUser={replaceUser} />
             ) : null}
-            {activeTab === 'partner' ? (
-              <Card>
-                <PartnerSection />
-              </Card>
-            ) : null}
+            {activeTab === 'partner' ? <PartnerSection /> : null}
             {activeTab === 'connections' ? <ConnectionsSection /> : null}
           </div>
         </div>

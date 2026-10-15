@@ -77,8 +77,10 @@ type ChangeDisplay = {
   available: boolean;
 };
 
+// `relative` keeps the visually hidden direction inside the change, so inside a table that scrolls
+// sideways it cannot widen the page.
 const BASE_CLASS_NAME =
-  'inline-flex items-baseline gap-1 whitespace-nowrap font-numeric text-[13px] leading-[18px] font-medium';
+  'relative inline-flex items-baseline gap-1 whitespace-nowrap font-numeric text-[13px] leading-[18px] font-medium';
 const CHIP_CLASS_NAME = 'rounded-sm px-1.5 py-px';
 
 function formatMagnitude(

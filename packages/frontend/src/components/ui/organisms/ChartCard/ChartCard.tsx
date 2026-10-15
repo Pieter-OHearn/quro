@@ -10,6 +10,8 @@ export type ChartCardProps = {
   hasData: boolean;
   children: ReactNode;
   footer?: ReactNode;
+  /** A row under the chart, shown with or without data, such as a phone's range control. */
+  belowContent?: ReactNode;
   emptyMessage?: ReactNode;
   className?: string;
   headerClassName?: string;
@@ -25,6 +27,7 @@ export function ChartCard({
   hasData,
   children,
   footer,
+  belowContent,
   emptyMessage = 'No data yet.',
   className,
   headerClassName,
@@ -53,6 +56,9 @@ export function ChartCard({
           {emptyMessage}
         </div>
       )}
+      {belowContent ? (
+        <div className="border-t border-border-subtle px-4 py-2">{belowContent}</div>
+      ) : null}
     </Card>
   );
 }

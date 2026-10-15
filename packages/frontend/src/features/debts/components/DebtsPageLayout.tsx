@@ -26,13 +26,13 @@ function DebtsHeader({ onAddDebt }: Readonly<{ onAddDebt: () => void }>) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 className="text-title-section text-fg">Debts & Liabilities</h2>
+        <h2 className="text-title-section text-fg">Debts & liabilities</h2>
         <p className="text-caption text-fg-subtle">
           Loans, credit cards, overdrafts, and other non-mortgage obligations.
         </p>
       </div>
       <Button onClick={onAddDebt} leadingIcon={<Plus size={14} aria-hidden />}>
-        Add Debt
+        Add debt
       </Button>
     </div>
   );
@@ -40,7 +40,7 @@ function DebtsHeader({ onAddDebt }: Readonly<{ onAddDebt: () => void }>) {
 
 function EmptyFilterResult() {
   return (
-    <div className="rounded-lg border border-dashed border-border-control bg-surface p-4 text-cell text-fg-muted">
+    <div className="rounded-lg border border-dashed border-border-control bg-surface p-4 text-cell text-fg-muted max-sm:rounded-xl">
       No debts match this filter.
     </div>
   );
@@ -48,7 +48,7 @@ function EmptyFilterResult() {
 
 function DebtsInfoCallout() {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-border-default bg-surface-sunken p-3">
+    <div className="flex items-start gap-2 rounded-lg border border-border-default bg-surface-sunken p-3 max-sm:rounded-xl">
       <Info size={14} className="mt-0.5 shrink-0 text-fg-faint" aria-hidden />
       <p className="text-caption text-fg-subtle">
         Outstanding debt balances are subtracted from your total assets on the dashboard to

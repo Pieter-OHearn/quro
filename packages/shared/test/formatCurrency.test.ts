@@ -21,6 +21,14 @@ test('supports European number formatting when requested', () => {
   ).toBe('1.234,00');
 });
 
+test('writes negative amounts with a true minus sign and zero without a sign', () => {
+  expect(formatCurrency(-612.75, 'EUR')).toBe('\u2212€612.75');
+  expect(formatCurrency(-612.75, 'EUR', true, 'de-DE')).toBe('\u2212612,75\u00a0€');
+  expect(formatCurrency(-1234, 'USD', false)).toBe('\u2212$1,234');
+  expect(formatCurrency(-0, 'EUR')).toBe('€0.00');
+  expect(formatCurrency(-0.004, 'EUR')).toBe('€0.00');
+});
+
 test('formats unit prices with two to four decimals', () => {
   expect(formatUnitPrice(123.4567, 'EUR')).toBe('€123.4567');
   expect(formatUnitPrice(123.45, 'EUR')).toBe('€123.45');
