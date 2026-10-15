@@ -19,6 +19,8 @@ export function AreaChartCard<T extends Record<string, unknown>>(props: AreaChar
           badge={props.badge}
           hasData
           className={props.className}
+          headerClassName={props.headerClassName}
+          headerActionClassName={props.headerActionClassName}
         >
           <div
             role="status"

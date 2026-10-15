@@ -1,8 +1,12 @@
+import type { NetWorthRange } from '@quro/shared';
+
 // Prefixes are shared by query producers and the domain dependency map.
 export const queryKeys = {
   dashboard: {
     all: ['dashboard'] as const,
     summary: ['dashboard', 'summary'] as const,
+    netWorth: ['dashboard', 'net-worth'] as const,
+    netWorthRange: (range: NetWorthRange) => ['dashboard', 'net-worth', range] as const,
     transactions: ['dashboard', 'transactions'] as const,
     insights: ['dashboard', 'insights'] as const,
     insightYear: (year: number) => ['dashboard', 'insights', year] as const,

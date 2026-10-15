@@ -3,5 +3,6 @@ export { DashboardChartsGrid } from './DashboardChartsGrid';
 export { DashboardStatCards } from './DashboardStatCards';
 export { GoalsOverviewCard } from './GoalsOverviewCard';
 export { MonthlySummary } from './MonthlySummary';
+export { NetWorthChartCard } from './NetWorthChartCard';
 export { NetWorthHero } from './NetWorthHero';
 export { RecentTransactionsCard } from './RecentTransactionsCard';

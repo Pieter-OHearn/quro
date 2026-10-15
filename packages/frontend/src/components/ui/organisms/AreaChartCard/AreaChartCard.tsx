@@ -32,6 +32,9 @@ export type AreaChartCardProps<T extends Record<string, unknown>> = {
   emptyMessage?: string;
   strokeWidth?: number;
   className?: string;
+  /** Classes for the card header and for its action slot, e.g. to wrap a control on phones. */
+  headerClassName?: string;
+  headerActionClassName?: string;
   estimatedKey?: keyof T;
 };
 
@@ -204,6 +207,8 @@ export function AreaChartCard<T extends Record<string, unknown>>({
   emptyMessage = 'No data yet.',
   strokeWidth = 2,
   className,
+  headerClassName,
+  headerActionClassName,
   estimatedKey,
 }: AreaChartCardProps<T>) {
   return (
@@ -214,6 +219,8 @@ export function AreaChartCard<T extends Record<string, unknown>>({
       hasData={data.length > 0}
       emptyMessage={emptyMessage}
       className={cn(className)}
+      headerClassName={headerClassName}
+      headerActionClassName={headerActionClassName}
     >
       {data.length > 0 && (
         <ChartContent

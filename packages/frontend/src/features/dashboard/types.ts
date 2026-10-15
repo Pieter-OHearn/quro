@@ -61,3 +61,6 @@ export type NetWorthMetricData = {
   value: number;
   isEstimated: boolean;
 };
+
+/** A chart point: the metric data with the label the range shows on the axis. */
+export type NetWorthChartPoint = NetWorthMetricData & { label: string };
