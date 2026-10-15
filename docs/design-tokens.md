@@ -156,6 +156,9 @@ feature component.
 - Render an amount or percentage that went up, down or did not change with `Change`
   instead of hand-written signs and colours. It applies the sign, arrow, `gain` / `loss` /
   `flat` colour and zero rule from [V1 design](design-v1.md#7-content-rules).
+  `StatCard` takes its change either as a formatted string (`{ value, positive }`) or as a
+  signed number (`{ amount, format, currency, label }`) that it renders through `Change`;
+  prefer the number.
 - `Button` supports `loading` and disables itself while loading; use it instead of
   a separate submitting-button pattern.
 - Keep loading, empty, error, disabled and submitting states, labels, keyboard
@@ -189,7 +192,7 @@ Current audit status and default direction:
 | Pension statement import review | `DataTable`                  | Editable review table.                                  |
 | Transaction history panels      | `TxnHistoryPanel` / `TxnRow` | Event feeds; do not force into tables by default.       |
 | Budget categories               | Follow-up audit              | Likely table-like because budget/spent columns compare. |
-| Recent transactions             | Row list                     | Activity feed, not a comparative table.                 |
+| Dashboard recent transactions   | `DataTable`                  | Compact; one line per row on phones.                    |
 
 ## `DataTable` usage
 

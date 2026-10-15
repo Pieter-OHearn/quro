@@ -1,30 +1,44 @@
-import { Cell, Pie, PieChart } from 'recharts';
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
+import { Card, PanelHeader } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { AllocationItem, DashboardFormatFn } from '../types';
 
-export function AllocationPieChart({ data }: Readonly<{ data: readonly AllocationItem[] }>) {
+const MINUS_SIGN = '−';
+const DEBT_COLOR = 'var(--viz-6)';
+const ROW_CLASS_NAME = 'flex h-7 items-center gap-2 text-cell';
+
+const swatchStyle = (color: string): CSSProperties => ({ backgroundColor: color });
+
+const formatShare = (value: number, total: number): string =>
+  `${total > 0 ? ((value / total) * 100).toFixed(0) : 0}%`;
+
+/** An 8px bar split by asset class, in the same colours as the rows below it. */
+function AllocationBar({
+  data,
+  totalAlloc,
+}: Readonly<{ data: readonly AllocationItem[]; totalAlloc: number }>) {
+  if (totalAlloc <= 0) return null;
   return (
-    <div className="flex justify-center mb-4">
-      <PieChart width={160} height={160}>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={50}
-          outerRadius={75}
-          paddingAngle={3}
-          dataKey="value"
-        >
-          {data.map((entry) => (
-            <Cell key={entry.key} fill={entry.color} />
-          ))}
-        </Pie>
-      </PieChart>
+    <div className="mb-3 flex h-2 gap-px overflow-hidden rounded-full" aria-hidden>
+      {data.map((item) =>
+        item.value > 0 ? (
+          <div
+            key={item.key}
+            className="h-full"
+            style={{ ...swatchStyle(item.color), width: `${(item.value / totalAlloc) * 100}%` }}
+          />
+        ) : null,
+      )}
     </div>
   );
 }
 
-function AllocationLegend({
+function Swatch({ color }: Readonly<{ color: string }>) {
+  return <span className="size-2 shrink-0 rounded-sm" style={swatchStyle(color)} aria-hidden />;
+}
+
+function AllocationRows({
   data,
   totalAlloc,
   fmtBase,
@@ -34,22 +48,47 @@ function AllocationLegend({
   fmtBase: DashboardFormatFn;
 }>) {
   return (
-    <div className="space-y-2">
+    <ul>
       {data.map((item) => (
-        <div key={item.key} className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-            <span className="text-xs text-fg-muted">{item.name}</span>
-          </div>
-          <div className="text-right">
-            <span className="text-xs font-semibold text-fg-emphasis">{fmtBase(item.value)}</span>
-            <span className="text-[10px] text-fg-faint ml-1">
-              {totalAlloc > 0 ? ((item.value / totalAlloc) * 100).toFixed(0) : 0}%
-            </span>
-          </div>
-        </div>
+        <li key={item.key} className={ROW_CLASS_NAME}>
+          <Swatch color={item.color} />
+          <span className="min-w-0 flex-1 truncate text-fg">{item.name}</span>
+          <span className="font-numeric text-fg">{fmtBase(item.value)}</span>
+          <span className="w-9 text-right font-numeric text-fg-muted">
+            {formatShare(item.value, totalAlloc)}
+          </span>
+        </li>
       ))}
-    </div>
+    </ul>
+  );
+}
+
+function LiabilitiesRow({
+  liabilitiesTotal,
+  debtCount,
+  fmtBase,
+}: Readonly<{ liabilitiesTotal: number; debtCount: number; fmtBase: DashboardFormatFn }>) {
+  return (
+    <Link
+      to="/debts"
+      className={cn(
+        ROW_CLASS_NAME,
+        '-mx-1 rounded-sm px-1 transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:h-11',
+      )}
+    >
+      <Swatch color={DEBT_COLOR} />
+      <span className="min-w-0 flex-1 truncate text-fg">
+        Liabilities{' '}
+        <span className="text-caption text-fg-subtle">
+          · {debtCount} active debt{debtCount === 1 ? '' : 's'}
+        </span>
+      </span>
+      <span className="font-numeric text-fg">
+        {MINUS_SIGN}
+        {fmtBase(liabilitiesTotal)}
+      </span>
+      <span className="w-9" aria-hidden />
+    </Link>
   );
 }
 
@@ -57,6 +96,7 @@ export function AssetAllocationCard({
   allocationData,
   totalAlloc,
   liabilitiesTotal,
+  debtCount,
   netWorth,
   baseCurrency,
   fmtBase,
@@ -64,6 +104,7 @@ export function AssetAllocationCard({
   allocationData: readonly AllocationItem[];
   totalAlloc: number;
   liabilitiesTotal: number;
+  debtCount: number;
   netWorth: number;
   baseCurrency: string;
   fmtBase: DashboardFormatFn;
@@ -71,39 +112,32 @@ export function AssetAllocationCard({
   const hasAssets = allocationData.length > 0;
 
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm h-full">
-      <h3 className="font-semibold text-fg mb-1">Asset Allocation</h3>
-      <p className="text-xs text-fg-faint mb-4">All values in {baseCurrency}</p>
-      {hasAssets ? (
-        <>
-          <AllocationPieChart data={allocationData} />
-          <AllocationLegend data={allocationData} totalAlloc={totalAlloc} fmtBase={fmtBase} />
-        </>
-      ) : (
-        <p className="py-12 text-center text-sm text-fg-faint">No asset allocation data yet.</p>
-      )}
-      {hasAssets || liabilitiesTotal > 0 ? (
-        <div className="mt-4 space-y-2">
-          <div className="border-t border-border-subtle" />
-          {liabilitiesTotal > 0 ? (
-            <Link to="/debts" className="group flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-danger-muted" />
-                <span className="text-xs text-danger transition-colors group-hover:text-danger-fg">
-                  Liabilities
-                </span>
-              </div>
-              <span className="text-xs font-semibold text-danger">
-                -{fmtBase(liabilitiesTotal)}
-              </span>
-            </Link>
-          ) : null}
-          <div className="flex items-center justify-between border-t border-border-subtle pt-2">
-            <span className="text-xs font-semibold text-fg-strong">Net Worth</span>
-            <span className="text-xs font-bold text-fg">{fmtBase(netWorth)}</span>
+    <Card padding="none" className="h-full overflow-hidden">
+      <PanelHeader title="Asset allocation" subtitle={`All values in ${baseCurrency}`} />
+      <div className="p-4">
+        {hasAssets ? (
+          <>
+            <AllocationBar data={allocationData} totalAlloc={totalAlloc} />
+            <AllocationRows data={allocationData} totalAlloc={totalAlloc} fmtBase={fmtBase} />
+          </>
+        ) : (
+          <p className="py-8 text-cell text-fg-subtle">No asset allocation data yet.</p>
+        )}
+        {liabilitiesTotal > 0 ? (
+          <LiabilitiesRow
+            liabilitiesTotal={liabilitiesTotal}
+            debtCount={debtCount}
+            fmtBase={fmtBase}
+          />
+        ) : null}
+        {hasAssets || liabilitiesTotal > 0 ? (
+          <div className={cn(ROW_CLASS_NAME, 'mt-1 border-t border-border-strong font-semibold')}>
+            <span className="flex-1 text-fg">Net worth</span>
+            <span className="font-numeric text-fg">{fmtBase(netWorth)}</span>
+            <span className="w-9" aria-hidden />
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </Card>
   );
 }

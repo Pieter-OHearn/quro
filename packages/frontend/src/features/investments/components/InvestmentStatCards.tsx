@@ -1,4 +1,5 @@
 import { BarChart2, Building2, DollarSign, TrendingUp } from 'lucide-react';
+import { toCents } from '@quro/shared';
 import { StatCard, StatsGrid } from '@/components/ui';
 import type { InvestmentFormatFn, InvestmentPortfolioStats, InvestmentStatTrends } from '../types';
 
@@ -6,6 +7,18 @@ type InvestmentStatCardsProps = InvestmentPortfolioStats & {
   fmtBase: InvestmentFormatFn;
   trends: InvestmentStatTrends;
 };
+
+const MINUS_SIGN = '\u2212';
+
+// A loss reads as "Unrealized Loss" with a minus sign; zero (to the cent) has no sign.
+function describeUnrealized(totalGainBase: number, fmtBase: InvestmentFormatFn) {
+  const cents = toCents(totalGainBase);
+  const sign = cents > 0 ? '+' : cents < 0 ? MINUS_SIGN : '';
+  return {
+    label: cents < 0 ? 'Unrealized Loss' : 'Unrealized Gain',
+    value: `${sign}${fmtBase(Math.abs(totalGainBase))}`,
+  };
+}
 
 type BrokerageStatCardsProps = Pick<
   InvestmentPortfolioStats,
@@ -22,6 +35,7 @@ function BrokerageStatCards({
   fmtBase,
   trends,
 }: BrokerageStatCardsProps) {
+  const unrealized = describeUnrealized(totalGainBase, fmtBase);
   return (
     <>
       <StatCard
@@ -33,8 +47,8 @@ function BrokerageStatCards({
         change={trends.brokerageValue}
       />
       <StatCard
-        label="Unrealized Gain"
-        value={`${totalGainBase >= 0 ? '+' : ''}${fmtBase(Math.abs(totalGainBase))}`}
+        label={unrealized.label}
+        value={unrealized.value}
         subtitle={`Cost basis ${fmtBase(totalCostBase)}`}
         icon={TrendingUp}
         color="emerald"

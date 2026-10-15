@@ -40,7 +40,7 @@ test('allocation appearance uses stable keys instead of translated display names
   expect(display.allocationData[0]).toMatchObject({
     key: 'brokerage',
     name: 'Beleggingen',
-    color: '#0ea5e9',
+    color: 'var(--viz-2)',
   });
   expect(allocationTotals(summary, (amount) => amount)).toEqual({
     portfolioTotal: 100,

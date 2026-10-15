@@ -870,6 +870,34 @@ const smokeCases: readonly SmokeCase[] = [
     includes: ['text-loss', '>\u2212EUR 12.50 MTD<', 'text-caption text-fg-subtle', '2 accounts'],
   },
   {
+    name: 'StatCard renders a numeric change through Change with a caption',
+    element: (
+      <StatCard
+        label="Savings"
+        value="EUR 10.00"
+        icon={PiggyBank}
+        color="emerald"
+        change={{ amount: -12.5, format: 'amount', label: 'this month' }}
+      />
+    ),
+    includes: ['text-loss', '<span class="sr-only">down </span>', '\u221212.50', '>this month<'],
+    excludes: ['text-gain'],
+  },
+  {
+    name: 'StatCard reads a numeric zero change as 0.00 with no sign',
+    element: (
+      <StatCard
+        label="Savings"
+        value="EUR 10.00"
+        icon={PiggyBank}
+        color="emerald"
+        change={{ amount: 0, format: 'amount', label: 'this month' }}
+      />
+    ),
+    includes: ['text-flat', '>0.00<'],
+    excludes: ['text-gain', 'text-loss', '+0.00', '\u22120.00', '\u25B2', '\u25BC'],
+  },
+  {
     name: 'ChartCard has a card header above padded content',
     element: (
       <ChartCard title="Net worth" hasData>

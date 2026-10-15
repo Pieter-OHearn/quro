@@ -1,6 +1,6 @@
-import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router';
 import { formatNumber, type Goal, type GoalType, formatPercent } from '@quro/shared';
+import { Badge, Card, PanelHeader, ProgressMeter } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { GoalProgressContext } from '@/features/goals/types';
 import { GOAL_TYPE_META } from '@/features/goals/utils/goals-constants';
@@ -17,26 +17,8 @@ const TYPE_BADGE_LABEL: Record<GoalType, string> = {
   salary: 'Career',
   invest_habit: 'Habit',
   portfolio: 'Portfolio',
-  net_worth: 'Net Worth',
+  net_worth: 'Net worth',
   annual: 'Annual',
-};
-
-const TYPE_BADGE_CLASS: Record<GoalType, string> = {
-  savings: 'bg-brand-soft text-brand-fg',
-  salary: 'bg-success-soft text-success-fg',
-  invest_habit: 'bg-info-soft text-info-fg',
-  portfolio: 'bg-accent-cool-soft text-accent-cool-fg',
-  net_worth: 'bg-accent-highlight-soft text-accent-highlight-fg',
-  annual: 'bg-accent-secondary-soft text-accent-secondary-fg',
-};
-
-const getAnnualBarColor = (goal: Goal, type: GoalType, clampedPct: number): string => {
-  const color = goal.color || 'var(--data-primary)';
-  if (type !== 'annual') return color;
-  const lowerIsBetter =
-    Boolean(goal.unit?.endsWith('/mo')) && (goal.currentAmount || 0) > (goal.targetAmount || 0);
-  if (lowerIsBetter && clampedPct < 100) return 'var(--data-forecast)';
-  return color;
 };
 
 const buildSalaryValueParts = (
@@ -164,12 +146,10 @@ const buildGoalSubtext = (
 function GoalTypePill({ type }: Readonly<{ type: GoalType }>) {
   const { Icon } = GOAL_TYPE_META[type];
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${TYPE_BADGE_CLASS[type]}`}
-    >
-      <Icon size={10} />
+    <Badge size="xs" className="shrink-0">
+      <Icon size={10} aria-hidden />
       {TYPE_BADGE_LABEL[type]}
-    </span>
+    </Badge>
   );
 }
 
@@ -188,7 +168,6 @@ function GoalProgressItem({
   const sourceResolution = resolveGoalCurrentAmount(goal, goalProgressContext);
   const pct = getGoalPct(goal, goalProgressContext);
   const clampedPct = Math.max(0, Math.min(pct, 100));
-  const barColor = getAnnualBarColor(goal, type, clampedPct);
   const valueParts = buildValueParts(
     goal,
     type,
@@ -213,32 +192,30 @@ function GoalProgressItem({
         );
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2.5 min-w-0">
-          <span className="text-xl leading-none mt-0.5">{goal.emoji}</span>
-          <div className="min-w-0">
-            <p className="text-base font-semibold text-fg-strong leading-tight truncate">
-              {goal.name}
-            </p>
-            <div className="mt-1 flex items-center gap-2 min-w-0">
-              <GoalTypePill type={type} />
-              <p className="text-xs text-fg-subtle truncate">{subtext}</p>
-            </div>
+    <li className="flex flex-col gap-1.5">
+      <div className="flex min-w-0 items-start gap-2">
+        <span className="text-body leading-5" aria-hidden>
+          {goal.emoji}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-body font-medium text-fg">{goal.name}</p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <GoalTypePill type={type} />
+            <p className="truncate text-caption text-fg-subtle">{subtext}</p>
           </div>
         </div>
-        <p className="text-sm whitespace-nowrap pl-3">
-          <span className="font-semibold text-fg-emphasis">{valueParts.primary}</span>
-          {valueParts.secondary && <span className="text-fg-faint">{valueParts.secondary}</span>}
+      </div>
+      <div className="flex items-center gap-3">
+        <ProgressMeter value={clampedPct} label={goal.name} className="min-w-0 flex-1" />
+        <p className="shrink-0 whitespace-nowrap text-figure-md font-numeric">
+          <span className="text-fg">{valueParts.primary}</span>
+          {valueParts.secondary && <span className="text-fg-subtle">{valueParts.secondary}</span>}
         </p>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-border-default/80 overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${clampedPct}%`, backgroundColor: barColor }}
-        />
-      </div>
-    </div>
+      <p className="text-caption font-numeric text-fg-muted">
+        {formatPercent(clampedPct, numberFormat, 0)}
+      </p>
+    </li>
   );
 }
 
@@ -254,38 +231,43 @@ export function GoalsOverviewCard({
   fmtBase: CompactFormatFn;
 }>) {
   return (
-    <div className="bg-surface rounded-3xl p-6 border border-border-default shadow-sm">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h3 className="text-3xl font-semibold text-fg">Financial Goals</h3>
-          <p className="text-sm text-fg-subtle mt-0.5">{currentYear} snapshot</p>
-        </div>
-        <Link
-          to="/goals"
-          className="text-sm text-brand hover:text-brand-fg font-semibold flex items-center gap-1"
-        >
-          View all <ArrowRight size={14} />
-        </Link>
-      </div>
-      {goals.length > 0 ? (
-        <div className="space-y-6">
-          {goals.map((goal) => (
-            <GoalProgressItem
-              key={goal.id}
-              goal={goal}
-              goalProgressContext={goalProgressContext}
-              fmtBase={fmtBase}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-fg-faint py-8 text-center">
-          No goals yet.{' '}
-          <Link to="/goals" className="text-brand-accent">
-            Create one
+    <Card padding="none" className="overflow-hidden">
+      <PanelHeader
+        title="Financial goals"
+        subtitle={`${currentYear} snapshot`}
+        action={
+          <Link
+            to="/goals"
+            className="rounded-sm text-cell font-medium text-brand transition-colors duration-fast hover:text-brand-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
+          >
+            View all
           </Link>
-        </p>
-      )}
-    </div>
+        }
+      />
+      <div className="p-4">
+        {goals.length > 0 ? (
+          <ul className="flex flex-col gap-4">
+            {goals.map((goal) => (
+              <GoalProgressItem
+                key={goal.id}
+                goal={goal}
+                goalProgressContext={goalProgressContext}
+                fmtBase={fmtBase}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="py-8 text-cell text-fg-subtle">
+            No goals yet.{' '}
+            <Link
+              to="/goals"
+              className="rounded-sm text-brand hover:text-brand-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+            >
+              Create one
+            </Link>
+          </p>
+        )}
+      </div>
+    </Card>
   );
 }

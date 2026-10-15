@@ -13,24 +13,21 @@ import type {
   NetWorthSnapshot,
   SavingsAccount,
 } from '@quro/shared';
-import { useAuth } from '@/lib/AuthContext';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
-import { getUserDisplayName } from '@/lib/user';
 import {
   DashboardChartsGrid,
   DashboardStatCards,
   GoalsOverviewCard,
   MonthlySummary,
+  NetWorthHero,
   RecentTransactionsCard,
-  WelcomeBanner,
 } from './components';
 import {
   buildDashboardCards,
   buildMonthlySummaryItems,
   computeDashboardTxnStats,
   computeNWMetrics,
-  getGreeting,
   normalizeAssetAllocations,
   normalizeDashboardTransactions,
   normalizeNetWorthSnapshots,
@@ -239,7 +236,6 @@ type DashboardData = ReturnType<typeof useDashboardData>;
 
 type DashboardPageBodyProps = {
   data: DashboardData;
-  userName: string;
   baseCurrency: string;
   fmtBase: DashboardFormatFn;
 };
@@ -257,7 +253,7 @@ function DashboardBottomCards({ data }: { data: DashboardData }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <RecentTransactionsCard
           transactions={displayedRecentTransactions}
           baseCurrency={baseCurrency}
@@ -275,12 +271,16 @@ function DashboardBottomCards({ data }: { data: DashboardData }) {
   );
 }
 
-function DashboardPageBody({
-  data,
-  userName,
-  baseCurrency,
-  fmtBase,
-}: Readonly<DashboardPageBodyProps>) {
+// The month change compares the current net worth with the second-to-last chart point.
+const PREVIOUS_POINT_OFFSET = 2;
+
+const getComparisonLabel = (chartData: DashboardData['chartData']): string | null => {
+  const previous =
+    chartData.length > 1 ? chartData[chartData.length - PREVIOUS_POINT_OFFSET] : undefined;
+  return previous ? `${previous.month} ${previous.year}` : null;
+};
+
+function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPageBodyProps>) {
   const {
     chartData,
     allocationData,
@@ -297,7 +297,6 @@ function DashboardPageBody({
     isEstimated,
   } = data;
 
-  const hour = new Date().getHours();
   const dashboardCards = buildDashboardCards(
     allocationByKey,
     monthlySalaryValue,
@@ -307,12 +306,12 @@ function DashboardPageBody({
 
   return (
     <PageStack>
-      <ContentSection>
-        <WelcomeBanner
-          greeting={getGreeting(hour)}
-          greetingName={userName}
+      <ContentSection as="div">
+        <NetWorthHero
           netWorth={netWorth}
           monthChange={monthChange}
+          comparisonLabel={getComparisonLabel(chartData)}
+          ytdPct={ytdPct}
           totalAssets={totalAssets}
           liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
@@ -321,12 +320,7 @@ function DashboardPageBody({
         />
       </ContentSection>
       <ContentSection>
-        <DashboardStatCards
-          cards={dashboardCards}
-          liabilitiesValue={liabilitiesTotal}
-          debtCount={debtCount}
-          fmtBase={fmtBase}
-        />
+        <DashboardStatCards cards={dashboardCards} baseCurrency={baseCurrency} fmtBase={fmtBase} />
       </ContentSection>
       <ContentSection>
         <DashboardChartsGrid
@@ -335,12 +329,12 @@ function DashboardPageBody({
           totalAlloc={totalAssets}
           netWorth={netWorth}
           liabilitiesTotal={liabilitiesTotal}
+          debtCount={debtCount}
           baseCurrency={baseCurrency}
-          ytdPct={ytdPct}
           fmtBase={fmtBase}
         />
       </ContentSection>
-      <ContentSection spacing="lg">
+      <ContentSection spacing="md">
         <DashboardBottomCards data={data} />
       </ContentSection>
     </PageStack>
@@ -349,7 +343,6 @@ function DashboardPageBody({
 
 export function Dashboard() {
   const { fmtBase, baseCurrency, convertToBase } = useCurrency();
-  const { user } = useAuth();
   const data = useDashboardData(fmtBase, convertToBase);
 
   if (data.isLoading) return <LoadingSpinner />;
@@ -357,12 +350,5 @@ export function Dashboard() {
     return <RouteQueryErrorState routeName="Dashboard" failedQueries={data.queryFailures} />;
   }
 
-  return (
-    <DashboardPageBody
-      data={data}
-      userName={getUserDisplayName(user, 'there')}
-      baseCurrency={baseCurrency}
-      fmtBase={fmtBase}
-    />
-  );
+  return <DashboardPageBody data={data} baseCurrency={baseCurrency} fmtBase={fmtBase} />;
 }

@@ -32,10 +32,6 @@ export type AllocationSummary = {
 export type MonthlySummaryItem = {
   label: string;
   value: string;
-  icon: string;
-  bg: string;
-  text: string;
-  border: string;
 };
 
 export type DashboardCard = {
