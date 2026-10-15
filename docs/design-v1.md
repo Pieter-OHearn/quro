@@ -7,10 +7,10 @@ Later changes implement these values; they do not round or rename them. It was r
 zero change, scrim and status tokens).
 
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css) holds the
-light and dark colour values, type scale, radius, shadows and motion of this page; until the
-shared UI and page migrations land, some components still render the values they used before. See
-[design tokens](design-tokens.md) for how tokens become Tailwind utilities and the rules for
-using them.
+light and dark colour values, type scale, radius, shadows and motion of this page, and the shared
+UI and every page render them. See [design tokens](design-tokens.md) for how tokens become Tailwind
+utilities, the rules for using them and the shared components. The
+[reference screenshots](#10-reference-screenshots) show the result.
 
 ## 1. Principles
 
@@ -19,11 +19,11 @@ using them.
 3. **Rules, not boxes.** Structure comes from 1px borders and alignment. No card shadows, no tinted icon tiles, no oversized pills.
 4. **Green acts, lilac highlights.** `brand` (evergreen) is the action colour and the only filled control: one per view. Selection is a `brand-soft` tint or a 2px underline, never a fill. `secondary` (lilac) marks goals and projections. Gain and loss keep their own green and red.
 5. **Sign, then colour.** A change carries a plus or a minus sign; zero carries neither. Colour only reinforces it.
-6. **Light, dark, desktop, phone.** Every token has a dark value and every pattern has a touch size.
+6. **Light, dark, laptop, phone.** Every token has a dark value and every pattern has a touch size. Quro 1.0 is designed for two sizes only: a laptop (1024px and wider) and a phone (below 640px). Widths in between get no dedicated layout and no tablet rail; the shell keeps its drawer behind the header menu button.
 
 ## 2. Colour tokens
 
-The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" were added to `theme.css` with the light values. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`; rows marked "Legacy alias" exist only until the components that use them are migrated (VD14 to VD17) and are deleted in VD19.
+The design system calls the action colour "primary". The code keeps the existing name `brand`, so existing utilities such as `bg-brand` keep working. Rows marked "(new)" were added with V1. Rows whose value is `var(--…)` are aliases, written exactly so in `:root`; rows marked "Legacy alias" are kept only so that old utility names keep compiling, are not used by the shared UI and are removed before the V1 release.
 
 | Variable                   | Light                    | Dark                     | Use                                                                                                         |
 | -------------------------- | ------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------- |
@@ -31,9 +31,9 @@ The design system calls the action colour "primary". The code keeps the existing
 | `--brand-hover`            | `#0F3D2B`                | `#A3E4C2`                | Hover and press on brand; text on brand-soft ("primary-hover")                                              |
 | `--brand-fg`               | `var(--brand-hover)`     | `var(--brand-hover)`     | Text on brand-soft; the same value as brand-hover                                                           |
 | `--brand-soft`             | `#E3F0E9`                | `#173326`                | Every selection: active nav item, selected row, selected segment, current page; chart fill ("primary-soft") |
-| `--brand-disabled`         | `var(--surface-muted)`   | `var(--surface-muted)`   | Legacy alias, deleted at VD19                                                                               |
-| `--brand-border`           | `var(--border-default)`  | `var(--border-default)`  | Legacy alias, deleted at VD19                                                                               |
-| `--brand-soft-strong`      | `var(--brand-soft)`      | `var(--brand-soft)`      | Legacy alias, deleted at VD19                                                                               |
+| `--brand-disabled`         | `var(--surface-muted)`   | `var(--surface-muted)`   | Legacy alias, removed before the V1 release                                                                 |
+| `--brand-border`           | `var(--border-default)`  | `var(--border-default)`  | Legacy alias, removed before the V1 release                                                                 |
+| `--brand-soft-strong`      | `var(--brand-soft)`      | `var(--brand-soft)`      | Legacy alias, removed before the V1 release                                                                 |
 | `--secondary (new)`        | `#6B4FD8`                | `#B5A4FF`                | Goals, projections (dashed lines), highlights. Never a button colour, never a chart series                  |
 | `--secondary-soft (new)`   | `#ECE8FC`                | `#2A2350`                | Behind goal and projection chips                                                                            |
 | `--surface`                | `#FFFFFF`                | `#161D19`                | Cards, tables, inputs                                                                                       |
@@ -41,7 +41,7 @@ The design system calls the action colour "primary". The code keeps the existing
 | `--surface-muted`          | `#EEEDE7`                | `#1E2722`                | Hover and press fill, disabled controls, progress track                                                     |
 | `--surface-nav (new)`      | `#FBFAF7`                | `#121915`                | Sidebar and phone tab bar                                                                                   |
 | `--surface-inverse`        | `var(--fg)`              | `var(--fg)`              | Tooltip fill                                                                                                |
-| `--surface-inverse-raised` | `var(--surface-inverse)` | `var(--surface-inverse)` | Legacy alias, deleted at VD19                                                                               |
+| `--surface-inverse-raised` | `var(--surface-inverse)` | `var(--surface-inverse)` | Legacy alias, removed before the V1 release                                                                 |
 | `--scrim (new)`            | `#15201B66`              | `#00000099`              | Behind dialogs and sheets; no blur                                                                          |
 | `--border-subtle`          | `#E9E7E0`                | `#232D27`                | Row dividers ("rule")                                                                                       |
 | `--border-default`         | `#DAD7CE`                | `#2E3A33`                | Card and table edges ("border")                                                                             |
@@ -53,9 +53,9 @@ The design system calls the action colour "primary". The code keeps the existing
 | `--fg-faint`               | `#879089`                | `#5E6A63`                | Placeholders and resting icons only                                                                         |
 | `--fg-inverted`            | `#FFFFFF`                | `#0E1411`                | Text on brand and danger fills ("fg-on-primary")                                                            |
 | `--fg-on-inverse (new)`    | `var(--surface-sunken)`  | `var(--surface-sunken)`  | Text on surface-inverse (tooltips)                                                                          |
-| `--fg-strong`              | `var(--fg)`              | `var(--fg)`              | Legacy alias, deleted at VD19                                                                               |
-| `--fg-emphasis`            | `var(--fg)`              | `var(--fg)`              | Legacy alias, deleted at VD19                                                                               |
-| `--fg-disabled`            | `var(--fg-faint)`        | `var(--fg-faint)`        | Legacy alias, deleted at VD19                                                                               |
+| `--fg-strong`              | `var(--fg)`              | `var(--fg)`              | Legacy alias, removed before the V1 release                                                                 |
+| `--fg-emphasis`            | `var(--fg)`              | `var(--fg)`              | Legacy alias, removed before the V1 release                                                                 |
+| `--fg-disabled`            | `var(--fg-faint)`        | `var(--fg-faint)`        | Legacy alias, removed before the V1 release                                                                 |
 | `--gain (new)`             | `#167242`                | `#5FD39A`                | Positive change                                                                                             |
 | `--gain-soft (new)`        | `#E1F3E8`                | `#153324`                | Behind gain chips                                                                                           |
 | `--loss (new)`             | `#C2372B`                | `#FF8F85`                | Negative change                                                                                             |
@@ -63,24 +63,24 @@ The design system calls the action colour "primary". The code keeps the existing
 | `--flat (new)`             | `var(--fg-muted)`        | `var(--fg-muted)`        | No change                                                                                                   |
 | `--success`                | `var(--gain)`            | `var(--gain)`            | Saved, synced, connected: the gain colour under its status name                                             |
 | `--success-soft`           | `var(--gain-soft)`       | `var(--gain-soft)`       | Success badge and banner fill                                                                               |
-| `--success-fg`             | `var(--success)`         | `var(--success)`         | Legacy alias, deleted at VD19                                                                               |
-| `--success-border`         | `var(--success)`         | `var(--success)`         | Legacy alias, deleted at VD19                                                                               |
-| `--success-soft-strong`    | `var(--success-soft)`    | `var(--success-soft)`    | Legacy alias, deleted at VD19                                                                               |
+| `--success-fg`             | `var(--success)`         | `var(--success)`         | Legacy alias, removed before the V1 release                                                                 |
+| `--success-border`         | `var(--success)`         | `var(--success)`         | Legacy alias, removed before the V1 release                                                                 |
+| `--success-soft-strong`    | `var(--success-soft)`    | `var(--success-soft)`    | Legacy alias, removed before the V1 release                                                                 |
 | `--warning`                | `#8A5300`                | `#F0B34A`                | Stale data, limits near: text and border                                                                    |
 | `--warning-soft`           | `#FBF0D9`                | `#33260C`                | Warning badge and banner fill                                                                               |
-| `--warning-fg`             | `var(--warning)`         | `var(--warning)`         | Legacy alias, deleted at VD19                                                                               |
-| `--warning-border`         | `var(--warning)`         | `var(--warning)`         | Legacy alias, deleted at VD19                                                                               |
-| `--warning-soft-strong`    | `var(--warning-soft)`    | `var(--warning-soft)`    | Legacy alias, deleted at VD19                                                                               |
+| `--warning-fg`             | `var(--warning)`         | `var(--warning)`         | Legacy alias, removed before the V1 release                                                                 |
+| `--warning-border`         | `var(--warning)`         | `var(--warning)`         | Legacy alias, removed before the V1 release                                                                 |
+| `--warning-soft-strong`    | `var(--warning-soft)`    | `var(--warning-soft)`    | Legacy alias, removed before the V1 release                                                                 |
 | `--danger`                 | `var(--loss)`            | `var(--loss)`            | Errors, invalid fields, destructive actions: the loss colour under its status name                          |
 | `--danger-soft`            | `var(--loss-soft)`       | `var(--loss-soft)`       | Error banner and danger badge fill                                                                          |
-| `--danger-fg`              | `var(--danger)`          | `var(--danger)`          | Legacy alias, deleted at VD19                                                                               |
-| `--danger-border`          | `var(--danger)`          | `var(--danger)`          | Legacy alias, deleted at VD19                                                                               |
-| `--danger-soft-strong`     | `var(--danger-soft)`     | `var(--danger-soft)`     | Legacy alias, deleted at VD19                                                                               |
+| `--danger-fg`              | `var(--danger)`          | `var(--danger)`          | Legacy alias, removed before the V1 release                                                                 |
+| `--danger-border`          | `var(--danger)`          | `var(--danger)`          | Legacy alias, removed before the V1 release                                                                 |
+| `--danger-soft-strong`     | `var(--danger-soft)`     | `var(--danger-soft)`     | Legacy alias, removed before the V1 release                                                                 |
 | `--info`                   | `#23618E`                | `#6FB4E6`                | Neutral notices and third-party labels such as a linked bank: text and border                               |
 | `--info-soft`              | `#E6F0F8`                | `#142A3A`                | Info badge and banner fill                                                                                  |
-| `--info-fg`                | `var(--info)`            | `var(--info)`            | Legacy alias, deleted at VD19                                                                               |
-| `--info-border`            | `var(--info)`            | `var(--info)`            | Legacy alias, deleted at VD19                                                                               |
-| `--info-soft-strong`       | `var(--info-soft)`       | `var(--info-soft)`       | Legacy alias, deleted at VD19                                                                               |
+| `--info-fg`                | `var(--info)`            | `var(--info)`            | Legacy alias, removed before the V1 release                                                                 |
+| `--info-border`            | `var(--info)`            | `var(--info)`            | Legacy alias, removed before the V1 release                                                                 |
+| `--info-soft-strong`       | `var(--info-soft)`       | `var(--info-soft)`       | Legacy alias, removed before the V1 release                                                                 |
 | `--focus-ring`             | `var(--brand)`           | `var(--brand)`           | 2px ring at 1px offset on every control                                                                     |
 | `--viz-1 (new)`            | `#2E8B62`                | `#5FC796`                | Chart: savings (green)                                                                                      |
 | `--viz-2 (new)`            | `#2F7FB8`                | `#6FB4E6`                | Chart: investments (blue)                                                                                   |
@@ -185,4 +185,24 @@ A rounded-square Q with a round-capped tail, one colour (evergreen on light, min
 | `fg-on-primary`     | `--fg-inverted`               |
 | everything else     | the same name                 |
 
-`DATA_COLORS` keeps its persisted hex identities; the `--data-*` display variables map onto `--viz-*` (VD03). The legacy aliases in section 2 are deleted in VD19 once nothing uses them.
+`DATA_COLORS` keeps its persisted hex identities; the `--data-*` display variables map onto `--viz-*`. The legacy aliases in section 2 are removed before the V1 release.
+
+## 10. Reference screenshots
+
+Taken from the synthetic demo household (`bun run --filter '@quro/backend' db:seed-household`, signed in as the demo user) on the design above. The dashboard, savings and investments pages at 1440px, then the dashboard at 390px.
+
+| Page        | Light                                                    | Dark                                                   |
+| ----------- | -------------------------------------------------------- | ------------------------------------------------------ |
+| Dashboard   | ![Dashboard, light](screenshots/dashboard-light.png)     | ![Dashboard, dark](screenshots/dashboard-dark.png)     |
+| Savings     | ![Savings, light](screenshots/savings-light.png)         | ![Savings, dark](screenshots/savings-dark.png)         |
+| Investments | ![Investments, light](screenshots/investments-light.png) | ![Investments, dark](screenshots/investments-dark.png) |
+
+| Phone (390px) | Light                                                                                             | Dark                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Dashboard     | <img src="screenshots/dashboard-light-phone.png" alt="Dashboard on a phone, light" width="260" /> | <img src="screenshots/dashboard-dark-phone.png" alt="Dashboard on a phone, dark" width="260" /> |
+
+Retake them after a visual change to the shared UI or the shell: migrate and seed a throwaway database
+([demo household](development.md#demo-household)), sign in as `demo@quro.local`, and capture the same
+pages in both themes with a headless Chrome at 1440px wide (the window as tall as the page) and at
+390px wide (the first screen, at twice the pixel density). Check that every image shows only the
+synthetic household.

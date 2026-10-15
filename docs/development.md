@@ -415,7 +415,8 @@ profile is empty.
 #### Demo household
 
 For screenshots and manual checks that need a lived-in profile, seed the household into a
-migrated, throwaway database (see [DB-backed tests](#db-backed-tests)):
+migrated, throwaway database (see [DB-backed tests](#db-backed-tests)). The [reference screenshots](design-v1.md#10-reference-screenshots)
+are taken from it, signed in as the demo user:
 
 ```bash
 bun run --filter '@quro/backend' db:seed-household

@@ -98,6 +98,14 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 - Reuse and export shared UI from `packages/frontend/src/components/ui/index.ts`
   before adding a primitive. Preserve persisted `DATA_COLORS` identities. Features
   own domain logic; shared UI owns presentation.
+- Style with the semantic tokens of `packages/frontend/src/styles/theme.css` (evergreen `brand`,
+  lilac `secondary`, `gain`/`loss`/`flat`, `viz-1` to `viz-6`) and never hard-code a colour: every
+  token has a light and a dark value, and both themes ship, so check a UI change in both and at
+  390px. Lint rejects raw palette colours and monospace fonts. Labels are sentence case, cards have
+  no shadow, selection is a `brand-soft` tint while a `brand` fill is the one action button of a
+  view, and a gain or loss renders through `Change`. Quro designs for a laptop (1024px and wider)
+  and a phone (below 640px) only, with 28px rows, 32px controls, 44px touch targets and 16px phone
+  field text. Values and reasons: [V1 design](docs/design-v1.md); usage: [design tokens](docs/design-tokens.md).
 - Update server caches through `useDomainMutation` and the domain map in
   `packages/frontend/src/lib/queryInvalidation.ts`; do not invalidate every query.
 
@@ -109,7 +117,7 @@ examples are references, not extra authorization. Report contradictions against
 current code.
 
 For features, follow [adding a feature](docs/adding-a-feature.md); for UI, follow
-[design tokens](docs/design-tokens.md) and
+[design tokens](docs/design-tokens.md), [V1 design](docs/design-v1.md) and
 [shared UI verification](docs/shared-ui-verification.md). For backup and restore
 work, follow [backup and restore](docs/backup-and-restore.md).
 
