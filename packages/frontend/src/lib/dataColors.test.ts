@@ -9,6 +9,8 @@ test('every persisted swatch value maps to a display token that points at a char
     expect(dataColorToken(value)).toBe(`var(--data-${name})`);
   }
   expect(dataColorToken('#123456')).toBe('#123456');
+  expect(dataColorToken(DATA_COLORS.primary.toUpperCase())).toBe('var(--data-primary)');
+  expect(dataColorToken('#ABCDEF')).toBe('#ABCDEF');
 });
 
 test('category pickers offer the six chart colours, one canonical identity each', () => {

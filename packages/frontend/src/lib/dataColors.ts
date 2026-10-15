@@ -28,7 +28,7 @@ const COLOR_TOKENS = new Map<string, string>(
 
 /** Use semantic CSS tokens for presets, while preserving custom colors from saved records. */
 export function dataColorToken(color: string): string {
-  return COLOR_TOKENS.get(color) ?? color;
+  return COLOR_TOKENS.get(color.toLowerCase()) ?? color;
 }
 
 type DataColorName = keyof typeof DATA_COLORS;

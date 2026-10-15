@@ -2,6 +2,7 @@ import { Edit3, Plus, WalletCards } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { Button, Card, EmptyState, IconButton, PanelHeader, ProgressMeter } from '@/components/ui';
 import { dataColorToken } from '@/lib/dataColors';
+import { formatAsNegative } from '@/lib/liability';
 import { cn } from '@/lib/utils';
 import type { BudgetCategory, BudgetFormatFn } from '../types';
 import { MonthYearSelector } from './MonthYearSelector';
@@ -19,8 +20,6 @@ type BudgetCategoriesSectionProps = {
   onAddCategory: () => void;
   onEditCategory: (category: BudgetCategory) => void;
 };
-
-const MINUS_SIGN = '\u2212';
 
 function CategoryProgress({
   category,
@@ -42,7 +41,7 @@ function CategoryProgress({
 
 // Over budget reads as a loss, money left as a gain, and nothing left with no sign.
 function describeSurplus(over: boolean, surplus: number, fmt: BudgetFormatFn) {
-  if (over) return { text: `${MINUS_SIGN}${fmt(Math.abs(surplus))}`, tone: 'text-loss' };
+  if (over) return { text: formatAsNegative(fmt, Math.abs(surplus)), tone: 'text-loss' };
   if (surplus === 0) return { text: `${fmt(surplus)} left`, tone: 'text-flat' };
   return { text: `+${fmt(surplus)} left`, tone: 'text-gain' };
 }

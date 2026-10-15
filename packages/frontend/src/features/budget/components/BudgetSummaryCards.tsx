@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, TrendingDown, Wallet } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { formatAsNegative } from '@/lib/liability';
 import { StatCard, StatsGrid } from '@/components/ui';
 import type { BudgetFormatFn } from '../types';
 import { formatPercent } from '@quro/shared';
@@ -43,13 +44,11 @@ function TotalSpentCard({
   );
 }
 
-const MINUS_SIGN = '\u2212';
-
 // Under budget reads as a gain and over budget as a loss; exactly on budget has no sign.
 function describeRemaining(remaining: number, fmt: BudgetFormatFn) {
   if (remaining > 0) return { value: `+${fmt(remaining)}`, tone: 'text-gain' };
   if (remaining < 0)
-    return { value: `${MINUS_SIGN}${fmt(Math.abs(remaining))}`, tone: 'text-loss' };
+    return { value: formatAsNegative(fmt, Math.abs(remaining)), tone: 'text-loss' };
   return { value: fmt(remaining), tone: 'text-flat' };
 }
 
