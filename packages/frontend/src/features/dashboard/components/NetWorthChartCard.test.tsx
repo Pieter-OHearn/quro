@@ -52,15 +52,14 @@ describe('net worth range control', () => {
     const markup = renderCard();
     expect(markup).toMatch(/<div role="group"[^>]*aria-label="Net worth range"/);
     const options = buttons(markup);
-    expect(options.map((option) => option.html.replace(/<[^>]+>/g, ''))).toEqual([
-      '1M1 month',
-      '6M6 months',
-      '1Y1 year',
-      'All',
-    ]);
-    expect(options[0]!.html).toContain(
+    const labels = [
       '<span aria-hidden="true">1M</span><span class="sr-only">1 month</span>',
-    );
+      '<span aria-hidden="true">6M</span><span class="sr-only">6 months</span>',
+      '<span aria-hidden="true">1Y</span><span class="sr-only">1 year</span>',
+      '<span class="min-w-0 truncate">All</span>',
+    ];
+    expect(options).toHaveLength(labels.length);
+    labels.forEach((label, index) => expect(options[index]!.html).toContain(label));
     expect(options.map((option) => option.pressed)).toEqual([false, true, false, false]);
     expect(options[1]!.html).toContain('bg-brand-soft');
     expect(options[1]!.html).not.toContain('bg-brand ');
