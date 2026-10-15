@@ -271,6 +271,14 @@ in the account, so each device can differ; other open tabs follow it at once.
   value or a dark value differs from the "Dark" column of [V1 design](design-v1.md).
 - Tailwind's `dark:` variant follows the class (`@custom-variant dark` in `theme.css`), not
   `prefers-color-scheme`. Prefer a token over a `dark:` override.
+- An installed app (`packages/frontend/public/site.webmanifest`) starts on the light ground
+  (`background_color` `#F6F5F1`) in both themes: a manifest has one background colour and the theme
+  is only known once `theme-init.js` runs, so the splash stays light and the page turns dark as it
+  loads. Its icons come in two sets: `web-app-icon-*.png` (`purpose: any`) are the rounded evergreen
+  tile of `favicon.svg` for platforms that show an icon as it is, and `web-app-manifest-*.png`
+  (`purpose: maskable`) are full-bleed evergreen with the mark inside the safe zone, for
+  platforms that cut their own shape. Render both from the SVGs with `rsvg-convert` at 192 and
+  512px.
 
 ## Adding a token
 
