@@ -62,10 +62,7 @@ function buildSubtitle(
   return `Archive keeps ${args.childrenLabel} so your wealth history stays continuous. Delete permanently removes everything.`;
 }
 
-// Cancel, then "Archive …", then "Delete …": the only filled destructive button in the app is
-// this confirm step.
-const DELETE_BUTTON_CLASS_NAME =
-  'border-danger bg-danger text-fg-inverted hover:bg-danger active:bg-danger enabled:hover:opacity-90 enabled:active:opacity-90';
+// Cancel, then "Archive …", then "Delete …": a destructive button fills only at this confirm step.
 
 function DialogFooter({
   entityLabel,
@@ -95,12 +92,7 @@ function DialogFooter({
           Archive {object}
         </Button>
       ) : null}
-      <Button
-        onClick={onDelete}
-        disabled={!nameMatches || isPending}
-        variant="danger"
-        className={DELETE_BUTTON_CLASS_NAME}
-      >
+      <Button onClick={onDelete} disabled={!nameMatches || isPending} variant="dangerSolid">
         Delete {object}
       </Button>
     </>

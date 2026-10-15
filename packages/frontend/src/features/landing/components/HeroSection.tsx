@@ -42,8 +42,8 @@ export function HeroSection({ onSignUp, onSignIn }: Readonly<HeroSectionProps>) 
     >
       <div>
         <p className="mb-3 text-label text-brand">Personal finance, beautifully simplified</p>
-        {/* The largest style of the type scale: 600 weight at -0.02em letter spacing. */}
-        <h1 className="mb-4 text-figure-hero text-fg">Your finances, beautifully organised.</h1>
+        {/* The display style: the landing headline is the only place it appears. */}
+        <h1 className="mb-4 text-figure-display text-fg">Your finances, beautifully organised.</h1>
         <p className="mb-6 max-w-lg text-body text-fg-muted">
           Quro unifies your savings, investments, mortgage, pension, salary and budget in one
           elegant dashboard — with full multi-currency support for wherever life takes you.

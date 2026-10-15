@@ -128,7 +128,7 @@ function ProfileButton() {
       className="flex h-8 max-sm:h-11 items-center gap-2 rounded-md pl-1 pr-2 max-sm:w-11 max-sm:justify-center max-sm:rounded-full max-sm:px-0 text-left transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       aria-label="Open profile settings"
     >
-      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-fg">
+      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border border-brand bg-brand-soft text-brand-fg">
         <User size={14} aria-hidden="true" />
       </span>
       <span className="hidden sm:block">

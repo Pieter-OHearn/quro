@@ -139,9 +139,9 @@ const smokeCases: readonly SmokeCase[] = [
     excludes: ['shadow-', 'p-4'],
   },
   {
-    name: 'Card default padding is 16px',
+    name: 'Card default padding is 16px, with 12px corners on a phone',
     element: <Card>Padded</Card>,
-    includes: ['bg-surface p-4'],
+    includes: ['rounded-lg', 'max-sm:rounded-xl', 'p-4'],
   },
   {
     name: 'ProgressMeter renders a thin secondary meter by default',
@@ -702,7 +702,7 @@ const smokeCases: readonly SmokeCase[] = [
             icon: PiggyBank,
             color: 'text-success',
             bg: 'bg-success-soft',
-            borderColor: 'border-success-border',
+            borderColor: 'border-success',
           },
           {
             key: 'transfer',
@@ -710,7 +710,7 @@ const smokeCases: readonly SmokeCase[] = [
             icon: ArrowDownUp,
             color: 'text-brand',
             bg: 'bg-brand-soft',
-            borderColor: 'border-brand-border',
+            borderColor: 'border-brand',
           },
         ]}
       />
@@ -727,7 +727,7 @@ const smokeCases: readonly SmokeCase[] = [
       'border-border-control bg-surface text-fg-muted',
       'text-success',
     ],
-    excludes: ['border-2', 'text-[10px]', 'bg-success-soft', 'border-success-border'],
+    excludes: ['border-2', 'text-[10px]', 'bg-success-soft', 'border-success'],
   },
   {
     name: 'Modal renders shared headerProps shell',
