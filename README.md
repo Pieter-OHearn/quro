@@ -12,9 +12,12 @@ It runs with Docker on a computer you own, such as a home server, a NAS or an ar
 Quro is for people who are comfortable running a few containers at home. It is pre-1.0 and has a single maintainer; the [roadmap](ROADMAP.md) says what 1.0 will contain.
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="The Quro dashboard of a new demo household: net worth, savings, investments, pension, salary and liability cards, a net worth chart and the asset allocation" width="900" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png" />
+    <img src="docs/screenshots/dashboard-light.png" alt="The Quro dashboard of the demo household: net worth, savings, investments, pension and salary cards, a net worth chart, the asset allocation, recent transactions and goals" width="900" />
+  </picture>
 </p>
-<p align="center"><sub>The dashboard of a new household, created by the built-in demo seed. The name and email address are synthetic.</sub></p>
+<p align="center"><sub>The dashboard of the demo household, in the light and dark theme (the picture follows your colour scheme). All names, accounts and amounts are synthetic, created by the built-in demo seed. More pages and the phone layout are in the <a href="docs/design-v1.md#10-reference-screenshots">reference screenshots</a>.</sub></p>
 
 ## Quickstart
 
