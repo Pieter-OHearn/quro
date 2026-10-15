@@ -31,6 +31,8 @@ import {
   normalizeAssetAllocations,
   normalizeDashboardTransactions,
   normalizeNetWorthSnapshots,
+  toYearStartValue,
+  type YearStartValue,
 } from './utils/dashboard-data';
 import type { DashboardFormatFn } from './types';
 import {
@@ -38,6 +40,7 @@ import {
   useDashboardTransactions,
   useDashboardInsights,
   useNetWorthSnapshots,
+  useNetWorthYearStart,
 } from './hooks';
 
 const DASHBOARD_GOAL_LIMIT = 4;
@@ -75,6 +78,8 @@ const buildMonthKey = (date: Date): string =>
 
 function useDashboardQueries(currentYear: number) {
   const netWorthQuery = useNetWorthSnapshots();
+  // The same summary query as the history; selecting it makes no extra request.
+  const yearStartQuery = useNetWorthYearStart();
   const allocationsQuery = useAssetAllocations();
   const transactionsQuery = useDashboardTransactions();
   const goalsQuery = useGoals();
@@ -91,6 +96,7 @@ function useDashboardQueries(currentYear: number) {
 
   return {
     netWorthQuery,
+    yearStartQuery,
     allocationsQuery,
     transactionsQuery,
     goalsQuery,
@@ -106,6 +112,7 @@ type DashboardQueries = ReturnType<typeof useDashboardQueries>;
 function getDashboardQueryData(queries: DashboardQueries) {
   return {
     netWorthData: queries.netWorthQuery.data ?? EMPTY_NET_WORTH,
+    yearStart: queries.yearStartQuery.data ?? null,
     allocations: queries.allocationsQuery.data ?? EMPTY_ALLOCATIONS_SUMMARY,
     transactions: queries.transactionsQuery.data ?? EMPTY_TRANSACTIONS,
     goals: queries.goalsQuery.data ?? EMPTY_GOALS,
@@ -122,12 +129,13 @@ function useDashboardData(
   const currentYear = today.getFullYear();
   const currentMonthKey = buildMonthKey(today);
   const queries = useDashboardQueries(currentYear);
-  const { netWorthData, allocations, transactions, goals, insights, savingsAccounts } =
+  const { netWorthData, yearStart, allocations, transactions, goals, insights, savingsAccounts } =
     getDashboardQueryData(queries);
   const derived = useMemo(
     () =>
       deriveDashboardData({
         netWorthData,
+        yearStart: toYearStartValue(yearStart, convertToBase),
         allocations,
         transactions,
         goals,
@@ -140,6 +148,7 @@ function useDashboardData(
       }),
     [
       netWorthData,
+      yearStart,
       allocations,
       transactions,
       goals,
@@ -156,6 +165,7 @@ function useDashboardData(
 
 function deriveDashboardData({
   netWorthData,
+  yearStart,
   allocations,
   transactions,
   goals,
@@ -165,7 +175,8 @@ function deriveDashboardData({
   currentMonthKey,
   convertToBase,
   fmtBase,
-}: ReturnType<typeof getDashboardQueryData> & {
+}: Omit<ReturnType<typeof getDashboardQueryData>, 'yearStart'> & {
+  yearStart: YearStartValue | null;
   currentYear: number;
   currentMonthKey: string;
   convertToBase: GoalProgressContext['convertToBase'];
@@ -189,7 +200,7 @@ function deriveDashboardData({
     investHabitBuyMonths: new Map([[currentYear, new Set(insights.investHabitBuyMonths)]]),
     convertToBase,
   };
-  const nwMetrics = computeNWMetrics(chartData, allocationSummary.netWorth, currentYear);
+  const nwMetrics = computeNWMetrics(chartData, allocationSummary.netWorth, yearStart);
   const {
     monthlyCategoryChange,
     monthlySalaryValue,
@@ -205,6 +216,7 @@ function deriveDashboardData({
   );
   return {
     chartData,
+    netWorthHistory: netWorthData,
     allocationData: allocationSummary.allocationData,
     totalAssets: allocationSummary.totalAssets,
     liabilitiesTotal: allocationSummary.liabilitiesTotal,
@@ -281,8 +293,10 @@ const getComparisonLabel = (chartData: DashboardData['chartData']): string | nul
 };
 
 function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPageBodyProps>) {
+  const { convertToBase } = useCurrency();
   const {
     chartData,
+    netWorthHistory,
     allocationData,
     totalAssets,
     liabilitiesTotal,
@@ -294,6 +308,7 @@ function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPa
     netWorth,
     monthChange,
     ytdPct,
+    ytdCaption,
     isEstimated,
   } = data;
 
@@ -312,6 +327,7 @@ function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPa
           monthChange={monthChange}
           comparisonLabel={getComparisonLabel(chartData)}
           ytdPct={ytdPct}
+          ytdCaption={ytdCaption}
           totalAssets={totalAssets}
           liabilitiesTotal={liabilitiesTotal}
           baseCurrency={baseCurrency}
@@ -324,7 +340,8 @@ function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPa
       </ContentSection>
       <ContentSection>
         <DashboardChartsGrid
-          chartData={chartData}
+          netWorthHistory={netWorthHistory}
+          convertToBase={convertToBase}
           allocationData={allocationData}
           totalAlloc={totalAssets}
           netWorth={netWorth}

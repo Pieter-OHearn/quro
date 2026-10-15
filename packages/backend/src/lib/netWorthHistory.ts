@@ -1,6 +1,7 @@
 import { getPropertyDebt } from './propertyDebt';
 import {
   addMonthsUtc,
+  DEFAULT_NET_WORTH_RANGE,
   holdingValue,
   monthEndUtc,
   monthStartUtc,
@@ -10,9 +11,11 @@ import {
   sumMoney,
   toIsoDate,
   toUtcTimestamp,
+  type NetWorthRange,
+  type NetWorthYearStart,
   type PensionTransactionType,
 } from '@quro/shared';
-import { and, desc, eq, getTableColumns, gte, lt, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, gte, lt, min, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/client';
 import {
   debtPayments,
@@ -49,7 +52,14 @@ import { ownedOrJointPredicate, loadHouseholdRows, scopeHouseholdRows } from '..
 import { toNumberOrZero } from '../lib/numbers';
 
 const BASE_CURRENCY = FX_BASE_CURRENCY;
-const NET_WORTH_HISTORY_MONTHS = 7;
+// Month-end points before the current month for the monthly ranges.
+const RANGE_MONTHS = { '6m': 6, '1y': 12 } as const;
+// Daily points before today for `1m`.
+const RANGE_DAYS = 30;
+/** `all` starts at the first dated record, but never more than this many months back. */
+export const NET_WORTH_ALL_MAX_MONTHS = 360;
+const DAY_MS = 86_400_000;
+const DECEMBER = 11;
 
 function toOptionalTimestamp(value: Date | string | null | undefined): number | null {
   if (!value) return null;
@@ -182,7 +192,7 @@ type JointScopedSourceRows = {
   mortgages: Array<typeof mortgages.$inferSelect>;
 };
 
-// Retain a boundary row so old-only ledgers still produce the same seven points.
+// Retain a boundary row so old-only ledgers still produce the same points as the full ledger.
 function loadSavingsHistory(access: SQL | undefined, start: string) {
   const columns = getTableColumns(savingsTransactions);
   const query = () =>
@@ -501,32 +511,97 @@ export function buildAllocationsFromSource(source: NetWorthSourceData): DerivedA
   );
 }
 
-function buildRollingMonths() {
-  const now = Date.now();
-  const currentMonth = monthStartUtc(now);
-  const firstMonth = addMonthsUtc(currentMonth, -(NET_WORTH_HISTORY_MONTHS - 1));
-  const months: Array<{
-    cutoff: number;
-    asOfDate: string;
-    snapshotDate: string;
-    isCurrent: boolean;
-    label: string;
-    year: number;
-  }> = [];
+/** One point of the history: everything dated after `cutoff` is replayed out of the balances. */
+export type HistoryPeriod = {
+  cutoff: number;
+  asOfDate: string;
+  /** The month end whose stored snapshot can stand in for the point; null for daily points. */
+  snapshotDate: string | null;
+  isCurrent: boolean;
+  label: string;
+  year: number;
+};
 
+function buildMonthlyPeriod(month: number, now: number): HistoryPeriod {
+  const isCurrent = month === monthStartUtc(now);
+  const cutoff = isCurrent ? now : monthEndUtc(month);
+  return {
+    cutoff,
+    asOfDate: toIsoDate(new Date(cutoff)),
+    snapshotDate: toIsoDate(new Date(monthEndUtc(month))),
+    isCurrent,
+    label: formatMonthShort(month),
+    year: new Date(month).getUTCFullYear(),
+  };
+}
+
+function buildMonthlyPeriods(firstMonth: number, now: number): HistoryPeriod[] {
+  const currentMonth = monthStartUtc(now);
+  const periods: HistoryPeriod[] = [];
   for (let month = firstMonth; month <= currentMonth; month = addMonthsUtc(month, 1)) {
-    const cutoff = month === currentMonth ? now : monthEndUtc(month);
-    months.push({
-      cutoff,
-      asOfDate: toIsoDate(new Date(cutoff)),
-      snapshotDate: toIsoDate(new Date(monthEndUtc(month))),
-      isCurrent: month === currentMonth,
-      label: formatMonthShort(month),
-      year: new Date(month).getUTCFullYear(),
+    periods.push(buildMonthlyPeriod(month, now));
+  }
+  return periods;
+}
+
+// Snapshots are month-end figures, so daily points are always rebuilt from the ledgers and the
+// stored rate and price history, as the current month's point is.
+function buildDailyPeriods(now: number): HistoryPeriod[] {
+  const today = toUtcTimestamp(toIsoDate(new Date(now)));
+  const periods: HistoryPeriod[] = [];
+  for (let offset = RANGE_DAYS; offset >= 0; offset -= 1) {
+    const day = today - offset * DAY_MS;
+    periods.push({
+      cutoff: offset === 0 ? now : day + DAY_MS - 1,
+      asOfDate: toIsoDate(new Date(day)),
+      snapshotDate: null,
+      isCurrent: offset === 0,
+      label: formatMonthShort(day),
+      year: new Date(day).getUTCFullYear(),
     });
   }
+  return periods;
+}
 
-  return months;
+/**
+ * The points of a range, oldest first, ending with the current moment. `firstRecordDate` is
+ * the household's first dated record and only moves the start of `all`.
+ */
+export function buildHistoryPeriods(
+  range: NetWorthRange = DEFAULT_NET_WORTH_RANGE,
+  now = Date.now(),
+  firstRecordDate: string | null = null,
+): HistoryPeriod[] {
+  const currentMonth = monthStartUtc(now);
+  if (range === '1m') return buildDailyPeriods(now);
+  if (range !== 'all') {
+    return buildMonthlyPeriods(addMonthsUtc(currentMonth, -RANGE_MONTHS[range]), now);
+  }
+  const earliest = addMonthsUtc(currentMonth, -NET_WORTH_ALL_MAX_MONTHS);
+  const firstRecord = firstRecordDate === null ? Number.NaN : toUtcTimestamp(firstRecordDate);
+  const firstMonth = Number.isFinite(firstRecord) ? monthStartUtc(firstRecord) : currentMonth;
+  return buildMonthlyPeriods(Math.min(currentMonth, Math.max(earliest, firstMonth)), now);
+}
+
+/**
+ * The point "year to date" measures from: the last month end before 1 January (the previous
+ * year end) when the household has a record before this year; otherwise the first point of this
+ * year, the month end of its first record (or now, when that is this month). Null without records.
+ */
+export function buildYearStartPeriod(
+  now: number,
+  firstRecordDate: string | null,
+): (HistoryPeriod & { from: NetWorthYearStart['from'] }) | null {
+  if (firstRecordDate === null) return null;
+  const firstRecord = toUtcTimestamp(firstRecordDate);
+  if (!Number.isFinite(firstRecord)) return null;
+  const yearStart = Date.UTC(new Date(now).getUTCFullYear(), 0, 1);
+  if (firstRecord < yearStart) {
+    const december = Date.UTC(new Date(now).getUTCFullYear() - 1, DECEMBER, 1);
+    return { ...buildMonthlyPeriod(december, now), from: 'previous-year-end' };
+  }
+  const month = Math.min(monthStartUtc(firstRecord), monthStartUtc(now));
+  return { ...buildMonthlyPeriod(month, now), from: 'first-point' };
 }
 
 function computeSavingsAtCutoff(
@@ -694,22 +769,88 @@ type NetWorthSourceData = {
   debts: DebtRow[];
   debtPayments: DebtPaymentRow[];
   snapshots: Array<typeof netWorthSnapshots.$inferSelect>;
+  /** The points to build; the default range when absent. */
+  periods?: HistoryPeriod[];
+  /** The point "year to date" measures from, when it was asked for and the household has one. */
+  yearStart?: ReturnType<typeof buildYearStartPeriod>;
 };
 
 type NetWorthHistoryPoint = {
   id: number;
   month: string;
   year: number;
+  date: string;
   totalValue: number;
   currency: string;
   isEstimated: boolean;
 };
 
-export async function loadNetWorthSourceData(
+/**
+ * The household's first dated record: the earliest row of the ledgers the history replays (the
+ * caller's own and the partner's joint savings and property rows, the caller's holding, pension
+ * and debt rows) or of the caller's stored snapshots. Null when there is none.
+ */
+async function loadFirstRecordDate(userId: number, partnerId: number | null) {
+  const rows = await db
+    .select({ first: min(savingsTransactions.date) })
+    .from(savingsTransactions)
+    .innerJoin(savingsAccounts, eq(savingsTransactions.accountId, savingsAccounts.id))
+    .where(ownedOrJointPredicate(savingsAccounts, userId, partnerId))
+    .unionAll(
+      db
+        .select({ first: min(propertyTransactions.date) })
+        .from(propertyTransactions)
+        .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
+        .where(ownedOrJointPredicate(properties, userId, partnerId)),
+    )
+    .unionAll(
+      db
+        .select({ first: min(holdingTransactions.date) })
+        .from(holdingTransactions)
+        .where(eq(holdingTransactions.userId, userId)),
+    )
+    .unionAll(
+      db
+        .select({ first: min(pensionTransactions.date) })
+        .from(pensionTransactions)
+        .where(eq(pensionTransactions.userId, userId)),
+    )
+    .unionAll(
+      db
+        .select({ first: min(debtPayments.date) })
+        .from(debtPayments)
+        .where(eq(debtPayments.userId, userId)),
+    )
+    .unionAll(
+      db
+        .select({ first: min(netWorthSnapshots.snapshotDate) })
+        .from(netWorthSnapshots)
+        .where(eq(netWorthSnapshots.userId, userId)),
+    );
+  const dates = rows.map((row) => row.first).filter((date): date is string => date !== null);
+  return dates.length > 0 ? dates.reduce((left, right) => (right < left ? right : left)) : null;
+}
+
+/**
+ * The points to build (the range, plus the year-start point when asked for), the stored snapshots
+ * that can stand in for them, and the first date whose ledgers must be replayed.
+ */
+async function planHistoryWindow(
   userId: number,
   partnerId: number | null,
-): Promise<NetWorthSourceData> {
-  const months = buildRollingMonths();
+  range: NetWorthRange,
+  withYearStart: boolean,
+) {
+  const now = Date.now();
+  const needsFirstRecord = range === 'all' || withYearStart;
+  const firstRecordDate = needsFirstRecord ? await loadFirstRecordDate(userId, partnerId) : null;
+  const periods = buildHistoryPeriods(range, now, firstRecordDate);
+  const yearStart = withYearStart ? buildYearStartPeriod(now, firstRecordDate) : null;
+  // Every point to compute, oldest first: the window and the snapshots must reach all of them.
+  const covered = [...periods, ...(yearStart ? [yearStart] : [])].sort(
+    (left, right) => left.cutoff - right.cutoff,
+  );
+  const firstPeriod = covered[0];
   // A failed read fails the request: a total never silently leaves out a whole asset class.
   const snapshots = await db
     .select()
@@ -717,14 +858,29 @@ export async function loadNetWorthSourceData(
     .where(
       and(
         eq(netWorthSnapshots.userId, userId),
-        gte(netWorthSnapshots.snapshotDate, months[0].snapshotDate),
+        gte(netWorthSnapshots.snapshotDate, firstPeriod.snapshotDate ?? firstPeriod.asOfDate),
       ),
     );
   const snapshotDates = new Set(snapshots.map((row) => row.snapshotDate));
-  const firstMissing = months.find(
-    (month) => month.isCurrent || !snapshotDates.has(month.snapshotDate),
+  const firstMissing = covered.find(
+    (period) =>
+      period.isCurrent || period.snapshotDate === null || !snapshotDates.has(period.snapshotDate),
   )!;
-  const windowStart = firstMissing.asOfDate;
+  return { periods, yearStart, snapshots, windowStart: firstMissing.asOfDate };
+}
+
+export async function loadNetWorthSourceData(
+  userId: number,
+  partnerId: number | null,
+  range: NetWorthRange = DEFAULT_NET_WORTH_RANGE,
+  options: { yearStart?: boolean } = {},
+): Promise<NetWorthSourceData> {
+  const { periods, yearStart, snapshots, windowStart } = await planHistoryWindow(
+    userId,
+    partnerId,
+    range,
+    options.yearStart === true,
+  );
   const [
     rates,
     historicalRates,
@@ -774,10 +930,15 @@ export async function loadNetWorthSourceData(
     debts: debtsData,
     debtPayments: debtPaymentsData,
     snapshots,
+    periods,
+    yearStart,
   };
 }
 
-function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
+function buildFallbackNetWorthHistory(
+  sourceData: NetWorthSourceData,
+  current: HistoryPeriod,
+): NetWorthHistoryPoint[] {
   const dropArchived = <T extends Archivable>(rows: readonly T[]): T[] =>
     rows.filter((row) => !row.archivedAt);
   const allocationSummary = computeDerivedAllocations(
@@ -790,15 +951,13 @@ function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthH
     dropArchived(sourceData.mortgages),
     dropArchived(sourceData.debts),
   );
-  const currentMonth = monthStartUtc(Date.now());
-  const totalValue = allocationSummary.netWorth;
-
   return [
     {
       id: 1,
-      month: formatMonthShort(currentMonth),
-      year: new Date(currentMonth).getUTCFullYear(),
-      totalValue,
+      month: current.label,
+      year: current.year,
+      date: current.asOfDate,
+      totalValue: allocationSummary.netWorth,
       currency: BASE_CURRENCY,
       isEstimated: false,
     },
@@ -806,13 +965,48 @@ function buildFallbackNetWorthHistory(sourceData: NetWorthSourceData): NetWorthH
 }
 
 export function buildNetWorthHistory(sourceData: NetWorthSourceData): NetWorthHistoryPoint[] {
-  const context = buildNetWorthHistoryContext(sourceData);
+  return buildHistoryWithContext(sourceData, buildNetWorthHistoryContext(sourceData));
+}
+
+function buildHistoryWithContext(
+  sourceData: NetWorthSourceData,
+  context: NetWorthHistoryContext,
+): NetWorthHistoryPoint[] {
+  const periods = sourceData.periods ?? buildHistoryPeriods();
   if (!hasNetWorthHistory(context, sourceData.snapshots)) {
-    return buildFallbackNetWorthHistory(sourceData);
+    return buildFallbackNetWorthHistory(sourceData, periods[periods.length - 1]);
   }
-  return buildRollingMonths().map((month, index) =>
-    buildNetWorthHistoryPoint(sourceData, context, month, index),
+  return periods.map((period, index) =>
+    buildNetWorthHistoryPoint(sourceData, context, period, index),
   );
+}
+
+/**
+ * The history and the year-start point of the dashboard summary, from one source and one
+ * context, so the year-start value is computed exactly like a point of the series.
+ */
+export function buildDashboardHistory(sourceData: NetWorthSourceData): {
+  netWorth: NetWorthHistoryPoint[];
+  yearStart: NetWorthYearStart | null;
+} {
+  const context = buildNetWorthHistoryContext(sourceData);
+  const period = sourceData.yearStart ?? null;
+  const point = period ? buildNetWorthHistoryPoint(sourceData, context, period, 0) : null;
+  return {
+    netWorth: buildHistoryWithContext(sourceData, context),
+    yearStart:
+      period && point
+        ? {
+            from: period.from,
+            month: point.month,
+            year: point.year,
+            date: point.date,
+            totalValue: point.totalValue,
+            currency: point.currency as NetWorthYearStart['currency'],
+            isEstimated: point.isEstimated,
+          }
+        : null,
+  };
 }
 
 type NetWorthHistoryContext = {
@@ -871,62 +1065,67 @@ function hasNetWorthHistory(
 function buildNetWorthHistoryPoint(
   sourceData: NetWorthSourceData,
   context: NetWorthHistoryContext,
-  month: ReturnType<typeof buildRollingMonths>[number],
+  period: HistoryPeriod,
   index: number,
 ): NetWorthHistoryPoint {
   // Current-month snapshots can predate a price sync or direct holding edit.
   // Rebuild that point from source data; completed months remain immutable snapshots.
-  const snapshot = month.isCurrent ? undefined : context.snapshotByDate.get(month.snapshotDate);
+  const snapshot =
+    period.isCurrent || period.snapshotDate === null
+      ? undefined
+      : context.snapshotByDate.get(period.snapshotDate);
   if (snapshot) {
     return {
       id: index + 1,
-      month: month.label,
-      year: month.year,
+      month: period.label,
+      year: period.year,
+      date: period.asOfDate,
       totalValue: toNumberOrZero(snapshot.totalValue),
       currency: snapshot.baseCurrency,
       isEstimated: snapshot.isEstimated,
     };
   }
   const historicalRates = context.ratesAt
-    ? context.ratesAt(month.asOfDate)
+    ? context.ratesAt(period.asOfDate)
     : { rates: sourceData.rates, isEstimated: true };
   const savings = computeSavingsAtCutoff(
     sourceData.savings,
     context.savingsByAccount,
-    month.cutoff,
+    period.cutoff,
     historicalRates.rates,
   );
   const brokerage = computeBrokerageAtCutoff(
     sourceData.holdings,
     context.holdingsById,
     context.holdingPricesById,
-    month.cutoff,
-    month.asOfDate,
+    period.cutoff,
+    period.asOfDate,
     historicalRates.rates,
   );
   const propertyEquity = computePropertyEquityAtCutoff(
     sourceData.properties,
     context.propertiesById,
-    buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, month.cutoff),
-    month.cutoff,
+    buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, period.cutoff),
+    period.cutoff,
     historicalRates.rates,
   );
   const pension = computePensionAtCutoff(
     sourceData.pensions,
     context.pensionsByPotId,
-    month.cutoff,
+    period.cutoff,
     historicalRates.rates,
   );
   const liabilities = computeDebtLiabilitiesAtCutoff(
     sourceData.debts,
     context.debtPaymentsByDebtId,
-    month.cutoff,
+    period.cutoff,
     historicalRates.rates,
   );
   return {
     id: index + 1,
-    month: month.label,
-    year: month.year,
+    month: period.label,
+    year: period.year,
+    date: period.asOfDate,
     totalValue: sumMoney([savings, brokerage.value, propertyEquity, pension, -liabilities]),
     currency: BASE_CURRENCY,
     isEstimated: historicalRates.isEstimated || brokerage.isEstimated,

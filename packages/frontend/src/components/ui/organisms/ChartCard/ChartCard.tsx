@@ -13,6 +13,7 @@ export type ChartCardProps = {
   emptyMessage?: ReactNode;
   className?: string;
   headerClassName?: string;
+  headerActionClassName?: string;
   contentClassName?: string;
   emptyStateClassName?: string;
 };
@@ -27,13 +28,20 @@ export function ChartCard({
   emptyMessage = 'No data yet.',
   className,
   headerClassName,
+  headerActionClassName,
   contentClassName,
   emptyStateClassName,
 }: Readonly<ChartCardProps>) {
   // A 36px card header, then the chart on 16px padding.
   return (
     <Card padding="none" className={cn('overflow-hidden', className)}>
-      <PanelHeader title={title} subtitle={subtitle} action={badge} className={headerClassName} />
+      <PanelHeader
+        title={title}
+        subtitle={subtitle}
+        action={badge}
+        className={headerClassName}
+        actionClassName={headerActionClassName}
+      />
 
       {hasData ? (
         <div className="p-4">

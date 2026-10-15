@@ -6,6 +6,7 @@ import {
   type DashboardAllocationsSummary as DashboardAllocationSummaryPayload,
   type DashboardTransaction as DashboardTransactionPayload,
   type NetWorthSnapshot,
+  type NetWorthYearStart,
   type Payslip,
 } from '@quro/shared';
 import type {
@@ -189,20 +190,57 @@ const computeSalaryMetrics = (
   };
 };
 
+/** Where "year to date" measures from, already converted to the display currency. */
+export type YearStartValue = Pick<NetWorthYearStart, 'from' | 'month' | 'year' | 'isEstimated'> & {
+  value: number;
+};
+
+export function toYearStartValue(
+  yearStart: NetWorthYearStart | null,
+  convertToBase: (amount: number, currency: string) => number,
+): YearStartValue | null {
+  if (!yearStart) return null;
+  const { from, month, year, isEstimated } = yearStart;
+  return {
+    from,
+    month,
+    year,
+    isEstimated,
+    value: convertToBase(yearStart.totalValue, yearStart.currency),
+  };
+}
+
+/**
+ * The "year to date" change: from the previous year end, or from the household's first point of
+ * this year when it has nothing before 1 January (the caption then names that month). A
+ * percentage of a zero or negative starting value means nothing, so it is null and not shown.
+ */
+export function computeYearToDate(
+  netWorth: number,
+  yearStart: YearStartValue | null,
+): { pct: number | null; caption: string } {
+  const since =
+    yearStart?.from === 'first-point'
+      ? `since ${yearStart.month} ${yearStart.year}`
+      : 'year to date';
+  const caption = yearStart?.isEstimated ? `${since} (estimated)` : since;
+  if (!yearStart || yearStart.value <= 0) return { pct: null, caption };
+  return { pct: ((netWorth - yearStart.value) / yearStart.value) * 100, caption };
+}
+
 export const computeNWMetrics = (
   chartData: readonly NetWorthMetricData[],
   fallbackNetWorth: number,
-  currentYear = new Date().getFullYear(),
+  yearStart: YearStartValue | null = null,
 ) => {
   const currentNW = fallbackNetWorth;
   const prevNW = chartData.length > 1 ? chartData[chartData.length - 2].value : currentNW;
-  const firstCurrentYearPoint = chartData.find((point) => point.year === currentYear);
-  const firstNW =
-    firstCurrentYearPoint?.value ?? (chartData.length > 0 ? chartData[0].value : currentNW);
+  const ytd = computeYearToDate(currentNW, yearStart);
   return {
     netWorth: currentNW,
     monthChange: currentNW - prevNW,
-    ytdPct: firstNW > 0 ? ((currentNW - firstNW) / firstNW) * 100 : 0,
+    ytdPct: ytd.pct,
+    ytdCaption: ytd.caption,
     isEstimated: chartData.at(-1)?.isEstimated ?? false,
   };
 };

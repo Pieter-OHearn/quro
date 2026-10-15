@@ -228,3 +228,21 @@ test('invalidating the household domain alone would keep the old rows readable',
   expect(client.getQueryData(keys.savings.accountList(false))).toBe('cached');
   client.clear();
 });
+
+test('ledger and price writes refresh every cached net-worth range; goal writes leave them', async () => {
+  const client = new QueryClient();
+  const ranges = [
+    keys.dashboard.netWorthRange('1m'),
+    keys.dashboard.netWorthRange('1y'),
+    keys.dashboard.netWorthRange('all'),
+  ];
+  for (const domain of ['savings', 'holdingPrices', 'debt', 'household'] as const) {
+    seed(client, ranges);
+    await invalidateDomain(client, domain);
+    for (const key of ranges) expect(isInvalidated(client, key)).toBe(true);
+  }
+  seed(client, ranges);
+  await invalidateDomain(client, 'goals');
+  for (const key of ranges) expect(isInvalidated(client, key)).toBe(false);
+  client.clear();
+});
