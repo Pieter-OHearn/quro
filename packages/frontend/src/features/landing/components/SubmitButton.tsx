@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui';
-import { cn } from '@/lib/utils';
 
 type SubmitButtonProps = {
   loading: boolean;
@@ -19,11 +18,10 @@ export function SubmitButton({
     <Button
       type="submit"
       variant="primary"
-      size="xl"
       fullWidth
       loading={loading}
       loadingLabel={loadingText}
-      className={cn('mt-2 font-semibold transition-all', className)}
+      className={className}
     >
       {idleContent}
     </Button>

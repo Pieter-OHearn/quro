@@ -1,37 +1,30 @@
+import { Card } from '@/components/ui';
 import { LANDING_FEATURES } from '../utils/landing-data';
+import { LANDING_CONTAINER_CLASS_NAME, LANDING_SECTION_CLASS_NAME } from './landingStyles';
+import { SectionIntro } from './SectionIntro';
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="bg-surface text-fg py-20">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="text-center mb-14">
-          <p className="text-xs font-semibold text-brand uppercase tracking-widest mb-3">
-            Everything you need
-          </p>
-          <h2 className="font-black text-4xl tracking-tight text-fg mb-4">
-            One app. Every financial category.
-          </h2>
-          <p className="text-fg-subtle max-w-lg mx-auto">
-            Stop juggling spreadsheets. Quro gives you a dedicated tracker for every part of your
-            financial life.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {LANDING_FEATURES.map(({ icon: Icon, label, desc, color, border }) => (
-            <div
-              key={label}
-              className={`bg-surface border border-border-subtle rounded-2xl p-5 hover:shadow-lg transition-all duration-200 cursor-default ${border}`}
-            >
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${color}`}
-              >
-                <Icon size={18} />
-              </div>
-              <p className="font-bold text-fg-emphasis mb-1.5">{label}</p>
-              <p className="text-sm text-fg-subtle leading-relaxed">{desc}</p>
-            </div>
+    <section id="features" className={LANDING_SECTION_CLASS_NAME}>
+      <div className={LANDING_CONTAINER_CLASS_NAME}>
+        <SectionIntro
+          eyebrow="Everything you need"
+          title="One app. Every financial category."
+          description="Stop juggling spreadsheets. Quro gives you a dedicated tracker for every part of your financial life."
+        />
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {LANDING_FEATURES.map(({ icon: Icon, label, desc }) => (
+            <li key={label}>
+              <Card className="h-full">
+                <h3 className="flex items-center gap-2 text-title-section text-fg">
+                  <Icon size={16} className="shrink-0 text-brand" aria-hidden="true" />
+                  {label}
+                </h3>
+                <p className="mt-1 text-cell text-fg-muted">{desc}</p>
+              </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

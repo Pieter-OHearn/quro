@@ -16,7 +16,8 @@ import {
   getPasswordStrength,
   formatPasswordChangedAt,
   useSavedState,
-  SectionHeader,
+  SettingsCard,
+  FormErrorNotice,
   SaveActionButton,
   DEFAULT_ERROR_MESSAGE,
 } from './settingsForm';
@@ -75,25 +76,30 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
   };
 
   return (
-    <div>
-      <SectionHeader
+    <div className="space-y-4">
+      <SettingsCard
         title="Security"
         subtitle="Change your password and sign out browsers you no longer use."
-      />
-
-      <div className="mb-6 flex items-center gap-4 rounded-3xl border border-border-default bg-surface-sunken p-4">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-success-soft-strong bg-success-soft">
-          <ShieldCheck size={18} className="text-success" />
+        footer={
+          <SaveActionButton
+            saved={saved}
+            loading={isSaving}
+            onClick={() => {
+              void handleSave();
+            }}
+          />
+        }
+      >
+        <div className="flex items-start gap-2">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
+          <div>
+            <p className="text-body font-medium text-fg">Password protected</p>
+            <p className="text-caption text-fg-subtle">
+              Last changed: {formatPasswordChangedAt(user.passwordUpdatedAt)}
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-fg">Password protected</p>
-          <p className="text-xs text-fg-subtle">
-            Last changed: {formatPasswordChangedAt(user.passwordUpdatedAt)}
-          </p>
-        </div>
-      </div>
 
-      <div className="mb-6 space-y-4">
         <FormField label="Current password" required error={errors.currentPassword}>
           <PasswordInput
             placeholder="Enter current password"
@@ -121,22 +127,22 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
             onToggle={() => setShowNextPassword((current) => !current)}
           />
           {form.nextPassword ? (
-            <div className="mt-3">
+            <div className="mt-2">
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((index) => (
                   <div
                     key={index}
                     className={cn(
-                      'h-1.5 flex-1 rounded-full transition-colors',
-                      index <= strength.score ? strength.barClassName : 'bg-border-default',
+                      'h-1.5 flex-1 rounded-full transition-colors duration-fast',
+                      index <= strength.score ? strength.barClassName : 'bg-surface-muted',
                     )}
                   />
                 ))}
-                <span className={cn('ml-2 text-xs font-semibold', strength.textClassName)}>
+                <span className={cn('ml-2 text-label', strength.textClassName)}>
                   {strength.label}
                 </span>
               </div>
-              <div className="mt-3 grid gap-1 text-xs sm:grid-cols-2">
+              <div className="mt-2 grid gap-1 text-caption sm:grid-cols-2">
                 {[
                   {
                     label: `${MIN_PASSWORD_LENGTH}+ characters`,
@@ -150,10 +156,14 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
                     key={item.label}
                     className={cn(
                       'flex items-center gap-1.5',
-                      item.valid ? 'text-success' : 'text-fg-faint',
+                      item.valid ? 'text-success' : 'text-fg-subtle',
                     )}
                   >
-                    <Check size={12} className={item.valid ? 'opacity-100' : 'opacity-0'} />
+                    <Check
+                      size={12}
+                      className={item.valid ? 'opacity-100' : 'opacity-0'}
+                      aria-hidden="true"
+                    />
                     {item.label}
                   </p>
                 ))}
@@ -175,41 +185,25 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
             onToggle={() => setShowConfirmPassword((current) => !current)}
           />
           {form.confirmPassword && form.confirmPassword === form.nextPassword ? (
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-success">
-              <Check size={12} />
+            <p className="mt-1 flex items-center gap-1.5 text-caption font-medium text-success">
+              <Check size={12} aria-hidden="true" />
               Passwords match
             </p>
           ) : null}
         </FormField>
-      </div>
 
-      <div className="mb-6 flex items-start gap-3 rounded-2xl border border-warning-soft-strong bg-warning-soft px-4 py-3">
-        <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-warning" />
-        <p className="text-sm text-warning-strong">
-          Use a password you are not reusing anywhere else. Quro stores password hashes, not raw
-          passwords.
-        </p>
-      </div>
+        <div className="flex items-start gap-2 rounded-md border border-warning bg-warning-soft p-3 text-cell text-warning">
+          <AlertTriangle size={16} className="mt-px shrink-0" aria-hidden="true" />
+          <p>
+            Use a password you are not reusing anywhere else. Quro stores password hashes, not raw
+            passwords.
+          </p>
+        </div>
 
-      {formError ? (
-        <p className="mb-4 rounded-2xl border border-danger-soft-strong bg-danger-soft px-4 py-3 text-sm text-danger-hover">
-          {formError}
-        </p>
-      ) : null}
+        {formError ? <FormErrorNotice>{formError}</FormErrorNotice> : null}
+      </SettingsCard>
 
-      <div className="flex justify-end">
-        <SaveActionButton
-          saved={saved}
-          loading={isSaving}
-          onClick={() => {
-            void handleSave();
-          }}
-        />
-      </div>
-
-      <div className="mt-8 border-t border-border-default pt-6">
-        <SessionsPanel />
-      </div>
+      <SessionsPanel />
     </div>
   );
 }

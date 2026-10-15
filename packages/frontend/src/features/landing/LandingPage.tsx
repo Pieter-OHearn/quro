@@ -15,7 +15,7 @@ export function LandingPage() {
   const { modal, closeModal, openSignIn, openSignUp } = useLandingModal();
 
   return (
-    <div className="min-h-screen bg-surface-inverse text-fg-inverted">
+    <div className="min-h-screen bg-surface-sunken text-fg">
       {modal === 'signin' && <SignInModal onClose={closeModal} onSwitchToSignUp={openSignUp} />}
       {modal === 'signup' && <SignUpModal onClose={closeModal} onSwitchToSignIn={openSignIn} />}
       <Navbar onSignIn={openSignIn} onSignUp={openSignUp} />

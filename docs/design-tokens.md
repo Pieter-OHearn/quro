@@ -24,6 +24,11 @@ sentence-case header, stat cards as label, figure and change, chart cards with a
 `duration-base`; the sheet rises from the bottom edge and leaves the same way, and only fades under
 reduced motion. `duration-fast`, `duration-base` and `duration-slow` resolve to the `--motion-*` tokens.
 
+Settings, the signed-out landing page with its sign-in, sign-up and password reset dialogs, the error
+screens and the notification panel use these components and V1 tokens only. Settings sections are cards
+with a card header and a footer for the save button; the landing page sits on the page ground with one
+filled button per view.
+
 Quro uses semantic CSS variables defined in
 [`packages/frontend/src/styles/theme.css`](../packages/frontend/src/styles/theme.css)
 to drive Tailwind utility classes. The goal is that shared UI primitives and

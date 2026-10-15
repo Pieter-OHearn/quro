@@ -1,26 +1,23 @@
+import { Card } from '@/components/ui';
 import { LANDING_PILLARS } from '../utils/landing-data';
+import { LANDING_CONTAINER_CLASS_NAME, LANDING_SECTION_CLASS_NAME } from './landingStyles';
 
 export function PillarsSection() {
   return (
-    <section className="bg-surface text-fg py-20 border-t border-border-subtle">
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="grid md:grid-cols-3 gap-6">
-          {LANDING_PILLARS.map(({ icon: Icon, title, desc, color }) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-border-subtle p-6 hover:shadow-md transition-shadow"
-            >
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${color}`}
-              >
-                <Icon size={18} className="text-fg-inverted" />
-              </div>
-              <h3 className="font-bold text-fg mb-2">{title}</h3>
-              <p className="text-sm text-fg-subtle leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+    <section className={LANDING_SECTION_CLASS_NAME}>
+      <ul className={`${LANDING_CONTAINER_CLASS_NAME} grid gap-4 md:grid-cols-3`}>
+        {LANDING_PILLARS.map(({ icon: Icon, title, desc }) => (
+          <li key={title}>
+            <Card className="h-full">
+              <h3 className="flex items-center gap-2 text-title-section text-fg">
+                <Icon size={16} className="shrink-0 text-brand" aria-hidden="true" />
+                {title}
+              </h3>
+              <p className="mt-1 text-cell text-fg-muted">{desc}</p>
+            </Card>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
