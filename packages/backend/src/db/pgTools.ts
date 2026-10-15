@@ -203,7 +203,8 @@ async function readToolMajor(toolName: PgToolName, command: string) {
   return major;
 }
 
-async function readServerMajor(connectionString: string) {
+/** The major version of the server behind `connectionString`; opens and closes one connection. */
+export async function readServerMajor(connectionString: string) {
   const { host, port } = parseConnectionString(connectionString);
   const sql = postgres(connectionString, { max: 1, connect_timeout: 10 });
   try {

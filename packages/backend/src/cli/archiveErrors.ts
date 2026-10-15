@@ -1,7 +1,11 @@
 import { ConfigError } from '../config';
 import { classifyDatabaseError, describeDatabaseError } from '../db/connectionErrors';
 import { PgToolError } from '../db/pgTools';
-import { BackupDirectoryError, SchemaNewerThanImageError } from '../backup/createBackup';
+import {
+  BackupDirectoryError,
+  SchemaNewerThanImageError,
+  UnsupportedServerError,
+} from '../backup/createBackup';
 import { ArchiveDecryptionError } from '../backup/encryption';
 import { ArchiveFormatError, ArchiveVersionError } from '../backup/manifest';
 import { RestoreRefusedError } from '../backup/restoreArchive';
@@ -24,7 +28,12 @@ const USAGE_ERRORS = [
   ArchiveNotFoundError,
   ArchiveKeyMissingError,
 ];
-const REFUSALS = [RestoreRefusedError, ArchiveVersionError, SchemaNewerThanImageError];
+const REFUSALS = [
+  RestoreRefusedError,
+  ArchiveVersionError,
+  SchemaNewerThanImageError,
+  UnsupportedServerError,
+];
 const DAMAGED = [ArchiveDecryptionError, ArchiveFormatError, ArchiveIntegrityError, TarFormatError];
 
 const MAX_CAUSE_DEPTH = 5;
