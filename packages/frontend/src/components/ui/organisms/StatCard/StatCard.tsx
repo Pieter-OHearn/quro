@@ -11,7 +11,8 @@ type StatCardColor = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose';
 const MINUS_SIGN = '\u2212';
 // Same look as the `Change` atom: tabular 13px figures in the gain, loss or flat colour.
 const CHANGE_CLASS_NAME = 'text-cell font-medium font-numeric';
-const CARD_CLASS_NAME = 'block rounded-lg border border-border-default bg-surface px-4 py-3';
+const CARD_CLASS_NAME =
+  'block rounded-lg border border-border-default bg-surface px-4 py-3 max-sm:rounded-xl';
 
 /** A change that arrives formatted; the zero rule and minus sign are applied to its text. */
 export type StatCardTextChange = { value: string; positive: boolean; details?: string };

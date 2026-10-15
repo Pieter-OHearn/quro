@@ -71,13 +71,7 @@ export function Pagination({
   };
 
   return (
-    <div
-      className={cn(
-        'mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3',
-        className,
-      )}
-      {...props}
-    >
+    <div className={cn('flex flex-wrap items-center justify-between gap-2', className)} {...props}>
       <p className={cn('text-caption font-numeric text-fg-muted', rangeClassName)}>
         {rangeStart}-{rangeEnd} of {totalCount}
       </p>

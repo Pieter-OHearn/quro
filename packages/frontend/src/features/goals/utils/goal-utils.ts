@@ -128,6 +128,15 @@ const getAnnualPct = (goal: Goal): number => {
   return Math.min((value / target) * 100, 100);
 };
 
+/**
+ * An annual goal counted per month against a limit (its unit ends in "/mo", such as
+ * "takeaways/mo") is a "lower is better" goal; this is true while it is still above its target.
+ */
+export const isAboveLowerIsBetterTarget = (goal: Goal): boolean =>
+  normalizeGoalType(goal) === 'annual' &&
+  Boolean(goal.unit?.endsWith('/mo')) &&
+  (goal.currentAmount || 0) > (goal.targetAmount || 0);
+
 export const resolveInvestHabitMonthsCompleted = (
   goal: Goal,
   context: GoalProgressContext,

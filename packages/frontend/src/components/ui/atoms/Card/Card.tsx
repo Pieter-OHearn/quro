@@ -14,7 +14,7 @@ export function Card({ className, padding = 'md', ...props }: CardProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border border-border-default bg-surface',
+        'rounded-lg border border-border-default bg-surface max-sm:rounded-xl',
         PADDING_CLASSES[padding],
         className,
       )}

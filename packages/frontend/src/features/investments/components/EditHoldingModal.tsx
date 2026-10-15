@@ -482,7 +482,7 @@ function PriceControlsSection({
           type="checkbox"
           checked={form.excludeFromSync}
           onChange={(e) => onToggleExcludeFromSync(e.target.checked)}
-          className="h-4 w-4 rounded-sm border-border-control accent-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+          className="h-4 w-4 rounded-sm border-border-control focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
         />
         <span className="text-cell text-fg">Exclude from price sync</span>
       </label>

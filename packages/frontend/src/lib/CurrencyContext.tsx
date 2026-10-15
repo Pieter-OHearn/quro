@@ -17,7 +17,7 @@ import {
   type NumberFormatPreference,
   type User,
 } from '@quro/shared';
-import { Button, LoadingSpinner } from '@/components/ui';
+import { Badge, Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from './AuthContext';
 import { apiPut } from './api';
 import { convertCurrencyAmount, type CurrencyRateTable } from './currencyRates';
@@ -67,23 +67,21 @@ type CurrencyRatesFallbackProps = {
 
 function CurrencyRatesFallback({ detail, onRetry }: Readonly<CurrencyRatesFallbackProps>) {
   return (
-    <div className="min-h-screen bg-surface-sunken flex items-center justify-center p-6">
-      <div className="w-full max-w-xl rounded-3xl border border-warning-border bg-surface p-8 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-warning">
-          Currency Rates Unavailable
-        </p>
-        <h1 className="mt-3 text-2xl font-semibold text-fg">Converted balances are paused</h1>
-        <p className="mt-3 text-sm leading-6 text-fg-muted">
+    <div className="min-h-dvh bg-surface-sunken flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-xl rounded-lg border border-border-default bg-surface p-4 max-sm:rounded-xl sm:p-6">
+        <Badge tone="warning">Currency rates unavailable</Badge>
+        <h1 className="mt-3 text-title-page text-fg">Converted balances are paused</h1>
+        <p className="mt-2 text-body text-fg-muted">
           Quro could not load the synced FX rates required to render converted totals safely. Native
           balances remain stored, but cross-currency views stay blocked until the rate source is
           available again.
         </p>
         {detail ? (
-          <p className="mt-4 rounded-2xl bg-surface-sunken px-4 py-3 text-xs leading-5 text-fg-subtle">
+          <p className="mt-4 rounded-md border border-border-subtle bg-surface-sunken px-3 py-2 text-caption text-fg-subtle">
             {detail}
           </p>
         ) : null}
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap gap-2">
           <Button onClick={onRetry}>Retry rate fetch</Button>
           <Button variant="secondary" onClick={() => window.location.reload()}>
             Reload app

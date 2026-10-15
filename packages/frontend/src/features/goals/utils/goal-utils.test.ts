@@ -5,6 +5,7 @@ import type { Goal } from '@quro/shared';
 import type { GoalProgressContext } from '../types';
 import {
   getGoalPct,
+  isAboveLowerIsBetterTarget,
   resolveGoalCurrentAmount,
   resolveInvestHabitMonthsCompleted,
 } from './goal-utils';
@@ -262,4 +263,15 @@ test('converts linked savings account goal targetAmount to base', () => {
   const resolved = resolveGoalCurrentAmount(goal, context);
   expect(resolved.currentAmount).toBe(5750 * 1.15);
   expect(getGoalPct(goal, context)).toBeCloseTo(((5750 * 1.15) / (10000 * 1.15)) * 100);
+});
+
+test('a monthly-limit annual goal above its target is a lower-is-better goal over target', () => {
+  const limit = { type: 'annual' as const, unit: 'takeaways/mo', targetAmount: 4 };
+  expect(isAboveLowerIsBetterTarget(buildGoal({ ...limit, currentAmount: 6 }))).toBe(true);
+  expect(isAboveLowerIsBetterTarget(buildGoal({ ...limit, currentAmount: 4 }))).toBe(false);
+  expect(isAboveLowerIsBetterTarget(buildGoal({ ...limit, currentAmount: 2 }))).toBe(false);
+  expect(isAboveLowerIsBetterTarget(buildGoal({ ...limit, unit: 'books', currentAmount: 6 }))).toBe(
+    false,
+  );
+  expect(isAboveLowerIsBetterTarget(buildGoal({ currentAmount: 20000 }))).toBe(false);
 });

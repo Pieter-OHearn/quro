@@ -30,9 +30,6 @@
   --brand-hover: #0f3d2b;
   --brand-fg: var(--brand-hover);
   --brand-soft: #e3f0e9;
-  --brand-disabled: var(--surface-muted);
-  --brand-border: var(--border-default);
-  --brand-soft-strong: var(--brand-soft);
 
   /* Secondary (lilac): goals, projections, highlights. */
   --secondary: #6b4fd8;
@@ -44,7 +41,6 @@
   --surface-muted: #eeede7;
   --surface-nav: #fbfaf7;
   --surface-inverse: var(--fg);
-  --surface-inverse-raised: var(--surface-inverse);
   --scrim: #15201b66;
 
   /* Border. */
@@ -60,9 +56,6 @@
   --fg-faint: #879089;
   --fg-inverted: #ffffff;
   --fg-on-inverse: var(--surface-sunken);
-  --fg-strong: var(--fg);
-  --fg-emphasis: var(--fg);
-  --fg-disabled: var(--fg-faint);
 
   /* Change: gain, loss, flat. */
   --gain: #167242;
@@ -74,30 +67,18 @@
   /* Status — success (the gain colour). */
   --success: var(--gain);
   --success-soft: var(--gain-soft);
-  --success-fg: var(--success);
-  --success-border: var(--success);
-  --success-soft-strong: var(--success-soft);
 
   /* Status — warning. */
   --warning: #8a5300;
   --warning-soft: #fbf0d9;
-  --warning-fg: var(--warning);
-  --warning-border: var(--warning);
-  --warning-soft-strong: var(--warning-soft);
 
   /* Status — danger (the loss colour). */
   --danger: var(--loss);
   --danger-soft: var(--loss-soft);
-  --danger-fg: var(--danger);
-  --danger-border: var(--danger);
-  --danger-soft-strong: var(--danger-soft);
 
   /* Status — info. */
   --info: #23618e;
   --info-soft: #e6f0f8;
-  --info-fg: var(--info);
-  --info-border: var(--info);
-  --info-soft-strong: var(--info-soft);
 
   /* Focus ring. */
   --focus-ring: var(--brand);
@@ -114,77 +95,12 @@
   --chart-axis: var(--fg-subtle);
 
   /*
-   * Legacy tones. Aliases of the tokens above so existing utilities keep compiling
-   * until the screens that use them are migrated; deleted with the other legacy aliases.
-   */
-  --accent-cool-fg: var(--info);
-  --accent-cool-soft: var(--info-soft);
-  --accent-creative: var(--secondary);
-  --accent-creative-border: var(--secondary);
-  --accent-creative-muted: var(--secondary);
-  --accent-creative-soft: var(--secondary-soft);
-  --accent-highlight: var(--secondary);
-  --accent-highlight-fg: var(--secondary);
-  --accent-highlight-soft: var(--secondary-soft);
-  --accent-link-accent: var(--info);
-  --accent-premium: var(--secondary);
-  --accent-premium-accent: var(--secondary);
-  --accent-premium-fg: var(--secondary);
-  --accent-premium-muted: var(--secondary);
-  --accent-secondary: var(--brand);
-  --accent-secondary-border: var(--brand);
-  --accent-secondary-fg: var(--brand);
-  --accent-secondary-soft: var(--brand-soft);
-  --accent-warm: var(--warning);
-  --accent-warm-border: var(--warning);
-  --accent-warm-fg: var(--warning);
-  --accent-warm-soft: var(--warning-soft);
-  --brand-accent: var(--brand);
-  --brand-deep: var(--brand-hover);
-  --brand-strong: var(--brand-hover);
-  --brand-tint: var(--brand-soft);
-  --danger-border-strong: var(--danger);
-  --danger-hover: var(--danger);
-  --danger-muted: var(--danger);
-  --danger-strong: var(--danger);
-  --fg-deep: var(--fg);
-  --info-accent: var(--info);
-  --info-border-strong: var(--info);
-  --info-muted: var(--info);
-  --overlay: var(--scrim);
-  --success-accent: var(--success);
-  --success-border-strong: var(--success);
-  --success-muted: var(--success);
-  --success-strong: var(--success);
-  --surface-auth-end: var(--surface-inverse);
-  --surface-code: var(--surface-inverse);
-  --surface-code-header: var(--surface-inverse);
-  --surface-debt-end: var(--surface-inverse);
-  --surface-debt-middle: var(--surface-inverse);
-  --surface-footer: var(--surface-inverse);
-  --surface-inverse-hover: var(--surface-inverse);
-  --surface-inverse-panel: var(--surface-inverse);
-  --surface-inverse-panel-hover: var(--surface-inverse);
-  --surface-mortgage-end: var(--surface-inverse);
-  --surface-pension-end: var(--surface-inverse);
-  --surface-pension-middle: var(--surface-inverse);
-  --surface-preview: var(--surface-inverse);
-  --surface-settings-end: var(--surface-inverse);
-  --surface-settings-middle: var(--surface-inverse);
-  --surface-tooltip: var(--surface-inverse);
-  --surface-welcome-end: var(--surface-inverse);
-  --warning-accent: var(--warning);
-  --warning-border-strong: var(--warning);
-  --warning-muted: var(--warning);
-  --warning-strong: var(--warning);
-
-  /*
    * Display colours for the persisted DATA_COLORS identities (see lib/dataColors.ts).
    * The stored hex values never change; only what they render as does.
    */
-  --data-alert: var(--loss);
+  --data-alert: var(--viz-4);
   --data-cash: var(--viz-1);
-  --data-expense: var(--loss);
+  --data-expense: var(--viz-4);
   --data-expense-muted: var(--viz-4);
   --data-forecast: var(--viz-3);
   --data-growth: var(--viz-1);
@@ -283,10 +199,7 @@
 
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
-  --color-brand-disabled: var(--brand-disabled);
-  --color-brand-border: var(--brand-border);
   --color-brand-soft: var(--brand-soft);
-  --color-brand-soft-strong: var(--brand-soft-strong);
   --color-brand-fg: var(--brand-fg);
   --color-secondary: var(--secondary);
   --color-secondary-soft: var(--secondary-soft);
@@ -296,7 +209,6 @@
   --color-surface-muted: var(--surface-muted);
   --color-surface-nav: var(--surface-nav);
   --color-surface-inverse: var(--surface-inverse);
-  --color-surface-inverse-raised: var(--surface-inverse-raised);
   --color-scrim: var(--scrim);
 
   --color-border-subtle: var(--border-subtle);
@@ -305,11 +217,9 @@
   --color-border-strong: var(--border-strong);
 
   --color-fg: var(--fg);
-  --color-fg-strong: var(--fg-strong);
   --color-fg-muted: var(--fg-muted);
   --color-fg-subtle: var(--fg-subtle);
   --color-fg-faint: var(--fg-faint);
-  --color-fg-disabled: var(--fg-disabled);
   --color-fg-inverted: var(--fg-inverted);
   --color-fg-on-inverse: var(--fg-on-inverse);
 
@@ -320,108 +230,16 @@
   --color-flat: var(--flat);
 
   --color-success: var(--success);
-  --color-success-fg: var(--success-fg);
   --color-success-soft: var(--success-soft);
-  --color-success-soft-strong: var(--success-soft-strong);
-  --color-success-border: var(--success-border);
 
   --color-warning: var(--warning);
-  --color-warning-fg: var(--warning-fg);
   --color-warning-soft: var(--warning-soft);
-  --color-warning-soft-strong: var(--warning-soft-strong);
-  --color-warning-border: var(--warning-border);
 
   --color-danger: var(--danger);
-  --color-danger-fg: var(--danger-fg);
   --color-danger-soft: var(--danger-soft);
-  --color-danger-soft-strong: var(--danger-soft-strong);
-  --color-danger-border: var(--danger-border);
 
   --color-info: var(--info);
-  --color-info-fg: var(--info-fg);
   --color-info-soft: var(--info-soft);
-  --color-info-soft-strong: var(--info-soft-strong);
-  --color-info-border: var(--info-border);
-
-  --color-accent-cool-fg: var(--accent-cool-fg);
-  --color-accent-cool-soft: var(--accent-cool-soft);
-  --color-accent-creative: var(--accent-creative);
-  --color-accent-creative-border: var(--accent-creative-border);
-  --color-accent-creative-muted: var(--accent-creative-muted);
-  --color-accent-creative-soft: var(--accent-creative-soft);
-  --color-accent-highlight: var(--accent-highlight);
-  --color-accent-highlight-fg: var(--accent-highlight-fg);
-  --color-accent-highlight-soft: var(--accent-highlight-soft);
-  --color-accent-link-accent: var(--accent-link-accent);
-  --color-accent-premium: var(--accent-premium);
-  --color-accent-premium-accent: var(--accent-premium-accent);
-  --color-accent-premium-fg: var(--accent-premium-fg);
-  --color-accent-premium-muted: var(--accent-premium-muted);
-  --color-accent-secondary: var(--accent-secondary);
-  --color-accent-secondary-border: var(--accent-secondary-border);
-  --color-accent-secondary-fg: var(--accent-secondary-fg);
-  --color-accent-secondary-soft: var(--accent-secondary-soft);
-  --color-accent-warm: var(--accent-warm);
-  --color-accent-warm-border: var(--accent-warm-border);
-  --color-accent-warm-fg: var(--accent-warm-fg);
-  --color-accent-warm-soft: var(--accent-warm-soft);
-  --color-brand-accent: var(--brand-accent);
-  --color-brand-deep: var(--brand-deep);
-  --color-brand-strong: var(--brand-strong);
-  --color-brand-tint: var(--brand-tint);
-  --color-danger-border-strong: var(--danger-border-strong);
-  --color-danger-hover: var(--danger-hover);
-  --color-danger-muted: var(--danger-muted);
-  --color-danger-strong: var(--danger-strong);
-  --color-data-alert: var(--data-alert);
-  --color-data-cash: var(--data-cash);
-  --color-data-expense: var(--data-expense);
-  --color-data-expense-muted: var(--data-expense-muted);
-  --color-data-forecast: var(--data-forecast);
-  --color-data-growth: var(--data-growth);
-  --color-data-income: var(--data-income);
-  --color-data-link: var(--data-link);
-  --color-data-liquidity: var(--data-liquidity);
-  --color-data-milestone: var(--data-milestone);
-  --color-data-neutral: var(--data-neutral);
-  --color-data-portfolio: var(--data-portfolio);
-  --color-data-portfolio-muted: var(--data-portfolio-muted);
-  --color-data-premium: var(--data-premium);
-  --color-data-primary: var(--data-primary);
-  --color-data-property: var(--data-property);
-  --color-data-recurring: var(--data-recurring);
-  --color-data-sun: var(--data-sun);
-  --color-fg-deep: var(--fg-deep);
-  --color-fg-emphasis: var(--fg-emphasis);
-  --color-info-accent: var(--info-accent);
-  --color-info-border-strong: var(--info-border-strong);
-  --color-info-muted: var(--info-muted);
-  --color-overlay: var(--overlay);
-  --color-success-accent: var(--success-accent);
-  --color-success-border-strong: var(--success-border-strong);
-  --color-success-muted: var(--success-muted);
-  --color-success-strong: var(--success-strong);
-  --color-surface-auth-end: var(--surface-auth-end);
-  --color-surface-code: var(--surface-code);
-  --color-surface-code-header: var(--surface-code-header);
-  --color-surface-debt-end: var(--surface-debt-end);
-  --color-surface-debt-middle: var(--surface-debt-middle);
-  --color-surface-footer: var(--surface-footer);
-  --color-surface-inverse-hover: var(--surface-inverse-hover);
-  --color-surface-inverse-panel: var(--surface-inverse-panel);
-  --color-surface-inverse-panel-hover: var(--surface-inverse-panel-hover);
-  --color-surface-mortgage-end: var(--surface-mortgage-end);
-  --color-surface-pension-end: var(--surface-pension-end);
-  --color-surface-pension-middle: var(--surface-pension-middle);
-  --color-surface-preview: var(--surface-preview);
-  --color-surface-settings-end: var(--surface-settings-end);
-  --color-surface-settings-middle: var(--surface-settings-middle);
-  --color-surface-tooltip: var(--surface-tooltip);
-  --color-surface-welcome-end: var(--surface-welcome-end);
-  --color-warning-accent: var(--warning-accent);
-  --color-warning-border-strong: var(--warning-border-strong);
-  --color-warning-muted: var(--warning-muted);
-  --color-warning-strong: var(--warning-strong);
 
   --color-focus-ring: var(--focus-ring);
 
@@ -471,6 +289,20 @@
  * The figure styles also lock tabular, lining numerals. "Below 640px" is the phone size.
  * New names here must also be added to `TYPE_SCALE_UTILITIES` in `lib/utils.ts`.
  */
+/* The landing headline only, never inside the app: a marketing display size, not a figure, so it
+ * keeps proportional numerals. */
+@utility text-figure-display {
+  font-size: 48px;
+  line-height: 52px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+
+  @media (width < 640px) {
+    font-size: 36px;
+    line-height: 40px;
+  }
+}
+
 @utility text-figure-hero {
   font-size: 30px;
   line-height: 36px;
@@ -598,6 +430,12 @@
   textarea,
   [contenteditable] {
     -webkit-user-select: text;
+  }
+
+  /* Native checkboxes and radios take the action colour when checked. */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--brand);
   }
 
   /**

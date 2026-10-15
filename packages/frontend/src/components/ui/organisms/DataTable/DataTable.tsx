@@ -39,7 +39,7 @@ const TABLE_VARIANT_CLASSES = {
 } as const;
 
 const MOBILE_CARD_CLASS_NAME =
-  'max-md:rounded-lg max-md:border max-md:border-border-default max-md:bg-surface max-md:px-3 max-sm:px-4';
+  'max-md:rounded-lg max-md:border max-md:border-border-default max-md:bg-surface max-md:px-3 max-sm:rounded-xl max-sm:px-4';
 const MOBILE_CELL_CLASS_NAME =
   'max-md:flex max-md:min-h-9 max-md:items-center max-md:justify-between max-md:gap-4 max-md:border-0 max-md:px-0 max-md:py-1.5 max-sm:min-h-12';
 
