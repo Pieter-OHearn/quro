@@ -61,7 +61,7 @@ services:
   # `docker compose up`; when nothing is pending it changes nothing. Also the place to run
   # maintenance commands: `docker compose run --rm migrate doctor`, `... migrate backup`.
   migrate:
-    image: ghcr.io/pieter-ohearn/quro-backend:v0.8.0
+    image: ghcr.io/pieter-ohearn/quro-backend:v0.9.0
     command: ['migrate']
     restart: 'no'
     env_file: ./config/quro.env
@@ -91,7 +91,7 @@ services:
         condition: service_healthy
 
   backend:
-    image: ghcr.io/pieter-ohearn/quro-backend:v0.8.0
+    image: ghcr.io/pieter-ohearn/quro-backend:v0.9.0
     restart: unless-stopped
     env_file: ./config/quro.env
     secrets:
@@ -123,7 +123,7 @@ services:
         condition: service_completed_successfully
 
   frontend:
-    image: ghcr.io/pieter-ohearn/quro-frontend:v0.8.0
+    image: ghcr.io/pieter-ohearn/quro-frontend:v0.9.0
     restart: unless-stopped
     environment:
       QRO_API_URL: http://backend:3000

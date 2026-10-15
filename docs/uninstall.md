@@ -21,7 +21,7 @@ docker compose down
 This removes the containers and the Compose networks. It keeps the database volume (`quro_postgres`), `config/`, `data/documents/` and `backups/`. `docker compose up -d` later starts Quro again with the same data and accounts. You can also remove the images to free disk space; the next `up -d` pulls them again:
 
 ```bash
-docker image rm ghcr.io/pieter-ohearn/quro-backend:v0.8.0 ghcr.io/pieter-ohearn/quro-frontend:v0.8.0 postgres:18.6-alpine3.23
+docker image rm ghcr.io/pieter-ohearn/quro-backend:v0.9.0 ghcr.io/pieter-ohearn/quro-frontend:v0.9.0 postgres:18.6-alpine3.23
 ```
 
 Use the tags in your `compose.yaml`, and leave out `postgres` if other containers on the host use that image.
