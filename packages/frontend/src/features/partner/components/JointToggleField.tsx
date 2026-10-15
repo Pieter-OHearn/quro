@@ -21,10 +21,10 @@ export function JointToggleField({ checked, onChange, hint, className }: JointTo
   return (
     <label
       className={cn(
-        'flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
+        'flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2 transition-colors duration-fast max-sm:min-h-11',
         checked
-          ? 'border-brand-border bg-brand-soft/60'
-          : 'border-border-default hover:border-border-strong',
+          ? 'border-brand bg-brand-soft'
+          : 'border-border-control hover:bg-surface-muted active:bg-surface-muted',
         className,
       )}
     >
@@ -32,14 +32,14 @@ export function JointToggleField({ checked, onChange, hint, className }: JointTo
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-border-strong text-brand focus:ring-brand-accent"
+        className="mt-0.5 h-4 w-4 rounded-sm border-border-control accent-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       />
       <span className="min-w-0">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-fg">
-          <Users size={14} className="text-brand-accent" />
+        <span className="flex items-center gap-1.5 text-cell font-medium text-fg">
+          <Users size={14} className="text-fg-muted" aria-hidden />
           Joint with {partnerName}
         </span>
-        <span className="mt-0.5 block text-xs text-fg-subtle">
+        <span className="mt-0.5 block text-caption text-fg-subtle">
           {hint ?? 'Both of you can view and edit this, and it counts 50/50 in your dashboards.'}
         </span>
       </span>

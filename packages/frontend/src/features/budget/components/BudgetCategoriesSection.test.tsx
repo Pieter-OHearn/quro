@@ -55,7 +55,7 @@ test('BudgetCategoriesSection renders shared table rows with mobile-critical cat
   expect(markup).not.toContain('<table');
   expect(markup).toContain('Dining');
   expect(markup).toContain('EUR 260.00 / EUR 200');
-  expect(markup).toContain('-EUR 60');
+  expect(markup).toContain('\u2212EUR 60');
   expect(markup).toContain('aria-label="Edit Dining"');
   expect(markup).toContain('width:100%');
 });

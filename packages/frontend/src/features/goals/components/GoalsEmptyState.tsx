@@ -19,10 +19,7 @@ export function GoalsEmptyState({
       title={`No ${activeFilter !== 'all' ? `${activeFilter} ` : ''}goals for ${activeYear}`}
       description="Add a goal to start tracking your financial progress."
       tone="neutral"
-      className="rounded-2xl border border-dashed border-border-default bg-surface p-12"
-      titleClassName="text-fg-subtle"
-      descriptionClassName="mb-4"
-      action={{ label: 'Add Your First Goal', onClick: onAdd }}
+      action={{ label: 'Add Your First Goal', onClick: onAdd, variant: 'secondary' }}
     />
   );
 }

@@ -1,3 +1,4 @@
+import { PageStack } from '@/components/ui';
 import type { GoalsPageState } from '../types';
 import { AddGoalModal } from './AddGoalModal';
 import { EditGoalModal } from './EditGoalModal';
@@ -14,7 +15,7 @@ export function GoalsMainContent({ state }: Readonly<GoalsMainContentProps>) {
   const initialFilter = state.activeFilter !== 'all' ? state.activeFilter : undefined;
 
   return (
-    <div className="p-6 space-y-6">
+    <PageStack>
       {state.showAdd && (
         <AddGoalModal
           onClose={() => state.setShowAdd(false)}
@@ -58,6 +59,6 @@ export function GoalsMainContent({ state }: Readonly<GoalsMainContentProps>) {
         onToggleMissedMonth={state.handleToggleMissedMonth}
         onAdd={() => state.setShowAdd(true)}
       />
-    </div>
+    </PageStack>
   );
 }

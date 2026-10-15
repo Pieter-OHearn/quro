@@ -8,8 +8,8 @@ const MIN_GROWTH_POINTS = 2;
 export type SalaryBreakdownItem = {
   label: string;
   val: number;
+  /** Swatch class for the legend dot; the same colour as its bar segment. */
   color: string;
-  tc: string;
   pct?: number;
 };
 
@@ -46,38 +46,33 @@ export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => 
     {
       label: 'Gross Pay',
       val: payslip.gross,
-      color: 'bg-border-default',
-      tc: 'text-fg-strong',
+      color: 'bg-fg',
     },
     ...(payslip.bonus
       ? [
           {
             label: 'Bonus',
             val: payslip.bonus,
-            color: 'bg-warning-border',
-            tc: 'text-warning-fg',
+            color: 'bg-viz-5',
           },
         ]
       : []),
     {
       label: 'Take-Home Pay',
       val: payslip.net,
-      color: 'bg-success-accent',
-      tc: 'text-success-fg',
+      color: 'bg-viz-1',
       pct: percentageOfTotal(Math.abs(payslip.net), totalPay),
     },
     {
       label: hasTaxCorrection ? 'Tax Correction' : 'Income Tax',
       val: -payslip.tax,
-      color: hasTaxCorrection ? 'bg-success-border-strong' : 'bg-danger-muted',
-      tc: hasTaxCorrection ? 'text-success-fg' : 'text-danger-hover',
+      color: 'bg-viz-6',
       pct: percentageOfTotal(Math.abs(payslip.tax), totalPay),
     },
     {
       label: hasPensionCorrection ? 'Pension Correction' : 'Pension',
       val: -payslip.pension,
-      color: hasPensionCorrection ? 'bg-success-border-strong' : 'bg-brand-disabled',
-      tc: hasPensionCorrection ? 'text-success-fg' : 'text-brand',
+      color: 'bg-viz-3',
       pct: percentageOfTotal(Math.abs(payslip.pension), totalPay),
     },
   ];

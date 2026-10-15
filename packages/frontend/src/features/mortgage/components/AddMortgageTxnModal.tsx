@@ -1,4 +1,5 @@
 import {
+  Change,
   Modal,
   ModalFooter,
   ModalHeader,
@@ -52,26 +53,28 @@ type ContextPillProps = {
 
 function ContextPill({ type, mortgage, fmt }: ContextPillProps) {
   return (
-    <div className="flex items-center gap-3 bg-surface-sunken rounded-xl px-4 py-2.5 text-xs text-fg-muted">
+    <div className="flex items-center gap-2 rounded-md bg-surface-sunken px-3 py-2 text-cell text-fg-muted">
       {type === 'repayment' && (
         <>
           <span>Current balance</span>
-          <span className="text-fg-disabled">·</span>
-          <span className="font-semibold text-fg-emphasis">{fmt(mortgage.outstandingBalance)}</span>
+          <span className="text-fg-faint">·</span>
+          <span className="font-medium font-numeric text-fg">
+            {fmt(mortgage.outstandingBalance)}
+          </span>
         </>
       )}
       {type === 'valuation' && (
         <>
           <span>Current value</span>
-          <span className="text-fg-disabled">·</span>
-          <span className="font-semibold text-fg-emphasis">{fmt(mortgage.propertyValue)}</span>
+          <span className="text-fg-faint">·</span>
+          <span className="font-medium font-numeric text-fg">{fmt(mortgage.propertyValue)}</span>
         </>
       )}
       {type === 'rate_change' && (
         <>
           <span>Current rate</span>
-          <span className="text-fg-disabled">·</span>
-          <span className="font-semibold text-fg-emphasis">{mortgage.interestRate}%</span>
+          <span className="text-fg-faint">·</span>
+          <span className="font-medium font-numeric text-fg">{mortgage.interestRate}%</span>
         </>
       )}
     </div>
@@ -99,21 +102,24 @@ function RepaymentPreview({
 }: Omit<LivePreviewProps, 'type' | 'computedFixedUntil'>) {
   return (
     <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">Total payment</span>
-        <span className="font-semibold text-fg-emphasis">{fmt(parsedAmount)}</span>
+        <span className="font-medium font-numeric text-fg">{fmt(parsedAmount)}</span>
       </div>
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">Interest (cost)</span>
-        <span className="font-semibold text-danger">{fmt(parsedInterest)}</span>
+        <span className="font-medium font-numeric text-fg">{fmt(parsedInterest)}</span>
       </div>
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">Principal (reduces balance)</span>
-        <span className="font-semibold text-brand">−{fmt(derivedPrincipal)}</span>
+        <span className="font-medium font-numeric text-fg">
+          {'\u2212'}
+          {fmt(derivedPrincipal)}
+        </span>
       </div>
-      <div className="flex justify-between text-xs border-t border-brand-soft-strong pt-1.5 mt-1">
+      <div className="mt-1 flex justify-between gap-3 border-t border-border-strong pt-1.5 text-cell">
         <span className="text-fg-muted">New balance</span>
-        <span className="font-semibold text-fg-emphasis">
+        <span className="font-medium font-numeric text-fg">
           {fmt(Math.max(0, mortgage.outstandingBalance - derivedPrincipal))}
         </span>
       </div>
@@ -126,33 +132,29 @@ function ValuationPreview({
   mortgage,
   fmt,
 }: Pick<LivePreviewProps, 'parsedAmount' | 'mortgage' | 'fmt'>) {
-  const { numberFormat } = useCurrency();
+  const { numberFormat, baseCurrency } = useCurrency();
   return (
     <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">Previous value</span>
-        <span className="font-semibold text-fg-emphasis">{fmt(mortgage.propertyValue)}</span>
+        <span className="font-medium font-numeric text-fg">{fmt(mortgage.propertyValue)}</span>
       </div>
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">New value</span>
-        <span
-          className={`font-semibold ${parsedAmount >= mortgage.propertyValue ? 'text-success' : 'text-danger'}`}
-        >
-          {fmt(parsedAmount)}
-        </span>
+        <span className="font-medium font-numeric text-fg">{fmt(parsedAmount)}</span>
       </div>
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">Change</span>
-        <span
-          className={`font-semibold ${parsedAmount >= mortgage.propertyValue ? 'text-success' : 'text-danger'}`}
-        >
-          {parsedAmount >= mortgage.propertyValue ? '+' : ''}
-          {fmt(parsedAmount - mortgage.propertyValue)}
-        </span>
+        <Change
+          format="amount"
+          currency={baseCurrency}
+          value={parsedAmount - mortgage.propertyValue}
+          showArrow={false}
+        />
       </div>
-      <div className="flex justify-between text-xs border-t border-success-soft-strong pt-1.5 mt-1">
+      <div className="mt-1 flex justify-between gap-3 border-t border-border-strong pt-1.5 text-cell">
         <span className="text-fg-muted">New LTV</span>
-        <span className="font-semibold text-fg-emphasis">
+        <span className="font-medium font-numeric text-fg">
           {formatPercent((mortgage.outstandingBalance / parsedAmount) * 100, numberFormat, 1)}
         </span>
       </div>
@@ -168,28 +170,24 @@ function RateChangePreview({
 }: Pick<LivePreviewProps, 'parsedAmount' | 'computedFixedUntil' | 'mortgage' | 'fmt'>) {
   return (
     <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">Previous rate</span>
-        <span className="font-semibold text-fg-emphasis">{mortgage.interestRate}%</span>
+        <span className="font-medium font-numeric text-fg">{mortgage.interestRate}%</span>
       </div>
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">New rate</span>
-        <span
-          className={`font-semibold ${parsedAmount <= mortgage.interestRate ? 'text-success' : 'text-danger'}`}
-        >
-          {parsedAmount}%
-        </span>
+        <span className="font-medium font-numeric text-fg">{parsedAmount}%</span>
       </div>
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between gap-3 text-cell">
         <span className="text-fg-muted">Monthly interest est.</span>
-        <span className="font-semibold text-fg-emphasis">
+        <span className="font-medium font-numeric text-fg">
           {fmt(monthlyInterest(mortgage.outstandingBalance, parsedAmount))}
         </span>
       </div>
       {computedFixedUntil && (
-        <div className="flex justify-between text-xs border-t border-warning-soft-strong pt-1.5 mt-1">
+        <div className="mt-1 flex justify-between gap-3 border-t border-border-strong pt-1.5 text-cell">
           <span className="text-fg-muted">Fixed until</span>
-          <span className="font-semibold text-warning">{computedFixedUntil}</span>
+          <span className="font-medium text-fg">{computedFixedUntil}</span>
         </div>
       )}
     </div>
@@ -199,14 +197,8 @@ function RateChangePreview({
 function LivePreview(props: LivePreviewProps) {
   const { type, parsedAmount } = props;
   if (parsedAmount <= 0) return null;
-  const bgClass =
-    type === 'valuation'
-      ? 'bg-success-soft border-success-soft-strong'
-      : type === 'rate_change'
-        ? 'bg-warning-soft border-warning-soft-strong'
-        : 'bg-brand-soft border-brand-soft-strong';
   return (
-    <div className={`rounded-xl p-4 border ${bgClass}`}>
+    <div className="rounded-lg border border-border-default bg-surface-sunken p-3">
       {type === 'repayment' && <RepaymentPreview {...props} />}
       {type === 'valuation' && <ValuationPreview {...props} />}
       {type === 'rate_change' && <RateChangePreview {...props} />}
@@ -288,13 +280,13 @@ function RateChangeFields({
             setError('');
           }}
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-faint text-xs font-medium">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-caption text-fg-subtle">
           years
         </span>
       </div>
       {computedFixedUntil && (
-        <p className="mt-1.5 text-xs text-fg-subtle">
-          Fixed until <span className="font-semibold text-warning">{computedFixedUntil}</span>
+        <p className="mt-1 text-caption text-fg-subtle">
+          Fixed until <span className="font-medium text-fg">{computedFixedUntil}</span>
         </p>
       )}
     </FormField>
@@ -337,12 +329,12 @@ function RepaymentInterestField({
           setError('');
         }}
       />
-      <div className="mt-2 flex gap-4 text-xs text-fg-subtle">
+      <div className="mt-1 flex gap-4 text-caption text-fg-subtle font-numeric">
         <span>
-          Interest: <span className="font-semibold text-danger">{fmt(parsedInterest)}</span>
+          Interest: <span className="font-medium text-fg">{fmt(parsedInterest)}</span>
         </span>
         <span>
-          Principal: <span className="font-semibold text-brand">{fmt(derivedPrincipal)}</span>
+          Principal: <span className="font-medium text-fg">{fmt(derivedPrincipal)}</span>
         </span>
       </div>
     </FormField>
@@ -389,7 +381,7 @@ function TxnConditionalFields({ state, mortgage, fmt }: TxnModalFormBodyProps) {
 
 function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-4 p-4">
       <FormField label="Transaction Type" labelClassName="mb-2">
         <TxnTypeSelector types={TXN_TYPES} value={state.type} onChange={state.handleTypeChange} />
       </FormField>
@@ -403,7 +395,7 @@ function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
         setError={state.setError}
       />
       <TxnConditionalFields state={state} mortgage={mortgage} fmt={fmt} />
-      {state.error && <p className="text-xs text-danger">{state.error}</p>}
+      {state.error && <p className="text-caption text-danger">{state.error}</p>}
       <DateNoteRow
         date={state.date}
         note={state.note}

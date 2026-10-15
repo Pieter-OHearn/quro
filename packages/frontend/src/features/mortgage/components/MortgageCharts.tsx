@@ -9,10 +9,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { ChartCard } from '@/components/ui';
+import { CHART_AXIS_PROPS, CHART_GRID_PROPS, CHART_TOOLTIP_PROPS } from '@/lib/chartStyles';
 import type { AmortizationRow, MortgageFormatFn, PaymentBreakdownRow } from '../types';
 import type { MortgageRepaymentType } from '@quro/shared';
 
-const ROUNDED_BAR_RADIUS = 4;
+// The balance and the principal that pays it down are debt (`viz-6`); interest is a cost.
+const DEBT_COLOR = 'var(--viz-6)';
+const INTEREST_COLOR = 'var(--viz-3)';
+const CHART_HEIGHT = 200;
 
 type MortgageBalanceChartProps = {
   amortization: AmortizationRow[];
@@ -26,64 +31,46 @@ function MortgageBalanceChart({
   repaymentType,
 }: Readonly<MortgageBalanceChartProps>) {
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <h3 className="font-semibold text-fg mb-1">Balance Projection</h3>
-      <p className="text-xs text-fg-faint mb-5">
-        Remaining balance using the {repaymentType.toLowerCase()} repayment method
-      </p>
-      <ResponsiveContainer width="100%" height={200}>
+    <ChartCard
+      title="Balance Projection"
+      subtitle={`Remaining balance using the ${repaymentType.toLowerCase()} repayment method`}
+      hasData
+    >
+      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <AreaChart data={amortization}>
-          <defs>
-            <linearGradient id="mortGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--data-primary)" stopOpacity={0.15} />
-              <stop offset="95%" stopColor="var(--data-primary)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-          <XAxis
-            dataKey="year"
-            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-          />
+          <CartesianGrid {...CHART_GRID_PROPS} />
+          <XAxis dataKey="year" {...CHART_AXIS_PROPS} />
+          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
           <Tooltip
+            {...CHART_TOOLTIP_PROPS}
+            cursor={{ stroke: 'var(--border-default)' }}
             formatter={(value) => [fmt(Number(value) || 0), 'Balance']}
-            contentStyle={{
-              borderRadius: '12px',
-              border: '1px solid var(--border-default)',
-              fontSize: '12px',
-            }}
           />
           <Area
             type="monotone"
             dataKey="balance"
-            stroke="var(--data-primary)"
-            strokeWidth={2.5}
-            fill="url(#mortGrad)"
+            stroke={DEBT_COLOR}
+            strokeWidth={2}
+            fill={DEBT_COLOR}
+            fillOpacity={0.12}
             dot={false}
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </ChartCard>
   );
 }
 
 function PaymentChartLegend() {
   return (
-    <div className="flex items-center gap-5 mt-3">
+    <div className="mt-3 flex items-center gap-4">
       <div className="flex items-center gap-1.5">
-        <div className="w-3 h-3 rounded-sm bg-brand-accent" />
-        <span className="text-xs text-fg-subtle">Principal</span>
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DEBT_COLOR }} />
+        <span className="text-caption text-fg-muted">Principal</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <div className="w-3 h-3 rounded-sm bg-warning-muted" />
-        <span className="text-xs text-fg-subtle">Interest</span>
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: INTEREST_COLOR }} />
+        <span className="text-caption text-fg-muted">Interest</span>
       </div>
     </div>
   );
@@ -96,61 +83,30 @@ type MortgagePaymentChartProps = {
 
 function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymentChartProps>) {
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <h3 className="font-semibold text-fg mb-1">Payment Breakdown</h3>
-      <p className="text-xs text-fg-faint mb-5">Principal vs Interest per month</p>
-      {paymentBreakdown.length > 0 ? (
-        <>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={paymentBreakdown} barSize={22}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`}
-              />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: '12px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                }}
-                formatter={(value, name) => [
-                  fmt(Number(value) || 0),
-                  String(name) === 'principal' ? 'Principal' : 'Interest',
-                ]}
-              />
-              <Bar
-                dataKey="principal"
-                name="principal"
-                fill="var(--data-primary)"
-                stackId="a"
-                radius={[0, 0, 0, 0]}
-              />
-              <Bar
-                dataKey="interest"
-                name="interest"
-                fill="var(--data-forecast)"
-                stackId="a"
-                radius={[ROUNDED_BAR_RADIUS, ROUNDED_BAR_RADIUS, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-          <PaymentChartLegend />
-        </>
-      ) : (
-        <div className="flex items-center justify-center py-12 text-sm text-fg-faint">
-          No repayment transactions yet.
-        </div>
-      )}
-    </div>
+    <ChartCard
+      title="Payment Breakdown"
+      subtitle="Principal vs Interest per month"
+      hasData={paymentBreakdown.length > 0}
+      emptyMessage="No repayment transactions yet."
+      footer={<PaymentChartLegend />}
+    >
+      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+        <BarChart data={paymentBreakdown} barSize={22}>
+          <CartesianGrid {...CHART_GRID_PROPS} />
+          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
+          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`} />
+          <Tooltip
+            {...CHART_TOOLTIP_PROPS}
+            formatter={(value, name) => [
+              fmt(Number(value) || 0),
+              String(name) === 'principal' ? 'Principal' : 'Interest',
+            ]}
+          />
+          <Bar dataKey="principal" name="principal" fill={DEBT_COLOR} stackId="a" />
+          <Bar dataKey="interest" name="interest" fill={INTEREST_COLOR} stackId="a" />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
   );
 }
 
@@ -168,7 +124,7 @@ export function MortgageCharts({
   repaymentType,
 }: Readonly<MortgageChartsProps>) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <MortgageBalanceChart amortization={amortization} fmt={fmt} repaymentType={repaymentType} />
       <MortgagePaymentChart paymentBreakdown={paymentBreakdown} fmt={fmt} />
     </div>

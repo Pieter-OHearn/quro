@@ -90,31 +90,23 @@ function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps
 
   return (
     <div
-      className={`rounded-xl p-4 border ${net >= 0 ? 'bg-success-soft border-success-soft-strong' : 'bg-danger-soft border-danger-soft-strong'}`}
+      className={`rounded-lg border p-3 ${net >= 0 ? 'border-border-default bg-surface-sunken' : 'border-danger bg-danger-soft'}`}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Info size={15} className={net >= 0 ? 'text-success' : 'text-danger'} />
-          <p className="text-sm font-semibold text-fg-strong">Calculated Take-Home</p>
+          <Info size={14} className={net >= 0 ? 'text-fg-faint' : 'text-danger'} aria-hidden />
+          <p className="text-cell font-medium text-fg">Calculated Take-Home</p>
         </div>
-        <p className={`font-bold ${net >= 0 ? 'text-success' : 'text-danger'}`}>
+        <p className={`text-figure-md font-numeric ${net >= 0 ? 'text-fg' : 'text-danger'}`}>
           {net >= 0 ? formatCurrencyValue(net, payCurrency, true, numberFormat) : 'Check values'}
         </p>
       </div>
       {previewTotal > 0 && (
         <div className="flex h-2 rounded-full overflow-hidden gap-px">
           {[
-            { id: 'net', pct: (Math.abs(net) / previewTotal) * 100, color: 'bg-success-accent' },
-            {
-              id: 'tax',
-              pct: (Math.abs(tax) / previewTotal) * 100,
-              color: tax < 0 ? 'bg-success-border-strong' : 'bg-danger-muted',
-            },
-            {
-              id: 'pension',
-              pct: (Math.abs(pension) / previewTotal) * 100,
-              color: pension < 0 ? 'bg-success-border-strong' : 'bg-brand-disabled',
-            },
+            { id: 'net', pct: (Math.abs(net) / previewTotal) * 100, color: 'bg-viz-1' },
+            { id: 'tax', pct: (Math.abs(tax) / previewTotal) * 100, color: 'bg-viz-6' },
+            { id: 'pension', pct: (Math.abs(pension) / previewTotal) * 100, color: 'bg-viz-3' },
           ]
             .filter((segment) => segment.pct > 0)
             .map((segment) => (
@@ -126,7 +118,7 @@ function NetPreview({ net, tax, pension, payCurrency }: Readonly<NetPreviewProps
             ))}
         </div>
       )}
-      <p className="text-xs text-fg-faint mt-1.5">Gross, bonus and deduction adjustments</p>
+      <p className="mt-1.5 text-caption text-fg-subtle">Gross, bonus and deduction adjustments</p>
     </div>
   );
 }
@@ -209,9 +201,9 @@ function PayslipBonusField({ form, set, disabled }: Readonly<PayslipFormPartProp
 function PayslipDeductionsRow({ form, errors, set, disabled }: Readonly<PayslipFormPartProps>) {
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
-        <p className="text-xs font-semibold text-fg-muted uppercase tracking-wide">Deductions</p>
-        <div className="flex-1 h-px bg-surface-muted" />
+      <div className="mb-2 flex items-center gap-2">
+        <h3 className="text-cell font-semibold text-fg">Deductions</h3>
+        <div className="h-px flex-1 bg-border-subtle" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField label={`Income Tax (${form.currency})`} required error={errors.tax}>
@@ -308,7 +300,7 @@ function buildDeleteButton(
       label="Delete payslip"
       variant="danger"
       size="lg"
-      className="border border-danger-border text-danger"
+      className="border border-danger text-danger"
       type="button"
       disabled={busy}
       onClick={() => {
@@ -407,12 +399,18 @@ function PayslipModalBody({
   return (
     <>
       {!isEdit && savedPayslipId !== null && (
-        <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
+        <div
+          role="status"
+          className="rounded-md border border-warning bg-warning-soft px-3 py-2 text-cell text-warning"
+        >
           Payslip saved. Retry the PDF upload or close this modal to finish without an attachment.
         </div>
       )}
       {formError && (
-        <div className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger-fg">
+        <div
+          role="alert"
+          className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-cell text-danger"
+        >
           {formError}
         </div>
       )}

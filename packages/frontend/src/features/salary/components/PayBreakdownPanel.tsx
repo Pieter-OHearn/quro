@@ -1,14 +1,12 @@
 import { formatPercent, type Payslip } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { PdfAttachmentField } from '@/components/ui';
+import { Card, Change, PanelHeader, PdfAttachmentField } from '@/components/ui';
 import { buildApiDownloadUrl, usePdfAttachmentState } from '@/lib/pdfDocuments';
 import { useDeletePayslipDocument, useUploadPayslipDocument } from '../hooks';
-import type { FmtFn } from '../types';
 import { buildBreakdownItems, getPayslipBreakdownTotal } from '../utils/salary-data';
 
 type PayBreakdownPanelProps = {
   selected: Payslip | null;
-  fmtBase: FmtFn;
 };
 
 function PayslipDocumentSection({ payslip }: Readonly<{ payslip: Payslip }>) {
@@ -48,11 +46,8 @@ function PayslipDocumentSection({ payslip }: Readonly<{ payslip: Payslip }>) {
   );
 }
 
-function PayBreakdownDetail({
-  selected,
-  fmtBase,
-}: Readonly<{ selected: Payslip; fmtBase: FmtFn }>) {
-  const { numberFormat } = useCurrency();
+function PayBreakdownDetail({ selected }: Readonly<{ selected: Payslip }>) {
+  const { numberFormat, convertToBase, baseCurrency } = useCurrency();
   const totalPay = getPayslipBreakdownTotal(selected);
   const percentageOfTotal = (value: number): number =>
     totalPay > 0 ? (value / totalPay) * 100 : 0;
@@ -61,56 +56,62 @@ function PayBreakdownDetail({
 
   return (
     <>
-      <div className="flex h-7 rounded-xl overflow-hidden mb-5 gap-px">
+      {/* Take-home pay, tax and pension as shares of the total, in their chart colours. */}
+      <div
+        className="mb-4 flex h-2 gap-px overflow-hidden rounded-full bg-surface-muted"
+        aria-hidden
+      >
         <div
-          className="bg-success-accent h-full"
+          className="h-full bg-viz-1"
           style={{ width: `${percentageOfTotal(Math.abs(selected.net))}%` }}
         />
-        <div
-          className={`${selected.tax < 0 ? 'bg-success-border-strong' : 'bg-danger-muted'} h-full`}
-          style={{ width: `${percentageOfTotal(taxValue)}%` }}
-        />
-        <div
-          className={`${selected.pension < 0 ? 'bg-success-border-strong' : 'bg-brand-disabled'} h-full`}
-          style={{ width: `${percentageOfTotal(pensionValue)}%` }}
-        />
+        <div className="h-full bg-viz-6" style={{ width: `${percentageOfTotal(taxValue)}%` }} />
+        <div className="h-full bg-viz-3" style={{ width: `${percentageOfTotal(pensionValue)}%` }} />
       </div>
-      <div className="space-y-2.5">
-        {buildBreakdownItems(selected).map(({ label, val, color, tc, pct }) => (
-          <div key={label} className="flex items-center justify-between">
+      <div className="space-y-1.5">
+        {buildBreakdownItems(selected).map(({ label, val, color, pct }) => (
+          <div key={label} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-sm ${color}`} />
-              <span className="text-sm text-fg-muted">{label}</span>
+              <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden />
+              <span className="text-cell text-fg-muted">{label}</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-baseline gap-3">
               {pct !== undefined && (
-                <span className="text-xs text-fg-faint">{formatPercent(pct, numberFormat, 0)}</span>
+                <span className="text-caption text-fg-subtle font-numeric">
+                  {formatPercent(pct, numberFormat, 0)}
+                </span>
               )}
-              <span className={`text-sm font-semibold ${tc}`}>
-                {val >= 0 ? '+' : '\u2212'}
-                {fmtBase(Math.abs(val), selected.currency)}
-              </span>
+              <Change
+                format="amount"
+                currency={baseCurrency}
+                value={convertToBase(val, selected.currency)}
+                showArrow={false}
+              />
             </div>
           </div>
         ))}
       </div>
-      <PayslipDocumentSection key={selected.id} payslip={selected} />
+      <div className="mt-4 border-t border-border-subtle pt-3">
+        <PayslipDocumentSection key={selected.id} payslip={selected} />
+      </div>
     </>
   );
 }
 
-export function PayBreakdownPanel({ selected, fmtBase }: Readonly<PayBreakdownPanelProps>) {
+export function PayBreakdownPanel({ selected }: Readonly<PayBreakdownPanelProps>) {
   return (
-    <div className="bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <h3 className="font-semibold text-fg mb-1">Pay Breakdown</h3>
-      <p className="text-xs text-fg-faint mb-4">
-        {selected?.month ?? '—'} — click a payslip row to switch month
-      </p>
-      {selected ? (
-        <PayBreakdownDetail selected={selected} fmtBase={fmtBase} />
-      ) : (
-        <p className="text-sm text-fg-faint py-8 text-center">No payslips yet.</p>
-      )}
-    </div>
+    <Card padding="none">
+      <PanelHeader
+        title="Pay Breakdown"
+        subtitle={`${selected?.month ?? '—'} — click a payslip row to switch month`}
+      />
+      <div className="p-4">
+        {selected ? (
+          <PayBreakdownDetail selected={selected} />
+        ) : (
+          <p className="py-8 text-center text-cell text-fg-subtle">No payslips yet.</p>
+        )}
+      </div>
+    </Card>
   );
 }

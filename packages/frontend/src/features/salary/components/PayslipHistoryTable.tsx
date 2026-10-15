@@ -4,6 +4,7 @@ import { CURRENCY_META, type Payslip } from '@quro/shared';
 import {
   Badge,
   Button,
+  Change,
   DataTable,
   DataTableCell,
   DataTableRow,
@@ -21,6 +22,8 @@ type PayslipTableProps = {
   payslips: readonly Payslip[];
   selected: Payslip | null;
   fmtBase: FmtFn;
+  baseCurrency: string;
+  convertToBase: (amount: number, fromCurrency: string) => number;
   onSelect: (id: number) => void;
   onAdd: () => void;
   onEdit: (payslip: Payslip) => void;
@@ -47,7 +50,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'whitespace-nowrap font-semibold text-fg-emphasis',
+    cellClassName: 'whitespace-nowrap font-medium text-fg',
   },
   {
     key: 'tax',
@@ -85,13 +88,33 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'whitespace-nowrap font-bold text-success',
+    cellClassName: 'whitespace-nowrap font-medium text-fg',
   },
   { key: 'actions', header: '', priority: 'actions', width: 96 },
 ];
 
-function formatSignedAmount(value: number, currency: Payslip['currency'], fmtBase: FmtFn): string {
-  return `${value < 0 ? '+' : '\u2212'}${fmtBase(Math.abs(value), currency)}`;
+type ToBaseFn = (amount: number, fromCurrency: string) => number;
+
+// A deduction reads as a loss; a correction (a negative deduction) reads as a gain.
+function DeductionAmount({
+  value,
+  currency,
+  baseCurrency,
+  convertToBase,
+}: Readonly<{
+  value: number;
+  currency: Payslip['currency'];
+  baseCurrency: string;
+  convertToBase: ToBaseFn;
+}>) {
+  return (
+    <Change
+      format="amount"
+      currency={baseCurrency}
+      value={-convertToBase(value, currency)}
+      showArrow={false}
+    />
+  );
 }
 
 function PayslipRowActions({
@@ -123,7 +146,6 @@ function PayslipRowActions({
           icon={Download}
           label="No payslip PDF"
           title="No payslip PDF"
-          className="text-border-default"
         />
       )}
       <IconButton
@@ -145,42 +167,54 @@ function PayslipTableRow({
   payslip,
   isSelected,
   fmtBase,
+  baseCurrency,
+  convertToBase,
   onSelect,
   onEdit,
 }: Readonly<{
   payslip: Payslip;
   isSelected: boolean;
   fmtBase: FmtFn;
+  baseCurrency: string;
+  convertToBase: ToBaseFn;
   onSelect: (id: number) => void;
   onEdit: (payslip: Payslip) => void;
 }>) {
   const currencyMeta = CURRENCY_META[payslip.currency];
-  const taxClass = payslip.tax < 0 ? 'text-success' : 'text-danger';
-  const pensionClass = payslip.pension < 0 ? 'text-success' : 'text-brand';
 
   return (
     <DataTableRow onClick={() => onSelect(payslip.id)} selected={isSelected} interactive>
       <DataTableCell columnKey="month">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-fg-emphasis">{payslip.month}</span>
-          <Badge tone="info" size="sm">
+          <span className="font-medium text-fg">{payslip.month}</span>
+          <Badge size="sm">
             <span aria-hidden>{currencyMeta.flag}</span>
             <span>{payslip.currency}</span>
           </Badge>
           {payslip.bonus && (
-            <Badge tone="warning" size="xs">
+            <Badge tone="brand" size="xs">
               +Bonus
             </Badge>
           )}
         </div>
-        <p className="text-xs text-fg-faint">{formatDate(payslip.date)}</p>
+        <p className="text-caption text-fg-subtle">{formatDate(payslip.date)}</p>
       </DataTableCell>
       <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
-      <DataTableCell columnKey="tax" className={taxClass}>
-        {formatSignedAmount(payslip.tax, payslip.currency, fmtBase)}
+      <DataTableCell columnKey="tax">
+        <DeductionAmount
+          value={payslip.tax}
+          currency={payslip.currency}
+          baseCurrency={baseCurrency}
+          convertToBase={convertToBase}
+        />
       </DataTableCell>
-      <DataTableCell columnKey="pension" className={pensionClass}>
-        {formatSignedAmount(payslip.pension, payslip.currency, fmtBase)}
+      <DataTableCell columnKey="pension">
+        <DeductionAmount
+          value={payslip.pension}
+          currency={payslip.currency}
+          baseCurrency={baseCurrency}
+          convertToBase={convertToBase}
+        />
       </DataTableCell>
       <DataTableCell columnKey="net">{fmtBase(payslip.net, payslip.currency)}</DataTableCell>
       <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
@@ -194,6 +228,8 @@ export function PayslipHistoryTable({
   payslips,
   selected,
   fmtBase,
+  baseCurrency,
+  convertToBase,
   onSelect,
   onAdd,
   onEdit,
@@ -209,8 +245,8 @@ export function PayslipHistoryTable({
         <Button
           onClick={onAdd}
           variant="primary"
-          size="md"
-          leadingIcon={<Plus size={15} />}
+          size="sm"
+          leadingIcon={<Plus size={12} aria-hidden />}
           data-testid="salary-add-payslip-button"
         >
           Add Payslip
@@ -235,6 +271,8 @@ export function PayslipHistoryTable({
           payslip={payslip}
           isSelected={selected?.id === payslip.id}
           fmtBase={fmtBase}
+          baseCurrency={baseCurrency}
+          convertToBase={convertToBase}
           onSelect={onSelect}
           onEdit={onEdit}
         />

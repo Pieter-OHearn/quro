@@ -102,7 +102,15 @@ new code; they are deleted once the screens that use them are migrated.
 
 The `--data-*` variables are display colours for the persisted `DATA_COLORS`
 identities. They point at the `--viz-*` chart colours (expense and alert at `loss`),
-so several identities share one colour until the swatch picker is redesigned.
+so several identities share one colour. Category colour pickers (goals, budget
+categories, debts) therefore offer only the six `CATEGORY_COLORS` from
+`packages/frontend/src/lib/dataColors.ts`, one canonical identity per `viz-*` colour.
+Saved values are never rewritten: `categoryColorFor()` picks the swatch a legacy value
+shows as selected, and the value keeps displaying through `dataColorToken()`. Recharts
+props for horizontal gridlines, 11px axis labels and the inverse tooltip live in
+`packages/frontend/src/lib/chartStyles.ts`; a liability balance or an outgoing payment
+reads as a negative amount with a true minus sign through `formatAsNegative()` in
+`packages/frontend/src/lib/liability.ts`.
 
 ## Adding a new token
 

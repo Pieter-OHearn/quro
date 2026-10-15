@@ -98,12 +98,12 @@ function LiquidityTierFields({
 }: Readonly<{ excludedTiers: readonly number[]; toggleTier: (tier: number) => void }>) {
   return (
     <fieldset>
-      <legend className="text-sm font-medium text-fg-strong">Liquidity included</legend>
+      <legend className="text-cell font-medium text-fg">Liquidity included</legend>
       <div className="mt-2 space-y-2">
         {[1, 2, 3].map((tier) => (
           <label
             key={tier}
-            className="flex items-center gap-3 rounded-xl border border-border-default px-3 py-2 text-sm"
+            className="flex items-center gap-3 rounded-lg border border-border-default px-3 py-2 text-cell"
           >
             <input
               type="checkbox"
@@ -132,7 +132,7 @@ function AssumptionFields({
   toggleTier: (tier: number) => void;
 }>) {
   return (
-    <div className="mt-6 space-y-5">
+    <div className="mt-4 space-y-4">
       <FormField label="Lean monthly burn override">
         <TextInput
           type="number"
@@ -154,7 +154,7 @@ function AssumptionFields({
         />
       </FormField>
       <LiquidityTierFields excludedTiers={form.excludedTiers} toggleTier={toggleTier} />
-      <label className="flex items-start gap-3 rounded-xl border border-border-default p-3 text-sm">
+      <label className="flex items-start gap-3 rounded-lg border border-border-default p-3 text-cell">
         <input
           type="checkbox"
           className="mt-0.5"
@@ -162,8 +162,8 @@ function AssumptionFields({
           onChange={(event) => setField('countFullJointBalances', event.target.checked)}
         />
         <span>
-          <span className="font-medium text-fg-strong">Count full joint balances</span>
-          <span className="mt-1 block text-xs leading-5 text-fg-subtle">
+          <span className="font-medium text-fg">Count full joint balances</span>
+          <span className="mt-1 block text-caption text-fg-subtle">
             The default model counts the user's 50% share.
           </span>
         </span>
@@ -254,7 +254,7 @@ function AssumptionActions({
   onApply: () => void;
 }>) {
   return (
-    <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-border-subtle pt-5">
+    <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-border-subtle pt-4">
       <Button variant="ghost" onClick={onReset} loading={pending}>
         Reset to derived
       </Button>
@@ -312,28 +312,26 @@ export function AssumptionsDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-surface-inverse/25" role="presentation">
+    <div className="fixed inset-0 z-50 flex justify-end bg-scrim" role="presentation">
       <button
         className="absolute inset-0 cursor-default"
         aria-label="Close assumptions"
         onClick={onClose}
       />
       <aside
-        className="relative h-full w-full max-w-lg overflow-y-auto bg-surface p-6 shadow-overlay"
+        className="relative h-full w-full max-w-lg overflow-y-auto border-l border-border-default bg-surface p-4 shadow-overlay sm:p-6"
         aria-label="Advanced runway assumptions"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
-              Advanced planner
-            </p>
-            <h2 className="mt-2 text-xl font-semibold text-fg">Runway assumptions</h2>
+            <p className="text-label text-fg-muted">Advanced planner</p>
+            <h2 className="text-title-section text-fg">Runway assumptions</h2>
           </div>
           <Button variant="ghost" size="sm" aria-label="Close" onClick={onClose}>
             <X size={18} />
           </Button>
         </div>
-        <p className="mt-3 text-sm leading-6 text-fg-muted">
+        <p className="mt-3 text-body text-fg-muted">
           Blank values stay derived. Spending uses net cash flow; income tax and pension deductions
           are therefore not counted twice. Severance tax uses the effective payslip rate as a
           planning simplification.
@@ -345,7 +343,7 @@ export function AssumptionsDrawer({
           toggleTier={toggleTier}
         />
         {updateAssumptions.isError ? (
-          <p className="mt-4 text-sm text-danger-fg">Assumptions could not be saved.</p>
+          <p className="mt-4 text-cell text-danger">Assumptions could not be saved.</p>
         ) : null}
         <AssumptionActions
           pending={updateAssumptions.isPending}

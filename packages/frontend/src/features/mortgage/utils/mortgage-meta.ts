@@ -17,21 +17,21 @@ export const TXN_META: Record<
     icon: Landmark,
     color: 'text-brand',
     bg: 'bg-brand-soft',
-    borderColor: 'border-brand-border',
+    borderColor: 'border-brand',
   },
   valuation: {
     label: 'Valuation',
     icon: Home,
     color: 'text-success',
     bg: 'bg-success-soft',
-    borderColor: 'border-success-border-strong',
+    borderColor: 'border-success',
   },
   rate_change: {
     label: 'Rate Change',
     icon: Percent,
     color: 'text-warning',
     bg: 'bg-warning-soft',
-    borderColor: 'border-warning-border-strong',
+    borderColor: 'border-warning',
   },
 };
 

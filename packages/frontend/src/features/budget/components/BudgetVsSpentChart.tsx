@@ -1,65 +1,66 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { ChartCard } from '@/components/ui';
+import { CHART_AXIS_PROPS, CHART_GRID_PROPS, CHART_TOOLTIP_PROPS } from '@/lib/chartStyles';
 import type { BudgetCategory, BudgetFormatFn } from '../types';
+
+// The budget is the grey reference; spending is the blue series beside it.
+const BUDGETED_COLOR = 'var(--viz-6)';
+const SPENT_COLOR = 'var(--viz-2)';
 
 type BudgetVsSpentChartProps = {
   categories: readonly BudgetCategory[];
   fmt: BudgetFormatFn;
 };
 
+function BudgetVsSpentLegend() {
+  return (
+    <div className="mt-2 flex items-center gap-4">
+      {[
+        { label: 'Budgeted', color: BUDGETED_COLOR },
+        { label: 'Spent', color: SPENT_COLOR },
+      ].map((item) => (
+        <div key={item.label} className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+          <span className="text-caption text-fg-muted">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function BudgetVsSpentChart({ categories, fmt }: Readonly<BudgetVsSpentChartProps>) {
   return (
-    <div className="lg:col-span-2 bg-surface rounded-2xl p-6 border border-border-subtle shadow-sm">
-      <h3 className="font-semibold text-fg mb-1">Budget vs Spent</h3>
-      <p className="text-xs text-fg-faint mb-5">Category breakdown</p>
-      {categories.length > 0 ? (
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart
-            data={categories.map((category) => ({
-              name: category.name,
-              budgeted: category.budgeted,
-              spent: category.spent,
-            }))}
-            barSize={14}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-            <XAxis
-              dataKey="name"
-              tick={{ fontSize: 10, fill: 'var(--data-neutral)' }}
-              axisLine={false}
-              tickLine={false}
-              angle={-30}
-              textAnchor="end"
-              height={60}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: 'var(--data-neutral)' }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(value) => fmt(value)}
-            />
-            <Tooltip
-              formatter={(value, name) => [
-                fmt(Number(value) || 0),
-                String(name) === 'budgeted' ? 'Budgeted' : 'Spent',
-              ]}
-              contentStyle={{
-                borderRadius: '12px',
-                border: '1px solid var(--border-default)',
-                fontSize: '12px',
-              }}
-            />
-            <Bar
-              dataKey="budgeted"
-              name="budgeted"
-              fill="var(--data-primary)"
-              radius={[4, 4, 0, 0]}
-            />
-            <Bar dataKey="spent" name="spent" fill="var(--data-expense)" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      ) : (
-        <p className="text-sm text-fg-faint py-12 text-center">No budget categories yet.</p>
-      )}
-    </div>
+    <ChartCard
+      title="Budget vs Spent"
+      subtitle="Category breakdown"
+      hasData={categories.length > 0}
+      emptyMessage="No budget categories yet."
+      className="lg:col-span-2"
+      footer={<BudgetVsSpentLegend />}
+    >
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart
+          data={categories.map((category) => ({
+            name: category.name,
+            budgeted: category.budgeted,
+            spent: category.spent,
+          }))}
+          barSize={14}
+        >
+          <CartesianGrid {...CHART_GRID_PROPS} />
+          <XAxis dataKey="name" {...CHART_AXIS_PROPS} angle={-30} textAnchor="end" height={60} />
+          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(value) => fmt(value)} />
+          <Tooltip
+            {...CHART_TOOLTIP_PROPS}
+            formatter={(value, name) => [
+              fmt(Number(value) || 0),
+              String(name) === 'budgeted' ? 'Budgeted' : 'Spent',
+            ]}
+          />
+          <Bar dataKey="budgeted" name="budgeted" fill={BUDGETED_COLOR} />
+          <Bar dataKey="spent" name="spent" fill={SPENT_COLOR} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
   );
 }

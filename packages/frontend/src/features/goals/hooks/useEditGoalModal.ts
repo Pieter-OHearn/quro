@@ -1,7 +1,7 @@
 import { useGoalForm } from './useGoalForm';
 import { getMonthAbbreviationIndex, type Goal, DEFAULT_EMOJI } from '@quro/shared';
 import type { GoalFormState, UpdateGoalInput } from '../types';
-import { COLORS } from '../utils/goals-constants';
+import { DATA_COLORS } from '@/lib/dataColors';
 import { normalizeGoalType } from '../utils/goal-utils';
 
 function deadlineToDateString(deadline: string): string {
@@ -33,7 +33,7 @@ function goalToFormState(goal: Goal, baseCurrency: string): GoalFormState {
   return {
     name: goal.name,
     emoji: goal.emoji ?? DEFAULT_EMOJI.goal,
-    color: goal.color ?? COLORS[0],
+    color: goal.color ?? DATA_COLORS.primary,
     notes: goal.notes ?? '',
     deadline: goal.deadline,
     year: String(goal.year ?? new Date().getFullYear()),

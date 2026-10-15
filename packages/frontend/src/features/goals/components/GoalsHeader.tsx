@@ -1,4 +1,3 @@
-import { Sparkles } from 'lucide-react';
 import { SegmentedControl } from '@/components/ui';
 import type { GoalStatsData } from '../types';
 
@@ -18,27 +17,24 @@ export function GoalsHeader({
   onYearChange,
 }: Readonly<GoalsHeaderProps>) {
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <SegmentedControl
+        aria-label="Goal year"
         options={years.map((year) => ({
           value: year,
           label: year,
           badge:
             year === currentYear ? (
-              <span className="text-[10px] opacity-70">current</span>
+              <span className="font-normal text-fg-subtle">current</span>
             ) : undefined,
         }))}
         value={activeYear}
         onChange={onYearChange}
-        variant="pill"
-        tone="dark"
-        buttonClassName="px-5 font-semibold"
+        buttonClassName="font-numeric"
       />
-      <div className="flex-1" />
-      <div className="flex items-center gap-1.5 text-xs text-fg-faint bg-surface border border-border-default rounded-xl px-3 py-2">
-        <Sparkles size={12} className="text-brand-disabled" />
+      <p className="text-caption text-fg-subtle font-numeric">
         {stats.total} goals - {stats.completed} completed - {stats.onTrack} on track
-      </div>
+      </p>
     </div>
   );
 }

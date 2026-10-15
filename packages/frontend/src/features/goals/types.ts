@@ -9,8 +9,6 @@ export type FilterKey = 'all' | 'savings' | 'career' | 'investing' | 'annual';
 export type GoalMeta = {
   label: string;
   Icon: ElementType;
-  bg: string;
-  text: string;
   filterKey: FilterKey;
   description: string;
 };

@@ -18,6 +18,8 @@ import {
   FormField,
   SelectInput,
 } from '@/components/ui';
+import { dataColorToken } from '@/lib/dataColors';
+import { formatAsNegative } from '@/lib/liability';
 import type { BudgetCategory, BudgetFormatFn, RecentBudgetTx } from '../types';
 
 const PAGE_SIZE = 6;
@@ -59,7 +61,7 @@ const TRANSACTION_COLUMNS: readonly DataTableColumn<RecentBudgetTx>[] = [
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
-    cellClassName: 'whitespace-nowrap font-semibold text-fg-emphasis',
+    cellClassName: 'whitespace-nowrap font-medium text-fg',
   },
   { key: 'actions', header: '', priority: 'actions', width: 64 },
 ];
@@ -99,8 +101,6 @@ function EditTransactionModal({
           danger={
             <Button
               variant="danger"
-              size="lg"
-              className="flex-1"
               onClick={() => {
                 onDelete();
                 onClose();
@@ -152,25 +152,22 @@ function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
   return (
     <DataTableRow interactive>
       <DataTableCell columnKey="transaction">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="w-8 shrink-0 text-center text-xl">{transaction.emoji}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="w-5 shrink-0 text-center text-base leading-none" aria-hidden>
+            {transaction.emoji}
+          </span>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-sm font-medium text-fg-emphasis">{transaction.name}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="truncate text-cell text-fg">{transaction.name}</p>
               {isReadOnly && (
-                <Badge
-                  tone="info"
-                  size="sm"
-                  className="bg-accent-link-accent text-fg-inverted"
-                  title={getBunqMetadataTitle(transaction)}
-                >
+                <Badge tone="info" size="sm" title={getBunqMetadataTitle(transaction)}>
                   Bunq
                 </Badge>
               )}
               {transaction.sourceProvider === 'bunq' &&
                 transaction.sourceAccountType === 'JOINT' && (
                   <Badge
-                    tone="success"
+                    tone="brand"
                     size="sm"
                     title={transaction.sourceAccountName ?? 'Joint account'}
                   >
@@ -184,18 +181,21 @@ function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
       <DataTableCell columnKey="date">{transaction.date}</DataTableCell>
       <DataTableCell columnKey="category">
         {transaction.category && transaction.color ? (
-          <Badge
-            size="sm"
-            className="text-fg-inverted"
-            style={{ backgroundColor: transaction.color }}
-          >
-            {transaction.category}
+          <Badge size="sm" className="max-w-full">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: dataColorToken(transaction.color) }}
+              aria-hidden
+            />
+            <span className="truncate">{transaction.category}</span>
           </Badge>
         ) : (
-          <span className="text-fg-faint">Uncategorized</span>
+          <span className="text-fg-subtle">Uncategorized</span>
         )}
       </DataTableCell>
-      <DataTableCell columnKey="amount">-{fmtDec(transaction.amount)}</DataTableCell>
+      <DataTableCell columnKey="amount">
+        {formatAsNegative(fmtDec, transaction.amount)}
+      </DataTableCell>
       <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
         {!isReadOnly && (
           <RowActions>

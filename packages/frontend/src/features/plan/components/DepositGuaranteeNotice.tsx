@@ -40,16 +40,16 @@ export function DepositGuaranteeNotice({
   const showCompactStatus = unverifiedAccountCount > 0 || !hasExcess;
 
   const compactStatus = showCompactStatus ? (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-surface px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
-        <Landmark className="shrink-0 text-fg-faint" size={18} />
+        <Landmark className="shrink-0 text-fg-faint" size={16} aria-hidden />
         <div>
-          <p className="text-sm font-medium text-fg">
+          <p className="text-cell font-medium text-fg">
             {unverifiedAccountCount > 0
               ? `${unverifiedAccountCount} bank account${unverifiedAccountCount === 1 ? '' : 's'} need entity review`
               : 'Banking entities identified'}
           </p>
-          <p className="text-xs text-fg-muted">
+          <p className="text-caption text-fg-muted">
             {unverifiedAccountCount > 0
               ? 'Confirm the licensed entity used for deposit protection.'
               : 'Manage how account brands are grouped for deposit protection.'}
@@ -63,19 +63,19 @@ export function DepositGuaranteeNotice({
   ) : null;
 
   const exposureNotice = hasExcess ? (
-    <Card className="border-warning-border bg-warning-soft/70">
+    <Card className="border-warning bg-warning-soft">
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 shrink-0 text-warning" size={20} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="font-semibold text-fg">Deposit guarantee review</h2>
+            <h2 className="text-title-section text-fg">Deposit guarantee review</h2>
             <Button variant="ghost" size="sm" onClick={onReview}>
               Review banks
             </Button>
           </div>
           <div className="mt-3 space-y-2">
             {atRisk.map((entry) => (
-              <p key={`${entry.entityId ?? entry.entityName}`} className="text-sm text-fg-strong">
+              <p key={`${entry.entityId ?? entry.entityName}`} className="text-cell text-fg">
                 <span className="font-semibold">{entry.entityName}:</span>{' '}
                 {exposureMessage(entry, fmtBase)}
               </p>

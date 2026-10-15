@@ -110,11 +110,11 @@ function BankingEntityAccountRow({
   };
 
   return (
-    <section className="rounded-xl border border-border-subtle p-4" aria-label={account.name}>
+    <section className="rounded-lg border border-border-subtle p-4" aria-label={account.name}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-fg">{account.name}</h3>
-          <p className="text-sm text-fg-muted">Entered bank: {account.bank}</p>
+          <h3 className="text-title-section text-fg">{account.name}</h3>
+          <p className="text-cell text-fg-muted">Entered bank: {account.bank}</p>
         </div>
         <Badge tone={confirmed ? 'success' : unresolved ? 'warningSoft' : 'neutral'}>
           {confirmed ? 'Confirmed by you' : unresolved ? 'Needs review' : 'Matched automatically'}
@@ -176,10 +176,10 @@ function BankingEntityAccountRow({
           </div>
         ) : null}
         {guarantee?.source ? (
-          <p className="text-xs text-fg-subtle">
+          <p className="text-caption text-fg-subtle">
             Official source:{' '}
             <a
-              className="font-medium text-brand-fg underline decoration-brand-border underline-offset-2"
+              className="font-medium text-brand underline decoration-brand underline-offset-2"
               href={guarantee.source.url}
               target="_blank"
               rel="noreferrer"
@@ -188,7 +188,7 @@ function BankingEntityAccountRow({
             </a>
           </p>
         ) : null}
-        {error ? <p className="text-sm text-danger-fg">{error}</p> : null}
+        {error ? <p className="text-cell text-danger">{error}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           {confirmed ? (
             <Button
@@ -233,7 +233,7 @@ export function BankingEntityReviewModal({
       maxWidth="xl"
       scrollable
     >
-      <p className="text-sm leading-6 text-fg-muted">
+      <p className="text-body text-fg-muted">
         Quro matches bank names automatically. Confirm the licensed entity when the brand is
         ambiguous; changing the bank name in Savings will reset that confirmation.
       </p>

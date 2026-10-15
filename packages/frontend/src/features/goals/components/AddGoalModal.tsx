@@ -1,6 +1,9 @@
-import { dataColorToken } from '@/lib/dataColors';
+import { useId } from 'react';
+import { CATEGORY_COLOR_NAMES, categoryColorFor, dataColorToken } from '@/lib/dataColors';
+import { cn } from '@/lib/utils';
 import { Link2 } from 'lucide-react';
 import {
+  Badge,
   FormField,
   Modal,
   ModalFooter,
@@ -20,7 +23,7 @@ import {
 } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddGoalModal } from '../hooks';
-import { COLORS, GOAL_TYPE_META } from '../utils/goals-constants';
+import { COLORS, GOAL_CHIP_CLASS_NAME, GOAL_TYPE_META } from '../utils/goals-constants';
 import type {
   AddGoalModalProps,
   FilterKey,
@@ -30,6 +33,9 @@ import type {
 } from '../types';
 
 type SetField = (key: GoalFormField, value: string) => void;
+
+const HINT_CLASS_NAME = 'mt-1 flex items-center gap-1 text-caption text-fg-subtle';
+const LINKED_BOX_CLASS_NAME = 'rounded-md border border-border-default bg-surface-sunken px-3 py-2';
 
 function dateStringToDeadline(dateStr: string): string {
   if (!dateStr) return '';
@@ -118,8 +124,8 @@ function SavingsSourceSelector({
           setField('currency', account ? account.currency : baseCurrency);
         }}
       />
-      <p className="text-[10px] text-fg-faint mt-1.5 flex items-center gap-1">
-        <Link2 size={10} />
+      <p className={HINT_CLASS_NAME}>
+        <Link2 size={12} aria-hidden />
         {selectedSource
           ? `Progress will use ${selectedSource.name}'s latest balance.`
           : 'Leave manual if you want to type progress yourself.'}
@@ -136,11 +142,9 @@ function LinkedCurrentAmountSummary({
   fmtNative: (amount: number, currency: string) => string;
 }>) {
   return (
-    <div className="rounded-xl border border-brand-soft-strong bg-brand-soft/70 px-3 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-accent">
-        Linked Current Amount
-      </p>
-      <p className="mt-0.5 text-sm font-semibold text-fg-emphasis">
+    <div className={LINKED_BOX_CLASS_NAME}>
+      <p className="text-label text-fg-muted">Linked Current Amount</p>
+      <p className="mt-0.5 text-figure-md font-numeric text-fg">
         {fmtNative(selectedSource.balance, selectedSource.currency)}
       </p>
     </div>
@@ -218,11 +222,11 @@ function AutoLinkedSourceSummary({
   fmtBase: AmountFieldsSavingsPortfolioProps['fmtBase'];
 }>) {
   return (
-    <div className="col-span-2 rounded-xl border border-brand-soft-strong bg-brand-soft/70 px-3 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-accent">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold text-fg-emphasis">{fmtBase(currentValue)}</p>
-      <p className="text-[10px] text-fg-faint mt-1 flex items-center gap-1">
-        <Link2 size={10} /> {description}
+    <div className={cn('col-span-2', LINKED_BOX_CLASS_NAME)}>
+      <p className="text-label text-fg-muted">{label}</p>
+      <p className="mt-0.5 text-figure-md font-numeric text-fg">{fmtBase(currentValue)}</p>
+      <p className={HINT_CLASS_NAME}>
+        <Link2 size={12} aria-hidden /> {description}
       </p>
     </div>
   );
@@ -308,8 +312,8 @@ function AmountFieldsSalary({
           value={form.target}
           onChange={(value) => setField('target', value)}
         />
-        <p className="text-[10px] text-fg-faint mt-1.5 flex items-center gap-1">
-          <Link2 size={10} /> Current salary auto-linked from your Salary page
+        <p className={HINT_CLASS_NAME}>
+          <Link2 size={12} aria-hidden /> Current salary auto-linked from your Salary page
         </p>
       </FormField>
       <DeadlineField form={form} setField={setField} />
@@ -403,9 +407,10 @@ function AmountFieldsInvestHabit({
       <FormField label="End Month">
         <MonthInput value={deadlineToMonthString(form.deadline)} onChange={handleEndMonthChange} />
       </FormField>
-      <div className="col-span-2 rounded-xl border border-brand-soft-strong bg-brand-soft/70 px-3 py-2.5">
-        <p className="text-[10px] text-fg-faint flex items-center gap-1">
-          <Link2 size={10} /> Monthly buy transactions auto-tracked from your investments.
+      <div className={cn('col-span-2', LINKED_BOX_CLASS_NAME)}>
+        <p className="flex items-center gap-1 text-caption text-fg-subtle">
+          <Link2 size={12} aria-hidden /> Monthly buy transactions auto-tracked from your
+          investments.
           {rangeMonths > 0 && ` ${rangeMonths} month${rangeMonths > 1 ? 's' : ''} in range.`}
         </p>
       </div>
@@ -488,16 +493,28 @@ function GoalColorPicker({
   selected,
   onSelect,
 }: Readonly<{ selected: string; onSelect: (color: string) => void }>) {
+  // A saved legacy colour selects the offered swatch it displays as.
+  const selectedSwatch = categoryColorFor(selected);
+  const labelId = useId();
   return (
     <div>
-      <label className="block text-xs font-semibold text-fg-muted mb-2">Colour</label>
-      <div className="flex flex-wrap gap-2">
+      <p id={labelId} className="mb-1.5 text-label text-fg-muted">
+        Colour
+      </p>
+      <div className="flex flex-wrap gap-2" role="group" aria-labelledby={labelId}>
         {COLORS.map((color) => (
           <button
             key={color}
             type="button"
             onClick={() => onSelect(color)}
-            className={`w-7 h-7 rounded-lg transition-all ${selected === color ? 'ring-2 ring-offset-2 ring-brand-disabled scale-110' : 'hover:scale-105'}`}
+            aria-label={CATEGORY_COLOR_NAMES[color]}
+            aria-pressed={selectedSwatch === color}
+            title={CATEGORY_COLOR_NAMES[color]}
+            className={cn(
+              'h-6 w-6 rounded-full transition-shadow duration-fast max-sm:h-11 max-sm:w-11',
+              'focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus-ring',
+              selectedSwatch === color && 'ring-2 ring-fg ring-offset-2 ring-offset-surface',
+            )}
             style={{ backgroundColor: dataColorToken(color) }}
           />
         ))}
@@ -514,29 +531,22 @@ function GoalTypeStep({
     ([, meta]) => !filterKey || filterKey === 'all' || meta.filterKey === filterKey,
   );
   return (
-    <div className="p-6">
-      <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-3">
-        Select goal type
-      </p>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="p-4">
+      <p className="mb-2 text-label text-fg-muted">Select goal type</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {entries.map(([goalType, meta]) => {
-          const { Icon, bg, text } = meta;
+          const { Icon } = meta;
           return (
             <button
               key={goalType}
+              type="button"
               onClick={() => onSelect(goalType)}
-              className="flex items-start gap-3 p-4 rounded-2xl border-2 border-border-subtle hover:border-brand-border hover:bg-brand-soft/50 transition-all text-left group"
+              className="flex items-start gap-2 rounded-md border border-border-control bg-surface p-3 text-left transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
             >
-              <div
-                className={`w-9 h-9 rounded-xl ${bg} ${text} flex items-center justify-center flex-shrink-0 mt-0.5`}
-              >
-                <Icon size={16} />
-              </div>
+              <Icon size={16} className="mt-0.5 shrink-0 text-secondary" aria-hidden />
               <div>
-                <p className="text-sm font-semibold text-fg-emphasis group-hover:text-brand-fg leading-tight">
-                  {meta.label}
-                </p>
-                <p className="text-[10px] text-fg-faint mt-0.5 leading-snug">{meta.description}</p>
+                <p className="text-cell font-medium text-fg">{meta.label}</p>
+                <p className="mt-0.5 text-caption text-fg-subtle">{meta.description}</p>
               </div>
             </button>
           );
@@ -574,17 +584,16 @@ export function GoalDetailsStep({
   const showSeparateDeadline = type === 'savings' || type === 'annual';
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4 p-4">
       <button
+        type="button"
         onClick={onBack}
-        className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-brand transition-colors"
+        className="flex items-center gap-1.5 rounded-sm text-cell text-fg-muted transition-colors duration-fast hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       >
         {'<- Change type'}
-        <span
-          className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${GOAL_TYPE_META[type].bg} ${GOAL_TYPE_META[type].text}`}
-        >
+        <Badge size="sm" className={GOAL_CHIP_CLASS_NAME}>
           {GOAL_TYPE_META[type].label}
-        </span>
+        </Badge>
       </button>
       <GoalDetailsNameRow form={form} setField={setField} />
       <GoalDetailsAmountFields

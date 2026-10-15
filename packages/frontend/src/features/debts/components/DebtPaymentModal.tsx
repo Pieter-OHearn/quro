@@ -1,16 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { Debt } from '@quro/shared';
 import { TrendingDown } from 'lucide-react';
-import {
-  Button,
-  CurrencyInput,
-  DateInput,
-  FormField,
-  Modal,
-  ModalHeader,
-  TextInput,
-} from '@/components/ui';
+import { Button, CurrencyInput, DateInput, FormField, Modal, TextInput } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { formatAsNegative } from '@/lib/liability';
 import type { CreateDebtPaymentPayload, DebtPaymentFormState } from '../types';
 import { estimateDebtMonthlyInterest } from '../utils/debt-metrics';
 import {
@@ -44,16 +37,16 @@ function DebtPaymentSummary({ debt }: Readonly<{ debt: Debt }>) {
   const monthlyInterest = estimateDebtMonthlyInterest(debt);
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-surface-sunken px-4 py-3">
+    <div className="flex items-center gap-3 rounded-md border border-border-default bg-surface-sunken px-3 py-2">
       <div className="flex-1">
-        <p className="text-[10px] uppercase tracking-wide text-fg-faint">Current Balance</p>
-        <p className="text-sm font-bold text-fg-emphasis">
-          {fmtNative(debt.remainingBalance, debt.currency)}
+        <p className="text-label text-fg-muted">Current Balance</p>
+        <p className="text-figure-md font-numeric text-fg">
+          {formatAsNegative((value) => fmtNative(value, debt.currency), debt.remainingBalance)}
         </p>
       </div>
       <div className="text-right">
-        <p className="text-[10px] uppercase tracking-wide text-fg-faint">Monthly Interest</p>
-        <p className="text-sm font-semibold text-danger">
+        <p className="text-label text-fg-muted">Monthly Interest</p>
+        <p className="text-figure-md font-numeric text-fg">
           {fmtNative(monthlyInterest, debt.currency, true)}
         </p>
       </div>
@@ -98,11 +91,13 @@ function PrincipalPreview({ debt, principal }: Readonly<{ debt: Debt; principal:
   const { fmtNative } = useCurrency();
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-success-soft-strong bg-success-soft px-4 py-3">
-      <TrendingDown size={13} className="flex-shrink-0 text-success-accent" />
-      <p className="text-xs text-success-fg">
-        <span className="font-semibold">{fmtNative(principal, debt.currency, true)}</span> reduces
-        your remaining balance.
+    <div className="flex items-center gap-2 rounded-md border border-border-default bg-surface-sunken px-3 py-2">
+      <TrendingDown size={13} className="shrink-0 text-fg-muted" aria-hidden />
+      <p className="text-cell text-fg-muted">
+        <span className="font-medium font-numeric text-fg">
+          {fmtNative(principal, debt.currency, true)}
+        </span>{' '}
+        reduces your remaining balance.
       </p>
     </div>
   );
@@ -118,29 +113,15 @@ function DebtPaymentModalShell({
   return (
     <Modal
       title="Log Payment"
-      subtitle={debt.name}
+      subtitle={`${debt.emoji} ${debt.name}`}
       onClose={onClose}
       maxWidth="sm"
-      header={
-        <ModalHeader
-          title="Log Payment"
-          subtitle={debt.name}
-          onClose={onClose}
-          visual={<div className="mb-3 text-3xl">{debt.emoji}</div>}
-        />
-      }
       footer={
         <>
-          <Button onClick={onClose} variant="secondary" size="lg" className="flex-1">
+          <Button onClick={onClose} variant="secondary">
             Cancel
           </Button>
-          <Button
-            onClick={onSubmit}
-            size="lg"
-            loading={submitting}
-            loadingLabel="Logging Payment..."
-            className="flex-1 bg-success hover:bg-success-fg"
-          >
+          <Button onClick={onSubmit} loading={submitting} loadingLabel="Logging Payment...">
             Log Payment
           </Button>
         </>
@@ -210,7 +191,7 @@ export function DebtPaymentModal({ debt, onClose, onSubmit }: Readonly<DebtPayme
           placeholder="e.g. Extra repayment"
         />
       </FormField>
-      {errors.submit ? <p className="text-sm text-danger">{errors.submit}</p> : null}
+      {errors.submit ? <p className="text-cell text-danger">{errors.submit}</p> : null}
     </DebtPaymentModalShell>
   );
 }

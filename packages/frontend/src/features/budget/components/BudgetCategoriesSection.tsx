@@ -1,5 +1,8 @@
 import { Edit3, Plus, WalletCards } from 'lucide-react';
-import { Button, Card, EmptyState, IconButton, PanelHeader } from '@/components/ui';
+import type { CSSProperties } from 'react';
+import { Button, Card, EmptyState, IconButton, PanelHeader, ProgressMeter } from '@/components/ui';
+import { dataColorToken } from '@/lib/dataColors';
+import { formatAsNegative } from '@/lib/liability';
 import { cn } from '@/lib/utils';
 import type { BudgetCategory, BudgetFormatFn } from '../types';
 import { MonthYearSelector } from './MonthYearSelector';
@@ -23,17 +26,24 @@ function CategoryProgress({
   over,
   pct,
 }: Readonly<{ category: BudgetCategory; over: boolean; pct: number }>) {
+  const meterStyle = {
+    '--category-color': over ? 'var(--loss)' : dataColorToken(category.color),
+  } as CSSProperties;
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
-      <div
-        className="h-full rounded-full transition-all"
-        style={{
-          width: `${over ? 100 : pct}%`,
-          backgroundColor: over ? 'var(--danger)' : category.color,
-        }}
-      />
-    </div>
+    <ProgressMeter
+      value={over ? 100 : pct}
+      label={`${category.name} spent`}
+      style={meterStyle}
+      indicatorClassName="bg-(--category-color)"
+    />
   );
+}
+
+// Over budget reads as a loss, money left as a gain, and nothing left with no sign.
+function describeSurplus(over: boolean, surplus: number, fmt: BudgetFormatFn) {
+  if (over) return { text: formatAsNegative(fmt, Math.abs(surplus)), tone: 'text-loss' };
+  if (surplus === 0) return { text: `${fmt(surplus)} left`, tone: 'text-flat' };
+  return { text: `+${fmt(surplus)} left`, tone: 'text-gain' };
 }
 
 function CategoryAmounts({
@@ -51,14 +61,13 @@ function CategoryAmounts({
   fmt: BudgetFormatFn;
   fmtDec: BudgetFormatFn;
 }>) {
+  const remaining = describeSurplus(over, surplus, fmt);
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-numeric md:justify-end">
-      <span className={cn('font-semibold', over ? 'text-danger' : 'text-fg-muted')}>
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-cell font-numeric md:justify-end">
+      <span className="text-fg-muted">
         {fmtDec(spent)} / {fmt(budgeted)}
       </span>
-      <span className={over ? 'font-semibold text-danger' : 'text-success'}>
-        {over ? `-${fmt(Math.abs(surplus))}` : `+${fmt(surplus)} left`}
-      </span>
+      <span className={cn('font-medium', remaining.tone)}>{remaining.text}</span>
     </div>
   );
 }
@@ -79,40 +88,33 @@ function CategoryRow({
   const surplus = category.budgeted - category.spent;
 
   return (
-    <div
-      className={cn(
-        'rounded-xl border p-3 transition-colors',
-        over
-          ? 'border-danger-border bg-danger-soft'
-          : 'border-transparent hover:border-border-subtle hover:bg-surface-muted',
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <span className="w-8 flex-shrink-0 text-center text-xl leading-8">{category.emoji}</span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <p className="truncate text-sm font-medium text-fg-strong">{category.name}</p>
-            <CategoryAmounts
-              over={over}
-              spent={category.spent}
-              surplus={surplus}
-              budgeted={category.budgeted}
-              fmt={fmt}
-              fmtDec={fmtDec}
-            />
-          </div>
-          <div className="mt-2">
-            <CategoryProgress category={category} over={over} pct={pct} />
-          </div>
+    <div className="flex items-center gap-2 px-3 py-2 transition-colors duration-fast hover:bg-surface-muted max-sm:px-4">
+      <span className="w-5 shrink-0 text-center text-base leading-none" aria-hidden>
+        {category.emoji}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-0.5 md:flex-row md:items-baseline md:justify-between md:gap-3">
+          <p className="truncate text-cell font-medium text-fg">{category.name}</p>
+          <CategoryAmounts
+            over={over}
+            spent={category.spent}
+            surplus={surplus}
+            budgeted={category.budgeted}
+            fmt={fmt}
+            fmtDec={fmtDec}
+          />
         </div>
-        <IconButton
-          onClick={() => onEdit(category)}
-          icon={Edit3}
-          label={`Edit ${category.name}`}
-          variant="subtle"
-          size="sm"
-        />
+        <div className="mt-1.5">
+          <CategoryProgress category={category} over={over} pct={pct} />
+        </div>
       </div>
+      <IconButton
+        onClick={() => onEdit(category)}
+        icon={Edit3}
+        label={`Edit ${category.name}`}
+        variant="subtle"
+        size="sm"
+      />
     </div>
   );
 }
@@ -121,30 +123,30 @@ function CategoryList({
   categories,
   fmt,
   fmtDec,
-  onAddCategory,
   onEditCategory,
 }: Readonly<{
   categories: BudgetCategory[];
   fmt: BudgetFormatFn;
   fmtDec: BudgetFormatFn;
-  onAddCategory: () => void;
   onEditCategory: (category: BudgetCategory) => void;
 }>) {
   if (categories.length === 0) {
+    // The header's Add Category button is the one action, so the empty state has none.
     return (
-      <EmptyState
-        icon={WalletCards}
-        title="No budget categories yet"
-        description="Click Add Category to get started."
-        action={{ label: 'Add Category', onClick: onAddCategory, icon: <Plus size={15} /> }}
-        compact
-        tone="neutral"
-      />
+      <div className="p-3 max-sm:p-4">
+        <EmptyState
+          icon={WalletCards}
+          title="No budget categories yet"
+          description="Click Add Category to get started."
+          compact
+          tone="neutral"
+        />
+      </div>
     );
   }
 
   return (
-    <div className="space-y-2 p-3">
+    <div className="divide-y divide-border-subtle">
       {categories.map((category) => (
         <CategoryRow
           key={category.id}
@@ -179,10 +181,9 @@ export function BudgetCategoriesSection({
       <PanelHeader
         title="Budget Categories"
         subtitle={subtitle}
-        className="max-md:flex-col max-md:items-start"
-        actionClassName="max-md:w-full"
+        className="max-md:flex-col max-md:items-stretch max-md:gap-2 max-md:py-2"
         action={
-          <div className="flex flex-wrap items-center justify-end gap-3 max-md:w-full max-md:justify-between">
+          <div className="flex flex-wrap items-center justify-end gap-2 max-md:w-full max-md:justify-between">
             <MonthYearSelector
               month={selectedMonth}
               year={selectedYear}
@@ -193,7 +194,8 @@ export function BudgetCategoriesSection({
             <Button
               data-testid="budget-add-category-button"
               onClick={onAddCategory}
-              leadingIcon={<Plus size={15} />}
+              size="sm"
+              leadingIcon={<Plus size={12} aria-hidden />}
             >
               Add Category
             </Button>
@@ -204,7 +206,6 @@ export function BudgetCategoriesSection({
         categories={categories}
         fmt={fmt}
         fmtDec={fmtDec}
-        onAddCategory={onAddCategory}
         onEditCategory={onEditCategory}
       />
     </Card>

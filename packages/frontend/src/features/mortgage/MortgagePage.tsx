@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
-import { EmptyState, LoadingState } from '@/components/ui';
+import { EmptyState, LoadingState, PageStack } from '@/components/ui';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import {
   AddMortgageModal,
@@ -28,7 +28,7 @@ function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
   const hasProperties = state.properties.length > 0;
 
   return (
-    <div className="p-6">
+    <PageStack>
       {state.showMortgageModal && (
         <AddMortgageModal
           properties={state.properties}
@@ -37,25 +37,23 @@ function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
           onSave={state.handleSaveMortgage}
         />
       )}
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <EmptyState
-          icon={Home}
-          title="No mortgages yet"
-          description={
-            hasProperties
-              ? 'Create a mortgage linked to one of your properties.'
-              : 'Add a property first, then create a mortgage linked to that property.'
-          }
-          action={{
-            label: hasProperties ? 'Set Up Mortgage' : 'Add Property First',
-            onClick: hasProperties
-              ? () => state.setShowMortgageModal(true)
-              : () => navigate('/investments'),
-          }}
-        />
-      </div>
+      <EmptyState
+        icon={Home}
+        title="No mortgages yet"
+        description={
+          hasProperties
+            ? 'Create a mortgage linked to one of your properties.'
+            : 'Add a property first, then create a mortgage linked to that property.'
+        }
+        action={{
+          label: hasProperties ? 'Set Up Mortgage' : 'Add Property First',
+          onClick: hasProperties
+            ? () => state.setShowMortgageModal(true)
+            : () => navigate('/investments'),
+        }}
+      />
       <MortgageArchivedSection />
-    </div>
+    </PageStack>
   );
 }
 
@@ -87,7 +85,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
   } = useMortgageMetrics(mortgage, state.txns);
 
   return (
-    <div className="p-6 space-y-6">
+    <PageStack>
       <MortgageModals
         showTxnModal={state.showTxnModal}
         editingTxn={state.editingTxn}
@@ -149,7 +147,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
         onDelete={state.handleDeleteTxn}
       />
       <MortgageArchivedSection />
-    </div>
+    </PageStack>
   );
 }
 

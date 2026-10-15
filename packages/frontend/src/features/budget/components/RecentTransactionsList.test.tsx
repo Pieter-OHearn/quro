@@ -82,7 +82,7 @@ test('RecentTransactionsList renders shared table rows with mobile-critical tran
   expect(markup).toContain('aria-sort="descending"');
   expect(markup).toContain('aria-label="Sort by Amount"');
   expect(markup).toContain('Albert Heijn');
-  expect(markup).toContain('-€42.35');
+  expect(markup).toContain('\u2212€42.35');
   expect(markup).toContain('2026-05-14');
   expect(markup).toContain('Groceries');
   expect(markup).toContain('Bunq');

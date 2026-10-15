@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 import type { Goal } from '@quro/shared';
-import { SegmentedControl } from '@/components/ui';
+import { Button, SegmentedControl } from '@/components/ui';
 import type { FilterKey } from '../types';
 import { FILTERS, GOAL_TYPE_META } from '../utils/goals-constants';
 import { normalizeGoalType, parseGoalYear } from '../utils/goal-utils';
@@ -9,7 +9,6 @@ const FILTER_HAS_SINGLE_TYPE = new Set<FilterKey>(['savings', 'career']);
 
 type FilterCountBadgeProps = {
   filterKey: FilterKey;
-  activeFilter: FilterKey;
   goals: readonly Goal[];
   activeYear: number;
   currentYear: number;
@@ -17,7 +16,6 @@ type FilterCountBadgeProps = {
 
 function FilterCountBadge({
   filterKey,
-  activeFilter,
   goals,
   activeYear,
   currentYear,
@@ -28,13 +26,7 @@ function FilterCountBadge({
       GOAL_TYPE_META[normalizeGoalType(goal)].filterKey === filterKey,
   ).length;
 
-  return (
-    <span
-      className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeFilter === filterKey ? 'bg-surface/20' : 'bg-surface-muted'}`}
-    >
-      {count}
-    </span>
-  );
+  return <span className="font-normal font-numeric text-fg-subtle">{count}</span>;
 }
 
 type GoalsFilterBarProps = {
@@ -59,17 +51,17 @@ export function GoalsFilterBar({
   };
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <SegmentedControl
+        aria-label="Filter goals"
         options={FILTERS.map(({ key, label, Icon }) => ({
           value: key,
           label,
-          icon: <Icon size={13} />,
+          icon: <Icon size={12} aria-hidden />,
           badge:
             key !== 'all' ? (
               <FilterCountBadge
                 filterKey={key}
-                activeFilter={activeFilter}
                 goals={goals}
                 activeYear={activeYear}
                 currentYear={currentYear}
@@ -78,19 +70,17 @@ export function GoalsFilterBar({
         }))}
         value={activeFilter}
         onChange={onFilterChange}
-        variant="contained"
+        className="max-sm:w-full"
       />
-      <div className="flex-1" />
-      <button
-        type="button"
+      <Button
         onClick={handleAdd}
-        className="flex items-center gap-2 text-sm bg-brand hover:bg-brand-hover text-fg-inverted px-4 py-2.5 rounded-xl transition-colors"
+        leadingIcon={<Plus size={14} aria-hidden />}
+        className="max-sm:w-full"
       >
-        <Plus size={15} />
         {FILTER_HAS_SINGLE_TYPE.has(activeFilter)
           ? `Add ${FILTERS.find((f) => f.key === activeFilter)?.label ?? ''} Goal`
           : 'Add Goal'}
-      </button>
+      </Button>
     </div>
   );
 }

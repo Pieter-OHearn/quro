@@ -24,18 +24,14 @@ type DebtsPageLayoutProps = {
 
 function DebtsHeader({ onAddDebt }: Readonly<{ onAddDebt: () => void }>) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-2xl font-bold text-fg">Debts & Liabilities</h1>
-        <p className="mt-1 text-sm text-fg-faint">
+        <h2 className="text-title-section text-fg">Debts & Liabilities</h2>
+        <p className="text-caption text-fg-subtle">
           Loans, credit cards, overdrafts, and other non-mortgage obligations.
         </p>
       </div>
-      <Button
-        onClick={onAddDebt}
-        className="bg-danger-hover hover:bg-danger-fg"
-        leadingIcon={<Plus size={15} />}
-      >
+      <Button onClick={onAddDebt} leadingIcon={<Plus size={14} aria-hidden />}>
         Add Debt
       </Button>
     </div>
@@ -44,7 +40,7 @@ function DebtsHeader({ onAddDebt }: Readonly<{ onAddDebt: () => void }>) {
 
 function EmptyFilterResult() {
   return (
-    <div className="rounded-2xl border border-dashed border-border-default px-6 py-12 text-center text-sm text-fg-faint">
+    <div className="rounded-lg border border-dashed border-border-control bg-surface p-4 text-cell text-fg-muted">
       No debts match this filter.
     </div>
   );
@@ -52,12 +48,12 @@ function EmptyFilterResult() {
 
 function DebtsInfoCallout() {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-border-default bg-surface-sunken px-5 py-4">
-      <Info size={14} className="mt-0.5 flex-shrink-0 text-fg-faint" />
-      <p className="text-xs leading-relaxed text-fg-subtle">
+    <div className="flex items-start gap-2 rounded-lg border border-border-default bg-surface-sunken p-3">
+      <Info size={14} className="mt-0.5 shrink-0 text-fg-faint" aria-hidden />
+      <p className="text-caption text-fg-subtle">
         Outstanding debt balances are subtracted from your total assets on the dashboard to
-        calculate <span className="font-semibold text-fg-strong">net worth</span>. Payoff
-        projections use standard amortisation and assume a constant monthly payment.
+        calculate <span className="font-medium text-fg">net worth</span>. Payoff projections use
+        standard amortisation and assume a constant monthly payment.
       </p>
     </div>
   );
@@ -74,7 +70,7 @@ function DebtCardsGrid({
   onDeletePayment,
 }: Readonly<Omit<DebtsPageLayoutProps, 'filter' | 'onFilterChange' | 'onAddDebt'>>) {
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {debts.map((debt) => (
         <DebtCard
           key={debt.id}
@@ -109,7 +105,7 @@ export function DebtsPageLayout(props: Readonly<DebtsPageLayoutProps>) {
         </ContentSection>
       ) : null}
 
-      <ContentSection spacing="lg">
+      <ContentSection spacing="md">
         <DebtsHeader onAddDebt={props.onAddDebt} />
         {hasDebts ? (
           <FilterPills debts={props.debts} value={props.filter} onChange={props.onFilterChange} />

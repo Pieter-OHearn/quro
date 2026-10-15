@@ -2,7 +2,7 @@ import { useGoalForm } from './useGoalForm';
 import { useState } from 'react';
 import { DEFAULT_EMOJI, type GoalType } from '@quro/shared';
 import type { CreateGoalInput, GoalFormState } from '../types';
-import { COLORS } from '../utils/goals-constants';
+import { DATA_COLORS } from '@/lib/dataColors';
 import { buildDefaultGoalDeadline, getCurrentGoalYear } from '../utils/goal-years';
 
 const defaultForm = (): GoalFormState => {
@@ -13,7 +13,7 @@ const defaultForm = (): GoalFormState => {
   return {
     name: '',
     emoji: DEFAULT_EMOJI.goal,
-    color: COLORS[0],
+    color: DATA_COLORS.primary,
     notes: '',
     deadline: buildDefaultGoalDeadline(now),
     year: String(currentYear),

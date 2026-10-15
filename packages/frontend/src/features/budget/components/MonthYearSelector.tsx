@@ -24,9 +24,8 @@ export function MonthYearSelector({
         label="Previous month"
         size="sm"
         variant="subtle"
-        className="h-7 w-7"
       />
-      <span className="min-w-[90px] text-center text-sm font-medium text-fg-muted">
+      <span className="min-w-[90px] text-center text-cell font-medium text-fg" aria-live="polite">
         {month} {year}
       </span>
       <IconButton
@@ -36,7 +35,6 @@ export function MonthYearSelector({
         label="Next month"
         size="sm"
         variant="subtle"
-        className="h-7 w-7"
       />
     </div>
   );

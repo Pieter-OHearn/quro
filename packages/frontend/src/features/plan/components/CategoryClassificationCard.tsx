@@ -34,7 +34,7 @@ function ClassificationRows({
     <div className="mt-5 divide-y divide-border-subtle border-t border-border-subtle">
       {categories.map((category) => (
         <div key={category.id} className="flex items-center justify-between gap-4 py-3">
-          <span className="text-sm font-medium text-fg-strong">
+          <span className="text-cell font-medium text-fg">
             {category.emoji} {category.name}
           </span>
           <SelectInput
@@ -71,27 +71,25 @@ export function CategoryClassificationCard({
 
   if (categoriesQuery.isPending || categories.length === 0) return null;
   return (
-    <Card className="border-border-default">
+    <Card>
       <details>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
-          <span className="flex items-center gap-3">
-            <span className="rounded-xl bg-surface-muted p-2 text-fg-muted">
-              <Tags size={18} />
-            </span>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
+          <span className="flex items-start gap-2">
+            <Tags size={16} className="mt-0.5 shrink-0 text-fg-faint" aria-hidden />
             <span>
-              <span className="block font-semibold text-fg">Review spending classes</span>
-              <span className="mt-0.5 block text-xs text-fg-subtle">
+              <span className="block text-title-section text-fg">Review spending classes</span>
+              <span className="mt-0.5 block text-caption text-fg-subtle">
                 {defaultedCount > 0
                   ? `${defaultedCount} custom categories currently use the conservative essential default.`
                   : 'Mark work-linked spending so it drops out of job-loss burn.'}
               </span>
             </span>
           </span>
-          <span className="text-xs font-semibold text-brand">Review all</span>
+          <span className="shrink-0 text-cell font-medium text-brand">Review all</span>
         </summary>
         <ClassificationRows categories={categories} classes={classes} setClasses={setClasses} />
         {classify.isError ? (
-          <p className="mt-3 text-sm text-danger-fg">Spending classes could not be saved.</p>
+          <p className="mt-3 text-cell text-danger">Spending classes could not be saved.</p>
         ) : null}
         <div className="mt-4 flex justify-end">
           <Button

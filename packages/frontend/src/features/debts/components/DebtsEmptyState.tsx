@@ -7,11 +7,7 @@ export function DebtsEmptyState({ onAdd }: Readonly<{ onAdd: () => void }>) {
       icon={Banknote}
       title="No debts recorded"
       description="Track student loans, credit cards, personal loans, car loans, overdrafts, and other liabilities to see their impact on net worth."
-      action={{
-        label: 'Add your first debt',
-        onClick: onAdd,
-        className: 'bg-danger-hover hover:bg-danger-fg',
-      }}
+      action={{ label: 'Add your first debt', onClick: onAdd }}
     />
   );
 }

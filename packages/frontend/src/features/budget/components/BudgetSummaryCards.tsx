@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, TrendingDown, Wallet } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
+import { formatAsNegative } from '@/lib/liability';
 import { StatCard, StatsGrid } from '@/components/ui';
 import type { BudgetFormatFn } from '../types';
 import { formatPercent } from '@quro/shared';
@@ -43,17 +44,25 @@ function TotalSpentCard({
   );
 }
 
+// Under budget reads as a gain and over budget as a loss; exactly on budget has no sign.
+function describeRemaining(remaining: number, fmt: BudgetFormatFn) {
+  if (remaining > 0) return { value: `+${fmt(remaining)}`, tone: 'text-gain' };
+  if (remaining < 0)
+    return { value: formatAsNegative(fmt, Math.abs(remaining)), tone: 'text-loss' };
+  return { value: fmt(remaining), tone: 'text-flat' };
+}
+
 function RemainingCard({ remaining, fmt }: Readonly<{ remaining: number; fmt: BudgetFormatFn }>) {
   const isPositive = remaining >= 0;
+  const display = describeRemaining(remaining, fmt);
   return (
     <StatCard
       label="Remaining"
-      value={`${isPositive ? '+' : ''}${fmt(remaining)}`}
-      valueClassName={isPositive ? 'text-success' : 'text-danger'}
+      value={display.value}
+      valueClassName={display.tone}
       subtitle={isPositive ? 'Under budget' : 'Over budget'}
       icon={isPositive ? CheckCircle2 : AlertTriangle}
       color={isPositive ? 'emerald' : 'rose'}
-      className={isPositive ? undefined : 'border-danger-border'}
     />
   );
 }
@@ -64,7 +73,6 @@ function SavingsRateCard({ savingsRate }: Readonly<{ savingsRate: number }>) {
     <StatCard
       label="Savings Rate"
       value={formatPercent(savingsRate, numberFormat, 1)}
-      valueClassName="text-info"
       subtitle="of monthly budget"
       icon={CheckCircle2}
       color="sky"

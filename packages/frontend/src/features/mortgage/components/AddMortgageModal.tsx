@@ -58,6 +58,9 @@ const n = (value: string) => parseFloat(value) || 0;
 // ─── Form Section Sub-components ─────────────────────────────────────────────
 
 type FormState = MortgageFormState;
+
+const SECTION_HEADING = 'mb-2 text-cell font-semibold text-fg';
+const FIELD_HINT = 'mt-1 text-caption text-fg-subtle';
 type SetFieldFn = <K extends keyof FormState>(field: K, value: FormState[K]) => void;
 type Errors = Record<string, string>;
 
@@ -75,13 +78,7 @@ function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
         />
       </FormField>
       <FormField label="Currency">
-        <TextInput
-          disabled
-          readOnly
-          className="bg-surface-muted text-fg-subtle"
-          value={form.currency}
-          onChange={() => undefined}
-        />
+        <TextInput disabled readOnly value={form.currency} onChange={() => undefined} />
       </FormField>
     </div>
   );
@@ -90,18 +87,17 @@ function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
 function PropertySection({ form, errors, setField }: PropertySectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">Property</p>
+      <h3 className={SECTION_HEADING}>Property</h3>
       <div className="space-y-3">
         <FormField label="Property Address">
           <TextInput
             disabled
             readOnly
-            className="bg-surface-muted text-fg-subtle"
             placeholder="Select a property below"
             value={form.propertyAddress}
             onChange={() => undefined}
           />
-          <p className="text-[10px] text-fg-faint mt-1">Taken from the linked property.</p>
+          <p className={FIELD_HINT}>Taken from the linked property.</p>
         </FormField>
         <LenderCurrencyGrid form={form} errors={errors} setField={setField} />
       </div>
@@ -128,9 +124,7 @@ function PropertyLinkSection({
 }: PropertyLinkSectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">
-        Property Link
-      </p>
+      <h3 className={SECTION_HEADING}>Property Link</h3>
       <FormField label="Linked Property" error={errors.linkedPropertyId}>
         <SelectInput
           error={Boolean(errors.linkedPropertyId)}
@@ -145,16 +139,14 @@ function PropertyLinkSection({
           ]}
         />
       </FormField>
-      <p className="text-[10px] text-fg-faint mt-1.5">
-        Add a property first, then link the mortgage here.
-      </p>
+      <p className={FIELD_HINT}>Add a property first, then link the mortgage here.</p>
       {selectedProperty && (
-        <p className="text-[10px] text-brand mt-1">
+        <p className={FIELD_HINT}>
           Using linked property details: {selectedProperty.address} ({selectedProperty.currency}).
         </p>
       )}
       {availableProperties.length === 0 && !existing && (
-        <p className="text-xs text-warning mt-2">
+        <p className="mt-2 text-caption text-warning">
           No unlinked properties available. Add a property in Investments first.
         </p>
       )}
@@ -188,9 +180,7 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
   ];
   return (
     <div>
-      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">
-        Loan Financials
-      </p>
+      <h3 className={SECTION_HEADING}>Loan Financials</h3>
       <div className="grid grid-cols-2 gap-3">
         {fields.map(({ field, label, placeholder, readOnly }) => (
           <FormField
@@ -204,7 +194,7 @@ function LoanFinancialsSection({ form, errors, setField }: LoanFinancialsSection
               disabled={readOnly}
               readOnly={readOnly}
               error={!readOnly && Boolean(errors[field])}
-              className={readOnly ? 'bg-surface-muted text-fg-subtle pr-3' : 'pr-3'}
+              className="pr-3"
               placeholder={placeholder}
               value={form[field]}
               onChange={(value) => setField(field, value)}
@@ -246,7 +236,7 @@ function LoanTermField({ form, errors, setField }: RateTermSectionProps) {
           value={form.termYears}
           onChange={(value) => setField('termYears', value)}
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-faint">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-caption text-fg-subtle">
           years
         </span>
       </div>
@@ -272,9 +262,7 @@ function OverpaymentLimitField({ form, setField }: { form: FormState; setField: 
 function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">
-        Rate & Term
-      </p>
+      <h3 className={SECTION_HEADING}>Rate & Term</h3>
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Repayment Method">
           <SelectInput
@@ -282,7 +270,7 @@ function RateTermSection({ form, errors, setField }: RateTermSectionProps) {
             onChange={(value) => setField('repaymentType', toMortgageRepaymentType(value))}
             options={REPAYMENT_TYPES}
           />
-          <p className="text-[10px] text-fg-faint mt-1">
+          <p className={FIELD_HINT}>
             {form.repaymentType === 'Linear'
               ? 'Fixed principal; the monthly payment declines over time.'
               : 'Fixed payment; the principal share increases over time.'}
@@ -308,7 +296,7 @@ type DatesSectionProps = { form: FormState; setField: SetFieldFn };
 function DatesSection({ form, setField }: DatesSectionProps) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-fg-faint uppercase tracking-widest mb-3">Dates</p>
+      <h3 className={SECTION_HEADING}>Dates</h3>
       <div className="grid grid-cols-3 gap-3">
         <FormField label="Start Date">
           <TextInput
@@ -339,10 +327,10 @@ function DatesSection({ form, setField }: DatesSectionProps) {
 
 function getLtvColor(ltv: number) {
   if (ltv < LOW_LTV_THRESHOLD)
-    return { border: 'bg-success-soft border-success-soft-strong', text: 'text-success' };
+    return { border: 'border-success bg-success-soft', text: 'text-success' };
   if (ltv < MEDIUM_LTV_THRESHOLD)
-    return { border: 'bg-warning-soft border-warning-soft-strong', text: 'text-warning' };
-  return { border: 'bg-danger-soft border-danger-soft-strong', text: 'text-danger' };
+    return { border: 'border-warning bg-warning-soft', text: 'text-warning' };
+  return { border: 'border-danger bg-danger-soft', text: 'text-danger' };
 }
 
 type LtvPreviewProps = { ltvPreview: string; form: FormState };
@@ -352,10 +340,10 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
   const ltvVal = parseFloat(ltvPreview);
   const { border, text } = getLtvColor(ltvVal);
   return (
-    <div className={`rounded-xl p-4 border flex items-center justify-between ${border}`}>
+    <div className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${border}`}>
       <div>
-        <p className="text-xs font-semibold text-fg-strong">Loan-to-Value Preview</p>
-        <p className="text-xs text-fg-subtle mt-0.5">
+        <p className="text-label text-fg">Loan-to-Value Preview</p>
+        <p className="mt-0.5 text-caption text-fg-muted font-numeric">
           {form.currency}{' '}
           {formatNumber(n(form.outstandingBalance), numberFormat, {
             minimumFractionDigits: 2,
@@ -369,8 +357,8 @@ function LtvPreview({ ltvPreview, form }: LtvPreviewProps) {
         </p>
       </div>
       <div className="text-right">
-        <p className={`font-black text-xl ${text}`}>{ltvPreview}%</p>
-        <p className="text-[10px] text-fg-faint">LTV</p>
+        <p className={`text-figure-lg font-numeric ${text}`}>{ltvPreview}%</p>
+        <p className="text-caption text-fg-muted">LTV</p>
       </div>
     </div>
   );
@@ -396,7 +384,7 @@ function MortgageFormBody({
   ltvPreview,
 }: MortgageFormBodyProps) {
   return (
-    <div className="p-6 space-y-5 overflow-y-auto">
+    <div className="space-y-4 overflow-y-auto p-4">
       <PropertySection form={form} errors={errors} setField={setField} />
       <PropertyLinkSection
         form={form}
@@ -431,7 +419,7 @@ function buildMortgageDeleteButton(
       label="Remove mortgage"
       variant="danger"
       size="lg"
-      className="border border-danger-border text-danger"
+      className="border border-danger text-danger"
       onClick={onRequestConfirm}
     />
   );
@@ -515,7 +503,6 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
       onClose={onClose}
       maxWidth="xl"
       scrollable
-      backdropClassName="bg-overlay/50 backdrop-blur-sm"
       bodyClassName="p-0 space-y-0"
       footer={
         <ModalFooter
