@@ -78,10 +78,10 @@ export function createEmptyPasswordForm(): PasswordFormState {
 }
 
 export function formatPasswordChangedAt(value: string | null): string {
-  if (!value) return 'Never changed';
+  if (!value) return 'never';
 
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Recently updated';
+  if (Number.isNaN(parsed.getTime())) return 'recently';
 
   return parsed.toLocaleDateString('en-GB', {
     day: 'numeric',

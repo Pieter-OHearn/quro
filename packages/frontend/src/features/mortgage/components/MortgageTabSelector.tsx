@@ -15,7 +15,7 @@ export function MortgageTabSelector({
   activeMortgage,
   onSelect,
   onAddClick,
-  addLabel = 'Add Mortgage',
+  addLabel = 'Add mortgage',
 }: Readonly<MortgageTabSelectorProps>) {
   return (
     <div className="flex flex-wrap items-center gap-2">

@@ -19,7 +19,7 @@ function TotalBudgetCard({
 }: Readonly<{ totalBudgeted: number; fmt: BudgetFormatFn }>) {
   return (
     <StatCard
-      label="Total Budget"
+      label="Total budget"
       value={fmt(totalBudgeted)}
       subtitle="This month"
       icon={Wallet}

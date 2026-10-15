@@ -498,7 +498,7 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
 
   return (
     <Modal
-      title={existing ? 'Edit Mortgage' : 'Add Mortgage'}
+      title={existing ? 'Edit mortgage' : 'Add mortgage'}
       subtitle={existing ? 'Update mortgage details' : 'Set up a new property mortgage'}
       onClose={onClose}
       maxWidth="xl"
@@ -510,7 +510,7 @@ export function AddMortgageModal(props: AddMortgageModalProps) {
           onConfirm={() => {
             void handleSave();
           }}
-          confirmLabel={existing ? 'Save changes' : 'Add Mortgage'}
+          confirmLabel={existing ? 'Save changes' : 'Add mortgage'}
           disabled={disableSave}
           loading={saving}
           danger={buildMortgageDeleteButton(existing, onDelete, () => setConfirmingDelete(true))}

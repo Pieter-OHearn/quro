@@ -545,8 +545,8 @@ const smokeCases: readonly SmokeCase[] = [
     includes: [
       'aria-sort="none"',
       'aria-sort="descending"',
-      'aria-label="Sort by Amount ascending"',
-      'Sort by Name',
+      'aria-label="Sort by amount ascending"',
+      'Sort by name',
     ],
   },
   {

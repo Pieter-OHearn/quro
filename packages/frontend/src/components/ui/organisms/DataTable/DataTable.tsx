@@ -322,7 +322,10 @@ function getNextSort(column: DataTableColumn, sort?: DataTableSortState): DataTa
 }
 
 function getSortLabel(column: DataTableColumn, sort?: DataTableSortState): string {
-  const label = getColumnDataLabel(column.header ?? column.mobileLabel ?? column.key) ?? column.key;
+  const header =
+    getColumnDataLabel(column.header ?? column.mobileLabel ?? column.key) ?? column.key;
+  // Mid-sentence the header reads in lower case ("Sort by net pay"); acronyms keep their case.
+  const label = header.replace(/^([A-Z])(?=[a-z])/, (letter) => letter.toLowerCase());
   if (sort?.columnKey !== column.key) return `Sort by ${label}`;
   return `Sort by ${label} ${sort.direction === 'asc' ? 'descending' : 'ascending'}`;
 }
