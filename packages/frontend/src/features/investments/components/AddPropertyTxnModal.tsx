@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { formatFixedInputValue } from '@/lib/utils';
 import {
+  Change,
   Modal,
   ModalFooter,
   FormField,
@@ -16,6 +17,8 @@ import {
   type PropertyTransaction,
   validateInterestWithinAmount,
 } from '@quro/shared';
+import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
+import { TxnAmount } from '@/components/finance/TxnAmount';
 import type { SavePropertyTxnInput } from '../types';
 import { isInvestmentProperty, type PropertyTxnType } from '../utils/position';
 
@@ -34,48 +37,27 @@ type PropertyTxnInfoBarProps = {
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
+function infoBarFigure(type: PropertyTxnType, property: Property, mortgageBalance: number) {
+  if (type === 'repayment') return { label: 'Current mortgage', value: mortgageBalance };
+  if (type === 'valuation') return { label: 'Current value', value: property.currentValue };
+  if (type === 'rent_income') return { label: 'Monthly rent target', value: property.monthlyRent };
+  return { label: 'Property value', value: property.currentValue };
+}
+
 function PropertyTxnInfoBar({
   type,
   property,
   mortgageBalance,
   fmtNative,
 }: PropertyTxnInfoBarProps) {
+  const { label, value } = infoBarFigure(type, property, mortgageBalance);
   return (
-    <div className="flex items-center gap-3 bg-surface-sunken rounded-xl px-4 py-2.5 text-xs text-fg-muted">
-      {type === 'repayment' ? (
-        <>
-          <span>Current mortgage</span>
-          <span className="text-fg-disabled">·</span>
-          <span className="font-semibold text-fg-emphasis">
-            {fmtNative(mortgageBalance, property.currency)}
-          </span>
-        </>
-      ) : type === 'valuation' ? (
-        <>
-          <span>Current value</span>
-          <span className="text-fg-disabled">·</span>
-          <span className="font-semibold text-fg-emphasis">
-            {fmtNative(property.currentValue, property.currency)}
-          </span>
-        </>
-      ) : type === 'rent_income' ? (
-        <>
-          <span>Monthly rent target</span>
-          <span className="text-fg-disabled">·</span>
-          <span className="font-semibold text-fg-emphasis">
-            {fmtNative(property.monthlyRent, property.currency)}
-          </span>
-        </>
-      ) : (
-        <>
-          <span>Property value</span>
-          <span className="text-fg-disabled">·</span>
-          <span className="font-semibold text-fg-emphasis">
-            {fmtNative(property.currentValue, property.currency)}
-          </span>
-        </>
-      )}
-    </div>
+    <p className="text-caption text-fg-subtle">
+      {label} ·{' '}
+      <span className="font-numeric font-medium text-fg">
+        {fmtNative(value, property.currency)}
+      </span>
+    </p>
   );
 }
 
@@ -108,33 +90,18 @@ function RepaymentPreview({
   currency,
   fmtNative,
 }: RepaymentPreviewProps) {
+  const format = (value: number) => fmtNative(value, currency, true);
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Total payment</span>
-        <span className="font-semibold text-fg-emphasis">
-          {fmtNative(parsedAmount, currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Interest (cost)</span>
-        <span className="font-semibold text-danger">
-          {fmtNative(parsedInterest, currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Principal (reduces mortgage)</span>
-        <span className="font-semibold text-brand">
-          -{fmtNative(derivedPrincipal, currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs border-t border-brand-soft-strong pt-1.5 mt-1">
-        <span className="text-fg-muted">New mortgage balance</span>
-        <span className="font-semibold text-fg-emphasis">
-          {fmtNative(Math.max(0, mortgageBalance - derivedPrincipal), currency, true)}
-        </span>
-      </div>
-    </div>
+    <>
+      <PreviewRow label="Total payment">{format(parsedAmount)}</PreviewRow>
+      <PreviewRow label="Interest (cost)">{format(parsedInterest)}</PreviewRow>
+      <PreviewRow label="Principal (reduces mortgage)">
+        <TxnAmount value={-derivedPrincipal} format={format} />
+      </PreviewRow>
+      <PreviewRow label="New mortgage balance" total>
+        {format(Math.max(0, mortgageBalance - derivedPrincipal))}
+      </PreviewRow>
+    </>
   );
 }
 
@@ -151,29 +118,14 @@ function ValuationPreview({
   currency,
   fmtNative,
 }: ValuationPreviewProps) {
-  const isUp = parsedAmount >= currentValue;
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Previous value</span>
-        <span className="font-semibold text-fg-emphasis">
-          {fmtNative(currentValue, currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">New value</span>
-        <span className={`font-semibold ${isUp ? 'text-success' : 'text-danger'}`}>
-          {fmtNative(parsedAmount, currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Change</span>
-        <span className={`font-semibold ${isUp ? 'text-success' : 'text-danger'}`}>
-          {isUp ? '+' : ''}
-          {fmtNative(parsedAmount - currentValue, currency, true)}
-        </span>
-      </div>
-    </div>
+    <>
+      <PreviewRow label="Previous value">{fmtNative(currentValue, currency, true)}</PreviewRow>
+      <PreviewRow label="New value">{fmtNative(parsedAmount, currency, true)}</PreviewRow>
+      <PreviewRow label="Change">
+        <Change value={parsedAmount - currentValue} format="amount" currency={currency} />
+      </PreviewRow>
+    </>
   );
 }
 
@@ -192,43 +144,28 @@ function RentExpensePreview({
   currency,
   fmtNative,
 }: RentExpensePreviewProps) {
+  const format = (value: number) => fmtNative(value, currency, true);
   if (type === 'rent_income') {
-    const diff = parsedAmount - monthlyRent;
     return (
-      <div className="space-y-1.5">
-        <div className="flex justify-between text-xs">
-          <span className="text-fg-muted">Income booked</span>
-          <span className="font-semibold text-info-fg">
-            +{fmtNative(parsedAmount, currency, true)}
-          </span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-fg-muted">Vs monthly target</span>
-          <span className={`font-semibold ${diff >= 0 ? 'text-success' : 'text-warning'}`}>
-            {diff >= 0 ? '+' : ''}
-            {fmtNative(diff, currency, true)}
-          </span>
-        </div>
-      </div>
+      <>
+        <PreviewRow label="Income booked">
+          <TxnAmount value={parsedAmount} format={format} />
+        </PreviewRow>
+        <PreviewRow label="Vs monthly target">
+          <Change value={parsedAmount - monthlyRent} format="amount" currency={currency} />
+        </PreviewRow>
+      </>
     );
   }
-  const net = monthlyRent - parsedAmount;
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Expense booked</span>
-        <span className="font-semibold text-danger-hover">
-          -{fmtNative(parsedAmount, currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Net vs monthly rent</span>
-        <span className={`font-semibold ${net >= 0 ? 'text-success' : 'text-danger-hover'}`}>
-          {net >= 0 ? '+' : ''}
-          {fmtNative(net, currency, true)}
-        </span>
-      </div>
-    </div>
+    <>
+      <PreviewRow label="Expense booked">
+        <TxnAmount value={-parsedAmount} format={format} />
+      </PreviewRow>
+      <PreviewRow label="Net vs monthly rent">
+        <Change value={monthlyRent - parsedAmount} format="amount" currency={currency} />
+      </PreviewRow>
+    </>
   );
 }
 
@@ -242,7 +179,7 @@ function PropertyTxnPreview({
   fmtNative,
 }: PropertyTxnPreviewProps) {
   return (
-    <div className={`rounded-xl p-4 border ${PROPERTY_TXN_FORM[type].previewClass}`}>
+    <PreviewPanel>
       {type === 'repayment' && (
         <RepaymentPreview
           parsedAmount={parsedAmount}
@@ -270,7 +207,7 @@ function PropertyTxnPreview({
           fmtNative={fmtNative}
         />
       )}
-    </div>
+    </PreviewPanel>
   );
 }
 
@@ -313,7 +250,7 @@ function RepaymentField({
 }: RepaymentFieldProps) {
   return (
     <FormField
-      label={`Interest Portion (${property.currency})`}
+      label={`Interest portion (${property.currency})`}
       hint="— principal is auto-calculated"
       error={error && parsedInterest > parsedAmount ? error : undefined}
     >
@@ -323,20 +260,20 @@ function RepaymentField({
         onChange={onInterestChange}
         error={Boolean(error) && parsedInterest > parsedAmount}
       />
-      <div className="mt-2 flex gap-4 text-xs text-fg-subtle">
+      <p className="mt-1 flex gap-4 text-caption text-fg-subtle">
         <span>
           Interest:{' '}
-          <span className="font-semibold text-danger">
+          <span className="font-numeric text-fg">
             {fmtNative(parsedInterest, property.currency, true)}
           </span>
         </span>
         <span>
           Principal:{' '}
-          <span className="font-semibold text-brand">
+          <span className="font-numeric text-fg">
             {fmtNative(derivedPrincipal, property.currency, true)}
           </span>
         </span>
-      </div>
+      </p>
     </FormField>
   );
 }
@@ -446,7 +383,11 @@ function AmountAndRepaymentFields({ form, property, fmtNative }: AmountAndRepaym
           }}
         />
       )}
-      {error && parsedAmount > 0 && <p className="text-xs text-danger">{error}</p>}
+      {error && parsedAmount > 0 && (
+        <p role="alert" className="text-caption text-danger">
+          {error}
+        </p>
+      )}
     </>
   );
 }
@@ -459,7 +400,7 @@ function PropertyTxnFormBody({
 }: PropertyTxnFormBodyProps) {
   return (
     <>
-      <FormField label="Transaction Type">
+      <FormField label="Transaction type">
         <TxnTypeSelector<PropertyTxnType>
           types={form.transactionTypes.map((txnType) => PROPERTY_TXN_META[txnType])}
           value={form.type}
@@ -542,14 +483,14 @@ export function AddPropertyTxnModal({
 
   return (
     <Modal
-      title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
+      title={isEditing ? 'Edit transaction' : 'Record transaction'}
       subtitle={`${property.emoji} ${property.address}`}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+          confirmLabel={isEditing ? 'Save changes' : 'Record'}
         />
       }
     >

@@ -172,6 +172,13 @@ feature component.
   `StatCard` takes its change either as a formatted string (`{ value, positive }`) or as a
   signed number (`{ amount, format, currency, label }`) that it renders through `Change`;
   prefer the number.
+- Feature pages share a few finance display helpers in `src/components/finance/`: `TxnAmount`
+  signs a transaction amount (money in reads `+` in the `gain` colour, money out reads a true
+  minus in the figure colour), `PreviewPanel` and `PreviewRow` show a calculated result under a
+  form, and `chartTheme` holds the axis, gridline, tooltip and legend settings for Recharts
+  charts (series colours come from the `viz-*` tokens by asset class).
+- Unit prices (price per share, current, manual and historical prices) use `formatUnitPrice`
+  from `@quro/shared`: two to four decimals in the user's number format. Money keeps two.
 - `Button` supports `loading` and disables itself while loading; use it instead of
   a separate submitting-button pattern.
 - Keep loading, empty, error, disabled and submitting states, labels, keyboard
@@ -450,11 +457,11 @@ filter value, pagination state, and handlers.
   filter={filter}
   onFilterChange={setFilter}
   stats={[
-    { label: 'In', value: fmt(inflow), color: 'text-success-fg' },
-    { label: 'Out', value: fmt(outflow), color: 'text-danger-fg' },
+    { label: 'In', value: <TxnAmount value={inflow} format={fmt} /> },
+    { label: 'Out', value: <TxnAmount value={-outflow} format={fmt} /> },
   ]}
   onAdd={onAddTransaction}
-  addLabel="Add Transaction"
+  addLabel="Add transaction"
   emptyMessage="No transactions match this filter."
   footer={
     <Pagination
@@ -472,11 +479,10 @@ filter value, pagination state, and handlers.
     <TxnRow
       key={transaction.id}
       icon={transaction.type === 'deposit' ? ArrowUpRight : ArrowDownRight}
-      iconColor={transaction.type === 'deposit' ? 'text-success-fg' : 'text-danger-fg'}
-      iconBg={transaction.type === 'deposit' ? 'bg-success-soft' : 'bg-danger-soft'}
+      iconColor={transaction.type === 'deposit' ? 'text-gain' : 'text-fg-muted'}
       date={transaction.date}
       label={transaction.note ?? 'Transaction'}
-      amount={fmt(transaction.amount)}
+      amount={<TxnAmount value={signedAmount(transaction)} format={fmt} />}
       onEdit={() => onEdit(transaction)}
       onDelete={() => onDelete(transaction.id)}
     />

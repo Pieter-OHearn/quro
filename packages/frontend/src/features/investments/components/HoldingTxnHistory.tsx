@@ -1,7 +1,9 @@
 import { HOLDING_TXN_META as TXN_META } from '../constants';
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { TxnHistoryPanel, TxnRow } from '@/components/ui';
+import { Change, TxnHistoryPanel, TxnRow } from '@/components/ui';
+import { TxnAmount } from '@/components/finance/TxnAmount';
+import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import { holdingValue, type Holding, type HoldingTransaction } from '@quro/shared';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
 import type { HoldingTxnType, Position } from '../utils/position';
@@ -15,69 +17,44 @@ type HoldingTxnHistoryProps = {
   onDelete: (id: number) => void;
 };
 
-type HoldingTxnAmountProps = {
-  transaction: HoldingTransaction;
-  holding: Holding;
-  incomeLowerLabel: string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-};
+type FmtNativeFn = (value: number, currency: string, compact?: boolean) => string;
 
-function HoldingTxnAmount({
-  transaction,
-  holding,
-  incomeLowerLabel,
-  fmtNative,
-}: HoldingTxnAmountProps) {
-  if (transaction.type === 'buy' || transaction.type === 'sell') {
-    return (
-      <div className="text-right flex-shrink-0">
-        <p
-          className={`text-sm font-semibold ${transaction.type === 'buy' ? 'text-fg-strong' : 'text-success'}`}
-        >
-          {transaction.type === 'buy' ? '-' : '+'}
-          {fmtNative(
-            holdingValue(transaction.shares ?? 0, transaction.price),
-            holding.currency,
-            true,
-          )}
-        </p>
-        <p className="text-[10px] text-fg-faint">
-          {transaction.shares ?? 0} @ {fmtNative(transaction.price, holding.currency, true)}
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="text-right flex-shrink-0">
-      <p className="text-sm font-semibold text-brand">
-        +{fmtNative(transaction.price, holding.currency, true)}
-      </p>
-      <p className="text-[10px] text-fg-faint">{incomeLowerLabel}</p>
-    </div>
-  );
+/** Buys move money out, sells and income move money in. */
+function signedHoldingCashflow(transaction: HoldingTransaction): number {
+  if (transaction.type === 'buy') return -holdingValue(transaction.shares ?? 0, transaction.price);
+  if (transaction.type === 'sell') return holdingValue(transaction.shares ?? 0, transaction.price);
+  return transaction.price;
 }
 
 function buildHoldingStats(
   position: Position,
   holding: Holding,
   totalIncomeLabel: string,
-  fmtNative: (value: number, currency: string, compact?: boolean) => string,
+  fmtNative: FmtNativeFn,
+  fmtPrice: UnitPriceFormatFn,
 ) {
   return [
-    {
-      label: 'Avg Cost',
-      value: fmtNative(position.avgCost, holding.currency, true),
-      color: 'text-fg-emphasis',
-    },
+    { label: 'Avg cost', value: fmtPrice(position.avgCost, holding.currency) },
     {
       label: totalIncomeLabel,
-      value: `+${fmtNative(position.totalDividends, holding.currency, true)}`,
-      color: 'text-brand',
+      value: (
+        <TxnAmount
+          value={position.totalDividends}
+          format={(amount) => fmtNative(amount, holding.currency, true)}
+        />
+      ),
     },
     {
-      label: 'Realized Gain',
-      value: `${position.realizedGain >= 0 ? '+' : ''}${fmtNative(position.realizedGain, holding.currency, true)}`,
-      color: position.realizedGain >= 0 ? 'text-success' : 'text-danger',
+      label: 'Realized gain',
+      value: (
+        <Change
+          value={position.realizedGain}
+          format="amount"
+          currency={holding.currency}
+          showArrow={false}
+          className="text-figure-md"
+        />
+      ),
     },
   ];
 }
@@ -91,6 +68,7 @@ export function HoldingTxnHistory({
   onDelete,
 }: HoldingTxnHistoryProps) {
   const { fmtNative } = useCurrency();
+  const fmtPrice = useUnitPriceFormatter();
   const [filter, setFilter] = useState<HoldingTxnType | 'all'>('all');
   const incomeLabels = getIncomeTxnLabels(holding);
   const txnMeta = {
@@ -113,7 +91,13 @@ export function HoldingTxnHistory({
     )
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const stats = buildHoldingStats(position, holding, `Total ${incomeLabels.plural}`, fmtNative);
+  const stats = buildHoldingStats(
+    position,
+    holding,
+    `Total ${incomeLabels.plural.toLowerCase()}`,
+    fmtNative,
+    fmtPrice,
+  );
 
   return (
     <TxnHistoryPanel
@@ -123,24 +107,27 @@ export function HoldingTxnHistory({
       stats={stats}
       statsColumns={3}
       onAdd={onAdd}
+      addLabel="Add transaction"
       isEmpty={sorted.length === 0}
     >
       {sorted.map((transaction) => {
         const meta = txnMeta[transaction.type as HoldingTxnType];
+        const isTrade = transaction.type === 'buy' || transaction.type === 'sell';
+        const trade = isTrade
+          ? ` · ${transaction.shares ?? 0} @ ${fmtPrice(transaction.price, holding.currency)}`
+          : '';
         return (
           <TxnRow
             key={transaction.id}
             icon={meta.icon}
             iconColor={meta.color}
-            iconBg={meta.bg}
-            label={transaction.note || meta.label}
+            label={`${transaction.note || meta.label}${trade}`}
             date={transaction.date}
+            badge={transaction.note ? { text: meta.label, className: 'max-sm:hidden' } : undefined}
             amount={
-              <HoldingTxnAmount
-                transaction={transaction}
-                holding={holding}
-                incomeLowerLabel={incomeLabels.lowerSingular}
-                fmtNative={fmtNative}
+              <TxnAmount
+                value={signedHoldingCashflow(transaction)}
+                format={(amount) => fmtNative(amount, holding.currency, true)}
               />
             }
             onEdit={() => onEdit(transaction)}

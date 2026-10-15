@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
-import { LoadingSpinner } from '@/components/ui';
+import { LoadingSpinner, PageStack } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import {
@@ -73,7 +73,7 @@ function SavingsPageBodyContent(props: Readonly<SavingsPageBodyProps>) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <PageStack>
       <SavingsModals
         accounts={props.accounts}
         showAccountModal={props.showAccountModal}
@@ -111,6 +111,7 @@ function SavingsPageBodyContent(props: Readonly<SavingsPageBodyProps>) {
         isForeign={props.isForeign}
         fmtBase={props.fmtBase}
         fmtNative={props.fmtNative}
+        baseCurrency={props.baseCurrency}
         onToggleExpand={handleToggleExpand}
         onEdit={props.setEditing}
         onAddAccount={handleAddAccount}
@@ -119,7 +120,7 @@ function SavingsPageBodyContent(props: Readonly<SavingsPageBodyProps>) {
         onDeleteTxn={props.onDeleteTxn}
       />
       <SavingsArchivedSection />
-    </div>
+    </PageStack>
   );
 }
 

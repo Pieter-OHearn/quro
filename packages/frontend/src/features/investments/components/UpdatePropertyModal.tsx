@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
   ArchiveOrDeleteDialog,
+  Change,
   Modal,
   ModalFooter,
   FormField,
@@ -11,7 +12,8 @@ import {
 } from '@/components/ui';
 import { JointToggleField } from '@/features/partner';
 import { formatFixedInputValue } from '@/lib/utils';
-import { formatPercent, type Property } from '@quro/shared';
+import type { Property } from '@quro/shared';
+import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import type { DeletePropertyMode } from '../hooks/mutations';
 
 type UpdatePropertyModalProps = {
@@ -37,24 +39,16 @@ function PropertyStatsPreview({
   currency,
   fmtNative,
 }: PropertyStatsPreviewProps) {
-  const { numberFormat } = useCurrency();
   return (
-    <div className="bg-surface-sunken rounded-xl p-3 space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-subtle">Equity</span>
-        <span className={`font-semibold ${equity >= 0 ? 'text-success' : 'text-danger'}`}>
-          {fmtNative(equity, currency)}
+    <PreviewPanel>
+      <PreviewRow label="Equity">{fmtNative(equity, currency)}</PreviewRow>
+      <PreviewRow label="Appreciation">
+        <span className="inline-flex flex-wrap justify-end gap-x-1.5">
+          <Change value={appreciation} format="amount" currency={currency} />
+          <Change value={appreciationPct} format="percent" />
         </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-subtle">Appreciation</span>
-        <span className={`font-semibold ${appreciation >= 0 ? 'text-success' : 'text-danger'}`}>
-          {appreciation >= 0 ? '+' : ''}
-          {fmtNative(appreciation, currency)} ({appreciationPct >= 0 ? '+' : ''}
-          {formatPercent(appreciationPct, numberFormat, 1)})
-        </span>
-      </div>
-    </div>
+      </PreviewRow>
+    </PreviewPanel>
   );
 }
 
@@ -99,11 +93,11 @@ type MortgageBalanceFieldProps = {
 
 function MortgageBalanceField({ mortgageBalance, currency, fmtNative }: MortgageBalanceFieldProps) {
   return (
-    <FormField label="Linked Mortgage Balance">
-      <div className="w-full rounded-xl border border-border-default bg-surface-sunken px-3 py-2.5 text-sm text-fg-strong">
+    <FormField label="Linked mortgage balance">
+      <p className="font-numeric text-cell text-fg">
         {mortgageBalance > 0 ? fmtNative(mortgageBalance, currency) : 'No mortgage linked yet'}
-      </div>
-      <p className="text-xs text-fg-faint mt-1">
+      </p>
+      <p className="mt-1 text-caption text-fg-subtle">
         Manage property-mortgage links in the Mortgage section.
       </p>
     </FormField>
@@ -137,7 +131,6 @@ function buildDeleteButton(
       label="Remove property"
       variant="danger"
       size="lg"
-      className="border border-danger-border text-danger"
       onClick={onRequestConfirm}
     />
   );
@@ -192,7 +185,7 @@ export function UpdatePropertyModal({
 
   return (
     <Modal
-      title="Update Property"
+      title="Update property"
       subtitle={property.address}
       onClose={onClose}
       maxWidth="sm"
@@ -205,7 +198,7 @@ export function UpdatePropertyModal({
         />
       }
     >
-      <FormField label={`Current Value (${property.currency})`} required error={form.errors.value}>
+      <FormField label={`Current value (${property.currency})`} required error={form.errors.value}>
         <TextInput
           type="number"
           inputMode="decimal"
@@ -214,7 +207,7 @@ export function UpdatePropertyModal({
           onChange={form.handleValueChange}
           error={Boolean(form.errors.value)}
         />
-        <p className="text-xs text-fg-faint mt-1">
+        <p className="mt-1 text-caption text-fg-subtle">
           Previously {fmtNative(property.currentValue, property.currency)}
         </p>
       </FormField>
@@ -223,7 +216,7 @@ export function UpdatePropertyModal({
         currency={property.currency}
         fmtNative={fmtNative}
       />
-      <FormField label={`Monthly Rent (${property.currency})`}>
+      <FormField label={`Monthly rent (${property.currency})`}>
         <TextInput
           type="number"
           inputMode="decimal"

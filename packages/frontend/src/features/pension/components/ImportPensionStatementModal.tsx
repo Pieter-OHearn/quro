@@ -92,12 +92,10 @@ function ImportPensionStatementModalContent({
 
   return (
     <Modal
-      title="Import Annual Statement"
+      title="Import annual statement"
       onClose={onClose}
       maxWidth={reviewLayout ? '3xl' : 'lg'}
       scrollable
-      backdropClassName="bg-overlay/40 backdrop-blur-sm"
-      contentClassName="shadow-2xl"
       bodyClassName="p-0 space-y-0 min-h-0 flex flex-col"
       header={
         <ImportHeader

@@ -36,12 +36,6 @@ function formatDate(timestamp: number): string {
   });
 }
 
-function formatSignedCurrency(value: number, fmtBase: InvestmentFormatFn): string {
-  const abs = Math.abs(value);
-  const sign = value >= 0 ? '+' : '-';
-  return `${sign}${fmtBase(abs, undefined, true)}`;
-}
-
 function mapHoldingTransactions(
   holdingTxns: HoldingTransaction[],
 ): Map<number, DatedHoldingTransaction[]> {
@@ -215,23 +209,23 @@ export function useInvestmentStatTrends(
 
     return {
       brokerageValue: {
-        value: `${formatSignedCurrency(brokerageDeltaThisMonth, fmtBase)} MTD`,
-        positive: brokerageDeltaThisMonth >= 0,
+        amount: brokerageDeltaThisMonth,
+        label: 'MTD',
         details: `Month-to-date change (${monthStartLabel} to ${todayLabel}). Now ${fmtBase(stats.totalBrokerageBase)} vs ${fmtBase(brokerageAtMonthStartBase)} at month start.`,
       },
       unrealizedGain: {
-        value: `${formatSignedCurrency(unrealizedDeltaThisMonth, fmtBase)} MTD`,
-        positive: unrealizedDeltaThisMonth >= 0,
+        amount: unrealizedDeltaThisMonth,
+        label: 'MTD',
         details: `Month-to-date change (${monthStartLabel} to ${todayLabel}). Unrealized gain is market value minus cost basis: now ${fmtBase(stats.totalGainBase)} vs ${fmtBase(unrealizedAtMonthStartBase)} at month start.`,
       },
       dividendsReceived: {
-        value: `${formatSignedCurrency(dividendsYearToDateBase, fmtBase)} YTD`,
-        positive: dividendsYearToDateBase >= 0,
+        amount: dividendsYearToDateBase,
+        label: 'YTD',
         details: `Year-to-date dividends (${yearStartLabel} to ${todayLabel}): ${fmtBase(dividendsYearToDateBase)}.`,
       },
       propertyEquity: {
-        value: `${formatSignedCurrency(propertyEquityDeltaThisMonth, fmtBase)} MTD`,
-        positive: propertyEquityDeltaThisMonth >= 0,
+        amount: propertyEquityDeltaThisMonth,
+        label: 'MTD',
         details: `Month-to-date change (${monthStartLabel} to ${todayLabel}). Now ${fmtBase(stats.totalPropertyEquityBase)} vs ${fmtBase(propertyEquityAtMonthStartBase)} at month start.`,
       },
     };

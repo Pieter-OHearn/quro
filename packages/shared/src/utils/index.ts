@@ -73,6 +73,28 @@ export function formatCurrency(
   });
 }
 
+const UNIT_PRICE_MIN_DECIMALS = 2;
+const UNIT_PRICE_MAX_DECIMALS = 4;
+
+/**
+ * Formats a unit price (price per share, a current, manual or historical price) in the user's
+ * number format with two to four decimals: zeros beyond the second decimal are trimmed, so
+ * `123.4567` reads `€123.4567`, `123.45` reads `€123.45` and `0.5` reads `€0.50`. Money amounts
+ * keep the two decimals of `formatCurrency`.
+ */
+export function formatUnitPrice(
+  amount: number,
+  currency: string,
+  numberFormat: NumberFormatPreference = DEFAULT_NUMBER_FORMAT,
+): string {
+  return formatNumber(amount, numberFormat, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: UNIT_PRICE_MIN_DECIMALS,
+    maximumFractionDigits: UNIT_PRICE_MAX_DECIMALS,
+  });
+}
+
 export * from './money.js';
 export * from './date.js';
 export * from './finance.js';

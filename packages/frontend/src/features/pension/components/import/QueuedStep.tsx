@@ -1,8 +1,10 @@
 import { cn } from '@/lib/utils';
 import { ArrowUpRight, Bell, Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui';
 import { type ConfirmMode, type JobPhase } from '../../hooks/usePensionImportModalController';
-
+import { ImportBody, ImportFooter, ImportNotice } from './ImportChrome';
 import { PIPELINE, PHASE_IDX } from './phaseMetadata';
+
 type QueuedStepProps = {
   fileName: string;
   jobPhase: JobPhase;
@@ -21,32 +23,11 @@ const QUEUE_PHASE_CONNECTOR_WIDTH: Record<number, string> = {
   2: '100%',
 };
 
-const QUEUE_BOUNCE_DOT_DELAYS_MS = [0, 120, 240] as const;
-
-function getQueuePhaseRingClass(phaseKey: JobPhase): string {
-  if (phaseKey === 'processing') return 'ring-brand-soft-strong';
-  if (phaseKey === 'ready') return 'ring-success-soft-strong';
-  return 'ring-border-subtle';
-}
-
-function getQueuePhaseCircleClass(params: {
-  isComplete: boolean;
-  isActive: boolean;
-  phase: (typeof PIPELINE)[number];
-}): string {
-  if (params.isComplete) return `${params.phase.completeCls} shadow-sm`;
-  if (params.isActive) {
-    return `${params.phase.activeCls} shadow-md ring-4 ring-offset-1 ${getQueuePhaseRingClass(
-      params.phase.key,
-    )}`;
-  }
-  return 'bg-surface-muted text-fg-disabled';
-}
-
-function getQueuePhaseLabelClass(isComplete: boolean, isActive: boolean): string {
-  if (isComplete) return 'text-fg-subtle';
-  if (isActive) return 'text-fg-emphasis';
-  return 'text-fg-disabled';
+// Done steps are a brand-soft dot with a check, the current step has a brand edge.
+function getQueuePhaseDotClass(isComplete: boolean, isActive: boolean): string {
+  if (isComplete) return 'bg-brand-soft text-brand-fg';
+  if (isActive) return 'border border-brand bg-surface text-brand';
+  return 'bg-surface-muted text-fg-faint';
 }
 
 function QueuePhaseIcon({
@@ -59,22 +40,22 @@ function QueuePhaseIcon({
   phase: (typeof PIPELINE)[number];
 }>) {
   const { Icon } = phase;
-  if (isComplete) return <Check size={15} />;
-  if (isActive && phase.key === 'processing') return <Loader2 size={15} className="animate-spin" />;
-  return <Icon size={15} />;
+  if (isComplete) return <Check size={12} aria-hidden />;
+  if (isActive && phase.key === 'processing') {
+    return <Loader2 size={12} className="animate-spin" aria-hidden />;
+  }
+  return <Icon size={12} aria-hidden />;
 }
 
 function QueuedFileBanner({ fileName }: Readonly<{ fileName: string }>) {
   return (
-    <div className="flex items-center gap-3 bg-success-soft border border-success-soft-strong rounded-xl px-4 py-3">
-      <div className="w-7 h-7 rounded-lg bg-success-soft-strong flex items-center justify-center flex-shrink-0">
-        <CheckCircle2 size={14} className="text-success" />
+    <ImportNotice tone="success" className="flex items-start gap-2">
+      <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden />
+      <div className="min-w-0">
+        <p className="font-medium">PDF submitted successfully</p>
+        {fileName && <p className="truncate text-caption text-fg-muted">{fileName}</p>}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-success-fg">PDF submitted successfully</p>
-        {fileName && <p className="text-[11px] text-success/70 truncate mt-0.5">{fileName}</p>}
-      </div>
-    </div>
+    </ImportNotice>
   );
 }
 
@@ -83,122 +64,88 @@ function QueuedPipeline({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
   const connectorWidth = QUEUE_PHASE_CONNECTOR_WIDTH[currentIdx] ?? '0%';
 
   return (
-    <div className="flex items-start justify-between relative">
-      <div className="absolute top-[18px] left-[calc(16.67%+10px)] right-[calc(16.67%+10px)] h-[2px] bg-surface-muted z-0">
-        <div
-          className="h-full bg-brand-disabled transition-all duration-700"
+    <ol className="relative flex items-start justify-between">
+      <li
+        aria-hidden
+        className="absolute left-[16.67%] right-[16.67%] top-3 h-px bg-border-default"
+      >
+        <span
+          className="block h-full bg-brand transition-[width] duration-slow"
           style={{ width: connectorWidth }}
         />
-      </div>
+      </li>
       {PIPELINE.map((phase, idx) => {
         const isComplete = idx < currentIdx;
         const isActive = idx === currentIdx;
         return (
-          <div key={phase.key} className="flex flex-col items-center gap-2 flex-1 z-10 relative">
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-500 ${getQueuePhaseCircleClass(
-                { isComplete, isActive, phase },
-              )}`}
+          <li
+            key={phase.key}
+            aria-current={isActive ? 'step' : undefined}
+            className="relative flex flex-1 flex-col items-center gap-1.5"
+          >
+            <span
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded-full',
+                getQueuePhaseDotClass(isComplete, isActive),
+              )}
             >
               <QueuePhaseIcon isComplete={isComplete} isActive={isActive} phase={phase} />
-            </div>
-            <div className="text-center">
-              <p
-                className={`text-[11px] font-semibold ${getQueuePhaseLabelClass(isComplete, isActive)}`}
-              >
-                {phase.label}
-              </p>
-              <p
+            </span>
+            <span className="text-center">
+              <span
                 className={cn(
-                  'text-[10px] mt-0.5',
-                  isActive ? 'text-fg-subtle' : 'text-fg-disabled',
+                  'block text-label',
+                  isActive || isComplete ? 'text-fg' : 'text-fg-subtle',
                 )}
               >
-                {phase.sublabel}
-              </p>
-            </div>
-          </div>
+                {phase.label}
+              </span>
+              <span className="block text-caption text-fg-subtle">{phase.sublabel}</span>
+            </span>
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
-}
-
-function getQueueStatusCaptionClass(jobPhase: JobPhase): string {
-  if (jobPhase === 'queuing') return 'bg-surface-sunken text-fg-subtle border border-border-subtle';
-  if (jobPhase === 'processing') return 'bg-brand-soft text-brand border border-brand-soft-strong';
-  return 'bg-success-soft text-success-fg border border-success-soft-strong';
 }
 
 function QueuedStatusMessage({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
   if (jobPhase === 'queuing') {
     return (
-      <span className="flex items-center justify-center gap-2">
-        <span className="flex gap-0.5">
-          {QUEUE_BOUNCE_DOT_DELAYS_MS.map((delay) => (
-            <span
-              key={delay}
-              className="w-1 h-1 bg-fg-faint rounded-full animate-bounce"
-              style={{ animationDelay: `${delay}ms` }}
-            />
-          ))}
-        </span>
+      <ImportNotice tone="neutral" className="text-center">
         Your PDF is waiting in the processing queue
-      </span>
+      </ImportNotice>
     );
   }
   if (jobPhase === 'processing') {
     return (
-      <span className="flex items-center justify-center gap-2">
-        <Loader2 size={11} className="animate-spin text-brand-disabled" />
+      <ImportNotice tone="info" className="flex items-center justify-center gap-2">
+        <Loader2 size={12} className="animate-spin" aria-hidden />
         AI is extracting contributions, fees and totals from your PDF
-      </span>
+      </ImportNotice>
     );
   }
   return (
-    <span className="flex items-center justify-center gap-2">
-      <CheckCircle2 size={11} className="text-success-accent" />
+    <ImportNotice tone="success" className="flex items-center justify-center gap-2">
+      <CheckCircle2 size={12} aria-hidden />
       <span>
-        Transactions extracted - <strong>ready for your review</strong>
+        Transactions extracted - <strong className="font-medium">ready for your review</strong>
       </span>
-    </span>
-  );
-}
-
-function QueuedStatusCaption({
-  jobPhase,
-  modelCaption,
-}: Readonly<{
-  jobPhase: JobPhase;
-  modelCaption: string | null;
-}>) {
-  return (
-    <>
-      <div
-        className={`mt-4 text-center py-2.5 px-4 rounded-xl text-xs transition-all ${getQueueStatusCaptionClass(
-          jobPhase,
-        )}`}
-      >
-        <QueuedStatusMessage jobPhase={jobPhase} />
-      </div>
-      {modelCaption && (
-        <p className="text-[11px] text-fg-faint text-center mt-2">Processed with {modelCaption}</p>
-      )}
-    </>
+    </ImportNotice>
   );
 }
 
 function QueuedInfoPanel() {
   return (
-    <div className="flex items-start gap-3 bg-surface-sunken border border-border-default rounded-xl px-4 py-3.5">
-      <Bell size={13} className="text-fg-faint mt-px flex-shrink-0" />
-      <p className="text-xs text-fg-subtle leading-relaxed">
+    <p className="flex items-start gap-2 text-caption text-fg-subtle">
+      <Bell size={12} className="mt-0.5 shrink-0 text-fg-faint" aria-hidden />
+      <span>
         You can leave this window at any time - the job runs in the background. Return to review
         from the <span className="font-medium text-fg-muted">notification bell</span> when it&apos;s
         ready. To stop the job entirely, use{' '}
-        <span className="font-medium text-fg-muted">Cancel Job</span>.
-      </p>
-    </div>
+        <span className="font-medium text-fg-muted">Cancel job</span>.
+      </span>
+    </p>
   );
 }
 
@@ -216,69 +163,35 @@ function QueuedCancelConfirm({
   onClose,
 }: Readonly<QueuedCancelConfirmProps>) {
   return (
-    <div className="bg-danger-soft border border-danger-border rounded-xl px-4 py-3 space-y-3">
-      <div className="flex items-start gap-2.5">
-        <XCircle size={14} className="text-danger mt-0.5 flex-shrink-0" />
+    <div className="w-full space-y-2">
+      <ImportNotice tone="danger" className="flex items-start gap-2">
+        <XCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
         <div>
-          <p className="text-xs font-semibold text-danger-fg">Cancel this import job?</p>
-          <p className="text-[11px] text-danger mt-0.5 leading-relaxed">
+          <p className="font-medium">Cancel this import job?</p>
+          <p className="text-caption">
             Processing will stop and the job will be removed from your notification list. This
             can&apos;t be undone.
           </p>
         </div>
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => onSetConfirmMode('none')}
-          className="flex-1 rounded-xl border border-border-default bg-surface text-fg-muted py-2 text-xs hover:bg-surface-sunken transition-colors font-medium"
-        >
-          Keep Running
-        </button>
-        <button
-          type="button"
+      </ImportNotice>
+      <div className="flex justify-end gap-2 max-sm:flex-col max-sm:*:w-full">
+        <Button variant="secondary" onClick={() => onSetConfirmMode('none')}>
+          Keep running
+        </Button>
+        <Button
+          variant="danger"
           onClick={() => {
             void (async () => {
               const cancelled = await onCancelJob();
               if (cancelled) onClose();
             })();
           }}
-          disabled={isCancelling}
-          className="flex-1 rounded-xl bg-danger-hover hover:bg-danger-fg text-fg-inverted py-2 text-xs transition-colors font-medium flex items-center justify-center gap-1.5 disabled:opacity-70"
+          loading={isCancelling}
+          leadingIcon={<XCircle size={14} aria-hidden />}
         >
-          {isCancelling ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
-          Confirm Cancel
-        </button>
+          Confirm cancel
+        </Button>
       </div>
-    </div>
-  );
-}
-
-function QueuedDefaultFooter({
-  onSetConfirmMode,
-  onClose,
-}: Readonly<{
-  onSetConfirmMode: (mode: ConfirmMode) => void;
-  onClose: () => void;
-}>) {
-  return (
-    <div className="flex gap-3">
-      <button
-        type="button"
-        onClick={() => onSetConfirmMode('queued-cancel')}
-        className="flex items-center gap-1.5 px-4 rounded-xl border border-danger-border text-danger py-2.5 text-sm hover:bg-danger-soft transition-colors font-medium"
-      >
-        <XCircle size={14} />
-        Cancel Job
-      </button>
-      <button
-        type="button"
-        onClick={onClose}
-        className="flex-1 rounded-xl text-fg-inverted py-2.5 text-sm transition-colors font-medium flex items-center justify-center gap-2 shadow-sm bg-brand hover:bg-brand-hover shadow-brand-tint"
-      >
-        Continue in Background
-        <ArrowUpRight size={14} />
-      </button>
     </div>
   );
 }
@@ -296,35 +209,42 @@ export function QueuedStep({
 }: Readonly<QueuedStepProps>) {
   return (
     <>
-      <div className="p-6 space-y-5">
+      <ImportBody>
         <QueuedFileBanner fileName={fileName} />
-
-        <div>
+        <div className="space-y-3">
           <QueuedPipeline jobPhase={jobPhase} />
-          <QueuedStatusCaption jobPhase={jobPhase} modelCaption={modelCaption} />
+          <QueuedStatusMessage jobPhase={jobPhase} />
+          {modelCaption && (
+            <p className="text-center text-caption text-fg-subtle">Processed with {modelCaption}</p>
+          )}
         </div>
-
         <QueuedInfoPanel />
+        {errorMessage && <ImportNotice tone="danger">{errorMessage}</ImportNotice>}
+      </ImportBody>
 
-        {errorMessage && (
-          <div className="rounded-xl border border-danger-border bg-danger-soft px-3 py-2 text-xs text-danger-fg">
-            {errorMessage}
-          </div>
-        )}
-      </div>
-
-      <div className="px-6 py-4 bg-surface-sunken border-t border-border-subtle">
-        {confirmMode === 'queued-cancel' ? (
+      {confirmMode === 'queued-cancel' ? (
+        <div className="shrink-0 border-t border-border-default bg-surface-sunken px-4 py-3">
           <QueuedCancelConfirm
             isCancelling={isCancelling}
             onSetConfirmMode={onSetConfirmMode}
             onCancelJob={onCancelJob}
             onClose={onClose}
           />
-        ) : (
-          <QueuedDefaultFooter onSetConfirmMode={onSetConfirmMode} onClose={onClose} />
-        )}
-      </div>
+        </div>
+      ) : (
+        <ImportFooter>
+          <Button
+            variant="danger"
+            onClick={() => onSetConfirmMode('queued-cancel')}
+            leadingIcon={<XCircle size={14} aria-hidden />}
+          >
+            Cancel job
+          </Button>
+          <Button onClick={onClose} trailingIcon={<ArrowUpRight size={14} aria-hidden />}>
+            Continue in background
+          </Button>
+        </ImportFooter>
+      )}
     </>
   );
 }

@@ -6,8 +6,9 @@ export type TxnTypeMeta = {
   label: string;
   icon: LucideIcon;
   color: string;
-  bg: string;
-  borderColor: string;
+  /** Unused since the selector shows selection as a `brand-soft` tint; optional for callers. */
+  bg?: string;
+  borderColor?: string;
 };
 
 export type TxnTypeSelectorProps<T extends string> = {

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { formatFixedInputValue } from '@/lib/utils';
+import { cn, formatFixedInputValue } from '@/lib/utils';
 import {
+  Change,
   Modal,
   ModalFooter,
   FormField,
@@ -16,7 +17,7 @@ import {
   type SavingsAccount,
   type SavingsTransaction,
 } from '@quro/shared';
-import { TXN_META, TXN_TYPE_LIST } from '../constants';
+import { TXN_TYPE_LIST } from '../constants';
 import type { SaveTransactionInput, TxnType } from '../types';
 import { saveSavingsTransaction } from '../utils/save-transaction';
 
@@ -48,24 +49,22 @@ function BalancePreview({
   fmtNative,
 }: BalancePreviewProps) {
   // The shared ledger rule, so the preview moves the balance exactly as saving will.
-  const newBalance = sumMoney([balanceBeforeTxn, signedSavingsAmount(type, parsed)]);
+  const signedAmount = signedSavingsAmount(type, parsed);
+  const newBalance = sumMoney([balanceBeforeTxn, signedAmount]);
 
   return (
-    <div
-      className={`rounded-xl p-4 border ${type === 'withdrawal' ? 'bg-danger-soft border-danger-soft-strong' : 'bg-success-soft border-success-soft-strong'}`}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-fg-muted">Balance after transaction</span>
-        <span className={`font-bold ${newBalance < 0 ? 'text-danger-hover' : 'text-success-fg'}`}>
+    <div className="rounded-lg border border-border-default px-3 py-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-label text-fg-muted">Balance after transaction</span>
+        <span className={cn('text-figure-md', newBalance < 0 ? 'text-danger' : 'text-fg')}>
           {fmtNative(newBalance, currency, true)}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-xs text-fg-subtle">
+      <div className="mt-1 flex flex-wrap items-baseline gap-1.5 text-caption text-fg-subtle font-numeric">
         <span>{fmtNative(balanceBeforeTxn, currency, true)}</span>
-        <span>{type === 'withdrawal' ? '\u2212' : '+'}</span>
-        <span className={TXN_META[type].color}>{fmtNative(parsed, currency, true)}</span>
+        <Change value={signedAmount} format="amount" currency={currency} showArrow={false} />
         <span>=</span>
-        <span className="font-semibold">{fmtNative(newBalance, currency, true)}</span>
+        <span className="text-fg">{fmtNative(newBalance, currency, true)}</span>
       </div>
     </div>
   );
@@ -131,7 +130,7 @@ export function AddTxnModal({ account, existing, onClose, onSave }: AddTxnModalP
   const isEditing = Boolean(existing);
   return (
     <Modal
-      title={isEditing ? 'Edit Transaction' : 'Add Transaction'}
+      title={isEditing ? 'Edit transaction' : 'Add transaction'}
       subtitle={`${account.emoji} ${account.name}`}
       onClose={onClose}
       footer={
@@ -140,11 +139,11 @@ export function AddTxnModal({ account, existing, onClose, onSave }: AddTxnModalP
           onConfirm={() => {
             void form.handleSave();
           }}
-          confirmLabel={isEditing ? 'Save Changes' : 'Record Transaction'}
+          confirmLabel={isEditing ? 'Save changes' : 'Record transaction'}
         />
       }
     >
-      <FormField label="Transaction Type">
+      <FormField label="Transaction type">
         <TxnTypeSelector
           types={TXN_TYPE_LIST}
           value={form.type}

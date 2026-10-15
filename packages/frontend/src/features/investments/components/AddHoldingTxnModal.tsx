@@ -2,6 +2,7 @@ import { HOLDING_TXN_META as TXN_META } from '../constants';
 import { useMemo, useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import {
+  Change,
   Modal,
   ModalFooter,
   FormField,
@@ -17,9 +18,12 @@ import {
   type Holding,
   type HoldingTransaction,
 } from '@quro/shared';
+import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
+import { TxnAmount } from '@/components/finance/TxnAmount';
+import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import type { SaveHoldingTxnInput } from '../types';
 import { getIncomeTxnLabels } from '../utils/incomeTxnLabels';
-import type { HoldingTxnType, Position } from '../utils/position';
+import { formatShares, type HoldingTxnType, type Position } from '../utils/position';
 
 type AddHoldingTxnModalProps = {
   holding: Holding;
@@ -48,6 +52,7 @@ type BuyPreviewProps = {
   currentPosition: Position;
   newAvgCost: number;
   fmtNative: FmtNative;
+  fmtPrice: UnitPriceFormatFn;
 };
 
 function BuyPreview({
@@ -57,34 +62,26 @@ function BuyPreview({
   currentPosition,
   newAvgCost,
   fmtNative,
+  fmtPrice,
 }: BuyPreviewProps) {
   if (parsedShares <= 0) return null;
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Total cost</span>
-        <span className="font-semibold text-fg-emphasis">
-          {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">New avg cost</span>
-        <span className="font-semibold text-success-fg">
-          {fmtNative(newAvgCost, holding.currency, true)}
-          {newAvgCost !== currentPosition.avgCost && currentPosition.shares > 0 && (
-            <span className="text-fg-faint font-normal ml-1">
-              (was {fmtNative(currentPosition.avgCost, holding.currency, true)})
-            </span>
-          )}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">New position</span>
-        <span className="font-semibold text-fg-emphasis">
-          {(currentPosition.shares + parsedShares).toFixed(4).replace(/\.?0+$/, '')} shares
-        </span>
-      </div>
-    </div>
+    <PreviewPanel>
+      <PreviewRow label="Total cost">
+        {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
+      </PreviewRow>
+      <PreviewRow label="New avg cost">
+        {fmtPrice(newAvgCost, holding.currency)}
+        {newAvgCost !== currentPosition.avgCost && currentPosition.shares > 0 && (
+          <span className="ml-1 text-fg-subtle">
+            (was {fmtPrice(currentPosition.avgCost, holding.currency)})
+          </span>
+        )}
+      </PreviewRow>
+      <PreviewRow label="New position">
+        {formatShares(currentPosition.shares + parsedShares)} shares
+      </PreviewRow>
+    </PreviewPanel>
   );
 }
 
@@ -107,49 +104,17 @@ function SellPreview({
 }: SellPreviewProps) {
   if (parsedShares <= 0) return null;
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Proceeds</span>
-        <span className="font-semibold text-fg-emphasis">
-          {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Realized gain/loss</span>
-        <span
-          className={`font-semibold ${realizedGain >= 0 ? 'text-success' : 'text-danger-hover'}`}
-        >
-          {realizedGain >= 0 ? '+' : ''}
-          {fmtNative(realizedGain, holding.currency, true)}
-        </span>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-muted">Remaining shares</span>
-        <span className="font-semibold text-fg-emphasis">
-          {Math.max(0, currentPosition.shares - parsedShares)
-            .toFixed(4)
-            .replace(/\.?0+$/, '')}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-type DividendPreviewProps = {
-  parsedPrice: number;
-  holding: Holding;
-  fmtNative: FmtNative;
-  incomeLabel: string;
-};
-
-function DividendPreview({ parsedPrice, holding, fmtNative, incomeLabel }: DividendPreviewProps) {
-  return (
-    <div className="flex justify-between text-xs">
-      <span className="text-brand-fg font-medium">{incomeLabel} income</span>
-      <span className="font-bold text-brand-fg">
-        +{fmtNative(parsedPrice, holding.currency, true)}
-      </span>
-    </div>
+    <PreviewPanel>
+      <PreviewRow label="Proceeds">
+        {fmtNative(parsedShares * parsedPrice, holding.currency, true)}
+      </PreviewRow>
+      <PreviewRow label="Realized gain/loss">
+        <Change value={realizedGain} format="amount" currency={holding.currency} />
+      </PreviewRow>
+      <PreviewRow label="Remaining shares">
+        {formatShares(Math.max(0, currentPosition.shares - parsedShares))}
+      </PreviewRow>
+    </PreviewPanel>
   );
 }
 
@@ -162,6 +127,7 @@ type TxnPreviewProps = {
   newAvgCost: number;
   realizedGain: number;
   fmtNative: FmtNative;
+  fmtPrice: UnitPriceFormatFn;
   incomeLabel: string;
 };
 
@@ -174,67 +140,64 @@ function TxnPreview({
   newAvgCost,
   realizedGain,
   fmtNative,
+  fmtPrice,
   incomeLabel,
 }: TxnPreviewProps) {
-  const bgClass =
-    type === 'sell'
-      ? 'bg-danger-soft border-danger-soft-strong'
-      : type === 'dividend'
-        ? 'bg-brand-soft border-brand-soft-strong'
-        : 'bg-success-soft border-success-soft-strong';
-
+  if (type === 'buy') {
+    return (
+      <BuyPreview
+        parsedShares={parsedShares}
+        parsedPrice={parsedPrice}
+        holding={holding}
+        currentPosition={currentPosition}
+        newAvgCost={newAvgCost}
+        fmtNative={fmtNative}
+        fmtPrice={fmtPrice}
+      />
+    );
+  }
+  if (type === 'sell') {
+    return (
+      <SellPreview
+        parsedShares={parsedShares}
+        parsedPrice={parsedPrice}
+        holding={holding}
+        currentPosition={currentPosition}
+        realizedGain={realizedGain}
+        fmtNative={fmtNative}
+      />
+    );
+  }
   return (
-    <div className={`rounded-xl p-4 border ${bgClass}`}>
-      {type === 'buy' && (
-        <BuyPreview
-          parsedShares={parsedShares}
-          parsedPrice={parsedPrice}
-          holding={holding}
-          currentPosition={currentPosition}
-          newAvgCost={newAvgCost}
-          fmtNative={fmtNative}
+    <PreviewPanel>
+      <PreviewRow label={`${incomeLabel} income`}>
+        <TxnAmount
+          value={parsedPrice}
+          format={(amount) => fmtNative(amount, holding.currency, true)}
         />
-      )}
-      {type === 'sell' && (
-        <SellPreview
-          parsedShares={parsedShares}
-          parsedPrice={parsedPrice}
-          holding={holding}
-          currentPosition={currentPosition}
-          realizedGain={realizedGain}
-          fmtNative={fmtNative}
-        />
-      )}
-      {type === 'dividend' && (
-        <DividendPreview
-          parsedPrice={parsedPrice}
-          holding={holding}
-          fmtNative={fmtNative}
-          incomeLabel={incomeLabel}
-        />
-      )}
-    </div>
+      </PreviewRow>
+    </PreviewPanel>
   );
 }
 
 type PositionInfoBarProps = {
   currentPosition: Position;
   holding: Holding;
-  fmtNative: FmtNative;
+  fmtPrice: UnitPriceFormatFn;
 };
 
-function PositionInfoBar({ currentPosition, holding, fmtNative }: PositionInfoBarProps) {
+function PositionInfoBar({ currentPosition, holding, fmtPrice }: PositionInfoBarProps) {
   if (currentPosition.shares <= 0) return null;
   return (
-    <div className="flex items-center gap-3 bg-surface-sunken rounded-xl px-4 py-2.5 text-xs text-fg-muted">
-      <span className="font-semibold text-fg-emphasis">
-        {currentPosition.shares.toFixed(4).replace(/\.?0+$/, '')} shares
+    <p className="text-caption text-fg-subtle">
+      <span className="font-numeric font-medium text-fg">
+        {formatShares(currentPosition.shares)} shares
       </span>
-      <span className="text-fg-disabled">·</span>
-      <span>avg cost {fmtNative(currentPosition.avgCost, holding.currency, true)}</span>
-      <span className="text-fg-disabled">·</span>
-      <span>current {fmtNative(holding.currentPrice, holding.currency, true)}</span>
-    </div>
+      {' · '}avg cost{' '}
+      <span className="font-numeric">{fmtPrice(currentPosition.avgCost, holding.currency)}</span>
+      {' · '}current{' '}
+      <span className="font-numeric">{fmtPrice(holding.currentPrice, holding.currency)}</span>
+    </p>
   );
 }
 
@@ -257,7 +220,7 @@ function SharesFormField({
 }: SharesFormFieldProps) {
   return (
     <FormField
-      label={type === 'sell' ? `Shares to Sell (max: ${currentPosition.shares})` : 'Shares to Buy'}
+      label={type === 'sell' ? `Shares to sell (max: ${currentPosition.shares})` : 'Shares to buy'}
       error={error && parsedShares <= 0 ? error : undefined}
     >
       <TextInput
@@ -297,8 +260,8 @@ function PriceFormField({
     <FormField
       label={
         type === 'dividend'
-          ? `Total ${incomeLabel} Received (${holding.currency})`
-          : `Price per Share (${holding.currency})`
+          ? `Total ${incomeLabel.toLowerCase()} received (${holding.currency})`
+          : `Price per share (${holding.currency})`
       }
       error={
         error && (parsedPrice <= 0 || (!needsShares && type === 'dividend')) ? error : undefined
@@ -309,7 +272,8 @@ function PriceFormField({
         value={price}
         onChange={onChange}
         error={Boolean(error) && parsedPrice <= 0}
-        step="0.0001"
+        // Unit prices take six decimals; dividends and distributions are money, so two.
+        step={type === 'dividend' ? '0.01' : '0.000001'}
       />
     </FormField>
   );
@@ -345,6 +309,7 @@ type TxnFormBodyProps = {
   holding: Holding;
   currentPosition: Position;
   fmtNative: FmtNative;
+  fmtPrice: UnitPriceFormatFn;
   incomeLabel: string;
   onTypeChange: (t: HoldingTxnType) => void;
   onSharesChange: (v: string) => void;
@@ -357,7 +322,7 @@ function TxnFormBodyFields(props: TxnFormBodyProps) {
   const needsShares = props.type === 'buy' || props.type === 'sell';
   return (
     <>
-      <FormField label="Transaction Type">
+      <FormField label="Transaction type">
         <TxnTypeSelector<HoldingTxnType>
           types={TXN_TYPES.map((txnType) =>
             txnType === 'dividend'
@@ -371,7 +336,7 @@ function TxnFormBodyFields(props: TxnFormBodyProps) {
       <PositionInfoBar
         currentPosition={props.currentPosition}
         holding={props.holding}
-        fmtNative={props.fmtNative}
+        fmtPrice={props.fmtPrice}
       />
       {needsShares && (
         <SharesFormField
@@ -418,6 +383,7 @@ function TxnFormBody(props: TxnFormBodyProps) {
           newAvgCost={props.newAvgCost}
           realizedGain={props.realizedGain}
           fmtNative={props.fmtNative}
+          fmtPrice={props.fmtPrice}
           incomeLabel={props.incomeLabel}
         />
       )}
@@ -559,6 +525,7 @@ export function AddHoldingTxnModal({
   onSave,
 }: AddHoldingTxnModalProps) {
   const { fmtNative } = useCurrency();
+  const fmtPrice = useUnitPriceFormatter();
   const incomeLabels = getIncomeTxnLabels(holding);
   const form = useHoldingTxnForm(currentPosition, existing);
   const handleSave = buildHoldingTxnSaveHandler(
@@ -581,14 +548,14 @@ export function AddHoldingTxnModal({
 
   return (
     <Modal
-      title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
+      title={isEditing ? 'Edit transaction' : 'Record transaction'}
       subtitle={`${holding.ticker} · ${holding.name}`}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+          confirmLabel={isEditing ? 'Save changes' : 'Record'}
         />
       }
     >
@@ -606,6 +573,7 @@ export function AddHoldingTxnModal({
         holding={holding}
         currentPosition={currentPosition}
         fmtNative={fmtNative}
+        fmtPrice={fmtPrice}
         incomeLabel={incomeLabels.singular}
         onTypeChange={form.handleTypeChange}
         onSharesChange={onSharesChange}

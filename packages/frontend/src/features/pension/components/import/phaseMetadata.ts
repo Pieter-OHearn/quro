@@ -6,33 +6,10 @@ export const PIPELINE: {
   label: string;
   sublabel: string;
   Icon: React.ElementType;
-  activeCls: string;
-  completeCls: string;
 }[] = [
-  {
-    key: 'queuing',
-    label: 'Queued',
-    sublabel: 'Waiting in queue',
-    Icon: Clock,
-    activeCls: 'bg-fg-strong text-fg-inverted',
-    completeCls: 'bg-fg-strong text-fg-inverted',
-  },
-  {
-    key: 'processing',
-    label: 'Processing',
-    sublabel: 'AI reading your PDF',
-    Icon: Brain,
-    activeCls: 'bg-brand text-fg-inverted',
-    completeCls: 'bg-brand-accent text-fg-inverted',
-  },
-  {
-    key: 'ready',
-    label: 'Review Ready',
-    sublabel: 'Transactions extracted',
-    Icon: Sparkles,
-    activeCls: 'bg-success text-fg-inverted',
-    completeCls: 'bg-success-accent text-fg-inverted',
-  },
+  { key: 'queuing', label: 'Queued', sublabel: 'Waiting in queue', Icon: Clock },
+  { key: 'processing', label: 'Processing', sublabel: 'AI reading your PDF', Icon: Brain },
+  { key: 'ready', label: 'Review ready', sublabel: 'Transactions extracted', Icon: Sparkles },
 ];
 
 export const PHASE_IDX: Record<JobPhase, number> = {

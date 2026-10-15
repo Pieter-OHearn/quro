@@ -1,5 +1,4 @@
-import { ChartCard } from '@/components/ui';
-import { useCurrency } from '@/lib/CurrencyContext';
+import { Change, ChartCard } from '@/components/ui';
 import {
   Area,
   AreaChart,
@@ -9,8 +8,16 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import {
+  CHART_AXIS_PROPS,
+  CHART_CURSOR,
+  CHART_GRID_PROPS,
+  ChartTooltipContent,
+} from '@/components/finance/chartTheme';
 import type { PensionFormatBaseFn, PensionGrowthPoint } from '../types';
-import { formatPercent } from '@quro/shared';
+
+// Pension is the third chart series colour.
+const PENSION_SERIES = 'var(--viz-3)';
 
 type PensionGrowthChartProps = {
   pensionGrowthData: PensionGrowthPoint[];
@@ -26,41 +33,35 @@ function PensionGrowthAreaChart({
   return (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data} margin={{ top: 8, right: 6, left: -16, bottom: 0 }}>
-        <defs>
-          <linearGradient id="pensionGrowthGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--data-forecast)" stopOpacity={0.12} />
-            <stop offset="95%" stopColor="var(--data-forecast)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" />
-        <XAxis
-          dataKey="year"
-          tick={{ fontSize: 12, fill: 'var(--data-neutral)' }}
-          axisLine={false}
-          tickLine={false}
-        />
+        <CartesianGrid {...CHART_GRID_PROPS} />
+        <XAxis dataKey="year" {...CHART_AXIS_PROPS} />
         <YAxis
-          tick={{ fontSize: 12, fill: 'var(--data-neutral)' }}
-          axisLine={false}
-          tickLine={false}
+          {...CHART_AXIS_PROPS}
           tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
         />
         <Tooltip
-          formatter={(value) => [fmtBase(Number(value) || 0), 'Pension Value']}
-          contentStyle={{
-            borderRadius: '12px',
-            border: '1px solid var(--border-default)',
-            fontSize: '12px',
-          }}
+          cursor={CHART_CURSOR}
+          content={(props) => (
+            <ChartTooltipContent
+              active={props.active}
+              label={props.label as string | undefined}
+              payload={props.payload}
+              formatEntry={(entry) => ({
+                name: 'Pension value',
+                value: fmtBase(Number(entry.value) || 0),
+              })}
+            />
+          )}
         />
         <Area
           type="monotone"
           dataKey="value"
-          stroke="var(--data-forecast)"
-          strokeWidth={4}
-          fill="url(#pensionGrowthGrad)"
+          stroke={PENSION_SERIES}
+          strokeWidth={2}
+          fill={PENSION_SERIES}
+          fillOpacity={0.12}
           dot={false}
-          activeDot={{ r: 5, fill: 'var(--data-forecast)' }}
+          activeDot={{ r: 4, fill: PENSION_SERIES, stroke: 'var(--surface)', strokeWidth: 2 }}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -73,18 +74,15 @@ export function PensionGrowthChart({
   fmtBase,
   baseCurrency,
 }: Readonly<PensionGrowthChartProps>) {
-  const { numberFormat } = useCurrency();
   return (
     <ChartCard
-      title="Total Pension Growth"
+      title="Total pension growth"
       subtitle={`Combined value across all pots (${baseCurrency})`}
       badge={
         pensionGrowthPct !== null && pensionGrowthData.length > 0 ? (
-          <span
-            className={`text-sm px-4 py-2 rounded-full font-semibold ${pensionGrowthPct >= 0 ? 'bg-warning-soft text-warning-fg' : 'bg-danger-soft text-danger-hover'}`}
-          >
-            {pensionGrowthPct >= 0 ? '+' : ''}
-            {formatPercent(pensionGrowthPct, numberFormat, 0)} since {pensionGrowthData[0].year}
+          <span className="flex items-baseline gap-1 text-caption text-fg-subtle">
+            <Change value={pensionGrowthPct} format="percent" />
+            since {pensionGrowthData[0].year}
           </span>
         ) : undefined
       }

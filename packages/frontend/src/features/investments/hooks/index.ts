@@ -30,3 +30,4 @@ export { useArchivedProperties, useProperties } from './useProperties';
 export { usePropertyTransactions } from './usePropertyTransactions';
 
 export { useTickerLookup } from './useTickerLookup';
+export { useUnitPriceFormatter, type UnitPriceFormatFn } from './useUnitPriceFormatter';

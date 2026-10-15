@@ -2,7 +2,8 @@ import { usePagination } from '@/hooks/usePagination';
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { Pagination, TxnHistoryPanel, TxnRow } from '@/components/ui';
-import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import { TxnAmount } from '@/components/finance/TxnAmount';
+import { signedSavingsAmount, type SavingsAccount, type SavingsTransaction } from '@quro/shared';
 import { TXN_META, FILTER_OPTIONS } from '../constants';
 import type { TxnType } from '../types';
 
@@ -38,6 +39,7 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
       filter={filter}
       onFilterChange={(key) => setFilter(key as TxnType | 'all')}
       onAdd={account.bunqAccountId ? undefined : onAdd}
+      addLabel="Add transaction"
       isEmpty={sorted.length === 0}
       footer={
         totalPages > 1 ? (
@@ -54,31 +56,23 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
     >
       {paginatedTransactions.map((t) => {
         const m = TXN_META[t.type as TxnType];
+        // The type moves to a badge when a note takes the label; phones hide it for the label.
+        const badgeText = [t.bunqTransactionId ? 'Bunq' : null, t.note ? m.label : null]
+          .filter(Boolean)
+          .join(' · ');
         return (
           <TxnRow
             key={t.id}
             icon={m.icon}
             iconColor={m.color}
-            iconBg={m.bg}
             label={t.note || m.label}
             date={t.date}
-            badge={
-              t.bunqTransactionId
-                ? { text: 'Bunq', className: 'bg-info-soft-strong text-info-fg' }
-                : undefined
-            }
+            badge={badgeText ? { text: badgeText, className: 'max-sm:hidden' } : undefined}
             amount={
-              <div className="text-right flex-shrink-0">
-                <p className={`text-sm font-semibold ${m.color}`}>
-                  {m.sign}
-                  {fmtNative(t.amount, account.currency, true)}
-                </p>
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${m.bg} ${m.color} capitalize`}
-                >
-                  {m.label}
-                </span>
-              </div>
+              <TxnAmount
+                value={signedSavingsAmount(t.type as TxnType, t.amount)}
+                format={(amount) => fmtNative(amount, account.currency, true)}
+              />
             }
             onEdit={() => onEdit(t)}
             onDelete={() => onDelete(t.id)}

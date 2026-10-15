@@ -1,10 +1,12 @@
 import { useEffect, useEffectEvent, useState } from 'react';
 import {
+  Change,
   CurrencyInput,
   FormField,
   Modal,
   ModalFooter,
   PdfAttachmentField,
+  SegmentedControl,
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
@@ -15,6 +17,7 @@ import {
   usePdfAttachmentState,
 } from '@/lib/pdfDocuments';
 import { resolveApiErrorMessage } from '@/lib/api';
+import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import { PENSION_TXN_META } from '../constants';
 import {
   useAddPensionTxnForm,
@@ -62,22 +65,16 @@ function EmployerToggle({
   setIsEmployer,
 }: Readonly<{ isEmployer: boolean; setIsEmployer: (value: boolean) => void }>) {
   return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={() => setIsEmployer(true)}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${isEmployer ? 'bg-brand-soft border-brand-border text-brand-fg' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
-      >
-        Employer
-      </button>
-      <button
-        type="button"
-        onClick={() => setIsEmployer(false)}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${!isEmployer ? 'bg-success-soft border-success-border-strong text-success-fg' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
-      >
-        Employee
-      </button>
-    </div>
+    <SegmentedControl
+      aria-label="Contribution from"
+      options={[
+        { value: 'employer', label: 'Employer' },
+        { value: 'employee', label: 'Employee' },
+      ]}
+      value={isEmployer ? 'employer' : 'employee'}
+      onChange={(value) => setIsEmployer(value === 'employer')}
+      className="w-full *:flex-1"
+    />
   );
 }
 
@@ -89,22 +86,16 @@ function AnnualStatementDirectionToggle({
   onChange: (value: AnnualStatementDirection) => void;
 }>) {
   return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={() => onChange('gain')}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'gain' ? 'bg-success-soft border-success-border-strong text-success-fg' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
-      >
-        Gain
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange('loss')}
-        className={`flex-1 py-2 rounded-xl border text-xs font-semibold transition-all ${direction === 'loss' ? 'bg-danger-soft border-danger-border-strong text-danger-hover' : 'border-border-default text-fg-faint hover:bg-surface-sunken'}`}
-      >
-        Loss
-      </button>
-    </div>
+    <SegmentedControl<AnnualStatementDirection>
+      aria-label="Statement result"
+      options={[
+        { value: 'gain', label: 'Gain' },
+        { value: 'loss', label: 'Loss' },
+      ]}
+      value={direction}
+      onChange={onChange}
+      className="w-full *:flex-1"
+    />
   );
 }
 
@@ -120,7 +111,7 @@ function ContributionFields({
   setError: (value: string) => void;
 }>) {
   return (
-    <FormField label={`Tax Amount (${currency})`}>
+    <FormField label={`Tax amount (${currency})`}>
       <CurrencyInput
         currency={currency}
         value={taxAmount}
@@ -156,11 +147,11 @@ function AnnualStatementFields({
 }>) {
   return (
     <>
-      <FormField label="Statement Result">
+      <FormField label="Statement result">
         <AnnualStatementDirectionToggle direction={direction} onChange={setDirection} />
       </FormField>
       <PdfAttachmentField
-        label="Annual Statement PDF"
+        label="Annual statement PDF"
         document={document}
         selectedFile={selectedFile}
         fileError={fileError}
@@ -185,11 +176,11 @@ function resolveAmountLabel(params: {
   currency: string;
   annualStatementDirection: AnnualStatementDirection;
 }): string {
-  if (params.type === 'contribution') return `Contribution Amount (${params.currency})`;
-  if (params.type === 'fee') return `Fee Amount (${params.currency})`;
+  if (params.type === 'contribution') return `Contribution amount (${params.currency})`;
+  if (params.type === 'fee') return `Fee amount (${params.currency})`;
   return params.annualStatementDirection === 'gain'
-    ? `Investment Gain (${params.currency})`
-    : `Investment Loss (${params.currency})`;
+    ? `Investment gain (${params.currency})`
+    : `Investment loss (${params.currency})`;
 }
 
 function PensionTxnDateNoteFields({
@@ -225,7 +216,7 @@ function PensionTxnFormBody({
 
   return (
     <>
-      <FormField label="Transaction Type">
+      <FormField label="Transaction type">
         <TxnTypeSelector<PensionTxnType>
           types={TXN_TYPE_OPTIONS}
           value={form.type}
@@ -313,12 +304,6 @@ function resolvePreviewLabel(params: {
   return params.isEmployer ? 'Employer contribution' : 'Employee contribution';
 }
 
-function resolvePreviewTone(isDeduction: boolean): { colorClass: string; bgClass: string } {
-  return isDeduction
-    ? { colorClass: 'text-danger-hover', bgClass: 'bg-danger-soft border-danger-soft-strong' }
-    : { colorClass: 'text-success-fg', bgClass: 'bg-success-soft border-success-soft-strong' };
-}
-
 function PreviewBanner({
   type,
   isEmployer,
@@ -342,25 +327,20 @@ function PreviewBanner({
     taxAmount,
     annualStatementDirection,
   });
-  const isDeduction = signedAmount < 0;
-  const { colorClass, bgClass } = resolvePreviewTone(isDeduction);
   const label = resolvePreviewLabel({ type, isEmployer, annualStatementDirection });
 
   return (
-    <div className={`rounded-xl p-4 border ${bgClass}`}>
-      <div className="flex justify-between text-xs">
-        <span className={`font-medium ${colorClass}`}>{label}</span>
-        <span className={`font-bold ${colorClass}`}>
-          {isDeduction ? '\u2212' : '+'}
-          {fmtNative(Math.abs(signedAmount), currency, true)}
-        </span>
-      </div>
+    <PreviewPanel>
+      <PreviewRow label={label}>
+        <Change value={signedAmount} format="amount" currency={currency} showArrow={false} />
+      </PreviewRow>
       {type === 'contribution' && taxAmount > 0 && (
-        <p className="mt-2 text-[11px] text-fg-subtle">
-          Gross {fmtNative(amount, currency, true)} · Tax {fmtNative(taxAmount, currency, true)}
+        <p className="text-caption text-fg-subtle">
+          Gross <span className="font-numeric">{fmtNative(amount, currency, true)}</span> · Tax{' '}
+          <span className="font-numeric">{fmtNative(taxAmount, currency, true)}</span>
         </p>
       )}
-    </div>
+    </PreviewPanel>
   );
 }
 
@@ -434,14 +414,14 @@ export function AddPensionTxnModal({
 
   return (
     <Modal
-      title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
+      title={isEditing ? 'Edit transaction' : 'Record transaction'}
       subtitle={`${pot.emoji} ${pot.name}`}
       onClose={onClose}
       footer={
         <ModalFooter
           onCancel={onClose}
           onConfirm={() => void handleConfirm()}
-          confirmLabel={isEditing ? 'Save Changes' : 'Record'}
+          confirmLabel={isEditing ? 'Save changes' : 'Record'}
           loading={busy}
           disabled={busy}
         />

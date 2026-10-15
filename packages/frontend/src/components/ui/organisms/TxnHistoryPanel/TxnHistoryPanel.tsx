@@ -13,7 +13,8 @@ export type FilterOption = {
 
 export type TxnHistoryStat = {
   label: string;
-  value: string;
+  /** A formatted figure, or a `Change` for a stat that rose or fell. */
+  value: ReactNode;
   color?: string;
 };
 
@@ -323,7 +324,8 @@ export function TxnHistoryPanel({
 export type TxnRowProps = {
   icon: LucideIcon;
   iconColor: string;
-  iconBg: string;
+  /** Unused since rows dropped the tinted icon tile; kept optional for existing callers. */
+  iconBg?: string;
   iconContainerClassName?: string;
   iconSize?: number;
   label: string;

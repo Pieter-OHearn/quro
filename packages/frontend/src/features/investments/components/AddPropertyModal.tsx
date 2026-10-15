@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CURRENCY_CODES, type CurrencyCode, useCurrency } from '@/lib/CurrencyContext';
-import { Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
+import { Change, Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
+import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import { JointToggleField } from '@/features/partner';
 import { DEFAULT_EMOJI, type Property } from '@quro/shared';
 
@@ -33,23 +34,14 @@ function PropertyEquityPreview({
   fmtNative,
 }: PropertyEquityPreviewProps) {
   return (
-    <div className="bg-surface-sunken rounded-xl p-3 space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="text-fg-subtle">Equity</span>
-        <span className={`font-semibold ${equity >= 0 ? 'text-success' : 'text-danger'}`}>
-          {fmtNative(equity, currency, true)}
-        </span>
-      </div>
+    <PreviewPanel>
+      <PreviewRow label="Equity">{fmtNative(equity, currency, true)}</PreviewRow>
       {purchasePrice > 0 && (
-        <div className="flex justify-between text-xs">
-          <span className="text-fg-subtle">Appreciation</span>
-          <span className={`font-semibold ${appreciation >= 0 ? 'text-success' : 'text-danger'}`}>
-            {appreciation >= 0 ? '+' : ''}
-            {fmtNative(appreciation, currency, true)}
-          </span>
-        </div>
+        <PreviewRow label="Appreciation">
+          <Change value={appreciation} format="amount" currency={currency} />
+        </PreviewRow>
       )}
-    </div>
+    </PreviewPanel>
   );
 }
 
@@ -78,7 +70,7 @@ function PropertyIdentityFields({ form, errors, onSet }: PropertyFormFieldsProps
           <TextInput
             value={form.emoji}
             onChange={(value) => onSet('emoji', value)}
-            className="text-center text-lg"
+            className="text-center"
             maxLength={2}
           />
         </FormField>
@@ -92,7 +84,7 @@ function PropertyIdentityFields({ form, errors, onSet }: PropertyFormFieldsProps
         </FormField>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Property Type">
+        <FormField label="Property type">
           <SelectInput
             value={form.propertyType}
             onChange={(value) => onSet('propertyType', value)}
@@ -115,7 +107,7 @@ function PropertyValueFields({ form, errors, onSet }: PropertyFormFieldsProps) {
   return (
     <>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Purchase Price" required error={errors.purchasePrice}>
+        <FormField label="Purchase price" required error={errors.purchasePrice}>
           <TextInput
             type="number"
             inputMode="decimal"
@@ -126,7 +118,7 @@ function PropertyValueFields({ form, errors, onSet }: PropertyFormFieldsProps) {
             placeholder="0.00"
           />
         </FormField>
-        <FormField label="Current Value" required error={errors.currentValue}>
+        <FormField label="Current value" required error={errors.currentValue}>
           <TextInput
             type="number"
             inputMode="decimal"
@@ -138,7 +130,7 @@ function PropertyValueFields({ form, errors, onSet }: PropertyFormFieldsProps) {
           />
         </FormField>
       </div>
-      <FormField label="Monthly Rent">
+      <FormField label="Monthly rent">
         <TextInput
           type="number"
           inputMode="decimal"
@@ -237,12 +229,12 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
 
   return (
     <Modal
-      title="Add Property"
+      title="Add property"
       subtitle="Track a new property in your portfolio"
       onClose={onClose}
       maxWidth="md"
       scrollable
-      footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Add Property" />}
+      footer={<ModalFooter onCancel={onClose} onConfirm={handleSave} confirmLabel="Add property" />}
     >
       <PropertyFormFields form={form} errors={errors} onSet={set} />
       {parsed.currentValue > 0 && (
