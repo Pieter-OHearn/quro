@@ -73,6 +73,11 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
 - Write requests, background job cycles and the import worker hold the maintenance lock in shared
   mode (`packages/backend/src/lib/maintenanceMode.ts`); `quro backup` and `quro restore` take it
   exclusively. Start jobs with `startIntervalJob` or wrap other writers in `runUnlessMaintenance`.
+- CSV imports are a reviewed ledger path ([import a CSV](docs/csv-import.md)): rows are staged, then
+  written in batches through the savings and budget ledger rules, keyed by `(source, externalId)` in
+  `packages/backend/src/lib/csvImport/`. Never insert imported rows around that service, and keep
+  amounts, dates and currencies strict: no guessed locale, no rounding of extra decimals, no FX
+  invented for a missing rate.
 - Documents go through `getDocumentStore()` (`packages/backend/src/lib/documentStorage.ts`):
   the filesystem by default, S3 only with `QRO_DOCUMENT_STORAGE=s3`. Keys are relative paths that
   both drivers share; build them on the server, never from client input. See
