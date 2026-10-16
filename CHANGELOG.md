@@ -2,40 +2,55 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
-## [Unreleased]
+## [v1.0.0-rc.1] - 2026-10-16
 
-### Changed
+Quro 1.0.0-rc.1 is the release candidate for 1.0.0. It adds account export and deletion, a reviewed CSV import, first-run guidance, structured logs and operational checks in `quro doctor`, bounded text fields, and a phone layout with cards, accessible charts and honest stale-data notices. Read the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1) before you upgrade, and back up with 0.9.0 first: one migration drops columns and cannot be undone.
 
-- Free-text fields have a maximum length: names, labels, providers, lenders and locations 100 characters, descriptions and transaction notes 500, debt, pension and goal notes 2000, emails 254, and uploaded document file names 255. The API answers `400` naming the field, and the web inputs stop at the same length. Rows that already hold a longer value still display, export and back up, and can be edited as long as that field is left unchanged. No migration. [Limits](docs/text-limits.md)
-- Server and import worker logs are JSON lines with a stable `event` name and a `requestId`; responses carry `X-Request-Id`. Log lines and trace spans no longer contain error messages, only the error class and codes. See the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1).
-- A failed background job waits a minute, then two, up to its interval, before it retries.
-- On a phone, the brokerage holdings and the payslip history are cards: the name and its caption on the left, the key figure on the right with the gain or loss under it, the other figures as a label over a value, and Edit and **Show details** along the foot. Desktop tables are unchanged.
-- On a phone, a card has one **Show details** button with a chevron instead of two controls, and the Edit and download buttons on it are easier to see. On a holding it also opens the position and transactions.
-- The Plan page shows the runway figure before the employment and spending class cards.
-- Stored values that were saved in Title Case (savings account types, pension types, property types, asset allocation names, the generic rule set) are shown in sentence case. The stored values and the API are unchanged.
-- The Brokerage value figure and the other stat cards shrink to fit their card instead of running out of it on a narrow phone.
-- On a phone, savings accounts and closed holdings are cards in the same layout (balance as the key figure, rate and interest as metrics, the bank, share and value under **Show details**), and a property card keeps its value and equity up front with the mortgage, rent and yield under **Show details**. Desktop tables are unchanged.
-- On a phone, Savings shows its total across the full width with the average rate and monthly interest side by side, and the dashboard puts net worth before the getting started list, which keeps the description of the next step only. The stat cards use the shorter labels Salary, Dividends and Property equity, and a change under a figure wraps instead of running past the card.
-- Below 360px the currency button drops its flag and chevron so the page title fits, and a transaction row puts its Edit and Delete buttons on a line of their own so the label stays readable.
+### Breaking changes
+
+Each item needs action from some operators or API clients and links to what to change in the upgrade notes.
+
+- **Migration 0042 drops three unused `budget_transactions` columns, `bunq_mcc`, `bunq_payment_type` and `counterparty_iban`.** Their values exist only in a backup afterwards, and the older image cannot run on the upgraded database. Back up with 0.9.0 first. [Details](docs/upgrade.md#migrations-and-the-backup-to-take-first)
+- **Server and import worker logs are JSON lines, not bracketed text.** Anything that parses the old lines (a log collector, an alert rule) must change. Responses carry an `X-Request-Id` header, and error messages are no longer logged. [Details](docs/upgrade.md#json-logs-and-request-ids)
+- **`quro doctor` checks more and reports a new `unknown` status.** A stopped core job, a referenced document missing from the store or a nearly full disk now makes it exit with code 1, and a script that reads each check's `status` must accept `unknown`. [Details](docs/upgrade.md#doctor-checks-and-the-unknown-status)
+- **`GET /api/capabilities` no longer has an `ai` key, and every capability has a `lifecycle` field.** Use `pensionStatementImport` where a client read `ai`. [Details](docs/upgrade.md#capabilities-and-the-setup-endpoint)
+- **The API answers `400` for a text value over its length limit.** Names and labels are limited to 100 characters, descriptions to 500, notes to 2000 and emails to 254. A value that is already longer stays editable while that field is left unchanged. [Details](docs/upgrade.md#text-field-length-limits)
 
 ### Added
 
-- Notices say when the data behind a figure is not current: an exchange rate older than 48 hours (with the currencies and the date), a holding whose synced price is older than a week, and a failed load of archived items, spending classes, banking entities or price history, each with a Retry where one applies. A failed load is never shown as an empty list.
-
-- Every chart has a text summary and a **Show values** table of the exact plotted values, including negative, missing and estimated entries. Charts follow the system reduced-motion setting, label axes in a compact form that fits a phone, keep tooltips inside the screen, and draw each series with a dash, fill or outline as well as a colour. Click a chart or tab to it and use the arrow keys to read a value.
-- `quro doctor` reports background job lag and failures, data freshness, disk space, the age of the newest backup and whether referenced documents are in the store, with a new `unknown` status for anything without evidence. [Monitor an install](docs/operations.md).
 - Every account can download its data in **Settings → Your data**: one ZIP with JSON and CSV for each table, the stored documents and a manifest with row counts and SHA-256 hashes (`GET /api/settings/export`). Text that a spreadsheet would run as a formula is escaped in the CSV. [Details](docs/data-export-and-deletion.md#export)
-- Every account can delete itself there (`DELETE /api/settings/account`, with the password and the email address). The rows, bank links, sessions and stored documents go in one step, an audit row records the counts without personal data, and `quro documents retry-deleted` removes documents the store refused to delete. Backups are not changed. [Details](docs/data-export-and-deletion.md#deletion)
-
+- Every account can delete itself there (`DELETE /api/settings/account`, with the password and the email address). The rows, bank links, sessions and stored documents go in one step, an audit row (`account_deletions`) records the counts without personal data, and `quro documents retry-deleted` removes documents the store refused to delete. Backups are not changed. [Details](docs/data-export-and-deletion.md#deletion)
 - A savings account or the budget can import a bank's **CSV** with a reviewed flow: map the columns once (the mapping is remembered per source), review every row in a dry run with locale, date and currency handling, and write only approved rows in bounded batches that can be cancelled and resumed. Rows already imported are found again by a `(source, external id)` key, so repeating an import adds nothing, and a savings import compares the statement's closing balance with the ledger and can book the difference as one labelled adjustment. [Details](docs/csv-import.md)
+- A getting started card on the dashboard guides a new household through currency and number format, what is shared with a partner, the first account and the first transaction, and goes away once there is an account and a transaction. `GET /api/dashboard/setup` returns `hasAccount` and `hasTransaction` for it. [API changes](docs/upgrade.md#capabilities-and-the-setup-endpoint)
+- Settings → Connections lists the features on this server with whether each is on, why not, and an experimental badge for statement import, instead of a fixed "Coming soon" list. The bunq Connect button and the statement import button are not shown on a server where that feature is not set up.
+- `quro doctor` reports background job lag and failures, data freshness, disk space, the age of the newest backup and whether referenced documents are in the store, with a new `unknown` status for anything without evidence. [Monitor an install](docs/operations.md)
+- Notices say when the data behind a figure is not current: an exchange rate older than 48 hours (with the currencies and the date), a holding whose synced price is older than a week, and a failed load of archived items, spending classes, banking entities or price history, each with a Retry where one applies. A failed load is never shown as an empty list.
+- Every chart has a text summary and a **Show values** table of the exact plotted values, including negative, missing and estimated entries. Charts follow the system reduced-motion setting, label axes in a compact form that fits a phone, keep tooltips inside the screen, and draw each series with a dash, fill or outline as well as a colour. Click a chart or tab to it and use the arrow keys to read a value.
+- Salary compares a payslip with the previous one, or with any other, in a gross-to-net table with a change column, and shows a year total row. An expanded holding shows its position (price, average cost, market value, cost basis, unrealized and realized gain) in the holding's currency and in your base currency, with the price source and a **Correct holding** button. Payslips and active holdings page at 25 rows.
+- On a phone, tables can be sorted and rows reveal their other figures with **Show details**; the brokerage holdings, the payslip history, savings accounts, closed holdings and properties are cards. Dialogs and the navigation drawer trap focus and return it, forms scroll to the first error and stay usable above the on-screen keyboard, and the app remembers its scroll position per page.
 
-### Removed
+### Changed
 
-- The columns `budget_transactions.bunq_mcc`, `bunq_payment_type` and `counterparty_iban` are dropped. Bank sync wrote them and nothing read them. [Details](docs/data-export-and-deletion.md#removed-bank-details)
+- A failed background job waits a minute, then two, and so on up to its interval before it retries, instead of retrying at every poll. [Details](docs/upgrade.md#background-job-backoff)
+- Free-text fields have a maximum length, and the web inputs stop at the same length. No migration. [Limits](docs/text-limits.md)
+- On a phone, the dashboard puts net worth before the getting started list, Savings shows its total across the full width, and the stat cards use the shorter labels Salary, Dividends and Property equity. The Plan page shows the runway figure before the employment and spending class cards. Below 360px the currency button drops its flag and chevron so the page title fits.
+- Stored values that were saved in Title Case (savings account types, pension types, property types, asset allocation names, the generic rule set) are shown in sentence case. The stored values and the API are unchanged.
+- The select arrow sits 12px from the edge with room for long options, and table rows with a caption under the first line have room to breathe.
+- Statement import copy no longer says "AI". The feature is marked experimental.
 
-### Upgrade notes
+### Fixed
 
-- **Back up first.** Three migrations run: one adds the `account_deletions` table, one drops the three unused `budget_transactions` columns above (their values are not recoverable except from a backup), and one adds the CSV import tables and three nullable columns on the two transaction tables, changing no value. Take one with the version you run before you upgrade ([backup and restore](docs/backup-and-restore.md)).
+- The app header, the navigation drawer, the landing page and the currency rates screen no longer slide under the status bar and notch when Quro is opened from a phone's home screen.
+- The goals at a glance bars end at the same point and their badges share one column.
+- The Brokerage value figure and the other stat cards shrink to fit their card instead of running out of it on a narrow phone, and a change under a figure wraps instead of running past the card.
+- A transaction row puts its Edit and Delete buttons on a line of their own below 360px, so the label stays readable.
+- Settings opened on a tab that a scrolled tab group had clipped now shows the tab.
+
+### Security
+
+- Logs and trace spans no longer contain error messages or stacks, only the error class and codes, and fields whose names look like credentials or personal data are redacted.
+- Free-text fields in the API are bounded in length.
+- CSV exports escape text that a spreadsheet would run as a formula, and CSV import reads a file within fixed limits (2 MB, 5,000 rows, 50 columns) and never evaluates a cell.
 
 ## [v0.9.0] - 2026-10-15
 

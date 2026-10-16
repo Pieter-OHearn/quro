@@ -16,7 +16,7 @@ The steps apply from 0.8.0. CI runs these steps from empty directories on amd64 
 
    ```bash
    mkdir -p quro/config quro/data/documents quro/backups && cd quro
-   curl -fsSL -o compose.yaml https://raw.githubusercontent.com/Pieter-OHearn/quro/v0.9.0/docs/compose.example.yaml
+   curl -fsSL -o compose.yaml https://raw.githubusercontent.com/Pieter-OHearn/quro/v1.0.0-rc.1/docs/compose.example.yaml
    ```
 
    Use the tag of the release you install in the URL; the file pins the images of that release. Read it before you start it: it is a plain file, and nothing is rendered or substituted.
@@ -32,7 +32,7 @@ The steps apply from 0.8.0. CI runs these steps from empty directories on amd64 
 3. Write the settings file, the database passwords and the secrets key:
 
    ```bash
-   docker run --rm -v "$PWD/config:/config" ghcr.io/pieter-ohearn/quro-backend:v0.9.0 init
+   docker run --rm -v "$PWD/config:/config" ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.1 init
    ```
 
    This creates `config/quro.env`, `config/secrets/postgres_admin_password` and `config/secrets/postgres_app_password` (24 random bytes each) and `config/secrets/secrets_key` (32 random bytes, the key that encrypts bank-link tokens in the database), all mode `0600`. The values are never printed. Running it again changes nothing; on an existing directory it creates only the files that are missing.
@@ -65,16 +65,16 @@ Keep a copy of `compose.yaml`, `config/quro.env` and `config/secrets/` somewhere
 
 ### Verify the images
 
-The images pull without a registry account. A tag such as `v0.9.0` can be moved on the registry; a digest cannot. Each release's notes list the digest of both images, and [distribution](distribution.md) records how their public, anonymous availability is checked. To run exactly those images:
+The images pull without a registry account. A tag such as `v1.0.0-rc.1` can be moved on the registry; a digest cannot. Each release's notes list the digest of both images, and [distribution](distribution.md) records how their public, anonymous availability is checked. To run exactly those images:
 
 1. Pull them and print the digest each tag points at:
 
    ```bash
    docker compose pull
-   docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/pieter-ohearn/quro-backend:v0.9.0 ghcr.io/pieter-ohearn/quro-frontend:v0.9.0
+   docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.1 ghcr.io/pieter-ohearn/quro-frontend:v1.0.0-rc.1
    ```
 
-2. Compare both digests with the release notes. Then pin them in `compose.yaml`: the `migrate` and `backend` services use `ghcr.io/pieter-ohearn/quro-backend:v0.9.0@sha256:<backend digest>`, and `frontend` uses `ghcr.io/pieter-ohearn/quro-frontend:v0.9.0@sha256:<frontend digest>`. Pin `quro init` the same way.
+2. Compare both digests with the release notes. Then pin them in `compose.yaml`: the `migrate` and `backend` services use `ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.1@sha256:<backend digest>`, and `frontend` uses `ghcr.io/pieter-ohearn/quro-frontend:v1.0.0-rc.1@sha256:<frontend digest>`. Pin `quro init` the same way.
 
 With a digest in the image reference, Docker pulls only an image with that digest and fails otherwise, on this host and on any other that uses your `compose.yaml`. The digest is that of the multi-platform image index, so it is the same on amd64 and arm64.
 
