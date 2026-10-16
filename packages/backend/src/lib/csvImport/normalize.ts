@@ -504,3 +504,41 @@ export function deriveExternalIds(rows: readonly NormalizedRow[]): string[] {
     return `h:${createHash('sha256').update(`${content}|${occurrence}`).digest('hex').slice(0, 32)}`;
   });
 }
+
+// ── Column suggestions ───────────────────────────────────────────────────────
+
+const COLUMN_KEYWORDS: Partial<Record<keyof CsvColumnMapping, readonly string[]>> = {
+  date: ['date', 'datum'],
+  amount: ['amount', 'bedrag'],
+  debit: ['debit', 'withdrawal', 'money out'],
+  credit: ['credit', 'deposit', 'money in'],
+  description: ['description', 'omschrijving', 'memo', 'details', 'narrative', 'payee'],
+  currency: ['currency', 'valuta'],
+  externalId: ['transaction id', 'reference', 'referentie', 'id'],
+  balance: ['balance', 'saldo'],
+  category: ['category', 'categorie'],
+  merchant: ['merchant', 'counterparty', 'name'],
+};
+
+/**
+ * A first guess at the column mapping from the header names: for each field the first header
+ * that equals or contains one of its keywords. A person confirms or changes every choice.
+ */
+export function suggestColumns(headers: readonly string[]): Partial<CsvColumnMapping> {
+  const suggestion: Partial<CsvColumnMapping> = {};
+  const taken = new Set<string>();
+  for (const [field, keywords] of Object.entries(COLUMN_KEYWORDS) as [
+    keyof CsvColumnMapping,
+    readonly string[],
+  ][]) {
+    const match = headers.find(
+      (header) =>
+        !taken.has(header) && keywords.some((word) => header.toLowerCase().includes(word)),
+    );
+    if (match !== undefined) {
+      suggestion[field] = match;
+      taken.add(match);
+    }
+  }
+  return suggestion;
+}

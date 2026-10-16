@@ -1,10 +1,17 @@
 import { Hono, type Context } from 'hono';
-import { CSV_IMPORT_KINDS, CSV_IMPORT_LIMITS, type CsvImportKind } from '@quro/shared';
+import {
+  CSV_DELIMITERS,
+  CSV_IMPORT_KINDS,
+  CSV_IMPORT_LIMITS,
+  type CsvDelimiter,
+  type CsvImportKind,
+} from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { parseImportMapping } from '../lib/csvImport/normalize';
 import {
   cancelImport,
+  describeCsv,
   commitNextBatch,
   deleteProfile,
   getImportProgress,
@@ -148,6 +155,22 @@ function failure(c: Context, error: unknown) {
   }
   throw error;
 }
+
+app.post('/csv/headers', async (c) => {
+  const read = await readBody(c, ['csv', 'delimiter']);
+  if (!read.body) return read.response;
+  const csv = parseCsvText(read.body.csv);
+  if (!csv.ok) return c.json({ error: csv.error }, HTTP_STATUS.BAD_REQUEST);
+  const delimiter = read.body.delimiter ?? 'auto';
+  if (!CSV_DELIMITERS.includes(delimiter as CsvDelimiter)) {
+    return c.json({ error: 'Invalid delimiter' }, HTTP_STATUS.BAD_REQUEST);
+  }
+  try {
+    return c.json({ data: describeCsv(csv.value, delimiter as CsvDelimiter) });
+  } catch (error) {
+    return failure(c, error);
+  }
+});
 
 app.post('/csv/preview', async (c) => {
   const read = await readBody(c, COMMON_FIELDS);

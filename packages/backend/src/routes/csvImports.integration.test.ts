@@ -157,6 +157,30 @@ async function commitAll(id: number, session = owner): Promise<{ calls: number; 
   }
 }
 
+describe('headers', () => {
+  test('reads the header, a sample and a column guess without a mapping', async () => {
+    const csv = 'Boekingsdatum;Bedrag;Omschrijving;Saldo\n02-01-2026;-1,50;Koffie;10,00\n';
+    const result = await body<{
+      headers: string[];
+      delimiter: string;
+      rowCount: number;
+      suggestion: Record<string, string>;
+    }>(await call(owner, 'POST', '/api/imports/csv/headers', { csv }));
+    expect(result.delimiter).toBe(';');
+    expect(result.rowCount).toBe(1);
+    expect(result.suggestion).toMatchObject({
+      date: 'Boekingsdatum',
+      amount: 'Bedrag',
+      description: 'Omschrijving',
+      balance: 'Saldo',
+    });
+    expect((await call(owner, 'POST', '/api/imports/csv/headers', { csv: '' })).status).toBe(400);
+    expect(
+      (await call(owner, 'POST', '/api/imports/csv/headers', { csv: 'A\n1', x: 1 })).status,
+    ).toBe(400);
+  });
+});
+
 describe('preview', () => {
   test('is a dry run: it classifies rows and writes nothing', async () => {
     const account = await createAccount();

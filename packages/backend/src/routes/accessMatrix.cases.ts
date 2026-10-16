@@ -1291,6 +1291,8 @@ export const ACCESS_CASES: AccessCase[] = [
 
 /** Routes the matrix does not run per actor, and why. Anonymous access is still checked for all. */
 export const EXEMPT_ROUTES: Record<string, string> = {
+  'POST /api/imports/csv/headers':
+    'reads only the request body and touches no stored data; covered by csvImports.integration.test.ts',
   'POST /api/imports/csv/:id/reconcile':
     'needs a finished import with a closing balance; covered by csvImports.integration.test.ts',
   'GET /api/health': 'public by design; reports no household data',

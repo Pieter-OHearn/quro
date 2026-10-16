@@ -5,6 +5,7 @@ import {
   sumMoney,
   toCents,
   type CsvClosingBalance,
+  type CsvDelimiter,
   type CsvImportKind,
   type CsvImportMapping,
   type CsvImportPreview,
@@ -29,15 +30,36 @@ import { findAccessible } from '../access';
 import { budgetRateToEur } from '../budgetCurrency';
 import { lockLedgerParents, withLedgerWrite } from '../ledgerWrite';
 import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from '../savingsBalance';
+import { suggestColumns } from './normalize';
+import { CsvFormatError, parseCsv } from './parse';
 import {
   analyzeCsv,
   budgetMonthOf,
+  ImportInputError,
   totalsByCurrency,
   type Analysis,
   type AnalyzedRow,
 } from './analyze';
 
 export { ImportInputError } from './analyze';
+
+/** The header, a few sample rows and a column guess for a file, before any mapping exists. */
+export function describeCsv(csv: string, delimiter: CsvDelimiter) {
+  let parsed;
+  try {
+    parsed = parseCsv(csv, delimiter);
+  } catch (error) {
+    if (error instanceof CsvFormatError) throw new ImportInputError(error.message);
+    throw error;
+  }
+  return {
+    headers: parsed.headers,
+    delimiter: parsed.delimiter,
+    rowCount: parsed.records.length,
+    sample: parsed.records.slice(0, SAMPLE_ROWS).map((record) => record.cells),
+    suggestion: suggestColumns(parsed.headers),
+  };
+}
 
 /** A refusal the route answers with its status; the message never names another account's data. */
 export class ImportRefused extends Error {
@@ -57,7 +79,8 @@ type Account = typeof savingsAccounts.$inferSelect;
 const ACCOUNT_NOT_FOUND = 'Account not found';
 const KEY_CHUNK = 1_000;
 const ROW_INSERT_CHUNK = 500;
-export const RECONCILIATION_SOURCE = 'reconciliation';
+export const SAMPLE_ROWS = 3;
+const RECONCILIATION_SOURCE = 'reconciliation';
 
 // ── Target ───────────────────────────────────────────────────────────────────
 
