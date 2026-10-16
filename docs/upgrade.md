@@ -276,7 +276,7 @@ For container health checks: it asks the server in the same container for `/api/
 
 ### `quro doctor --json`
 
-Read-only checks of everything an install depends on. The report has `status` (`ok` or `fail`), `exitCode`, `build` (the same object as `quro version --json`) and `checks`, a list of `{ id, status, message }` with `status` one of `ok`, `warn`, `fail` or `skip`. The exit code is the most serious failure: 2 for settings, 4 for unreachable, 3 for refused, 1 for any other failed check. The list of checks may grow.
+Read-only checks of everything an install depends on. The report has `status` (`ok` or `fail`), `exitCode`, `build` (the same object as `quro version --json`) and `checks`, a list of `{ id, status, message }` with `status` one of `ok`, `warn`, `fail`, `skip` or `unknown`. `unknown` means nothing proves the check healthy, such as a job with no recorded run or no backup found; it does not change the exit code. The exit code is the most serious failure: 2 for settings, 4 for unreachable, 3 for refused, 1 for any other failed check. The list of checks may grow. [Monitor an install](operations.md) describes the operational checks.
 
 ## Upgrade notes
 
@@ -419,3 +419,11 @@ What the operator does: nothing, unless a script or client of your own calls the
 - `jurisdiction.rulesEffectiveFrom` of the runway is `null` when the default tax rate is used.
 - `POST /api/bunq/sync`, `/sync/savings` and `/sync/budget` answer `409` with `code: bunq_reauthorization_required` when stored credentials cannot be opened (see [Secrets key for bank links](#secrets-key-for-bank-links)).
 - Holding prices (`currentPrice`, `manualPrice`, transaction prices and price history) carry up to six decimals. Money amounts keep two.
+
+### Upgrade from 0.9.0 to 1.0.0-rc.1
+
+What the operator does: nothing is required. If a log collector or alert parses the server's log lines, update it for the new format.
+
+- **Logs are JSON lines.** The server and the import worker write one JSON object per line with `time`, `level`, `event` and, during a request, `requestId`. The old bracketed text lines are gone. Every response carries an `X-Request-Id` header. Error messages are no longer logged or put into traces: only the error class and its codes. See [Monitor an install](operations.md).
+- **`quro doctor` has more checks and a new status.** New check ids: `jobs.*`, `freshness.*`, `disk.*`, `backup.age` and `documents.references`. A check with `status: "unknown"` has no evidence either way. A stopped core job, a missing referenced document or a nearly full disk fails the run (exit code 1).
+- **Failed background jobs back off.** After a failed cycle a job waits a minute, then two, up to its normal interval, instead of retrying at every poll.

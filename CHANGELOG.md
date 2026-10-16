@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [Unreleased]
+
+### Changed
+
+- Server and import worker logs are JSON lines with a stable `event` name and a `requestId`; responses carry `X-Request-Id`. Log lines and trace spans no longer contain error messages, only the error class and codes. See the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1).
+- A failed background job waits a minute, then two, up to its interval, before it retries.
+
+### Added
+
+- `quro doctor` reports background job lag and failures, data freshness, disk space, the age of the newest backup and whether referenced documents are in the store, with a new `unknown` status for anything without evidence. [Monitor an install](docs/operations.md).
+
 ## [v0.9.0] - 2026-10-15
 
 Quro 0.9.0 hardens the containers, encrypts bank-link secrets at rest, bounds statement processing, adds net worth chart ranges and brings the new design to every page, for laptop and phone, in light and dark mode. Read the [upgrade notes](docs/upgrade.md#upgrade-from-080-to-090) before you upgrade, and back up with 0.8.0 first.

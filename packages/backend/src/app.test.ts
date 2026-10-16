@@ -71,4 +71,16 @@ describe('createApp', () => {
     const response = await appFor({}).request('/api/bunq/oauth/callback');
     expect(response.status).toBe(404);
   });
+
+  test('every response carries a request id, including errors and refusals', async () => {
+    const app = appFor({});
+    for (const path of ['/api/health', '/api/savings', '/api/unknown-route']) {
+      const response = await app.request(path);
+      expect(response.headers.get('X-Request-Id')).toMatch(/^[0-9a-f-]{36}$/);
+    }
+    const kept = await app.request('/api/health', {
+      headers: { 'X-Request-Id': 'proxy-12345678' },
+    });
+    expect(kept.headers.get('X-Request-Id')).toBe('proxy-12345678');
+  });
 });

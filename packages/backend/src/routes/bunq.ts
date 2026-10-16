@@ -48,10 +48,12 @@ function unavailable(c: Context) {
   return c.json({ error: BUNQ_UNAVAILABLE_MESSAGE }, HTTP_STATUS.SERVICE_UNAVAILABLE);
 }
 
-// Only the error class and codes are logged: a failed statement's message repeats its parameters
-// and a bank's message may name accounts.
+// A failed statement's message repeats its parameters, so only bank and own messages are logged.
 function logBunqError(event: string, error: unknown): void {
-  log.error(event, errorFields(error));
+  log.error(event, {
+    ...errorFields(error),
+    detail: describeSyncFailure(error, 'database or unknown error'),
+  });
 }
 
 /** The answer when the stored credentials cannot be opened: the user has to connect again. */

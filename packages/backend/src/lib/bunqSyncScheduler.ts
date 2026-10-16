@@ -4,6 +4,7 @@ import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { createRotatingWork } from './rotatingWork';
 import { JOB_INTERVAL_MS } from './operationalStatus';
+import { describeSyncFailure } from './syncFailure';
 import { startIntervalJob } from './intervalJob';
 import { log, errorFields } from './logger';
 
@@ -36,9 +37,12 @@ async function syncUserAccounts(userId: number): Promise<void> {
 
     log.info('job.bunq_sync.user', { userId, savings: savingsStatus, budget: budgetStatus });
   } catch (error) {
-    // A failed statement's message repeats its parameters, and a bank's message may name accounts:
-    // only the error class and codes are logged.
-    log.error('job.bunq_sync.user_failed', { userId, ...errorFields(error) });
+    // A failed statement's message repeats its parameters; describeSyncFailure withholds it.
+    log.error('job.bunq_sync.user_failed', {
+      userId,
+      ...errorFields(error),
+      detail: describeSyncFailure(error, 'database or unknown error'),
+    });
   }
 }
 
