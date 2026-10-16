@@ -1,3 +1,4 @@
+import { TEXT_FIELD_LIMITS } from '@quro/shared';
 import { useState, type ReactNode } from 'react';
 import type { Debt } from '@quro/shared';
 import { TrendingDown } from 'lucide-react';
@@ -187,6 +188,7 @@ export function DebtPaymentModal({ debt, onClose, onSubmit }: Readonly<DebtPayme
       <FormField label="Note">
         <TextInput
           value={form.note}
+          maxLength={TEXT_FIELD_LIMITS.debtPayment.note}
           onChange={(value) => handleChange('note', value)}
           placeholder="e.g. Extra repayment"
         />

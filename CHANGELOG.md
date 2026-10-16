@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Changed
 
+- Free-text fields have a maximum length: names, labels, providers, lenders and locations 100 characters, descriptions and transaction notes 500, debt, pension and goal notes 2000, emails 254, and uploaded document file names 255. The API answers `400` naming the field, and the web inputs stop at the same length. Rows that already hold a longer value still display, export and back up, and can be edited as long as that field is left unchanged. No migration. [Limits](docs/text-limits.md)
 - Server and import worker logs are JSON lines with a stable `event` name and a `requestId`; responses carry `X-Request-Id`. Log lines and trace spans no longer contain error messages, only the error class and codes. See the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1).
 - A failed background job waits a minute, then two, up to its interval, before it retries.
 - On a phone, the brokerage holdings and the payslip history are cards: the name and its caption on the left, the key figure on the right with the gain or loss under it, the other figures as a label over a value, and Edit and **Show details** along the foot. Desktop tables are unchanged.

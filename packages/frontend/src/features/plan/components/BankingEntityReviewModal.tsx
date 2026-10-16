@@ -6,7 +6,7 @@ import type {
   RunwayResponse,
   SavingsAccount,
 } from '@quro/shared';
-import { CURRENCY_CODES } from '@quro/shared';
+import { CURRENCY_CODES, TEXT_FIELD_LIMITS } from '@quro/shared';
 import {
   Badge,
   Button,
@@ -146,12 +146,18 @@ function BankingEntityAccountRow({
             <FormField label="Licensed entity name">
               <TextInput
                 value={entityName}
+                maxLength={TEXT_FIELD_LIMITS.bankingEntity.entityName}
                 onChange={setEntityName}
                 placeholder="Legal bank name"
               />
             </FormField>
             <FormField label="Deposit protection scheme">
-              <TextInput value={scheme} onChange={setScheme} placeholder="Country or scheme name" />
+              <TextInput
+                value={scheme}
+                onChange={setScheme}
+                placeholder="Country or scheme name"
+                maxLength={TEXT_FIELD_LIMITS.bankingEntity.scheme}
+              />
             </FormField>
             <FormField
               label="Protection cap"

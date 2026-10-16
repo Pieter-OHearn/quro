@@ -1,3 +1,5 @@
+import { TEXT_LIMITS } from '@quro/shared';
+
 import { DateInput, TextInput } from '../../atoms';
 import { FormField } from '../FormField';
 
@@ -22,7 +24,12 @@ export function DateNoteRow({
         <DateInput value={date} onChange={onDateChange} />
       </FormField>
       <FormField label="Note" hint="optional">
-        <TextInput value={note} onChange={onNoteChange} placeholder={notePlaceholder} />
+        <TextInput
+          value={note}
+          onChange={onNoteChange}
+          placeholder={notePlaceholder}
+          maxLength={TEXT_LIMITS.description}
+        />
       </FormField>
     </div>
   );

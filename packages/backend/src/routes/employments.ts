@@ -9,6 +9,7 @@ import {
 import { and, asc, eq, gte, isNull, ne, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
+import { findOwnedRow } from '../lib/access';
 import { db } from '../db/client';
 import { employments } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
@@ -177,13 +178,7 @@ app.patch('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (!id) return c.json({ error: 'Invalid employment ID' }, HTTP_STATUS.BAD_REQUEST);
-  const parsed = await readPayload(c.req, true, async () => {
-    const [current] = await db
-      .select()
-      .from(employments)
-      .where(and(eq(employments.id, id), eq(employments.userId, user.id)));
-    return current;
-  });
+  const parsed = await readPayload(c.req, true, () => findOwnedRow(employments, id, user.id));
   if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
   // The branches preserve date, ownership, and exactly-one-primary invariants.
   // eslint-disable-next-line complexity

@@ -1,5 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import { CURRENCY_CODES, type CurrencyCode, type Debt, type DebtType } from '@quro/shared';
+import {
+  CURRENCY_CODES,
+  type CurrencyCode,
+  type Debt,
+  type DebtType,
+  TEXT_FIELD_LIMITS,
+} from '@quro/shared';
 import {
   Button,
   CurrencyInput,
@@ -56,6 +62,7 @@ function DebtIdentityFields({ form, errors, onChange }: Readonly<DebtFormFieldsP
       <FormField label="Debt name" required error={errors.name}>
         <TextInput
           value={form.name}
+          maxLength={TEXT_FIELD_LIMITS.debt.name}
           onChange={(value) => onChange('name', value)}
           placeholder="e.g. Volkswagen Golf Loan"
           error={Boolean(errors.name)}
@@ -87,6 +94,7 @@ function DebtTypeFields({
       <FormField label="Lender / provider" required error={errors.lender}>
         <TextInput
           value={form.lender}
+          maxLength={TEXT_FIELD_LIMITS.debt.lender}
           onChange={(value) => onChange('lender', value)}
           placeholder="e.g. Volkskrediet Bank"
           error={Boolean(errors.lender)}
@@ -203,6 +211,7 @@ function DebtNotesField({ form, errors, onChange }: Readonly<DebtFormFieldsProps
     <FormField label="Notes" hint="optional" error={errors.notes}>
       <Textarea
         value={form.notes}
+        maxLength={TEXT_FIELD_LIMITS.debt.notes}
         onChange={(value) => onChange('notes', value)}
         rows={3}
         placeholder="e.g. Early repayment allowed with no penalty"

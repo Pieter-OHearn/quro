@@ -1,3 +1,4 @@
+import { TEXT_FIELD_LIMITS } from '@quro/shared';
 import { FormField, Modal, PasswordInput, TextInput } from '@/components/ui';
 import { useSignUpState } from '../hooks';
 import type { SignUpState } from '../types';
@@ -34,6 +35,7 @@ function NameFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) 
           placeholder="John"
           error={Boolean(errors.firstName)}
           value={form.firstName}
+          maxLength={TEXT_FIELD_LIMITS.signUp.firstName}
           onChange={(value) => setField('firstName', value)}
         />
       </FormField>
@@ -44,6 +46,7 @@ function NameFields({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) 
           placeholder="Doe"
           error={Boolean(errors.lastName)}
           value={form.lastName}
+          maxLength={TEXT_FIELD_LIMITS.signUp.lastName}
           onChange={(value) => setField('lastName', value)}
         />
       </FormField>
@@ -60,6 +63,7 @@ function EmailField({ form, setField, errors }: Readonly<BaseSignUpFieldProps>) 
         placeholder="you@example.com"
         error={Boolean(errors.email)}
         value={form.email}
+        maxLength={TEXT_FIELD_LIMITS.signUp.email}
         onChange={(value) => setField('email', value)}
       />
     </FormField>

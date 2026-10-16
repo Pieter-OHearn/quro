@@ -1,3 +1,4 @@
+import { TEXT_FIELD_LIMITS } from '@quro/shared';
 import {
   CATEGORY_COLOR_NAMES,
   CATEGORY_COLORS,
@@ -85,6 +86,7 @@ function CategoryFields({ form, set, currency }: Readonly<CategoryFieldsProps>) 
           <TextInput
             data-testid="budget-category-name-input"
             value={form.name}
+            maxLength={TEXT_FIELD_LIMITS.budgetCategory.name}
             onChange={(value) => set('name', value)}
           />
         </FormField>

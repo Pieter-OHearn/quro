@@ -1,3 +1,4 @@
+import { TEXT_FIELD_LIMITS } from '@quro/shared';
 import { useState } from 'react';
 import type { PartnerLink } from '@quro/shared';
 import { Check, Heart, Send, Unlink, X } from 'lucide-react';
@@ -67,6 +68,7 @@ function InviteForm() {
             <TextInput
               type="email"
               value={email}
+              maxLength={TEXT_FIELD_LIMITS.partnerInvite.email}
               placeholder="partner@example.com"
               onChange={setEmail}
             />
