@@ -18,6 +18,8 @@ const DISPLAY_LABELS: Readonly<Record<string, string>> = {
   'Buy-to-Let': 'Buy-to-let',
   'Primary Residence': 'Primary residence',
   'Holiday Home': 'Holiday home',
+  // The runway's rule set when no country applies
+  GENERIC: 'Generic',
   // Asset allocation names from the API
   'Property Equity': 'Property equity',
 };

@@ -70,7 +70,6 @@ export function Plan() {
       {data.budgetCurrencyNeedsReview && <CurrencyReviewNotice />}
       <ContentSection className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-label text-fg-muted">Plan</p>
           <h2 className="text-title-section text-fg">Financial resilience</h2>
           <p className="mt-1 max-w-2xl text-cell text-fg-muted">
             A derived planning view built from the balances, spending, and income already in Quro.

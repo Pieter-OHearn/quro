@@ -8,6 +8,8 @@ describe('displayLabel', () => {
     expect(displayLabel('Easy Access')).toBe('Easy access');
     expect(displayLabel('Buy-to-Let')).toBe('Buy-to-let');
     expect(displayLabel('Property Equity')).toBe('Property equity');
+    expect(displayLabel('GENERIC')).toBe('Generic');
+    expect(displayLabel('NL')).toBe('NL');
   });
 
   test('covers every savings account and pension type the app stores', () => {

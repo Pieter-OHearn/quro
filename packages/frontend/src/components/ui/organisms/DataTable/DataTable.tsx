@@ -68,10 +68,10 @@ const PHONE_CARD_METRIC_SPAN_CLASSES = {
 } as const;
 const PHONE_CARD_FOOTER_CLASS_NAME =
   'max-md:mt-2 max-md:border-t max-md:border-border-subtle max-md:pt-1';
-// The footer's icon buttons read as controls on a card: muted rather than the faint resting tint
-// of a table row, so the Edit pencil stays visible beside the details button.
+// The footer's icon buttons read as controls on a card: full-strength icon and a visible border
+// instead of the faint resting tint of a table row, so the Edit pencil is easy to see and hit.
 const PHONE_CARD_ACTIONS_CLASS_NAME =
-  'max-md:[&_a]:text-fg-muted max-md:[&_button:not(:disabled)]:text-fg-muted';
+  'max-md:[&_a]:border max-md:[&_a]:border-border-control max-md:[&_a]:text-fg max-md:[&_button:not(:disabled)]:border max-md:[&_button:not(:disabled)]:border-border-control max-md:[&_button:not(:disabled)]:text-fg';
 const MOBILE_CELL_CLASS_NAME =
   'max-md:flex max-md:min-h-9 max-md:items-center max-md:justify-between max-md:gap-4 max-md:border-0 max-md:px-0 max-md:py-1.5 max-sm:min-h-12';
 
@@ -547,13 +547,7 @@ export function DataTableCell({
         hasHeadlineNote={Boolean(tableContext?.hasHeadlineNote)}
       />
       <div
-        className={cn(
-          'min-w-0',
-          cellConfig.align === 'right' && 'md:text-right',
-          // The first 44px icon button of the footer lines its glyph up with the card's text.
-          phoneRole === 'footer' && 'max-md:-ml-3',
-          contentClassName,
-        )}
+        className={cn('min-w-0', cellConfig.align === 'right' && 'md:text-right', contentClassName)}
       >
         {children}
       </div>
