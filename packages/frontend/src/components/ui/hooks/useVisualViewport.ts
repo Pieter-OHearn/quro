@@ -5,12 +5,15 @@ export type VisualViewportBox = { top: number; height: number };
 // Below this the visual viewport only differs from the layout viewport by browser chrome, not by a
 // virtual keyboard, so it is ignored.
 const KEYBOARD_MIN_HEIGHT = 120;
+const ZOOM_TOLERANCE = 1.01;
 
 /** The box of the visual viewport when it is at least 120px shorter than the layout viewport. */
 export function keyboardBoxFrom(
-  viewport: Pick<VisualViewport, 'height' | 'offsetTop'>,
+  viewport: Pick<VisualViewport, 'height' | 'offsetTop'> & { scale?: number },
   layoutHeight: number,
 ): VisualViewportBox | null {
+  // A pinch zoom also shrinks the visual viewport, and is not a keyboard.
+  if ((viewport.scale ?? 1) > ZOOM_TOLERANCE) return null;
   if (layoutHeight - viewport.height < KEYBOARD_MIN_HEIGHT) return null;
   return { top: viewport.offsetTop, height: viewport.height };
 }

@@ -11,4 +11,12 @@ describe('keyboardBoxFrom', () => {
     expect(keyboardBoxFrom({ height: 844, offsetTop: 0 }, 844)).toBeNull();
     expect(keyboardBoxFrom({ height: 780, offsetTop: 0 }, 844)).toBeNull();
   });
+
+  test('ignores a pinch zoom', () => {
+    expect(keyboardBoxFrom({ height: 420, offsetTop: 0, scale: 2 }, 844)).toBeNull();
+    expect(keyboardBoxFrom({ height: 420, offsetTop: 0, scale: 1 }, 844)).toEqual({
+      top: 0,
+      height: 420,
+    });
+  });
 });
