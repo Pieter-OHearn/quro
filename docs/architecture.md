@@ -64,7 +64,7 @@ graph LR
 | vllm                  | no           | no          | yes     | yes        |
 | db-tools              | no           | yes         | no      | no         |
 
-The frontend can reach the backend (via `frontend-net`) but cannot directly reach the database, the documents directory or the AI services. The pension import worker bridges `backend-net` (for the database) and `ocr-net` (for the parser), and mounts the same documents directory as the backend. The parser and vLLM are isolated on `ocr-net` and are unreachable from the browser or the Hono API server directly. Both run as non-root users with dropped capabilities and CPU, memory and process limits; the parser also has a read-only root filesystem.
+The frontend can reach the backend (via `frontend-net`) but cannot directly reach the database, the documents directory or the OCR services. The pension import worker bridges `backend-net` (for the database) and `ocr-net` (for the parser), and mounts the same documents directory as the backend. The parser and vLLM are isolated on `ocr-net` and are unreachable from the browser or the Hono API server directly. Both run as non-root users with dropped capabilities and CPU, memory and process limits; the parser also has a read-only root filesystem.
 
 Uploaded documents are stored on the filesystem (`./data/documents`, mounted at `/var/lib/quro/documents`) by default. An S3-compatible store the operator runs is the alternative; the backend then reaches it over the network instead of the volume. See [document storage](document-storage.md).
 
@@ -242,7 +242,7 @@ Exactly one `annual_statement` row must be present; the commit is rejected other
 
 **7. Capabilities system**
 
-`GET /api/capabilities` (authenticated) returns an `AppCapabilities` object with four fields: `ai`, `pensionStatementImport`, `bunq` and `documents`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, and `checkedAt`. Document storage is part of the core, so `documents` is always enabled; whether the configured store is usable is a readiness check (`GET /api/readiness`).
+`GET /api/capabilities` (authenticated) returns an `AppCapabilities` object with three fields: `pensionStatementImport`, `bunq` and `documents`. Each is an `AppCapabilityStatus` with `enabled`, `reason`, `message`, `lifecycle` and `checkedAt`. `lifecycle` is `stable` or `experimental`: an experimental feature (statement import today) may change or be removed in a minor release, and Settings labels it so. Document storage is part of the core, so `documents` is always enabled; whether the configured store is usable is a readiness check (`GET /api/readiness`).
 
 Whether a feature is switched on comes from configuration alone and is decided by the capability registry (`lib/capabilityRegistry.ts`), the single source of truth for optional features:
 
@@ -261,9 +261,7 @@ The `pensionStatementImport` capability is disabled when:
 - The last heartbeat is more than 15 s old (`reason: 'worker_stale'`)
 - The parser health check failed (`reason: 'parser_unhealthy'`)
 
-The `ai` capability mirrors `pensionStatementImport` (it is the same underlying check).
-
-The frontend (`useAppCapabilities.ts`) polls this endpoint every 15 s and uses the result to show or hide the PDF upload button. The default state (used before the first response arrives) shows both capabilities as disabled.
+The frontend (`useAppCapabilities.ts`) polls this endpoint every 15 s and uses the result to show the PDF upload button, show it disabled with the reason, or leave it out when statement import is not configured, and to list the features on this server in Settings. The default state (used before the first response arrives) shows every capability as disabled.
 
 ---
 

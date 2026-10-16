@@ -443,18 +443,35 @@ export type PensionImportCollisionWarning = {
 export type AppCapabilityReason =
   'worker_unavailable' | 'worker_stale' | 'parser_unhealthy' | 'not_configured';
 
+/**
+ * How far a feature is supported. A `stable` feature keeps working across upgrades; an
+ * `experimental` one may change or be removed in a minor release.
+ */
+export type AppCapabilityLifecycle = 'stable' | 'experimental';
+
 export type AppCapabilityStatus = {
   enabled: boolean;
   reason: AppCapabilityReason | null;
   message: string;
+  lifecycle: AppCapabilityLifecycle;
   checkedAt: string;
 };
 
 export type AppCapabilities = {
-  ai: AppCapabilityStatus;
   pensionStatementImport: AppCapabilityStatus;
   bunq: AppCapabilityStatus;
   documents: AppCapabilityStatus;
+};
+
+/** Whether the household holds the records a useful dashboard needs. */
+export type SetupProgress = {
+  /** A savings account, holding, pension pot, property, mortgage or debt, archived or not. */
+  hasAccount: boolean;
+  /**
+   * A ledger row: a savings, holding, pension, property or mortgage transaction, a debt payment,
+   * a payslip or a budget transaction.
+   */
+  hasTransaction: boolean;
 };
 
 export type PensionStatementImport = {
