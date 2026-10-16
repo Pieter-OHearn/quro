@@ -9,10 +9,10 @@ export function ImportBody({
   return <div className={cn('space-y-4 p-4', className)}>{children}</div>;
 }
 
-/** Footer actions like the shared dialog footer: at the end, stacked full width on phones. */
+/** Footer actions like the shared dialog footer: at the end, sharing one 44px row on phones. */
 export function ImportFooter({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className="flex shrink-0 justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:flex-col max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:w-full">
+    <div className="flex shrink-0 justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:flex-wrap max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:min-w-[calc(50%-0.25rem)] max-sm:*:flex-1">
       {children}
     </div>
   );

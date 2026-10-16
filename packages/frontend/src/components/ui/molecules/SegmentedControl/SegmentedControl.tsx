@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  type ComponentPropsWithoutRef,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import type { ComponentPropsWithoutRef, KeyboardEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 // `pill`, `contained` and `soft` all render the joined segmented control: one bordered group,
@@ -145,21 +139,19 @@ function optionAttributes({ isTabs, tabsId, value, isActive, inTabOrder }: Optio
 }
 
 // A selection made elsewhere (a link to `?tab=data`, an arrow key) can be an option that the
-// scrolled group has clipped, so the group scrolls it into view. Only the group moves, not the page.
-function useRevealSelection(value: string | number) {
-  const groupRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const group = groupRef.current;
-    const selected = group?.querySelector<HTMLElement>(
-      '[aria-selected="true"], [aria-pressed="true"]',
-    );
-    if (!group || !selected || group.scrollWidth <= group.clientWidth) return;
-    const groupBox = group.getBoundingClientRect();
-    const box = selected.getBoundingClientRect();
-    if (box.left >= groupBox.left && box.right <= groupBox.right) return;
-    group.scrollLeft += box.left - groupBox.left - (group.clientWidth - box.width) / 2;
-  }, [value]);
-  return groupRef;
+// scrolled group has clipped, so the group scrolls it into view. Only the group moves, not the
+// page, and only when the selection has changed since the group last did so.
+function revealSelection(group: HTMLDivElement | null, value: string | number) {
+  if (!group || group.dataset.revealed === String(value)) return;
+  group.dataset.revealed = String(value);
+  const selected = group.querySelector<HTMLElement>(
+    '[aria-selected="true"], [aria-pressed="true"]',
+  );
+  if (!selected || group.scrollWidth <= group.clientWidth) return;
+  const groupBox = group.getBoundingClientRect();
+  const box = selected.getBoundingClientRect();
+  if (box.left >= groupBox.left && box.right <= groupBox.right) return;
+  group.scrollLeft += box.left - groupBox.left - (group.clientWidth - box.width) / 2;
 }
 
 export function SegmentedControl<T extends string | number>({
@@ -174,7 +166,6 @@ export function SegmentedControl<T extends string | number>({
 }: SegmentedControlProps<T>) {
   const isTabs = variant === 'underline';
   const hasSelection = options.some((option) => option.value === value);
-  const groupRef = useRevealSelection(value);
 
   // Tabs follow the arrow-key pattern: one tab is in the Tab order, the arrows move the selection
   // and focus together, and Home and End jump to the ends.
@@ -193,7 +184,7 @@ export function SegmentedControl<T extends string | number>({
 
   return (
     <div
-      ref={groupRef}
+      ref={(group) => revealSelection(group, value)}
       role={isTabs ? 'tablist' : 'group'}
       className={cn(WRAPPER_CLASSES[variant], className)}
       onKeyDown={isTabs ? handleKeyDown : undefined}

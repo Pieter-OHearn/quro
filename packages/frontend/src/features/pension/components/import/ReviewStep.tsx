@@ -124,7 +124,7 @@ function ReviewTypeCell({ row, draft, onPatch }: Readonly<ReviewTypeCellProps>) 
             aria-pressed={draft.isEmployer ?? false}
             onClick={() => onPatch(row, { isEmployer: !(draft.isEmployer ?? false) })}
             className={cn(
-              'inline-flex items-center rounded-sm border px-1.5 py-px text-[11px] leading-4 font-medium transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+              'inline-flex items-center rounded-sm border px-1.5 py-px text-[11px] leading-4 font-medium max-sm:min-h-11 max-sm:px-3 max-sm:text-cell transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
               draft.isEmployer
                 ? 'border-brand bg-brand-soft text-brand-fg'
                 : 'border-border-control text-fg-muted hover:bg-surface-muted active:bg-surface-muted',
@@ -447,7 +447,7 @@ function ReviewCancelConfirm({
           </p>
         </div>
       </ImportNotice>
-      <div className="flex justify-end gap-2 max-sm:flex-col max-sm:*:w-full">
+      <div className="flex justify-end gap-2 max-sm:flex-wrap max-sm:*:h-11 max-sm:*:min-w-[calc(50%-0.25rem)] max-sm:*:flex-1">
         <Button variant="secondary" onClick={() => onSetConfirmMode('none')}>
           Keep reviewing
         </Button>
@@ -491,8 +491,8 @@ function ReviewDefaultFooter({
   onClose: () => void;
 }>) {
   return (
-    <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <div className="flex items-center gap-3 max-sm:*:w-full">
+    <div className="flex items-center justify-between gap-2 sm:gap-4">
+      <div className="flex items-center gap-3 max-sm:flex-1 max-sm:*:w-full">
         <Button
           variant="danger"
           onClick={() => onSetConfirmMode('review-cancel')}
@@ -518,7 +518,7 @@ function ReviewDefaultFooter({
           })();
         }}
         disabled={!canCommit || reviewBusy}
-        className="whitespace-nowrap max-sm:h-11"
+        className="whitespace-nowrap max-sm:h-11 max-sm:flex-1"
       >
         {isCommitting ? 'Committing...' : 'Commit transactions'}
       </Button>

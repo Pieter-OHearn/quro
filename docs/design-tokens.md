@@ -252,6 +252,17 @@ same way. Nothing scales, bounces or slides in from the side, and figures never 
 `prefers-reduced-motion: reduce` the sheet only fades and the shell's drawer does not animate
 (`motion-safe:` and `motion-reduce:` variants); the 100ms colour changes stay because they carry state.
 
+### Forms and the virtual keyboard
+
+Below 640px a dialog's actions are sticky and share one 44px row (a danger action takes a row above
+them), so they leave room for the fields when a keyboard is open. The page asks browsers that
+resize the layout for the keyboard to do so (`interactive-widget=resizes-content` in
+`index.html`); where the layout does not resize (iOS Safari), `Modal` sizes itself to the visual
+viewport through `useVisualViewport`. A `FormField` that gains an error scrolls it into view above
+the sticky actions and, for the first such field, moves focus to its control unless another field
+is being typed in. Pass the error to `FormField` rather than rendering your own message, so this
+behaviour and the `role="alert"` announcement stay shared.
+
 ## Dark mode
 
 Settings → Preferences → Appearance offers Light, Dark and System; System is the default and follows
