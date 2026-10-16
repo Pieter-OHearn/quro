@@ -9,12 +9,16 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ChartCard } from '@/components/ui';
+import { ChartCard, buildChartAlternative } from '@/components/ui';
+import { formatAxisCompact } from '@/lib/chartStyles';
+import { useChartMotion } from '@/hooks/useMediaQuery';
 import {
-  CHART_AXIS_PROPS,
   CHART_BAR_CURSOR,
   CHART_CURSOR,
   CHART_GRID_PROPS,
+  CHART_TOOLTIP_WRAPPER_STYLE,
+  CHART_X_AXIS_PROPS,
+  CHART_Y_AXIS_PROPS,
   ChartLegend,
   ChartTooltipContent,
 } from '@/components/finance/chartTheme';
@@ -37,18 +41,28 @@ type SavingsChartsProps = {
 type GrowthChartProps = Pick<SavingsChartsProps, 'growthChartData' | 'baseCurrency' | 'fmtBase'>;
 
 function GrowthChart({ growthChartData, baseCurrency, fmtBase }: Readonly<GrowthChartProps>) {
+  const motion = useChartMotion();
   return (
     <ChartCard
       title="Savings growth"
       subtitle={`Total balance in ${baseCurrency}`}
       hasData={growthChartData.length > 0}
+      alternative={buildChartAlternative({
+        subject: 'Savings growth',
+        xLabel: 'Month',
+        x: (point) => point.month,
+        rows: growthChartData,
+        columns: [{ label: 'Total savings', value: (point) => point.savings, format: fmtBase }],
+      })}
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <AreaChart data={growthChartData}>
+        <AreaChart data={growthChartData} accessibilityLayer>
           <CartesianGrid {...CHART_GRID_PROPS} />
-          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
-          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+          <XAxis dataKey="month" {...CHART_X_AXIS_PROPS} />
+          <YAxis {...CHART_Y_AXIS_PROPS} tickFormatter={(value) => formatAxisCompact(value)} />
           <Tooltip
+            {...motion}
+            wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
             cursor={CHART_CURSOR}
             content={(props) => (
               <ChartTooltipContent
@@ -70,6 +84,7 @@ function GrowthChart({ growthChartData, baseCurrency, fmtBase }: Readonly<Growth
             fill={SAVINGS_SERIES}
             fillOpacity={0.12}
             dot={false}
+            {...motion}
             activeDot={{ r: 4, fill: SAVINGS_SERIES, stroke: 'var(--surface)', strokeWidth: 2 }}
           />
         </AreaChart>
@@ -85,18 +100,31 @@ function contribSeriesName(dataKey: unknown): string {
 }
 
 function ContribChart({ contribChartData, baseCurrency, fmtBase }: Readonly<ContribChartProps>) {
+  const motion = useChartMotion();
   return (
     <ChartCard
       title="Contributions vs interest"
       subtitle={`Monthly totals in ${baseCurrency}`}
       hasData={contribChartData.length > 0}
+      alternative={buildChartAlternative({
+        subject: 'Contributions vs interest',
+        xLabel: 'Month',
+        x: (point) => point.month,
+        rows: contribChartData,
+        columns: [
+          { label: 'Net contributions', value: (point) => point.contribution, format: fmtBase },
+          { label: 'Interest', value: (point) => point.interest, format: fmtBase },
+        ],
+      })}
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <BarChart data={contribChartData} barSize={18}>
+        <BarChart data={contribChartData} barSize={18} accessibilityLayer>
           <CartesianGrid {...CHART_GRID_PROPS} />
-          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
-          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(value) => `${(value / 1000).toFixed(1)}k`} />
+          <XAxis dataKey="month" {...CHART_X_AXIS_PROPS} />
+          <YAxis {...CHART_Y_AXIS_PROPS} tickFormatter={(value) => formatAxisCompact(value)} />
           <Tooltip
+            {...motion}
+            wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
             cursor={CHART_BAR_CURSOR}
             content={(props) => (
               <ChartTooltipContent
@@ -110,19 +138,21 @@ function ContribChart({ contribChartData, baseCurrency, fmtBase }: Readonly<Cont
               />
             )}
           />
-          <Bar dataKey="contribution" fill={SAVINGS_SERIES} radius={BAR_RADIUS} />
+          <Bar dataKey="contribution" fill={SAVINGS_SERIES} radius={BAR_RADIUS} {...motion} />
           <Bar
             dataKey="interest"
             fill={SAVINGS_SERIES}
             fillOpacity={INTEREST_OPACITY}
+            stroke={SAVINGS_SERIES}
             radius={BAR_RADIUS}
+            {...motion}
           />
         </BarChart>
       </ResponsiveContainer>
       <ChartLegend
         items={[
-          { label: 'Net contributions', color: SAVINGS_SERIES },
-          { label: 'Interest', color: SAVINGS_SERIES, opacity: INTEREST_OPACITY },
+          { label: 'Net contributions', color: SAVINGS_SERIES, swatch: 'solid' },
+          { label: 'Interest', color: SAVINGS_SERIES, swatch: 'soft' },
         ]}
       />
     </ChartCard>

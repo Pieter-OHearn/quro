@@ -8,14 +8,21 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { DataKey } from 'recharts/types/util/types';
+import {
+  CHART_TOOLTIP_CLASS,
+  CHART_TOOLTIP_WRAPPER_STYLE,
+  CHART_X_AXIS_PROPS,
+  CHART_Y_AXIS_PROPS,
+  formatAxisCompact,
+} from '@/lib/chartStyles';
+import { useChartMotion } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
-import { ChartCard } from '../ChartCard';
+import { ChartCard, buildChartAlternative } from '../ChartCard';
 
 // One series: a 2px `brand` line over a flat `brand-soft` fill, horizontal gridlines only and
 // 11px tabular axis labels. `color` no longer changes the series colour; it stays for callers.
 const SERIES_STROKE = 'var(--brand)';
 const SERIES_FILL = 'var(--brand-soft)';
-const AXIS_TICK = { fontSize: 11, fill: 'var(--chart-axis)', className: 'font-numeric' };
 const ACTIVE_DOT = { r: 4, fill: SERIES_STROKE, stroke: 'var(--surface)', strokeWidth: 2 };
 
 export type AreaChartCardProps<T extends Record<string, unknown>> = {
@@ -37,6 +44,8 @@ export type AreaChartCardProps<T extends Record<string, unknown>> = {
   headerClassName?: string;
   headerActionClassName?: string;
   estimatedKey?: keyof T;
+  /** Names the first column of the values table; the default is "Date". */
+  xLabel?: string;
 };
 
 type ChartContentProps<T extends Record<string, unknown>> = {
@@ -59,6 +68,25 @@ type SegmentedChartPoint<T> = T & {
 function readDataValue<T extends Record<string, unknown>>(row: T, key: DataKey<T, number>): number {
   if (typeof key === 'function') return Number(key(row));
   return Number(row[String(key)]);
+}
+
+/** The plotted value of a row, or null when the row has none (never 0 for a gap). */
+function readValue<T extends Record<string, unknown>>(
+  row: T,
+  key: DataKey<T, number>,
+): number | null {
+  const raw = typeof key === 'function' ? key(row) : row[String(key)];
+  if (raw == null || raw === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function readLabel<T extends Record<string, unknown>>(
+  row: T,
+  key: DataKey<T, string | number>,
+): string {
+  const raw = typeof key === 'function' ? key(row) : row[String(key)];
+  return raw == null ? '' : String(raw);
 }
 
 function segmentEstimatedData<T extends Record<string, unknown>>(
@@ -92,6 +120,7 @@ function ChartSeries<T extends Record<string, unknown>>({
   dataKey,
   strokeWidth,
 }: Pick<ChartContentProps<T>, 'estimatedKey' | 'dataKey' | 'strokeWidth'>) {
+  const motion = useChartMotion();
   if (!estimatedKey) {
     return (
       <Area
@@ -103,6 +132,7 @@ function ChartSeries<T extends Record<string, unknown>>({
         fillOpacity={1}
         dot={false}
         activeDot={ACTIVE_DOT}
+        {...motion}
       />
     );
   }
@@ -117,6 +147,7 @@ function ChartSeries<T extends Record<string, unknown>>({
         fillOpacity={1}
         dot={false}
         activeDot={ACTIVE_DOT}
+        {...motion}
       />
       <Area
         type="monotone"
@@ -127,6 +158,7 @@ function ChartSeries<T extends Record<string, unknown>>({
         fill="transparent"
         dot={false}
         activeDot={ACTIVE_DOT}
+        {...motion}
       />
     </>
   );
@@ -145,7 +177,7 @@ function ChartTooltip({ active, label, payload, title, formatValue }: Readonly<C
   const entries = (payload ?? []).filter((entry) => entry.value != null);
   if (!active || entries.length === 0) return null;
   return (
-    <div className="rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover">
+    <div className={CHART_TOOLTIP_CLASS}>
       <p className="font-medium">{label}</p>
       {entries.map((entry) => (
         <p key={String(entry.name)} className="font-numeric">
@@ -168,16 +200,19 @@ function ChartContent<T extends Record<string, unknown>>({
   title,
   estimatedKey,
 }: ChartContentProps<T>) {
+  const motion = useChartMotion();
   const yTickFormatter = (value: unknown) =>
-    formatYAxis ? formatYAxis(Number(value)) : `${(Number(value) / 1000).toFixed(0)}k`;
+    formatYAxis ? formatYAxis(Number(value)) : formatAxisCompact(Number(value));
   const chartData = estimatedKey ? segmentEstimatedData(data, dataKey, estimatedKey) : [...data];
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={chartData}>
+      <AreaChart data={chartData} accessibilityLayer>
         <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-        <XAxis dataKey={xKey} tick={AXIS_TICK} axisLine={false} tickLine={false} />
-        <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={yTickFormatter} />
+        <XAxis dataKey={xKey} {...CHART_X_AXIS_PROPS} />
+        <YAxis {...CHART_Y_AXIS_PROPS} tickFormatter={yTickFormatter} />
         <Tooltip
+          {...motion}
+          wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
           cursor={{ stroke: 'var(--border-default)' }}
           content={(props) => (
             <ChartTooltip
@@ -212,7 +247,16 @@ export function AreaChartCard<T extends Record<string, unknown>>({
   headerClassName,
   headerActionClassName,
   estimatedKey,
+  xLabel = 'Date',
 }: AreaChartCardProps<T>) {
+  const alternative = buildChartAlternative({
+    subject: title,
+    xLabel,
+    x: (row) => readLabel(row, xKey),
+    rows: data,
+    columns: [{ label: title, value: (row) => readValue(row, dataKey), format: formatValue }],
+    estimated: estimatedKey ? (row) => Boolean(row[estimatedKey]) : undefined,
+  });
   return (
     <ChartCard
       title={title}
@@ -220,6 +264,7 @@ export function AreaChartCard<T extends Record<string, unknown>>({
       badge={badge}
       belowContent={belowContent}
       hasData={data.length > 0}
+      alternative={alternative}
       emptyMessage={emptyMessage}
       className={cn(className)}
       headerClassName={headerClassName}

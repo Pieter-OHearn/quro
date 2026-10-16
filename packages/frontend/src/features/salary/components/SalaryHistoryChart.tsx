@@ -1,7 +1,16 @@
-import { ChartCard } from '@/components/ui';
+import { ChartCard, buildChartAlternative } from '@/components/ui';
+import { ChartLegend } from '@/components/finance/chartTheme';
+import { useChartMotion } from '@/hooks/useMediaQuery';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { CHART_AXIS_PROPS, CHART_GRID_PROPS } from '@/lib/chartStyles';
+import {
+  CHART_GRID_PROPS,
+  CHART_TOOLTIP_CLASS,
+  CHART_TOOLTIP_WRAPPER_STYLE,
+  CHART_X_AXIS_PROPS,
+  CHART_Y_AXIS_PROPS,
+  formatAxisCompact,
+} from '@/lib/chartStyles';
 import type { TooltipContentProps } from 'recharts';
 import type { FmtFn, SalaryChartEntry } from '../types';
 import { formatPercent } from '@quro/shared';
@@ -25,7 +34,7 @@ function SalaryTooltip({ active, payload, fmtBase }: TooltipContentProps & { fmt
   const gross = typeof chartEntry?.gross === 'number' ? chartEntry.gross : 0;
 
   return (
-    <div className="rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover font-numeric">
+    <div className={`${CHART_TOOLTIP_CLASS} font-numeric`}>
       {payload.map((entry, index) => (
         <p key={`${entry.dataKey ?? entry.name ?? index}`}>
           {entry.dataKey === 'net' ? 'Net pay' : 'Deductions'}: {fmtBase(Number(entry.value) || 0)}
@@ -38,17 +47,12 @@ function SalaryTooltip({ active, payload, fmtBase }: TooltipContentProps & { fmt
 
 function SalaryChartLegend() {
   return (
-    <div className="mt-2 flex items-center gap-4">
-      {[
-        { label: 'Net pay', color: NET_COLOR },
-        { label: 'Deductions', color: DEDUCTIONS_COLOR },
-      ].map((item) => (
-        <div key={item.label} className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-          <span className="text-caption text-fg-muted">{item.label}</span>
-        </div>
-      ))}
-    </div>
+    <ChartLegend
+      items={[
+        { label: 'Net pay', color: NET_COLOR, swatch: 'solid' },
+        { label: 'Deductions', color: DEDUCTIONS_COLOR, swatch: 'soft' },
+      ]}
+    />
   );
 }
 
@@ -59,6 +63,7 @@ export function SalaryHistoryChart({
   baseCurrency,
 }: Readonly<SalaryHistoryChartProps>) {
   const { numberFormat } = useCurrency();
+  const motion = useChartMotion();
   const chartData = data.map((entry) => ({ ...entry, deductions: entry.gross - entry.net }));
 
   return (
@@ -67,6 +72,17 @@ export function SalaryHistoryChart({
       subtitle={`Annual salary in ${baseCurrency}`}
       hasData={data.length > 0}
       emptyMessage="No salary history yet."
+      alternative={buildChartAlternative({
+        subject: 'Salary growth history',
+        xLabel: 'Year',
+        x: (entry) => entry.year,
+        rows: chartData,
+        columns: [
+          { label: 'Net pay', value: (entry) => entry.net, format: fmtBase },
+          { label: 'Deductions', value: (entry) => entry.deductions, format: fmtBase },
+          { label: 'Gross', value: (entry) => entry.gross, format: fmtBase },
+        ],
+      })}
       footer={
         <>
           <SalaryChartLegend />
@@ -84,19 +100,26 @@ export function SalaryHistoryChart({
     >
       {chartData.length > 0 && (
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={chartData} barSize={32}>
+          <BarChart data={chartData} barSize={32} accessibilityLayer>
             <CartesianGrid {...CHART_GRID_PROPS} />
-            <XAxis dataKey="year" {...CHART_AXIS_PROPS} />
-            <YAxis
-              {...CHART_AXIS_PROPS}
-              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-            />
+            <XAxis dataKey="year" {...CHART_X_AXIS_PROPS} />
+            <YAxis {...CHART_Y_AXIS_PROPS} tickFormatter={(value) => formatAxisCompact(value)} />
             <Tooltip
+              {...motion}
+              wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
               cursor={{ fill: 'var(--surface-muted)' }}
               content={(props) => <SalaryTooltip {...props} fmtBase={fmtBase} />}
             />
-            <Bar dataKey="net" fill={NET_COLOR} stackId="salary" name="net" />
-            <Bar dataKey="deductions" fill={DEDUCTIONS_COLOR} stackId="salary" name="deductions" />
+            <Bar dataKey="net" fill={NET_COLOR} stackId="salary" name="net" {...motion} />
+            <Bar
+              dataKey="deductions"
+              fill={DEDUCTIONS_COLOR}
+              fillOpacity={0.3}
+              stroke={DEDUCTIONS_COLOR}
+              stackId="salary"
+              name="deductions"
+              {...motion}
+            />
           </BarChart>
         </ResponsiveContainer>
       )}

@@ -1,8 +1,15 @@
 import type { ReactNode } from 'react';
+import { CHART_TOOLTIP_CLASS } from '@/lib/chartStyles';
 
 // Axis labels (11px tabular figures, no axis or tick lines) and horizontal-only gridlines are
 // shared with the chart cards in `lib/chartStyles.ts`.
-export { CHART_AXIS_PROPS, CHART_GRID_PROPS } from '@/lib/chartStyles';
+export {
+  CHART_AXIS_PROPS,
+  CHART_GRID_PROPS,
+  CHART_TOOLTIP_WRAPPER_STYLE,
+  CHART_X_AXIS_PROPS,
+  CHART_Y_AXIS_PROPS,
+} from '@/lib/chartStyles';
 
 export const CHART_CURSOR = { stroke: 'var(--border-default)' } as const;
 export const CHART_BAR_CURSOR = { fill: 'var(--surface-muted)' } as const;
@@ -40,7 +47,7 @@ export function ChartTooltipContent({
     );
   if (rows.length === 0) return null;
   return (
-    <div className="rounded-md bg-surface-inverse px-2 py-1 text-caption text-fg-on-inverse shadow-popover">
+    <div className={CHART_TOOLTIP_CLASS}>
       {label != null && label !== '' ? <p className="font-medium">{label}</p> : null}
       {rows.map(({ entry, row }) => (
         <p key={String(entry.dataKey ?? entry.name)} className="font-numeric">
@@ -51,7 +58,46 @@ export function ChartTooltipContent({
   );
 }
 
-type ChartLegendItem = { label: string; color: string; dashed?: boolean; opacity?: number };
+type ChartLegendItem = {
+  label: string;
+  color: string;
+  dashed?: boolean;
+  opacity?: number;
+  /** A square key for bars: `solid`, `soft` (a tinted fill with an outline) or `line`. */
+  swatch?: 'line' | 'solid' | 'soft';
+};
+
+function LegendKey({ item }: Readonly<{ item: ChartLegendItem }>) {
+  if (item.swatch === 'solid' || item.swatch === 'soft') {
+    // A bar key. The soft fill keeps its outline, so it differs from the solid one by more than
+    // hue.
+    return (
+      <span
+        aria-hidden
+        className="inline-block size-2.5 shrink-0 rounded-sm border"
+        style={{
+          borderColor: item.color,
+          backgroundColor:
+            item.swatch === 'solid'
+              ? item.color
+              : `color-mix(in srgb, ${item.color} 30%, transparent)`,
+          opacity: item.opacity,
+        }}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-0 w-3 shrink-0 border-t-2"
+      style={{
+        borderColor: item.color,
+        borderTopStyle: item.dashed ? 'dashed' : 'solid',
+        opacity: item.opacity,
+      }}
+    />
+  );
+}
 
 /** A legend below a chart: a short line or dot per series, then the label in the caption style. */
 export function ChartLegend({
@@ -62,15 +108,7 @@ export function ChartLegend({
     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-fg-muted">
       {items.map((item) => (
         <span key={item.label} className="inline-flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="inline-block h-0 w-3 border-t-2"
-            style={{
-              borderColor: item.color,
-              borderTopStyle: item.dashed ? 'dashed' : 'solid',
-              opacity: item.opacity,
-            }}
-          />
+          <LegendKey item={item} />
           {item.label}
         </span>
       ))}

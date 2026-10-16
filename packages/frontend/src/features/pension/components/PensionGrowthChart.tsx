@@ -1,4 +1,4 @@
-import { Change, ChartCard } from '@/components/ui';
+import { Change, ChartCard, buildChartAlternative } from '@/components/ui';
 import {
   Area,
   AreaChart,
@@ -9,11 +9,15 @@ import {
   YAxis,
 } from 'recharts';
 import {
-  CHART_AXIS_PROPS,
   CHART_CURSOR,
   CHART_GRID_PROPS,
+  CHART_TOOLTIP_WRAPPER_STYLE,
+  CHART_X_AXIS_PROPS,
+  CHART_Y_AXIS_PROPS,
   ChartTooltipContent,
 } from '@/components/finance/chartTheme';
+import { formatAxisCompact } from '@/lib/chartStyles';
+import { useChartMotion } from '@/hooks/useMediaQuery';
 import type { PensionFormatBaseFn, PensionGrowthPoint } from '../types';
 
 // Pension is the third chart series colour.
@@ -30,16 +34,19 @@ function PensionGrowthAreaChart({
   data,
   fmtBase,
 }: Readonly<{ data: PensionGrowthPoint[]; fmtBase: PensionFormatBaseFn }>) {
+  const motion = useChartMotion();
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <AreaChart data={data} margin={{ top: 8, right: 6, left: -16, bottom: 0 }}>
+      <AreaChart data={data} margin={{ top: 8, right: 6, left: 0, bottom: 0 }} accessibilityLayer>
         <CartesianGrid {...CHART_GRID_PROPS} />
-        <XAxis dataKey="year" {...CHART_AXIS_PROPS} />
+        <XAxis dataKey="year" {...CHART_X_AXIS_PROPS} />
         <YAxis
-          {...CHART_AXIS_PROPS}
-          tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
+          {...CHART_Y_AXIS_PROPS}
+          tickFormatter={(value) => formatAxisCompact(Number(value))}
         />
         <Tooltip
+          {...motion}
+          wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
           cursor={CHART_CURSOR}
           content={(props) => (
             <ChartTooltipContent
@@ -61,6 +68,7 @@ function PensionGrowthAreaChart({
           fill={PENSION_SERIES}
           fillOpacity={0.12}
           dot={false}
+          {...motion}
           activeDot={{ r: 4, fill: PENSION_SERIES, stroke: 'var(--surface)', strokeWidth: 2 }}
         />
       </AreaChart>
@@ -88,6 +96,13 @@ export function PensionGrowthChart({
       }
       hasData={pensionGrowthData.length > 0}
       emptyMessage="Add pension transactions to generate growth history."
+      alternative={buildChartAlternative({
+        subject: 'Total pension growth',
+        xLabel: 'Year',
+        x: (point) => point.year,
+        rows: pensionGrowthData,
+        columns: [{ label: 'Pension value', value: (point) => point.value, format: fmtBase }],
+      })}
     >
       {pensionGrowthData.length > 0 && (
         <PensionGrowthAreaChart data={pensionGrowthData} fmtBase={fmtBase} />
