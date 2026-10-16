@@ -1,3 +1,4 @@
+import { segmentedPanelId, segmentedTabId } from '@/components/ui';
 import type {
   Holding,
   HoldingPriceSyncResult,
@@ -20,6 +21,7 @@ import type { Position } from '../utils/position';
 import { BrokerageTab } from './BrokerageTab';
 import { HoldingsArchivedSection } from './HoldingsArchivedSection';
 import { PropertyTab } from './PropertyTab';
+import { INVESTMENT_TABS_ID } from './TabSwitcher';
 
 type InvestmentTabPanelProps = {
   tab: Tab;
@@ -146,9 +148,13 @@ function renderPropertyTab({
 }
 
 export function InvestmentTabPanel(props: InvestmentTabPanelProps) {
-  if (props.tab === 'brokerage') {
-    return renderBrokerageTab(props);
-  }
-
-  return renderPropertyTab(props);
+  return (
+    <div
+      role="tabpanel"
+      id={segmentedPanelId(INVESTMENT_TABS_ID, props.tab)}
+      aria-labelledby={segmentedTabId(INVESTMENT_TABS_ID, props.tab)}
+    >
+      {props.tab === 'brokerage' ? renderBrokerageTab(props) : renderPropertyTab(props)}
+    </div>
+  );
 }

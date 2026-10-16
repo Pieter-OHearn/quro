@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, KeyboardEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 // `pill`, `contained` and `soft` all render the joined segmented control: one bordered group,
@@ -48,6 +48,50 @@ const INACTIVE_CLASSES = {
 
 type SegmentedControlVariant = keyof typeof WRAPPER_CLASSES;
 
+/** The id of the tab for `value` in an underline control with the given `tabsId`. */
+export function segmentedTabId(tabsId: string, value: string | number): string {
+  return `${tabsId}-tab-${value}`;
+}
+
+/** The id the panel shown for `value` must carry (with `role="tabpanel"`) in an underline control. */
+export function segmentedPanelId(tabsId: string, value: string | number): string {
+  return `${tabsId}-panel-${value}`;
+}
+
+/**
+ * The enabled option an arrow, Home or End key moves to, wrapping around the ends; `null` for any
+ * other key.
+ */
+export function nextTabIndex(
+  key: string,
+  current: number,
+  disabled: readonly boolean[],
+): number | null {
+  const count = disabled.length;
+  let start: number;
+  let direction: 1 | -1;
+  if (key === 'ArrowRight' || key === 'ArrowDown') {
+    start = current;
+    direction = 1;
+  } else if (key === 'ArrowLeft' || key === 'ArrowUp') {
+    start = current;
+    direction = -1;
+  } else if (key === 'Home') {
+    start = -1;
+    direction = 1;
+  } else if (key === 'End') {
+    start = count;
+    direction = -1;
+  } else {
+    return null;
+  }
+  for (let offset = 1; offset <= count; offset += 1) {
+    const index = (((start + direction * offset) % count) + count) % count;
+    if (!disabled[index]) return index;
+  }
+  return null;
+}
+
 export type SegmentedControlOption<T extends string | number> = {
   value: T;
   label: ReactNode;
@@ -66,7 +110,33 @@ export type SegmentedControlProps<T extends string | number> = Omit<
   onChange: (value: T) => void;
   variant?: SegmentedControlVariant;
   buttonClassName?: string;
+  /**
+   * Underline tabs only. Gives each tab the id `segmentedTabId(tabsId, value)` and points it at
+   * the panel `segmentedPanelId(tabsId, value)`, which the page renders for the selected tab.
+   */
+  tabsId?: string;
 };
+
+type OptionAttributesInput = {
+  isTabs: boolean;
+  tabsId?: string;
+  value: string | number;
+  isActive: boolean;
+  inTabOrder: boolean;
+};
+
+// Underline tabs are `role="tab"` with one tab in the Tab order; the other variants are toggle
+// buttons.
+function optionAttributes({ isTabs, tabsId, value, isActive, inTabOrder }: OptionAttributesInput) {
+  if (!isTabs) return { 'aria-pressed': isActive };
+  return {
+    role: 'tab',
+    'aria-selected': isActive,
+    tabIndex: inTabOrder ? undefined : -1,
+    id: tabsId ? segmentedTabId(tabsId, value) : undefined,
+    'aria-controls': tabsId ? segmentedPanelId(tabsId, value) : undefined,
+  };
+}
 
 export function SegmentedControl<T extends string | number>({
   options,
@@ -75,12 +145,32 @@ export function SegmentedControl<T extends string | number>({
   variant = 'pill',
   className,
   buttonClassName,
+  tabsId,
   ...props
 }: SegmentedControlProps<T>) {
+  const isTabs = variant === 'underline';
+  const hasSelection = options.some((option) => option.value === value);
+
+  // Tabs follow the arrow-key pattern: one tab is in the Tab order, the arrows move the selection
+  // and focus together, and Home and End jump to the ends.
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const current = options.findIndex((option) => option.value === value);
+    const next = nextTabIndex(
+      event.key,
+      current,
+      options.map((option) => Boolean(option.disabled)),
+    );
+    if (next === null || next === current) return;
+    event.preventDefault();
+    onChange(options[next].value);
+    event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
+  };
+
   return (
     <div
-      role={variant === 'underline' ? 'tablist' : 'group'}
+      role={isTabs ? 'tablist' : 'group'}
       className={cn(WRAPPER_CLASSES[variant], className)}
+      onKeyDown={isTabs ? handleKeyDown : undefined}
       {...props}
     >
       {options.map((option) => {
@@ -90,9 +180,13 @@ export function SegmentedControl<T extends string | number>({
           <button
             key={String(option.value)}
             type="button"
-            role={variant === 'underline' ? 'tab' : undefined}
-            aria-selected={variant === 'underline' ? isActive : undefined}
-            aria-pressed={variant === 'underline' ? undefined : isActive}
+            {...optionAttributes({
+              isTabs,
+              tabsId,
+              value: option.value,
+              isActive,
+              inTabOrder: isActive || (!hasSelection && option === options[0]),
+            })}
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={cn(
