@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { and, eq, inArray, or } from 'drizzle-orm';
-import type { PartnerLink, PartnerProfile } from '@quro/shared';
+import { TEXT_FIELD_LIMITS, type PartnerLink, type PartnerProfile } from '@quro/shared';
 import { db } from '../db/client';
 import {
   mortgages,
@@ -14,7 +14,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser } from '../lib/authUser';
 import { partnerInviteRateLimit } from '../middleware/rateLimit';
 import { isUniqueViolation } from '../lib/postgresErrors';
-import { readJsonRecord } from '../lib/requestValidation';
+import { checkTextLimits, readJsonRecord } from '../lib/requestValidation';
 
 const app = new Hono();
 
@@ -87,6 +87,8 @@ app.post('/invite', async (c) => {
   if (!email || !EMAIL_PATTERN.test(email)) {
     return c.json({ error: 'Enter a valid email address' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits({ email }, TEXT_FIELD_LIMITS.partnerInvite);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   let result;
   try {

@@ -9,6 +9,7 @@ import {
   type BankingEntityConfirmationInput,
   type SavingsAccountType,
   type SavingsTransactionType,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db, type DbTransaction } from '../db/client';
@@ -46,6 +47,7 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
   readJsonBody,
   rejectUnknownFields,
 } from '../lib/requestValidation';
@@ -458,6 +460,8 @@ app.post('/accounts', async (c) => {
 
   const body = parseSavingsAccountCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.savingsAccount);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const jointError = assertJointAllowed(getPartnerId(c), body.value.isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
@@ -469,6 +473,7 @@ app.post('/accounts', async (c) => {
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
+// eslint-disable-next-line complexity
 app.patch('/accounts/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
@@ -489,6 +494,8 @@ app.patch('/accounts/:id', async (c) => {
   const partnerId = getPartnerId(c);
   const current = await getAccessibleSavingsAccount(id, user.id, partnerId);
   if (!current) return c.json({ error: 'Account not found' }, HTTP_STATUS.NOT_FOUND);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.savingsAccount, current);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
   const updateValues = toSavingsAccountUpdateValues(body.value);
   if (body.value.bank !== undefined && body.value.bank !== current.bank) {
     Object.assign(updateValues, {
@@ -517,6 +524,8 @@ app.patch('/accounts/:id/banking-entity', async (c) => {
   if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
   const parsed = parseBankingEntityConfirmation(rawBody.value);
   if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(rawBody.value, TEXT_FIELD_LIMITS.bankingEntity);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   let confirmation: Pick<
     SavingsAccountInsert,
@@ -596,6 +605,8 @@ app.post('/transactions', async (c) => {
 
   const body = parseSavingsTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.savingsTransaction);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const partnerId = getPartnerId(c);
   const account = await getAccessibleSavingsAccount(body.value.accountId, user.id, partnerId);
@@ -648,6 +659,8 @@ app.patch('/transactions/:id', async (c) => {
   const editable = await getEditableSavingsTransaction(id, user.id, partnerId, 'modify');
   if (!editable.ok) return c.json({ error: editable.error }, editable.status);
   const existing = editable.transaction;
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.savingsTransaction, existing);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const nextState = resolveNextSavingsTransactionState(body.value, existing);
   const nextAccount = await resolvePatchedSavingsTransactionAccount({

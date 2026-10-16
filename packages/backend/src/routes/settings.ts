@@ -11,6 +11,7 @@ import {
   type UpdateUserPasswordInput,
   type UpdateUserPreferencesInput,
   type UpdateUserProfileInput,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { and, eq, gt, ne } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -34,6 +35,7 @@ import {
   ok,
   parseWholeNumber,
   readJsonRecord,
+  checkTextLimits,
   type ParseResult,
 } from '../lib/requestValidation';
 
@@ -171,6 +173,11 @@ app.put('/profile', async (c) => {
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(parsed.value, TEXT_FIELD_LIMITS.profile, async () => {
+    const [current] = await db.select().from(users).where(eq(users.id, authUser.id));
+    return current;
+  });
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [existingEmailUser] = await db
     .select({ id: users.id })

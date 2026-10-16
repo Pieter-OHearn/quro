@@ -1,7 +1,7 @@
 import { findOwnedRow } from '../lib/access';
 import { Hono } from 'hono';
 import { and, eq, gte, isNull, or } from 'drizzle-orm';
-import { toIsoDate, type CurrencyCode } from '@quro/shared';
+import { toIsoDate, type CurrencyCode, TEXT_FIELD_LIMITS } from '@quro/shared';
 import { db } from '../db/client';
 import { employments, payslips } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
@@ -35,6 +35,7 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
   parseWholeNumber,
   readJsonRecord,
   rejectUnknownFields,
@@ -223,6 +224,8 @@ app.post('/payslips', async (c) => {
 
   const body = parsePayslipCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.payslip);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
   const employment = await resolveEmploymentId(user.id, body.value.employmentId, true);
   if (!employment.ok) return c.json({ error: 'Employment not found' }, HTTP_STATUS.BAD_REQUEST);
 
@@ -253,6 +256,8 @@ app.patch('/payslips/:id', async (c) => {
   }
   const existing = await findOwnedRow(payslips, id, user.id);
   if (!existing) return c.json({ error: 'Payslip not found' }, HTTP_STATUS.NOT_FOUND);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.payslip, existing);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
   if ('employmentId' in body.value) {
     const employment = await resolveEmploymentId(user.id, body.value.employmentId, false);
     if (!employment.ok) return c.json({ error: 'Employment not found' }, HTTP_STATUS.BAD_REQUEST);

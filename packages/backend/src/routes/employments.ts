@@ -4,6 +4,7 @@ import {
   type EmploymentInput,
   type EmploymentType,
   toIsoDate,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { and, asc, eq, gte, isNull, ne, or } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -22,6 +23,8 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
+  type ExistingTextSource,
   readJsonRecord,
   rejectUnknownFields,
 } from '../lib/requestValidation';
@@ -117,11 +120,18 @@ function parseValues(
   return dates.ok ? parsed : dates;
 }
 
-async function readPayload(request: Pick<Request, 'json'>, partial: boolean) {
+async function readPayload(
+  request: Pick<Request, 'json'>,
+  partial: boolean,
+  existing?: ExistingTextSource,
+) {
   const body = await readJsonRecord(request, 'Invalid employment payload');
   if (!body.ok) return body;
   if (partial && Object.keys(body.value).length === 0) return err('No fields provided');
-  return parseValues(body.value, partial);
+  const parsed = parseValues(body.value, partial);
+  if (!parsed.ok) return parsed;
+  const lengths = await checkTextLimits(parsed.value, TEXT_FIELD_LIMITS.employment, existing);
+  return lengths.ok ? parsed : lengths;
 }
 
 app.get('/', async (c) => {
@@ -167,7 +177,13 @@ app.patch('/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
   if (!id) return c.json({ error: 'Invalid employment ID' }, HTTP_STATUS.BAD_REQUEST);
-  const parsed = await readPayload(c.req, true);
+  const parsed = await readPayload(c.req, true, async () => {
+    const [current] = await db
+      .select()
+      .from(employments)
+      .where(and(eq(employments.id, id), eq(employments.userId, user.id)));
+    return current;
+  });
   if (!parsed.ok) return c.json({ error: parsed.error }, HTTP_STATUS.BAD_REQUEST);
   // The branches preserve date, ownership, and exactly-one-primary invariants.
   // eslint-disable-next-line complexity

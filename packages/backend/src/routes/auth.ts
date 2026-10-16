@@ -5,6 +5,7 @@ import {
   MIN_PASSWORD_LENGTH,
   MIN_RETIREMENT_AGE,
   MIN_USER_AGE,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
@@ -23,7 +24,7 @@ import {
   DEFAULT_USER_AGE,
   publicUserColumns,
 } from '../lib/users';
-import { parseWholeNumber, readJsonRecord } from '../lib/requestValidation';
+import { checkTextLimits, parseWholeNumber, readJsonRecord } from '../lib/requestValidation';
 import { consumeAuthCode } from '../lib/authCodes';
 import { cookieTransportCheck } from '../middleware/cookieTransport';
 import {
@@ -205,6 +206,8 @@ app.post('/signup', signupRateLimit, async (c) => {
   }
 
   const { data } = validationResult;
+  const lengths = await checkTextLimits(data, TEXT_FIELD_LIMITS.signUp);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
   const passwordHash = await Bun.password.hash(data.password, {
     algorithm: 'bcrypt',
     cost: BCRYPT_COST,
