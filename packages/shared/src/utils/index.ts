@@ -97,19 +97,33 @@ const UNIT_PRICE_MAX_DECIMALS = 4;
  * Formats a unit price (price per share, a current, manual or historical price) in the user's
  * number format with two to four decimals: zeros beyond the second decimal are trimmed, so
  * `123.4567` reads `€123.4567`, `123.45` reads `€123.45` and `0.5` reads `€0.50`. Money amounts
- * keep the two decimals of `formatCurrency`.
+ * keep the two decimals of `formatCurrency`. Pass `decimals` (2 to 4) to show a fixed number of
+ * decimals, so figures that sit side by side, such as a price and an average cost, align.
  */
 export function formatUnitPrice(
   amount: number,
   currency: string,
   numberFormat: NumberFormatPreference = DEFAULT_NUMBER_FORMAT,
+  decimals?: number,
 ): string {
+  const fixed =
+    decimals === undefined
+      ? undefined
+      : Math.min(UNIT_PRICE_MAX_DECIMALS, Math.max(UNIT_PRICE_MIN_DECIMALS, Math.round(decimals)));
   return formatNumber(amount, numberFormat, {
     style: 'currency',
     currency,
-    minimumFractionDigits: UNIT_PRICE_MIN_DECIMALS,
-    maximumFractionDigits: UNIT_PRICE_MAX_DECIMALS,
+    minimumFractionDigits: fixed ?? UNIT_PRICE_MIN_DECIMALS,
+    maximumFractionDigits: fixed ?? UNIT_PRICE_MAX_DECIMALS,
   });
+}
+
+/** The decimals a unit price needs: two to four, trimming zeros beyond the second. */
+export function unitPriceDecimals(amount: number): number {
+  if (!Number.isFinite(amount)) return UNIT_PRICE_MIN_DECIMALS;
+  const text = Math.abs(amount).toFixed(UNIT_PRICE_MAX_DECIMALS);
+  const fraction = text.split('.')[1] ?? '';
+  return Math.max(UNIT_PRICE_MIN_DECIMALS, fraction.replace(/0+$/, '').length);
 }
 
 export * from './money.js';

@@ -1051,6 +1051,34 @@ const smokeCases: readonly SmokeCase[] = [
     excludes: ['bg-gain-soft', 'Filter:', 'text-[10px]'],
   },
   {
+    name: 'TxnHistoryPanel stripes rows only when asked and keeps hover and selection above the stripe',
+    element: (
+      <TxnHistoryPanel
+        filterOptions={[{ key: 'all', label: 'All' }]}
+        filter="all"
+        onFilterChange={noop}
+        striped
+        isEmpty={false}
+      >
+        <TxnRow
+          icon={Plus}
+          iconColor="text-gain"
+          label="Deposit"
+          date="2026-10-01"
+          amount="+EUR 10.00"
+          onDelete={noop}
+        />
+      </TxnHistoryPanel>
+    ),
+    includes: [
+      'divide-border-default',
+      ':nth-child(even)',
+      'bg-surface-sunken',
+      'hover:bg-surface-muted',
+    ],
+    excludes: ['divide-border-subtle'],
+  },
+  {
     name: 'PageStack renders shared page spacing classes',
     element: (
       <PageStack data-smoke="page-stack">

@@ -1,10 +1,10 @@
 /// <reference types="bun-types" />
 
 import { expect, test } from 'bun:test';
-import type { Holding } from '@quro/shared';
+import { unitPriceDecimals, type Holding } from '@quro/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  buildPositionRows,
+  buildPositionMeasures,
   describePriceSource,
   getEffectivePrice,
   HoldingPositionTable,
@@ -28,7 +28,8 @@ const position: Position = {
   realizedGain: 0,
 };
 
-const fmtPrice = (amount: number, currency: string) => `${currency} ${amount.toFixed(4)}`;
+const fmtPrice = (amount: number, currency: string, decimals = 2) =>
+  `${currency} ${amount.toFixed(decimals)}`;
 const fmtNative = (amount: number, currency: string) => `${currency} ${amount.toFixed(2)}`;
 
 const render = (overrides: Partial<Holding> = {}, base = 'EUR', pos: Position = position) =>
@@ -46,25 +47,61 @@ const render = (overrides: Partial<Holding> = {}, base = 'EUR', pos: Position = 
     />,
   );
 
-test('a foreign holding shows native and base columns, the rate and a correction action', () => {
+test('a foreign holding stacks the base value under each native value, with the rate and caveat', () => {
   const markup = render();
 
-  expect(markup).toContain('>GBP</th>');
-  expect(markup).toContain('>EUR</th>');
+  expect(markup).toContain('<dl');
+  expect(markup).not.toContain('<table');
+  for (const label of [
+    'Price',
+    'Avg cost',
+    'Market value',
+    'Cost basis',
+    'Unrealized gain',
+    'Dividends',
+    'Realized gain',
+  ]) {
+    expect(markup).toContain(`>${label}</dt>`);
+  }
   expect(markup).toContain('GBP 2812.50');
-  expect(markup).toContain('EUR 3318.75');
+  expect(markup).toContain('<span class="sr-only">in EUR: </span>EUR 3318.75');
+  expect(markup).toContain('<span class="sr-only">in GBP: </span>');
   expect(markup).toContain('1 GBP = 1.1800 EUR (rates updated 16 Oct 2026)');
   expect(markup).toContain('the rate at purchase is not stored');
   expect(markup).toContain('Correct holding');
-  expect(markup).toContain('aria-label="Fictional Retail Group position"');
+  expect(markup).toContain('aria-labelledby=');
+  expect(markup).toContain('Position<span class="sr-only"> of Fictional Retail Group</span>');
 });
 
-test('a holding in the base currency has one value column and no rate note', () => {
+test('price and average cost share one precision and money keeps two decimals', () => {
+  const markup = render();
+
+  expect(markup).toContain('GBP 29.97');
+  expect(markup).not.toContain('29.9667');
+  expect(unitPriceDecimals(18.75)).toBe(2);
+  expect(unitPriceDecimals(123.4567)).toBe(4);
+  expect(unitPriceDecimals(0.5)).toBe(2);
+  expect(render({ currentPrice: 123.4567 })).toContain('GBP 29.9667');
+});
+
+test('a holding in the base currency has one line per figure and no rate note', () => {
   const markup = render({ currency: 'EUR' });
 
-  expect(markup).not.toContain('>GBP</th>');
+  expect(markup).not.toContain('in EUR');
   expect(markup).not.toContain('today&#x27;s rate');
-  expect(markup).toContain('>EUR</th>');
+  expect(markup).toContain('EUR 2812.50');
+  expect(markup).not.toContain('EUR 3318.75');
+});
+
+test('no value is repeated: distributions and realized gain are cells of the strip', () => {
+  const markup = render({ currency: 'EUR' }, 'EUR', {
+    ...position,
+    totalDividends: 123.45,
+    realizedGain: -50,
+  });
+
+  expect(markup.split('EUR 123.45').length - 1).toBe(1);
+  expect(markup).toContain('>Dividends</dt>');
 });
 
 test('the unrealized gain keeps its sign and a loss reads as a loss in both currencies', () => {
@@ -78,10 +115,10 @@ test('rows use the manual price over the synced one and flag it', () => {
   const manual = { ...holding, manualPrice: 20 };
 
   expect(getEffectivePrice(manual)).toBe(20);
-  expect(buildPositionRows(manual, position)[0].native.value).toBe(20);
+  expect(buildPositionMeasures(manual, position)[0].value).toBe(20);
   expect(render({ manualPrice: 20 })).toContain('Manual price');
   expect(describePriceSource(manual, fmtPrice)).toBe(
-    'Manual price in use. The synced price is GBP 18.7500.',
+    'Manual price in use. The synced price is GBP 18.75.',
   );
 });
 

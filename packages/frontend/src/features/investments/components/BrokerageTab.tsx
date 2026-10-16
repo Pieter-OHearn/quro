@@ -332,7 +332,6 @@ function HoldingHistoryRow({
         ) : null}
         <HoldingTxnHistory
           holding={holding}
-          position={position}
           transactions={holdingTxns}
           onAdd={() => onAddTxnForHolding(holding)}
           onEdit={onEditTxn}

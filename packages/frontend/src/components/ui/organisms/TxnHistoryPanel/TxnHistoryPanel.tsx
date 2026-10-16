@@ -70,10 +70,20 @@ export type TxnHistoryPanelProps = {
   /** Another action beside the add button, such as an import. */
   secondaryAction?: ReactNode;
   emptyMessage?: string;
+  /**
+   * Tints every second row with `surface-sunken` and draws a `border-default` rule between rows,
+   * for a long history that is read across. Opt in; `surface-muted` hover still wins.
+   */
+  striped?: boolean;
   children: ReactNode;
   footer?: ReactNode;
   isEmpty: boolean;
 };
+
+// `:where()` keeps the stripe at one class of specificity, so a row's hover tint, and a row that
+// is marked selected, are never overridden by it.
+const STRIPED_LIST_CLASS =
+  'divide-y divide-border-default [&>:where(:nth-child(even):not([aria-selected=true]))]:bg-surface-sunken';
 
 type StatsGridProps = {
   stats: TxnHistoryStat[];
@@ -183,6 +193,7 @@ type TxnHistoryBodyProps = Pick<
   | 'footer'
   | 'isEmpty'
   | 'onAdd'
+  | 'striped'
 > & {
   variantStyles: (typeof PANEL_VARIANTS)[keyof typeof PANEL_VARIANTS];
   addAction?: ReactNode;
@@ -199,6 +210,7 @@ function TxnHistoryBody({
   footer,
   isEmpty,
   onAdd,
+  striped,
   variantStyles,
   addAction,
 }: TxnHistoryBodyProps) {
@@ -221,7 +233,7 @@ function TxnHistoryBody({
     </p>
   ) : (
     <>
-      <div className={variantStyles.listClassName}>{children}</div>
+      <div className={striped ? STRIPED_LIST_CLASS : variantStyles.listClassName}>{children}</div>
       {footer ? (
         <div className="border-t border-border-subtle px-3 py-2 max-sm:px-4">{footer}</div>
       ) : null}
@@ -291,6 +303,7 @@ export function TxnHistoryPanel({
   addButtonSize,
   secondaryAction,
   emptyMessage = 'No transactions.',
+  striped,
   children,
   footer,
   isEmpty,
@@ -327,6 +340,7 @@ export function TxnHistoryPanel({
       footer={footer}
       isEmpty={isEmpty}
       onAdd={onAdd}
+      striped={striped}
       variantStyles={variantStyles}
       addAction={filterBarAction}
     >
