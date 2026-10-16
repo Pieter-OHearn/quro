@@ -342,7 +342,6 @@ function secretsCheckFor(report: SecretsReport, keyId: string | null): DoctorChe
   }
 }
 
-const BACKUP_AGE_UNREADABLE = ['ENOENT', 'EACCES', 'ENOTDIR', 'EPERM'];
 const SESSION_CLEANUP_FALLBACK_MS = 60 * 60 * 1000;
 
 async function withRuntime<T>(work: (sql: AnySql) => Promise<T>): Promise<T | null | undefined> {
@@ -404,8 +403,7 @@ async function storageChecks(now: Date): Promise<DoctorCheck[]> {
     let reachable = true;
     try {
       newest = await newestBackup(backup.directory);
-    } catch (error) {
-      if (!BACKUP_AGE_UNREADABLE.includes((error as { code?: string }).code ?? '')) throw error;
+    } catch {
       reachable = false;
     }
     checks.push(fromFinding(classifyBackup(newest, now, reachable)));
