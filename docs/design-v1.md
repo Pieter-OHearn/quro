@@ -79,6 +79,7 @@ Rules:
 - `success` and `danger` are the gain and loss colours under their status names; `warning` is stale data and limits; `info` is a neutral notice or a third-party label.
 - `secondary` is only for goals, projections and highlights. It is never a chart series, so a dashed projection is always distinct from the line it extends.
 - Chart colours are fixed per asset class: `viz-1` savings, `viz-2` investments, `viz-3` pension, `viz-4` property, `viz-5` other assets, `viz-6` debt.
+- Colour is never the only signal in a chart. Series that share a hue or sit side by side differ by dash (the second line), fill (a solid bar beside a tinted, outlined one) or position, every chart card carries a text summary and a **Show values** table built from the plotted rows by `buildChartAlternative`, estimated entries are marked in that table, and animation follows `useChartMotion`.
 - Category colours: the colour pickers for goals, budget categories and debts offer exactly the six `viz-*` colours, and each swatch saves one canonical `DATA_COLORS` identity. Gain green and loss red are never category colours. A saved colour that is no longer offered is not migrated: it keeps displaying through `dataColorToken()`, and the picker shows the swatch it maps to as selected.
 - Every text pair in the table measures at least 4.5:1 on the grounds its use names, in both themes; `border-control`, `focus-ring`, `fg-faint` and `viz-1` to `viz-6` measure at least 3:1 on `surface`.
 

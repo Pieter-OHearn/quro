@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
+- Every chart has a text summary and a **Show values** table of the exact plotted values, including negative, missing and estimated entries. Charts follow the system reduced-motion setting, label axes in a compact form that fits a phone, keep tooltips inside the screen, and draw each series with a dash, fill or outline as well as a colour. Click a chart or tab to it and use the arrow keys to read a value.
 - `quro doctor` reports background job lag and failures, data freshness, disk space, the age of the newest backup and whether referenced documents are in the store, with a new `unknown` status for anything without evidence. [Monitor an install](docs/operations.md).
 - Every account can download its data in **Settings → Your data**: one ZIP with JSON and CSV for each table, the stored documents and a manifest with row counts and SHA-256 hashes (`GET /api/settings/export`). Text that a spreadsheet would run as a formula is escaped in the CSV. [Details](docs/data-export-and-deletion.md#export)
 - Every account can delete itself there (`DELETE /api/settings/account`, with the password and the email address). The rows, bank links, sessions and stored documents go in one step, an audit row records the counts without personal data, and `quro documents retry-deleted` removes documents the store refused to delete. Backups are not changed. [Details](docs/data-export-and-deletion.md#deletion)

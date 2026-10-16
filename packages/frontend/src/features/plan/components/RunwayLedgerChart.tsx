@@ -14,10 +14,10 @@ export function RunwayLedgerChart({
       subtitle="Modelled liquid balance after income and lean spending"
       data={ledger}
       dataKey="liquidRemaining"
+      xLabel="Month"
       xKey="month"
       color="var(--brand)"
       formatValue={fmtBase}
-      formatYAxis={(value) => fmtBase(value)}
       emptyMessage="Complete employment setup to add the benefit-adjusted ledger."
     />
   );
