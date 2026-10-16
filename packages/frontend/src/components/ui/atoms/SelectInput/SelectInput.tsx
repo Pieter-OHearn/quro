@@ -1,4 +1,5 @@
 import type { SelectHTMLAttributes } from 'react';
+import { cn } from '@/lib/utils';
 import { getFieldChrome } from '../sharedFieldStyles';
 
 export type SelectInputOption = {
@@ -32,7 +33,11 @@ export function SelectInput({
       disabled={disabled}
       value={value}
       aria-invalid={error || undefined}
-      className={getFieldChrome({ className, error })}
+      className={getFieldChrome({
+        className: cn('select-chevron', className),
+        error,
+        paddingClassName: 'pl-2 pr-9',
+      })}
       onChange={(event) => onChange(event.target.value)}
     >
       {options.map((option) => {

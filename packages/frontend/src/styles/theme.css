@@ -54,6 +54,9 @@
   --fg-muted: #535c56;
   --fg-subtle: #667069;
   --fg-faint: #879089;
+
+  /* Select arrow (fg-muted), drawn as a background image because the native arrow cannot be moved. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23535c56' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
   --fg-inverted: #ffffff;
   --fg-on-inverse: var(--surface-sunken);
 
@@ -161,6 +164,7 @@
   --fg-muted: #a9b4ad;
   --fg-subtle: #8a968e;
   --fg-faint: #5e6a63;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23a9b4ad' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");
   --fg-inverted: #0e1411;
 
   --gain: #5fd39a;
@@ -388,6 +392,17 @@
     font-size: 16px;
     line-height: 20px;
   }
+}
+
+/* A select without its native arrow: a 12px chevron 12px from the right edge. Pair it with
+ * `pr-9` (36px) so long option text is cut with an ellipsis before it reaches the arrow. */
+@utility select-chevron {
+  appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 12px;
+  text-overflow: ellipsis;
 }
 
 @utility text-label {

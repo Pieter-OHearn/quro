@@ -253,7 +253,7 @@ function PayslipTotalRow({
 
   return (
     <DataTableRow data-total>
-      <DataTableCell columnKey="month">
+      <DataTableCell columnKey="month" stacked>
         <p>Total</p>
         <p className="text-caption font-normal text-fg-subtle">
           {payslips.length} payslips in {baseCurrency}
@@ -290,7 +290,7 @@ function PayslipMonthCell({
   const currencyMeta = CURRENCY_META[payslip.currency];
 
   return (
-    <DataTableCell columnKey="month">
+    <DataTableCell columnKey="month" stacked>
       <div className="flex items-center gap-2">
         <span className="font-medium text-fg">{payslip.month}</span>
         <Badge size="sm">
