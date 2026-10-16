@@ -87,4 +87,5 @@ export const queryKeys = {
   capabilities: ['app', 'capabilities'] as const,
   registrationPolicy: ['auth', 'registration'] as const,
   sessions: ['settings', 'sessions'] as const,
+  accountDeletionPreview: ['settings', 'account'] as const,
 };

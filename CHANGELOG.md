@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [Unreleased]
+
+### Added
+
+- Every account can download its data in **Settings → Your data**: one ZIP with JSON and CSV for each table, the stored documents and a manifest with row counts and SHA-256 hashes (`GET /api/settings/export`). Text that a spreadsheet would run as a formula is escaped in the CSV. [Details](docs/data-export-and-deletion.md#export)
+- Every account can delete itself there (`DELETE /api/settings/account`, with the password and the email address). The rows, bank links, sessions and stored documents go in one step, an audit row records the counts without personal data, and `quro documents retry-deleted` removes documents the store refused to delete. Backups are not changed. [Details](docs/data-export-and-deletion.md#deletion)
+
+### Changed
+
+- Bank sync no longer stores `bunq_mcc`, `bunq_payment_type` or `counterparty_iban` on new transactions; nothing read them. Existing values are kept. [Details](docs/data-export-and-deletion.md#write-only-bank-details)
+
+### Upgrade notes
+
+- One migration adds the `account_deletions` table. It changes no existing row. Back up and upgrade as usual.
+
 ## [v0.9.0] - 2026-10-15
 
 Quro 0.9.0 hardens the containers, encrypts bank-link secrets at rest, bounds statement processing, adds net worth chart ranges and brings the new design to every page, for laptop and phone, in light and dark mode. Read the [upgrade notes](docs/upgrade.md#upgrade-from-080-to-090) before you upgrade, and back up with 0.8.0 first.

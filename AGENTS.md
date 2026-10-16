@@ -77,6 +77,10 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   the filesystem by default, S3 only with `QRO_DOCUMENT_STORAGE=s3`. Keys are relative paths that
   both drivers share; build them on the server, never from client input. See
   [document storage](docs/document-storage.md).
+- A table that holds a user's data goes into the account registry
+  (`packages/backend/src/lib/accountData.ts`), which drives the data export and account deletion;
+  a new secret or internal key column is omitted from exports there. See
+  [export and deletion](docs/data-export-and-deletion.md).
 - Sessions and operator codes are stored only as SHA-256 digests
   (`packages/backend/src/lib/sessions.ts`, `packages/backend/src/lib/authCodes.ts`); never store or
   log a raw token. Instance operations are `quro` CLI commands (`packages/backend/src/cli/`), not
