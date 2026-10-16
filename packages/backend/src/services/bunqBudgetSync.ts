@@ -267,8 +267,6 @@ async function claimMatchingManualBudgetTransaction(
     .update(budgetTransactions)
     .set({
       bunqTransactionId,
-      bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
-      bunqPaymentType: payment.type || null,
       sourceProvider: 'bunq',
       sourceAmount: amount,
       sourceCurrency: payment.amount.currency as CurrencyCode,
@@ -276,7 +274,6 @@ async function claimMatchingManualBudgetTransaction(
       sourceAccountId: String(account.id),
       sourceAccountName: account.description || null,
       sourceAccountType: account.type,
-      counterpartyIban: payment.counterpartyAlias.iban,
     })
     .where(
       and(
@@ -378,13 +375,10 @@ export async function importBudgetPayment(
         date: dateStr,
         merchant: payment.counterpartyAlias.displayName || '',
         bunqTransactionId,
-        bunqMcc: payment.counterpartyAlias.merchantCategoryCode,
-        bunqPaymentType: payment.type || null,
         sourceProvider: 'bunq',
         sourceAccountId: String(account.id),
         sourceAccountName: account.description || null,
         sourceAccountType: account.type,
-        counterpartyIban: payment.counterpartyAlias.iban,
       })
       .onConflictDoNothing({
         target: [budgetTransactions.userId, budgetTransactions.bunqTransactionId],
@@ -667,13 +661,10 @@ function batchTransactionValues(
     date: row.date,
     merchant: row.payment.counterpartyAlias.displayName || '',
     bunqTransactionId: String(row.payment.id),
-    bunqMcc: row.payment.counterpartyAlias.merchantCategoryCode,
-    bunqPaymentType: row.payment.type || null,
     sourceProvider: 'bunq',
     sourceAccountId: String(account.id),
     sourceAccountName: account.description || null,
     sourceAccountType: account.type,
-    counterpartyIban: row.payment.counterpartyAlias.iban,
   };
 }
 

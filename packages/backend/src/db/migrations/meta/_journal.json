@@ -288,6 +288,13 @@
       "when": 1791817533400,
       "tag": "0040_ledger_correctness",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792158713805,
+      "tag": "0041_account_deletions",
+      "breakpoints": true
     }
   ]
 }

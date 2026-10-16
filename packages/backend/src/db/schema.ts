@@ -196,6 +196,29 @@ export const authCodes = pgTable(
   }),
 );
 
+// ── Account deletions ───────────────────────────────────────────────────────
+
+// One row per deleted account, written in the transaction that deletes it. It keeps no personal
+// data: the former account id (no foreign key, the account is gone), when, the number of rows
+// removed per table and what happened to the account's stored documents, so an operator can
+// account for a deletion and remove documents the store refused to delete.
+export const accountDeletions = pgTable(
+  'account_deletions',
+  {
+    id: serial('id').primaryKey(),
+    deletedUserId: integer('deleted_user_id').notNull(),
+    deletedAt: timestamp('deleted_at').defaultNow().notNull(),
+    rowCounts: jsonb('row_counts').$type<Record<string, number>>().notNull(),
+    documentCount: integer('document_count').notNull(),
+    documentsDeleted: integer('documents_deleted'),
+    documentsFailedKeys: jsonb('documents_failed_keys').$type<string[]>(),
+    documentsCheckedAt: timestamp('documents_checked_at'),
+  },
+  (table) => ({
+    deletedAtIdx: index('account_deletions_deleted_at_idx').on(table.deletedAt),
+  }),
+);
+
 // ── Partner Links ────────────────────────────────────────────────────────────
 
 export const partnerLinks = pgTable(
@@ -995,6 +1018,8 @@ export const budgetTransactions = pgTable(
     sourceCurrency: currencyCodeEnum('source_currency'),
     merchant: text('merchant').notNull(),
     bunqTransactionId: text('bunq_transaction_id'),
+    // Legacy: bunq sync no longer writes bunq_mcc, bunq_payment_type or counterparty_iban, and
+    // nothing reads them. Rows synced before keep their values, and the data export includes them.
     bunqMcc: text('bunq_mcc'),
     bunqPaymentType: text('bunq_payment_type'),
     sourceProvider: text('source_provider'),
