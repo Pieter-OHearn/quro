@@ -109,6 +109,8 @@ export type DataTableCellProps = ComponentPropsWithoutRef<'td'> & {
   mobileLabel?: ReactNode;
   priority?: keyof typeof PRIORITY_CLASSES;
   numeric?: boolean;
+  /** A cell with a caption under its first line: gives the row 6px more room above and below on desktop. */
+  stacked?: boolean;
   contentClassName?: string;
 };
 
@@ -310,6 +312,7 @@ export function DataTableCell({
   mobileLabel,
   priority,
   numeric,
+  stacked = false,
   className,
   contentClassName,
   children,
@@ -332,6 +335,7 @@ export function DataTableCell({
         TABLE_VARIANT_CLASSES[cellConfig.tableVariant].cell,
         ALIGNMENT_CLASSES[cellConfig.align],
         PRIORITY_CLASSES[cellConfig.priority],
+        stacked && 'md:py-1.5',
         cellConfig.numeric && 'font-numeric',
         cellConfig.columnClassName,
         className,

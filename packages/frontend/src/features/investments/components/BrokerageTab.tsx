@@ -399,7 +399,7 @@ function HoldingRow({
   return (
     <>
       <DataTableRow interactive selected={isExpanded} onClick={() => onToggleExpanded(holding.id)}>
-        <DataTableCell columnKey="asset">
+        <DataTableCell columnKey="asset" stacked>
           <HoldingAssetCell holding={holding} txnCount={txnCount} />
         </DataTableCell>
         <DataTableCell columnKey="units">{formatShares(position.shares)}</DataTableCell>
@@ -466,7 +466,7 @@ function BrokerageTotalRow({
 }: Readonly<BrokerageTotalRowProps>) {
   return (
     <DataTableRow data-total>
-      <DataTableCell columnKey="asset">
+      <DataTableCell columnKey="asset" stacked>
         <div className="min-w-0">
           <p>Total portfolio</p>
           <p className="truncate text-caption font-normal text-fg-subtle">
@@ -690,7 +690,7 @@ function ClosedHoldingRow({
   return (
     <>
       <DataTableRow interactive selected={isExpanded} onClick={() => onToggleExpanded(holding.id)}>
-        <DataTableCell columnKey="asset">
+        <DataTableCell columnKey="asset" stacked>
           <HoldingAssetCell holding={holding} txnCount={txnCount} closed />
         </DataTableCell>
         <DataTableCell columnKey="sold" className="text-fg-muted">
