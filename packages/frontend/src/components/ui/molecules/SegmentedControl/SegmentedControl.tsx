@@ -1,4 +1,4 @@
-import { useRef, type ComponentPropsWithoutRef, type KeyboardEvent, type ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, KeyboardEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 // `pill`, `contained` and `soft` all render the joined segmented control: one bordered group,
@@ -150,7 +150,6 @@ export function SegmentedControl<T extends string | number>({
 }: SegmentedControlProps<T>) {
   const isTabs = variant === 'underline';
   const hasSelection = options.some((option) => option.value === value);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Tabs follow the arrow-key pattern: one tab is in the Tab order, the arrows move the selection
   // and focus together, and Home and End jump to the ends.
@@ -164,12 +163,11 @@ export function SegmentedControl<T extends string | number>({
     if (next === null || next === current) return;
     event.preventDefault();
     onChange(options[next].value);
-    wrapperRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
+    event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
   };
 
   return (
     <div
-      ref={wrapperRef}
       role={isTabs ? 'tablist' : 'group'}
       className={cn(WRAPPER_CLASSES[variant], className)}
       onKeyDown={isTabs ? handleKeyDown : undefined}

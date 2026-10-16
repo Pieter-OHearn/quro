@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AlertTriangle, ArrowDownUp, Pencil, PiggyBank, Plus } from 'lucide-react';
@@ -29,6 +29,7 @@ import { Pagination } from './molecules/Pagination';
 import { PanelHeader } from './molecules/PanelHeader';
 import { RowActions } from './molecules/RowActions';
 import { SegmentedControl } from './molecules/SegmentedControl';
+import { nextTabIndex } from './molecules/SegmentedControl/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
 import { ArchiveOrDeleteDialog } from './organisms/ArchiveOrDeleteDialog';
 import { ChartCard } from './organisms/ChartCard';
@@ -803,6 +804,72 @@ const smokeCases: readonly SmokeCase[] = [
     excludes: ['backdrop-blur', 'bg-gradient', 'scale-', 'from-surface-inverse'],
   },
   {
+    name: 'Modal that is closing is inert and plays the closing transition',
+    element: (
+      <Modal title="Edit account" onClose={noop} open={false}>
+        <div>Body</div>
+      </Modal>
+    ),
+    includes: ['inert=""', 'data-closing=""', 'overflow-clip'],
+  },
+  {
+    name: 'Modal that is open is not inert',
+    element: (
+      <Modal title="Edit account" onClose={noop}>
+        <div>Body</div>
+      </Modal>
+    ),
+    includes: ['aria-modal="true"'],
+    excludes: ['inert=""', 'data-closing'],
+  },
+  {
+    name: 'underline SegmentedControl links tabs to their panels with one tab in the Tab order',
+    element: (
+      <SegmentedControl
+        variant="underline"
+        tabsId="demo"
+        value="b"
+        onChange={noop}
+        options={[
+          { value: 'a', label: 'A' },
+          { value: 'b', label: 'B' },
+        ]}
+      />
+    ),
+    includes: [
+      'id="demo-tab-a"',
+      'aria-controls="demo-panel-a"',
+      'id="demo-tab-b"',
+      'aria-controls="demo-panel-b"',
+      'tabindex="-1"',
+    ],
+  },
+  {
+    name: 'DataTable offers details for columns the cards leave out and a phone sort control',
+    element: (
+      <DataTable
+        sort={{ columnKey: 'account', direction: 'asc' }}
+        onSortChange={noop}
+        columns={[
+          { key: 'account', header: 'Account', sortable: true },
+          { key: 'note', header: 'Note', priority: 'secondary', sortable: true },
+        ]}
+      >
+        <DataTableRow>
+          <DataTableCell columnKey="account">Checking</DataTableCell>
+          <DataTableCell columnKey="note">Joint</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: [
+      'max-md:group-data-details-open:flex',
+      'aria-expanded="false"',
+      'Show details',
+      '>Sort by</label>',
+      'Sorted ascending, sort descending',
+    ],
+  },
+  {
     name: 'ArchiveOrDeleteDialog orders cancel, archive and a filled delete',
     element: (
       <CurrencyContext.Provider value={smokeCurrency}>
@@ -1030,3 +1097,27 @@ for (const smokeCase of smokeCases) {
     }
   });
 }
+
+describe('nextTabIndex', () => {
+  const enabled = [false, false, false];
+
+  test('arrows move by one and wrap around the ends', () => {
+    expect(nextTabIndex('ArrowRight', 0, enabled)).toBe(1);
+    expect(nextTabIndex('ArrowRight', 2, enabled)).toBe(0);
+    expect(nextTabIndex('ArrowLeft', 0, enabled)).toBe(2);
+    expect(nextTabIndex('ArrowDown', 1, enabled)).toBe(2);
+    expect(nextTabIndex('ArrowUp', 1, enabled)).toBe(0);
+  });
+
+  test('Home and End go to the ends and disabled tabs are skipped', () => {
+    expect(nextTabIndex('Home', 2, enabled)).toBe(0);
+    expect(nextTabIndex('End', 0, enabled)).toBe(2);
+    expect(nextTabIndex('ArrowRight', 0, [false, true, false])).toBe(2);
+    expect(nextTabIndex('Home', 2, [true, false, false])).toBe(1);
+  });
+
+  test('other keys and a control with nothing enabled report no target', () => {
+    expect(nextTabIndex('Enter', 0, enabled)).toBeNull();
+    expect(nextTabIndex('ArrowRight', 0, [true, true])).toBeNull();
+  });
+});

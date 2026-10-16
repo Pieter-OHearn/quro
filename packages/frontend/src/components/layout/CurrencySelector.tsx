@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { useCurrency, CURRENCY_META, CURRENCY_CODES } from '@/lib/CurrencyContext';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
-import { Button } from '@/components/ui';
+import { Button, useFocusTrap } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 type CurrencyDropdownProps = {
+  id: string;
+  onClose: () => void;
   baseCurrency: CurrencyCode;
   onSelect: (code: CurrencyCode) => void;
   ratesUpdatedAt: string | null;
@@ -26,9 +28,32 @@ function formatRatesUpdatedAt(updatedAt: string | null): string {
   })}`;
 }
 
-function CurrencyDropdown({ baseCurrency, onSelect, ratesUpdatedAt }: CurrencyDropdownProps) {
+function CurrencyDropdown({
+  id,
+  onClose,
+  baseCurrency,
+  onSelect,
+  ratesUpdatedAt,
+}: CurrencyDropdownProps) {
+  // Focus starts on the current currency; Escape closes the list and returns focus to the button.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+  useFocusTrap({
+    containerRef: panelRef,
+    active: true,
+    onEscape: onClose,
+    initialFocusRef: selectedRef,
+  });
+
   return (
-    <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover">
+    <div
+      ref={panelRef}
+      id={id}
+      role="dialog"
+      aria-label="Base currency"
+      tabIndex={-1}
+      className="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover outline-none"
+    >
       <div className="border-b border-border-subtle px-3 py-2">
         <p className="text-label text-fg-muted">Base currency</p>
         <p className="mt-0.5 text-caption text-fg-subtle">All totals convert to this currency</p>
@@ -40,7 +65,9 @@ function CurrencyDropdown({ baseCurrency, onSelect, ratesUpdatedAt }: CurrencyDr
           return (
             <button
               key={code}
+              ref={isSelected ? selectedRef : undefined}
               type="button"
+              aria-pressed={isSelected}
               onClick={() => onSelect(code)}
               className={cn(
                 'flex h-8 max-sm:h-11 w-full items-center gap-2 px-3 text-cell transition-colors duration-fast focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring',
@@ -70,6 +97,7 @@ export function CurrencySelector() {
   const { baseCurrency, setBaseCurrency, ratesUpdatedAt } = useCurrency();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelId = useId();
   const meta = CURRENCY_META[baseCurrency];
 
   useEffect(() => {
@@ -87,6 +115,9 @@ export function CurrencySelector() {
         size="md"
         className="gap-2 max-sm:gap-1 max-sm:px-2"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        aria-haspopup="dialog"
+        aria-label={`Base currency ${baseCurrency}`}
         onClick={() => setOpen(!open)}
       >
         <span className="text-body leading-none">{meta.flag}</span>
@@ -102,6 +133,8 @@ export function CurrencySelector() {
       </Button>
       {open && (
         <CurrencyDropdown
+          id={panelId}
+          onClose={() => setOpen(false)}
           baseCurrency={baseCurrency}
           ratesUpdatedAt={ratesUpdatedAt}
           onSelect={(code) => {

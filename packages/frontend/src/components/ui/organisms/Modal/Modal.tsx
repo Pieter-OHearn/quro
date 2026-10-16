@@ -74,7 +74,7 @@ const PANEL_CLASS_NAME = cn(
 );
 // Footer actions sit at the end on desktop and stack full width, 44px high, on phones.
 const FOOTER_CLASS_NAME =
-  'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:flex-col max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:w-full max-sm:*:flex-none';
+  'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:sticky max-sm:bottom-0 max-sm:flex-col max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:w-full max-sm:*:flex-none';
 
 export function ModalHeader({
   title,
