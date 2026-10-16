@@ -52,7 +52,7 @@ function CurrencyDropdown({
       role="dialog"
       aria-label="Base currency"
       tabIndex={-1}
-      className="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover outline-none"
+      className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover outline-none max-sm:fixed max-sm:inset-x-4 max-sm:top-14 max-sm:w-auto"
     >
       <div className="border-b border-border-subtle px-3 py-2">
         <p className="text-label text-fg-muted">Base currency</p>

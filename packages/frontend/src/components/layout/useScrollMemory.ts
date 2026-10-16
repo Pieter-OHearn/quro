@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 const RESTORE_POLL_MS = 100;
 const RESTORE_GIVE_UP_MS = 2000;
@@ -14,38 +14,29 @@ const USER_INPUT_EVENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as c
  */
 export function useScrollMemory(containerRef: RefObject<HTMLElement | null>, key: string): void {
   const positions = useRef(new Map<string, number>());
-  const keyRef = useRef(key);
-  const tracking = useRef(false);
-  keyRef.current = key;
+  const currentKey = useRef(key);
 
-  useEffect(() => {
+  // The new page renders in the commit after this render, so the container still holds the old
+  // page's scroll position here, and reading it needs no scroll listener.
+  if (currentKey.current !== key) {
     const container = containerRef.current;
-    if (!container) return undefined;
-    const handleScroll = () => {
-      if (tracking.current) positions.current.set(keyRef.current, container.scrollTop);
-    };
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [containerRef]);
+    if (container) positions.current.set(currentKey.current, container.scrollTop);
+    currentKey.current = key;
+  }
 
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
     const target = positions.current.get(key) ?? 0;
-    tracking.current = false;
     container.scrollTop = target;
     const reached = () => Math.abs(container.scrollTop - target) <= TOLERANCE_PX;
-    if (reached()) {
-      tracking.current = true;
-      return undefined;
-    }
+    if (reached()) return undefined;
 
     // The page is not tall enough yet: keep trying while it loads.
     const stop = () => {
       window.clearInterval(poll);
       window.clearTimeout(giveUp);
       for (const type of USER_INPUT_EVENTS) container.removeEventListener(type, stop);
-      tracking.current = true;
     };
     const poll = window.setInterval(() => {
       container.scrollTop = target;
@@ -55,10 +46,6 @@ export function useScrollMemory(containerRef: RefObject<HTMLElement | null>, key
     for (const type of USER_INPUT_EVENTS) {
       container.addEventListener(type, stop, { passive: true });
     }
-    return () => {
-      window.clearInterval(poll);
-      window.clearTimeout(giveUp);
-      for (const type of USER_INPUT_EVENTS) container.removeEventListener(type, stop);
-    };
+    return stop;
   }, [containerRef, key]);
 }

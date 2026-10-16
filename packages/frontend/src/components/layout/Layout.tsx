@@ -179,7 +179,7 @@ type AppHeaderProps = {
 };
 
 // 48px on desktop; 56px on phones, where the logo takes the place of the menu button because the
-// tab bar opens the drawer.
+// tab bar opens the drawer. Below 360px the logo is dropped so the page title keeps its room.
 function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHeaderProps) {
   return (
     <header className="flex h-14 sm:h-12 flex-shrink-0 items-center justify-between gap-2 border-b border-border-default bg-surface-sunken px-4 sm:px-6">
@@ -194,7 +194,7 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(!mobileOpen)}
         />
-        <QuroLogo size={20} className="flex-shrink-0 sm:hidden" />
+        <QuroLogo size={20} className="flex-shrink-0 sm:hidden max-[359px]:hidden" />
         <div className="flex min-w-0 items-baseline sm:gap-3">
           <h1 className="truncate text-title-page text-fg">{currentPageLabel}</h1>
           <p className="hidden truncate text-caption text-fg-subtle sm:block">{today}</p>

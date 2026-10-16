@@ -820,7 +820,7 @@ const smokeCases: readonly SmokeCase[] = [
       </Modal>
     ),
     includes: ['aria-modal="true"'],
-    excludes: ['inert=""', 'data-closing'],
+    excludes: ['inert=""', 'data-closing=""'],
   },
   {
     name: 'underline SegmentedControl links tabs to their panels with one tab in the Tab order',

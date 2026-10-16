@@ -85,9 +85,17 @@ export function useFocusTrap({
     // A panel may still be entering from beyond the viewport; scrolling to it would shift its
     // overlay and leave a gap.
     const initial = initialFocusRef?.current ?? focusableElements(container)[0] ?? container;
-    if (!container.contains(document.activeElement) || initialFocusRef?.current) {
-      initial.focus({ preventScroll: true });
-    }
+    const focusInitial = () => {
+      if (!container.contains(document.activeElement) || initialFocusRef?.current) {
+        initial.focus({ preventScroll: true });
+      }
+    };
+    focusInitial();
+    // A panel that is still `visibility: hidden` when it opens (a drawer fading in) cannot take
+    // focus yet, so try once more on the next frame.
+    const retry = window.requestAnimationFrame(() => {
+      if (!container.contains(document.activeElement)) initial.focus({ preventScroll: true });
+    });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (openTraps[openTraps.length - 1] !== id) return;
@@ -101,6 +109,7 @@ export function useFocusTrap({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
+      window.cancelAnimationFrame(retry);
       document.removeEventListener('keydown', handleKeyDown);
       const index = openTraps.indexOf(id);
       if (index !== -1) openTraps.splice(index, 1);
