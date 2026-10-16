@@ -118,6 +118,7 @@ function useSalaryPageState() {
     createPayslip,
     updatePayslip,
     deletePayslip,
+    payslips,
     isLoading,
     queryFailures,
     showAdd,
@@ -186,7 +187,7 @@ function SalaryPageContent({
       <SalaryStatsCards cards={state.statCards} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PayBreakdownPanel selected={state.selected} />
+        <PayBreakdownPanel selected={state.selected} payslips={state.payslips} />
         <SalaryHistoryChart
           data={state.salaryChartData}
           growthPct={state.salaryGrowthPct}
