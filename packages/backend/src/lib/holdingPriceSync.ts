@@ -10,6 +10,7 @@ import { holdingPriceHistory, holdings } from '../db/schema';
 import { getMarketDataClient } from './marketDataClient';
 import { currentWorkSignal } from './workDeadline';
 import { isCancellation, rethrowCancellation, toYahooSymbol } from './yahooFinanceClient';
+import { log, errorFields } from './logger';
 
 const QUOTE_BATCH_SIZE = 50;
 
@@ -227,7 +228,7 @@ async function applyQuoteToHolding(
       ticker,
       'Price updated, but failed to persist history snapshot',
     );
-    console.warn('[Investments] Failed to upsert holding price snapshot', error);
+    log.warn('investments.price_snapshot_failed', errorFields(error));
   }
 
   return {

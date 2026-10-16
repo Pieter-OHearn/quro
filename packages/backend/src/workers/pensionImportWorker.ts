@@ -11,15 +11,14 @@ import { evaluateCapability } from '../lib/capabilityRegistry';
 import { closeMaintenanceGate, runUnlessMaintenance } from '../lib/maintenanceMode';
 import { runPensionImportWorkerTick } from '../routes/pension-imports';
 import { queryClient } from '../db/client';
+import { log, errorFields } from '../lib/logger';
 
 // The worker has nothing to do without a parser; stop with the settings exit code instead of
 // polling a service that cannot be reached. It reads documents from the same store as the server
 // (QRO_DOCUMENT_STORAGE), so with the filesystem driver it mounts the same directory.
 const configured = evaluateCapability('pensionImport');
 if (!configured.enabled) {
-  console.error(
-    '[pension-import-worker] Statement import is not configured: set PENSION_PARSER_URL.',
-  );
+  log.error('pension_worker.not_configured', { setting: 'PENSION_PARSER_URL' });
   process.exit(2);
 }
 
@@ -47,7 +46,7 @@ async function sleep(ms: number): Promise<void> {
 function maybeLogIdle(): void {
   const now = Date.now();
   if (now - lastLogAt < DEFAULT_IDLE_LOG_INTERVAL_MS) return;
-  console.log('[PensionImportWorker] waiting for queued imports');
+  log.info('pension_worker.idle');
   lastLogAt = now;
 }
 
@@ -73,7 +72,7 @@ async function runHeartbeatLoop(): Promise<void> {
     try {
       await writeWorkerHeartbeat();
     } catch (error) {
-      console.error('[PensionImportWorker] heartbeat update failed', error);
+      log.error('pension_worker.heartbeat_failed', errorFields(error));
     }
 
     if (shuttingDown) break;
@@ -90,12 +89,12 @@ async function runHeartbeatLoop(): Promise<void> {
       parserError: runtimeState.parserError,
     });
   } catch (error) {
-    console.error('[PensionImportWorker] failed to persist stopping heartbeat', error);
+    log.error('pension_worker.stopping_heartbeat_failed', errorFields(error));
   }
 }
 
 async function runProcessingLoop(): Promise<void> {
-  console.log('[PensionImportWorker] started', {
+  log.info('pension_worker.started', {
     pollIntervalMs: POLL_INTERVAL_MS,
     heartbeatIntervalMs: WORKER_HEARTBEAT_INTERVAL_MS,
   });
@@ -105,9 +104,9 @@ async function runProcessingLoop(): Promise<void> {
     try {
       // A backup or restore holds maintenance mode: wait for the next tick instead.
       const outcome = await runUnlessMaintenance(runPensionImportWorkerTick);
-      if (!outcome.ran) console.log('[PensionImportWorker] paused while a backup or restore runs');
+      if (!outcome.ran) log.info('pension_worker.paused_for_maintenance');
     } catch (error) {
-      console.error('[PensionImportWorker] tick failed', error);
+      log.error('pension_worker.tick_failed', errorFields(error));
     } finally {
       runtimeState.status = shuttingDown ? 'stopping' : 'idle';
     }
@@ -117,7 +116,7 @@ async function runProcessingLoop(): Promise<void> {
     await sleep(POLL_INTERVAL_MS);
   }
 
-  console.log('[PensionImportWorker] stopped');
+  log.info('pension_worker.stopped');
 }
 
 process.on('SIGINT', () => {

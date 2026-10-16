@@ -35,6 +35,7 @@ import {
   MCC_DEFAULTS,
   UNCATEGORISED_NAME,
 } from './bunqCategoryRules';
+import { log, errorFields } from '../lib/logger';
 
 const MCC_SOURCE = 'mcc';
 
@@ -757,7 +758,7 @@ export async function importBudgetPaymentBatch(
     try {
       await persistBudgetBatch(userId, batch, account);
     } catch (error) {
-      console.warn('[bunq-budget-sync] Batch failed, retrying payments individually', error);
+      log.warn('bunq.budget_batch_failed', { payments: batch.length, ...errorFields(error) });
       issues.push(
         ...(await importBudgetBatchIndividually(userId, batch, account, ownIbans, bunqUserId)),
       );

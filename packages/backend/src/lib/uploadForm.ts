@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { MAX_PDF_SIZE_BYTES, PDF_TOO_LARGE_ERROR } from './pdfDocuments';
+import { log } from './logger';
 
 export const INVALID_UPLOAD_ERROR = 'Invalid upload';
 
@@ -29,7 +30,7 @@ export async function readUploadForm(c: Context): Promise<UploadFormResult> {
   try {
     return { ok: true, form: await c.req.formData() };
   } catch {
-    console.warn('[Warn] refused an upload that is not a readable multipart form');
+    log.warn('upload.refused_unreadable_form');
     return {
       ok: false,
       response: c.json({ error: INVALID_UPLOAD_ERROR }, HTTP_STATUS.BAD_REQUEST),

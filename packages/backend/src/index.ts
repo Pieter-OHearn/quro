@@ -8,6 +8,7 @@ import { closeMaintenanceGate } from './lib/maintenanceMode';
 import { MAX_REQUEST_BODY_BYTES } from './lib/uploadForm';
 import { checkConfiguredCookieTransport } from './middleware/cookieTransport';
 import { startSchedulers } from './schedulers';
+import { log } from './lib/logger';
 
 const config = getConfig();
 const DATABASE_CLOSE_TIMEOUT_SECONDS = 5;
@@ -36,6 +37,6 @@ installGracefulShutdown({
     await closeMaintenanceGate();
     await queryClient.end({ timeout: DATABASE_CLOSE_TIMEOUT_SECONDS });
   },
-  log: (line) => console.log(line),
+  log: (line) => log.info('server.shutdown', { step: line }),
   exit: (code) => process.exit(code),
 });

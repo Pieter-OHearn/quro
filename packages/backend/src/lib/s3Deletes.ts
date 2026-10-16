@@ -1,4 +1,5 @@
 import type { ObjectDeletionResult } from './documentStore';
+import { log, errorFields } from './logger';
 
 const S3_DELETE_BATCH_SIZE = 1000;
 
@@ -16,7 +17,7 @@ export async function deleteObjectsInBatches(
       deletedKeys.push(...batch.filter((key) => !failures.has(key)));
       failedKeys.push(...batch.filter((key) => failures.has(key)));
     } catch (error) {
-      console.error('Failed to delete S3 object batch; retaining keys for retry', error);
+      log.error('s3.delete_batch_failed', { keys: batch.length, ...errorFields(error) });
       failedKeys.push(...batch);
     }
   }
