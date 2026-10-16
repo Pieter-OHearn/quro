@@ -55,7 +55,7 @@ export const buildDashboardCards = (
     path: '/pension',
   },
   {
-    label: 'Monthly salary',
+    label: 'Salary',
     value: monthlySalaryValue,
     change: {
       amount: salaryTrendChange,

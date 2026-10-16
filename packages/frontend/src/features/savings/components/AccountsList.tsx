@@ -58,37 +58,77 @@ type AccountRowProps = Pick<
 
 function buildAccountColumns(baseCurrency: string): readonly DataTableColumn[] {
   return [
-    { key: 'account', header: 'Account', width: '29%' },
-    { key: 'bank', header: 'Bank', priority: 'secondary', width: '17%' },
-    { key: 'rate', header: 'Rate (APY)', numeric: true, priority: 'secondary', width: '9%' },
+    { key: 'account', header: 'Account', phoneCard: 'title', width: '29%' },
+    {
+      key: 'bank',
+      header: 'Bank',
+      priority: 'secondary',
+      phoneCard: 'hiddenUntilDetails',
+      width: '17%',
+    },
+    {
+      key: 'rate',
+      header: 'Rate (APY)',
+      numeric: true,
+      priority: 'secondary',
+      phoneCard: 'metric',
+      width: '9%',
+    },
     {
       key: 'interest',
       header: 'Interest / month',
       numeric: true,
       priority: 'secondary',
+      phoneCard: 'metric',
       width: '12%',
     },
-    { key: 'share', header: 'Share', priority: 'tertiary', width: '7%' },
-    { key: 'balance', header: 'Balance', numeric: true, width: '13%' },
-    { key: 'value', header: `Value (${baseCurrency})`, numeric: true, width: '13%' },
+    {
+      key: 'share',
+      header: 'Share',
+      priority: 'tertiary',
+      phoneCard: 'hiddenUntilDetails',
+      width: '7%',
+    },
+    { key: 'balance', header: 'Balance', numeric: true, phoneCard: 'headline', width: '13%' },
+    {
+      key: 'value',
+      header: `Value (${baseCurrency})`,
+      numeric: true,
+      phoneCard: 'hiddenUntilDetails',
+      width: '13%',
+    },
     { key: 'actions', header: '', priority: 'actions', width: 72 },
   ];
 }
 
 const COLUMN_COUNT = 8;
 
-function AccountNameCell({ acc, foreign }: Readonly<{ acc: SavingsAccount; foreign: boolean }>) {
+function AccountNameCell({
+  acc,
+  foreign,
+  txnCount,
+}: Readonly<{ acc: SavingsAccount; foreign: boolean; txnCount: number }>) {
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="shrink-0 leading-none" aria-hidden>
-        {acc.emoji}
-      </span>
-      <span className="min-w-0 truncate font-medium text-fg">{acc.name}</span>
-      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-        {acc.bunqAccountId && <Badge tone="info">Bunq</Badge>}
-        <JointBadge isJoint={acc.isJoint} ownerUserId={acc.userId} />
-        {foreign && <Badge>{acc.currency}</Badge>}
-      </span>
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:flex-nowrap">
+        <span className="flex min-w-0 items-center gap-2 max-md:basis-full">
+          <span className="shrink-0 leading-none" aria-hidden>
+            {acc.emoji}
+          </span>
+          <span className="min-w-0 font-medium text-fg max-md:break-words md:truncate">
+            {acc.name}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+          {acc.bunqAccountId && <Badge tone="info">Bunq</Badge>}
+          <JointBadge isJoint={acc.isJoint} ownerUserId={acc.userId} />
+          {foreign && <Badge>{acc.currency}</Badge>}
+        </span>
+      </div>
+      {/* The bank column is a detail on a phone, so the card names the type and the count here. */}
+      <p className="mt-0.5 text-caption font-normal text-fg-subtle md:hidden">
+        {displayLabel(acc.accountType)} · {txnCount} transactions
+      </p>
     </div>
   );
 }
@@ -111,8 +151,9 @@ function AccountRowActions({
   onToggleExpand,
 }: Readonly<{ isExpanded: boolean; onEdit: () => void; onToggleExpand: () => void }>) {
   const toggleLabel = isExpanded ? 'Hide transactions' : 'Show transactions';
+  // The phone card's details button opens the transactions too, so the chevron is left out there.
   return (
-    <RowActions>
+    <RowActions className="max-md:justify-start">
       <IconButton
         onClick={stopRowClick(onEdit)}
         icon={Edit3}
@@ -129,8 +170,37 @@ function AccountRowActions({
         aria-expanded={isExpanded}
         size="sm"
         variant="subtle"
+        className="max-md:hidden"
       />
     </RowActions>
+  );
+}
+
+function AccountTransactionsRow({
+  acc,
+  transactions,
+  onAddTxn,
+  onEditTxn,
+  onDeleteTxn,
+}: Readonly<
+  Pick<AccountRowProps, 'acc' | 'transactions' | 'onAddTxn' | 'onEditTxn' | 'onDeleteTxn'>
+>) {
+  return (
+    <DataTableRow mobileCard={false} className="md:hover:bg-transparent">
+      <DataTableCell
+        colSpan={COLUMN_COUNT}
+        className="p-0 max-md:block max-md:py-0"
+        contentClassName="w-full"
+      >
+        <TxnHistory
+          account={acc}
+          transactions={transactions}
+          onAdd={onAddTxn}
+          onEdit={onEditTxn}
+          onDelete={onDeleteTxn}
+        />
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -159,12 +229,26 @@ function AccountRow({
 
   return (
     <>
-      <DataTableRow interactive selected={isExpanded} onClick={onToggleExpand}>
+      <DataTableRow
+        interactive
+        selected={isExpanded}
+        onClick={onToggleExpand}
+        detailsOpen={isExpanded}
+        onDetailsOpenChange={onToggleExpand}
+        detailsLabel={acc.name}
+      >
         <DataTableCell columnKey="account">
-          <AccountNameCell acc={acc} foreign={foreign} />
+          <AccountNameCell acc={acc} foreign={foreign} txnCount={txnCount} />
         </DataTableCell>
-        <DataTableCell columnKey="bank" contentClassName="truncate text-fg-muted">
-          {acc.bank} · {displayLabel(acc.accountType)} · {txnCount} transactions
+        <DataTableCell
+          columnKey="bank"
+          contentClassName="text-fg-muted max-md:break-words md:truncate"
+        >
+          {acc.bank}
+          <span className="max-md:hidden">
+            {' '}
+            · {displayLabel(acc.accountType)} · {txnCount} transactions
+          </span>
         </DataTableCell>
         <DataTableCell columnKey="rate">{acc.interestRate}%</DataTableCell>
         <DataTableCell columnKey="interest">
@@ -186,21 +270,13 @@ function AccountRow({
         </DataTableCell>
       </DataTableRow>
       {isExpanded && (
-        <DataTableRow mobileCard={false} className="md:hover:bg-transparent">
-          <DataTableCell
-            colSpan={COLUMN_COUNT}
-            className="p-0 max-md:block max-md:py-0"
-            contentClassName="w-full"
-          >
-            <TxnHistory
-              account={acc}
-              transactions={transactions}
-              onAdd={onAddTxn}
-              onEdit={onEditTxn}
-              onDelete={onDeleteTxn}
-            />
-          </DataTableCell>
-        </DataTableRow>
+        <AccountTransactionsRow
+          acc={acc}
+          transactions={transactions}
+          onAddTxn={onAddTxn}
+          onEditTxn={onEditTxn}
+          onDeleteTxn={onDeleteTxn}
+        />
       )}
     </>
   );
@@ -212,14 +288,18 @@ function AccountsTotalRow({
   fmtBase,
 }: Readonly<{ totalInBase: number; totalInterest: number; fmtBase: SavingsFormatFn }>) {
   return (
-    <DataTableRow data-total>
+    <DataTableRow data-total cardDetails={false}>
       <DataTableCell columnKey="account">Total (your share)</DataTableCell>
-      <DataTableCell columnKey="bank" />
-      <DataTableCell columnKey="rate" />
+      <DataTableCell columnKey="bank" className="max-md:hidden" />
+      <DataTableCell columnKey="rate" className="max-md:hidden" />
       <DataTableCell columnKey="interest">{fmtBase(totalInterest, undefined, true)}</DataTableCell>
-      <DataTableCell columnKey="share" />
-      <DataTableCell columnKey="balance" className="max-md:hidden" />
-      <DataTableCell columnKey="value">{fmtBase(totalInBase)}</DataTableCell>
+      <DataTableCell columnKey="share" className="max-md:hidden" />
+      <DataTableCell columnKey="balance">
+        <span className="md:hidden">{fmtBase(totalInBase)}</span>
+      </DataTableCell>
+      <DataTableCell columnKey="value" className="max-md:hidden">
+        {fmtBase(totalInBase)}
+      </DataTableCell>
       <DataTableCell columnKey="actions" className="max-md:hidden" />
     </DataTableRow>
   );
@@ -246,7 +326,7 @@ export function AccountsList({
   return (
     <DataTable
       title="Savings accounts"
-      subtitle={`${accounts.length} accounts · click a row to view and record transactions`}
+      subtitle={`${accounts.length} accounts · open an account to view and record transactions`}
       action={
         <Button
           onClick={onAddAccount}

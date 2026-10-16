@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file. The format 
 - The Plan page shows the runway figure before the employment and spending class cards.
 - Stored values that were saved in Title Case (savings account types, pension types, property types, asset allocation names, the generic rule set) are shown in sentence case. The stored values and the API are unchanged.
 - The Brokerage value figure and the other stat cards shrink to fit their card instead of running out of it on a narrow phone.
+- On a phone, savings accounts and closed holdings are cards in the same layout (balance as the key figure, rate and interest as metrics, the bank, share and value under **Show details**), and a property card keeps its value and equity up front with the mortgage, rent and yield under **Show details**. Desktop tables are unchanged.
+- On a phone, Savings shows its total across the full width with the average rate and monthly interest side by side, and the dashboard puts net worth before the getting started list, which keeps the description of the next step only. The stat cards use the shorter labels Salary, Dividends and Property equity, and a change under a figure wraps instead of running past the card.
+- Below 360px the currency button drops its flag and chevron so the page title fits, and a transaction row puts its Edit and Delete buttons on a line of their own so the label stays readable.
 
 ### Added
 

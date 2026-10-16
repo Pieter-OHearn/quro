@@ -27,6 +27,16 @@ describe('GettingStartedCard', () => {
     expect(markup.match(/aria-label="To do"/g)).toHaveLength(1);
   });
 
+  it('keeps only the next step description on a phone', () => {
+    const markup = render(false, false);
+    const shown = (text: string) => markup.includes(`text-caption text-fg-subtle">${text}`);
+    const hidden = (text: string) => markup.includes(`max-sm:hidden">${text}`);
+    expect(hidden('Totals and charts convert')).toBe(true);
+    expect(hidden('Your data stays on this server')).toBe(true);
+    expect(shown('A savings account is the quickest start')).toBe(true);
+    expect(hidden('A deposit or a budget entry')).toBe(true);
+  });
+
   it('disappears once there is an account and a transaction', () => {
     expect(render(true, true)).toBe('');
   });

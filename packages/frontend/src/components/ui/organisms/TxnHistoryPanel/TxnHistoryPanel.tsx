@@ -385,7 +385,8 @@ const TXN_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 
 /**
  * One transaction on one 28px line on desktop: date, type icon, label, amount and actions.
- * Below 640px the row is 48px with the date under the label and the actions always visible.
+ * Below 640px the row is 48px with the date under the label and the actions always visible;
+ * below 360px the actions wrap to a line of their own so the label keeps its room.
  * The caller formats `amount` (sign and colour); the row right-aligns it in tabular figures.
  */
 export function TxnRow({
@@ -408,7 +409,7 @@ export function TxnRow({
   return (
     <div
       className={cn(
-        'group flex min-h-7 items-center gap-2 px-3 text-cell transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4',
+        'group flex min-h-7 items-center gap-2 px-3 text-cell transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4 max-[359px]:flex-wrap',
         className,
       )}
     >
@@ -418,7 +419,7 @@ export function TxnRow({
       >
         <Icon size={iconSize} className={iconColor} />
       </span>
-      <div className="flex min-w-0 flex-1 items-center gap-3 max-sm:flex-col max-sm:items-start max-sm:gap-0">
+      <div className="flex min-w-0 flex-1 items-center gap-3 max-sm:flex-col max-sm:items-start max-sm:gap-0 max-[359px]:min-w-32">
         <p
           className={cn(
             'w-24 shrink-0 truncate text-caption text-fg-subtle font-numeric max-sm:order-last max-sm:w-auto max-sm:max-w-full',
@@ -439,7 +440,7 @@ export function TxnRow({
       <div className="shrink-0 text-right font-numeric">{amount}</div>
       <RowActions
         className={cn(
-          'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100',
+          'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100 max-[359px]:basis-full max-[359px]:justify-end',
           actionsClassName,
         )}
       >

@@ -69,6 +69,9 @@ function StepMarker({ done }: Readonly<{ done: boolean | undefined }>) {
 /** First-run guidance, shown until the household has an account and a transaction. */
 export function GettingStartedCard({ progress }: Readonly<{ progress: SetupProgress }>) {
   if (progress.hasAccount && progress.hasTransaction) return null;
+  const steps = buildSteps(progress);
+  // On a phone only the next step to do keeps its description, so the list stays short.
+  const nextKey = steps.find((step) => step.done === false)?.key;
   return (
     <Card padding="none" aria-labelledby="getting-started-title">
       <PanelHeader
@@ -76,13 +79,20 @@ export function GettingStartedCard({ progress }: Readonly<{ progress: SetupProgr
         subtitle="Four steps to a dashboard with your own figures."
       />
       <ol className="divide-y divide-border-subtle">
-        {buildSteps(progress).map((step) => (
+        {steps.map((step) => (
           <li key={step.key} className="flex items-start gap-3 px-4 py-3">
             <StepMarker done={step.done} />
             <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-cell font-medium text-fg">{step.title}</p>
-                <p className="text-caption text-fg-subtle">{step.description}</p>
+                <p
+                  className={cn(
+                    'text-caption text-fg-subtle',
+                    step.key !== nextKey && 'max-sm:hidden',
+                  )}
+                >
+                  {step.description}
+                </p>
               </div>
               <Link
                 to={step.to}

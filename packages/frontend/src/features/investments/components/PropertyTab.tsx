@@ -1,6 +1,6 @@
 import { displayLabel } from '@/lib/displayLabels';
 import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { Link } from 'react-router';
 import { Badge, Button, Card, Change, EmptyState, IconButton, RowActions } from '@/components/ui';
@@ -305,23 +305,19 @@ function PropertyCardHeader({
 }: PropertyCardHeaderProps) {
   const toggleLabel = isExpanded ? 'Collapse' : 'View transactions';
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3">
       <div className="flex min-w-0 items-start gap-2">
         <span className="shrink-0 text-title-section leading-5" aria-hidden>
           {property.emoji}
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-title-section text-fg">{property.address}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <JointBadge isJoint={property.isJoint} ownerUserId={property.userId} size="xs" />
-            <Badge size="xs">{displayLabel(property.propertyType)}</Badge>
-            <Badge size="xs">{property.currency}</Badge>
-            {!linkedMortgage && <Badge size="xs">Unencumbered</Badge>}
-          </div>
-          <p className="mt-1 text-caption text-fg-subtle">{txnCount} transactions</p>
-        </div>
+        <p
+          title={property.address}
+          className="line-clamp-2 min-w-0 break-words text-title-section text-fg sm:line-clamp-1"
+        >
+          {property.address}
+        </p>
       </div>
-      <RowActions className="shrink-0">
+      <RowActions className="shrink-0 sm:row-span-2">
         <IconButton
           onClick={() => onUpdateProperty(property)}
           icon={Edit3}
@@ -340,7 +336,41 @@ function PropertyCardHeader({
           variant="subtle"
         />
       </RowActions>
+      <div className="col-span-2 mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 pl-7 sm:col-span-1 [&_*]:whitespace-nowrap">
+        <JointBadge isJoint={property.isJoint} ownerUserId={property.userId} size="xs" />
+        <Badge size="xs">{displayLabel(property.propertyType)}</Badge>
+        <Badge size="xs">{property.currency}</Badge>
+        {!linkedMortgage && <Badge size="xs">Unencumbered</Badge>}
+        <span className="ml-1 text-caption text-fg-subtle">{txnCount} transactions</span>
+      </div>
     </div>
+  );
+}
+
+/** The phone card keeps the value and equity up front; this button opens the rest. */
+function PropertyDetailsToggle({
+  open,
+  controlsId,
+  label,
+  onToggle,
+}: Readonly<{ open: boolean; controlsId: string; label: string; onToggle: () => void }>) {
+  const text = open ? 'Hide details' : 'Show details';
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={controlsId}
+      aria-label={`${text} for ${label}`}
+      onClick={onToggle}
+      className="inline-flex min-h-11 items-center gap-1 text-label text-brand-fg underline-offset-2 hover:underline md:hidden focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+    >
+      {text}
+      <ChevronDown
+        size={14}
+        aria-hidden
+        className={cn('transition-transform duration-fast', open && 'rotate-180')}
+      />
+    </button>
   );
 }
 
@@ -350,6 +380,8 @@ function PropertyCard(props: PropertyCardProps) {
   const linkedMortgage =
     property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
   const stats = computePropertyCardStats(property, propertyTxns, mortgageById);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const detailsId = useId();
 
   return (
     <Card padding="none" className="overflow-hidden">
@@ -368,15 +400,25 @@ function PropertyCard(props: PropertyCardProps) {
           stats={stats}
           fmtNative={fmtNative}
         />
-        <MortgageLinkRow
-          property={property}
-          linkedMortgage={linkedMortgage}
-          fmtNative={fmtNative}
+        <PropertyDetailsToggle
+          open={detailsOpen}
+          controlsId={detailsId}
+          label={property.address}
+          onToggle={() => setDetailsOpen(!detailsOpen)}
         />
-        {stats.hasPL && <PropertyPLGrid property={property} stats={stats} fmtNative={fmtNative} />}
-        {stats.grossYield > 0 && !stats.hasPL && (
-          <PropertyYieldBadges grossYield={stats.grossYield} netYield={stats.netYield} />
-        )}
+        <div id={detailsId} className={cn('space-y-4', !detailsOpen && 'max-md:hidden')}>
+          <MortgageLinkRow
+            property={property}
+            linkedMortgage={linkedMortgage}
+            fmtNative={fmtNative}
+          />
+          {stats.hasPL && (
+            <PropertyPLGrid property={property} stats={stats} fmtNative={fmtNative} />
+          )}
+          {stats.grossYield > 0 && !stats.hasPL && (
+            <PropertyYieldBadges grossYield={stats.grossYield} netYield={stats.netYield} />
+          )}
+        </div>
       </div>
       {isExpanded && (
         <PropertyTxnHistory
@@ -445,8 +487,8 @@ export function PropertyTab({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-default px-3 py-2 max-sm:px-4">
         <p className="text-caption text-fg-subtle">
-          {properties.length} {properties.length === 1 ? 'property' : 'properties'} · click a card
-          to view transactions
+          {properties.length} {properties.length === 1 ? 'property' : 'properties'} · use the arrow
+          on a card to view transactions
         </p>
         <Button
           variant="primary"
