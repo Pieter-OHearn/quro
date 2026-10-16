@@ -53,3 +53,33 @@ test('computes each selected sort value once and leaves unknown columns in sourc
   expect(result).toEqual(rows);
   expect(result).not.toBe(rows);
 });
+
+test('sorts a 10,000-row fixture in either direction with newest-first ties, without mutating it', () => {
+  const large: Row[] = Array.from({ length: 10_000 }, (_, index) => ({
+    id: index + 1,
+    date: `2026-${String((index % 12) + 1).padStart(2, '0')}-01`,
+    name: `Row ${index % 97}`,
+    amount: ((index * 7919) % 20_001) - 10_000,
+  }));
+  const started = performance.now();
+  const ascending = sortRows(
+    large,
+    columns,
+    { columnKey: 'amount', direction: 'asc' },
+    newestFirst,
+  );
+  const descending = sortRows(
+    large,
+    columns,
+    { columnKey: 'amount', direction: 'desc' },
+    newestFirst,
+  );
+  const elapsed = performance.now() - started;
+
+  expect(ascending).toHaveLength(10_000);
+  expect(ascending[0].amount).toBe(-10_000);
+  expect(descending[0].amount).toBe(10_000);
+  expect(ascending.every((row, i) => i === 0 || ascending[i - 1].amount <= row.amount)).toBe(true);
+  expect(large[0].id).toBe(1);
+  expect(elapsed).toBeLessThan(1_000);
+});

@@ -1,3 +1,4 @@
+import { usePagination } from '@/hooks/usePagination';
 import { useSortedRows } from '@/hooks/useSortedRows';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Archive, ChevronDown, ChevronUp, Edit3, Plus, RefreshCcw } from 'lucide-react';
@@ -17,6 +18,7 @@ import {
   DataTableCell,
   DataTableRow,
   IconButton,
+  Pagination,
   RowActions,
   type DataTableColumn,
   type DataTableSortState,
@@ -24,6 +26,7 @@ import {
 import { stopRowClick } from '@/components/finance/stopRowClick';
 import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import { formatShares, groupHoldingTransactions, type Position } from '../utils/position';
+import { HoldingPositionPanel, getEffectivePrice } from './HoldingPositionPanel';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
 type FormatBaseFn = (value: number, currency?: string, compact?: boolean) => string;
@@ -81,10 +84,8 @@ type ClosedHoldingMetrics = {
 const ACTIVE_COLUMN_COUNT = 7;
 const CLOSED_COLUMN_COUNT = 5;
 
-function getEffectivePrice(holding: Holding): number {
-  const manual = holding.manualPrice != null ? Number(holding.manualPrice) : null;
-  return manual != null && Number.isFinite(manual) ? manual : holding.currentPrice;
-}
+// Paging keeps an unusually long holdings list from rendering thousands of rows at once.
+const HOLDINGS_PAGE_SIZE = 25;
 
 function formatSyncDate(priceUpdatedAt: string | null | undefined): string | null {
   if (!priceUpdatedAt) return null;
@@ -301,6 +302,7 @@ function HoldingHistoryRow({
   holdingTxns,
   position,
   colSpan,
+  onEditHolding,
   onAddTxnForHolding,
   onEditTxn,
   onDeleteTxn,
@@ -310,6 +312,8 @@ function HoldingHistoryRow({
     holdingTxns: HoldingTransaction[];
     position: Position;
     colSpan: number;
+    /** Set for an active holding, which shows its position above the transactions. */
+    onEditHolding?: (holding: Holding) => void;
   }
 >) {
   return (
@@ -319,6 +323,13 @@ function HoldingHistoryRow({
         className="p-0 max-md:block max-md:py-0"
         contentClassName="w-full"
       >
+        {onEditHolding ? (
+          <HoldingPositionPanel
+            holding={holding}
+            position={position}
+            onEditHolding={onEditHolding}
+          />
+        ) : null}
         <HoldingTxnHistory
           holding={holding}
           position={position}
@@ -425,6 +436,7 @@ function HoldingRow({
           holdingTxns={holdingTxns}
           position={position}
           colSpan={ACTIVE_COLUMN_COUNT}
+          onEditHolding={onEditHolding}
           {...handlers}
         />
       )}
@@ -527,6 +539,26 @@ type BrokerageHoldingsListProps = HoldingHistoryHandlers &
     toolbar: ReactNode;
   };
 
+function HoldingsPagination({
+  pagination,
+  totalCount,
+}: Readonly<{
+  pagination: ReturnType<typeof usePagination<Holding>>;
+  totalCount: number;
+}>) {
+  if (totalCount <= HOLDINGS_PAGE_SIZE) return null;
+  return (
+    <Pagination
+      page={pagination.safeCurrentPage}
+      totalPages={pagination.totalPages}
+      rangeStart={pagination.rangeStart}
+      rangeEnd={pagination.rangeEnd}
+      totalCount={totalCount}
+      onChange={pagination.handlePageChange}
+    />
+  );
+}
+
 function BrokerageHoldingsList({
   holdings,
   holdingTxns,
@@ -557,6 +589,11 @@ function BrokerageHoldingsList({
     [totals.baseCurrency, positions, metricsById],
   );
   const sortedHoldings = useSortedRows(holdings, columns, sort, holdingNameOrder);
+  const pagination = usePagination(
+    sortedHoldings,
+    HOLDINGS_PAGE_SIZE,
+    `${sort.columnKey}:${sort.direction}`,
+  );
 
   return (
     <DataTable
@@ -571,8 +608,9 @@ function BrokerageHoldingsList({
       minWidth={960}
       isEmpty={holdings.length === 0}
       emptyState="No active holdings yet."
+      footer={<HoldingsPagination pagination={pagination} totalCount={holdings.length} />}
     >
-      {sortedHoldings.map((holding) => (
+      {pagination.pageItems.map((holding) => (
         <HoldingRow
           key={holding.id}
           metrics={metricsById[holding.id]}

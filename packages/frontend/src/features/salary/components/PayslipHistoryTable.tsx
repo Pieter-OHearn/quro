@@ -1,3 +1,4 @@
+import { usePagination } from '@/hooks/usePagination';
 import { useSortedRows, newestFirst } from '@/hooks/useSortedRows';
 import { useState } from 'react';
 import { CURRENCY_META, sumMoney, type Payslip } from '@quro/shared';
@@ -9,6 +10,7 @@ import {
   DataTableCell,
   DataTableRow,
   IconButton,
+  Pagination,
   RowActions,
   type DataTableColumn,
   type DataTableSortState,
@@ -108,6 +110,9 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
 
 const COLUMN_COUNT = PAYSLIP_COLUMNS.length;
 
+// A year has about a dozen payslips; paging keeps an imported history from rendering thousands.
+export const PAYSLIP_PAGE_SIZE = 25;
+
 type ToBaseFn = (amount: number, fromCurrency: string) => number;
 
 // A deduction reads as a loss; a correction (a negative deduction) reads as a gain.
@@ -194,8 +199,8 @@ function PayslipPhoneDetail({
   convertToBase: ToBaseFn;
 }>) {
   return (
-    <DataTableRow mobileCard={false} className="md:hidden">
-      <DataTableCell colSpan={COLUMN_COUNT} className="max-md:block max-md:px-4 max-md:py-2">
+    <DataTableRow className="md:hidden" data-phone-detail>
+      <DataTableCell colSpan={COLUMN_COUNT} className="max-md:block">
         <dl className="grid w-full grid-cols-3 gap-3 text-left">
           <div>
             <dt className="text-label text-fg-muted">Bonus</dt>
@@ -385,6 +390,11 @@ export function PayslipHistoryTable({
 }: Readonly<PayslipTableProps>) {
   const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'month', direction: 'desc' });
   const sortedPayslips = useSortedRows(payslips, PAYSLIP_COLUMNS, sort, newestFirst);
+  const pagination = usePagination(
+    sortedPayslips,
+    PAYSLIP_PAGE_SIZE,
+    `${sort.columnKey}:${sort.direction}`,
+  );
 
   return (
     <DataTable
@@ -413,8 +423,20 @@ export function PayslipHistoryTable({
       minWidth={940}
       tableLayout="fixed"
       tableVariant="financial"
+      footer={
+        payslips.length > PAYSLIP_PAGE_SIZE ? (
+          <Pagination
+            page={pagination.safeCurrentPage}
+            totalPages={pagination.totalPages}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            totalCount={payslips.length}
+            onChange={pagination.handlePageChange}
+          />
+        ) : undefined
+      }
     >
-      {sortedPayslips.map((payslip) => (
+      {pagination.pageItems.map((payslip) => (
         <PayslipTableRow
           key={payslip.id}
           payslip={payslip}
