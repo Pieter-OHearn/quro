@@ -1,4 +1,3 @@
-import { Calendar, CheckCircle2, Target, Trophy } from 'lucide-react';
 import type { Goal } from '@quro/shared';
 import type { GoalProgressContext, GoalStatCard, GoalStatsData } from '../types';
 import { getGoalStatus, parseGoalYear } from './goal-utils';
@@ -44,28 +43,20 @@ export const buildGoalStatCards = (
     label: 'Total goals',
     value: stats.total.toString(),
     sub: `${activeYear} plan`,
-    icon: Target,
-    color: 'indigo',
   },
   {
     label: 'On track',
     value: stats.onTrack.toString(),
     sub: `${stats.atRisk} need attention`,
-    icon: CheckCircle2,
-    color: 'emerald',
   },
   {
     label: 'Monthly commitment',
     value: fmtBase(stats.monthly),
     sub: 'Savings + invest habits',
-    icon: Calendar,
-    color: 'sky',
   },
   {
     label: 'Completed',
     value: stats.completed.toString(),
     sub: stats.completed > 0 ? 'Great work!' : '-',
-    icon: Trophy,
-    color: 'amber',
   },
 ];

@@ -1,4 +1,3 @@
-import { AlertTriangle, CheckCircle2, TrendingDown, Wallet } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { formatAsNegative } from '@/lib/liability';
 import { StatCard, StatsGrid } from '@/components/ui';
@@ -17,15 +16,7 @@ function TotalBudgetCard({
   totalBudgeted,
   fmt,
 }: Readonly<{ totalBudgeted: number; fmt: BudgetFormatFn }>) {
-  return (
-    <StatCard
-      label="Total budget"
-      value={fmt(totalBudgeted)}
-      subtitle="This month"
-      icon={Wallet}
-      color="indigo"
-    />
-  );
+  return <StatCard label="Total budget" value={fmt(totalBudgeted)} subtitle="This month" />;
 }
 
 function TotalSpentCard({
@@ -38,8 +29,6 @@ function TotalSpentCard({
       label="Total spent"
       value={fmt(totalSpent)}
       subtitle={`${totalBudgeted > 0 ? ((totalSpent / totalBudgeted) * 100).toFixed(0) : 0}% of budget`}
-      icon={TrendingDown}
-      color="rose"
     />
   );
 }
@@ -61,8 +50,6 @@ function RemainingCard({ remaining, fmt }: Readonly<{ remaining: number; fmt: Bu
       value={display.value}
       valueClassName={display.tone}
       subtitle={isPositive ? 'Under budget' : 'Over budget'}
-      icon={isPositive ? CheckCircle2 : AlertTriangle}
-      color={isPositive ? 'emerald' : 'rose'}
     />
   );
 }
@@ -74,8 +61,6 @@ function SavingsRateCard({ savingsRate }: Readonly<{ savingsRate: number }>) {
       label="Savings rate"
       value={formatPercent(savingsRate, numberFormat, 1)}
       subtitle="of monthly budget"
-      icon={CheckCircle2}
-      color="sky"
     />
   );
 }

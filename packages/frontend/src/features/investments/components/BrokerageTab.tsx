@@ -276,7 +276,8 @@ function FigureWithCaption({
 function ExpandToggle({
   isExpanded,
   onToggle,
-}: Readonly<{ isExpanded: boolean; onToggle: () => void }>) {
+  className,
+}: Readonly<{ isExpanded: boolean; onToggle: () => void; className?: string }>) {
   const label = isExpanded ? 'Collapse' : 'View transactions';
   return (
     <IconButton
@@ -287,6 +288,7 @@ function ExpandToggle({
       aria-expanded={isExpanded}
       size="sm"
       variant="subtle"
+      className={className}
     />
   );
 }
@@ -294,11 +296,14 @@ function ExpandToggle({
 function HoldingRowActions({
   holding,
   isExpanded,
+  mergedDetailsOnPhone = false,
   onEditHolding,
   onToggleExpanded,
 }: Readonly<{
   holding: Holding;
   isExpanded: boolean;
+  /** The phone card's details button opens the history too, so the chevron is left out there. */
+  mergedDetailsOnPhone?: boolean;
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
 }>) {
@@ -312,7 +317,11 @@ function HoldingRowActions({
         size="sm"
         variant="subtle"
       />
-      <ExpandToggle isExpanded={isExpanded} onToggle={() => onToggleExpanded(holding.id)} />
+      <ExpandToggle
+        isExpanded={isExpanded}
+        onToggle={() => onToggleExpanded(holding.id)}
+        className={mergedDetailsOnPhone ? 'max-md:hidden' : undefined}
+      />
     </RowActions>
   );
 }
@@ -417,7 +426,14 @@ function HoldingRow({
 
   return (
     <>
-      <DataTableRow interactive selected={isExpanded} onClick={() => onToggleExpanded(holding.id)}>
+      <DataTableRow
+        interactive
+        selected={isExpanded}
+        onClick={() => onToggleExpanded(holding.id)}
+        detailsOpen={isExpanded}
+        onDetailsOpenChange={() => onToggleExpanded(holding.id)}
+        detailsLabel={holding.name}
+      >
         <DataTableCell columnKey="asset" stacked>
           <HoldingAssetCell holding={holding} txnCount={txnCount} />
         </DataTableCell>
@@ -445,6 +461,7 @@ function HoldingRow({
           <HoldingRowActions
             holding={holding}
             isExpanded={isExpanded}
+            mergedDetailsOnPhone
             onEditHolding={onEditHolding}
             onToggleExpanded={onToggleExpanded}
           />

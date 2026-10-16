@@ -1,18 +1,15 @@
 import { useId, useState, type ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
 import { ArrowRight, CircleHelp } from 'lucide-react';
 import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 import { Change, type ChangeProps } from '../../atoms';
-
-// The icon tile and its tint are gone; `icon`, `color` and `layout` stay for existing callers.
-type StatCardColor = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose';
+import { useFitText } from '../../hooks';
 
 const MINUS_SIGN = '\u2212';
 // Same look as the `Change` atom: tabular 13px figures in the gain, loss or flat colour.
 const CHANGE_CLASS_NAME = 'text-cell font-medium font-numeric';
 const CARD_CLASS_NAME =
-  'block rounded-lg border border-border-default bg-surface px-4 py-3 max-sm:rounded-xl';
+  'block min-w-0 rounded-lg border border-border-default bg-surface px-4 py-3 max-sm:rounded-xl';
 
 /** A change that arrives formatted; the zero rule and minus sign are applied to its text. */
 export type StatCardTextChange = { value: string; positive: boolean; details?: string };
@@ -35,9 +32,6 @@ export type StatCardProps = {
   label: string;
   value: string;
   subtitle?: ReactNode;
-  layout?: 'stacked' | 'inline';
-  icon: LucideIcon;
-  color: StatCardColor;
   change?: StatCardChangeProp;
   href?: string;
   className?: string;
@@ -168,6 +162,19 @@ function StatCardChange({ change, inLink }: { change: StatCardChangeProp; inLink
   );
 }
 
+/** The figure stays on one line and shrinks to the card's width instead of running out of it. */
+function StatCardFigure({ value, className }: { value: string; className?: string }) {
+  const ref = useFitText<HTMLParagraphElement>(value);
+  return (
+    <p
+      ref={ref}
+      className={cn('mt-1 overflow-hidden whitespace-nowrap text-figure-lg text-fg', className)}
+    >
+      {value}
+    </p>
+  );
+}
+
 /** Label, then the figure, then the change and an optional caption. */
 function StatCardContent({
   label,
@@ -189,7 +196,7 @@ function StatCardContent({
           />
         )}
       </div>
-      <p className={cn('mt-1 text-figure-lg text-fg', valueClassName)}>{value}</p>
+      <StatCardFigure value={value} className={valueClassName} />
       {change || subtitle ? (
         <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
           {change && <StatCardChange change={change} inLink={Boolean(href)} />}

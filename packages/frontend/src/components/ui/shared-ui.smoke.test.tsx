@@ -174,8 +174,6 @@ const smokeCases: readonly SmokeCase[] = [
         <StatCard
           label="Total savings"
           value="EUR 1,250.00"
-          icon={PiggyBank}
-          color="emerald"
           href="/savings"
           testId="smoke-stat-card"
         />
@@ -1014,8 +1012,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ value: '+EUR 0.00 this month', positive: true }}
       />
     ),
@@ -1028,8 +1024,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ value: '-EUR 12.50 MTD', positive: false }}
         subtitle="2 accounts"
       />
@@ -1042,8 +1036,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ amount: -12.5, format: 'amount', label: 'this month' }}
       />
     ),
@@ -1056,8 +1048,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ amount: 0, format: 'amount', label: 'this month' }}
       />
     ),

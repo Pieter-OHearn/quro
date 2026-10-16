@@ -1,4 +1,3 @@
-import { BarChart2, Building2, DollarSign, TrendingUp } from 'lucide-react';
 import { toCents } from '@quro/shared';
 import { Change, StatCard, StatsGrid, type StatCardNumericChange } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
@@ -55,16 +54,12 @@ export function InvestmentStatCards({
         value={fmtBase(totalBrokerageBase)}
         valueClassName="text-figure-hero"
         subtitle="Total portfolio value in base currency"
-        icon={BarChart2}
-        color="indigo"
         change={toCardChange(trends.brokerageValue, baseCurrency)}
       />
       <StatCard
         label={unrealized.label}
         value={unrealized.value}
         subtitle={`Cost basis ${fmtBase(totalCostBase)}`}
-        icon={TrendingUp}
-        color="emerald"
         change={toCardChange(trends.unrealizedGain, baseCurrency)}
       />
       <StatCard
@@ -82,16 +77,12 @@ export function InvestmentStatCards({
             realized
           </>
         }
-        icon={DollarSign}
-        color="sky"
         change={toCardChange(trends.dividendsReceived, baseCurrency)}
       />
       <StatCard
         label="Your property equity"
         value={fmtBase(totalPropertyEquityBase)}
         subtitle={`Your share after mortgages · ${fmtBase(totalRentalBase)}/mo rental`}
-        icon={Building2}
-        color="amber"
         change={toCardChange(trends.propertyEquity, baseCurrency)}
       />
     </StatsGrid>
