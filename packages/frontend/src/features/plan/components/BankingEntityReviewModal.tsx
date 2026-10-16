@@ -14,6 +14,7 @@ import {
   LoadingState,
   Modal,
   SelectInput,
+  StateNotice,
   TextInput,
 } from '@/components/ui';
 import {
@@ -239,6 +240,21 @@ export function BankingEntityReviewModal({
       </p>
       {accountsQuery.isPending || entitiesQuery.isPending ? (
         <LoadingState label="Loading banking entities" />
+      ) : accountsQuery.isError || entitiesQuery.isError ? (
+        <StateNotice
+          tone="danger"
+          title="Banking entities could not be loaded"
+          action={{
+            label: 'Retry',
+            onClick: () => {
+              if (accountsQuery.isError) void accountsQuery.refetch();
+              if (entitiesQuery.isError) void entitiesQuery.refetch();
+            },
+            loading: accountsQuery.isFetching || entitiesQuery.isFetching,
+          }}
+        >
+          Your accounts are unchanged; none are listed until the data loads.
+        </StateNotice>
       ) : (
         <div className="space-y-3">
           {accounts.map((account) => (

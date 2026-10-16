@@ -16,6 +16,11 @@ export function HoldingsArchivedSection({ holdingTxns }: Readonly<HoldingsArchiv
 
   return (
     <ArchivedItemsSection
+      loadError={
+        archivedQuery.isError
+          ? { onRetry: () => void archivedQuery.refetch(), retrying: archivedQuery.isFetching }
+          : null
+      }
       title="Archived holdings"
       entityLabel="Holding"
       childrenLabel="buy and sell history"

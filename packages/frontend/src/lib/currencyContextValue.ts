@@ -13,6 +13,10 @@ export type CurrencyContextType = {
   isForeign: (currency: string) => boolean;
   ratesStatus: CurrencyRatesStatus;
   ratesUpdatedAt: string | null;
+  /** Currencies whose synced rate is older than 48 hours; converted figures use it as it is. */
+  staleRateCurrencies: readonly CurrencyCode[];
+  /** When the oldest stale rate was last updated. */
+  staleRatesSince: string | null;
 };
 
 export const CurrencyContext = createContext<CurrencyContextType | null>(null);

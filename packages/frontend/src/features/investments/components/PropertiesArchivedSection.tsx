@@ -13,6 +13,11 @@ export function PropertiesArchivedSection() {
 
   return (
     <ArchivedItemsSection
+      loadError={
+        archivedQuery.isError
+          ? { onRetry: () => void archivedQuery.refetch(), retrying: archivedQuery.isFetching }
+          : null
+      }
       title="Archived properties"
       entityLabel="Property"
       childrenLabel="transaction history"

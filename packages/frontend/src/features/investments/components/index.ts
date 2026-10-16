@@ -4,6 +4,7 @@ export { AddPropertyTxnModal } from './AddPropertyTxnModal';
 export { BrokerageTab } from './BrokerageTab';
 export { EditHoldingModal } from './EditHoldingModal';
 export { HoldingTxnHistory } from './HoldingTxnHistory';
+export { InvestmentDataNotices } from './InvestmentDataNotices';
 export { InvestmentModals } from './InvestmentModals';
 export { InvestmentStatCards } from './InvestmentStatCards';
 export { InvestmentTabPanel } from './InvestmentTabPanel';

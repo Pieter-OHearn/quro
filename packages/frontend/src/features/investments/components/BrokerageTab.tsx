@@ -26,6 +26,7 @@ import {
 import { stopRowClick } from '@/components/finance/stopRowClick';
 import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import { formatShares, groupHoldingTransactions, type Position } from '../utils/position';
+import { isPriceStale } from '../utils/priceFreshness';
 import { HoldingPositionPanel, getEffectivePrice } from './HoldingPositionPanel';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
@@ -376,9 +377,17 @@ function HoldingPriceCell({
   holding,
   fmtPrice,
 }: Readonly<{ holding: Holding; fmtPrice: UnitPriceFormatFn }>) {
-  const syncCaption = holding.excludeFromSync
-    ? 'sync off'
-    : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency);
+  const stale = isPriceStale(holding);
+  const syncDate = formatSyncDate(holding.priceUpdatedAt);
+  let syncCaption: ReactNode = holding.currency;
+  if (holding.excludeFromSync) syncCaption = 'sync off';
+  else if (stale) {
+    syncCaption = (
+      <span className="text-warning" title="The price has not synced for more than a week">
+        Stale · {syncDate}
+      </span>
+    );
+  } else if (syncDate) syncCaption = syncDate;
   return (
     <FigureWithCaption
       figure={

@@ -112,6 +112,8 @@ const currencyContext = {
   isForeign: () => false,
   ratesStatus: 'ready',
   ratesUpdatedAt: null,
+  staleRateCurrencies: [],
+  staleRatesSince: null,
 } satisfies CurrencyContextType;
 
 const buildGoal = (overrides: Partial<Goal>): Goal => ({

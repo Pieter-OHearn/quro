@@ -11,6 +11,7 @@ import type {
   PropertyTransaction,
 } from '@quro/shared';
 import {
+  InvestmentDataNotices,
   InvestmentModals,
   InvestmentStatCards,
   InvestmentTabPanel,
@@ -41,6 +42,7 @@ import type {
   PortfolioHistoryPoint,
 } from './types';
 import type { Position } from './utils/position';
+import { isPriceStale } from './utils/priceFreshness';
 import { buildHoldingModalsProps, buildPropertyModalsProps } from './utils/modal-props';
 
 type InvestmentPageBodyProps = {
@@ -64,6 +66,8 @@ type InvestmentPageBodyProps = {
   onSyncPrices: () => void;
   isSyncingPrices: boolean;
   syncSummary: HoldingPriceSyncResult | null;
+  priceHistoryFailed: boolean;
+  onRetryPriceHistory: () => void;
 };
 
 function InvestmentPageBody({
@@ -87,7 +91,13 @@ function InvestmentPageBody({
   onSyncPrices,
   isSyncingPrices,
   syncSummary,
+  priceHistoryFailed,
+  onRetryPriceHistory,
 }: Readonly<InvestmentPageBodyProps>) {
+  const staleHoldings = useMemo(
+    () => activeHoldings.filter((holding) => isPriceStale(holding)),
+    [activeHoldings],
+  );
   return (
     <PageStack>
       <InvestmentModals
@@ -99,6 +109,13 @@ function InvestmentPageBody({
           positions,
         )}
         propertyModals={buildPropertyModalsProps(ui, actions, properties, mortgageById)}
+      />
+      <InvestmentDataNotices
+        staleHoldings={staleHoldings}
+        historyLoadFailed={priceHistoryFailed}
+        onRetryHistory={onRetryPriceHistory}
+        onSyncPrices={onSyncPrices}
+        isSyncingPrices={isSyncingPrices}
       />
       <InvestmentStatCards {...stats} trends={statTrends} fmtBase={fmtBase} />
       <PortfolioChart data={portfolioHistory} baseCurrency={baseCurrency} fmtBase={fmtBase} />
@@ -172,9 +189,8 @@ function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
     fmtBase,
   );
   const actions = useInvestmentActions(holdings, properties, ui);
-  const { data: holdingPriceHistory = [] } = useHoldingPriceHistory(
-    holdings.map((holding) => holding.id),
-  );
+  const priceHistoryQuery = useHoldingPriceHistory(holdings.map((holding) => holding.id));
+  const holdingPriceHistory = priceHistoryQuery.data ?? [];
   const portfolioHistory = usePortfolioHistory(
     holdings,
     holdingTxns,
@@ -209,6 +225,8 @@ function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
       }
       isSyncingPrices={syncHoldingPrices.isPending}
       syncSummary={syncHoldingPrices.data ?? null}
+      priceHistoryFailed={priceHistoryQuery.isError}
+      onRetryPriceHistory={() => void priceHistoryQuery.refetch()}
     />
   );
 }
