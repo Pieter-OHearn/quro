@@ -330,11 +330,6 @@ function DashboardPageBody({
 
   return (
     <PageStack>
-      {setupProgress ? (
-        <ContentSection as="div">
-          <GettingStartedCard progress={setupProgress} />
-        </ContentSection>
-      ) : null}
       <ContentSection as="div">
         <NetWorthHero
           netWorth={netWorth}
@@ -349,6 +344,11 @@ function DashboardPageBody({
           isEstimated={isEstimated}
         />
       </ContentSection>
+      {setupProgress ? (
+        <ContentSection as="div">
+          <GettingStartedCard progress={setupProgress} />
+        </ContentSection>
+      ) : null}
       <ContentSection>
         <DashboardStatCards cards={dashboardCards} baseCurrency={baseCurrency} fmtBase={fmtBase} />
       </ContentSection>

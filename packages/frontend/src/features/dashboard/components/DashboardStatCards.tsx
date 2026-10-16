@@ -19,7 +19,7 @@ export function DashboardStatCards({
           label={card.label}
           value={fmtBase(card.value)}
           href={card.path}
-          testId={card.label === 'Monthly salary' ? 'dashboard-monthly-salary-card' : undefined}
+          testId={card.label === 'Salary' ? 'dashboard-monthly-salary-card' : undefined}
           change={{
             amount: card.change.amount,
             format: 'amount',

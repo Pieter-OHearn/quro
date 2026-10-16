@@ -24,11 +24,12 @@ export function SavingsStats({
   const { numberFormat } = useCurrency();
   const currencyCount = new Set(accounts.map((account) => account.currency)).size;
   return (
-    <StatsGrid className="grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3">
+    <StatsGrid className="sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3">
       <StatCard
         label="Total savings (your share)"
         value={fmtBase(totalInBase)}
         valueClassName="text-figure-hero"
+        className="col-span-2 sm:col-span-1"
         subtitle={`Across ${accounts.length} accounts · ${currencyCount} currencies · ${transactions.length} transactions`}
       />
       <StatCard
@@ -37,9 +38,9 @@ export function SavingsStats({
         subtitle="Weighted average APY"
       />
       <StatCard
-        label="Monthly interest (your share)"
+        label="Monthly interest"
         value={fmtBase(totalInterest, undefined, true)}
-        subtitle={`≈ ${fmtBase(totalInterest * 12)} per year`}
+        subtitle={`≈ ${fmtBase(totalInterest * 12)} a year, your share`}
       />
     </StatsGrid>
   );

@@ -145,7 +145,7 @@ function StatCardNumericChangeContent({ change }: { change: StatCardNumericChang
 function StatCardChange({ change, inLink }: { change: StatCardChangeProp; inLink: boolean }) {
   if (isNumericChange(change)) {
     return (
-      <span className="group/trend relative inline-flex items-baseline gap-1">
+      <span className="group/trend relative inline-flex max-w-full flex-wrap items-baseline gap-x-1">
         <StatCardNumericChangeContent change={change} />
         {change.details && <StatCardChangeDetails details={change.details} inLink={inLink} />}
       </span>
@@ -154,7 +154,11 @@ function StatCardChange({ change, inLink }: { change: StatCardChangeProp; inLink
   const { text, tone } = describeChangeText(change);
   return (
     <span
-      className={cn('group/trend relative inline-flex items-center gap-1', CHANGE_CLASS_NAME, tone)}
+      className={cn(
+        'group/trend relative inline-flex max-w-full flex-wrap items-center gap-x-1',
+        CHANGE_CLASS_NAME,
+        tone,
+      )}
     >
       <span>{text}</span>
       {change.details && <StatCardChangeDetails details={change.details} inLink={inLink} />}

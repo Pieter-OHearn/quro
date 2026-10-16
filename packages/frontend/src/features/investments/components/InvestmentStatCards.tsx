@@ -63,7 +63,7 @@ export function InvestmentStatCards({
         change={toCardChange(trends.unrealizedGain, baseCurrency)}
       />
       <StatCard
-        label="Dividends received"
+        label="Dividends"
         value={`+${fmtBase(totalDividendsBase)}`}
         subtitle={
           <>
@@ -80,7 +80,7 @@ export function InvestmentStatCards({
         change={toCardChange(trends.dividendsReceived, baseCurrency)}
       />
       <StatCard
-        label="Your property equity"
+        label="Property equity"
         value={fmtBase(totalPropertyEquityBase)}
         subtitle={`Your share after mortgages · ${fmtBase(totalRentalBase)}/mo rental`}
         change={toCardChange(trends.propertyEquity, baseCurrency)}

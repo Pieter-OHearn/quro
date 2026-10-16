@@ -169,11 +169,19 @@ function buildClosedHoldingColumns(
   metricsById: Record<number, ClosedHoldingMetrics>,
 ): readonly DataTableColumn<Holding>[] {
   return [
-    { key: 'asset', sortValue: (row) => row.name, header: 'Asset', width: '40%', sortable: true },
+    {
+      key: 'asset',
+      sortValue: (row) => row.name,
+      header: 'Asset',
+      phoneCard: 'title',
+      width: '40%',
+      sortable: true,
+    },
     {
       key: 'sold',
       sortValue: (row) => metricsById[row.id].lastSellPrice ?? 0,
       header: 'Last sell price',
+      phoneCard: 'metric',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
@@ -183,6 +191,7 @@ function buildClosedHoldingColumns(
       key: 'dividends',
       sortValue: (row) => positions[row.id].totalDividends,
       header: 'Dividends',
+      phoneCard: 'metric',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
@@ -192,6 +201,7 @@ function buildClosedHoldingColumns(
       key: 'realized',
       sortValue: (row) => positions[row.id].realizedGain,
       header: 'Realized P&L',
+      phoneCard: 'headline',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
@@ -715,6 +725,25 @@ type ClosedHoldingRowProps = HoldingHistoryHandlers & {
   onToggleExpanded: (id: number) => void;
 };
 
+function ClosedRealizedFigure({
+  realizedGain,
+  currency,
+  realizedPct,
+}: Readonly<{ realizedGain: number; currency: string; realizedPct: number | null }>) {
+  return (
+    <FigureWithCaption
+      figure={<Change value={realizedGain} format="amount" currency={currency} />}
+      caption={
+        realizedPct === null ? (
+          '—'
+        ) : (
+          <Change value={realizedPct} format="percent" className="text-caption" />
+        )
+      }
+    />
+  );
+}
+
 function ClosedHoldingRow({
   metrics,
   holding,
@@ -736,7 +765,14 @@ function ClosedHoldingRow({
 
   return (
     <>
-      <DataTableRow interactive selected={isExpanded} onClick={() => onToggleExpanded(holding.id)}>
+      <DataTableRow
+        interactive
+        selected={isExpanded}
+        onClick={() => onToggleExpanded(holding.id)}
+        detailsOpen={isExpanded}
+        onDetailsOpenChange={() => onToggleExpanded(holding.id)}
+        detailsLabel={holding.name}
+      >
         <DataTableCell columnKey="asset" stacked>
           <HoldingAssetCell holding={holding} txnCount={txnCount} closed />
         </DataTableCell>
@@ -760,21 +796,17 @@ function ClosedHoldingRow({
           )}
         </DataTableCell>
         <DataTableCell columnKey="realized">
-          <FigureWithCaption
-            figure={<Change value={realizedGain} format="amount" currency={holding.currency} />}
-            caption={
-              costBasis > 0 ? (
-                <Change value={realizedPct} format="percent" className="text-caption" />
-              ) : (
-                '—'
-              )
-            }
+          <ClosedRealizedFigure
+            realizedGain={realizedGain}
+            currency={holding.currency}
+            realizedPct={costBasis > 0 ? realizedPct : null}
           />
         </DataTableCell>
         <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
           <HoldingRowActions
             holding={holding}
             isExpanded={isExpanded}
+            mergedDetailsOnPhone
             onEditHolding={onEditHolding}
             onToggleExpanded={onToggleExpanded}
           />

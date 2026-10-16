@@ -120,13 +120,13 @@ export function CurrencySelector() {
         aria-label={`Base currency ${baseCurrency}`}
         onClick={() => setOpen(!open)}
       >
-        <span className="text-body leading-none">{meta.flag}</span>
+        <span className="text-body leading-none max-[359px]:hidden">{meta.flag}</span>
         <span>{baseCurrency}</span>
         <ChevronDown
           size={14}
           aria-hidden="true"
           className={cn(
-            'text-fg-subtle transition-transform duration-fast motion-reduce:transition-none',
+            'text-fg-subtle max-[359px]:hidden transition-transform duration-fast motion-reduce:transition-none',
             open && 'rotate-180',
           )}
         />
