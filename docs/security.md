@@ -209,7 +209,7 @@ person signing up needs to know why it failed; the sign-up rate limit bounds pro
 - **Settings → Security** lists the account's sessions. The user can sign out one browser or every
   other browser.
 - Changing the password signs out every other session. A password reset signs out all of them.
-- Sessions are deleted with their account.
+- Sessions are deleted with their account ([export and deletion](data-export-and-deletion.md)).
 
 ## Operator recovery without email
 
@@ -522,6 +522,7 @@ Auth endpoints are rate-limited with an in-process sliding window counter, keyed
 | `POST /api/auth/signup`         | 15 minutes | 3            | Client IP          |
 | `POST /api/auth/password-reset` | 15 minutes | 5            | Client IP          |
 | `PUT /api/settings/password`    | 15 minutes | 5            | Client IP          |
+| `DELETE /api/settings/account`  | 15 minutes | 5            | Client IP          |
 | `POST /api/partner/invite`      | 15 minutes | 10           | Authenticated user |
 
 Requests over the limit receive `429 Too Many Requests`. The limiter state is in memory and resets

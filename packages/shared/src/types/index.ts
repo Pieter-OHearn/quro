@@ -106,6 +106,28 @@ export type UpdateUserPasswordInput = {
   nextPassword: string;
 };
 
+/** What deleting the account removes (`GET /api/settings/account`). */
+export type AccountDeletionPreview = {
+  /** Rows that go with the account, per table; tables without rows are absent. */
+  rowCounts: Record<string, number>;
+  /** Joint accounts, properties and mortgages the partner can see today. */
+  sharedWithPartner: number;
+  documentCount: number;
+  hasPartner: boolean;
+};
+
+/** Both are required to delete the account (`DELETE /api/settings/account`). */
+export type DeleteAccountInput = {
+  password: string;
+  confirmEmail: string;
+};
+
+export type DeleteAccountResult = {
+  documentCount: number;
+  /** Documents the store has not removed yet; an operator can retry them. */
+  documentsPending: number;
+};
+
 // Redeems a one-time code an operator issued with the backend `auth reset-password` command.
 export type ResetPasswordInput = {
   code: string;

@@ -12,13 +12,22 @@ import {
   type UpdateUserPreferencesInput,
   type UpdateUserProfileInput,
 } from '@quro/shared';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, gt, ne } from 'drizzle-orm';
 import { db } from '../db/client';
-import { users } from '../db/schema';
+import { sessions, users } from '../db/schema';
 import { HTTP_STATUS } from '../constants/http';
 import { getAuthUser, getSessionId } from '../lib/authUser';
 import { publicUserColumns } from '../lib/users';
-import { listUserSessions, revokeUserSession, revokeUserSessions } from '../lib/sessions';
+import {
+  clearSessionCookies,
+  listUserSessions,
+  revokeUserSession,
+  revokeUserSessions,
+} from '../lib/sessions';
+import { deleteAccount, previewAccountDeletion } from '../lib/accountDeletion';
+import { ExportLimitError, exportStream, prepareExport } from '../lib/dataExport';
+import { getBuildInfo } from '../lib/buildInfo';
+import { getDocumentStore } from '../lib/documentStorage';
 import { changePasswordRateLimit } from '../middleware/rateLimit';
 import {
   err,
@@ -295,6 +304,99 @@ app.delete('/sessions/:id', async (c) => {
     return c.json({ error: 'Session not found' }, HTTP_STATUS.NOT_FOUND);
   }
   return c.json({ data: null });
+});
+
+// ── Data export and account deletion ────────────────────────────────────────
+
+const MAX_CONCURRENT_EXPORTS = 2;
+const activeExports = new Set<number>();
+
+async function sessionStillValid(userId: number, sessionId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.id, sessionId),
+        eq(sessions.userId, userId),
+        gt(sessions.expiresAt, new Date()),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+// One ZIP with the account's own data as JSON and CSV, its documents and a manifest. Only the
+// caller's rows are read (see lib/accountData.ts), and the session is checked again before each
+// document, so signing out elsewhere or deleting the account stops a running export.
+app.get('/export', async (c) => {
+  const authUser = getAuthUser(c);
+  const sessionId = getSessionId(c);
+  if (activeExports.has(authUser.id) || activeExports.size >= MAX_CONCURRENT_EXPORTS) {
+    return c.json(
+      { error: 'An export is already running. Try again shortly.' },
+      HTTP_STATUS.TOO_MANY_REQUESTS,
+    );
+  }
+  activeExports.add(authUser.id);
+  const release = () => activeExports.delete(authUser.id);
+  try {
+    const prepared = await prepareExport(authUser.id);
+    const stream = exportStream(prepared, {
+      store: getDocumentStore(),
+      quroVersion: getBuildInfo().version,
+      stillAllowed: () => sessionStillValid(authUser.id, sessionId),
+      onClose: release,
+    });
+    const stamp = prepared.exportedAt.toISOString().slice(0, 10);
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="quro-export-${stamp}.zip"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch (error) {
+    release();
+    if (error instanceof ExportLimitError) {
+      return c.json({ error: error.message }, HTTP_STATUS.PAYLOAD_TOO_LARGE);
+    }
+    throw error;
+  }
+});
+
+// What deleting the account would remove, for the confirmation dialog.
+app.get('/account', async (c) => {
+  return c.json({ data: await previewAccountDeletion(getAuthUser(c).id) });
+});
+
+// Deletes the account and everything it owns. The caller proves it is them with the password and
+// the account email.
+app.delete('/account', changePasswordRateLimit, async (c) => {
+  const authUser = getAuthUser(c);
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const { password, confirmEmail } = body.value;
+  if (typeof password !== 'string' || typeof confirmEmail !== 'string') {
+    return c.json(
+      { error: 'Password and email confirmation are required' },
+      HTTP_STATUS.BAD_REQUEST,
+    );
+  }
+  const [user] = await db
+    .select({ email: users.email, passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, authUser.id));
+  if (!user) return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
+  if (confirmEmail.toLowerCase().trim() !== user.email) {
+    return c.json({ error: 'Type your email address to confirm' }, HTTP_STATUS.BAD_REQUEST);
+  }
+  if (!(await Bun.password.verify(password, user.passwordHash))) {
+    return c.json({ error: 'Password is incorrect' }, HTTP_STATUS.UNAUTHORIZED);
+  }
+  const result = await deleteAccount(authUser.id);
+  clearSessionCookies(c);
+  return c.json({ data: result });
 });
 
 export default app;

@@ -1,6 +1,6 @@
 # Uninstall Quro
 
-This page removes an install made with [the install guide](install.md), in steps: stop it and keep everything, remove the containers and keep the data, or delete it all. Run the commands in the directory that holds `compose.yaml`. Nothing here is undone by Quro itself: deleted data comes back only from a backup.
+This page removes an install made with [the install guide](install.md), in steps: stop it and keep everything, remove the containers and keep the data, or delete it all. Run the commands in the directory that holds `compose.yaml`. Each person can first download their data and delete their account in the app ([export and deletion](data-export-and-deletion.md)). Nothing here is undone by Quro itself: deleted data comes back only from a backup.
 
 ## Stop and keep everything
 

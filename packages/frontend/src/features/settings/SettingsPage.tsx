@@ -2,7 +2,15 @@ import { useEffect } from 'react';
 import type { ElementType } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { Link2, Lock, ShieldCheck, SlidersHorizontal, User as UserIcon, Users } from 'lucide-react';
+import {
+  Database,
+  Link2,
+  Lock,
+  ShieldCheck,
+  SlidersHorizontal,
+  User as UserIcon,
+  Users,
+} from 'lucide-react';
 import {
   Badge,
   Card,
@@ -21,7 +29,8 @@ import { ProfileSection } from './components/ProfileSection';
 import { SecuritySection } from './components/SecuritySection';
 import { PreferencesSection } from './components/PreferencesSection';
 import { ConnectionsSection } from './components/ConnectionsSection';
-type TabKey = 'profile' | 'security' | 'preferences' | 'partner' | 'connections';
+import { DataSection } from './components/DataSection';
+type TabKey = 'profile' | 'security' | 'preferences' | 'partner' | 'connections' | 'data';
 
 const TABS: ReadonlyArray<{ key: TabKey; label: string; icon: ElementType }> = [
   { key: 'profile', label: 'Profile', icon: UserIcon },
@@ -29,6 +38,7 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string; icon: ElementType }> = [
   { key: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
   { key: 'partner', label: 'Partner', icon: Users },
   { key: 'connections', label: 'Connections', icon: Link2 },
+  { key: 'data', label: 'Your data', icon: Database },
 ];
 
 const DEFAULT_TAB: TabKey = 'profile';
@@ -182,6 +192,7 @@ export function Settings() {
             ) : null}
             {activeTab === 'partner' ? <PartnerSection /> : null}
             {activeTab === 'connections' ? <ConnectionsSection /> : null}
+            {activeTab === 'data' ? <DataSection user={user} /> : null}
           </div>
         </div>
       </ContentSection>

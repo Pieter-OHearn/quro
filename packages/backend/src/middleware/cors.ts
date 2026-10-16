@@ -14,6 +14,9 @@ export function createCorsMiddleware(origins: readonly string[] = getConfig().we
   return cors({
     origin: resolveCorsOrigin(origins),
     credentials: true,
+    // The export download names its file there; a split-origin dev frontend can only read it
+    // when exposed.
+    exposeHeaders: ['Content-Disposition'],
   });
 }
 

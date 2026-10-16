@@ -62,6 +62,8 @@ export async function installProviderMocks() {
 
   return {
     storedDocuments: documents.objects,
+    /** The whole in-memory store, to make deletions fail or to inspect requests. */
+    documentStore: documents,
     restore: async () => {
       documents.objects.clear();
       await mock.module('../lib/documentStorage', () => real.documentStorage);

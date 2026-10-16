@@ -29,8 +29,10 @@ Commands:
                     deleted from S3. Nothing is added to the documents directory unless every
                     needed document was copied; run it again to continue after a failure or an
                     interruption. Then set QRO_DOCUMENT_STORAGE=filesystem and restart.
+  retry-deleted     Remove the documents of deleted accounts that the document store refused to
+                    remove when the account was deleted. Run it again until none are pending.
 
-In Docker Compose: docker compose exec backend quro documents migrate-from-s3`;
+In Docker Compose: docker compose exec backend quro documents <command>`;
 
 // Imports the worker still has to read, or that the user can still commit. Committed imports are
 // read through their pension transaction; the others are never read again.
@@ -201,6 +203,22 @@ async function migrateFromS3(
   }
 }
 
+async function retryDeleted(args: readonly string[], io: CommandIo): Promise<number> {
+  if (args.length > 0) throw new UsageError(`Unexpected argument: ${args[0]}`);
+  const { retryDeletedAccountDocuments } = await import('../lib/accountDeletion');
+  let report;
+  try {
+    report = await retryDeletedAccountDocuments();
+  } catch (error) {
+    io.err(`Documents could not be removed (${errorName(error)}).`);
+    return databaseAnswered(error) ? EXIT_FAILURE : EXIT_UNAVAILABLE;
+  }
+  io.out(
+    `${report.deletions} deleted accounts had documents pending: ${report.deleted} removed, ${report.stillFailing} still pending.`,
+  );
+  return report.stillFailing > 0 ? EXIT_FAILURE : EXIT_OK;
+}
+
 export async function runDocumentsCommand(
   args: readonly string[],
   io: CommandIo,
@@ -212,5 +230,6 @@ export async function runDocumentsCommand(
     return command === undefined ? EXIT_USAGE : EXIT_OK;
   }
   if (command === 'migrate-from-s3') return await migrateFromS3(rest, io, dependencies);
+  if (command === 'retry-deleted') return await retryDeleted(rest, io);
   throw new UsageError(`Unknown documents command: ${command}`);
 }

@@ -38,6 +38,15 @@ const INLINE_OWNER_PREDICATES: Inventory = {
     savingsTransactions: 1,
   },
   'cli/user.ts': { sessions: 1 },
+  'lib/accountData.ts': { parent: 1, table: 1 },
+  'lib/accountDeletion.ts': {
+    authCodes: 1,
+    bunqConnections: 1,
+    bunqOauthAttempts: 1,
+    bunqPaymentProgress: 1,
+    sessions: 1,
+    table: 1,
+  },
   'lib/activity.ts': {
     budgetTransactions: 1,
     debtPayments: 1,
@@ -94,6 +103,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
     planAssumptions: 2,
   },
   'routes/salary.ts': { employments: 2, payslips: 6 },
+  'routes/settings.ts': { sessions: 1 },
   'services/bunqBudgetSync.ts': {
     budgetCategories: 3,
     budgetTransactions: 5,

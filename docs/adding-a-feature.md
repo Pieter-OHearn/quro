@@ -133,6 +133,11 @@ integration test that runs it against pre-existing synthetic rows and checks the
 [migration tests](development.md#migration-tests). Adding the `recurring_payments` table needs
 none.
 
+A table with a `user_id` column also goes into the account registry
+(`packages/backend/src/lib/accountData.ts`, parents before children), which drives the data export and
+account deletion ([export and deletion](data-export-and-deletion.md)). A test fails until every such
+table is in the registry or listed there as handled elsewhere.
+
 ---
 
 ## 3. Backend route

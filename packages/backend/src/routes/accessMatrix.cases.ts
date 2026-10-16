@@ -1218,6 +1218,10 @@ export const EXEMPT_ROUTES: Record<string, string> = {
   'POST /api/auth/signup': 'public; covered by authAccess and the dynamic deployment tests',
   'POST /api/auth/signin': 'public; covered by authAccess and the dynamic deployment tests',
   'POST /api/auth/password-reset': 'public; covered by authAccess.integration.test.ts',
+  'GET /api/settings/export': 'reads only the caller; covered by accountData.integration.test.ts',
+  'GET /api/settings/account': 'reads only the caller; covered by accountData.integration.test.ts',
+  'DELETE /api/settings/account':
+    'acts only on the caller; covered by accountData.integration.test.ts',
   'GET /api/auth/me': 'returns only the caller; covered by the session lifecycle tests',
   'POST /api/auth/signout': 'ends only the caller session; covered by the session lifecycle tests',
   'GET /api/savings/banking-entities': 'static reference data, no household data',

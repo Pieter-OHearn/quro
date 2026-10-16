@@ -189,7 +189,7 @@ Quro is pre-1.0. What it does not do yet, or does only partly:
 - **One household.** Accounts share data only through the partner model: two people, each with private records and shared joint ones.
 - **Prices and exchange rates come from Yahoo Finance only,** through an unofficial interface that can change without notice. There is no other provider and no switch to turn off only this one, and a new install cannot show balances until it has fetched the rates once.
 - **Bank linking supports bunq only.** Other banks need manual entry.
-- **No data export or CSV import yet.** Both are planned for 1.0. Until then, `quro backup` is the way to take your data with you.
+- **No CSV import yet.** Each account can download its data as JSON and CSV and delete itself ([export and deletion](docs/data-export-and-deletion.md)), but the archive cannot be imported again; `quro backup` is the way to move a whole instance.
 - **Statement import is not part of the example install.** It needs a GPU and images built from a checkout.
 - **PostgreSQL 18 only.** `quro migrate`, `quro doctor`, `quro backup` and `quro restore` refuse any other major.
 - **Tested in CI and containers,** on amd64 and arm64 runners and Docker Desktop, not on a Raspberry Pi or a NAS. Measured times are in [backup and restore](docs/backup-and-restore.md#recovery-objectives).
