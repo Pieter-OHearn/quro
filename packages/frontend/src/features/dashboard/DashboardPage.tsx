@@ -12,12 +12,14 @@ import type {
   Goal,
   NetWorthSnapshot,
   SavingsAccount,
+  SetupProgress,
 } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
   DashboardChartsGrid,
   DashboardStatCards,
+  GettingStartedCard,
   GoalsOverviewCard,
   MonthlySummary,
   NetWorthHero,
@@ -41,6 +43,7 @@ import {
   useDashboardInsights,
   useNetWorthSnapshots,
   useNetWorthYearStart,
+  useSetupProgress,
 } from './hooks';
 
 const DASHBOARD_GOAL_LIMIT = 4;
@@ -250,6 +253,7 @@ type DashboardPageBodyProps = {
   data: DashboardData;
   baseCurrency: string;
   fmtBase: DashboardFormatFn;
+  setupProgress: SetupProgress | undefined;
 };
 
 function DashboardBottomCards({ data }: { data: DashboardData }) {
@@ -292,7 +296,12 @@ const getComparisonLabel = (chartData: DashboardData['chartData']): string | nul
   return previous ? `${previous.month} ${previous.year}` : null;
 };
 
-function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPageBodyProps>) {
+function DashboardPageBody({
+  data,
+  baseCurrency,
+  fmtBase,
+  setupProgress,
+}: Readonly<DashboardPageBodyProps>) {
   const { convertToBase } = useCurrency();
   const {
     chartData,
@@ -321,6 +330,11 @@ function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPa
 
   return (
     <PageStack>
+      {setupProgress ? (
+        <ContentSection as="div">
+          <GettingStartedCard progress={setupProgress} />
+        </ContentSection>
+      ) : null}
       <ContentSection as="div">
         <NetWorthHero
           netWorth={netWorth}
@@ -361,11 +375,20 @@ function DashboardPageBody({ data, baseCurrency, fmtBase }: Readonly<DashboardPa
 export function Dashboard() {
   const { fmtBase, baseCurrency, convertToBase } = useCurrency();
   const data = useDashboardData(fmtBase, convertToBase);
+  // Guidance only: a failed read of it leaves the dashboard as it was.
+  const setupProgress = useSetupProgress().data;
 
   if (data.isLoading) return <LoadingSpinner />;
   if (data.queryFailures.length > 0) {
     return <RouteQueryErrorState routeName="Dashboard" failedQueries={data.queryFailures} />;
   }
 
-  return <DashboardPageBody data={data} baseCurrency={baseCurrency} fmtBase={fmtBase} />;
+  return (
+    <DashboardPageBody
+      data={data}
+      baseCurrency={baseCurrency}
+      fmtBase={fmtBase}
+      setupProgress={setupProgress}
+    />
+  );
 }

@@ -135,7 +135,7 @@ function ReviewTypeCell({ row, draft, onPatch }: Readonly<ReviewTypeCellProps>) 
         )}
         {row.isDerived && (
           <Badge tone="warning" size="xs">
-            <Brain size={10} aria-hidden /> AI derived
+            <Brain size={10} aria-hidden /> Derived
           </Badge>
         )}
       </div>
@@ -347,7 +347,7 @@ function ReviewSummaryChips({
       {derivedRows.length > 0 && (
         <Badge size="md">
           <Brain size={12} aria-hidden />
-          {derivedRows.length} AI derived
+          {derivedRows.length} derived
         </Badge>
       )}
       {warnRows.length > 0 && (

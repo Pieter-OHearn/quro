@@ -1,25 +1,23 @@
-import type { AppCapabilities, AppCapabilityReason, AppCapabilityStatus } from '@quro/shared';
+import type {
+  AppCapabilities,
+  AppCapabilityLifecycle,
+  AppCapabilityReason,
+  AppCapabilityStatus,
+} from '@quro/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { workerHeartbeats } from '../db/schema';
-import { evaluateCapability } from './capabilityRegistry';
+import { evaluateCapability, getCapabilityDefinition } from './capabilityRegistry';
 
 export const PENSION_IMPORT_WORKER_NAME = 'pension-import-worker';
 export const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
 const WORKER_HEARTBEAT_STALE_AFTER_MS = 15_000;
 
-const AI_AVAILABLE_MESSAGE = 'AI features are available.';
-const AI_DISABLED_MESSAGE =
-  'AI features are unavailable. Start the pension import worker to enable AI.';
-const AI_DISABLED_NOT_CONFIGURED_MESSAGE =
-  'AI features are unavailable because this Quro instance has not configured them.';
-const AI_DISABLED_PARSER_MESSAGE =
-  'AI features are unavailable because the parser service is unhealthy.';
-const PENSION_IMPORT_AVAILABLE_MESSAGE = 'AI import is available.';
+const PENSION_IMPORT_AVAILABLE_MESSAGE = 'Statement import is available.';
 const PENSION_IMPORT_DISABLED_MESSAGE =
-  'AI import is unavailable. Start the pension import worker to use PDF import.';
+  'Statement import is set up on this server, but its import worker is not running.';
 const PENSION_IMPORT_DISABLED_PARSER_MESSAGE =
-  'AI import is unavailable because the parser service is unhealthy.';
+  'Statement import is set up on this server, but its parser is not responding.';
 
 const ACTIVE_WORKER_STATUSES = new Set<WorkerHeartbeatRuntimeStatus>(['idle', 'processing']);
 
@@ -34,18 +32,31 @@ type WorkerHeartbeatUpsertInput = {
   parserError: string | null;
 };
 
+const PENSION_IMPORT_LIFECYCLE = getCapabilityDefinition('pensionImport').lifecycle;
+
 function buildCapability(
   enabled: boolean,
   message: string,
   checkedAt: Date,
   reason: AppCapabilityReason | null = null,
+  lifecycle: AppCapabilityLifecycle = 'stable',
 ): AppCapabilityStatus {
   return {
     enabled,
     reason,
     message,
+    lifecycle,
     checkedAt: checkedAt.toISOString(),
   };
+}
+
+function pensionImportCapability(
+  enabled: boolean,
+  message: string,
+  checkedAt: Date,
+  reason: AppCapabilityReason | null = null,
+): AppCapabilityStatus {
+  return buildCapability(enabled, message, checkedAt, reason, PENSION_IMPORT_LIFECYCLE);
 }
 
 async function getWorkerHeartbeat(workerName: string) {
@@ -61,37 +72,28 @@ function resolvePensionImportCapabilityFromHeartbeat(
   now: Date,
 ): AppCapabilityStatus {
   if (!heartbeat || !ACTIVE_WORKER_STATUSES.has(heartbeat.status as WorkerHeartbeatRuntimeStatus)) {
-    return buildCapability(false, PENSION_IMPORT_DISABLED_MESSAGE, now, 'worker_unavailable');
+    return pensionImportCapability(
+      false,
+      PENSION_IMPORT_DISABLED_MESSAGE,
+      now,
+      'worker_unavailable',
+    );
   }
 
   if (now.getTime() - heartbeat.lastHeartbeatAt.getTime() > WORKER_HEARTBEAT_STALE_AFTER_MS) {
-    return buildCapability(false, PENSION_IMPORT_DISABLED_MESSAGE, now, 'worker_stale');
+    return pensionImportCapability(false, PENSION_IMPORT_DISABLED_MESSAGE, now, 'worker_stale');
   }
 
   if (!heartbeat.parserHealthy || heartbeat.parserCheckedAt === null) {
-    return buildCapability(false, PENSION_IMPORT_DISABLED_PARSER_MESSAGE, now, 'parser_unhealthy');
+    return pensionImportCapability(
+      false,
+      PENSION_IMPORT_DISABLED_PARSER_MESSAGE,
+      now,
+      'parser_unhealthy',
+    );
   }
 
-  return buildCapability(true, PENSION_IMPORT_AVAILABLE_MESSAGE, now);
-}
-
-function toAiCapability(
-  pensionStatementImport: AppCapabilityStatus,
-  now: Date,
-): AppCapabilityStatus {
-  if (pensionStatementImport.enabled) {
-    return buildCapability(true, AI_AVAILABLE_MESSAGE, now);
-  }
-
-  if (pensionStatementImport.reason === 'not_configured') {
-    return buildCapability(false, AI_DISABLED_NOT_CONFIGURED_MESSAGE, now, 'not_configured');
-  }
-
-  if (pensionStatementImport.reason === 'parser_unhealthy') {
-    return buildCapability(false, AI_DISABLED_PARSER_MESSAGE, now, pensionStatementImport.reason);
-  }
-
-  return buildCapability(false, AI_DISABLED_MESSAGE, now, pensionStatementImport.reason);
+  return pensionImportCapability(true, PENSION_IMPORT_AVAILABLE_MESSAGE, now);
 }
 
 // Document storage is part of the core: the filesystem store needs no configuration, and the
@@ -100,7 +102,7 @@ const DOCUMENTS_AVAILABLE_MESSAGE = 'Document storage is available.';
 
 function getConfiguredCapability(id: 'bunq', now: Date): AppCapabilityStatus {
   const { enabled, message, reason } = evaluateCapability(id);
-  return buildCapability(enabled, message, now, reason);
+  return buildCapability(enabled, message, now, reason, getCapabilityDefinition(id).lifecycle);
 }
 
 export async function upsertWorkerHeartbeat(input: WorkerHeartbeatUpsertInput): Promise<void> {
@@ -134,17 +136,15 @@ export async function getPensionStatementImportCapability(
 ): Promise<AppCapabilityStatus> {
   const configured = evaluateCapability('pensionImport');
   if (!configured.enabled) {
-    return buildCapability(false, configured.message, now, 'not_configured');
+    return pensionImportCapability(false, configured.message, now, 'not_configured');
   }
   const heartbeat = await getWorkerHeartbeat(PENSION_IMPORT_WORKER_NAME);
   return resolvePensionImportCapabilityFromHeartbeat(heartbeat, now);
 }
 
 export async function getAppCapabilities(now = new Date()): Promise<AppCapabilities> {
-  const pensionStatementImport = await getPensionStatementImportCapability(now);
   return {
-    ai: toAiCapability(pensionStatementImport, now),
-    pensionStatementImport,
+    pensionStatementImport: await getPensionStatementImportCapability(now),
     bunq: getConfiguredCapability('bunq', now),
     documents: buildCapability(true, DOCUMENTS_AVAILABLE_MESSAGE, now),
   };

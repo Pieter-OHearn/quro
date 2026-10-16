@@ -24,15 +24,17 @@ await mock.module('../lib/capabilities', () => {
     Promise.resolve({
       enabled: pensionImportCapabilityEnabled,
       reason: pensionImportCapabilityEnabled ? null : 'worker_unavailable',
-      message: pensionImportCapabilityEnabled ? 'AI import is available.' : 'AI import disabled',
+      message: pensionImportCapabilityEnabled
+        ? 'Statement import is available.'
+        : 'Statement import disabled',
+      lifecycle: 'experimental' as const,
       checkedAt: new Date('2026-03-01T12:00:00.000Z').toISOString(),
     });
   return {
     getPensionStatementImportCapability,
-    getAppCapabilities: async () => {
-      const pensionStatementImport = await getPensionStatementImportCapability();
-      return { ai: pensionStatementImport, pensionStatementImport };
-    },
+    getAppCapabilities: async () => ({
+      pensionStatementImport: await getPensionStatementImportCapability(),
+    }),
   };
 });
 
@@ -386,7 +388,7 @@ describe('pension imports integration', () => {
     pensionImportCapabilityEnabled = true;
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
-      error: 'AI import disabled',
+      error: 'Statement import disabled',
       reason: 'worker_unavailable',
     });
   });

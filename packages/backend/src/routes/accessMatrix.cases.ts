@@ -1144,6 +1144,12 @@ export const ACCESS_CASES: AccessCase[] = [
   },
   {
     kind: 'list',
+    route: 'GET /api/dashboard/setup',
+    scope: 'joint',
+    build: () => get('/api/dashboard/setup'),
+  },
+  {
+    kind: 'list',
     route: 'GET /api/plan/runway',
     scope: 'joint',
     build: () => get('/api/plan/runway'),

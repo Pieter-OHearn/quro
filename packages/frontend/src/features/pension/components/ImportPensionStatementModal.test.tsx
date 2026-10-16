@@ -42,7 +42,7 @@ test('new imports show the upload step with pension identity', () => {
 });
 test('queued and processing imports keep their corresponding progress captions', () => {
   expect(renderImport('queued')).toContain('waiting in the processing queue');
-  expect(renderImport('processing')).toContain('AI is extracting');
+  expect(renderImport('processing')).toContain('Quro is reading');
 });
 test('review and committed imports show review controls and require valid rows to commit', () => {
   for (const status of ['ready_for_review', 'committed'] as const) {

@@ -1,7 +1,12 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client';
-import { bunqConnections, bunqOauthAttempts } from '../db/schema';
+import {
+  bunqConnections,
+  bunqOauthAttempts,
+  savingsAccounts,
+  savingsTransactions,
+} from '../db/schema';
 import { consumeOAuthAttempt } from '../lib/bunqOAuthAttempts';
 import { BUNQ_TEST_ORIGIN, bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
@@ -113,6 +118,65 @@ describe('bunq unconfigured', () => {
     };
     expect(body.data.bunq).toMatchObject({ enabled: false, reason: 'not_configured' });
     expect(body.data.bunq.message).toContain('unavailable');
+  });
+});
+
+describe('bunq switched off after use', () => {
+  test('hides the integration but keeps the connection and everything it imported', async () => {
+    const user = await newUser('switched-off');
+    mockTokenExchange();
+    expect((await callback(await startAttempt(user.cookie))).status).toBe(302);
+    // Rows a sync would have written: an account linked to a bunq account and one transaction.
+    const [account] = await db
+      .insert(savingsAccounts)
+      .values({
+        userId: user.user.id,
+        name: 'Synced account',
+        bank: 'bunq',
+        balance: 120,
+        currency: 'EUR',
+        interestRate: 0,
+        accountType: 'Easy Access',
+        bunqAccountId: 'synthetic-bunq-account',
+      })
+      .returning({ id: savingsAccounts.id });
+    await db.insert(savingsTransactions).values({
+      userId: user.user.id,
+      accountId: account.id,
+      type: 'deposit',
+      amount: 120,
+      date: '2026-03-01',
+      bunqTransactionId: 'synthetic-bunq-payment',
+    });
+
+    clearBunqTestEnv();
+
+    expect(
+      (await integration.request('/api/bunq/connection', { cookie: user.cookie })).status,
+    ).toBe(404);
+    const capabilities = await integration.request('/api/capabilities', { cookie: user.cookie });
+    expect(((await capabilities.json()) as { data: { bunq: unknown } }).data.bunq).toMatchObject({
+      enabled: false,
+      reason: 'not_configured',
+      lifecycle: 'stable',
+    });
+    const accounts = await integration.request('/api/savings/accounts', { cookie: user.cookie });
+    expect(accounts.status).toBe(200);
+    const accountRows = ((await accounts.json()) as { data: Array<{ id: number }> }).data;
+    expect(accountRows.map((row) => row.id)).toEqual([account.id]);
+    const transactions = await integration.request(
+      `/api/savings/transactions?accountId=${account.id}`,
+      { cookie: user.cookie },
+    );
+    expect(transactions.status).toBe(200);
+    expect(((await transactions.json()) as { data: unknown[] }).data).toHaveLength(1);
+    expect(await connectionsFor(user.user.id)).toHaveLength(1);
+
+    // Switching it back on finds the same connection.
+    setBunqTestEnv();
+    const connection = await integration.request('/api/bunq/connection', { cookie: user.cookie });
+    expect(connection.status).toBe(200);
+    expect(((await connection.json()) as { data: unknown }).data).not.toBeNull();
   });
 });
 

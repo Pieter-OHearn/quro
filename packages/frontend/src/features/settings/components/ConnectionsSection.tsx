@@ -1,11 +1,12 @@
 import { FormErrorNotice, SettingsCard, useSavedState } from './settingsForm';
 /* eslint-disable max-lines-per-function */
 import { useState } from 'react';
+import type { AppCapabilities, AppCapabilityStatus } from '@quro/shared';
 
 import { Check, Link2, RefreshCw, Unlink } from 'lucide-react';
 import { Badge, Button, LoadingState, Modal, TextInput } from '@/components/ui';
 import { buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
-import { useBunqAvailability } from '@/lib/useAppCapabilities';
+import { useAppCapabilities, useBunqAvailability } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
 import {
   useBunqConnection,
@@ -15,6 +16,81 @@ import {
   useUpdateCategoryMapping,
   type CategoryMapping,
 } from '../hooks';
+
+const ROADMAP_URL = 'https://github.com/Pieter-OHearn/quro/blob/main/ROADMAP.md';
+
+type FeatureRow = {
+  key: 'bunq' | 'pensionStatementImport' | 'documents';
+  name: string;
+  /** What the feature is, when it is on. */
+  summary: string;
+};
+
+const FEATURE_ROWS: readonly FeatureRow[] = [
+  { key: 'documents', name: 'Document storage', summary: 'Payslips and statements you attach.' },
+  { key: 'bunq', name: 'Bunq linking', summary: 'Sync savings accounts and transactions.' },
+  {
+    key: 'pensionStatementImport',
+    name: 'Statement import',
+    summary: 'Read pension statement PDFs with a local model.',
+  },
+];
+
+function featureState(status: AppCapabilityStatus): { label: string; tone: 'success' | 'muted' } {
+  return status.enabled ? { label: 'On', tone: 'success' } : { label: 'Off', tone: 'muted' };
+}
+
+// What this server offers, as the server reports it. Optional features are switched on by the
+// operator, so an "Off" row says why instead of offering a button that cannot work.
+export function FeaturesList({ capabilities }: Readonly<{ capabilities: AppCapabilities }>) {
+  return (
+    <SettingsCard
+      title="Features on this server"
+      subtitle="Optional features are switched on by whoever runs this server."
+      flush
+      footer={
+        <a
+          href={ROADMAP_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-sm text-cell font-medium text-brand hover:text-brand-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+        >
+          See the roadmap
+        </a>
+      }
+    >
+      <ul className="divide-y divide-border-subtle">
+        {FEATURE_ROWS.map(({ key, name, summary }) => {
+          const status = capabilities[key];
+          const state = featureState(status);
+          return (
+            <li key={key} className="flex items-start justify-between gap-3 px-4 py-2">
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-2 text-cell font-medium text-fg">
+                  {name}
+                  {status.lifecycle === 'experimental' ? (
+                    <Badge tone="warning" size="xs">
+                      Experimental
+                    </Badge>
+                  ) : null}
+                </p>
+                <p className="text-caption text-fg-subtle">
+                  {status.enabled ? summary : status.message}
+                </p>
+              </div>
+              <Badge tone={state.tone}>{state.label}</Badge>
+            </li>
+          );
+        })}
+      </ul>
+    </SettingsCard>
+  );
+}
+
+function FeaturesCard() {
+  const { data: capabilities } = useAppCapabilities();
+  return capabilities ? <FeaturesList capabilities={capabilities} /> : null;
+}
 
 function formatSyncTime(value: string | null): string {
   if (!value) return 'Never synced';
@@ -115,6 +191,19 @@ export function DisconnectBunqDialog({
   );
 }
 
+// A server without bunq set up has nothing to connect, so it offers no button; the card says why.
+function ConnectBunqButton({
+  unavailable,
+  onConnect,
+}: Readonly<{ unavailable: boolean; onConnect: () => void }>) {
+  if (unavailable) return null;
+  return (
+    <Button variant="primary" size="sm" leadingIcon={<Link2 size={14} />} onClick={onConnect}>
+      Connect
+    </Button>
+  );
+}
+
 export function ConnectionsSection() {
   const { data: connection, isLoading } = useBunqConnection();
   const disconnect = useDisconnectBunq();
@@ -205,21 +294,15 @@ export function ConnectionsSection() {
                 </Button>
               </>
             ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                leadingIcon={<Link2 size={14} />}
-                disabled={bunqUnavailable}
-                onClick={handleConnect}
-              >
-                Connect
-              </Button>
+              <ConnectBunqButton unavailable={bunqUnavailable} onConnect={handleConnect} />
             )}
           </div>
         </div>
       </SettingsCard>
 
       <CategoryMappingsSection />
+
+      <FeaturesCard />
 
       {confirmingDisconnect ? (
         <DisconnectBunqDialog

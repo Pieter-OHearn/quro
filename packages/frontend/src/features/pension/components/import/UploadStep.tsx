@@ -70,8 +70,9 @@ function UploadInfoPanel() {
   return (
     <p className="flex items-start gap-2 text-caption text-fg-subtle">
       <Brain size={12} className="mt-0.5 shrink-0 text-fg-faint" aria-hidden />
-      Quro&apos;s AI will extract contributions, fees, and annual totals. You&apos;ll review every
-      row in a staging area before anything is committed to your ledger.
+      Statement import is experimental. A local model reads contributions, fees, and annual totals,
+      and its output can be wrong. You&apos;ll review every row in a staging area before anything is
+      committed to your ledger.
     </p>
   );
 }
