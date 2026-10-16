@@ -16,7 +16,7 @@ import {
   EmojiPickerField,
   IconButton,
 } from '@/components/ui';
-import { monthlyInterest, type SavingsAccount } from '@quro/shared';
+import { monthlyInterest, type SavingsAccount, TEXT_FIELD_LIMITS } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
 import type { DeleteSavingsAccountMode, SaveAccountInput } from '../types';
 
@@ -128,6 +128,7 @@ function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
           <TextInput
             data-testid="savings-account-name-input"
             value={form.name}
+            maxLength={TEXT_FIELD_LIMITS.savingsAccount.name}
             onChange={(v) => set('name', v)}
             error={Boolean(errors.name)}
             placeholder="e.g. ASN Spaarrekening"
@@ -138,6 +139,7 @@ function AccountBasicFields({ form, errors, set }: AccountFormBodyProps) {
         <TextInput
           data-testid="savings-account-bank-input"
           value={form.bank}
+          maxLength={TEXT_FIELD_LIMITS.savingsAccount.bank}
           onChange={(v) => set('bank', v)}
           error={Boolean(errors.bank)}
           placeholder="e.g. Rabobank"

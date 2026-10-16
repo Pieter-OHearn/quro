@@ -19,6 +19,7 @@ import {
   type MortgageRateType,
   type MortgageRepaymentType,
   type Property,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
 import { useAddMortgageForm } from '../hooks';
@@ -74,6 +75,7 @@ function LenderCurrencyGrid({ form, errors, setField }: PropertySectionProps) {
           error={Boolean(errors.lender)}
           placeholder="e.g. ABN AMRO"
           value={form.lender}
+          maxLength={TEXT_FIELD_LIMITS.mortgage.lender}
           onChange={(value) => setField('lender', value)}
         />
       </FormField>

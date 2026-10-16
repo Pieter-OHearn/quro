@@ -2,7 +2,13 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { UpdateUserProfileInput, User } from '@quro/shared';
-import { MAX_RETIREMENT_AGE, MAX_USER_AGE, MIN_RETIREMENT_AGE, MIN_USER_AGE } from '@quro/shared';
+import {
+  MAX_RETIREMENT_AGE,
+  MAX_USER_AGE,
+  MIN_RETIREMENT_AGE,
+  MIN_USER_AGE,
+  TEXT_FIELD_LIMITS,
+} from '@quro/shared';
 import { FormField, StatCard, TextInput } from '@/components/ui';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
 
@@ -88,6 +94,7 @@ function ProfileForm({
           <TextInput
             placeholder="John"
             value={form.firstName}
+            maxLength={TEXT_FIELD_LIMITS.profile.firstName}
             error={Boolean(errors.firstName)}
             onChange={(value) => {
               setForm((current) => ({ ...current, firstName: value }));
@@ -99,6 +106,7 @@ function ProfileForm({
           <TextInput
             placeholder="Doe"
             value={form.lastName}
+            maxLength={TEXT_FIELD_LIMITS.profile.lastName}
             error={Boolean(errors.lastName)}
             onChange={(value) => {
               setForm((current) => ({ ...current, lastName: value }));
@@ -113,6 +121,7 @@ function ProfileForm({
           type="email"
           placeholder="you@example.com"
           value={form.email}
+          maxLength={TEXT_FIELD_LIMITS.profile.email}
           error={Boolean(errors.email)}
           onChange={(value) => {
             setForm((current) => ({ ...current, email: value }));
@@ -169,6 +178,7 @@ function ProfileForm({
         <TextInput
           placeholder="Amsterdam, Netherlands"
           value={form.location}
+          maxLength={TEXT_FIELD_LIMITS.profile.location}
           onChange={(value) => {
             setForm((current) => ({ ...current, location: value }));
           }}

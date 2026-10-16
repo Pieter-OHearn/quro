@@ -1,3 +1,4 @@
+import { TEXT_FIELD_LIMITS } from '@quro/shared';
 import { findOwnedRow } from '../lib/access';
 import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
@@ -45,6 +46,7 @@ import {
   parseId,
   type ParseResult,
   readJsonBody,
+  checkTextLimits,
   rejectUnknownFields,
 } from '../lib/requestValidation';
 import { toNumberOrZero } from '../lib/numbers';
@@ -951,6 +953,7 @@ app.get('/:id/rows', async (c) => {
   });
 });
 
+// eslint-disable-next-line complexity
 app.patch('/:id/rows/:rowId', async (c) => {
   const user = getAuthUser(c);
   const importId = parseId(c.req.param('id'));
@@ -976,6 +979,8 @@ app.patch('/:id/rows/:rowId', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No import row fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.pensionTransaction, existing);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const validated = validateEditableRowUpdate({
     importRecord: editableImport,

@@ -10,6 +10,7 @@ import {
   validateInterestWithinAmount,
   type DebtPayload,
   type DebtPaymentPayload,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db, type DbExecutor } from '../db/client';
@@ -33,6 +34,7 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
   readJsonRecord,
 } from '../lib/requestValidation';
 
@@ -224,6 +226,8 @@ async function createDebt(params: {
 }): Promise<RouteMutationResult> {
   const parsed = parseDebtPayload(params.raw);
   if (!parsed.ok) return { error: parsed.error, status: HTTP_STATUS.BAD_REQUEST };
+  const lengths = await checkTextLimits(parsed.value, TEXT_FIELD_LIMITS.debt);
+  if (!lengths.ok) return { error: lengths.error, status: HTTP_STATUS.BAD_REQUEST };
 
   const [data] = await db
     .insert(debts)
@@ -243,6 +247,8 @@ async function updateDebt(params: {
 
   const parsed = mergeDebtPayload(params.raw, existing);
   if (!parsed.ok) return { error: parsed.error, status: HTTP_STATUS.BAD_REQUEST };
+  const lengths = await checkTextLimits(parsed.value, TEXT_FIELD_LIMITS.debt, existing);
+  if (!lengths.ok) return { error: lengths.error, status: HTTP_STATUS.BAD_REQUEST };
 
   const [data] = await db
     .update(debts)
@@ -260,6 +266,8 @@ async function createDebtPayment(params: {
 }): Promise<RouteMutationResult> {
   const parsed = parseDebtPaymentPayload(params.raw);
   if (!parsed.ok) return { error: parsed.error, status: HTTP_STATUS.BAD_REQUEST };
+  const lengths = await checkTextLimits(parsed.value, TEXT_FIELD_LIMITS.debtPayment);
+  if (!lengths.ok) return { error: lengths.error, status: HTTP_STATUS.BAD_REQUEST };
 
   return await db.transaction(async (tx) => {
     const debt = await getDebtById(tx, params.userId, parsed.value.debtId);

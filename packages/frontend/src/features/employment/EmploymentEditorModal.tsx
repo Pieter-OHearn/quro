@@ -1,3 +1,4 @@
+import { TEXT_FIELD_LIMITS } from '@quro/shared';
 import { useEffect, useState } from 'react';
 import type { Employment, EmploymentInput, EmploymentType } from '@quro/shared';
 import { FormField, Modal, ModalFooter, SelectInput, TextInput } from '@/components/ui';
@@ -93,6 +94,7 @@ export function EmploymentEditorModal({
         <FormField label="Employer or business" required>
           <TextInput
             value={form.employerName}
+            maxLength={TEXT_FIELD_LIMITS.employment.employerName}
             onChange={(value) => set('employerName', value)}
             placeholder="Employer name"
           />

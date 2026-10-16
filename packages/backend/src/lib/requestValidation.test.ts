@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  checkTextLimits,
   err,
   MONEY_LIMIT,
   moneyLimitError,
@@ -362,5 +363,36 @@ describe('unit prices', () => {
     expect(parseOptionalUnitPriceField(null, 'bad')).toEqual(ok(null));
     expect(parseOptionalUnitPriceField('', 'bad')).toEqual(ok(null));
     expect(parseOptionalUnitPriceField('12.3456', 'bad', 0)).toEqual(ok(12.3456));
+  });
+});
+
+describe('checkTextLimits', () => {
+  const limits = { name: 5, notes: 8 };
+
+  test('accepts values at the limit and refuses one over, naming the field', async () => {
+    expect((await checkTextLimits({ name: 'abcde' }, limits)).ok).toBe(true);
+    const over = await checkTextLimits({ name: 'abcdef' }, limits);
+    expect(over).toEqual({ ok: false, error: 'name must be at most 5 characters' });
+  });
+
+  test('measures the trimmed value and ignores non-strings and missing fields', async () => {
+    expect((await checkTextLimits({ name: '  abcde  ' }, limits)).ok).toBe(true);
+    expect((await checkTextLimits({ name: 12, other: 'x'.repeat(50) }, limits)).ok).toBe(true);
+    expect((await checkTextLimits('text', limits)).ok).toBe(true);
+  });
+
+  test('accepts an unchanged long value but not a changed one', async () => {
+    const existing = { name: 'abcdefghij' };
+    expect((await checkTextLimits({ name: 'abcdefghij' }, limits, existing)).ok).toBe(true);
+    expect((await checkTextLimits({ name: 'abcdefghijk' }, limits, existing)).ok).toBe(false);
+    let loads = 0;
+    const loader = () => {
+      loads += 1;
+      return Promise.resolve(existing);
+    };
+    expect((await checkTextLimits({ name: 'abc' }, limits, loader)).ok).toBe(true);
+    expect(loads).toBe(0);
+    expect((await checkTextLimits({ name: 'abcdefghij' }, limits, loader)).ok).toBe(true);
+    expect(loads).toBe(1);
   });
 });

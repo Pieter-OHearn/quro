@@ -20,6 +20,7 @@ import {
   MONTH_ABBREVIATIONS,
   type GoalType,
   type SavingsAccount,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddGoalModal } from '../hooks';
@@ -347,6 +348,7 @@ function AmountFieldsAnnual({
         <TextInput
           placeholder="e.g. books, %, EUR/mo"
           value={form.unit}
+          maxLength={TEXT_FIELD_LIMITS.goal.unit}
           onChange={(value) => setField('unit', value)}
         />
       </FormField>
@@ -482,6 +484,7 @@ function GoalDetailsNameRow({
         <TextInput
           placeholder="e.g. Hit 100k salary"
           value={form.name}
+          maxLength={TEXT_FIELD_LIMITS.goal.name}
           onChange={(value) => setField('name', value)}
         />
       </FormField>
@@ -627,6 +630,7 @@ export function GoalDetailsStep({
           rows={2}
           placeholder="Any extra context..."
           value={form.notes}
+          maxLength={TEXT_FIELD_LIMITS.goal.notes}
           onChange={(value) => setField('notes', value)}
         />
       </FormField>

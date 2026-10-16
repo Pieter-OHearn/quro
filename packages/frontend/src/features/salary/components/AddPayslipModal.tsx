@@ -7,6 +7,7 @@ import {
   type Employment,
   type Payslip,
   type PayslipDocument,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { Info, Trash2 } from 'lucide-react';
 import {
@@ -145,6 +146,7 @@ function PayslipPeriodField({ form, errors, set, disabled }: Readonly<PayslipFor
       <TextInput
         data-testid="salary-payslip-month-input"
         value={form.month}
+        maxLength={TEXT_FIELD_LIMITS.payslip.month}
         onChange={(value) => set('month', value)}
         placeholder="e.g. Mar 2026"
         error={Boolean(errors.month)}

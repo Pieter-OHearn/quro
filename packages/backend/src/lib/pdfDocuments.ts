@@ -3,7 +3,9 @@ import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { HTTP_STATUS } from '../constants/http';
 import { getDocumentStore } from './documentStorage';
+import { TEXT_LIMITS } from '@quro/shared';
 import { log, errorFields } from './logger';
+import { textLimitError } from './requestValidation';
 
 const PDF_MAGIC = Buffer.from('%PDF', 'ascii');
 
@@ -78,6 +80,9 @@ export function validateUploadedPdf(file: File): { valid: true } | { valid: fals
   if (file.size <= 0) return { valid: false, error: 'Uploaded file is empty' };
   if (file.size > MAX_PDF_SIZE_BYTES) return { valid: false, error: PDF_TOO_LARGE_ERROR };
   if (!hasPdfExtension(file.name)) return { valid: false, error: 'Only PDF files are allowed' };
+  if (file.name.length > TEXT_LIMITS.fileName) {
+    return { valid: false, error: textLimitError('fileName', TEXT_LIMITS.fileName) };
+  }
   if (!isAllowedPdfMimeType(file.type))
     return { valid: false, error: 'Only PDF files are allowed' };
   return { valid: true };

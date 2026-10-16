@@ -4,7 +4,7 @@ import { CURRENCY_CODES, type CurrencyCode, useCurrency } from '@/lib/CurrencyCo
 import { Change, Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
 import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import { JointToggleField } from '@/features/partner';
-import { DEFAULT_EMOJI, type Property } from '@quro/shared';
+import { DEFAULT_EMOJI, type Property, TEXT_FIELD_LIMITS } from '@quro/shared';
 
 const PROPERTY_TYPES = [
   'Buy-to-Let',
@@ -78,6 +78,7 @@ function PropertyIdentityFields({ form, errors, onSet }: PropertyFormFieldsProps
         <FormField label="Address" required error={errors.address} className="flex-1">
           <TextInput
             value={form.address}
+            maxLength={TEXT_FIELD_LIMITS.property.address}
             onChange={(value) => onSet('address', value)}
             error={Boolean(errors.address)}
             placeholder="e.g. Keizersgracht 12, Amsterdam"

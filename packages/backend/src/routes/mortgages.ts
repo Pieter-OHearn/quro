@@ -16,6 +16,7 @@ import {
   validateRateChange,
   validateRepaymentSplit,
   type MortgageTransactionPayload,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
@@ -54,6 +55,7 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
   pickPatchedValue,
   readJsonBody,
   rejectUnknownFields,
@@ -681,6 +683,7 @@ app.get('/:id', async (c) => {
   return c.json({ data });
 });
 
+// eslint-disable-next-line complexity
 app.post('/', async (c) => {
   const user = getAuthUser(c);
   const rawBody = await readJsonBody(c.req, 'Invalid mortgage payload');
@@ -714,6 +717,8 @@ app.post('/', async (c) => {
     propertyValue,
   });
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.mortgage);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   // A mortgage linked to a joint property is joint too (and vice versa).
   const isJoint = body.value.isJoint || property.isJoint;
@@ -755,6 +760,8 @@ app.patch('/:id', async (c) => {
 
   const body = await readMortgagePatchPayload(c.req);
   if (!body.ok) return c.json({ error: body.error }, body.status);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.mortgage, existingMortgage);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
   const patchContext = await prepareMortgagePatch({
     userId: user.id,
     partnerId,
@@ -822,6 +829,8 @@ app.post('/transactions', async (c) => {
 
   const body = parseMortgageTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.mortgageTransaction);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const partnerId = getPartnerId(c);
   const result = await db.transaction(async (tx) => {
@@ -852,6 +861,7 @@ app.post('/transactions', async (c) => {
   return c.json({ data: result.data }, HTTP_STATUS.CREATED);
 });
 
+// eslint-disable-next-line complexity, max-lines-per-function
 app.patch('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
@@ -873,6 +883,12 @@ app.patch('/transactions/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No mortgage transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(
+    body.value,
+    TEXT_FIELD_LIMITS.mortgageTransaction,
+    existing,
+  );
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
   const nextMortgageId = body.value.mortgageId ?? existing.mortgageId;
   if (
     nextMortgageId !== existing.mortgageId &&

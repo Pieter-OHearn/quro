@@ -19,6 +19,7 @@ import {
   type TickerItemType,
   type TickerLookupResult,
   todayIsoDate,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import { useTickerLookup } from '../hooks/useTickerLookup';
@@ -292,6 +293,7 @@ function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
       <FormField label="Security name" required error={errors.name} className="col-span-2">
         <TextInput
           value={form.name}
+          maxLength={TEXT_FIELD_LIMITS.holding.name}
           onChange={(value) => onChange('name', value)}
           error={Boolean(errors.name)}
           placeholder="e.g. Vanguard FTSE All-World"
@@ -300,6 +302,7 @@ function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
       <FormField label="Ticker" required error={errors.ticker}>
         <TextInput
           value={form.ticker}
+          maxLength={TEXT_FIELD_LIMITS.holding.ticker}
           onChange={(value) => onChange('ticker', value)}
           error={Boolean(errors.ticker)}
           placeholder="VWCE"

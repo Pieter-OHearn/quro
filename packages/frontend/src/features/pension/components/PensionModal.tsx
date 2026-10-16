@@ -14,7 +14,7 @@ import {
   TextInput,
   Textarea,
 } from '@/components/ui';
-import { DEFAULT_EMOJI, type PensionPot } from '@quro/shared';
+import { DEFAULT_EMOJI, type PensionPot, TEXT_FIELD_LIMITS } from '@quro/shared';
 import { PENSION_TYPES, PALETTE } from '../constants';
 
 type PensionModalProps = {
@@ -109,6 +109,7 @@ function PensionEmojiNameRow({ form, errors, set }: Readonly<PensionFormFields>)
       <FormField label="Pension name" required error={errors.name} className="flex-1">
         <TextInput
           value={form.name}
+          maxLength={TEXT_FIELD_LIMITS.pensionPot.name}
           onChange={(v) => set('name', v)}
           error={Boolean(errors.name)}
           placeholder="e.g. ABP Workplace Pension"
@@ -124,6 +125,7 @@ function PensionProviderTypeRow({ form, errors, set }: Readonly<PensionFormField
       <FormField label="Provider" required error={errors.provider}>
         <TextInput
           value={form.provider}
+          maxLength={TEXT_FIELD_LIMITS.pensionPot.provider}
           onChange={(v) => set('provider', v)}
           error={Boolean(errors.provider)}
           placeholder="e.g. ABP, AustralianSuper"

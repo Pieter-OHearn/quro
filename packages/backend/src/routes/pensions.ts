@@ -2,7 +2,12 @@ import { findOwnedRow } from '../lib/access';
 import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
 import { registerArchivableResource } from '../lib/archivableResource';
 import { Hono } from 'hono';
-import { PENSION_POT_TYPES, type CurrencyCode, type PensionPotType } from '@quro/shared';
+import {
+  PENSION_POT_TYPES,
+  type CurrencyCode,
+  type PensionPotType,
+  TEXT_FIELD_LIMITS,
+} from '@quro/shared';
 import { db, type DbTransaction } from '../db/client';
 import { pensionPots, pensionTransactions } from '../db/schema';
 import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
@@ -37,6 +42,7 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
   readJsonBody,
   rejectUnknownFields,
 } from '../lib/requestValidation';
@@ -727,6 +733,8 @@ app.post('/pots', async (c) => {
 
   const body = parsePensionPotCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.pensionPot);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
     .insert(pensionPots)
@@ -748,6 +756,10 @@ app.patch('/pots/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No pension pot fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.pensionPot, () =>
+    findOwnedRow(pensionPots, id, user.id),
+  );
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
     .update(pensionPots)
@@ -787,6 +799,8 @@ app.post('/transactions', async (c) => {
 
   const validated = parsePensionTransactionCreate(rawBody.value);
   if (!validated.ok) return c.json({ error: validated.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(validated.value, TEXT_FIELD_LIMITS.pensionTransaction);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const result = await createPensionTransaction({ userId: user.id, payload: validated.value });
   if ('error' in result) return c.json({ error: result.error }, result.status);
@@ -806,6 +820,10 @@ app.patch('/transactions/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No pension transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.pensionTransaction, () =>
+    findOwnedRow(pensionTransactions, id, user.id),
+  );
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const result = await updatePensionTransaction({
     userId: user.id,

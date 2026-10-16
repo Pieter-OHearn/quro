@@ -12,6 +12,7 @@ import {
   type BudgetMonth,
   type ExpenseClass,
   type CurrencyCode,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
 import { db, type DbTransaction } from '../db/client';
@@ -35,6 +36,7 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
   readJsonBody,
   rejectUnknownFields,
 } from '../lib/requestValidation';
@@ -391,6 +393,8 @@ app.post('/categories', async (c) => {
 
   const body = parseBudgetCategoryCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.budgetCategory);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
     .insert(budgetCategories)
@@ -415,6 +419,10 @@ app.patch('/categories/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No budget category fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.budgetCategory, () =>
+    findOwnedRow(budgetCategories, id, user.id),
+  );
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
     .update(budgetCategories)
@@ -511,6 +519,8 @@ app.post('/transactions', async (c) => {
 
   const body = parseBudgetTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.budgetTransaction);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const category = await findOwnedRow(budgetCategories, body.value.categoryId, user.id);
   if (!category) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
@@ -527,6 +537,7 @@ app.post('/transactions', async (c) => {
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
+// eslint-disable-next-line complexity
 app.patch('/transactions/:id', async (c) => {
   const user = getAuthUser(c);
   const id = parseId(c.req.param('id'));
@@ -534,6 +545,10 @@ app.patch('/transactions/:id', async (c) => {
 
   const body = await readBudgetTransactionPatch(c.req);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.budgetTransaction, () =>
+    findOwnedRow(budgetTransactions, id, user.id),
+  );
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const patch = await normalizeBudgetTransactionMoney(body.value);
   const current = await findOwnedRow(budgetTransactions, id, user.id);
@@ -655,6 +670,12 @@ app.patch('/category-mappings/:id', async (c) => {
 
   const categoryName = parseTextField(rawBody.value.categoryName, 'categoryName');
   if (!categoryName.ok) return c.json({ error: categoryName.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(
+    { categoryName: categoryName.value },
+    TEXT_FIELD_LIMITS.categoryMapping,
+    () => findOwnedRow(categoryMappings, id, user.id),
+  );
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
     .update(categoryMappings)

@@ -12,6 +12,7 @@ import {
   type TickerLookupResult,
   toDateOnly,
   toDateOnlyOr,
+  TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { db } from '../db/client';
 import { holdings, holdingPriceHistory, holdingTransactions, stockExchanges } from '../db/schema';
@@ -43,6 +44,7 @@ import {
   parseRequiredFields,
   type ParseResult,
   parseTextField,
+  checkTextLimits,
   parseUnitPriceField,
   readJsonBody,
   rejectUnknownFields,
@@ -487,6 +489,8 @@ app.post('/holdings', async (c) => {
 
   const body = parseHoldingCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.holding);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const { priceCurrency: rawPriceCurrency, eodDate: rawEodDate, ...insertPayload } = body.value;
   const [data] = await db
@@ -530,6 +534,10 @@ app.patch('/holdings/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No holding fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.holding, () =>
+    findOwnedRow(holdings, id, user.id),
+  );
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db
     .update(holdings)
@@ -680,6 +688,8 @@ app.post('/holding-transactions', async (c) => {
 
   const body = parseHoldingTransactionCreate(rawBody.value);
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.holdingTransaction);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const holding = await findOwnedRow(holdings, body.value.holdingId, user.id);
   if (!holding) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
@@ -711,6 +721,8 @@ app.patch('/holding-transactions/:id', async (c) => {
   if (Object.keys(body.value).length === 0) {
     return c.json({ error: 'No holding transaction fields provided' }, HTTP_STATUS.BAD_REQUEST);
   }
+  const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.holdingTransaction, existing);
+  if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const merged = mergeHoldingTransactionPayload(body.value, existing);
   if (!merged.ok) return c.json({ error: merged.error }, HTTP_STATUS.BAD_REQUEST);

@@ -384,3 +384,44 @@ export function parseOptionalMoneyField(
   if (value == null || value === '') return ok(null);
   return parseMoneyField(value, options);
 }
+
+/** The stored row an edit applies to, or a loader for it (only called when a limit is exceeded). */
+export type ExistingTextSource =
+  | Readonly<Record<string, unknown>>
+  | null
+  | undefined
+  | (() => Promise<Readonly<Record<string, unknown>> | null | undefined>);
+
+export function textLimitError(field: string, limit: number): string {
+  return `${field} must be at most ${limit} characters`;
+}
+
+/**
+ * Rejects a request body whose text fields exceed their limits (see `TEXT_FIELD_LIMITS` in
+ * `@quro/shared`), naming the field. A value that equals the stored one is accepted, so editing
+ * a row that predates the limits does not fail on a field the request leaves unchanged. Values
+ * that are not strings are left to the field parsers.
+ */
+export async function checkTextLimits(
+  body: unknown,
+  limits: Readonly<Record<string, number>>,
+  existing?: ExistingTextSource,
+): Promise<ParseResult<void>> {
+  if (!isRecord(body)) return ok(undefined);
+  let stored: Readonly<Record<string, unknown>> | null | undefined;
+  let storedLoaded = false;
+  for (const [field, limit] of Object.entries(limits)) {
+    const value = body[field];
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (trimmed.length <= limit) continue;
+    if (!storedLoaded) {
+      stored = typeof existing === 'function' ? await existing() : existing;
+      storedLoaded = true;
+    }
+    const current = stored?.[field];
+    if (typeof current === 'string' && current.trim() === trimmed) continue;
+    return err(textLimitError(field, limit));
+  }
+  return ok(undefined);
+}
