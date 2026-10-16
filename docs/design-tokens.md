@@ -510,7 +510,7 @@ A column with the `actions` priority becomes the footer: left aligned, 44px targ
 it. Give the `RowActions` inside it `className="max-md:justify-start"`. Pass
 `cardDetails={false}` to a row with nothing to reveal (a total) so it gets no details button. Cells
 without a `columnKey` and a role, and rows with `mobileCard={false}` (an expansion panel), keep the
-generic layout. Desktop is unchanged: roles only apply below 768px. The brokerage holdings and the
+generic layout, so give every column of an opted-in table a role (or `max-md:hidden` its cells). Desktop is unchanged: roles only apply below 768px. The brokerage holdings and the
 payslip history use it.
 
 ### Table slots
