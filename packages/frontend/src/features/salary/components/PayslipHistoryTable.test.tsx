@@ -97,14 +97,16 @@ test('PayslipHistoryTable keeps negative corrections and very large amounts exac
   expect(markup).toContain('+€1,234.56');
 });
 
-test('PayslipHistoryTable marks the selected row and lists the phone-only columns under it', () => {
+test('PayslipHistoryTable marks the selected row and shows every figure on its phone card', () => {
   const markup = render(payslips, payslips[1]);
 
   expect(markup.match(/aria-current="true"/g)).toHaveLength(1);
-  // Bonus, tax and pension are hidden from the phone row, so one detail row repeats them.
-  expect(markup.match(/data-phone-detail/g)).toHaveLength(1);
-  expect(markup).toContain('<dt class="text-label text-fg-muted">Pension</dt>');
-  expect(render(payslips)).not.toContain('<dt class="text-label text-fg-muted">Pension</dt>');
+  // Bonus, tax and pension are metrics of the card, so no detail row or details button repeats them.
+  expect(markup).not.toContain('data-phone-detail');
+  expect(markup).not.toContain('Show details');
+  for (const label of ['Gross', 'Bonus', 'Tax', 'Pension', 'Net pay']) {
+    expect(markup).toContain(`>${label}</span>`);
+  }
 });
 
 test('PayslipHistoryTable keeps a long month label in its own cell and shows the empty state', () => {

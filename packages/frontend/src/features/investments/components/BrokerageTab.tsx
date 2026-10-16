@@ -104,6 +104,7 @@ function buildBrokerageHoldingColumns(
       key: 'asset',
       sortValue: (row) => row.name,
       header: 'Asset',
+      phoneCard: 'title',
       width: '28%',
       sortable: true,
     },
@@ -111,6 +112,7 @@ function buildBrokerageHoldingColumns(
       key: 'units',
       sortValue: (row) => positions[row.id].shares,
       header: 'Units',
+      phoneCard: 'metric',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
@@ -122,6 +124,7 @@ function buildBrokerageHoldingColumns(
       header: 'Avg cost',
       numeric: true,
       priority: 'secondary',
+      phoneCard: 'hiddenUntilDetails',
       sortable: true,
       defaultSortDirection: 'desc',
       width: '11%',
@@ -130,6 +133,7 @@ function buildBrokerageHoldingColumns(
       key: 'current',
       sortValue: (row) => getEffectivePrice(row),
       header: 'Price',
+      phoneCard: 'metric',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
@@ -139,6 +143,7 @@ function buildBrokerageHoldingColumns(
       key: 'value',
       sortValue: (row) => metricsById[row.id].valueInBase,
       header: `Value (${baseCurrency})`,
+      phoneCard: 'headline',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
@@ -148,6 +153,7 @@ function buildBrokerageHoldingColumns(
       key: 'gain',
       sortValue: (row) => metricsById[row.id].gain,
       header: 'Gain / loss',
+      phoneCard: 'headlineNote',
       numeric: true,
       sortable: true,
       defaultSortDirection: 'desc',
@@ -244,9 +250,21 @@ function HoldingAssetCell({
 function FigureWithCaption({
   figure,
   caption,
-}: Readonly<{ figure: ReactNode; caption?: ReactNode }>) {
+  inlineOnPhone = false,
+}: Readonly<{
+  figure: ReactNode;
+  caption?: ReactNode;
+  /** On a phone card the caption sits beside the figure instead of under it. */
+  inlineOnPhone?: boolean;
+}>) {
   return (
-    <div>
+    <div
+      className={
+        inlineOnPhone
+          ? 'max-md:flex max-md:flex-wrap max-md:justify-end max-md:gap-x-1.5'
+          : undefined
+      }
+    >
       <div>{figure}</div>
       {caption ? <div className="text-caption text-fg-subtle">{caption}</div> : null}
     </div>
@@ -283,7 +301,7 @@ function HoldingRowActions({
   onToggleExpanded: (id: number) => void;
 }>) {
   return (
-    <RowActions>
+    <RowActions className="max-md:justify-start">
       <IconButton
         onClick={stopRowClick(() => onEditHolding(holding))}
         icon={Edit3}
@@ -417,6 +435,7 @@ function HoldingRow({
         </DataTableCell>
         <DataTableCell columnKey="gain">
           <FigureWithCaption
+            inlineOnPhone
             figure={<Change value={gain} format="amount" currency={holding.currency} />}
             caption={<Change value={gainPctHolding} format="percent" className="text-caption" />}
           />
@@ -465,7 +484,7 @@ function BrokerageTotalRow({
   fmtBase,
 }: Readonly<BrokerageTotalRowProps>) {
   return (
-    <DataTableRow data-total>
+    <DataTableRow data-total cardDetails={false}>
       <DataTableCell columnKey="asset" stacked>
         <div className="min-w-0">
           <p>Total portfolio</p>
@@ -483,11 +502,12 @@ function BrokerageTotalRow({
         </div>
       </DataTableCell>
       <DataTableCell columnKey="units" className="max-md:hidden" />
-      <DataTableCell columnKey="avgCost" />
+      <DataTableCell columnKey="avgCost" className="max-md:hidden" />
       <DataTableCell columnKey="current" className="max-md:hidden" />
       <DataTableCell columnKey="value">{fmtBase(totalBrokerageBase)}</DataTableCell>
       <DataTableCell columnKey="gain">
         <FigureWithCaption
+          inlineOnPhone
           figure={<Change value={totalGainBase} format="amount" currency={baseCurrency} />}
           caption={<Change value={gainPct} format="percent" className="text-caption" />}
         />
