@@ -181,6 +181,25 @@ function compareOptionLabel(payslip: Payslip): string {
   return `${payslip.month} (${payslip.currency})`;
 }
 
+function buildCompareOptions(
+  previous: Payslip | null,
+  others: readonly Payslip[],
+  picked: Payslip | undefined,
+) {
+  const listed = others.slice(0, COMPARE_OPTION_LIMIT);
+  // A payslip chosen from further back stays in the list while it is the comparison.
+  const shown = picked && !listed.includes(picked) ? [...listed, picked] : listed;
+  return [
+    {
+      value: 'previous',
+      label: previous ? `Previous payslip (${previous.month})` : 'Previous payslip (none)',
+      disabled: previous === null,
+    },
+    { value: 'none', label: 'No comparison' },
+    ...shown.map((payslip) => ({ value: String(payslip.id), label: compareOptionLabel(payslip) })),
+  ];
+}
+
 function useCompareTarget(selected: Payslip, payslips: readonly Payslip[]) {
   const [choice, setChoice] = useState<CompareChoice>('previous');
   const previous = useMemo(() => findPreviousPayslip(selected, payslips), [selected, payslips]);
@@ -191,32 +210,14 @@ function useCompareTarget(selected: Payslip, payslips: readonly Payslip[]) {
         .sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id),
     [payslips, selected.id],
   );
-  const chosen = choice === 'previous' || choice === 'none' ? null : Number(choice);
-  const compareTo = useMemo(() => {
-    if (choice === 'none') return null;
-    if (choice === 'previous') return previous;
-    return others.find((payslip) => payslip.id === chosen) ?? previous;
-  }, [choice, chosen, others, previous]);
+  const picked = others.find((payslip) => String(payslip.id) === choice);
+  // A chosen payslip that is gone (deleted, or now the selected one) falls back to the previous.
+  const compareTo = choice === 'none' ? null : (picked ?? previous);
+  const options = buildCompareOptions(previous, others, picked);
+  const shownChoice: CompareChoice =
+    picked || choice === 'none' ? choice : previous ? 'previous' : 'none';
 
-  const options = [
-    {
-      value: 'previous',
-      label: previous ? `Previous payslip (${previous.month})` : 'Previous payslip (none)',
-      disabled: previous === null,
-    },
-    { value: 'none', label: 'No comparison' },
-    ...others.slice(0, COMPARE_OPTION_LIMIT).map((payslip) => ({
-      value: String(payslip.id),
-      label: compareOptionLabel(payslip),
-    })),
-  ];
-  // A payslip chosen from further back stays in the list while it is the comparison.
-  const pinned = chosen === null ? undefined : others.find((payslip) => payslip.id === chosen);
-  if (pinned && !options.some((option) => option.value === String(pinned.id))) {
-    options.push({ value: String(pinned.id), label: compareOptionLabel(pinned) });
-  }
-
-  return { choice: compareTo ? choice : 'none', setChoice, compareTo, options };
+  return { choice: shownChoice, setChoice, compareTo, options };
 }
 
 function PayBreakdownDetail({
