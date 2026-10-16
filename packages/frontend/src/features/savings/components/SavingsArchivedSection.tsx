@@ -16,6 +16,11 @@ export function SavingsArchivedSection() {
 
   return (
     <ArchivedItemsSection
+      loadError={
+        accountsQuery.isError
+          ? { onRetry: () => void accountsQuery.refetch(), retrying: accountsQuery.isFetching }
+          : null
+      }
       title="Archived savings accounts"
       entityLabel="Account"
       childrenLabel="transactions"

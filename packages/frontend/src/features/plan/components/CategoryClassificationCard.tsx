@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { toBudgetMonthIndex, type BudgetCategory, type ExpenseClass } from '@quro/shared';
 import { Tags } from 'lucide-react';
-import { Button, Card, SelectInput } from '@/components/ui';
+import { Button, Card, SelectInput, StateNotice } from '@/components/ui';
 import { useAllBudgetCategories, useClassifyBudgetCategories } from '../hooks';
 
 const CLASS_OPTIONS = [
@@ -69,7 +69,23 @@ export function CategoryClassificationCard({
   }, [categories]);
   const classify = useClassifyBudgetCategories();
 
-  if (categoriesQuery.isPending || categories.length === 0) return null;
+  if (categoriesQuery.isPending) return null;
+  if (categoriesQuery.isError && categories.length === 0) {
+    return (
+      <StateNotice
+        tone="danger"
+        title="Spending classes could not be loaded"
+        action={{
+          label: 'Retry',
+          onClick: () => void categoriesQuery.refetch(),
+          loading: categoriesQuery.isFetching,
+        }}
+      >
+        The runway uses each category&apos;s class, so review them once they load.
+      </StateNotice>
+    );
+  }
+  if (categories.length === 0) return null;
   return (
     <Card>
       <details>

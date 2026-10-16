@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '../../atoms';
 import { PanelHeader } from '../../molecules';
@@ -68,6 +68,10 @@ const PHONE_CARD_METRIC_SPAN_CLASSES = {
 } as const;
 const PHONE_CARD_FOOTER_CLASS_NAME =
   'max-md:mt-2 max-md:border-t max-md:border-border-subtle max-md:pt-1';
+// The footer's icon buttons read as controls on a card: full-strength icon and a visible border
+// instead of the faint resting tint of a table row, so the Edit pencil is easy to see and hit.
+const PHONE_CARD_ACTIONS_CLASS_NAME =
+  'max-md:[&_a]:border max-md:[&_a]:border-border-control max-md:[&_a]:text-fg max-md:[&_button:not(:disabled)]:border max-md:[&_button:not(:disabled)]:border-border-control max-md:[&_button:not(:disabled)]:text-fg';
 const MOBILE_CELL_CLASS_NAME =
   'max-md:flex max-md:min-h-9 max-md:items-center max-md:justify-between max-md:gap-4 max-md:border-0 max-md:px-0 max-md:py-1.5 max-sm:min-h-12';
 
@@ -138,6 +142,14 @@ export type DataTableRowProps = ComponentPropsWithoutRef<'tr'> & {
   mobileCard?: boolean;
   /** False for a row with nothing to reveal (a total): it gets no "Show details" button. */
   cardDetails?: boolean;
+  /**
+   * Makes the card's details control controlled, for a row whose expansion elsewhere (a history
+   * row under it) should open with the same control. Without it the row keeps its own state.
+   */
+  detailsOpen?: boolean;
+  onDetailsOpenChange?: (open: boolean) => void;
+  /** Names the row for assistive technology: "Show details for <label>". */
+  detailsLabel?: string;
 };
 
 export type DataTableCellProps = ComponentPropsWithoutRef<'td'> & {
@@ -276,7 +288,9 @@ function DataTableDetailsToggle({
   open,
   onToggle,
   phoneCard,
-}: Readonly<{ open: boolean; onToggle: () => void; phoneCard: boolean }>) {
+  label,
+}: Readonly<{ open: boolean; onToggle: () => void; phoneCard: boolean; label?: string }>) {
+  const text = open ? 'Hide details' : 'Show details';
   return (
     <td
       className={cn(
@@ -291,16 +305,22 @@ function DataTableDetailsToggle({
       <button
         type="button"
         aria-expanded={open}
+        aria-label={label ? `${text} for ${label}` : undefined}
         onClick={(event) => {
           event.stopPropagation();
           onToggle();
         }}
         className={cn(
-          'inline-flex min-h-9 items-center text-label text-brand-fg underline-offset-2 hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+          'inline-flex min-h-9 items-center gap-1 text-label text-brand-fg underline-offset-2 hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
           phoneCard && 'max-md:min-h-11',
         )}
       >
-        {open ? 'Hide details' : 'Show details'}
+        {text}
+        <ChevronDown
+          size={14}
+          aria-hidden
+          className={cn('transition-transform duration-fast', open && 'rotate-180')}
+        />
       </button>
     </td>
   );
@@ -315,16 +335,33 @@ function getRowChrome(tableContext: DataTableContextValue | null) {
 
 function useCardDetails(
   tableContext: DataTableContextValue | null,
-  { mobileCard, cardDetails }: Required<Pick<DataTableRowProps, 'mobileCard' | 'cardDetails'>>,
+  {
+    mobileCard,
+    cardDetails,
+    detailsOpen,
+    onDetailsOpenChange,
+    detailsLabel,
+  }: Required<Pick<DataTableRowProps, 'mobileCard' | 'cardDetails'>> &
+    Pick<DataTableRowProps, 'detailsOpen' | 'onDetailsOpenChange' | 'detailsLabel'>,
 ) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = detailsOpen ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    if (detailsOpen === undefined) setOwnOpen(next);
+    onDetailsOpenChange?.(next);
+  };
   const phoneCard = Boolean(tableContext?.phoneCard && mobileCard);
   const enabled = Boolean(tableContext?.hasCardDetails && mobileCard && cardDetails);
   return {
     phoneCard,
     rowProps: { 'data-details-open': open ? '' : undefined },
     toggle: enabled ? (
-      <DataTableDetailsToggle open={open} onToggle={() => setOpen(!open)} phoneCard={phoneCard} />
+      <DataTableDetailsToggle
+        open={open}
+        onToggle={() => setOpen(!open)}
+        phoneCard={phoneCard}
+        label={detailsLabel}
+      />
     ) : null,
   };
 }
@@ -334,6 +371,9 @@ export function DataTableRow({
   interactive = false,
   mobileCard = true,
   cardDetails = true,
+  detailsOpen,
+  onDetailsOpenChange,
+  detailsLabel,
   className,
   children,
   onClick,
@@ -343,7 +383,13 @@ export function DataTableRow({
 }: Readonly<DataTableRowProps>) {
   const tableContext = useDataTableContext();
   const isKeyboardInteractive = Boolean(interactive && onClick);
-  const details = useCardDetails(tableContext, { mobileCard, cardDetails });
+  const details = useCardDetails(tableContext, {
+    mobileCard,
+    cardDetails,
+    detailsOpen,
+    onDetailsOpenChange,
+    detailsLabel,
+  });
 
   function handleKeyDown(event: KeyboardEvent<HTMLTableRowElement>) {
     onKeyDown?.(event);
@@ -391,6 +437,7 @@ function getPhoneCardCellClassName(
   if (role === 'footer') {
     return cn(
       PHONE_CARD_FOOTER_CLASS_NAME,
+      PHONE_CARD_ACTIONS_CLASS_NAME,
       'max-md:order-6 max-md:col-start-1 max-md:block',
       tableContext.hasCardDetails ? 'max-md:col-span-6' : 'max-md:col-span-12',
     );
@@ -500,13 +547,7 @@ export function DataTableCell({
         hasHeadlineNote={Boolean(tableContext?.hasHeadlineNote)}
       />
       <div
-        className={cn(
-          'min-w-0',
-          cellConfig.align === 'right' && 'md:text-right',
-          // The first 44px icon button of the footer lines its glyph up with the card's text.
-          phoneRole === 'footer' && 'max-md:-ml-3',
-          contentClassName,
-        )}
+        className={cn('min-w-0', cellConfig.align === 'right' && 'md:text-right', contentClassName)}
       >
         {children}
       </div>

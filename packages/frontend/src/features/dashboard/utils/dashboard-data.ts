@@ -1,4 +1,4 @@
-import { Briefcase, PiggyBank, ShieldCheck, TrendingUp } from 'lucide-react';
+import { displayLabel } from '@/lib/displayLabels';
 import {
   householdAmount,
   sumMoney,
@@ -34,9 +34,7 @@ export const buildDashboardCards = (
       amount: monthlyCategoryChange('Savings'),
       label: 'this month',
     },
-    icon: PiggyBank,
     path: '/savings',
-    color: 'indigo',
   },
   {
     label: 'Investments',
@@ -45,9 +43,7 @@ export const buildDashboardCards = (
       amount: monthlyCategoryChange('Investment'),
       label: 'this month',
     },
-    icon: TrendingUp,
     path: '/investments',
-    color: 'sky',
   },
   {
     label: 'Pension',
@@ -56,9 +52,7 @@ export const buildDashboardCards = (
       amount: monthlyCategoryChange('Pension'),
       label: 'this month',
     },
-    icon: ShieldCheck,
     path: '/pension',
-    color: 'amber',
   },
   {
     label: 'Monthly salary',
@@ -67,9 +61,7 @@ export const buildDashboardCards = (
       amount: salaryTrendChange,
       label: 'over 12 months',
     },
-    icon: Briefcase,
     path: '/salary',
-    color: 'emerald',
   },
 ];
 
@@ -100,7 +92,7 @@ export function normalizeAssetAllocations(
 ): AllocationSummary {
   const allocationData = summary.allocations.map((allocation) => ({
     key: allocation.key,
-    name: allocation.name,
+    name: displayLabel(allocation.name),
     value: convertToBase(allocation.value, allocation.currency),
     color: ALLOCATION_COLORS[allocation.key],
   }));

@@ -1,3 +1,4 @@
+import { displayLabelOptions } from '@/lib/displayLabels';
 import { useState } from 'react';
 import { CURRENCY_CODES, type CurrencyCode, useCurrency } from '@/lib/CurrencyContext';
 import { Change, Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
@@ -89,7 +90,7 @@ function PropertyIdentityFields({ form, errors, onSet }: PropertyFormFieldsProps
           <SelectInput
             value={form.propertyType}
             onChange={(value) => onSet('propertyType', value)}
-            options={Array.from(PROPERTY_TYPES)}
+            options={displayLabelOptions(PROPERTY_TYPES)}
           />
         </FormField>
         <FormField label="Currency">

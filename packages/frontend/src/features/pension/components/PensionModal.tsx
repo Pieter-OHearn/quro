@@ -1,3 +1,4 @@
+import { displayLabelOptions } from '@/lib/displayLabels';
 import { useState } from 'react';
 import { createClientId } from '@/lib/clientId';
 import { CURRENCY_CODES, type CurrencyCode } from '@/lib/CurrencyContext';
@@ -134,7 +135,7 @@ function PensionProviderTypeRow({ form, errors, set }: Readonly<PensionFormField
         <SelectInput
           value={form.type}
           onChange={(v) => set('type', v)}
-          options={PENSION_TYPES.map((t) => t)}
+          options={displayLabelOptions(PENSION_TYPES)}
         />
       </FormField>
     </div>

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { IconButton, QuroLogo, useFocusTrap } from '@/components/ui';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { NotificationBell } from '@/components/notifications';
+import { StaleRatesNotice } from '@/components/finance/StaleRatesNotice';
 import { CurrencySelector } from './CurrencySelector';
 import { navItems } from './navItems';
 import { SidebarButton, SidebarLink } from './SidebarItem';
@@ -273,6 +274,7 @@ export function Layout() {
           currentPageLabel={currentPageLabel}
           today={today}
         />
+        <StaleRatesNotice className="rounded-none border-x-0 border-t-0 max-sm:rounded-none sm:px-6" />
         <main
           ref={mainRef}
           className="flex-1 overflow-y-auto pb-[calc(61px+env(safe-area-inset-bottom))] sm:pb-0"

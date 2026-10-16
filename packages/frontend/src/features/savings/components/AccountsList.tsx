@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import { ChevronDown, ChevronUp, Edit3, Plus } from 'lucide-react';
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
 import { monthlyInterest } from '@quro/shared';
@@ -163,7 +164,7 @@ function AccountRow({
           <AccountNameCell acc={acc} foreign={foreign} />
         </DataTableCell>
         <DataTableCell columnKey="bank" contentClassName="truncate text-fg-muted">
-          {acc.bank} · {acc.accountType} · {txnCount} transactions
+          {acc.bank} · {displayLabel(acc.accountType)} · {txnCount} transactions
         </DataTableCell>
         <DataTableCell columnKey="rate">{acc.interestRate}%</DataTableCell>
         <DataTableCell columnKey="interest">

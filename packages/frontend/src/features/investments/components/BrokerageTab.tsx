@@ -26,6 +26,7 @@ import {
 import { stopRowClick } from '@/components/finance/stopRowClick';
 import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import { formatShares, groupHoldingTransactions, type Position } from '../utils/position';
+import { isPriceStale } from '../utils/priceFreshness';
 import { HoldingPositionPanel, getEffectivePrice } from './HoldingPositionPanel';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
@@ -276,7 +277,8 @@ function FigureWithCaption({
 function ExpandToggle({
   isExpanded,
   onToggle,
-}: Readonly<{ isExpanded: boolean; onToggle: () => void }>) {
+  className,
+}: Readonly<{ isExpanded: boolean; onToggle: () => void; className?: string }>) {
   const label = isExpanded ? 'Collapse' : 'View transactions';
   return (
     <IconButton
@@ -287,6 +289,7 @@ function ExpandToggle({
       aria-expanded={isExpanded}
       size="sm"
       variant="subtle"
+      className={className}
     />
   );
 }
@@ -294,11 +297,14 @@ function ExpandToggle({
 function HoldingRowActions({
   holding,
   isExpanded,
+  mergedDetailsOnPhone = false,
   onEditHolding,
   onToggleExpanded,
 }: Readonly<{
   holding: Holding;
   isExpanded: boolean;
+  /** The phone card's details button opens the history too, so the chevron is left out there. */
+  mergedDetailsOnPhone?: boolean;
   onEditHolding: (holding: Holding) => void;
   onToggleExpanded: (id: number) => void;
 }>) {
@@ -312,7 +318,11 @@ function HoldingRowActions({
         size="sm"
         variant="subtle"
       />
-      <ExpandToggle isExpanded={isExpanded} onToggle={() => onToggleExpanded(holding.id)} />
+      <ExpandToggle
+        isExpanded={isExpanded}
+        onToggle={() => onToggleExpanded(holding.id)}
+        className={mergedDetailsOnPhone ? 'max-md:hidden' : undefined}
+      />
     </RowActions>
   );
 }
@@ -367,9 +377,17 @@ function HoldingPriceCell({
   holding,
   fmtPrice,
 }: Readonly<{ holding: Holding; fmtPrice: UnitPriceFormatFn }>) {
-  const syncCaption = holding.excludeFromSync
-    ? 'sync off'
-    : (formatSyncDate(holding.priceUpdatedAt) ?? holding.currency);
+  const stale = isPriceStale(holding);
+  const syncDate = formatSyncDate(holding.priceUpdatedAt);
+  let syncCaption: ReactNode = holding.currency;
+  if (holding.excludeFromSync) syncCaption = 'sync off';
+  else if (stale) {
+    syncCaption = (
+      <span className="text-warning" title="The price has not synced for more than a week">
+        Stale · {syncDate}
+      </span>
+    );
+  } else if (syncDate) syncCaption = syncDate;
   return (
     <FigureWithCaption
       figure={
@@ -417,7 +435,14 @@ function HoldingRow({
 
   return (
     <>
-      <DataTableRow interactive selected={isExpanded} onClick={() => onToggleExpanded(holding.id)}>
+      <DataTableRow
+        interactive
+        selected={isExpanded}
+        onClick={() => onToggleExpanded(holding.id)}
+        detailsOpen={isExpanded}
+        onDetailsOpenChange={() => onToggleExpanded(holding.id)}
+        detailsLabel={holding.name}
+      >
         <DataTableCell columnKey="asset" stacked>
           <HoldingAssetCell holding={holding} txnCount={txnCount} />
         </DataTableCell>
@@ -445,6 +470,7 @@ function HoldingRow({
           <HoldingRowActions
             holding={holding}
             isExpanded={isExpanded}
+            mergedDetailsOnPhone
             onEditHolding={onEditHolding}
             onToggleExpanded={onToggleExpanded}
           />

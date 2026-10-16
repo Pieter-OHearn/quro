@@ -1,4 +1,3 @@
-import { Calendar, Home, Percent, TrendingDown } from 'lucide-react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { StatCard, StatsGrid } from '@/components/ui';
 import { formatPercent, type Mortgage as MortgageType } from '@quro/shared';
@@ -35,29 +34,21 @@ export function MortgageStatCards({
           positive: valueChange >= 0,
         }}
         subtitle="since purchase"
-        icon={Home}
-        color="emerald"
       />
       <StatCard
         label="Equity built"
         value={fmt(equity)}
         subtitle={`${formatPercent((equity / mortgage.propertyValue) * 100, numberFormat, 0)} of property value`}
-        icon={TrendingDown}
-        color="indigo"
       />
       <StatCard
         label="Loan-to-Value"
         value={formatPercent(ltv, numberFormat, 1)}
         subtitle={ltv < GOOD_LTV_THRESHOLD ? `Good — below ${GOOD_LTV_THRESHOLD}%` : 'High LTV'}
-        icon={Percent}
-        color="sky"
       />
       <StatCard
         label="Capital repaid"
         value={fmt(paid)}
         subtitle={`${formatPercent(paidPct, numberFormat, 0)} of original loan`}
-        icon={Calendar}
-        color="amber"
       />
     </StatsGrid>
   );

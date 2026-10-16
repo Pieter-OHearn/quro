@@ -12,6 +12,11 @@ export function MortgageArchivedSection() {
 
   return (
     <ArchivedItemsSection
+      loadError={
+        archivedQuery.isError
+          ? { onRetry: () => void archivedQuery.refetch(), retrying: archivedQuery.isFetching }
+          : null
+      }
       title="Archived mortgages"
       entityLabel="Mortgage"
       childrenLabel="repayment history"

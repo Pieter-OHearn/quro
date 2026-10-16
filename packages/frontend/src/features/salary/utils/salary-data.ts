@@ -1,5 +1,4 @@
 import { sumMoney, type CurrencyCode, type Payslip } from '@quro/shared';
-import { ArrowUpRight, Briefcase, Calculator, ShieldCheck } from 'lucide-react';
 import type { FmtFn, SalaryChartEntry, SalaryHistoryEntry, SalaryStatCard } from '../types';
 
 const DATE_YEAR_LENGTH = 4;
@@ -124,30 +123,22 @@ export const buildSalaryStatCards = (
     label: 'Annual gross',
     value: fmtBase(gross),
     sub: activeYear === currentYear ? 'Total this year' : `Total in ${activeYear}`,
-    icon: Briefcase,
-    color: 'indigo',
   },
   {
     label: 'Annual net',
     value: fmtBase(net),
     sub: 'After all deductions',
-    icon: ArrowUpRight,
-    color: 'emerald',
   },
   {
     label: `Tax paid (${activeYear === currentYear ? 'YTD' : activeYear})`,
     value: fmtBase(tax),
     sub: activeYear === currentYear ? 'Income tax' : `Income tax in ${activeYear}`,
-    icon: Calculator,
-    color: 'rose',
   },
   {
     label: 'Pension contributions',
     value: fmtBase(pension),
     sub:
       activeYear === currentYear ? 'Your contributions YTD' : `Your contributions in ${activeYear}`,
-    icon: ShieldCheck,
-    color: 'amber',
   },
 ];
 

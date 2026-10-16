@@ -29,12 +29,14 @@ import { Pagination } from './molecules/Pagination';
 import { PanelHeader } from './molecules/PanelHeader';
 import { RowActions } from './molecules/RowActions';
 import { SegmentedControl } from './molecules/SegmentedControl';
+import { StateNotice } from './molecules/StateNotice';
 import { nextTabIndex } from './molecules/SegmentedControl/SegmentedControl';
 import { TxnTypeSelector } from './molecules/TxnTypeSelector';
 import { ArchiveOrDeleteDialog } from './organisms/ArchiveOrDeleteDialog';
 import { ChartCard } from './organisms/ChartCard';
 import { DataTable, DataTableCell, DataTableRow } from './organisms/DataTable';
 import { Modal, ModalFooter } from './organisms/Modal';
+import { ArchivedItemsSection } from './organisms/ArchivedItemsSection';
 import { StatCard } from './organisms/StatCard';
 import { TxnHistoryPanel, TxnRow } from './organisms/TxnHistoryPanel';
 import { ContentSection, PageStack } from './templates';
@@ -174,8 +176,6 @@ const smokeCases: readonly SmokeCase[] = [
         <StatCard
           label="Total savings"
           value="EUR 1,250.00"
-          icon={PiggyBank}
-          color="emerald"
           href="/savings"
           testId="smoke-stat-card"
         />
@@ -600,6 +600,94 @@ const smokeCases: readonly SmokeCase[] = [
     excludes: ['shadow-'],
   },
   {
+    name: 'DataTable controlled details button is named for its row and drives the card',
+    element: (
+      <DataTable
+        columns={[
+          { key: 'name', header: 'Asset', phoneCard: 'title' },
+          {
+            key: 'cost',
+            header: 'Avg cost',
+            priority: 'secondary',
+            phoneCard: 'hiddenUntilDetails',
+          },
+        ]}
+      >
+        <DataTableRow detailsOpen onDetailsOpenChange={noop} detailsLabel="Global ETF">
+          <DataTableCell columnKey="name">Global ETF</DataTableCell>
+          <DataTableCell columnKey="cost">95.50</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    // One control per card: open state comes from the caller, its name carries the row.
+    includes: [
+      'aria-expanded="true"',
+      'aria-label="Hide details for Global ETF"',
+      'data-details-open',
+      'Hide details',
+    ],
+    excludes: ['Show details'],
+  },
+  {
+    name: 'StateNotice announces a failed load as an alert with its retry action',
+    element: (
+      <StateNotice
+        tone="danger"
+        title="Savings could not be loaded"
+        action={{ label: 'Retry', onClick: noop }}
+      >
+        Nothing is shown until it loads.
+      </StateNotice>
+    ),
+    includes: [
+      'role="alert"',
+      'border-danger bg-danger-soft',
+      'Savings could not be loaded',
+      'Retry',
+      'Nothing is shown until it loads.',
+    ],
+  },
+  {
+    name: 'StateNotice announces an estimate as a status',
+    element: (
+      <StateNotice title="Exchange rates are out of date">
+        GBP was last updated on 12 Oct 2026.
+      </StateNotice>
+    ),
+    includes: ['role="status"', 'border-warning bg-warning-soft', 'GBP was last updated'],
+    excludes: ['<button'],
+  },
+  {
+    name: 'ArchivedItemsSection says so when the archived items could not be loaded',
+    element: (
+      <ArchivedItemsSection
+        title="Archived debts"
+        entityLabel="Debt"
+        childrenLabel="payments"
+        items={[]}
+        onUnarchive={noop}
+        onHardDelete={noop}
+        loadError={{ onRetry: noop }}
+      />
+    ),
+    includes: ['role="alert"', 'Archived debts could not be loaded', 'Retry'],
+  },
+  {
+    name: 'ArchivedItemsSection renders nothing for an empty archive that loaded',
+    element: (
+      <ArchivedItemsSection
+        title="Archived debts"
+        entityLabel="Debt"
+        childrenLabel="payments"
+        items={[]}
+        onUnarchive={noop}
+        onHardDelete={noop}
+      />
+    ),
+    includes: [],
+    excludes: ['Archived debts', 'role="alert"'],
+  },
+  {
     name: 'DataTable phone cards place cells by role and keep the generic layout elsewhere',
     element: (
       <DataTable
@@ -1014,8 +1102,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ value: '+EUR 0.00 this month', positive: true }}
       />
     ),
@@ -1028,8 +1114,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ value: '-EUR 12.50 MTD', positive: false }}
         subtitle="2 accounts"
       />
@@ -1042,8 +1126,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ amount: -12.5, format: 'amount', label: 'this month' }}
       />
     ),
@@ -1056,8 +1138,6 @@ const smokeCases: readonly SmokeCase[] = [
       <StatCard
         label="Savings"
         value="EUR 10.00"
-        icon={PiggyBank}
-        color="emerald"
         change={{ amount: 0, format: 'amount', label: 'this month' }}
       />
     ),

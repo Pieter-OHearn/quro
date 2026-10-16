@@ -9,7 +9,6 @@ import {
   MIN_USER_AGE,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
-import { CalendarClock, Hourglass, TrendingUp } from 'lucide-react';
 import { FormField, StatCard, TextInput } from '@/components/ui';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
 
@@ -169,24 +168,9 @@ function ProfileForm({
 
       {yearsAway > 0 ? (
         <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            label="Years remaining to retirement"
-            value={String(yearsAway)}
-            icon={Hourglass}
-            color="indigo"
-          />
-          <StatCard
-            label="Career timeline already elapsed"
-            value={`${elapsedPercent}%`}
-            icon={CalendarClock}
-            color="indigo"
-          />
-          <StatCard
-            label="Runway left to keep contributing"
-            value={`${remainingPercent}%`}
-            icon={TrendingUp}
-            color="indigo"
-          />
+          <StatCard label="Years remaining to retirement" value={String(yearsAway)} />
+          <StatCard label="Career timeline already elapsed" value={`${elapsedPercent}%`} />
+          <StatCard label="Runway left to keep contributing" value={`${remainingPercent}%`} />
         </div>
       ) : null}
 

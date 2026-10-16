@@ -9,6 +9,11 @@ export function DebtsArchivedSection() {
 
   return (
     <ArchivedItemsSection
+      loadError={
+        archivedQuery.isError
+          ? { onRetry: () => void archivedQuery.refetch(), retrying: archivedQuery.isFetching }
+          : null
+      }
       title="Archived debts"
       entityLabel="Debt"
       childrenLabel="payment history"
