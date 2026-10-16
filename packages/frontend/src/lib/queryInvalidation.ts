@@ -1,7 +1,12 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import { queryKeys as keys } from './queryKeys';
 
-const dashboard = [keys.dashboard.summary, keys.dashboard.netWorth, keys.dashboard.transactions];
+const dashboard = [
+  keys.dashboard.summary,
+  keys.dashboard.netWorth,
+  keys.dashboard.transactions,
+  keys.dashboard.setup,
+];
 const savings = [keys.savings.accounts, keys.savings.transactions];
 const holdings = [
   keys.investments.holdings,
@@ -16,7 +21,7 @@ const budget = [keys.budget.categories, keys.budget.transactions];
 export const domainQueryDependencies = {
   goals: [keys.goals],
   budgetCategory: [...budget, keys.plan.all],
-  budgetTransaction: [...budget, keys.dashboard.transactions, keys.plan.all],
+  budgetTransaction: [...budget, keys.dashboard.transactions, keys.dashboard.setup, keys.plan.all],
   budgetClassification: [keys.budget.categories, keys.plan.all],
   categoryMapping: [keys.budget.mappings],
   savings: [...savings, ...dashboard, keys.plan.all],
