@@ -341,7 +341,10 @@ feature component.
   existing variants and sizes, and Lucide icons.
 - Style form fields with `getFieldChrome` and aligned financial values with `font-numeric`.
 - Unit prices (price per share, current, manual and historical prices) use `formatUnitPrice` from
-  `@quro/shared`: two to four decimals in the user's number format. Money keeps two.
+  `@quro/shared`: two to four decimals in the user's number format. Money keeps two. Where a
+  price and an average cost sit side by side (a holding's position strip), pass `decimals`
+  (from `unitPriceDecimals` of the price) so both use one precision, and show a base-currency
+  value as a smaller muted second line under the native one with a hidden "in EUR" cue.
 - `Button` supports `loading` and disables itself while loading; use it instead of a separate
   submitting-button pattern.
 - Keep loading, empty, error, disabled and submitting states, labels, keyboard controls and focus
@@ -647,6 +650,11 @@ filter value, pagination state, and handlers.
   ))}
 </TxnHistoryPanel>
 ```
+
+Pass `striped` for a long history that is read across, such as a holding's transactions. It
+tints every second row with `surface-sunken` and draws the rules in `border-default`; a
+row's `surface-muted` hover and an `aria-selected` row stay above the stripe. Check text on both
+stripes for 4.5:1 in light and dark. It is off by default, so other feeds do not change.
 
 Reach for `DataTable` instead when the same records need desktop headers,
 sortable columns, aligned comparison, column priority, or custom table footer

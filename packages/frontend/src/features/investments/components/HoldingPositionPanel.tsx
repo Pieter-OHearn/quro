@@ -107,10 +107,19 @@ function renderMeasure(
   }: Pick<MeasureValueProps, 'measure' | 'fmtNative' | 'fmtPrice' | 'decimals'>,
   value: number,
   currency: string,
+  secondary = false,
 ) {
   if (measure.kind === 'price') return fmtPrice(value, currency, decimals);
   if (measure.kind === 'gain') {
-    return <Change format="amount" currency={currency} value={value} showArrow={false} />;
+    return (
+      <Change
+        format="amount"
+        currency={currency}
+        value={value}
+        showArrow={false}
+        className={secondary ? 'text-caption font-normal' : undefined}
+      />
+    );
   }
   return fmtNative(value, currency);
 }
@@ -140,7 +149,7 @@ function MeasureCell({
         {foreign ? (
           <span className="block text-caption font-normal text-fg-muted">
             <span className="sr-only">in {baseCurrency}: </span>
-            {renderMeasure(shared, convertToBase(measure.value, currency), baseCurrency)}
+            {renderMeasure(shared, convertToBase(measure.value, currency), baseCurrency, true)}
           </span>
         ) : null}
       </dd>
@@ -191,13 +200,14 @@ export function HoldingPositionTable({
           type="button"
           variant="secondary"
           size="sm"
+          className="max-sm:min-h-11"
           leadingIcon={<Edit3 size={12} aria-hidden />}
           onClick={() => onEditHolding(holding)}
         >
           Correct holding
         </Button>
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4 xl:grid-cols-7">
         {measures.map((measure) => (
           <MeasureCell
             key={measure.key}
