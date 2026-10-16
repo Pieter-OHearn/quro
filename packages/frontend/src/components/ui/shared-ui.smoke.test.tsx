@@ -331,8 +331,21 @@ const smokeCases: readonly SmokeCase[] = [
       'mb-1 block text-label text-fg-muted',
       'font-normal text-fg-subtle',
       'mt-1 text-caption text-danger',
+      'role="alert"',
+      'data-field-error=""',
+      'scroll-mb-28',
     ],
     excludes: ['text-xs', 'font-semibold', 'text-fg-faint font-normal'],
+  },
+  {
+    name: 'FormField without an error is not marked and announces nothing',
+    element: (
+      <FormField label="Amount">
+        <TextInput value="" onChange={noop} />
+      </FormField>
+    ),
+    includes: ['Amount'],
+    excludes: ['data-field-error', 'role="alert"'],
   },
   {
     name: 'PanelHeader renders title, subtitle, and action',
@@ -796,7 +809,7 @@ const smokeCases: readonly SmokeCase[] = [
       'text-title-section',
       'p-4 space-y-4 text-body',
       'bg-surface-sunken',
-      'max-sm:flex-col',
+      'max-sm:flex-wrap',
       'max-sm:*:h-11',
       'Cancel',
       'Save',
