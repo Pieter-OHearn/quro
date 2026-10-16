@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { HTTP_STATUS } from '../constants/http';
 import { getDocumentStore } from './documentStorage';
+import { log, errorFields } from './logger';
 
 const PDF_MAGIC = Buffer.from('%PDF', 'ascii');
 
@@ -169,10 +170,7 @@ export async function deleteStoredPdfSafely(storageKey: string, context: string)
   try {
     await getDocumentStore().delete(storageKey);
   } catch (error) {
-    console.error(`Failed to delete ${context} from storage`, {
-      storageKey,
-      error,
-    });
+    log.error('documents.delete_failed', { context, storageKey, ...errorFields(error) });
   }
 }
 
@@ -221,7 +219,7 @@ export async function replaceStoredPdfDocument<TRow, TDocument>(params: {
     if (error instanceof HTTPException) {
       return { ok: false, error: error.message, status: HTTP_STATUS.BAD_REQUEST };
     }
-    console.error(`Failed to upload ${context} to storage`, error);
+    log.error('documents.upload_failed', { context, ...errorFields(error) });
     return internalError(errors.uploadFailed);
   }
 
@@ -235,7 +233,7 @@ export async function replaceStoredPdfDocument<TRow, TDocument>(params: {
     });
   } catch (error) {
     await deleteStoredPdfSafely(storageKey, context);
-    console.error(`Failed to save ${context} metadata`, error);
+    log.error('documents.save_failed', { context, ...errorFields(error) });
     return internalError(errors.saveFailed);
   }
   if (!updated) {
@@ -275,7 +273,7 @@ export async function streamStoredPdf(
       },
     });
   } catch (error) {
-    console.error(`Failed to download ${params.context}`, error);
+    log.error('documents.download_failed', { context: params.context, ...errorFields(error) });
     return c.json({ error: params.failureMessage }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 }

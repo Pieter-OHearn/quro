@@ -57,6 +57,7 @@ import {
   type NormalizedPensionTransactionPayload,
   validatePensionTransactionPayload,
 } from '../lib/pensionTransactionValidation';
+import { log, errorFields } from '../lib/logger';
 
 const app = new Hono();
 const PENSION_IMPORT_PDF_CONTEXT = 'pension statement import document';
@@ -755,9 +756,9 @@ async function deleteEndedImportDocument(importRecord: ImportRecord): Promise<vo
   try {
     await getDocumentStore().delete(importRecord.storageKey);
   } catch (error) {
-    console.error('Failed to delete pension import PDF from storage', {
+    log.error('pension_import.delete_failed', {
       importId: importRecord.id,
-      error,
+      ...errorFields(error),
     });
     return;
   }
@@ -863,7 +864,7 @@ app.post('/', async (c) => {
   try {
     await getDocumentStore().put(storageKey, bytes);
   } catch (error) {
-    console.error('Failed to upload pension statement import document', error);
+    log.error('pension_import.upload_failed', errorFields(error));
     return c.json({ error: 'Failed to upload PDF' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 
@@ -888,7 +889,7 @@ app.post('/', async (c) => {
     return c.json({ data: normalizeImportResponse(inserted) }, HTTP_STATUS.CREATED);
   } catch (error) {
     await deleteStoredPdfSafely(storageKey, PENSION_IMPORT_PDF_CONTEXT);
-    console.error('Failed to persist pension statement import metadata', error);
+    log.error('pension_import.save_failed', errorFields(error));
     return c.json({ error: 'Failed to create import' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });
@@ -1100,7 +1101,7 @@ app.post('/:id/commit', async (c) => {
     if (error instanceof DuplicateStatementCommitted) {
       return c.json({ error: DUPLICATE_STATEMENT_COMMITTED }, HTTP_STATUS.CONFLICT);
     }
-    console.error('Failed to commit pension import', error);
+    log.error('pension_import.commit_failed', errorFields(error));
     return c.json({ error: 'Failed to commit import' }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 
@@ -1174,15 +1175,13 @@ async function processQueuedImport(): Promise<void> {
     await persistParsedImport(lockedImport, parsed);
   } catch (error) {
     if (error instanceof PensionParserBusyError) {
-      console.warn('[PensionImportWorker] the parser is busy; the import stays queued', {
-        importId: lockedImport.id,
-      });
+      log.warn('pension_import.parser_busy', { importId: lockedImport.id });
       await returnImportToQueue(lockedImport.id);
       return;
     }
-    console.error('Failed to process pension statement import', {
+    log.error('pension_import.process_failed', {
       importId: lockedImport.id,
-      error,
+      ...errorFields(error),
     });
     await markImportAsFailed(lockedImport, error);
   }
@@ -1230,7 +1229,7 @@ async function expireDraftImports(): Promise<void> {
     const ids = expired.filter((row) => deleted.has(row.storageKey)).map((row) => row.id);
     await markImportStorageDeleted(ids, now);
   } catch (error) {
-    console.error('Failed to delete expired pension import PDFs', error);
+    log.error('pension_import.expiry_cleanup_failed', errorFields(error));
   }
 }
 

@@ -1,8 +1,9 @@
-import { DAY_MS } from '../constants/time';
 import { syncAllHoldingPrices } from './holdingPriceSync';
+import { JOB_INTERVAL_MS } from './operationalStatus';
 import { startIntervalJob } from './intervalJob';
+import { log } from './logger';
 
-const SYNC_INTERVAL_MS = DAY_MS;
+const SYNC_INTERVAL_MS = JOB_INTERVAL_MS['holding-price-sync'];
 
 export function startHoldingPriceSyncScheduler(): void {
   startIntervalJob({
@@ -16,10 +17,12 @@ export function startHoldingPriceSyncScheduler(): void {
 
 async function runSync(): Promise<void> {
   const result = await syncAllHoldingPrices();
-  console.log(
-    `[holding-price-sync] updated=${result.summary.updatedHoldings}/${result.summary.requestedHoldings} symbols=${result.summary.requestedSymbols}`,
-  );
+  log.info('job.holding_price_sync.done', {
+    updated: result.summary.updatedHoldings,
+    requested: result.summary.requestedHoldings,
+    symbols: result.summary.requestedSymbols,
+  });
   for (const issue of result.summary.issues) {
-    console.warn(`[holding-price-sync] holdingId=${issue.holdingId} ${issue.reason}`);
+    log.warn('job.holding_price_sync.issue', { holdingId: issue.holdingId, reason: issue.reason });
   }
 }

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { MINUTE_MS } from '../constants/time';
+import { log, errorFields } from './logger';
 
 export const UPSTREAM_TIMEOUT_MS = 15_000;
 const SCHEDULED_JOB_TIMEOUT_MINUTES = 5;
@@ -117,7 +118,7 @@ export async function withWorkDeadline<T>(
       void workScope
         .run(scope, () => runFailureCleanup(cleanup))
         .catch((error: unknown) => {
-          console.error('[scheduler] Failed to record deadline status', error);
+          log.error('scheduler.deadline_status_failed', errorFields(error));
         });
     }
     graceTimer = setTimeout(() => {
@@ -125,7 +126,7 @@ export async function withWorkDeadline<T>(
         try {
           await options.destroy?.();
         } catch (error) {
-          console.error('[scheduler] Failed to destroy expired job connections', error);
+          log.error('scheduler.destroy_connections_failed', errorFields(error));
         } finally {
           rejectHard(new HardDeadlineError());
         }

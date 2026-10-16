@@ -1,13 +1,13 @@
-import { HOUR_MS } from '../constants/time';
 import { db } from '../db/client';
 import { bunqConnections } from '../db/schema';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { createRotatingWork } from './rotatingWork';
-import { describeSyncFailure } from './syncFailure';
+import { JOB_INTERVAL_MS } from './operationalStatus';
 import { startIntervalJob } from './intervalJob';
+import { log, errorFields } from './logger';
 
-const SYNC_INTERVAL_MS = HOUR_MS;
+const SYNC_INTERVAL_MS = JOB_INTERVAL_MS['bunq-sync'];
 const rotateUsers = createRotatingWork();
 
 export function startBunqSyncScheduler(): void {
@@ -34,11 +34,11 @@ async function syncUserAccounts(userId: number): Promise<void> {
     const savingsStatus = formatSyncStatus(savingsResult.status, savingsResult.issues);
     const budgetStatus = formatSyncStatus(budgetResult.status, budgetResult.issues);
 
-    console.log(`[bunq-sync] userId=${userId} savings=${savingsStatus} budget=${budgetStatus}`);
+    log.info('job.bunq_sync.user', { userId, savings: savingsStatus, budget: budgetStatus });
   } catch (error) {
-    // A failed statement's message repeats its parameters; describeSyncFailure withholds it.
-    const message = describeSyncFailure(error, 'database or unknown error');
-    console.error(`[bunq-sync] userId=${userId} error: ${message}`);
+    // A failed statement's message repeats its parameters, and a bank's message may name accounts:
+    // only the error class and codes are logged.
+    log.error('job.bunq_sync.user_failed', { userId, ...errorFields(error) });
   }
 }
 

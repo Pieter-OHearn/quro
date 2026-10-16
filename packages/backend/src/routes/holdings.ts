@@ -49,6 +49,7 @@ import {
   roundUnitPrice,
   toMoneyAmount,
 } from '../lib/requestValidation';
+import { log, errorFields } from '../lib/logger';
 
 const app = new Hono();
 
@@ -510,7 +511,7 @@ app.post('/holdings', async (c) => {
       ),
     });
   } catch (error) {
-    console.warn('[Investments] Failed to save initial holding price snapshot', error);
+    log.warn('investments.initial_snapshot_failed', errorFields(error));
   }
 
   return c.json({ data }, HTTP_STATUS.CREATED);
@@ -601,9 +602,9 @@ app.get('/ticker-lookup/:symbol', async (c) => {
       },
     });
   } catch (error) {
-    console.warn('[Investments] Ticker lookup failed', {
+    log.warn('investments.ticker_lookup_failed', {
       symbol: normalizedSymbol,
-      error: error instanceof Error ? error.message : String(error),
+      ...errorFields(error),
     });
     return c.json({ error: LOOKUP_TICKER_UNAVAILABLE_MESSAGE }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
