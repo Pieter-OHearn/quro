@@ -1,17 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router';
 import { Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { getUserDisplayName } from '@/lib/user';
 import { cn } from '@/lib/utils';
-import { IconButton, QuroLogo } from '@/components/ui';
+import { IconButton, QuroLogo, useFocusTrap } from '@/components/ui';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { NotificationBell } from '@/components/notifications';
 import { CurrencySelector } from './CurrencySelector';
 import { navItems } from './navItems';
 import { SidebarButton, SidebarLink } from './SidebarItem';
 import { TabBar } from './TabBar';
+import { useScrollMemory } from './useScrollMemory';
 
 const SIDEBAR_ID = 'app-sidebar';
+// From 1024px the sidebar is part of the page; below it is a drawer (Tailwind's `lg`).
+const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +72,8 @@ function SidebarBottom({ collapsed, onNavigate }: NavItemsProps) {
 
 type SidebarProps = {
   collapsed: boolean;
+  /** Whether the sidebar is the drawer (below 1024px) rather than part of the page. */
+  isDrawer: boolean;
   mobileOpen: boolean;
   setCollapsed: (v: boolean) => void;
   setMobileOpen: (v: boolean) => void;
@@ -76,15 +82,33 @@ type SidebarProps = {
 // From 1024px the sidebar is part of the page. Below that it is a drawer, opened by the header's
 // menu button from 640px and by the tab bar's "More" below 640px. A closed drawer is off screen
 // and out of the Tab order and the accessibility tree; visibility is transitioned too, so it only
-// turns hidden once the drawer has slid away.
-function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen }: SidebarProps) {
+// turns hidden once the drawer has slid away. An open drawer is modal: focus moves into it and
+// stays there, Escape or its close button closes it, and focus returns to the control that opened
+// it. The drawer is always the full width; only the page sidebar collapses to icons.
+function Sidebar({
+  collapsed: collapsedPreference,
+  isDrawer,
+  mobileOpen,
+  setCollapsed,
+  setMobileOpen,
+}: SidebarProps) {
+  const collapsed = collapsedPreference && !isDrawer;
   const ToggleIcon = collapsed ? ChevronRight : ChevronLeft;
+  const asideRef = useRef<HTMLElement>(null);
+  useFocusTrap({
+    containerRef: asideRef,
+    active: isDrawer && mobileOpen,
+    onEscape: () => setMobileOpen(false),
+  });
 
   return (
     <aside
+      ref={asideRef}
       id={SIDEBAR_ID}
+      aria-label="Navigation"
+      tabIndex={-1}
       className={cn(
-        'fixed lg:relative z-50 h-full flex flex-col gap-2 p-2 border-r border-border-default bg-surface-nav transition-[width,transform,visibility] duration-base ease-standard motion-reduce:transition-none',
+        'fixed lg:relative z-50 h-full flex flex-col gap-2 p-2 outline-none border-r border-border-default bg-surface-nav transition-[width,transform,visibility] duration-base ease-standard motion-reduce:transition-none',
         collapsed ? 'w-[72px]' : 'w-52',
         !mobileOpen && 'max-lg:invisible max-lg:-translate-x-full',
       )}
@@ -97,6 +121,14 @@ function Sidebar({ collapsed, mobileOpen, setCollapsed, setMobileOpen }: Sidebar
       >
         <QuroLogo size={20} className="flex-shrink-0" />
         {!collapsed && <span className="text-title-section text-fg">Quro</span>}
+        <IconButton
+          icon={X}
+          label="Close navigation"
+          variant="subtle"
+          size="md"
+          className="ml-auto text-fg-muted lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
       </div>
       <SidebarNav collapsed={collapsed} onNavigate={() => setMobileOpen(false)} />
       <SidebarBottom collapsed={collapsed} onNavigate={() => setMobileOpen(false)} />
@@ -182,13 +214,23 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const isDrawer = !useMediaQuery(DESKTOP_MEDIA_QUERY);
+  const drawerOpen = isDrawer && mobileOpen;
   const location = useLocation();
+  useScrollMemory(mainRef, location.pathname);
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   });
+
+  // A drawer left open while the window grows to the sidebar layout would reappear open when it
+  // shrinks again.
+  useEffect(() => {
+    if (!isDrawer) setMobileOpen(false);
+  }, [isDrawer]);
 
   const currentPage = navItems.find((item) =>
     item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path),
@@ -199,34 +241,42 @@ export function Layout() {
 
   // The page scrolls inside `main`. Below 640px it is padded by the tab bar's height (60px tabs,
   // a 1px top border and the safe area) so nothing ends behind the bar, and `h-dvh` keeps the bar
-  // on the visible viewport while a phone browser shows its toolbars.
+  // on the visible viewport while a phone browser shows its toolbars. While the drawer is open
+  // everything behind it is inert.
   return (
     <div className="flex h-dvh bg-surface-sunken overflow-hidden">
-      <TabBar
-        moreOpen={mobileOpen}
-        moreControls={SIDEBAR_ID}
-        onMore={() => setMobileOpen(!mobileOpen)}
-      />
-      {mobileOpen && (
+      <div inert={drawerOpen}>
+        <TabBar
+          moreOpen={mobileOpen}
+          moreControls={SIDEBAR_ID}
+          onMore={() => setMobileOpen(!mobileOpen)}
+        />
+      </div>
+      {drawerOpen && (
         <div
-          className="fixed inset-0 bg-scrim z-40 lg:hidden"
+          aria-hidden="true"
+          className="fixed inset-0 bg-scrim z-40"
           onClick={() => setMobileOpen(false)}
         />
       )}
       <Sidebar
         collapsed={collapsed}
+        isDrawer={isDrawer}
         mobileOpen={mobileOpen}
         setCollapsed={setCollapsed}
         setMobileOpen={setMobileOpen}
       />
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div inert={drawerOpen} className="flex-1 flex flex-col overflow-hidden min-w-0">
         <AppHeader
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
           currentPageLabel={currentPageLabel}
           today={today}
         />
-        <main className="flex-1 overflow-y-auto pb-[calc(61px+env(safe-area-inset-bottom))] sm:pb-0">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto pb-[calc(61px+env(safe-area-inset-bottom))] sm:pb-0"
+        >
           <Outlet />
         </main>
       </div>

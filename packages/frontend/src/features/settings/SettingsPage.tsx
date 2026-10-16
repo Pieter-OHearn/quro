@@ -3,7 +3,15 @@ import type { ElementType } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { Link2, Lock, ShieldCheck, SlidersHorizontal, User as UserIcon, Users } from 'lucide-react';
-import { Badge, Card, ContentSection, PageStack, SegmentedControl } from '@/components/ui';
+import {
+  Badge,
+  Card,
+  ContentSection,
+  PageStack,
+  SegmentedControl,
+  segmentedPanelId,
+  segmentedTabId,
+} from '@/components/ui';
 import { useAuth } from '@/lib/AuthContext';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
@@ -37,6 +45,7 @@ const NAV_ITEM_REST_CLASS_NAME =
   'text-fg-muted hover:bg-surface-muted hover:text-fg active:bg-surface-muted active:text-fg';
 const NAV_ITEM_ACTIVE_CLASS_NAME = 'bg-brand-soft font-semibold text-brand-fg';
 
+const SETTINGS_TABS_ID = 'settings-sections';
 const PHONE_TAB_OPTIONS = TABS.map(({ key, label }) => ({ value: key, label }));
 
 type SectionNavProps = {
@@ -80,6 +89,7 @@ function SectionNav({ activeTab, onSelect, appVersion }: Readonly<SectionNavProp
       <SegmentedControl
         aria-label="Settings sections"
         variant="underline"
+        tabsId={SETTINGS_TABS_ID}
         options={PHONE_TAB_OPTIONS}
         value={activeTab}
         onChange={onSelect}
@@ -155,7 +165,12 @@ export function Settings() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
           <SectionNav activeTab={activeTab} onSelect={setActiveTab} appVersion={appVersion} />
 
-          <div className="min-w-0 flex-1">
+          <div
+            role="tabpanel"
+            id={segmentedPanelId(SETTINGS_TABS_ID, activeTab)}
+            aria-labelledby={segmentedTabId(SETTINGS_TABS_ID, activeTab)}
+            className="min-w-0 flex-1"
+          >
             {activeTab === 'profile' ? (
               <ProfileSection user={user} replaceUser={replaceUser} />
             ) : null}
