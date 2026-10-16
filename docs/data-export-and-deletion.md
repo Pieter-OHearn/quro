@@ -22,7 +22,7 @@ The account's own rows: profile, employments, planning assumptions, savings acco
 
 - **Joint rows.** Joint accounts, properties and mortgages you own are exported in full, not halved, including ledger rows your partner entered on them (`enteredByPartner` is `true` on those). Rows your partner owns are not exported, joint or not: they belong to their account.
 - **Money and currency.** Amounts are numbers in the currency the row names (`currency`, or `sourceCurrency` and `baseCurrency` where a row carries them). Nothing is converted, negative balances and equity keep their sign, and empty values stay empty.
-- **Provenance.** Bank-synced rows keep their source fields. `bunq_mcc`, `bunq_payment_type` and `counterparty_iban` on older budget transactions are still exported; see [write-only bank details](#write-only-bank-details).
+- **Provenance.** Bank-synced rows keep their source fields.
 - **Never included:** password hash, sessions, sign-in codes, bank-link credentials, encryption keys and storage keys. Exchange rates, the stock exchange list and background job state are shared reference or housekeeping data, not yours.
 
 ### CSV and spreadsheets
@@ -75,6 +75,6 @@ Deleting an account changes the live database and document store only. A backup 
 - Delete archives made before the deletion if the person must be gone from every copy.
 - After a restore, delete the account again if it was deleted after the backup was taken. The audit table is restored with the backup, so it does not help here: keep your own record of deletions you owe.
 
-### Write-only bank details
+### Removed bank details
 
-`bunq_mcc`, `bunq_payment_type` and `counterparty_iban` on budget transactions were written on every bank sync and read by nothing. Sync no longer stores them. Existing values stay in the database and in exports; Quro does not rewrite or drop them during an upgrade. Sync still uses the counterparty IBAN and merchant category it receives, in memory, to recognise transfers between your own accounts and to pick a category.
+`budget_transactions.bunq_mcc`, `bunq_payment_type` and `counterparty_iban` were written on every bank sync and read by nothing. A migration drops them, so take a backup before upgrading: the values exist only there afterwards. Sync still uses the counterparty IBAN and merchant category it receives, in memory, to recognise transfers between your own accounts and to pick a category.

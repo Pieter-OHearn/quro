@@ -390,5 +390,4 @@ Credentials are supplied as Docker secrets (files in `./secrets/`), not as Compo
 - `holding_price_history` — end-of-day price history for investment holdings, with a unique index on `(holding_id, eod_date)`.
 - `bunq_connections` — one row per connected user, enforced by a unique index on `user_id`. It stores the OAuth access token, cached API session fields, bunq user ID, last successful sync cursor, and sync status/error.
 - `savings_accounts.bunq_account_id`, `savings_transactions.bunq_transaction_id`, and `budget_transactions.bunq_transaction_id` — bunq identifiers used to make repeated syncs idempotent. Transaction IDs are unique per user.
-- `budget_transactions.bunq_mcc`, `budget_transactions.bunq_payment_type`, and `budget_transactions.counterparty_iban` — bunq payment metadata retained for budget categorisation and review.
 - `category_mappings` — stores per-user category decisions by source/source key. bunq budget sync currently uses `source = 'mcc'` to remember merchant category code mappings.

@@ -87,10 +87,6 @@ test('batched imports keep mappings, templates, manual matches and concurrent re
     .from(budgetTransactions)
     .where(eq(budgetTransactions.userId, owner.user.id));
   expect(rows).toHaveLength(3);
-  // The payment carries a merchant category and a type; sync reads them but no longer stores them.
-  for (const row of rows) {
-    expect([row.bunqMcc, row.bunqPaymentType, row.counterpartyIban]).toEqual([null, null, null]);
-  }
   expect(rows.map((row) => row.bunqTransactionId).sort()).toEqual(['1', '2', '3']);
   expect(rows.find((row) => row.bunqTransactionId === '1')?.categoryId).toBe(category.id);
   const [october] = await db

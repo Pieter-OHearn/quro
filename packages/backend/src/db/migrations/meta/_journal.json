@@ -295,6 +295,13 @@
       "when": 1792158713805,
       "tag": "0041_account_deletions",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792160835036,
+      "tag": "0042_drop_write_only_bunq_columns",
+      "breakpoints": true
     }
   ]
 }

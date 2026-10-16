@@ -213,8 +213,6 @@ Reading the data
   when you read such a value back. The JSON files never change a value.
 - enteredByPartner (joint ledgers) says whether your partner entered the row.
 - Joint accounts, properties and mortgages you own are included in full, not halved.
-- bunq_mcc, bunq_payment_type and counterparty_iban in budget_transactions are old bunq sync
-  details: Quro no longer stores them for new transactions.
 
 What is not in the archive
 --------------------------

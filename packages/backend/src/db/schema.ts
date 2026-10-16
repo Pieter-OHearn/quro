@@ -1018,15 +1018,10 @@ export const budgetTransactions = pgTable(
     sourceCurrency: currencyCodeEnum('source_currency'),
     merchant: text('merchant').notNull(),
     bunqTransactionId: text('bunq_transaction_id'),
-    // Legacy: bunq sync no longer writes bunq_mcc, bunq_payment_type or counterparty_iban, and
-    // nothing reads them. Rows synced before keep their values, and the data export includes them.
-    bunqMcc: text('bunq_mcc'),
-    bunqPaymentType: text('bunq_payment_type'),
     sourceProvider: text('source_provider'),
     sourceAccountId: text('source_account_id'),
     sourceAccountName: text('source_account_name'),
     sourceAccountType: text('source_account_type'),
-    counterpartyIban: text('counterparty_iban'),
   },
   (table) => ({
     currencyEur: check('budget_transactions_currency_eur', sql`${table.currency} = 'EUR'`),
