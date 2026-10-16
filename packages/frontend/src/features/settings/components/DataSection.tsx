@@ -99,7 +99,9 @@ export function DeleteAccountDialog({
       }
     >
       <div className="space-y-4">
-        {preview.isPending ? <LoadingState compact label="Checking what will be deleted" /> : null}
+        {preview.isPending ? (
+          <LoadingState compact className="min-h-0 py-4" label="Checking what will be deleted" />
+        ) : null}
         {preview.data ? <DeletionSummary preview={preview.data} /> : null}
         <FormField label={`Type ${user.email} to confirm`} required>
           <TextInput
