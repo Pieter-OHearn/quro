@@ -1,3 +1,4 @@
+import { displayLabelOptions } from '@/lib/displayLabels';
 import { DATA_COLORS } from '@/lib/dataColors';
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
@@ -195,7 +196,11 @@ function AccountAmountFields({
           />
         </FormField>
         <FormField label="Account type">
-          <SelectInput value={form.type} onChange={(v) => set('type', v)} options={ACCOUNT_TYPES} />
+          <SelectInput
+            value={form.type}
+            onChange={(v) => set('type', v)}
+            options={displayLabelOptions(ACCOUNT_TYPES)}
+          />
         </FormField>
       </div>
     </>

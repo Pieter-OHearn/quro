@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import { ArchivedItemsSection } from '@/components/ui';
 import { useArchivedProperties, useDeleteProperty, useUnarchiveProperty } from '../hooks';
 
@@ -16,7 +17,7 @@ export function PropertiesArchivedSection() {
       entityLabel="Property"
       childrenLabel="transaction history"
       items={archived}
-      renderMeta={(property) => property.propertyType}
+      renderMeta={(property) => displayLabel(property.propertyType)}
       getBalance={(property) => ({
         value: property.currentValue,
         currency: property.currency,

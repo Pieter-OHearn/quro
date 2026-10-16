@@ -93,12 +93,12 @@ export function Plan() {
         onChange={() => undefined}
         aria-label="Plan sections"
       />
-      <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
-      <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
       <ContentSection spacing="md">
         <RunwayHeroCard data={data} onReview={() => setReviewOpen(true)} />
         <BurnRateCards burn={data.burn} fmtBase={fmtPlanMoney} />
       </ContentSection>
+      <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
+      <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
       <ContentSection className="grid gap-4 xl:grid-cols-2">
         <LiquidityTierBar tiers={data.tiers} fmtBase={fmtPlanMoney} />
         <RunwayLedgerChart ledger={data.runway.ledger} fmtBase={fmtPlanMoney} />

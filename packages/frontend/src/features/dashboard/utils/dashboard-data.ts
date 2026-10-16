@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import {
   householdAmount,
   sumMoney,
@@ -91,7 +92,7 @@ export function normalizeAssetAllocations(
 ): AllocationSummary {
   const allocationData = summary.allocations.map((allocation) => ({
     key: allocation.key,
-    name: allocation.name,
+    name: displayLabel(allocation.name),
     value: convertToBase(allocation.value, allocation.currency),
     color: ALLOCATION_COLORS[allocation.key],
   }));
