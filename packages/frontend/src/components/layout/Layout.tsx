@@ -108,7 +108,7 @@ function Sidebar({
       aria-label="Navigation"
       tabIndex={-1}
       className={cn(
-        'fixed lg:relative z-50 h-full flex flex-col gap-2 p-2 outline-none border-r border-border-default bg-surface-nav transition-[width,transform,visibility] duration-base ease-standard motion-reduce:transition-none',
+        'fixed lg:relative z-50 h-full flex flex-col gap-2 p-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] outline-none border-r border-border-default bg-surface-nav transition-[width,transform,visibility] duration-base ease-standard motion-reduce:transition-none',
         collapsed ? 'w-[72px]' : 'w-52',
         !mobileOpen && 'max-lg:invisible max-lg:-translate-x-full',
       )}
@@ -182,7 +182,7 @@ type AppHeaderProps = {
 // tab bar opens the drawer. Below 360px the logo is dropped so the page title keeps its room.
 function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHeaderProps) {
   return (
-    <header className="flex h-14 sm:h-12 flex-shrink-0 items-center justify-between gap-2 border-b border-border-default bg-surface-sunken px-4 sm:px-6">
+    <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] sm:h-12 sm:pt-0 flex-shrink-0 items-center justify-between gap-2 border-b border-border-default bg-surface-sunken px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
         <IconButton
           icon={mobileOpen ? X : Menu}
