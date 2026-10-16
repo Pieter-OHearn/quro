@@ -600,6 +600,82 @@ const smokeCases: readonly SmokeCase[] = [
     excludes: ['shadow-'],
   },
   {
+    name: 'DataTable phone cards place cells by role and keep the generic layout elsewhere',
+    element: (
+      <DataTable
+        columns={[
+          { key: 'name', header: 'Asset', phoneCard: 'title' },
+          { key: 'units', header: 'Units', phoneCard: 'metric' },
+          {
+            key: 'cost',
+            header: 'Avg cost',
+            priority: 'secondary',
+            phoneCard: 'hiddenUntilDetails',
+          },
+          { key: 'value', header: 'Value', phoneCard: 'headline' },
+          { key: 'gain', header: 'Gain', phoneCard: 'headlineNote' },
+          { key: 'actions', header: '', priority: 'actions' },
+        ]}
+      >
+        <DataTableRow interactive>
+          <DataTableCell columnKey="name">Global ETF</DataTableCell>
+          <DataTableCell columnKey="units">40</DataTableCell>
+          <DataTableCell columnKey="cost">95.50</DataTableCell>
+          <DataTableCell columnKey="value">4,496.00</DataTableCell>
+          <DataTableCell columnKey="gain">+676.00</DataTableCell>
+          <DataTableCell columnKey="actions">
+            <button type="button">Edit holding</button>
+          </DataTableCell>
+        </DataTableRow>
+        <DataTableRow data-total cardDetails={false}>
+          <DataTableCell columnKey="name">Total</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: [
+      'max-md:grid-cols-12',
+      'max-md:order-1',
+      'max-md:order-2',
+      'max-md:order-3',
+      'max-md:order-4',
+      'max-md:order-6',
+      // One metric shares the row with nothing else; the revealed one stays hidden until details.
+      'max-md:col-span-12',
+      'max-md:group-data-details-open:block',
+      // A headline with a note under it keeps its label for assistive technology only.
+      'class="text-label text-fg-muted max-md:block sr-only">Value</span>',
+      'class="text-label text-fg-muted max-md:block hidden">Units</span>',
+      'Show details',
+      'Edit holding',
+    ],
+    // The title and the note have no label of their own, and the total row has no details button.
+    excludes: ['>Asset</span>', '>Gain</span>', 'shadow-'],
+  },
+  {
+    name: 'DataTable phone cards show the headline label when no note stands under it',
+    element: (
+      <DataTable
+        columns={[
+          { key: 'month', header: 'Month', phoneCard: 'title' },
+          { key: 'gross', header: 'Gross', phoneCard: 'metric' },
+          { key: 'bonus', header: 'Bonus', phoneCard: 'metric' },
+          { key: 'tax', header: 'Tax', phoneCard: 'metric' },
+          { key: 'net', header: 'Net pay', mobileLabel: 'Net pay', phoneCard: 'headline' },
+        ]}
+      >
+        <DataTableRow>
+          <DataTableCell columnKey="month">Sep 2026</DataTableCell>
+          <DataTableCell columnKey="gross">5,500.00</DataTableCell>
+          <DataTableCell columnKey="bonus">—</DataTableCell>
+          <DataTableCell columnKey="tax">1,465.00</DataTableCell>
+          <DataTableCell columnKey="net">3,760.00</DataTableCell>
+        </DataTableRow>
+      </DataTable>
+    ),
+    includes: ['max-md:col-span-4', '>Net pay</span>', '>Gross</span>'],
+    excludes: ['sr-only', 'Show details'],
+  },
+  {
     name: 'DataTable applies column cell metadata',
     element: (
       <DataTable

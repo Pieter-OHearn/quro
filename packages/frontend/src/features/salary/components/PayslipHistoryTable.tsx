@@ -38,6 +38,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Month',
     mobileLabel: 'Month',
     priority: 'primary',
+    phoneCard: 'title',
     width: '24%',
     sortable: true,
     defaultSortDirection: 'desc',
@@ -48,6 +49,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Gross',
     align: 'right',
     mobileLabel: 'Gross',
+    phoneCard: 'metric',
     width: '14%',
     numeric: true,
     sortable: true,
@@ -60,7 +62,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Bonus',
     align: 'right',
     mobileLabel: 'Bonus',
-    priority: 'secondary',
+    phoneCard: 'metric',
     width: '12%',
     numeric: true,
     sortable: true,
@@ -73,7 +75,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Tax',
     align: 'right',
     mobileLabel: 'Tax',
-    priority: 'secondary',
+    phoneCard: 'metric',
     width: '13%',
     numeric: true,
     sortable: true,
@@ -86,7 +88,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Pension',
     align: 'right',
     mobileLabel: 'Pension',
-    priority: 'secondary',
+    phoneCard: 'metric',
     width: '13%',
     numeric: true,
     sortable: true,
@@ -99,6 +101,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Net pay',
     align: 'right',
     mobileLabel: 'Net pay',
+    phoneCard: 'headline',
     width: '14%',
     numeric: true,
     sortable: true,
@@ -107,8 +110,6 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
   },
   { key: 'actions', header: '', priority: 'actions', width: 96 },
 ];
-
-const COLUMN_COUNT = PAYSLIP_COLUMNS.length;
 
 // A year has about a dozen payslips; paging keeps an imported history from rendering thousands.
 export const PAYSLIP_PAGE_SIZE = 25;
@@ -147,7 +148,7 @@ function PayslipRowActions({
   const downloadUrl = buildApiDownloadUrl(`/api/salary/payslips/${payslip.id}/document/download`);
 
   return (
-    <RowActions>
+    <RowActions className="max-md:justify-start">
       {payslip.document ? (
         <IconButton
           href={downloadUrl}
@@ -183,59 +184,6 @@ function PayslipRowActions({
   );
 }
 
-/**
- * On a phone the Bonus, Tax and Pension columns are hidden, so the selected payslip lists them
- * under its row; the pay breakdown above the table scrolls out of view there.
- */
-function PayslipPhoneDetail({
-  payslip,
-  baseCurrency,
-  fmtBase,
-  convertToBase,
-}: Readonly<{
-  payslip: Payslip;
-  baseCurrency: string;
-  fmtBase: FmtFn;
-  convertToBase: ToBaseFn;
-}>) {
-  return (
-    <DataTableRow className="md:hidden" data-phone-detail>
-      <DataTableCell colSpan={COLUMN_COUNT} className="max-md:block">
-        <dl className="grid w-full grid-cols-3 gap-3 text-left">
-          <div>
-            <dt className="text-label text-fg-muted">Bonus</dt>
-            <dd className="font-numeric">
-              {payslip.bonus ? fmtBase(payslip.bonus, payslip.currency) : '—'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-label text-fg-muted">Tax</dt>
-            <dd>
-              <DeductionAmount
-                value={payslip.tax}
-                currency={payslip.currency}
-                baseCurrency={baseCurrency}
-                convertToBase={convertToBase}
-              />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-label text-fg-muted">Pension</dt>
-            <dd>
-              <DeductionAmount
-                value={payslip.pension}
-                currency={payslip.currency}
-                baseCurrency={baseCurrency}
-                convertToBase={convertToBase}
-              />
-            </dd>
-          </div>
-        </dl>
-      </DataTableCell>
-    </DataTableRow>
-  );
-}
-
 /** The year's totals in the base currency; gross excludes bonus, which has its own column. */
 function PayslipTotalRow({
   payslips,
@@ -252,7 +200,7 @@ function PayslipTotalRow({
     sumMoney(payslips.map((payslip) => convertToBase(pick(payslip), payslip.currency)));
 
   return (
-    <DataTableRow data-total>
+    <DataTableRow data-total cardDetails={false}>
       <DataTableCell columnKey="month" stacked>
         <p>Total</p>
         <p className="text-caption font-normal text-fg-subtle">
@@ -329,52 +277,42 @@ function PayslipTableRow({
   onEdit: (payslip: Payslip) => void;
 }>) {
   return (
-    <>
-      <DataTableRow
-        onClick={() => onSelect(payslip.id)}
-        selected={isSelected}
-        interactive
-        aria-current={isSelected ? 'true' : undefined}
-      >
-        <PayslipMonthCell payslip={payslip} isSelected={isSelected} />
-        <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
-        <DataTableCell columnKey="bonus">
-          {payslip.bonus ? (
-            fmtBase(payslip.bonus, payslip.currency)
-          ) : (
-            <span aria-label="none">—</span>
-          )}
-        </DataTableCell>
-        <DataTableCell columnKey="tax">
-          <DeductionAmount
-            value={payslip.tax}
-            currency={payslip.currency}
-            baseCurrency={baseCurrency}
-            convertToBase={convertToBase}
-          />
-        </DataTableCell>
-        <DataTableCell columnKey="pension">
-          <DeductionAmount
-            value={payslip.pension}
-            currency={payslip.currency}
-            baseCurrency={baseCurrency}
-            convertToBase={convertToBase}
-          />
-        </DataTableCell>
-        <DataTableCell columnKey="net">{fmtBase(payslip.net, payslip.currency)}</DataTableCell>
-        <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
-          <PayslipRowActions payslip={payslip} onEdit={onEdit} />
-        </DataTableCell>
-      </DataTableRow>
-      {isSelected ? (
-        <PayslipPhoneDetail
-          payslip={payslip}
+    <DataTableRow
+      onClick={() => onSelect(payslip.id)}
+      selected={isSelected}
+      interactive
+      aria-current={isSelected ? 'true' : undefined}
+    >
+      <PayslipMonthCell payslip={payslip} isSelected={isSelected} />
+      <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
+      <DataTableCell columnKey="bonus">
+        {payslip.bonus ? (
+          fmtBase(payslip.bonus, payslip.currency)
+        ) : (
+          <span aria-label="none">—</span>
+        )}
+      </DataTableCell>
+      <DataTableCell columnKey="tax">
+        <DeductionAmount
+          value={payslip.tax}
+          currency={payslip.currency}
           baseCurrency={baseCurrency}
-          fmtBase={fmtBase}
           convertToBase={convertToBase}
         />
-      ) : null}
-    </>
+      </DataTableCell>
+      <DataTableCell columnKey="pension">
+        <DeductionAmount
+          value={payslip.pension}
+          currency={payslip.currency}
+          baseCurrency={baseCurrency}
+          convertToBase={convertToBase}
+        />
+      </DataTableCell>
+      <DataTableCell columnKey="net">{fmtBase(payslip.net, payslip.currency)}</DataTableCell>
+      <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+        <PayslipRowActions payslip={payslip} onEdit={onEdit} />
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 

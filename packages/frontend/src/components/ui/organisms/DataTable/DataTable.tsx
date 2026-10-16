@@ -45,8 +45,41 @@ const TABLE_VARIANT_CLASSES = {
 
 const MOBILE_CARD_CLASS_NAME =
   'max-md:rounded-lg max-md:border max-md:border-border-default max-md:bg-surface max-md:px-3 max-sm:rounded-xl max-sm:px-4';
+// The phone card: a 12-column grid. The title takes 7 columns and the headline 5; the metrics
+// share the next rows; the footer holds the actions and the "Show details" button. `order` puts
+// the cells in that sequence whatever the column order is.
+const PHONE_CARD_CLASS_NAME =
+  'max-md:grid max-md:grid-cols-12 max-md:items-start max-md:px-4 max-md:py-3';
+const PHONE_CARD_CELL_CLASS_NAME = 'max-md:min-w-0 max-md:p-0 max-md:text-left';
+const PHONE_CARD_ROLE_CLASSES = {
+  title: 'max-md:order-1 max-md:col-span-7',
+  headline: 'max-md:order-2 max-md:col-span-5 max-md:justify-self-end max-md:text-right',
+  headlineNote: 'max-md:order-3 max-md:col-span-5 max-md:justify-self-end max-md:text-right',
+  metric: 'max-md:order-4 max-md:mt-3',
+  hiddenUntilDetails:
+    'max-md:order-5 max-md:mt-3 max-md:hidden max-md:group-data-details-open:block',
+} as const;
+// A label over a value: metrics share a row two (up to four), three or one to a row.
+const PHONE_CARD_METRIC_SPAN_CLASSES = {
+  1: 'max-md:col-span-12',
+  2: 'max-md:col-span-6',
+  3: 'max-md:col-span-4',
+  4: 'max-md:col-span-6',
+} as const;
+const PHONE_CARD_FOOTER_CLASS_NAME =
+  'max-md:mt-2 max-md:border-t max-md:border-border-subtle max-md:pt-1';
 const MOBILE_CELL_CLASS_NAME =
   'max-md:flex max-md:min-h-9 max-md:items-center max-md:justify-between max-md:gap-4 max-md:border-0 max-md:px-0 max-md:py-1.5 max-sm:min-h-12';
+
+/**
+ * Where a column's cell goes on the phone card of a table that opts in with `phoneCard` roles.
+ * `title`: the identity on the left (name over a caption line). `headline`: the key figure on the
+ * right. `headlineNote`: a line under the headline (a gain, say). `metric`: a label over a value in
+ * a grid under the header. `hiddenUntilDetails`: a metric the "Show details" button reveals.
+ * A column with the `actions` priority becomes the card's footer.
+ */
+export type DataTablePhoneCardRole =
+  'title' | 'headline' | 'headlineNote' | 'metric' | 'hiddenUntilDetails';
 
 export type DataTableColumn<Row = never> = {
   key: string;
@@ -55,6 +88,8 @@ export type DataTableColumn<Row = never> = {
   width?: number | string;
   priority?: keyof typeof PRIORITY_CLASSES;
   mobileLabel?: ReactNode;
+  /** Opts the table into the phone card layout; see `DataTablePhoneCardRole`. */
+  phoneCard?: DataTablePhoneCardRole;
   numeric?: boolean;
   sortable?: boolean;
   sortValue?(row: Row): string | number;
@@ -101,6 +136,8 @@ export type DataTableRowProps = ComponentPropsWithoutRef<'tr'> & {
   selected?: boolean;
   interactive?: boolean;
   mobileCard?: boolean;
+  /** False for a row with nothing to reveal (a total): it gets no "Show details" button. */
+  cardDetails?: boolean;
 };
 
 export type DataTableCellProps = ComponentPropsWithoutRef<'td'> & {
@@ -117,6 +154,11 @@ export type DataTableCellProps = ComponentPropsWithoutRef<'td'> & {
 type DataTableContextValue = {
   /** Whether some column is left out of the cards until a row's details are opened. */
   hasCardDetails: boolean;
+  /** Whether the cards use the phone card layout (some column has a `phoneCard` role). */
+  phoneCard: boolean;
+  /** Whether a column holds a note under the headline figure. */
+  hasHeadlineNote: boolean;
+  metricCount: number;
   columnsByKey: ReadonlyMap<string, DataTableColumn>;
   density: keyof typeof DENSITY_CLASSES;
   tableVariant: keyof typeof TABLE_VARIANT_CLASSES;
@@ -129,6 +171,7 @@ type ResolvedCellConfig = {
   numeric: boolean;
   columnClassName?: string;
   tableVariant: keyof typeof TABLE_VARIANT_CLASSES;
+  phoneCardRole?: DataTablePhoneCardRole;
 };
 
 const DataTableContext = createContext<DataTableContextValue | null>(null);
@@ -192,6 +235,7 @@ function resolveCellConfig({
     numeric: resolvedNumeric,
     columnClassName: column?.cellClassName,
     tableVariant: tableContext?.tableVariant ?? 'default',
+    phoneCardRole: column?.phoneCard,
   };
 }
 
@@ -199,16 +243,20 @@ function getRowClassName({
   density,
   tableVariant,
   mobileCard,
+  phoneCard,
   interactive,
   selected,
   className,
 }: Required<Pick<DataTableRowProps, 'mobileCard' | 'interactive' | 'selected'>> & {
   density: keyof typeof DENSITY_CLASSES;
   tableVariant: keyof typeof TABLE_VARIANT_CLASSES;
+  /** The row is a card in the phone card layout. */
+  phoneCard: boolean;
   className?: string;
 }) {
   return cn(
-    'group border-b border-border-subtle transition-colors duration-fast md:last:border-b-0 md:hover:bg-surface-muted max-md:block',
+    'group border-b border-border-subtle transition-colors duration-fast md:last:border-b-0 md:hover:bg-surface-muted',
+    phoneCard ? PHONE_CARD_CLASS_NAME : 'max-md:block',
     DENSITY_CLASSES[density].row,
     mobileCard && MOBILE_CARD_CLASS_NAME,
     TABLE_VARIANT_CLASSES[tableVariant].row,
@@ -227,9 +275,19 @@ function getRowClassName({
 function DataTableDetailsToggle({
   open,
   onToggle,
-}: Readonly<{ open: boolean; onToggle: () => void }>) {
+  phoneCard,
+}: Readonly<{ open: boolean; onToggle: () => void; phoneCard: boolean }>) {
   return (
-    <td className="hidden max-md:block max-md:pb-1">
+    <td
+      className={cn(
+        'hidden max-md:block max-md:pb-1',
+        phoneCard &&
+          cn(
+            'max-md:order-7 max-md:col-span-6 max-md:col-start-7 max-md:pb-0 max-md:text-right',
+            PHONE_CARD_FOOTER_CLASS_NAME,
+          ),
+      )}
+    >
       <button
         type="button"
         aria-expanded={open}
@@ -237,7 +295,10 @@ function DataTableDetailsToggle({
           event.stopPropagation();
           onToggle();
         }}
-        className="inline-flex min-h-9 items-center text-label text-brand-fg underline-offset-2 hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+        className={cn(
+          'inline-flex min-h-9 items-center text-label text-brand-fg underline-offset-2 hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring',
+          phoneCard && 'max-md:min-h-11',
+        )}
       >
         {open ? 'Hide details' : 'Show details'}
       </button>
@@ -252,11 +313,19 @@ function getRowChrome(tableContext: DataTableContextValue | null) {
   } as const;
 }
 
-function useCardDetails(enabled: boolean) {
+function useCardDetails(
+  tableContext: DataTableContextValue | null,
+  { mobileCard, cardDetails }: Required<Pick<DataTableRowProps, 'mobileCard' | 'cardDetails'>>,
+) {
   const [open, setOpen] = useState(false);
+  const phoneCard = Boolean(tableContext?.phoneCard && mobileCard);
+  const enabled = Boolean(tableContext?.hasCardDetails && mobileCard && cardDetails);
   return {
+    phoneCard,
     rowProps: { 'data-details-open': open ? '' : undefined },
-    toggle: enabled ? <DataTableDetailsToggle open={open} onToggle={() => setOpen(!open)} /> : null,
+    toggle: enabled ? (
+      <DataTableDetailsToggle open={open} onToggle={() => setOpen(!open)} phoneCard={phoneCard} />
+    ) : null,
   };
 }
 
@@ -264,6 +333,7 @@ export function DataTableRow({
   selected = false,
   interactive = false,
   mobileCard = true,
+  cardDetails = true,
   className,
   children,
   onClick,
@@ -273,7 +343,7 @@ export function DataTableRow({
 }: Readonly<DataTableRowProps>) {
   const tableContext = useDataTableContext();
   const isKeyboardInteractive = Boolean(interactive && onClick);
-  const details = useCardDetails(Boolean(tableContext?.hasCardDetails && mobileCard));
+  const details = useCardDetails(tableContext, { mobileCard, cardDetails });
 
   function handleKeyDown(event: KeyboardEvent<HTMLTableRowElement>) {
     onKeyDown?.(event);
@@ -290,6 +360,7 @@ export function DataTableRow({
       className={getRowClassName({
         ...getRowChrome(tableContext),
         mobileCard,
+        phoneCard: details.phoneCard,
         interactive,
         selected,
         className,
@@ -306,6 +377,91 @@ export function DataTableRow({
   );
 }
 
+function getPhoneCardRole(
+  config: ResolvedCellConfig,
+): DataTablePhoneCardRole | 'footer' | undefined {
+  if (config.phoneCardRole) return config.phoneCardRole;
+  return config.priority === 'actions' ? 'footer' : undefined;
+}
+
+function getPhoneCardCellClassName(
+  role: DataTablePhoneCardRole | 'footer',
+  tableContext: DataTableContextValue,
+) {
+  if (role === 'footer') {
+    return cn(
+      PHONE_CARD_FOOTER_CLASS_NAME,
+      'max-md:order-6 max-md:col-start-1 max-md:block',
+      tableContext.hasCardDetails ? 'max-md:col-span-6' : 'max-md:col-span-12',
+    );
+  }
+  if (role === 'title') {
+    return cn(PHONE_CARD_ROLE_CLASSES.title, tableContext.hasHeadlineNote && 'max-md:row-span-2');
+  }
+  if (role === 'metric' || role === 'hiddenUntilDetails') {
+    const span =
+      PHONE_CARD_METRIC_SPAN_CLASSES[
+        tableContext.metricCount as keyof typeof PHONE_CARD_METRIC_SPAN_CLASSES
+      ] ?? 'max-md:col-span-4';
+    return cn(PHONE_CARD_ROLE_CLASSES[role], span);
+  }
+  return PHONE_CARD_ROLE_CLASSES[role];
+}
+
+// The label of a phone card cell: none for the title and the note, above the value for a metric,
+// and for the headline above the figure, or only for assistive technology when a note under it
+// says what it is.
+function PhoneCardLabel({
+  role,
+  label,
+  hasHeadlineNote,
+}: Readonly<{
+  role: DataTablePhoneCardRole | 'footer';
+  label: ReactNode;
+  hasHeadlineNote: boolean;
+}>) {
+  if (!label || role === 'title' || role === 'headlineNote' || role === 'footer') return null;
+  const hidden = role === 'headline' && hasHeadlineNote;
+  return (
+    <span className={cn('text-label text-fg-muted max-md:block', hidden ? 'sr-only' : 'hidden')}>
+      {label}
+    </span>
+  );
+}
+
+function getCellClassName(
+  cellConfig: ResolvedCellConfig,
+  tableContext: DataTableContextValue | null,
+  phoneRole: DataTablePhoneCardRole | 'footer' | undefined,
+) {
+  return cn(
+    'px-3',
+    phoneRole ? PHONE_CARD_CELL_CLASS_NAME : MOBILE_CELL_CLASS_NAME,
+    TABLE_VARIANT_CLASSES[cellConfig.tableVariant].cell,
+    ALIGNMENT_CLASSES[cellConfig.align],
+    !phoneRole && PRIORITY_CLASSES[cellConfig.priority],
+    phoneRole && tableContext && getPhoneCardCellClassName(phoneRole, tableContext),
+    cellConfig.numeric && 'font-numeric',
+    cellConfig.columnClassName,
+  );
+}
+
+function CellLabel({
+  phoneRole,
+  label,
+  hasHeadlineNote,
+}: Readonly<{
+  phoneRole: DataTablePhoneCardRole | 'footer' | undefined;
+  label: ReactNode;
+  hasHeadlineNote: boolean;
+}>) {
+  if (phoneRole) {
+    return <PhoneCardLabel role={phoneRole} label={label} hasHeadlineNote={hasHeadlineNote} />;
+  }
+  if (!label) return null;
+  return <span className="hidden shrink-0 text-label text-fg-muted max-md:block">{label}</span>;
+}
+
 export function DataTableCell({
   columnKey,
   align,
@@ -318,37 +474,39 @@ export function DataTableCell({
   children,
   ...props
 }: Readonly<DataTableCellProps>) {
+  const tableContext = useDataTableContext();
   const cellConfig = resolveCellConfig({
-    tableContext: useDataTableContext(),
+    tableContext,
     columnKey,
     align,
     mobileLabel,
     priority,
     numeric,
   });
+  const phoneRole = tableContext?.phoneCard ? getPhoneCardRole(cellConfig) : undefined;
 
   return (
     <td
       className={cn(
-        'px-3',
-        MOBILE_CELL_CLASS_NAME,
-        TABLE_VARIANT_CLASSES[cellConfig.tableVariant].cell,
-        ALIGNMENT_CLASSES[cellConfig.align],
-        PRIORITY_CLASSES[cellConfig.priority],
+        getCellClassName(cellConfig, tableContext, phoneRole),
         stacked && 'md:py-1.5',
-        cellConfig.numeric && 'font-numeric',
-        cellConfig.columnClassName,
         className,
       )}
       {...props}
     >
-      {cellConfig.mobileLabel ? (
-        <span className="hidden shrink-0 text-label text-fg-muted max-md:block">
-          {cellConfig.mobileLabel}
-        </span>
-      ) : null}
+      <CellLabel
+        phoneRole={phoneRole}
+        label={cellConfig.mobileLabel}
+        hasHeadlineNote={Boolean(tableContext?.hasHeadlineNote)}
+      />
       <div
-        className={cn('min-w-0', cellConfig.align === 'right' && 'md:text-right', contentClassName)}
+        className={cn(
+          'min-w-0',
+          cellConfig.align === 'right' && 'md:text-right',
+          // The first 44px icon button of the footer lines its glyph up with the card's text.
+          phoneRole === 'footer' && 'max-md:-ml-3',
+          contentClassName,
+        )}
       >
         {children}
       </div>
@@ -593,8 +751,14 @@ function DataTableContent({
     <DataTableContext.Provider
       value={{
         hasCardDetails: columns.some(
-          (column) => column.priority === 'secondary' || column.priority === 'tertiary',
+          (column) =>
+            column.priority === 'secondary' ||
+            column.priority === 'tertiary' ||
+            column.phoneCard === 'hiddenUntilDetails',
         ),
+        phoneCard: columns.some((column) => column.phoneCard),
+        hasHeadlineNote: columns.some((column) => column.phoneCard === 'headlineNote'),
+        metricCount: columns.filter((column) => column.phoneCard === 'metric').length,
         columnsByKey: new Map(columns.map((column) => [column.key, column])),
         density,
         tableVariant,
