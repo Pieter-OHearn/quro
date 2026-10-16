@@ -64,6 +64,7 @@ export function NetWorthChartCard({
       data={chartData}
       dataKey="value"
       estimatedKey="isEstimated"
+      xLabel="Date"
       xKey="label"
       color="var(--brand)"
       height={220}

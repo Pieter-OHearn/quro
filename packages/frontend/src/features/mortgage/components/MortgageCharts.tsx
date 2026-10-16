@@ -9,8 +9,16 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ChartCard } from '@/components/ui';
-import { CHART_AXIS_PROPS, CHART_GRID_PROPS, CHART_TOOLTIP_PROPS } from '@/lib/chartStyles';
+import { ChartCard, buildChartAlternative } from '@/components/ui';
+import { ChartLegend } from '@/components/finance/chartTheme';
+import {
+  CHART_GRID_PROPS,
+  CHART_TOOLTIP_PROPS,
+  CHART_X_AXIS_PROPS,
+  CHART_Y_AXIS_PROPS,
+  formatAxisCompact,
+} from '@/lib/chartStyles';
+import { useChartMotion } from '@/hooks/useMediaQuery';
 import type { AmortizationRow, MortgageFormatFn, PaymentBreakdownRow } from '../types';
 import type { MortgageRepaymentType } from '@quro/shared';
 
@@ -18,6 +26,8 @@ import type { MortgageRepaymentType } from '@quro/shared';
 const DEBT_COLOR = 'var(--viz-6)';
 const INTEREST_COLOR = 'var(--viz-3)';
 const CHART_HEIGHT = 200;
+// Interest is a tinted, outlined bar beside the solid principal, so it is not told apart by hue alone.
+const SOFT_FILL_OPACITY = 0.3;
 
 type MortgageBalanceChartProps = {
   amortization: AmortizationRow[];
@@ -30,19 +40,30 @@ function MortgageBalanceChart({
   fmt,
   repaymentType,
 }: Readonly<MortgageBalanceChartProps>) {
+  const motion = useChartMotion();
   return (
     <ChartCard
       title="Balance projection"
       subtitle={`Remaining balance using the ${repaymentType.toLowerCase()} repayment method`}
-      hasData
+      hasData={amortization.length > 0}
+      emptyMessage="No balance projection yet."
+      alternative={buildChartAlternative({
+        subject: 'Balance projection',
+        xLabel: 'Year',
+        x: (row) => row.year,
+        rows: amortization,
+        columns: [{ label: 'Remaining balance', value: (row) => row.balance, format: fmt }],
+        note: 'A projection from the current terms, not a record of payments made.',
+      })}
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <AreaChart data={amortization}>
+        <AreaChart data={amortization} accessibilityLayer>
           <CartesianGrid {...CHART_GRID_PROPS} />
-          <XAxis dataKey="year" {...CHART_AXIS_PROPS} />
-          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+          <XAxis dataKey="year" {...CHART_X_AXIS_PROPS} />
+          <YAxis {...CHART_Y_AXIS_PROPS} tickFormatter={(v) => formatAxisCompact(v)} />
           <Tooltip
             {...CHART_TOOLTIP_PROPS}
+            {...motion}
             cursor={{ stroke: 'var(--border-default)' }}
             formatter={(value) => [fmt(Number(value) || 0), 'Balance']}
           />
@@ -54,6 +75,7 @@ function MortgageBalanceChart({
             fill={DEBT_COLOR}
             fillOpacity={0.12}
             dot={false}
+            {...motion}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -63,16 +85,12 @@ function MortgageBalanceChart({
 
 function PaymentChartLegend() {
   return (
-    <div className="mt-3 flex items-center gap-4">
-      <div className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DEBT_COLOR }} />
-        <span className="text-caption text-fg-muted">Principal</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: INTEREST_COLOR }} />
-        <span className="text-caption text-fg-muted">Interest</span>
-      </div>
-    </div>
+    <ChartLegend
+      items={[
+        { label: 'Principal', color: DEBT_COLOR, swatch: 'solid' },
+        { label: 'Interest', color: INTEREST_COLOR, swatch: 'soft' },
+      ]}
+    />
   );
 }
 
@@ -82,6 +100,7 @@ type MortgagePaymentChartProps = {
 };
 
 function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymentChartProps>) {
+  const motion = useChartMotion();
   return (
     <ChartCard
       title="Payment breakdown"
@@ -89,21 +108,40 @@ function MortgagePaymentChart({ paymentBreakdown, fmt }: Readonly<MortgagePaymen
       hasData={paymentBreakdown.length > 0}
       emptyMessage="No repayment transactions yet."
       footer={<PaymentChartLegend />}
+      alternative={buildChartAlternative({
+        subject: 'Payment breakdown',
+        xLabel: 'Month',
+        x: (row) => row.month,
+        rows: paymentBreakdown,
+        columns: [
+          { label: 'Principal', value: (row) => row.principal, format: fmt },
+          { label: 'Interest', value: (row) => row.interest, format: fmt },
+        ],
+      })}
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <BarChart data={paymentBreakdown} barSize={22}>
+        <BarChart data={paymentBreakdown} barSize={22} accessibilityLayer>
           <CartesianGrid {...CHART_GRID_PROPS} />
-          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
-          <YAxis {...CHART_AXIS_PROPS} tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`} />
+          <XAxis dataKey="month" {...CHART_X_AXIS_PROPS} />
+          <YAxis {...CHART_Y_AXIS_PROPS} tickFormatter={(v) => formatAxisCompact(v)} />
           <Tooltip
             {...CHART_TOOLTIP_PROPS}
+            {...motion}
             formatter={(value, name) => [
               fmt(Number(value) || 0),
               String(name) === 'principal' ? 'Principal' : 'Interest',
             ]}
           />
-          <Bar dataKey="principal" name="principal" fill={DEBT_COLOR} stackId="a" />
-          <Bar dataKey="interest" name="interest" fill={INTEREST_COLOR} stackId="a" />
+          <Bar dataKey="principal" name="principal" fill={DEBT_COLOR} stackId="a" {...motion} />
+          <Bar
+            dataKey="interest"
+            name="interest"
+            fill={INTEREST_COLOR}
+            fillOpacity={SOFT_FILL_OPACITY}
+            stroke={INTEREST_COLOR}
+            stackId="a"
+            {...motion}
+          />
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>

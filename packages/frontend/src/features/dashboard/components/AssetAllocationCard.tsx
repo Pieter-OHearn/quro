@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useId, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { Card, PanelHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -47,19 +47,31 @@ function AllocationRows({
   totalAlloc: number;
   fmtBase: DashboardFormatFn;
 }>) {
+  const summaryId = useId();
+  const largest = data.reduce<AllocationItem | null>(
+    (top, item) => (top === null || item.value > top.value ? item : top),
+    null,
+  );
   return (
-    <ul>
-      {data.map((item) => (
-        <li key={item.key} className={ROW_CLASS_NAME}>
-          <Swatch color={item.color} />
-          <span className="min-w-0 flex-1 truncate text-fg">{item.name}</span>
-          <span className="font-numeric text-fg">{fmtBase(item.value)}</span>
-          <span className="w-9 text-right font-numeric text-fg-muted">
-            {formatShare(item.value, totalAlloc)}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <>
+      <p id={summaryId} className="sr-only">
+        {largest
+          ? `${data.length} asset classes. Largest: ${largest.name}, ${formatShare(largest.value, totalAlloc)} of assets. Each row lists the exact value and its share of assets.`
+          : 'No asset classes.'}
+      </p>
+      <ul aria-label="Asset allocation by class" aria-describedby={summaryId}>
+        {data.map((item) => (
+          <li key={item.key} className={ROW_CLASS_NAME}>
+            <Swatch color={item.color} />
+            <span className="min-w-0 flex-1 truncate text-fg">{item.name}</span>
+            <span className="font-numeric text-fg">{fmtBase(item.value)}</span>
+            <span className="w-9 text-right font-numeric text-fg-muted">
+              {formatShare(item.value, totalAlloc)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

@@ -21,3 +21,14 @@ export function useMediaQuery(query: string): boolean {
     typeof window !== 'undefined' && Boolean(window.matchMedia?.(query).matches);
   return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
+
+/** The operating system's reduced-motion preference, following changes live. */
+export const REDUCED_MOTION_MEDIA_QUERY = '(prefers-reduced-motion: reduce)';
+
+/**
+ * Props for animated chart series, tooltips and slices: no animation with reduced motion.
+ * Spread them on every Recharts `Area`, `Bar`, `Pie` and `Tooltip`.
+ */
+export function useChartMotion(): { isAnimationActive: boolean } {
+  return { isAnimationActive: !useMediaQuery(REDUCED_MOTION_MEDIA_QUERY) };
+}

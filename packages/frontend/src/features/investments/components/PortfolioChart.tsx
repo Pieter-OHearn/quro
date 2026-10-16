@@ -1,4 +1,6 @@
-import { ChartCard } from '@/components/ui';
+import { ChartCard, buildChartAlternative } from '@/components/ui';
+import { formatAxisCompact } from '@/lib/chartStyles';
+import { useChartMotion } from '@/hooks/useMediaQuery';
 import {
   Area,
   AreaChart,
@@ -9,9 +11,11 @@ import {
   YAxis,
 } from 'recharts';
 import {
-  CHART_AXIS_PROPS,
   CHART_CURSOR,
   CHART_GRID_PROPS,
+  CHART_TOOLTIP_WRAPPER_STYLE,
+  CHART_X_AXIS_PROPS,
+  CHART_Y_AXIS_PROPS,
   ChartLegend,
   ChartTooltipContent,
   type ChartTooltipEntry,
@@ -22,6 +26,8 @@ import type { PortfolioHistoryPoint } from '../types';
 const BROKERAGE_SERIES = 'var(--viz-2)';
 const PROPERTY_SERIES = 'var(--viz-4)';
 const SERIES_FILL_OPACITY = 0.08;
+// Property is dashed, so the two lines differ by more than hue.
+const PROPERTY_DASH = '6 4';
 
 type PortfolioChartProps = {
   data: PortfolioHistoryPoint[];
@@ -49,17 +55,20 @@ function activeDot(color: string) {
 }
 
 function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
+  const motion = useChartMotion();
   return (
     <>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={data} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} accessibilityLayer>
           <CartesianGrid {...CHART_GRID_PROPS} />
-          <XAxis dataKey="month" {...CHART_AXIS_PROPS} />
+          <XAxis dataKey="month" {...CHART_X_AXIS_PROPS} />
           <YAxis
-            {...CHART_AXIS_PROPS}
-            tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
+            {...CHART_Y_AXIS_PROPS}
+            tickFormatter={(value) => formatAxisCompact(Number(value))}
           />
           <Tooltip
+            {...motion}
+            wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE}
             cursor={CHART_CURSOR}
             content={(props) => (
               <ChartTooltipContent
@@ -78,10 +87,12 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
             dataKey="propertyEquity"
             stroke={PROPERTY_SERIES}
             strokeWidth={2}
+            strokeDasharray={PROPERTY_DASH}
             fill={PROPERTY_SERIES}
             fillOpacity={SERIES_FILL_OPACITY}
             dot={false}
             activeDot={activeDot(PROPERTY_SERIES)}
+            {...motion}
           />
           <Area
             type="monotone"
@@ -92,13 +103,14 @@ function PortfolioAreaChart({ data, fmtBase }: PortfolioAreaChartProps) {
             fillOpacity={SERIES_FILL_OPACITY}
             dot={false}
             activeDot={activeDot(BROKERAGE_SERIES)}
+            {...motion}
           />
         </AreaChart>
       </ResponsiveContainer>
       <ChartLegend
         items={[
           { label: 'Brokerage', color: BROKERAGE_SERIES },
-          { label: 'Your property equity', color: PROPERTY_SERIES },
+          { label: 'Your property equity', color: PROPERTY_SERIES, dashed: true },
         ]}
         note="Estimated where historical market prices are unavailable."
       />
@@ -113,6 +125,22 @@ export function PortfolioChart({ data, baseCurrency, fmtBase }: PortfolioChartPr
       subtitle={`Brokerage + your property equity in ${baseCurrency}`}
       hasData={data.length > 0}
       emptyMessage="Add transactions to generate portfolio history."
+      alternative={buildChartAlternative({
+        subject: 'Portfolio performance',
+        xLabel: 'Month',
+        x: (point) => point.month,
+        rows: data,
+        columns: [
+          { label: 'Brokerage', value: (point) => point.brokerage, format: fmtBase },
+          {
+            label: 'Your property equity',
+            value: (point) => point.propertyEquity,
+            format: fmtBase,
+          },
+        ],
+        estimated: (point) => point.isEstimated,
+        note: 'Estimated rows use fallback market prices for the brokerage value.',
+      })}
     >
       {data.length > 0 && <PortfolioAreaChart data={data} fmtBase={fmtBase} />}
     </ChartCard>
