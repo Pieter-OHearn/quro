@@ -319,9 +319,20 @@ Rules for every figure:
   reports `rulesEffectiveFrom: null`. The tax rate comes from the latest twelve payslips by date,
   and payslips that share a date are taken in the order they were entered.
 
-The frontend already treats an FX rate as stale 48 hours after `updatedAt`, but no view shows
-that yet. Showing these indicators consistently in the interface is design work that follows this
-contract.
+The interface shows these indicators the same way everywhere, through the `StateNotice` component
+and the figures' own marks (a `~` before an estimated total, an "Estimated" status in a chart's
+data table):
+
+- **Stale FX.** A synced rate is stale 48 hours after `updatedAt`. A notice under the header names
+  the stale currencies and the date of the oldest update; the rate stays in use.
+- **Stale prices.** A synced holding price older than seven days is marked stale in its row, and the
+  Investments page lists the holdings behind it. A manual price or a holding with sync off is a
+  choice and is not flagged.
+- **Needs review.** Budget amounts without a recorded currency are read as EUR and a notice says
+  so on the Budget and Plan pages.
+- **Failed loads.** A page whose required data fails shows the route error state with a retry. A
+  secondary list (archived items, spending classes, banking entities, price history) shows its own
+  notice with a retry, never an empty list.
 
 ## Rule review and corrections
 
@@ -378,7 +389,7 @@ cents (for example 4.762747 → 4.762749 months).
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Savings history            | Each account floored at zero, UTC months                                                                                | Total floored, rounded to whole units, local-calendar months  | months differ around midnight on the first for users outside UTC          |
 | Current month vs dashboard | History floors negative savings and debt balances, leaves out future-dated rows, and prices holdings from price history | Dashboard allocations use current balances and `currentPrice` | an overdrawn account lowers allocations but not the current history point |
-| FX staleness               | None                                                                                                                    | Stale 48 hours after `updatedAt`                              | a provider outage is visible only to the frontend                         |
+| FX staleness               | None                                                                                                                    | Stale 48 hours after `updatedAt`, shown as a notice           | a provider outage is visible only to the frontend                         |
 
 ## Where the tests live
 

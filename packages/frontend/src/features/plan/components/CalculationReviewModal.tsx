@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import { formatPercent, type RunwayResponse } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { Badge, Modal } from '@/components/ui';
@@ -33,7 +34,7 @@ export function CalculationReviewModal({
   return (
     <Modal
       title="Review calculation"
-      subtitle={`${data.jurisdiction.code} rules · calculated ${data.asOf}`}
+      subtitle={`${displayLabel(data.jurisdiction.code)} rules · calculated ${data.asOf}`}
       onClose={onClose}
       maxWidth="xl"
       scrollable

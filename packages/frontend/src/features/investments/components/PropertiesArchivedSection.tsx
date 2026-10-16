@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import { ArchivedItemsSection } from '@/components/ui';
 import { useArchivedProperties, useDeleteProperty, useUnarchiveProperty } from '../hooks';
 
@@ -12,11 +13,16 @@ export function PropertiesArchivedSection() {
 
   return (
     <ArchivedItemsSection
+      loadError={
+        archivedQuery.isError
+          ? { onRetry: () => void archivedQuery.refetch(), retrying: archivedQuery.isFetching }
+          : null
+      }
       title="Archived properties"
       entityLabel="Property"
       childrenLabel="transaction history"
       items={archived}
-      renderMeta={(property) => property.propertyType}
+      renderMeta={(property) => displayLabel(property.propertyType)}
       getBalance={(property) => ({
         value: property.currentValue,
         currency: property.currency,

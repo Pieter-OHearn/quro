@@ -7,6 +7,7 @@ import {
   PageStack,
   SegmentedControl,
 } from '@/components/ui';
+import { CurrencyReviewNotice } from '@/components/finance/CurrencyReviewNotice';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { EmploymentCard } from '@/features/employment';
 import { useCurrency } from '@/lib/CurrencyContext';
@@ -66,18 +67,9 @@ export function Plan() {
 
   return (
     <PageStack>
-      {data.budgetCurrencyNeedsReview && (
-        <p
-          role="status"
-          className="rounded-lg border border-warning bg-warning-soft p-3 text-cell text-warning"
-        >
-          Some older budget amounts have no recorded currency and are treated as EUR. Review these
-          records against your statements before relying on spending or runway estimates.
-        </p>
-      )}
+      {data.budgetCurrencyNeedsReview && <CurrencyReviewNotice />}
       <ContentSection className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-label text-fg-muted">Plan</p>
           <h2 className="text-title-section text-fg">Financial resilience</h2>
           <p className="mt-1 max-w-2xl text-cell text-fg-muted">
             A derived planning view built from the balances, spending, and income already in Quro.
@@ -93,12 +85,12 @@ export function Plan() {
         onChange={() => undefined}
         aria-label="Plan sections"
       />
-      <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
-      <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
       <ContentSection spacing="md">
         <RunwayHeroCard data={data} onReview={() => setReviewOpen(true)} />
         <BurnRateCards burn={data.burn} fmtBase={fmtPlanMoney} />
       </ContentSection>
+      <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
+      <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
       <ContentSection className="grid gap-4 xl:grid-cols-2">
         <LiquidityTierBar tiers={data.tiers} fmtBase={fmtPlanMoney} />
         <RunwayLedgerChart ledger={data.runway.ledger} fmtBase={fmtPlanMoney} />

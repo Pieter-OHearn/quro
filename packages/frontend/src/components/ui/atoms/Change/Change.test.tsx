@@ -224,6 +224,8 @@ describe('Change number formatting', () => {
       isForeign: () => false,
       ratesStatus: 'ready',
       ratesUpdatedAt: null,
+      staleRateCurrencies: [],
+      staleRatesSince: null,
     } satisfies CurrencyContextType;
     const markup = render(
       <CurrencyContext.Provider value={context}>

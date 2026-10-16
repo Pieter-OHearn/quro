@@ -1,6 +1,5 @@
 import type { ElementType } from 'react';
 import type { Goal, SavingsAccount } from '@quro/shared';
-import type { LucideIcon } from 'lucide-react';
 import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 
 export type GoalStatus = 'complete' | 'on_track' | 'at_risk' | 'pending';
@@ -50,14 +49,10 @@ export type GoalStatsData = {
   monthly: number;
 };
 
-export type GoalStatCardColor = 'indigo' | 'emerald' | 'sky' | 'amber';
-
 export type GoalStatCard = {
   label: string;
   value: string;
   sub: string;
-  icon: LucideIcon;
-  color: GoalStatCardColor;
 };
 
 export type GoalsComputations = {

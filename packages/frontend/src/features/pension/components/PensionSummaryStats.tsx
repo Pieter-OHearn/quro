@@ -1,4 +1,3 @@
-import { Calendar, Clock, ShieldCheck, TrendingUp } from 'lucide-react';
 import { StatCard, StatsGrid } from '@/components/ui';
 import type { PensionFormatBaseFn } from '../types';
 
@@ -23,29 +22,21 @@ export function PensionSummaryStats({
         label="Total pension value"
         value={fmtBase(totalInBase)}
         subtitle={`across ${pensionsCount} pots`}
-        icon={ShieldCheck}
-        color="amber"
       />
       <StatCard
         label="Monthly contributions"
         value={fmtBase(totalMonthlyContribInBase)}
         subtitle="combined (you + employer)"
-        icon={TrendingUp}
-        color="indigo"
       />
       <StatCard
         label="Annual contributions"
         value={fmtBase(totalMonthlyContribInBase * 12)}
         subtitle="in total per year"
-        icon={Calendar}
-        color="emerald"
       />
       <StatCard
         label="Monthly drawdown est."
         value={monthlyDrawdown == null ? '—' : fmtBase(monthlyDrawdown)}
         subtitle={monthlyDrawdown == null ? 'Set retirement horizon' : 'Over 25-year drawdown'}
-        icon={Clock}
-        color="sky"
       />
     </StatsGrid>
   );

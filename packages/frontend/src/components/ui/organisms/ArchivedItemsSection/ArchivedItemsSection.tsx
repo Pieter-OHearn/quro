@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Archive, ChevronDown, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '../../atoms/Button';
 import { Card } from '../../atoms/Card';
+import { StateNotice } from '../../molecules/StateNotice';
 import { ArchiveOrDeleteDialog } from '../ArchiveOrDeleteDialog';
 
 export type ArchivedItem = {
@@ -25,6 +26,11 @@ export type ArchivedItemsSectionProps<T extends ArchivedItem> = {
   getBalance?: (item: T) => ArchivedItemBalance | null;
   onUnarchive: (item: T) => void;
   onHardDelete: (item: T) => void;
+  /**
+   * Set when the archived items could not be loaded. A failed load is not "nothing archived":
+   * the section says so and offers a retry, so restore controls are never silently missing.
+   */
+  loadError?: { onRetry: () => void; retrying?: boolean } | null;
 };
 
 function formatArchivedAt(archivedAt: Date | string | null | undefined): string | null {
@@ -105,7 +111,25 @@ function SectionHeader({
   );
 }
 
-export function ArchivedItemsSection<T extends ArchivedItem>({
+function ArchivedLoadError({
+  title,
+  loadError,
+}: Readonly<{
+  title: string;
+  loadError: NonNullable<ArchivedItemsSectionProps<ArchivedItem>['loadError']>;
+}>) {
+  return (
+    <StateNotice
+      tone="danger"
+      title={`${title} could not be loaded`}
+      action={{ label: 'Retry', onClick: loadError.onRetry, loading: loadError.retrying }}
+    >
+      Archived items are not shown until they load, so this is not the same as having none.
+    </StateNotice>
+  );
+}
+
+function ArchivedItemsList<T extends ArchivedItem>({
   title,
   entityLabel,
   childrenLabel,
@@ -114,7 +138,7 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
   getBalance,
   onUnarchive,
   onHardDelete,
-}: Readonly<ArchivedItemsSectionProps<T>>) {
+}: Readonly<Omit<ArchivedItemsSectionProps<T>, 'loadError'>>) {
   const [expanded, setExpanded] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<T | null>(null);
 
@@ -161,4 +185,14 @@ export function ArchivedItemsSection<T extends ArchivedItem>({
       ) : null}
     </Card>
   );
+}
+
+export function ArchivedItemsSection<T extends ArchivedItem>({
+  loadError,
+  ...props
+}: Readonly<ArchivedItemsSectionProps<T>>) {
+  if (props.items.length === 0 && loadError) {
+    return <ArchivedLoadError title={props.title} loadError={loadError} />;
+  }
+  return <ArchivedItemsList {...props} />;
 }

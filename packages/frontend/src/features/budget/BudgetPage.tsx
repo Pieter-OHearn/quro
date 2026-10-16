@@ -1,4 +1,5 @@
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
+import { CurrencyReviewNotice } from '@/components/finance/CurrencyReviewNotice';
 import { ContentSection, PageStack } from '@/components/ui';
 import {
   BudgetCategoriesSection,
@@ -10,18 +11,6 @@ import {
 } from './components';
 import { BudgetImportAction } from './components/BudgetImportAction';
 import { useBudgetPage } from './hooks';
-
-function CurrencyReviewNotice() {
-  return (
-    <p
-      role="status"
-      className="rounded-lg border border-warning bg-warning-soft p-3 text-cell text-warning"
-    >
-      Some older budget amounts have no recorded currency and are treated as EUR. Review these
-      records against your statements before relying on spending or runway estimates.
-    </p>
-  );
-}
 
 export function Budget() {
   const page = useBudgetPage();

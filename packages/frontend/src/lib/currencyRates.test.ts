@@ -105,6 +105,7 @@ test('flags stale synced rates', () => {
   );
 
   expect(table.staleCurrencies).toEqual(['GBP']);
+  expect(table.oldestStaleUpdatedAt).toBe('2026-03-07T08:00:00.000Z');
 });
 
 test('rejects invalid server payload rows', () => {

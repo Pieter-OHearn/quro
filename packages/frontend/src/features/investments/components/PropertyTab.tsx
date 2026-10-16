@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
@@ -313,7 +314,7 @@ function PropertyCardHeader({
           <p className="truncate text-title-section text-fg">{property.address}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1">
             <JointBadge isJoint={property.isJoint} ownerUserId={property.userId} size="xs" />
-            <Badge size="xs">{property.propertyType}</Badge>
+            <Badge size="xs">{displayLabel(property.propertyType)}</Badge>
             <Badge size="xs">{property.currency}</Badge>
             {!linkedMortgage && <Badge size="xs">Unencumbered</Badge>}
           </div>

@@ -30,6 +30,15 @@ import {
 export { CURRENCY_CODES, CURRENCY_META };
 export type { CurrencyCode };
 
+const NO_STALE_RATES: readonly CurrencyCode[] = [];
+
+function getStaleRates(table: CurrencyRateTable | undefined) {
+  return {
+    staleRateCurrencies: table?.staleCurrencies ?? NO_STALE_RATES,
+    staleRatesSince: table?.oldestStaleUpdatedAt ?? null,
+  };
+}
+
 export type CurrencyRatesFailureMode = 'fx-unavailable' | 'app-error';
 
 type CurrencyRatesQueryState = Pick<
@@ -221,6 +230,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     table,
   );
   const ratesUpdatedAt = table?.latestUpdatedAt ?? null;
+  const { staleRateCurrencies, staleRatesSince } = getStaleRates(table);
   const value = useMemo<CurrencyContextType>(
     () => ({
       baseCurrency,
@@ -232,6 +242,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       isForeign,
       ratesStatus,
       ratesUpdatedAt,
+      staleRateCurrencies,
+      staleRatesSince,
     }),
     [
       baseCurrency,
@@ -243,6 +255,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       isForeign,
       ratesStatus,
       ratesUpdatedAt,
+      staleRateCurrencies,
+      staleRatesSince,
     ],
   );
 

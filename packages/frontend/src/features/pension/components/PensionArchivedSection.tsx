@@ -15,6 +15,11 @@ export function PensionArchivedSection({ pensionTxns }: Readonly<PensionArchived
 
   return (
     <ArchivedItemsSection
+      loadError={
+        archivedQuery.isError
+          ? { onRetry: () => void archivedQuery.refetch(), retrying: archivedQuery.isFetching }
+          : null
+      }
       title="Archived pension pots"
       entityLabel="Pension pot"
       childrenLabel="contributions and history"

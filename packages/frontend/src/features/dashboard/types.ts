@@ -1,5 +1,3 @@
-import type { LucideIcon } from 'lucide-react';
-
 export type DashboardFormatFn = (n: number, u?: undefined, c?: boolean) => string;
 export type CompactFormatFn = (n: number) => string;
 
@@ -41,9 +39,7 @@ export type DashboardCard = {
     amount: number;
     label: string;
   };
-  icon: LucideIcon;
   path: string;
-  color: 'indigo' | 'sky' | 'amber' | 'emerald';
 };
 
 export type DashboardTxnStats = {

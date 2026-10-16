@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Edit3, Info, Lock, Plus, Trash2 } from 'lucide-react';
 import type { AppCapabilityStatus, PensionPot, PensionTransaction } from '@quro/shared';
@@ -347,7 +348,7 @@ function PensionPotRow({
             </span>
             <span className="min-w-0 truncate font-medium text-fg">{pot.name}</span>
             <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-              <Badge>{pot.type}</Badge>
+              <Badge>{displayLabel(pot.type)}</Badge>
               {foreign && <Badge>{pot.currency}</Badge>}
             </span>
           </div>

@@ -1,3 +1,4 @@
+import { displayLabel } from '@/lib/displayLabels';
 import type { RunwayResponse } from '@quro/shared';
 import { Badge, Button, Card } from '@/components/ui';
 import { formatMonths, RUNWAY_BAND_META, RUNWAY_CITATIONS } from '../utils/runway-display';
@@ -50,7 +51,7 @@ export function RunwayHeroCard({
           <div className="col-span-2">
             <dt className="text-label text-fg-muted">Model basis</dt>
             <dd className="mt-1 text-cell font-medium text-fg">
-              {data.jurisdiction.code}
+              {displayLabel(data.jurisdiction.code)}
               {data.jurisdiction.rulesEffectiveFrom
                 ? ` · rates from ${data.jurisdiction.rulesEffectiveFrom}`
                 : ''}

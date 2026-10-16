@@ -24,6 +24,8 @@ export type CurrencyRateTable = {
   latestUpdatedAt: string | null;
   missingCurrencies: CurrencyCode[];
   staleCurrencies: CurrencyCode[];
+  /** The oldest `updatedAt` among the stale rates, or null when none is stale. */
+  oldestStaleUpdatedAt: string | null;
   rateIndex: ReadonlyMap<string, number>;
   rates: CurrencyRate[];
 };
@@ -139,6 +141,14 @@ export function createCurrencyRateTable(
     return false;
   });
 
+  const staleSet = new Set<CurrencyCode>(staleCurrencies);
+  const oldestStaleUpdatedAt = rates.reduce<string | null>((oldest, row) => {
+    const currency = row.fromCurrency === EUR_CURRENCY ? row.toCurrency : row.fromCurrency;
+    if (!staleSet.has(currency)) return oldest;
+    if (!oldest || row.updatedAt < oldest) return row.updatedAt;
+    return oldest;
+  }, null);
+
   const latestUpdatedAt = rates.reduce<string | null>((latest, row) => {
     if (!latest || row.updatedAt > latest) return row.updatedAt;
     return latest;
@@ -148,6 +158,7 @@ export function createCurrencyRateTable(
     latestUpdatedAt,
     missingCurrencies,
     staleCurrencies,
+    oldestStaleUpdatedAt,
     rateIndex,
     rates,
   };

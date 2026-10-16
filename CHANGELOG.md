@@ -9,8 +9,14 @@ All notable changes to this project will be documented in this file. The format 
 - Server and import worker logs are JSON lines with a stable `event` name and a `requestId`; responses carry `X-Request-Id`. Log lines and trace spans no longer contain error messages, only the error class and codes. See the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1).
 - A failed background job waits a minute, then two, up to its interval, before it retries.
 - On a phone, the brokerage holdings and the payslip history are cards: the name and its caption on the left, the key figure on the right with the gain or loss under it, the other figures as a label over a value, and Edit and **Show details** along the foot. Desktop tables are unchanged.
+- On a phone, a card has one **Show details** button with a chevron instead of two controls, and the Edit and download buttons on it are easier to see. On a holding it also opens the position and transactions.
+- The Plan page shows the runway figure before the employment and spending class cards.
+- Stored values that were saved in Title Case (savings account types, pension types, property types, asset allocation names, the generic rule set) are shown in sentence case. The stored values and the API are unchanged.
+- The Brokerage value figure and the other stat cards shrink to fit their card instead of running out of it on a narrow phone.
 
 ### Added
+
+- Notices say when the data behind a figure is not current: an exchange rate older than 48 hours (with the currencies and the date), a holding whose synced price is older than a week, and a failed load of archived items, spending classes, banking entities or price history, each with a Retry where one applies. A failed load is never shown as an empty list.
 
 - Every chart has a text summary and a **Show values** table of the exact plotted values, including negative, missing and estimated entries. Charts follow the system reduced-motion setting, label axes in a compact form that fits a phone, keep tooltips inside the screen, and draw each series with a dash, fill or outline as well as a colour. Click a chart or tab to it and use the arrow keys to read a value.
 - `quro doctor` reports background job lag and failures, data freshness, disk space, the age of the newest backup and whether referenced documents are in the store, with a new `unknown` status for anything without evidence. [Monitor an install](docs/operations.md).
