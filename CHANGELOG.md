@@ -16,13 +16,15 @@ All notable changes to this project will be documented in this file. The format 
 - Every account can download its data in **Settings → Your data**: one ZIP with JSON and CSV for each table, the stored documents and a manifest with row counts and SHA-256 hashes (`GET /api/settings/export`). Text that a spreadsheet would run as a formula is escaped in the CSV. [Details](docs/data-export-and-deletion.md#export)
 - Every account can delete itself there (`DELETE /api/settings/account`, with the password and the email address). The rows, bank links, sessions and stored documents go in one step, an audit row records the counts without personal data, and `quro documents retry-deleted` removes documents the store refused to delete. Backups are not changed. [Details](docs/data-export-and-deletion.md#deletion)
 
+- A savings account or the budget can import a bank's **CSV** with a reviewed flow: map the columns once (the mapping is remembered per source), review every row in a dry run with locale, date and currency handling, and write only approved rows in bounded batches that can be cancelled and resumed. Rows already imported are found again by a `(source, external id)` key, so repeating an import adds nothing, and a savings import compares the statement's closing balance with the ledger and can book the difference as one labelled adjustment. [Details](docs/csv-import.md)
+
 ### Removed
 
 - The columns `budget_transactions.bunq_mcc`, `bunq_payment_type` and `counterparty_iban` are dropped. Bank sync wrote them and nothing read them. [Details](docs/data-export-and-deletion.md#removed-bank-details)
 
 ### Upgrade notes
 
-- **Back up first.** Two migrations run: one adds the `account_deletions` table, the other drops the three unused `budget_transactions` columns above, and their values are not recoverable except from a backup. Take one with the version you run before you upgrade ([backup and restore](docs/backup-and-restore.md)).
+- **Back up first.** Three migrations run: one adds the `account_deletions` table, one drops the three unused `budget_transactions` columns above (their values are not recoverable except from a backup), and one adds the CSV import tables and three nullable columns on the two transaction tables, changing no value. Take one with the version you run before you upgrade ([backup and restore](docs/backup-and-restore.md)).
 
 ## [v0.9.0] - 2026-10-15
 

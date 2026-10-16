@@ -79,6 +79,13 @@ function pdfForm(extra: Record<string, string> = {}) {
   };
 }
 
+const IMPORT_MAPPING = {
+  source: 'Synthetic',
+  columns: { date: 'Date', amount: 'Amount', description: 'Description' },
+  defaultCurrency: 'EUR',
+  dateFormat: 'YYYY-MM-DD',
+};
+
 const get = (path: string): Req => ({ method: 'GET', path });
 const send = (method: string, path: string, json?: unknown): Req => ({ method, path, json });
 
@@ -186,6 +193,79 @@ export const ACCESS_CASES: AccessCase[] = [
     scope: 'joint',
     consumes: true,
     build: (r) => send('DELETE', `/api/savings/transactions/${r.savingsTxn}`),
+  },
+
+  // ── CSV imports ────────────────────────────────────────────────────────────
+  {
+    kind: 'list',
+    route: 'GET /api/imports/csv',
+    scope: 'owner',
+    build: () => get('/api/imports/csv'),
+  },
+  {
+    kind: 'row',
+    route: 'GET /api/imports/csv/:id',
+    scope: 'owner',
+    build: (r) => get(`/api/imports/csv/${r.csvImport}`),
+  },
+  {
+    kind: 'row',
+    route: 'GET /api/imports/csv/:id/rows',
+    scope: 'owner',
+    build: (r) => get(`/api/imports/csv/${r.csvImport}/rows`),
+  },
+  {
+    kind: 'row',
+    route: 'POST /api/imports/csv/:id/commit',
+    scope: 'owner',
+    consumes: true,
+    build: (r) => send('POST', `/api/imports/csv/${r.csvImport}/commit`),
+  },
+  {
+    kind: 'row',
+    route: 'POST /api/imports/csv/:id/cancel',
+    scope: 'owner',
+    consumes: true,
+    build: (r) => send('POST', `/api/imports/csv/${r.csvImport}/cancel`),
+  },
+  {
+    kind: 'list',
+    route: 'GET /api/imports/profiles',
+    scope: 'owner',
+    build: () => get('/api/imports/profiles'),
+  },
+  {
+    kind: 'row',
+    route: 'DELETE /api/imports/profiles/:id',
+    scope: 'owner',
+    consumes: true,
+    build: (r) => send('DELETE', `/api/imports/profiles/${r.importProfile}`),
+  },
+  {
+    kind: 'caller',
+    route: 'POST /api/imports/csv/preview',
+    build: (victim, victimRows) =>
+      send('POST', '/api/imports/csv/preview', {
+        userId: victim,
+        kind: 'savings',
+        accountId: victimRows.savingsAccount,
+        csv: 'Date,Amount,Description\n2026-03-02,1.00,Forged',
+        mapping: IMPORT_MAPPING,
+      }),
+  },
+  {
+    kind: 'caller',
+    route: 'POST /api/imports/csv',
+    build: (victim, victimRows) =>
+      send('POST', '/api/imports/csv', {
+        userId: victim,
+        kind: 'savings',
+        accountId: victimRows.savingsAccount,
+        csv: 'Date,Amount,Description\n2026-03-02,1.00,Forged',
+        mapping: IMPORT_MAPPING,
+        fileSha256: 'a'.repeat(64),
+        selectedRows: [1],
+      }),
   },
 
   // ── Investments: holdings (not shareable) ──────────────────────────────────
@@ -1211,6 +1291,10 @@ export const ACCESS_CASES: AccessCase[] = [
 
 /** Routes the matrix does not run per actor, and why. Anonymous access is still checked for all. */
 export const EXEMPT_ROUTES: Record<string, string> = {
+  'POST /api/imports/csv/headers':
+    'reads only the request body and touches no stored data; covered by csvImports.integration.test.ts',
+  'POST /api/imports/csv/:id/reconcile':
+    'needs a finished import with a closing balance; covered by csvImports.integration.test.ts',
   'GET /api/health': 'public by design; reports no household data',
   'GET /api/readiness': 'public by design; reports service readiness only',
   'GET /api/readiness/pension-import': 'public by design; reports parser readiness only',

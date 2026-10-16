@@ -10,6 +10,8 @@ import {
   budgetCategories,
   budgetTransactions,
   categoryMappings,
+  csvImports,
+  importProfiles,
   debtPayments,
   debts,
   goals,
@@ -198,6 +200,8 @@ async function cleanupTestUsers(emailPattern: string) {
     return;
   }
 
+  await db.delete(csvImports).where(inArray(csvImports.userId, userIds));
+  await db.delete(importProfiles).where(inArray(importProfiles.userId, userIds));
   await db.delete(savingsTransactions).where(inArray(savingsTransactions.userId, userIds));
   await db.delete(savingsAccounts).where(inArray(savingsAccounts.userId, userIds));
   await db.delete(holdingPriceHistory).where(inArray(holdingPriceHistory.userId, userIds));

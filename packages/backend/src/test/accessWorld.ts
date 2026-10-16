@@ -5,6 +5,9 @@ import * as schema from '../db/schema';
 import {
   bunqConnections,
   bunqPaymentProgress,
+  csvImportRows,
+  csvImports,
+  importProfiles,
   budgetCategories,
   budgetTransactions,
   categoryMappings,
@@ -41,6 +44,8 @@ export type RowIds = {
   marker: string;
   savingsAccount: number;
   savingsTxn: number;
+  csvImport: number;
+  importProfile: number;
   holding: number;
   holdingTxn: number;
   property: number;
@@ -72,6 +77,8 @@ export type IdKey = Exclude<keyof RowIds, 'marker' | 'extraSession'>;
 export const ID_KEYS: readonly IdKey[] = [
   'savingsAccount',
   'savingsTxn',
+  'csvImport',
+  'importProfile',
   'holding',
   'holdingTxn',
   'property',
@@ -152,7 +159,48 @@ async function seedSavings(ctx: SeedContext) {
     })
     .returning();
 
-  return { savingsAccount: savingsAccount.id, savingsTxn: savingsTxn.id };
+  const mapping = {
+    source: m('csv-source'),
+    delimiter: 'auto',
+    columns: { date: 'Date', amount: 'Amount', description: 'Description' },
+    dateFormat: 'YYYY-MM-DD',
+    decimalSeparator: '.',
+    defaultCurrency: 'EUR',
+    invertSign: false,
+    defaultCategory: 'Uncategorised',
+  } as const;
+  const [csvImport] = await db
+    .insert(csvImports)
+    .values({
+      userId,
+      kind: 'savings',
+      accountId: savingsAccount.id,
+      source: mapping.source,
+      fileName: m('csv-file'),
+      fileSha256: 'a'.repeat(64),
+      mapping,
+    })
+    .returning();
+  await db.insert(csvImportRows).values({
+    importId: csvImport.id,
+    rowNumber: 1,
+    externalId: m('csv-row'),
+    date: '2026-03-02',
+    amount: -5,
+    currency: 'EUR',
+    description: m('csv-row-description'),
+  });
+  const [importProfile] = await db
+    .insert(importProfiles)
+    .values({ userId, kind: 'savings', source: m('csv-profile'), mapping })
+    .returning();
+
+  return {
+    savingsAccount: savingsAccount.id,
+    savingsTxn: savingsTxn.id,
+    csvImport: csvImport.id,
+    importProfile: importProfile.id,
+  };
 }
 
 async function seedHoldings(ctx: SeedContext) {
@@ -739,6 +787,8 @@ const SNAPSHOT_TABLES: Record<string, PgTable> = {
   users,
   savings_accounts: savingsAccounts,
   savings_transactions: savingsTransactions,
+  csv_imports: csvImports,
+  import_profiles: importProfiles,
   holdings,
   holding_transactions: holdingTransactions,
   holding_price_history: holdingPriceHistory,
@@ -812,6 +862,20 @@ export async function snapshotWorld(userIds: number[]): Promise<string> {
       ),
     )
     .orderBy(pensionStatementImportRows.id);
+  const stagedImports = await db
+    .select({ id: csvImports.id })
+    .from(csvImports)
+    .where(inArray(csvImports.userId, userIds));
+  parts.csv_import_rows = await db
+    .select()
+    .from(csvImportRows)
+    .where(
+      inArray(
+        csvImportRows.importId,
+        stagedImports.map((row) => row.id),
+      ),
+    )
+    .orderBy(csvImportRows.id);
   parts.partner_links = await db
     .select()
     .from(partnerLinks)

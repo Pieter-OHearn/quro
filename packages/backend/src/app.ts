@@ -23,6 +23,7 @@ import partner from './routes/partner';
 import bunq from './routes/bunq';
 import plan from './routes/plan';
 import employments from './routes/employments';
+import csvImports from './routes/csvImports';
 import { enabledCapabilities } from './lib/capabilityRegistry';
 import {
   getCoreReadinessReport,
@@ -81,6 +82,7 @@ export function createApp(config: Config = getConfig()) {
   if (enabled.has('bunq')) app.route('/api/bunq', bunq);
   app.route('/api/plan', plan);
   app.route('/api/employments', employments);
+  app.route('/api/imports', csvImports);
 
   return app;
 }

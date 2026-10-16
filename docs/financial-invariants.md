@@ -261,6 +261,13 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
   of the same import is refused and its rows reach the ledger once. A unique index allows one
   committed import per statement file (by SHA-256) and pot, so of two imports of the same file
   committed at once one writes its rows and the other is answered `409`.
+- **CSV imports go through the ledger rules.** A reviewed file import ([import a CSV](csv-import.md))
+  writes savings and budget rows keyed by `(source, externalId)`. Each amount is read in a stated
+  notation, refused unless it fits whole cents and the 10^13 limit, summed in integer cents, and
+  moves the balance (or the category's `spent`) only for rows actually inserted. A savings row in
+  another currency than its account is refused, never converted; a budget row is converted to EUR
+  at the stored rate or fails when there is none. Parents are locked before rows, and calls for
+  one import run one at a time, so concurrent commits and overlapping imports write each row once.
 - **Linked debt is read, not copied.** A property linked to an active mortgage takes its debt from
   the mortgage; an archived or missing linked mortgage contributes no debt. Mortgage debt is
   deducted inside property equity and never counted again as a liability.
@@ -375,20 +382,21 @@ cents (for example 4.762747 → 4.762749 months).
 
 ## Where the tests live
 
-| Invariant                                                 | Tests                                                                                                                                  |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Cent rounding, round trips, float sums                    | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                            |
-| Money input: cents, the 10^13 limit, non-money untouched  | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                     |
-| Unit prices: six decimals, dividends in cents, value      | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`      |
-| Allocation identities, order, additivity, FX, linked debt | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                 |
-| Joint shares, signs, missing data                         | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                     |
-| Positions, signs, property types, shares, sums, percents  | `packages/shared/test/domainMaths.test.ts`                                                                                             |
-| Dashboard and page totals agree (golden household)        | `packages/backend/src/lib/goldenHousehold.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`                           |
-| FX cut-offs and fail-closed rates                         | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                   |
-| Ledger balances under random edits, moves and deletes     | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                     |
-| Concurrent edits, deletes and import commits              | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                    |
-| Clamped repayments, repayment debt, archive vs edit       | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                    |
-| One committed import per statement (migration preflight)  | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                           |
-| Golden household reconciliation across API, pages and SQL | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                              |
-| Repeated bunq imports                                     | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts` |
-| Stale and extrapolated rules                              | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                 |
+| Invariant                                                       | Tests                                                                                                                                                                       |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cent rounding, round trips, float sums                          | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                                                                 |
+| Money input: cents, the 10^13 limit, non-money untouched        | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                                                          |
+| Unit prices: six decimals, dividends in cents, value            | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`                                           |
+| Allocation identities, order, additivity, FX, linked debt       | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                                                      |
+| Joint shares, signs, missing data                               | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                                                          |
+| Positions, signs, property types, shares, sums, percents        | `packages/shared/test/domainMaths.test.ts`                                                                                                                                  |
+| Dashboard and page totals agree (golden household)              | `packages/backend/src/lib/goldenHousehold.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`                                                                |
+| FX cut-offs and fail-closed rates                               | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                                                        |
+| Ledger balances under random edits, moves and deletes           | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                                                          |
+| Concurrent edits, deletes and import commits                    | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                                                         |
+| Clamped repayments, repayment debt, archive vs edit             | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                                                         |
+| One committed import per statement (migration preflight)        | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                                                                |
+| Golden household reconciliation across API, pages and SQL       | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                                                                   |
+| CSV import: parsing, locale, duplicates, batches, balance check | `packages/backend/src/lib/csvImport/csvImport.test.ts`, `packages/backend/src/routes/csvImports.integration.test.ts`, `packages/backend/src/db/csvImportsMigration.test.ts` |
+| Repeated bunq imports                                           | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts`                                      |
+| Stale and extrapolated rules                                    | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                                                      |
