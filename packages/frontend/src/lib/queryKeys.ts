@@ -8,6 +8,7 @@ export const queryKeys = {
     netWorth: ['dashboard', 'net-worth'] as const,
     netWorthRange: (range: NetWorthRange) => ['dashboard', 'net-worth', range] as const,
     transactions: ['dashboard', 'transactions'] as const,
+    setup: ['dashboard', 'setup'] as const,
     insights: ['dashboard', 'insights'] as const,
     insightYear: (year: number) => ['dashboard', 'insights', year] as const,
   },

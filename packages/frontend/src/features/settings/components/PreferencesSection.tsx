@@ -11,7 +11,6 @@ import type {
   User,
 } from '@quro/shared';
 import { formatNumber, NUMBER_FORMATS, JURISDICTION_CODES } from '@quro/shared';
-import { Badge } from '@/components/ui';
 import { CURRENCY_CODES, CURRENCY_META } from '@/lib/CurrencyContext';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
 
@@ -48,12 +47,6 @@ const JURISDICTION_LABELS: Record<JurisdictionCode, { name: string; note: string
   GENERIC: { name: 'Generic', note: 'Conservative international defaults' },
 };
 
-const COMING_SOON_ITEMS = [
-  'Email and push notifications',
-  'Two-factor authentication',
-  'CSV and PDF export packs',
-];
-
 type ChoiceGroupProps = {
   label: string;
   description: string;
@@ -81,21 +74,6 @@ function ChoiceText({ title, note }: Readonly<{ title: ReactNode; note: ReactNod
       <span className="block text-cell font-medium">{title}</span>
       <span className="block text-caption text-fg-muted">{note}</span>
     </>
-  );
-}
-
-function ComingSoonCard() {
-  return (
-    <SettingsCard title="Coming soon" flush>
-      <ul className="divide-y divide-border-subtle">
-        {COMING_SOON_ITEMS.map((item) => (
-          <li key={item} className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
-            <span className="text-cell text-fg-muted">{item}</span>
-            <Badge tone="muted">Soon</Badge>
-          </li>
-        ))}
-      </ul>
-    </SettingsCard>
   );
 }
 
@@ -227,7 +205,6 @@ function PreferencesForm({
       </SettingsCard>
 
       <AppearanceSetting />
-      <ComingSoonCard />
     </div>
   );
 }

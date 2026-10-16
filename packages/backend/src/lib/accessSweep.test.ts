@@ -77,6 +77,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
   },
   'lib/pensionTransactions.ts': { pensionPots: 1 },
   'lib/sessions.ts': { sessions: 4 },
+  'lib/setupProgress.ts': { table: 1 },
   'middleware/auth.ts': { sessions: 1 },
   'routes/budget.ts': { budgetCategories: 6, budgetTransactions: 4, categoryMappings: 2 },
   'routes/bunq.ts': { bunqConnections: 3, bunqPaymentProgress: 2 },

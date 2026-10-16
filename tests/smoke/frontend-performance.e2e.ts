@@ -26,11 +26,11 @@ const capability = (enabled: boolean, reason: string | null) => ({
   enabled,
   reason,
   message: enabled ? 'Available.' : 'Unavailable.',
+  lifecycle: 'stable',
   checkedAt: new Date().toISOString(),
 });
 // Pension import is configured, so the notification feed calls its route; bunq is not.
 const CAPABILITIES = {
-  ai: capability(true, null),
   pensionStatementImport: capability(true, null),
   bunq: capability(false, 'not_configured'),
   documents: capability(true, null),

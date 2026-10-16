@@ -6,28 +6,25 @@ import type { AppCapabilities, AppCapabilityStatus } from '@quro/shared';
 export const APP_CAPABILITIES_QUERY_KEY = queryKeys.capabilities;
 
 export const DEFAULT_APP_CAPABILITIES: AppCapabilities = {
-  ai: {
-    enabled: false,
-    reason: 'worker_unavailable',
-    message: 'AI features are unavailable. Start the pension import worker to enable AI.',
-    checkedAt: new Date(0).toISOString(),
-  },
   pensionStatementImport: {
     enabled: false,
-    reason: 'worker_unavailable',
-    message: 'AI import is unavailable. Start the pension import worker to use PDF import.',
+    reason: 'not_configured',
+    message: 'Statement import is not set up on this Quro server.',
+    lifecycle: 'experimental',
     checkedAt: new Date(0).toISOString(),
   },
   bunq: {
     enabled: false,
     reason: 'not_configured',
     message: 'Bunq linking is unavailable because this Quro instance has not configured it.',
+    lifecycle: 'stable',
     checkedAt: new Date(0).toISOString(),
   },
   documents: {
     enabled: false,
     reason: 'not_configured',
     message: 'Document storage is not configured.',
+    lifecycle: 'stable',
     checkedAt: new Date(0).toISOString(),
   },
 };

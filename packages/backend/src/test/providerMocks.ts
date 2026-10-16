@@ -25,12 +25,12 @@ export async function installProviderMocks() {
         enabled: true,
         reason: null,
         message: 'Import is available.',
+        lifecycle: 'experimental' as const,
         checkedAt: new Date('2026-03-01T12:00:00.000Z').toISOString(),
       });
     return {
       getPensionStatementImportCapability: capability,
       getAppCapabilities: async () => ({
-        ai: await capability(),
         pensionStatementImport: await capability(),
       }),
     };
