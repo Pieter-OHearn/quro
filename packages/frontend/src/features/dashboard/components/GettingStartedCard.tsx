@@ -53,7 +53,9 @@ function buildSteps(progress: SetupProgress): Step[] {
 }
 
 function StepMarker({ done }: Readonly<{ done: boolean | undefined }>) {
-  if (done === undefined) return <span className="w-4 flex-shrink-0" aria-hidden="true" />;
+  if (done === undefined) {
+    return <Circle size={16} className="mt-0.5 flex-shrink-0 text-fg-faint" aria-hidden="true" />;
+  }
   const Icon = done ? Check : Circle;
   return (
     <Icon
@@ -75,18 +77,20 @@ export function GettingStartedCard({ progress }: Readonly<{ progress: SetupProgr
       />
       <ol className="divide-y divide-border-subtle">
         {buildSteps(progress).map((step) => (
-          <li key={step.key} className="flex items-start gap-3 px-4 py-3 max-sm:flex-wrap">
+          <li key={step.key} className="flex items-start gap-3 px-4 py-3">
             <StepMarker done={step.done} />
-            <div className="min-w-0 flex-1">
-              <p className="text-cell font-medium text-fg">{step.title}</p>
-              <p className="text-caption text-fg-subtle">{step.description}</p>
+            <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-cell font-medium text-fg">{step.title}</p>
+                <p className="text-caption text-fg-subtle">{step.description}</p>
+              </div>
+              <Link
+                to={step.to}
+                className="rounded-sm text-cell font-medium text-brand transition-colors duration-fast hover:text-brand-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
+              >
+                {step.action}
+              </Link>
             </div>
-            <Link
-              to={step.to}
-              className="rounded-sm text-cell font-medium text-brand transition-colors duration-fast hover:text-brand-hover focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:inline-flex max-sm:min-h-11 max-sm:items-center"
-            >
-              {step.action}
-            </Link>
           </li>
         ))}
       </ol>
