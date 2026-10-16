@@ -131,7 +131,8 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await payslipDialog.getByTestId('salary-payslip-pension-input').fill('400');
   await payslipDialog.getByRole('button', { name: 'Save payslip' }).click();
 
-  await expect(page.getByText(payslipMonth, { exact: true })).toBeVisible();
+  // The pay breakdown names the selected month in its header too; the history table holds the cell.
+  await expect(page.getByRole('cell').getByText(payslipMonth, { exact: true })).toBeVisible();
 
   await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
 

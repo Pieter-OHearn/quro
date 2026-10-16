@@ -1,6 +1,7 @@
+import { usePagination } from '@/hooks/usePagination';
 import { useSortedRows, newestFirst } from '@/hooks/useSortedRows';
 import { useState } from 'react';
-import { CURRENCY_META, type Payslip } from '@quro/shared';
+import { CURRENCY_META, sumMoney, type Payslip } from '@quro/shared';
 import {
   Badge,
   Button,
@@ -9,6 +10,7 @@ import {
   DataTableCell,
   DataTableRow,
   IconButton,
+  Pagination,
   RowActions,
   type DataTableColumn,
   type DataTableSortState,
@@ -36,7 +38,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Month',
     mobileLabel: 'Month',
     priority: 'primary',
-    width: '28%',
+    width: '24%',
     sortable: true,
     defaultSortDirection: 'desc',
   },
@@ -46,11 +48,24 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Gross',
     align: 'right',
     mobileLabel: 'Gross',
-    width: '15%',
+    width: '14%',
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
     cellClassName: 'whitespace-nowrap font-medium text-fg',
+  },
+  {
+    key: 'bonus',
+    sortValue: (row) => row.bonus ?? 0,
+    header: 'Bonus',
+    align: 'right',
+    mobileLabel: 'Bonus',
+    priority: 'secondary',
+    width: '12%',
+    numeric: true,
+    sortable: true,
+    defaultSortDirection: 'desc',
+    cellClassName: 'whitespace-nowrap',
   },
   {
     key: 'tax',
@@ -59,7 +74,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     align: 'right',
     mobileLabel: 'Tax',
     priority: 'secondary',
-    width: '15%',
+    width: '13%',
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
@@ -72,7 +87,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     align: 'right',
     mobileLabel: 'Pension',
     priority: 'secondary',
-    width: '15%',
+    width: '13%',
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
@@ -84,7 +99,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
     header: 'Net pay',
     align: 'right',
     mobileLabel: 'Net pay',
-    width: '15%',
+    width: '14%',
     numeric: true,
     sortable: true,
     defaultSortDirection: 'desc',
@@ -92,6 +107,11 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
   },
   { key: 'actions', header: '', priority: 'actions', width: 96 },
 ];
+
+const COLUMN_COUNT = PAYSLIP_COLUMNS.length;
+
+// A year has about a dozen payslips; paging keeps an imported history from rendering thousands.
+export const PAYSLIP_PAGE_SIZE = 25;
 
 type ToBaseFn = (amount: number, fromCurrency: string) => number;
 
@@ -163,6 +183,134 @@ function PayslipRowActions({
   );
 }
 
+/**
+ * On a phone the Bonus, Tax and Pension columns are hidden, so the selected payslip lists them
+ * under its row; the pay breakdown above the table scrolls out of view there.
+ */
+function PayslipPhoneDetail({
+  payslip,
+  baseCurrency,
+  fmtBase,
+  convertToBase,
+}: Readonly<{
+  payslip: Payslip;
+  baseCurrency: string;
+  fmtBase: FmtFn;
+  convertToBase: ToBaseFn;
+}>) {
+  return (
+    <DataTableRow className="md:hidden" data-phone-detail>
+      <DataTableCell colSpan={COLUMN_COUNT} className="max-md:block">
+        <dl className="grid w-full grid-cols-3 gap-3 text-left">
+          <div>
+            <dt className="text-label text-fg-muted">Bonus</dt>
+            <dd className="font-numeric">
+              {payslip.bonus ? fmtBase(payslip.bonus, payslip.currency) : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-label text-fg-muted">Tax</dt>
+            <dd>
+              <DeductionAmount
+                value={payslip.tax}
+                currency={payslip.currency}
+                baseCurrency={baseCurrency}
+                convertToBase={convertToBase}
+              />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-label text-fg-muted">Pension</dt>
+            <dd>
+              <DeductionAmount
+                value={payslip.pension}
+                currency={payslip.currency}
+                baseCurrency={baseCurrency}
+                convertToBase={convertToBase}
+              />
+            </dd>
+          </div>
+        </dl>
+      </DataTableCell>
+    </DataTableRow>
+  );
+}
+
+/** The year's totals in the base currency; gross excludes bonus, which has its own column. */
+function PayslipTotalRow({
+  payslips,
+  baseCurrency,
+  fmtBase,
+  convertToBase,
+}: Readonly<{
+  payslips: readonly Payslip[];
+  baseCurrency: string;
+  fmtBase: FmtFn;
+  convertToBase: ToBaseFn;
+}>) {
+  const total = (pick: (payslip: Payslip) => number) =>
+    sumMoney(payslips.map((payslip) => convertToBase(pick(payslip), payslip.currency)));
+
+  return (
+    <DataTableRow data-total>
+      <DataTableCell columnKey="month">
+        <p>Total</p>
+        <p className="text-caption font-normal text-fg-subtle">
+          {payslips.length} payslips in {baseCurrency}
+        </p>
+      </DataTableCell>
+      <DataTableCell columnKey="gross">{fmtBase(total((p) => p.gross))}</DataTableCell>
+      <DataTableCell columnKey="bonus">{fmtBase(total((p) => p.bonus ?? 0))}</DataTableCell>
+      <DataTableCell columnKey="tax">
+        <Change
+          format="amount"
+          currency={baseCurrency}
+          value={-total((p) => p.tax)}
+          showArrow={false}
+        />
+      </DataTableCell>
+      <DataTableCell columnKey="pension">
+        <Change
+          format="amount"
+          currency={baseCurrency}
+          value={-total((p) => p.pension)}
+          showArrow={false}
+        />
+      </DataTableCell>
+      <DataTableCell columnKey="net">{fmtBase(total((p) => p.net))}</DataTableCell>
+      <DataTableCell columnKey="actions" className="max-md:hidden" />
+    </DataTableRow>
+  );
+}
+
+function PayslipMonthCell({
+  payslip,
+  isSelected,
+}: Readonly<{ payslip: Payslip; isSelected: boolean }>) {
+  const currencyMeta = CURRENCY_META[payslip.currency];
+
+  return (
+    <DataTableCell columnKey="month">
+      <div className="flex items-center gap-2">
+        <span className="font-medium text-fg">{payslip.month}</span>
+        <Badge size="sm">
+          <span aria-hidden>{currencyMeta.flag}</span>
+          <span>{payslip.currency}</span>
+        </Badge>
+        {payslip.bonus && (
+          <Badge tone="brand" size="xs">
+            +Bonus
+          </Badge>
+        )}
+      </div>
+      {/* On the brand-soft tint of a selected row the caption takes fg-muted to keep 4.5:1. */}
+      <p className={cn('text-caption', isSelected ? 'text-fg-muted' : 'text-fg-subtle')}>
+        {formatDate(payslip.date)}
+      </p>
+    </DataTableCell>
+  );
+}
+
 function PayslipTableRow({
   payslip,
   isSelected,
@@ -180,50 +328,53 @@ function PayslipTableRow({
   onSelect: (id: number) => void;
   onEdit: (payslip: Payslip) => void;
 }>) {
-  const currencyMeta = CURRENCY_META[payslip.currency];
-
   return (
-    <DataTableRow onClick={() => onSelect(payslip.id)} selected={isSelected} interactive>
-      <DataTableCell columnKey="month">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-fg">{payslip.month}</span>
-          <Badge size="sm">
-            <span aria-hidden>{currencyMeta.flag}</span>
-            <span>{payslip.currency}</span>
-          </Badge>
-          {payslip.bonus && (
-            <Badge tone="brand" size="xs">
-              +Bonus
-            </Badge>
+    <>
+      <DataTableRow
+        onClick={() => onSelect(payslip.id)}
+        selected={isSelected}
+        interactive
+        aria-current={isSelected ? 'true' : undefined}
+      >
+        <PayslipMonthCell payslip={payslip} isSelected={isSelected} />
+        <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
+        <DataTableCell columnKey="bonus">
+          {payslip.bonus ? (
+            fmtBase(payslip.bonus, payslip.currency)
+          ) : (
+            <span aria-label="none">—</span>
           )}
-        </div>
-        {/* On the brand-soft tint of a selected row the caption takes fg-muted to keep 4.5:1. */}
-        <p className={cn('text-caption', isSelected ? 'text-fg-muted' : 'text-fg-subtle')}>
-          {formatDate(payslip.date)}
-        </p>
-      </DataTableCell>
-      <DataTableCell columnKey="gross">{fmtBase(payslip.gross, payslip.currency)}</DataTableCell>
-      <DataTableCell columnKey="tax">
-        <DeductionAmount
-          value={payslip.tax}
-          currency={payslip.currency}
+        </DataTableCell>
+        <DataTableCell columnKey="tax">
+          <DeductionAmount
+            value={payslip.tax}
+            currency={payslip.currency}
+            baseCurrency={baseCurrency}
+            convertToBase={convertToBase}
+          />
+        </DataTableCell>
+        <DataTableCell columnKey="pension">
+          <DeductionAmount
+            value={payslip.pension}
+            currency={payslip.currency}
+            baseCurrency={baseCurrency}
+            convertToBase={convertToBase}
+          />
+        </DataTableCell>
+        <DataTableCell columnKey="net">{fmtBase(payslip.net, payslip.currency)}</DataTableCell>
+        <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
+          <PayslipRowActions payslip={payslip} onEdit={onEdit} />
+        </DataTableCell>
+      </DataTableRow>
+      {isSelected ? (
+        <PayslipPhoneDetail
+          payslip={payslip}
           baseCurrency={baseCurrency}
+          fmtBase={fmtBase}
           convertToBase={convertToBase}
         />
-      </DataTableCell>
-      <DataTableCell columnKey="pension">
-        <DeductionAmount
-          value={payslip.pension}
-          currency={payslip.currency}
-          baseCurrency={baseCurrency}
-          convertToBase={convertToBase}
-        />
-      </DataTableCell>
-      <DataTableCell columnKey="net">{fmtBase(payslip.net, payslip.currency)}</DataTableCell>
-      <DataTableCell columnKey="actions" contentClassName="md:ml-auto">
-        <PayslipRowActions payslip={payslip} onEdit={onEdit} />
-      </DataTableCell>
-    </DataTableRow>
+      ) : null}
+    </>
   );
 }
 
@@ -239,6 +390,11 @@ export function PayslipHistoryTable({
 }: Readonly<PayslipTableProps>) {
   const [sort, setSort] = useState<DataTableSortState>({ columnKey: 'month', direction: 'desc' });
   const sortedPayslips = useSortedRows(payslips, PAYSLIP_COLUMNS, sort, newestFirst);
+  const pagination = usePagination(
+    sortedPayslips,
+    PAYSLIP_PAGE_SIZE,
+    `${sort.columnKey}:${sort.direction}`,
+  );
 
   return (
     <DataTable
@@ -264,11 +420,23 @@ export function PayslipHistoryTable({
           No payslips yet. Click <strong>Add payslip</strong> to get started.
         </>
       }
-      minWidth={860}
+      minWidth={940}
       tableLayout="fixed"
       tableVariant="financial"
+      footer={
+        payslips.length > PAYSLIP_PAGE_SIZE ? (
+          <Pagination
+            page={pagination.safeCurrentPage}
+            totalPages={pagination.totalPages}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            totalCount={payslips.length}
+            onChange={pagination.handlePageChange}
+          />
+        ) : undefined
+      }
     >
-      {sortedPayslips.map((payslip) => (
+      {pagination.pageItems.map((payslip) => (
         <PayslipTableRow
           key={payslip.id}
           payslip={payslip}
@@ -280,6 +448,14 @@ export function PayslipHistoryTable({
           onEdit={onEdit}
         />
       ))}
+      {payslips.length > 0 ? (
+        <PayslipTotalRow
+          payslips={payslips}
+          baseCurrency={baseCurrency}
+          fmtBase={fmtBase}
+          convertToBase={convertToBase}
+        />
+      ) : null}
     </DataTable>
   );
 }

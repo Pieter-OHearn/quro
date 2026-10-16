@@ -1,17 +1,28 @@
-import type { CurrencyCode, Payslip } from '@quro/shared';
+import { sumMoney, type CurrencyCode, type Payslip } from '@quro/shared';
 import { ArrowUpRight, Briefcase, Calculator, ShieldCheck } from 'lucide-react';
 import type { FmtFn, SalaryChartEntry, SalaryHistoryEntry, SalaryStatCard } from '../types';
 
 const DATE_YEAR_LENGTH = 4;
 const MIN_GROWTH_POINTS = 2;
 
-export type SalaryBreakdownItem = {
+export type BreakdownLineKey = 'gross' | 'bonus' | 'tax' | 'pension' | 'net';
+
+export type BreakdownLine = {
+  key: BreakdownLineKey;
   label: string;
-  val: number;
   /** Swatch class for the legend dot; the same colour as its bar segment. */
   color: string;
+  /** Signed in the base currency: deductions are negative, a correction is positive. */
+  value: number;
+  /** The same line on the payslip being compared, or null when none is chosen. */
+  compareValue: number | null;
+  /** `value` minus `compareValue`; its sign already reads as a gain or a loss. */
+  change: number | null;
+  /** Share of the pay the line takes (take-home, tax, pension), as a percentage. */
   pct?: number;
 };
+
+type ToBaseFn = (amount: number, fromCurrency: CurrencyCode) => number;
 
 export const getPayslipBreakdownTotal = (
   payslip: Pick<Payslip, 'net' | 'tax' | 'pension'>,
@@ -37,46 +48,68 @@ const buildSalaryChartDataFromHistory = (
     .sort(([leftYear], [rightYear]) => leftYear - rightYear)
     .map(([year, gross]) => ({ year: String(year), gross, net: gross }));
 
-export const buildBreakdownItems = (payslip: Payslip): SalaryBreakdownItem[] => {
-  const totalPay = getPayslipBreakdownTotal(payslip);
-  const hasTaxCorrection = payslip.tax < 0;
-  const hasPensionCorrection = payslip.pension < 0;
-
-  return [
-    {
-      label: 'Gross pay',
-      val: payslip.gross,
-      color: 'bg-fg',
-    },
-    ...(payslip.bonus
-      ? [
-          {
-            label: 'Bonus',
-            val: payslip.bonus,
-            color: 'bg-viz-5',
-          },
-        ]
-      : []),
-    {
-      label: 'Take-home pay',
-      val: payslip.net,
-      color: 'bg-viz-1',
-      pct: percentageOfTotal(Math.abs(payslip.net), totalPay),
-    },
-    {
-      label: hasTaxCorrection ? 'Tax correction' : 'Income tax',
-      val: -payslip.tax,
-      color: 'bg-viz-6',
-      pct: percentageOfTotal(Math.abs(payslip.tax), totalPay),
-    },
-    {
-      label: hasPensionCorrection ? 'Pension correction' : 'Pension',
-      val: -payslip.pension,
-      color: 'bg-viz-3',
-      pct: percentageOfTotal(Math.abs(payslip.pension), totalPay),
-    },
-  ];
+const signedLineValue = (payslip: Payslip, key: BreakdownLineKey): number => {
+  if (key === 'gross') return payslip.gross;
+  if (key === 'bonus') return payslip.bonus ?? 0;
+  if (key === 'tax') return -payslip.tax;
+  if (key === 'pension') return -payslip.pension;
+  return payslip.net;
 };
+
+/**
+ * The gross-to-net lines of a payslip in the base currency, each next to the same line of another
+ * payslip. A deduction is negative, so more tax than the other month reads as a loss.
+ */
+export const buildBreakdownLines = (
+  payslip: Payslip,
+  compareTo: Payslip | null,
+  convertToBase: ToBaseFn,
+): BreakdownLine[] => {
+  const totalPay = getPayslipBreakdownTotal(payslip);
+  const showBonus = Boolean(payslip.bonus) || Boolean(compareTo?.bonus);
+  const lines: Omit<BreakdownLine, 'value' | 'compareValue' | 'change'>[] = [
+    { key: 'gross', label: 'Gross pay', color: 'bg-fg' },
+    ...(showBonus ? [{ key: 'bonus' as const, label: 'Bonus', color: 'bg-viz-5' }] : []),
+    { key: 'tax', label: payslip.tax < 0 ? 'Tax correction' : 'Income tax', color: 'bg-viz-6' },
+    {
+      key: 'pension',
+      label: payslip.pension < 0 ? 'Pension correction' : 'Pension',
+      color: 'bg-viz-3',
+    },
+    { key: 'net', label: 'Take-home pay', color: 'bg-viz-1' },
+  ];
+
+  return lines.map((line) => {
+    const value = convertToBase(signedLineValue(payslip, line.key), payslip.currency);
+    const compareValue = compareTo
+      ? convertToBase(signedLineValue(compareTo, line.key), compareTo.currency)
+      : null;
+    return {
+      ...line,
+      value,
+      compareValue,
+      change: compareValue === null ? null : sumMoney([value, -compareValue]),
+      pct:
+        line.key === 'gross' || line.key === 'bonus'
+          ? undefined
+          : percentageOfTotal(Math.abs(signedLineValue(payslip, line.key)), totalPay),
+    };
+  });
+};
+
+/** The payslip dated just before `payslip`, across every year, or null for the first one. */
+export const findPreviousPayslip = (
+  payslip: Pick<Payslip, 'id' | 'date'>,
+  payslips: readonly Payslip[],
+): Payslip | null =>
+  payslips
+    .filter(
+      (candidate) =>
+        candidate.id !== payslip.id &&
+        (candidate.date < payslip.date ||
+          (candidate.date === payslip.date && candidate.id < payslip.id)),
+    )
+    .sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id)[0] ?? null;
 
 export const buildSalaryStatCards = (
   fmtBase: FmtFn,
