@@ -283,7 +283,7 @@ function DataTableDetailsToggle({
         'hidden max-md:block max-md:pb-1',
         phoneCard &&
           cn(
-            'max-md:order-7 max-md:col-span-6 max-md:justify-self-end max-md:pb-0',
+            'max-md:order-7 max-md:col-span-6 max-md:col-start-7 max-md:pb-0 max-md:text-right',
             PHONE_CARD_FOOTER_CLASS_NAME,
           ),
       )}
@@ -391,7 +391,7 @@ function getPhoneCardCellClassName(
   if (role === 'footer') {
     return cn(
       PHONE_CARD_FOOTER_CLASS_NAME,
-      'max-md:order-6 max-md:block',
+      'max-md:order-6 max-md:col-start-1 max-md:block',
       tableContext.hasCardDetails ? 'max-md:col-span-6' : 'max-md:col-span-12',
     );
   }
@@ -446,6 +446,22 @@ function getCellClassName(
   );
 }
 
+function CellLabel({
+  phoneRole,
+  label,
+  hasHeadlineNote,
+}: Readonly<{
+  phoneRole: DataTablePhoneCardRole | 'footer' | undefined;
+  label: ReactNode;
+  hasHeadlineNote: boolean;
+}>) {
+  if (phoneRole) {
+    return <PhoneCardLabel role={phoneRole} label={label} hasHeadlineNote={hasHeadlineNote} />;
+  }
+  if (!label) return null;
+  return <span className="hidden shrink-0 text-label text-fg-muted max-md:block">{label}</span>;
+}
+
 export function DataTableCell({
   columnKey,
   align,
@@ -478,20 +494,19 @@ export function DataTableCell({
       )}
       {...props}
     >
-      {phoneRole ? (
-        <PhoneCardLabel
-          role={phoneRole}
-          label={cellConfig.mobileLabel}
-          hasHeadlineNote={Boolean(tableContext?.hasHeadlineNote)}
-        />
-      ) : null}
-      {!phoneRole && cellConfig.mobileLabel ? (
-        <span className="hidden shrink-0 text-label text-fg-muted max-md:block">
-          {cellConfig.mobileLabel}
-        </span>
-      ) : null}
+      <CellLabel
+        phoneRole={phoneRole}
+        label={cellConfig.mobileLabel}
+        hasHeadlineNote={Boolean(tableContext?.hasHeadlineNote)}
+      />
       <div
-        className={cn('min-w-0', cellConfig.align === 'right' && 'md:text-right', contentClassName)}
+        className={cn(
+          'min-w-0',
+          cellConfig.align === 'right' && 'md:text-right',
+          // The first 44px icon button of the footer lines its glyph up with the card's text.
+          phoneRole === 'footer' && 'max-md:-ml-3',
+          contentClassName,
+        )}
       >
         {children}
       </div>

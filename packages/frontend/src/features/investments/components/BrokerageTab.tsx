@@ -241,7 +241,9 @@ function HoldingAssetCell({
         </p>
         {closed && <Badge className="shrink-0">Closed</Badge>}
       </div>
-      <p className="truncate text-caption text-fg-subtle">{meta.join(' · ')}</p>
+      <p className="truncate text-caption text-fg-subtle max-md:whitespace-normal">
+        {meta.join(' · ')}
+      </p>
     </div>
   );
 }
@@ -488,7 +490,7 @@ function BrokerageTotalRow({
       <DataTableCell columnKey="asset" stacked>
         <div className="min-w-0">
           <p>Total portfolio</p>
-          <p className="truncate text-caption font-normal text-fg-subtle">
+          <p className="truncate text-caption font-normal text-fg-subtle max-md:whitespace-normal">
             +{fmtBase(totalDividendsBase)} dividends ·{' '}
             <Change
               value={totalRealizedBase}

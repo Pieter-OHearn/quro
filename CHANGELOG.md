@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 - Server and import worker logs are JSON lines with a stable `event` name and a `requestId`; responses carry `X-Request-Id`. Log lines and trace spans no longer contain error messages, only the error class and codes. See the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1).
 - A failed background job waits a minute, then two, up to its interval, before it retries.
+- On a phone, the brokerage holdings and the payslip history are cards: the name and its caption on the left, the key figure on the right with the gain or loss under it, the other figures as a label over a value, and Edit and **Show details** along the foot. Desktop tables are unchanged.
 
 ### Added
 
