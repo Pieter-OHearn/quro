@@ -17,6 +17,7 @@ import {
   type SecretsKey,
   type SecretsKeyring,
 } from './secretEnvelope';
+import { log } from './logger';
 
 // The bank-link credentials of one user, opened for a sync and sealed again whenever they change.
 // Nothing outside this module reads or writes the secret columns of `bunq_connections` directly
@@ -124,9 +125,11 @@ export async function loadBunqConnection(userId: number): Promise<OpenBunqConnec
     const id = row.id;
     const outcome = await db.transaction((tx) => sealRow(tx, id, keys, 'encrypt'));
     if (outcome && outcome.sealed.length > 0) {
-      console.log(
-        `[bunq] encrypted ${outcome.sealed.length} stored credential(s) of user ${userId} with secrets key ${keys.current.id}`,
-      );
+      log.info('bunq.credentials_encrypted', {
+        userId,
+        count: outcome.sealed.length,
+        keyId: keys.current.id,
+      });
     }
     row = await selectConnection(userId);
     if (!row) return null;
@@ -234,9 +237,7 @@ export async function readStoredSession(
     return { sessionToken: opened.value, sessionId: row.sessionId };
   } catch (error) {
     if (!(error instanceof SecretUnreadableError)) throw error;
-    console.warn(
-      `[bunq] the stored session of user ${userId} cannot be opened (${error.reason}); not ending it at bunq`,
-    );
+    log.warn('bunq.session_unreadable', { userId, reason: error.reason });
     return null;
   }
 }

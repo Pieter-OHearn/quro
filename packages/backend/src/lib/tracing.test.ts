@@ -115,6 +115,32 @@ describe('httpTracing', () => {
   });
 });
 
+describe('redacted errors', () => {
+  test('a span carries the error class and code, never its message or stack', async () => {
+    const canary = 'canary-5a0c33d8';
+    const app = new Hono();
+    app.use('*', httpTracing);
+    app.onError((_error, c) => c.json({ error: 'Internal server error' }, 500));
+    app.get('/boom', () => {
+      throw Object.assign(new Error(`Failed query: params ${canary}`), { code: '23505' });
+    });
+    await app.request('/boom');
+    const [span] = exporter.getFinishedSpans();
+    expect(JSON.stringify([span.attributes, span.events, span.status])).not.toContain(canary);
+    expect(span.attributes['db.response.status_code']).toBe('23505');
+    expect(span.status.message).toBeUndefined();
+  });
+
+  test('a failed query span does not repeat the error message', async () => {
+    const canary = 'canary-77be1f02';
+    const sql = instrumentPostgres(fakeClient(new Error(`bad value ${canary}`)));
+    await Promise.resolve(sql.unsafe('select 1')).catch(() => undefined);
+    expect(
+      JSON.stringify(exporter.getFinishedSpans().map((s) => [s.events, s.status])),
+    ).not.toContain(canary);
+  });
+});
+
 describe('instrumentPostgres', () => {
   test('creates a child client span per query, inside the request span', async () => {
     const sql = instrumentPostgres(fakeClient());

@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useState,
   type ComponentPropsWithoutRef,
   type CSSProperties,
   type KeyboardEvent,
@@ -10,6 +11,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '../../atoms';
 import { PanelHeader } from '../../molecules';
+import { DataTableMobileSort } from './DataTableMobileSort';
 
 const ALIGNMENT_CLASSES = {
   left: 'text-left',
@@ -17,10 +19,13 @@ const ALIGNMENT_CLASSES = {
   right: 'text-right',
 } as const;
 
+// Secondary and tertiary columns are left out of the cards below 768px until the row's details
+// are opened (`data-details-open` on the row, set by its "Show details" button).
+const HIDDEN_ON_CARD_CLASS_NAME = 'max-md:hidden max-md:group-data-details-open:flex';
 const PRIORITY_CLASSES = {
   primary: '',
-  secondary: 'max-md:hidden',
-  tertiary: 'max-md:hidden',
+  secondary: HIDDEN_ON_CARD_CLASS_NAME,
+  tertiary: HIDDEN_ON_CARD_CLASS_NAME,
   actions: '',
 } as const;
 
@@ -108,6 +113,8 @@ export type DataTableCellProps = ComponentPropsWithoutRef<'td'> & {
 };
 
 type DataTableContextValue = {
+  /** Whether some column is left out of the cards until a row's details are opened. */
+  hasCardDetails: boolean;
   columnsByKey: ReadonlyMap<string, DataTableColumn>;
   density: keyof typeof DENSITY_CLASSES;
   tableVariant: keyof typeof TABLE_VARIANT_CLASSES;
@@ -212,6 +219,45 @@ function getRowClassName({
   );
 }
 
+// A last cell that only the cards have. It reveals the columns the card leaves out, so nothing
+// shown in the table is missing on a phone. It stops the click so an interactive row does not
+// also open.
+function DataTableDetailsToggle({
+  open,
+  onToggle,
+}: Readonly<{ open: boolean; onToggle: () => void }>) {
+  return (
+    <td className="hidden max-md:block max-md:pb-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        className="inline-flex min-h-9 items-center text-label text-brand-fg underline-offset-2 hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+      >
+        {open ? 'Hide details' : 'Show details'}
+      </button>
+    </td>
+  );
+}
+
+function getRowChrome(tableContext: DataTableContextValue | null) {
+  return {
+    density: tableContext?.density ?? 'compact',
+    tableVariant: tableContext?.tableVariant ?? 'default',
+  } as const;
+}
+
+function useCardDetails(enabled: boolean) {
+  const [open, setOpen] = useState(false);
+  return {
+    rowProps: { 'data-details-open': open ? '' : undefined },
+    toggle: enabled ? <DataTableDetailsToggle open={open} onToggle={() => setOpen(!open)} /> : null,
+  };
+}
+
 export function DataTableRow({
   selected = false,
   interactive = false,
@@ -225,6 +271,7 @@ export function DataTableRow({
 }: Readonly<DataTableRowProps>) {
   const tableContext = useDataTableContext();
   const isKeyboardInteractive = Boolean(interactive && onClick);
+  const details = useCardDetails(Boolean(tableContext?.hasCardDetails && mobileCard));
 
   function handleKeyDown(event: KeyboardEvent<HTMLTableRowElement>) {
     onKeyDown?.(event);
@@ -239,8 +286,7 @@ export function DataTableRow({
   return (
     <tr
       className={getRowClassName({
-        density: tableContext?.density ?? 'compact',
-        tableVariant: tableContext?.tableVariant ?? 'default',
+        ...getRowChrome(tableContext),
         mobileCard,
         interactive,
         selected,
@@ -249,9 +295,11 @@ export function DataTableRow({
       onClick={onClick}
       onKeyDown={handleKeyDown}
       tabIndex={getRowTabIndex(isKeyboardInteractive, tabIndex)}
+      {...details.rowProps}
       {...props}
     >
       {children}
+      {details.toggle}
     </tr>
   );
 }
@@ -540,6 +588,9 @@ function DataTableContent({
   return (
     <DataTableContext.Provider
       value={{
+        hasCardDetails: columns.some(
+          (column) => column.priority === 'secondary' || column.priority === 'tertiary',
+        ),
         columnsByKey: new Map(columns.map((column) => [column.key, column])),
         density,
         tableVariant,
@@ -556,6 +607,9 @@ function DataTableContent({
 
       {toolbar ? <div className={SLOT_CLASS_NAME}>{toolbar}</div> : null}
       {filters ? <div className={SLOT_CLASS_NAME}>{filters}</div> : null}
+      {onSortChange ? (
+        <DataTableMobileSort columns={columns} sort={sort} onSortChange={onSortChange} />
+      ) : null}
 
       <DataTableElement
         bodyClassName={bodyClassName}

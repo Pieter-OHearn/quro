@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Bell, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { usePensionImportNotifications } from '@/features/pension/hooks';
 import { useMortgages } from '@/features/mortgage/hooks';
+import { useFocusTrap } from '@/components/ui';
 import { useAuth } from '@/lib/AuthContext';
 import { buildNotificationStatusCounts, mapImportFeedToNotifications } from './notification-utils';
 import { NotificationEmptyState } from './NotificationEmptyState';
@@ -53,12 +54,19 @@ function useMortgageReminders(
 
 type BellButtonProps = {
   open: boolean;
+  panelId: string;
   unreadCount: number;
   hasActiveJobs: boolean;
   onToggle: () => void;
 };
 
-function BellButton({ open, unreadCount, hasActiveJobs, onToggle }: Readonly<BellButtonProps>) {
+function BellButton({
+  open,
+  panelId,
+  unreadCount,
+  hasActiveJobs,
+  onToggle,
+}: Readonly<BellButtonProps>) {
   return (
     <button
       type="button"
@@ -71,6 +79,8 @@ function BellButton({ open, unreadCount, hasActiveJobs, onToggle }: Readonly<Bel
       title="Notifications"
       aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} new` : 'Notifications'}
       aria-expanded={open}
+      aria-controls={open ? panelId : undefined}
+      aria-haspopup="dialog"
     >
       {/* No ring or bounce when a notification arrives: the count badge is the signal. */}
       <Bell size={16} aria-hidden />
@@ -89,6 +99,8 @@ function BellButton({ open, unreadCount, hasActiveJobs, onToggle }: Readonly<Bel
 }
 
 type DropdownProps = {
+  id: string;
+  onClose: () => void;
   notifications: NotificationItem[];
   counts: NotificationStatusCounts;
   isLoading: boolean;
@@ -100,6 +112,8 @@ type DropdownProps = {
 };
 
 function Dropdown({
+  id,
+  onClose,
   notifications,
   counts,
   isLoading,
@@ -109,8 +123,19 @@ function Dropdown({
   onDismiss,
   onRetry,
 }: Readonly<DropdownProps>) {
+  // Escape closes the panel and returns focus to the bell, which opened it.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap({ containerRef: panelRef, active: true, onEscape: onClose });
+
   return (
-    <div className="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[92vw] overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:top-14 max-sm:w-auto max-sm:max-w-none">
+    <div
+      ref={panelRef}
+      id={id}
+      role="dialog"
+      aria-label="Notifications"
+      tabIndex={-1}
+      className="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[92vw] overflow-hidden rounded-lg border border-border-default bg-surface shadow-popover outline-none max-sm:fixed max-sm:inset-x-4 max-sm:top-14 max-sm:w-auto max-sm:max-w-none"
+    >
       <NotificationPanelHeader totalCount={notifications.length} isFetching={isFetching} />
       <NotificationStatusRow counts={counts} />
 
@@ -145,6 +170,7 @@ export function NotificationBell() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
   const notificationsQuery = usePensionImportNotifications();
   const mortgagesQuery = useMortgages();
   const mortgageReminders = useMortgageReminders(user?.id, mortgagesQuery.data ?? []);
@@ -188,6 +214,7 @@ export function NotificationBell() {
     <div className="relative" ref={panelRef}>
       <BellButton
         open={open}
+        panelId={panelId}
         unreadCount={unreadCount}
         hasActiveJobs={hasActiveJobs}
         onToggle={() => {
@@ -197,6 +224,8 @@ export function NotificationBell() {
       />
       {open && (
         <Dropdown
+          id={panelId}
+          onClose={() => setOpen(false)}
           notifications={notifications}
           counts={counts}
           isLoading={notificationsQuery.isLoading || mortgagesQuery.isLoading}

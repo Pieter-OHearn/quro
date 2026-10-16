@@ -160,7 +160,7 @@ describe('bank-link secrets stay out of logs, traces, responses and the stored r
   test('a failed token exchange logs the path, not the code or the client secret', async () => {
     const { callback } = await linkAndSync('failed-exchange', true);
     expect(callback.headers.get('location')).toContain('bunq=error');
-    expect(logged.some((line) => line.includes('[bunq oauth callback error]'))).toBe(true);
+    expect(logged.some((line) => line.includes('bunq.oauth_callback_failed'))).toBe(true);
     expect(logged.join('\n')).toContain('/token');
   });
 

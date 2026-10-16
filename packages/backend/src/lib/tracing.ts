@@ -21,6 +21,8 @@ import type { MiddlewareHandler } from 'hono';
 import { routePath } from 'hono/route';
 import { getConfig, type TracingConfig } from '../config';
 import { HTTP_STATUS } from '../constants/http';
+import { errorFields } from './logger';
+import { currentRequestId } from './requestContext';
 
 // OpenTelemetry tracing: HTTP server spans for every request and a client span
 // for every Postgres query, exported over OTLP/HTTP. Off unless
@@ -81,14 +83,16 @@ const headerGetter: TextMapGetter<Headers> = {
   keys: (headers) => [...headers.keys()],
 };
 
+// An error's message and stack are not recorded: a failed statement's message repeats the SQL and
+// the values it carried, and a span leaves the process. The class and codes identify the failure.
 function markError(span: Span, error: unknown): void {
-  if (error instanceof Error) {
-    span.recordException(error);
-  }
-  span.setStatus({
-    code: SpanStatusCode.ERROR,
-    message: error instanceof Error ? error.message : undefined,
+  const { errorName, errorCode } = errorFields(error);
+  if (typeof errorName === 'string') span.setAttribute('error.type', errorName);
+  if (typeof errorCode === 'string') span.setAttribute('db.response.status_code', errorCode);
+  span.addEvent('exception', {
+    'exception.type': typeof errorName === 'string' ? errorName : 'unknown',
   });
+  span.setStatus({ code: SpanStatusCode.ERROR });
 }
 
 /**
@@ -107,6 +111,7 @@ export const httpTracing: MiddlewareHandler = (c, next) => {
       attributes: {
         'http.request.method': method,
         'url.path': c.req.path,
+        ...(currentRequestId() ? { 'quro.request_id': currentRequestId() } : {}),
       },
     },
     parent,

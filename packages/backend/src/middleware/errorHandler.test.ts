@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import type { Context } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { CurrencyRatesUnavailableError } from '../lib/currencyRateCache';
+import { runWithRequestId } from '../lib/requestContext';
 import { errorHandler } from './errorHandler';
 
 function createTestContext(): Context {
@@ -44,5 +45,34 @@ describe('errorHandler', () => {
 
     expect(response.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
     expect(await response.json()).toEqual({ error: 'Internal server error' });
+  });
+});
+
+describe('errorHandler logging', () => {
+  const original = { warn: console.warn, error: console.error };
+  afterEach(() => Object.assign(console, original));
+
+  test('logs the class, code and request id of an unexpected error, never its message', async () => {
+    const canary = 'canary-9d2b77e1';
+    const logged: string[] = [];
+    console.error = (line: string) => logged.push(line);
+    console.warn = (line: string) => logged.push(line);
+    const failure = Object.assign(new Error(`Failed query: insert params: ${canary}`), {
+      cause: Object.assign(new Error(`duplicate key value ${canary}`), { code: '23505' }),
+    });
+
+    const response = await runWithRequestId('req-abcdef12', () =>
+      errorHandler(failure, createTestContext()),
+    );
+
+    expect(response.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).not.toContain(canary);
+    expect(JSON.parse(logged[0]!)).toMatchObject({
+      event: 'request.failed',
+      requestId: 'req-abcdef12',
+      errorName: 'Error',
+      errorCode: '23505',
+    });
   });
 });
