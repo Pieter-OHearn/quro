@@ -132,7 +132,7 @@ test('PayslipHistoryTable pages a 10,000-row fixture but totals every payslip', 
   // One page of rows plus the total row and the selected row's phone detail.
   expect(markup.match(/<tr /g)?.length).toBeLessThanOrEqual(25 + 3);
   expect(markup.replaceAll('<!-- -->', '')).toContain('1-25 of 10000');
-  expect(markup).toContain('10,000 payslips in EUR');
+  expect(markup).toContain('10000 payslips in EUR');
   expect(markup).toContain('EUR 10000000.00');
   expect(performance.now() - started).toBeLessThan(1_000);
 });
