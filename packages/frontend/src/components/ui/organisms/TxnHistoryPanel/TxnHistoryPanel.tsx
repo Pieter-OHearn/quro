@@ -67,6 +67,8 @@ export type TxnHistoryPanelProps = {
   variant?: keyof typeof PANEL_VARIANTS;
   addButtonPlacement?: 'filterBar' | 'header';
   addButtonSize?: ButtonProps['size'];
+  /** Another action beside the add button, such as an import. */
+  secondaryAction?: ReactNode;
   emptyMessage?: string;
   children: ReactNode;
   footer?: ReactNode;
@@ -287,6 +289,7 @@ export function TxnHistoryPanel({
   variant = 'embedded',
   addButtonPlacement = 'filterBar',
   addButtonSize,
+  secondaryAction,
   emptyMessage = 'No transactions.',
   children,
   footer,
@@ -303,7 +306,15 @@ export function TxnHistoryPanel({
       variant={variantStyles.addButtonVariant}
     />
   ) : null;
-  const filterBarAction = addButtonPlacement === 'filterBar' ? addButton : undefined;
+  const actions = secondaryAction ? (
+    <div className="flex flex-wrap items-center gap-2 max-sm:flex-col max-sm:items-stretch">
+      {secondaryAction}
+      {addButton}
+    </div>
+  ) : (
+    addButton
+  );
+  const filterBarAction = addButtonPlacement === 'filterBar' ? actions : undefined;
   const headerAction = addButtonPlacement === 'header' ? addButton : undefined;
   const body = (
     <TxnHistoryBody

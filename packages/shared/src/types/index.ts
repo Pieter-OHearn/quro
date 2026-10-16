@@ -231,6 +231,10 @@ export type SavingsTransaction = {
   date: string;
   note: string;
   bunqTransactionId?: string | null;
+  /** Set on rows that came from a reviewed file import. */
+  importId?: number | null;
+  importSource?: string | null;
+  externalId?: string | null;
 };
 
 // ── Ticker Item Types ─────────────────────────────────────────────────────────
@@ -747,6 +751,9 @@ export type BudgetTransaction = {
   date: string;
   merchant: string;
   bunqTransactionId?: string | null;
+  importId?: number | null;
+  importSource?: string | null;
+  externalId?: string | null;
   sourceProvider?: string | null;
   sourceAccountId?: string | null;
   sourceAccountName?: string | null;
