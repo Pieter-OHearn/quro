@@ -6,3 +6,4 @@ export { MonthlySummary } from './MonthlySummary';
 export { NetWorthChartCard } from './NetWorthChartCard';
 export { NetWorthHero } from './NetWorthHero';
 export { RecentTransactionsCard } from './RecentTransactionsCard';
+export { GettingStartedCard } from './GettingStartedCard';

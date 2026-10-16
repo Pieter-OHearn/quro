@@ -1,13 +1,14 @@
-import { DAY_MS } from '../constants/time';
 import { db } from '../db/client';
 import { sql, eq } from 'drizzle-orm';
 import { partnerLinks } from '../db/schema';
 import { getCurrentRatesToBaseCurrency } from './currencyRateSync';
 import { forEachConcurrent } from './concurrency';
+import { JOB_INTERVAL_MS } from './operationalStatus';
 import { startIntervalJob } from './intervalJob';
 import { upsertCurrentNetWorthSnapshot } from './netWorth';
+import { log, errorFields } from './logger';
 
-const SNAPSHOT_INTERVAL_MS = DAY_MS;
+const SNAPSHOT_INTERVAL_MS = JOB_INTERVAL_MS['net-worth-snapshot'];
 const SNAPSHOT_CONCURRENCY = 4;
 
 async function snapshotUser(
@@ -17,10 +18,9 @@ async function snapshotUser(
 ): Promise<void> {
   try {
     await upsertCurrentNetWorthSnapshot(userId, new Date(), { rates, partnerId });
-    console.log(`[net-worth-snapshot] userId=${userId} status=ok`);
+    log.info('job.net_worth_snapshot.user', { userId, status: 'ok' });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[net-worth-snapshot] userId=${userId} error: ${message}`);
+    log.error('job.net_worth_snapshot.user_failed', { userId, ...errorFields(error) });
   }
 }
 
@@ -47,7 +47,7 @@ export async function runSnapshots(): Promise<void> {
       userIds.add(link.addresseeId);
     }
   }
-  console.log(`[net-worth-snapshot] Starting snapshots for ${userIds.size} users`);
+  log.info('job.net_worth_snapshot.start', { users: userIds.size });
   await forEachConcurrent([...userIds], SNAPSHOT_CONCURRENCY, (userId) =>
     snapshotUser(userId, rates, partners.get(userId) ?? null),
   );

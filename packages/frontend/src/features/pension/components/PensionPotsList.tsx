@@ -220,7 +220,7 @@ function DisabledPensionImportButton({
         onFocus={() => setShowHint(true)}
         onBlur={() => setShowHint(false)}
         leadingIcon={<Lock size={12} className="shrink-0 text-fg-faint" aria-hidden />}
-        trailingIcon={<Badge size="xs">AI off</Badge>}
+        trailingIcon={<Badge size="xs">Unavailable</Badge>}
         className="max-w-full text-fg-subtle"
       >
         <span className="truncate">Import annual statement PDF</span>
@@ -234,12 +234,20 @@ function PensionImportButton({
   capability,
   onImportStatement,
 }: Readonly<PensionImportButtonProps>) {
+  // A server that never set statement import up has no import to offer; a set-up one that is
+  // down shows why.
+  if (capability.reason === 'not_configured') return null;
   if (!capability.enabled) {
     return <DisabledPensionImportButton capability={capability} />;
   }
 
   return (
-    <Button variant="secondary" size="sm" onClick={() => onImportStatement(pot)}>
+    <Button
+      variant="secondary"
+      size="sm"
+      trailingIcon={<Badge size="xs">Experimental</Badge>}
+      onClick={() => onImportStatement(pot)}
+    >
       Import annual statement PDF
     </Button>
   );

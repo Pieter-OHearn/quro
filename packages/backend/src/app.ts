@@ -31,6 +31,7 @@ import {
   getReadinessStatusCode,
 } from './lib/readiness';
 import { httpTracing } from './lib/tracing';
+import { requestId } from './middleware/requestId';
 
 /**
  * Builds the API. Routes that belong to an optional capability (see lib/capabilityRegistry.ts) are
@@ -41,6 +42,7 @@ export function createApp(config: Config = getConfig()) {
   const enabled = enabledCapabilities(config);
   const app = new Hono();
 
+  app.use('*', requestId);
   app.use('*', httpTracing);
   app.use('*', corsMiddleware);
   app.use('*', requireCsrf);

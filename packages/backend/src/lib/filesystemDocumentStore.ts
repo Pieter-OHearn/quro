@@ -8,6 +8,7 @@ import {
   type DocumentStore,
   type ObjectDeletionResult,
 } from './documentStore';
+import { log } from './logger';
 
 // The default document store: one file per object under QRO_DOCUMENTS_DIR, at the object's key.
 // Files are written under a temporary name, flushed and renamed, so a reader never sees a partial
@@ -147,7 +148,7 @@ export function createFilesystemDocumentStore(directory: string): DocumentStore 
           await remove(key);
           deletedKeys.push(key);
         } catch (error) {
-          console.error('Failed to delete a stored document; keeping its key for a retry', {
+          log.error('documents.delete_failed', {
             code: errorCode(error) ?? (error instanceof Error ? error.name : 'unknown'),
           });
           failedKeys.push(key);

@@ -10,6 +10,7 @@ import type { Readable } from 'node:stream';
 import type { S3Connection } from '../config';
 import type { DocumentStore } from './documentStore';
 import { deleteObjectsInBatches } from './s3Deletes';
+import { log } from './logger';
 
 // The optional S3 document store (QRO_DOCUMENT_STORAGE=s3), and the source that
 // `quro documents migrate-from-s3` reads from. Any S3-compatible service works.
@@ -103,7 +104,7 @@ export function createS3DocumentStore(
           }),
         );
         const errors = result.Errors ?? [];
-        if (errors.length) console.error('Some S3 objects could not be deleted', errors);
+        if (errors.length) log.error('s3.delete_failed', { count: errors.length });
         // An error without a key cannot safely be attributed to one object.
         if (errors.some((error) => !error.Key)) return batch;
         return errors.map((error) => error.Key!);

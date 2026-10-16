@@ -12,6 +12,7 @@ import { loadDashboardInsights } from '../lib/dashboardInsights';
 import { parseWholeNumber } from '../lib/requestValidation';
 import { HTTP_STATUS } from '../constants/http';
 import { loadActivity } from '../lib/activity';
+import { loadSetupProgress } from '../lib/setupProgress';
 
 export { buildNetWorthHistory } from '../lib/netWorthHistory';
 export { buildActivityList, getActivityCutoff } from '../lib/activity';
@@ -57,6 +58,12 @@ app.get('/insights', async (c) => {
 
 app.get('/transactions', async (c) => {
   const data = await loadActivity(getAuthUser(c).id, getPartnerId(c));
+  return c.json({ data });
+});
+
+// What first-run guidance needs to know: whether the household has an account and a transaction.
+app.get('/setup', async (c) => {
+  const data = await loadSetupProgress(getAuthUser(c).id, getPartnerId(c));
   return c.json({ data });
 });
 

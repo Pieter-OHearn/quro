@@ -5,6 +5,7 @@ import { startCurrencyRateSyncScheduler } from './lib/currencyRateSyncScheduler'
 import { startHoldingPriceSyncScheduler } from './lib/holdingPriceSyncScheduler';
 import { startNetWorthSnapshotScheduler } from './lib/netWorthSnapshotScheduler';
 import { startSessionCleanup } from './lib/sessionCleanup';
+import { log } from './lib/logger';
 
 export type SchedulerEntry = {
   name: string;
@@ -36,7 +37,7 @@ export function startSchedulers(
 ): void {
   if (config.runtime.environment === 'test') return;
   if (config.runtime.schedulersDisabled) {
-    console.log('[schedulers] QRO_DISABLE_SCHEDULERS is set; background jobs are off');
+    log.info('schedulers.disabled', { setting: 'QRO_DISABLE_SCHEDULERS' });
     return;
   }
   for (const scheduler of activeSchedulers(config, entries)) scheduler.start();

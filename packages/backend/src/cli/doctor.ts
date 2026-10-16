@@ -5,8 +5,26 @@ import { readInstalledToolMajor } from '../db/pgTools';
 import { readOwnerFacts, type OwnerFacts } from '../db/runtimeRole';
 import { compareSchema, describeSchema, readLatestAppliedWhen } from '../db/schemaVersion';
 import { getBuildInfo, type BuildInfo } from '../lib/buildInfo';
+import { REFERENCES_SQL } from '../backup/createBackup';
 import { createDocumentStore } from '../lib/documentStorage';
 import { summarizeSecrets, type SecretRow, type SecretsReport } from '../lib/integrationSecrets';
+import {
+  classifyBackup,
+  classifyDisk,
+  classifyDocuments,
+  classifyFreshness,
+  classifyJob,
+  countMissingDocuments,
+  FRESHNESS_SQL,
+  JOB_INTERVAL_MS,
+  JOB_ROWS_SQL,
+  newestBackup,
+  readDiskFacts,
+  type Finding,
+  type FreshnessFacts,
+  type JobExpectation,
+  type JobRow,
+} from '../lib/operationalStatus';
 import { postgresMajorProblem, runtimeProblems } from '../lib/platformSupport';
 import {
   EXIT_FAILURE,
@@ -25,8 +43,10 @@ import {
 export const DOCTOR_USAGE = `Usage: quro doctor [--json]
 
 Read-only checks: host and runtime, settings, both database roles, the schema against this
-image, the backup tool version, the document store and the encryption of stored bank-link
-secrets. Changes nothing.
+image, the backup tool version, the document store, the encryption of stored bank-link
+secrets, background jobs, data freshness, disk space, the age of the newest backup and whether
+the documents the database refers to are in the store. Changes nothing. A job, sync or backup
+with no record is reported as unknown, never as healthy.
 
 Options:
   --json   Print one JSON report instead of text
@@ -35,7 +55,8 @@ Exit codes: 0 every check passed (warnings allowed), 1 a check failed, 2 invalid
 3 refused by a safety check (unsupported database, schema newer than this image),
 4 database or document store unreachable.`;
 
-export type CheckStatus = 'ok' | 'warn' | 'fail' | 'skip';
+/** `unknown`: nothing proves the thing is healthy or not (no recorded run, no backup found). */
+export type CheckStatus = 'ok' | 'warn' | 'fail' | 'skip' | 'unknown';
 
 /** Which exit code a failed check leads to. */
 export type FailureKind = 'settings' | 'unreachable' | 'refused' | 'failed';
@@ -54,11 +75,16 @@ export type DoctorReport = {
   checks: DoctorCheck[];
 };
 
+const STATUS_WIDTH = 'UNKNOWN'.length;
 const CONNECT_TIMEOUT_SECONDS = 5;
 const CLOSE_TIMEOUT_SECONDS = 5;
 
 const ok = (id: string, message: string): DoctorCheck => ({ id, status: 'ok', message });
 const warn = (id: string, message: string): DoctorCheck => ({ id, status: 'warn', message });
+const fromFinding = (finding: Finding): DoctorCheck => {
+  if (finding.health === 'fail') return fail(finding.id, 'failed', finding.message);
+  return { id: finding.id, status: finding.health, message: finding.message };
+};
 const skip = (id: string, message: string): DoctorCheck => ({ id, status: 'skip', message });
 const fail = (id: string, failure: FailureKind, message: string): DoctorCheck => ({
   id,
@@ -316,6 +342,98 @@ function secretsCheckFor(report: SecretsReport, keyId: string | null): DoctorChe
   }
 }
 
+const SESSION_CLEANUP_FALLBACK_MS = 60 * 60 * 1000;
+
+async function withRuntime<T>(work: (sql: AnySql) => Promise<T>): Promise<T | null | undefined> {
+  const runtime = section(() => getConfig().runtimeDatabase);
+  if (!runtime) return null;
+  try {
+    return await withConnection(runtime, work);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Background jobs and data freshness, from records the server leaves in the database. */
+async function jobAndFreshnessChecks(now: Date): Promise<DoctorCheck[]> {
+  const read = await withRuntime(async (sql) => ({
+    jobs: await sql.unsafe<JobRow[]>(JOB_ROWS_SQL),
+    freshness: (await sql.unsafe<FreshnessFacts[]>(FRESHNESS_SQL))[0]!,
+  }));
+  if (!read) return [skip('jobs', 'Not checked: the database or the schema is not ready.')];
+  const bunq = section(() => getConfig().bunq);
+  const sessionMs = section(() => getConfig().runtime.sessionCleanupIntervalMs);
+  const expectations: JobExpectation[] = [
+    { name: 'session-cleanup', intervalMs: sessionMs ?? SESSION_CLEANUP_FALLBACK_MS, core: true },
+    { name: 'holding-price-sync', intervalMs: JOB_INTERVAL_MS['holding-price-sync'], core: true },
+    { name: 'currency-rate-sync', intervalMs: JOB_INTERVAL_MS['currency-rate-sync'], core: true },
+    { name: 'net-worth-snapshot', intervalMs: JOB_INTERVAL_MS['net-worth-snapshot'], core: true },
+    ...(bunq?.enabled
+      ? [{ name: 'bunq-sync', intervalMs: JOB_INTERVAL_MS['bunq-sync'], core: false }]
+      : []),
+  ];
+  return [
+    ...expectations.map((job) => fromFinding(classifyJob(job, read.jobs, now))),
+    ...classifyFreshness(read.freshness, now).map(fromFinding),
+  ];
+}
+
+/** Disk space of the document directory, and the age of the newest backup. */
+async function storageChecks(now: Date): Promise<DoctorCheck[]> {
+  const checks: DoctorCheck[] = [];
+  const documents = section(() => getConfig().documents);
+  if (documents?.driver === 'filesystem') {
+    try {
+      checks.push(
+        fromFinding(
+          classifyDisk(
+            'disk.documents',
+            'Document directory',
+            await readDiskFacts(documents.directory),
+          ),
+        ),
+      );
+    } catch {
+      checks.push(skip('disk.documents', 'Not checked: the document directory cannot be read.'));
+    }
+  }
+  const backup = section(() => getConfig().backup);
+  if (backup) {
+    let newest: Date | null = null;
+    let reachable = true;
+    try {
+      newest = await newestBackup(backup.directory);
+    } catch {
+      reachable = false;
+    }
+    checks.push(fromFinding(classifyBackup(newest, now, reachable)));
+    try {
+      checks.push(
+        fromFinding(
+          classifyDisk('disk.backups', 'Backup directory', await readDiskFacts(backup.directory)),
+        ),
+      );
+    } catch {
+      // The age check already says the directory cannot be read.
+    }
+  }
+  return checks;
+}
+
+/** That every document a row refers to is in the filesystem store (an S3 store is not listed). */
+async function documentReferenceCheck(): Promise<DoctorCheck> {
+  const documents = section(() => getConfig().documents);
+  if (documents?.driver !== 'filesystem') {
+    return skip('documents.references', 'Not checked: only the filesystem store is checked here.');
+  }
+  const keys = await withRuntime(async (sql) =>
+    (await sql.unsafe<{ key: string }[]>(REFERENCES_SQL)).map((row) => row.key),
+  );
+  if (!keys)
+    return skip('documents.references', 'Not checked: the database or the schema is not ready.');
+  return fromFinding(classifyDocuments(await countMissingDocuments(documents.directory, keys)));
+}
+
 const EXIT_BY_FAILURE: ReadonlyArray<[FailureKind, number]> = [
   ['settings', EXIT_USAGE],
   ['unreachable', EXIT_UNAVAILABLE],
@@ -339,6 +457,9 @@ export async function runDoctor(): Promise<DoctorReport> {
     await backupToolCheck(owner.serverMajor),
     await documentStoreCheck(),
     await integrationSecretsCheck(),
+    ...(await jobAndFreshnessChecks(new Date())),
+    ...(await storageChecks(new Date())),
+    await documentReferenceCheck(),
   ];
   const exitCode = exitCodeFor(checks);
   return { status: exitCode === EXIT_OK ? 'ok' : 'fail', exitCode, build, checks };
@@ -348,7 +469,7 @@ function printText(report: DoctorReport, io: CommandIo) {
   const { version, revision, migrations } = report.build;
   io.out(`Quro ${version} (revision ${revision}, schema ${migrations.latest})`);
   for (const check of report.checks) {
-    io.out(`${check.status.toUpperCase().padEnd(4)}  ${check.id}: ${check.message}`);
+    io.out(`${check.status.toUpperCase().padEnd(STATUS_WIDTH)}  ${check.id}: ${check.message}`);
   }
   io.out(
     report.status === 'ok'

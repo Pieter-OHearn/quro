@@ -1,8 +1,9 @@
-import { DAY_MS } from '../constants/time';
 import { getCurrentCurrencyRateRows, syncCurrencyRates } from './currencyRateSync';
+import { JOB_INTERVAL_MS } from './operationalStatus';
 import { startIntervalJob } from './intervalJob';
+import { log } from './logger';
 
-const SYNC_INTERVAL_MS = DAY_MS;
+const SYNC_INTERVAL_MS = JOB_INTERVAL_MS['currency-rate-sync'];
 
 export function startCurrencyRateSyncScheduler(): void {
   startIntervalJob({
@@ -21,11 +22,13 @@ async function runSync(): Promise<void> {
     result.issues.length > 0
       ? `partial (${result.updatedRates}/${result.requestedRates} updated)`
       : `ok (${result.updatedRates} updated)`;
-  console.log(`[currency-rate-sync] status=${status}`);
+  log.info('job.currency_rate_sync.done', { status });
 
   for (const issue of result.issues) {
-    console.warn(
-      `[currency-rate-sync] ${issue.fromCurrency}->${issue.toCurrency} skipped: ${issue.reason}`,
-    );
+    log.warn('job.currency_rate_sync.skipped', {
+      from: issue.fromCurrency,
+      to: issue.toCurrency,
+      reason: issue.reason,
+    });
   }
 }

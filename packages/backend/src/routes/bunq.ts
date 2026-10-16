@@ -23,6 +23,7 @@ import { describeSyncFailure } from '../lib/syncFailure';
 import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { secureCookiesEnabled } from '../lib/sessions';
+import { log, errorFields } from '../lib/logger';
 
 const app = new Hono();
 
@@ -48,8 +49,11 @@ function unavailable(c: Context) {
 }
 
 // A failed statement's message repeats its parameters, so only bank and own messages are logged.
-function logBunqError(label: string, error: unknown): void {
-  console.error(label, { message: describeSyncFailure(error, 'database or unknown error') });
+function logBunqError(event: string, error: unknown): void {
+  log.error(event, {
+    ...errorFields(error),
+    detail: describeSyncFailure(error, 'database or unknown error'),
+  });
 }
 
 /** The answer when the stored credentials cannot be opened: the user has to connect again. */
@@ -146,7 +150,7 @@ app.get('/oauth/callback', async (c) => {
 
     return c.redirect(buildFrontendRedirect(config.frontendOrigin, destination, 'connected'));
   } catch (e) {
-    logBunqError('[bunq oauth callback error]', e);
+    logBunqError('bunq.oauth_callback_failed', e);
     return fail(destination);
   }
 });
@@ -182,7 +186,7 @@ app.delete('/connection', async (c) => {
     try {
       await deleteSession(session.sessionToken, session.sessionId);
     } catch (error) {
-      logBunqError('[bunq session delete error]', error);
+      logBunqError('bunq.session_delete_failed', error);
     }
   }
 
@@ -214,7 +218,7 @@ app.post('/sync/savings', async (c) => {
     );
   } catch (e) {
     if (e instanceof BunqCredentialsUnavailableError) return reauthorizationRequired(c);
-    logBunqError('[bunq savings sync error]', e);
+    logBunqError('bunq.savings_sync_failed', e);
     const message = describeSyncFailure(e, 'Bunq savings sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
@@ -240,7 +244,7 @@ app.post('/sync/budget', async (c) => {
     );
   } catch (e) {
     if (e instanceof BunqCredentialsUnavailableError) return reauthorizationRequired(c);
-    logBunqError('[bunq budget sync error]', e);
+    logBunqError('bunq.budget_sync_failed', e);
     const message = describeSyncFailure(e, 'Bunq budget sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
@@ -283,7 +287,7 @@ app.post('/sync', async (c) => {
     );
   } catch (e) {
     if (e instanceof BunqCredentialsUnavailableError) return reauthorizationRequired(c);
-    logBunqError('[bunq sync error]', e);
+    logBunqError('bunq.sync_failed', e);
     const message = describeSyncFailure(e, 'Bunq sync failed');
     return c.json({ error: message }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }

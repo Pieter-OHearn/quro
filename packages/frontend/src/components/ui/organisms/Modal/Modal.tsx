@@ -1,7 +1,8 @@
 import { X } from 'lucide-react';
-import { useEffect, useId, useRef } from 'react';
+import { useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '../../atoms';
+import { useFocusTrap } from '../../hooks';
 import { useExitTransition } from './useExitTransition';
 
 export type ModalHeaderProps = {
@@ -24,6 +25,14 @@ export type ModalProps = {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   onClose: () => void;
+  /**
+   * Whether the dialog is shown. It defaults to true, and a caller that unmounts a closed dialog
+   * needs nothing else. To play the closing transition, keep the dialog mounted with `open` false
+   * until `onExited` runs, which `useModalPresence` does.
+   */
+  open?: boolean;
+  /** Called once the closing transition has ended after `open` turned false. */
+  onExited?: () => void;
   maxWidth?: keyof typeof MAX_WIDTH_MAP;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -54,7 +63,7 @@ const CLOSE_BUTTON_CLASS_NAME =
 
 // The scrim and the panel fade in over `duration-base`. Below 640px the panel is a bottom sheet
 // that rises from the bottom edge; under reduced motion it only fades. `data-closing` is set on
-// the copy that plays the closing transition (see useExitTransition).
+// both layers while the dialog is closing (see useExitTransition).
 const SCRIM_CLASS_NAME =
   'absolute -inset-4 bg-scrim transition-opacity duration-base ease-standard starting:opacity-0 data-closing:opacity-0';
 const PANEL_CLASS_NAME = cn(
@@ -65,75 +74,7 @@ const PANEL_CLASS_NAME = cn(
 );
 // Footer actions sit at the end on desktop and stack full width, 44px high, on phones.
 const FOOTER_CLASS_NAME =
-  'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:flex-col max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:w-full max-sm:*:flex-none';
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function getActiveElement(): HTMLElement | null {
-  return typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
-    ? document.activeElement
-    : null;
-}
-
-function useModalFocusTrap(
-  dialogRef: React.RefObject<HTMLDivElement | null>,
-  returnFocusRef: React.RefObject<HTMLElement | null>,
-  onClose: () => void,
-) {
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => {
-    const previouslyFocused = returnFocusRef.current;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    const focusableElements = () =>
-      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-        (element) => !element.hasAttribute('hidden'),
-      );
-
-    // The panel may still be entering from below the viewport; scrolling to it would shift the
-    // overflow-hidden overlay and leave a gap under the sheet.
-    (focusableElements()[0] ?? dialog).focus({ preventScroll: true });
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-
-      const elements = focusableElements();
-      if (elements.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-      const first = elements[0];
-      const last = elements[elements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      queueMicrotask(() => {
-        if (previouslyFocused && document.body.contains(previouslyFocused)) {
-          previouslyFocused.focus();
-        }
-      });
-    };
-  }, [dialogRef, returnFocusRef]);
-}
+  'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:sticky max-sm:bottom-0 max-sm:flex-col max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:w-full max-sm:*:flex-none';
 
 export function ModalHeader({
   title,
@@ -201,10 +142,18 @@ export function ModalHeader({
   );
 }
 
+// A custom header has no title element to point at, so the dialog is named from the title text.
+function dialogNameProps(hasCustomHeader: boolean, title: React.ReactNode, titleId: string) {
+  if (!hasCustomHeader) return { 'aria-labelledby': titleId };
+  return { 'aria-label': typeof title === 'string' ? title : 'Dialog' };
+}
+
 export function Modal({
   title,
   subtitle,
   onClose,
+  open = true,
+  onExited,
   maxWidth = 'md',
   children,
   footer,
@@ -216,25 +165,23 @@ export function Modal({
   bodyClassName,
 }: ModalProps) {
   const titleId = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(getActiveElement());
-  useModalFocusTrap(dialogRef, returnFocusRef, onClose);
-  useExitTransition(rootRef);
+  useFocusTrap({ containerRef: dialogRef, active: open, onEscape: onClose });
+  useExitTransition({ panelRef: dialogRef, open, onExited });
 
   return (
     <div
-      ref={rootRef}
-      className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4 max-sm:items-end max-sm:px-0 max-sm:pb-0"
+      inert={!open}
+      className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-clip p-4 max-sm:items-end max-sm:px-0 max-sm:pb-0"
     >
       <div
-        data-modal-layer="scrim"
+        data-closing={open ? undefined : ''}
         className={cn(SCRIM_CLASS_NAME, backdropClassName)}
         onClick={onClose}
       />
       <div
         ref={dialogRef}
-        data-modal-layer="panel"
+        data-closing={open ? undefined : ''}
         className={cn(
           PANEL_CLASS_NAME,
           MAX_WIDTH_MAP[maxWidth],
@@ -243,8 +190,7 @@ export function Modal({
         )}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={header ? undefined : titleId}
-        aria-label={header ? (typeof title === 'string' ? title : 'Dialog') : undefined}
+        {...dialogNameProps(Boolean(header), title, titleId)}
         tabIndex={-1}
       >
         {header ?? (

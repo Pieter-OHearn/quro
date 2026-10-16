@@ -79,4 +79,10 @@ describe('capability registry', () => {
     const ids = CAPABILITIES.map((capability) => capability.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  test('statement import is the only experimental capability', () => {
+    expect(
+      Object.fromEntries(describeCapabilities(configFor({})).map((c) => [c.id, c.lifecycle])),
+    ).toEqual({ bunq: 'stable', s3Storage: 'stable', pensionImport: 'experimental' });
+  });
 });

@@ -8,7 +8,7 @@ export const PIPELINE: {
   Icon: React.ElementType;
 }[] = [
   { key: 'queuing', label: 'Queued', sublabel: 'Waiting in queue', Icon: Clock },
-  { key: 'processing', label: 'Processing', sublabel: 'AI reading your PDF', Icon: Brain },
+  { key: 'processing', label: 'Processing', sublabel: 'Reading your PDF', Icon: Brain },
   { key: 'ready', label: 'Review ready', sublabel: 'Transactions extracted', Icon: Sparkles },
 ];
 

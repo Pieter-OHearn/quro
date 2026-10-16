@@ -187,7 +187,7 @@ function planPaths(request: BackupRequest, createdAt: Date): Paths {
   };
 }
 
-const REFERENCES_SQL = `
+export const REFERENCES_SQL = `
   select 'payslips#' || id as source, document_storage_key as key,
     document_size_bytes as bytes, null::text as sha256, true as needed
   from payslips where document_storage_key is not null

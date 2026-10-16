@@ -134,7 +134,7 @@ describe('quro doctor', () => {
     const run = await doctor(settingsFor(empty));
     expect(run.exitCode).toBe(EXIT_FAILURE);
     expect(run.out).toContain(
-      'FAIL  database.schema: The database has no schema yet. Run `quro migrate`.',
+      'FAIL     database.schema: The database has no schema yet. Run `quro migrate`.',
     );
     const sql = postgres(urlFor(empty, owner), { max: 1 });
     try {
@@ -251,6 +251,121 @@ describe('quro doctor', () => {
       }
     } finally {
       await sql`delete from bunq_connections`;
+      await sql`delete from users where email like '%@doctor.quro.test'`;
+      await sql.end({ timeout: 5 });
+    }
+  });
+
+  test('operational checks report no record as unknown and never as healthy', async () => {
+    const run = await report(settingsFor(migrated));
+    expect(run.exitCode).toBe(EXIT_OK);
+    for (const id of [
+      'jobs.session-cleanup',
+      'jobs.holding-price-sync',
+      'jobs.currency-rate-sync',
+      'jobs.net-worth-snapshot',
+      'freshness.currency_rates',
+      'backup.age',
+    ]) {
+      expect(statusOf(run.report, id)).toBe('unknown');
+    }
+    expect(statusOf(run.report, 'jobs.bunq-sync')).toBeUndefined();
+    expect(statusOf(run.report, 'disk.documents')).toBe('ok');
+    expect(statusOf(run.report, 'documents.references')).toBe('ok');
+    expect(run.out).not.toContain('postgres://');
+  });
+
+  test('a core job that stops or keeps failing fails the check, and recovery clears it', async () => {
+    const sql = postgres(urlFor(migrated, owner), { max: 1, onnotice: () => undefined });
+    const job = (name: string, status: string, at: string) =>
+      sql`insert into worker_heartbeats (worker_name, status, last_heartbeat_at)
+        values (${name}, ${status}, ${at}::timestamp)
+        on conflict (worker_name) do update set last_heartbeat_at = excluded.last_heartbeat_at`;
+    const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+    try {
+      await job('scheduler:currency-rate-sync', 'idle', hoursAgo(1));
+      expect(
+        statusOf((await report(settingsFor(migrated))).report, 'jobs.currency-rate-sync'),
+      ).toBe('ok');
+
+      await job('scheduler:currency-rate-sync', 'idle', hoursAgo(24 * 5));
+      const stale = await report(settingsFor(migrated));
+      expect(stale.exitCode).toBe(EXIT_FAILURE);
+      expect(statusOf(stale.report, 'jobs.currency-rate-sync')).toBe('fail');
+
+      await job('scheduler:currency-rate-sync', 'idle', hoursAgo(2));
+      await job('scheduler-failed:currency-rate-sync', 'failed', hoursAgo(1));
+      const failing = await report(settingsFor(migrated));
+      expect(failing.exitCode).toBe(EXIT_FAILURE);
+      expect(failing.out).toContain('is failing');
+
+      // A worker restart keeps the record: the next success clears the failure.
+      await job('scheduler:currency-rate-sync', 'idle', hoursAgo(0));
+      expect(
+        statusOf((await report(settingsFor(migrated))).report, 'jobs.currency-rate-sync'),
+      ).toBe('ok');
+    } finally {
+      await sql`delete from worker_heartbeats where worker_name like 'scheduler%'`;
+      await sql.end({ timeout: 5 });
+    }
+  });
+
+  test('reports the age of the newest backup, and stale or unreadable ones as not healthy', async () => {
+    const backups = join(scratch, 'backups');
+    await Bun.write(join(backups, '.keep'), '');
+    const stamp = (date: Date) =>
+      date
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\.\d+Z$/, 'Z')
+        .replace('T', '-');
+    const settings = settingsFor(migrated, { QRO_BACKUP_DIR: backups });
+
+    expect(statusOf((await report(settings)).report, 'backup.age')).toBe('unknown');
+
+    await Bun.write(
+      join(backups, `quro-backup-${stamp(new Date(Date.now() - 3_600_000))}.tar`),
+      '',
+    );
+    expect(statusOf((await report(settings)).report, 'backup.age')).toBe('ok');
+
+    rmSync(backups, { recursive: true, force: true });
+    await Bun.write(
+      join(backups, `quro-backup-${stamp(new Date(Date.now() - 5 * 86_400_000))}.tar`),
+      '',
+    );
+    const stale = await report(settings);
+    expect(statusOf(stale.report, 'backup.age')).toBe('warn');
+    expect(stale.exitCode).toBe(EXIT_OK);
+
+    const unreadable = await report(
+      settingsFor(migrated, { QRO_BACKUP_DIR: join(scratch, 'nope') }),
+    );
+    expect(statusOf(unreadable.report, 'backup.age')).toBe('unknown');
+  });
+
+  test('fails when a referenced document is missing from the store', async () => {
+    const sql = postgres(urlFor(migrated, owner), { max: 1, onnotice: () => undefined });
+    try {
+      const [user] = await sql<{ id: number }[]>`
+        insert into users (first_name, last_name, email, password_hash)
+        values ('Synthetic', 'Docs', ${`docs-${suffix}@doctor.quro.test`}, 'synthetic-hash')
+        returning id`;
+      const key = `users/${user!.id}/salary/payslips/1/lost-${suffix}.pdf`;
+      await sql`insert into payslips (user_id, month, date, gross, tax, pension, net,
+          document_storage_key, document_file_name, document_size_bytes, document_uploaded_at)
+        values (${user!.id}, '2026-09', '2026-09-25', 1, 0, 0, 1, ${key}, 'lost.pdf', 4, now())`;
+
+      const missing = await report(settingsFor(migrated));
+      expect(missing.exitCode).toBe(EXIT_FAILURE);
+      expect(statusOf(missing.report, 'documents.references')).toBe('fail');
+      expect(missing.out).not.toContain(key);
+
+      await Bun.write(join(documents, key), 'data');
+      const present = await report(settingsFor(migrated));
+      expect(statusOf(present.report, 'documents.references')).toBe('ok');
+    } finally {
+      await sql`delete from payslips`;
       await sql`delete from users where email like '%@doctor.quro.test'`;
       await sql.end({ timeout: 5 });
     }
