@@ -600,11 +600,10 @@ The capabilities system describes which optional backend features are available.
 - The **capability registry** (`packages/backend/src/lib/capabilityRegistry.ts`) decides from configuration alone whether a feature is switched on. It is the single source of truth: routes, schedulers, `GET /api/capabilities` and diagnostics all read it.
 - **Runtime state**, where a feature has some (for example the pension import worker's heartbeat), is checked on top in `packages/backend/src/lib/capabilities.ts`, which serves `GET /api/capabilities` (requires auth).
 
-Currently there are four keys in the response:
+Currently there are three keys in the response, each with a `lifecycle` of `stable` or `experimental` (a new optional feature starts `experimental` until it has been supported across a release):
 
 | Key                      | What it tracks                                                                      |
 | ------------------------ | ----------------------------------------------------------------------------------- |
-| `ai`                     | Whether AI features are operational (derived from the pension import worker state)  |
 | `pensionStatementImport` | Whether statement import is configured and the import worker is running and healthy |
 | `bunq`                   | Whether the complete optional bunq OAuth configuration is available                 |
 | `documents`              | Always enabled: documents are stored on the filesystem or in a configured S3 store  |

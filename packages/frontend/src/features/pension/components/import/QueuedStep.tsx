@@ -121,7 +121,7 @@ function QueuedStatusMessage({ jobPhase }: Readonly<{ jobPhase: JobPhase }>) {
     return (
       <ImportNotice tone="info" className="flex items-center justify-center gap-2">
         <Loader2 size={12} className="animate-spin" aria-hidden />
-        AI is extracting contributions, fees and totals from your PDF
+        Quro is reading contributions, fees and totals from your PDF
       </ImportNotice>
     );
   }

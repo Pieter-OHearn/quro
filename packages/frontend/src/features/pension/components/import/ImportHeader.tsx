@@ -27,7 +27,7 @@ export function ImportHeader({ pot, step, jobPhase, onClose }: Readonly<HeaderPr
         {step === 'review' && (
           <Badge>
             <Sparkles size={10} aria-hidden />
-            Parsed by AI
+            Read by OCR
           </Badge>
         )}
         {step === 'queued' && (

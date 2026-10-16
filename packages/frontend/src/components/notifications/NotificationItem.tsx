@@ -46,7 +46,7 @@ function renderFooter(item: NotificationItemType) {
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
           <Badge tone="brand">Processing</Badge>
-          <span className="text-caption text-fg-subtle">AI reading your PDF…</span>
+          <span className="text-caption text-fg-subtle">Reading your PDF…</span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-surface-muted">
           <div
