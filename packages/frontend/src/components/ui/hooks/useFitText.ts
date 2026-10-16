@@ -28,7 +28,12 @@ export function useFitText<T extends HTMLElement>(text: string) {
     }
 
     fit(element);
-    if (typeof ResizeObserver === 'undefined') return;
+    // The web font can arrive after the first measure and change the text's width.
+    let cancelled = false;
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) fit(element);
+    });
+    if (typeof ResizeObserver === 'undefined') return () => void (cancelled = true);
     let lastWidth = element.clientWidth;
     const observer = new ResizeObserver(() => {
       if (element.clientWidth === lastWidth) return;
@@ -36,7 +41,10 @@ export function useFitText<T extends HTMLElement>(text: string) {
       fit(element);
     });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
   }, [text]);
 
   return ref;
