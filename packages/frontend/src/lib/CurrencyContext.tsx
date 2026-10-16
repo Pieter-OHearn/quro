@@ -67,7 +67,7 @@ type CurrencyRatesFallbackProps = {
 
 function CurrencyRatesFallback({ detail, onRetry }: Readonly<CurrencyRatesFallbackProps>) {
   return (
-    <div className="min-h-dvh bg-surface-sunken flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh bg-surface-sunken pt-[env(safe-area-inset-top)] flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-xl rounded-lg border border-border-default bg-surface p-4 max-sm:rounded-xl sm:p-6">
         <Badge tone="warning">Currency rates unavailable</Badge>
         <h1 className="mt-3 text-title-page text-fg">Converted balances are paused</h1>
