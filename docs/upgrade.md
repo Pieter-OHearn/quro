@@ -7,7 +7,7 @@ The commands assume an install made with [the install guide](install.md): they r
 ## How upgrades work
 
 - **Two images per release.** `ghcr.io/pieter-ohearn/quro-backend` (the server, the optional import worker and every `quro` command) and `ghcr.io/pieter-ohearn/quro-frontend`. Use both at the same version. Pulling them needs no registry account.
-- **Pin the version and the digest.** A tag can be moved; a digest cannot. Each release's notes list the digest of both images. Pin both in `compose.yaml`, for example `image: ghcr.io/pieter-ohearn/quro-backend:v0.9.0@sha256:<digest from the release notes>`, and the same tag and digest for the `migrate` service. Docker then refuses an image whose digest does not match.
+- **Pin the version and the digest.** A tag can be moved; a digest cannot. Each release's notes list the digest of both images. Pin both in `compose.yaml`, for example `image: ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.1@sha256:<digest from the release notes>`, and the same tag and digest for the `migrate` service. Docker then refuses an image whose digest does not match.
 - **Migrations only move forward.** `quro migrate` applies a release's schema migrations, all in one transaction, under a lock. The server never migrates by itself. An image refuses to run against a schema it does not know: readiness stays `503` and `quro migrate` stops with exit code 3. So going back to an older image works only while it ships every migration the database has (see [Roll back or restore](#roll-back-or-restore)).
 - **Readiness tells you when to route traffic.** `GET /api/health` answers `200` while the process runs. `GET /api/readiness` answers `200` only when the database answers, the schema matches the image and the document store is usable. The image's health check, `quro health`, uses readiness, so `docker compose ps` shows the backend as `healthy` only then.
 
@@ -168,9 +168,9 @@ Needs no settings and no database.
 
 ```json
 {
-  "version": "v0.9.0",
+  "version": "v1.0.0-rc.1",
   "revision": "<commit the image was built from>",
-  "migrations": { "latest": "0040_ledger_correctness", "count": 41 },
+  "migrations": { "latest": "0043_csv_imports", "count": 44 },
   "runtime": { "bun": "1.4.2", "platform": "linux", "arch": "arm64" }
 }
 ```
@@ -422,9 +422,58 @@ What the operator does: nothing, unless a script or client of your own calls the
 
 ### Upgrade from 0.9.0 to 1.0.0-rc.1
 
-What the operator does: nothing is required. If a log collector or alert parses the server's log lines, update it for the new format.
+Back up with 0.9.0 first (step 1 of the general procedure): [migration 0042 cannot be undone](#migrations-and-the-backup-to-take-first). Then work through the subsections that apply. Every install needs the backup, and an install with a log collector or alert needs [JSON logs and request ids](#json-logs-and-request-ids). A script that calls `quro doctor --json` or the capabilities endpoint needs [doctor checks and the unknown status](#doctor-checks-and-the-unknown-status) or [capabilities and the setup endpoint](#capabilities-and-the-setup-endpoint). The others need no action from most installs: [text field length limits](#text-field-length-limits), [account export and deletion](#account-export-and-deletion), [background job backoff](#background-job-backoff) and [CSV import](#csv-import).
 
-- **Logs are JSON lines.** The server and the import worker write one JSON object per line with `time`, `level`, `event` and, during a request, `requestId`. The old bracketed text lines are gone. Every response carries an `X-Request-Id` header. Error messages are no longer logged or put into traces: only the error class and its codes. See [Monitor an install](operations.md).
-- **`quro doctor` has more checks and a new status.** New check ids: `jobs.*`, `freshness.*`, `disk.*`, `backup.age` and `documents.references`. A check with `status: "unknown"` has no evidence either way. A stopped core job, a missing referenced document or a nearly full disk fails the run (exit code 1).
-- **New tables for CSV import.** One migration adds `import_profiles`, `csv_imports` and `csv_import_rows` and three nullable columns on `savings_transactions` and `budget_transactions`. No existing value changes and nothing is required. See [import a CSV](csv-import.md).
-- **Failed background jobs back off.** After a failed cycle a job waits a minute, then two, up to its normal interval, instead of retrying at every poll.
+#### Migrations and the backup to take first
+
+What the operator does: take a backup with 0.9.0 before you pull the new images, and keep it until you have checked the upgraded install. Then upgrade as in the general procedure; `quro migrate` applies the three migrations in one transaction.
+
+- `0041_account_deletions` adds the `account_deletions` table, which records account deletions (see [account export and deletion](#account-export-and-deletion)).
+- `0042_drop_write_only_bunq_columns` drops `budget_transactions.bunq_mcc`, `bunq_payment_type` and `counterparty_iban`. Bank sync wrote them and nothing read them, but the values are gone once the migration has run: only the backup holds them. Because the database then has migrations that 0.9.0 does not ship, 0.9.0 refuses to run on it; [restore the backup](#restore-the-snapshot-taken-before-the-upgrade) to go back.
+- `0043_csv_imports` adds the `import_profiles`, `csv_imports` and `csv_import_rows` tables and the nullable columns `import_id`, `import_source` and `external_id` on `savings_transactions` and `budget_transactions`. No existing value changes.
+
+After the upgrade `quro version --json` reports `1.0.0-rc.1`, `0043_csv_imports` and a count of 44, and `quro migrate --status` exits 0.
+
+#### JSON logs and request ids
+
+What the operator does: if a log collector, parser or alert rule reads the server's or the import worker's log lines, change it to read JSON before you upgrade. Nothing else is needed.
+
+The server and the import worker write one JSON object per line with `time`, `level`, `event` and, during a request, `requestId`. The old bracketed text lines are gone. Every response carries an `X-Request-Id` header, and a reverse proxy may supply its own. Error messages are no longer logged or put into traces: only the error class and its codes. See [Monitor an install](operations.md).
+
+#### Doctor checks and the unknown status
+
+What the operator does: if a script or monitor reads `quro doctor`, accept the new status and the new check ids, and expect exit code 1 where it was 0 before. Run `docker compose run --rm migrate doctor` once after the upgrade and fix what it reports.
+
+New check ids are `jobs.<name>`, `freshness.*`, `disk.*`, `backup.age` and `documents.references`. A check with `status: "unknown"` has no evidence either way, such as a job that has not run since the server started or a backup directory the command cannot read; it does not change the exit code. A stopped core background job, a document that a row refers to but the store lacks, or a nearly full disk fails the run (exit code 1). A backup directory that is not mounted into the container the command runs in reports `backup.age` as `unknown`. See [`quro doctor --json`](#quro-doctor---json) and [Monitor an install](operations.md).
+
+#### Capabilities and the setup endpoint
+
+What the operator does: nothing, unless a script or client of your own calls these endpoints.
+
+- `GET /api/capabilities` no longer has an `ai` key. It duplicated `pensionStatementImport`; read that instead. The result has `pensionStatementImport`, `bunq` and `documents`.
+- Each capability has a `lifecycle` field, `stable` or `experimental`. Statement import is `experimental`: it may change or go in a minor release.
+- New `GET /api/dashboard/setup` returns `{ "data": { "hasAccount": boolean, "hasTransaction": boolean } }` for the signed-in household (its own rows plus an accepted partner's joint rows). The web app uses it to show the getting started card.
+
+#### Text field length limits
+
+What the operator does: nothing, unless a script or import of your own writes long text through the API.
+
+Create and update requests answer `400` with `<field> must be at most N characters` for text over its limit: names, labels, providers, lenders and locations 100 characters, descriptions and transaction notes 500, debt, pension and goal notes 2000, emails 254 and uploaded document file names 255. A row that already holds a longer value still displays, exports and restores, and an edit is accepted while that field is left unchanged. Bank sync and the importers are not bounded. No migration. The full table is in [text limits](text-limits.md).
+
+#### Account export and deletion
+
+What the operator does: nothing is required. Know that every account can now download its data and delete itself, and that a deletion does not reach your backups.
+
+- `GET /api/settings/export` streams a ZIP of the account's data; `GET` and `DELETE /api/settings/account` preview and perform the deletion, which needs the password and the email address. Both are in **Settings → Your data**. See [data export and deletion](data-export-and-deletion.md).
+- If the document store refuses to delete a file, the account is still deleted and the keys stay on the `account_deletions` row. Retry them with `docker compose exec backend quro documents retry-deleted`; it exits 0 when none are pending and 1 when some still fail.
+- Backups taken before a deletion still hold the account, and a restore brings it back. Delete those archives if the person must be gone from every copy.
+
+#### CSV import
+
+What the operator does: nothing. The import needs no setting. The tables come with migration `0043` (see [migrations](#migrations-and-the-backup-to-take-first)); [import a CSV](csv-import.md) describes the flow for users.
+
+#### Background job backoff
+
+What the operator does: nothing.
+
+After a failed cycle a background job waits a minute, then two, doubling up to its normal interval, instead of retrying at every poll. `quro doctor` shows a job that keeps failing.
