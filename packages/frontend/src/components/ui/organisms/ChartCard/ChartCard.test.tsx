@@ -37,6 +37,18 @@ describe('buildChartAlternative', () => {
     expect(summary).toContain('1 of 4 entries are estimated');
   });
 
+  test('names the series in the summary only when there are several', () => {
+    expect(build().summary).not.toContain('Value:');
+    const two = build({
+      columns: [
+        { label: 'Value', value: (row) => row.value, format: money },
+        { label: 'Other', value: (row) => row.value, format: money },
+      ],
+    });
+    expect(two.summary).toContain('Value: latest');
+    expect(two.summary).toContain('Other: latest');
+  });
+
   test('keeps negative, missing and estimated rows in the table instead of zeroing them', () => {
     const table = build();
     expect(table.columns.map((column) => column.label)).toEqual(['Month', 'Value', 'Status']);

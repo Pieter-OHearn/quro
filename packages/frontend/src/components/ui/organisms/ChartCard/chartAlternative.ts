@@ -53,11 +53,13 @@ function describeColumn<T>(
   rows: readonly T[],
   x: (row: T) => string,
   ordered: boolean,
+  named: boolean,
 ): string {
+  const lead = named ? `${column.label}: ` : '';
   const plotted = rows
     .map((row) => ({ at: x(row), value: column.value(row) }))
     .filter((point): point is { at: string; value: number } => isPlotted(point.value));
-  if (plotted.length === 0) return `${column.label}: no values.`;
+  if (plotted.length === 0) return `${lead}no values.`;
   let low = plotted[0];
   let high = plotted[0];
   for (const point of plotted) {
@@ -70,7 +72,7 @@ function describeColumn<T>(
   parts.push(`highest ${column.format(high.value)} at ${high.at}`);
   const missing = rows.length - plotted.length;
   if (missing > 0) parts.push(`${missing} without a value`);
-  return `${column.label}: ${parts.join(', ')}.`;
+  return `${lead}${parts.join(', ')}.`;
 }
 
 function buildRows<T>(
@@ -105,7 +107,7 @@ function buildSummary<T>(options: BuildOptions<T>, estimatedCount: number): stri
     ordered && rows.length > 1 ? ` from ${x(rows[0])} to ${x(rows[rows.length - 1])}` : '';
   return [
     `${subject}: ${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}${span}.`,
-    ...columns.map((column) => describeColumn(column, rows, x, ordered)),
+    ...columns.map((column) => describeColumn(column, rows, x, ordered, columns.length > 1)),
     estimatedCount > 0
       ? `${estimatedCount} of ${rows.length} entries are estimated from fallback prices or rates.`
       : '',
