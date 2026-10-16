@@ -32,9 +32,9 @@ export function ChartDataTable({ alternative }: Readonly<{ alternative: ChartAlt
           </caption>
           <thead className="sticky top-0 bg-surface">
             <tr className="border-b border-border-default">
-              {alternative.columns.map((column) => (
+              {alternative.columns.map((column, index) => (
                 <th
-                  key={column.label}
+                  key={`${index}-${column.label}`}
                   scope="col"
                   className={cn(
                     'h-7 whitespace-nowrap px-2 text-caption font-medium text-fg-muted',
@@ -54,7 +54,7 @@ export function ChartDataTable({ alternative }: Readonly<{ alternative: ChartAlt
                   const content = cell === '' ? <span className="sr-only">Actual</span> : cell;
                   return index === 0 ? (
                     <th
-                      key={column.label}
+                      key={`${index}-${column.label}`}
                       scope="row"
                       className="h-7 whitespace-nowrap px-2 text-left font-normal text-fg"
                     >
@@ -62,7 +62,7 @@ export function ChartDataTable({ alternative }: Readonly<{ alternative: ChartAlt
                     </th>
                   ) : (
                     <td
-                      key={column.label}
+                      key={`${index}-${column.label}`}
                       className={cn(
                         'h-7 whitespace-nowrap px-2 text-fg',
                         column.align === 'right' ? 'text-right font-numeric' : 'text-left',
