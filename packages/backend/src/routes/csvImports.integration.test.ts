@@ -12,7 +12,12 @@ import {
 } from '../db/schema';
 import { invalidateCurrentCurrencyRateCache } from '../lib/currencyRateSync';
 import { FIXTURE_RATES_TO_EUR, useFixtureCurrencyRates } from '../test/currencyRates';
-import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
+import {
+  createIntegrationHelpers,
+  insertPartnerLink,
+  integrationPassword,
+  type AuthSession,
+} from '../test/integration';
 
 // Reviewed CSV import: dry-run preview without writes, staging of approved rows, bounded commit
 // batches, idempotent re-runs, cancellation, concurrency, reconciliation and ownership.
@@ -853,5 +858,33 @@ describe('row listing', () => {
     expect(rows.map((r) => r.status)).toEqual(['committed', 'committed', 'committed']);
     const ids = (await transactionsOf(account.id)).map((r) => r.id).sort();
     expect(rows.map((r) => r.transactionId).sort()).toEqual(ids);
+  });
+});
+
+describe('account deletion', () => {
+  test('a partner who imported into a joint account leaves the rows with the owner, and the owner can leave too', async () => {
+    const joint = await createAccount(owner, { isJoint: true });
+    const csv = csvOf([['2026-04-02', '-7.00', 'Shared groceries']]);
+    const staged = await stage(joint.id, csv, {}, partner);
+    await commitAll(staged.id, partner);
+
+    const leave = (session: AuthSession) =>
+      call(session, 'DELETE', '/api/settings/account', {
+        password: integrationPassword,
+        confirmEmail: session.user.email,
+      });
+    expect((await leave(partner)).status).toBe(200);
+    const [kept] = await transactionsOf(joint.id);
+    expect(kept).toMatchObject({
+      userId: owner.user.id,
+      importId: null,
+      importSource: 'Synthetic bank',
+    });
+    // The same source and id cannot be written twice for the account, even after the hand-over.
+    expect((await preview(joint.id, csv)).summary.duplicate).toBe(1);
+
+    expect((await leave(owner)).status).toBe(200);
+    expect(await db.$count(csvImports, eq(csvImports.userId, owner.user.id))).toBe(0);
+    expect(await transactionsOf(joint.id)).toHaveLength(0);
   });
 });
