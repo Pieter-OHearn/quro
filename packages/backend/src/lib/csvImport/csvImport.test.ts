@@ -4,6 +4,8 @@ import { analyzeCsv, ImportInputError } from './analyze';
 import {
   cleanText,
   deriveExternalIds,
+  guessDecimalSeparator,
+  suggestColumns,
   parseCsvAmount,
   parseDateWithFormat,
   parseImportMapping,
@@ -336,5 +338,33 @@ describe('analyzeCsv', () => {
       accountCurrency: 'EUR',
     });
     expect(analysis.rows.map((r) => r.status)).toEqual(['ready', 'duplicate']);
+  });
+});
+
+describe('column suggestions', () => {
+  test('guesses columns from English and Dutch headers, matching short words only exactly', () => {
+    expect(
+      suggestColumns(['Datum', 'Omschrijving', 'Af', 'Bij', 'Saldo', 'Affiliate', 'Valuta']),
+    ).toEqual({
+      date: 'Datum',
+      description: 'Omschrijving',
+      debit: 'Af',
+      credit: 'Bij',
+      balance: 'Saldo',
+      currency: 'Valuta',
+    });
+    expect(suggestColumns(['Booking Date', 'Amount', 'Transaction ID', 'Memo'])).toEqual({
+      date: 'Booking Date',
+      amount: 'Amount',
+      externalId: 'Transaction ID',
+      description: 'Memo',
+    });
+  });
+
+  test('reads the decimal separator from amounts that show one', () => {
+    expect(guessDecimalSeparator(['54,30', '2,40', ''])).toBe(',');
+    expect(guessDecimalSeparator(['54.30', '1,500.00'])).toBe('.');
+    expect(guessDecimalSeparator(['54', '12'])).toBeNull();
+    expect(guessDecimalSeparator(['1,5', '2.50'])).toBeNull();
   });
 });

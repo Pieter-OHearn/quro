@@ -55,7 +55,9 @@ function startingDraft(
   saved: CsvImportProfile | undefined,
 ): MappingDraft {
   const base = emptyDraft(currency);
-  return saved ? draftFromProfile(base, saved) : draftFromSuggestion(base, described.suggestion);
+  if (saved) return draftFromProfile(base, saved);
+  const guessed = draftFromSuggestion(base, described.suggestion);
+  return { ...guessed, decimalSeparator: described.decimalSeparator ?? guessed.decimalSeparator };
 }
 
 /** The state and actions of the import dialog: file, mapping, review, run. */

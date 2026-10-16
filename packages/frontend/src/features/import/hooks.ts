@@ -16,6 +16,8 @@ import { useDomainMutation } from '@/lib/useDomainMutation';
 export type CsvDescription = {
   headers: string[];
   delimiter: string;
+  /** The separator the amounts seem to use, when the file shows one. */
+  decimalSeparator: '.' | ',' | null;
   rowCount: number;
   sample: string[][];
   suggestion: Partial<CsvColumnMapping>;

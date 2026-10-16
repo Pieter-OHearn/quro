@@ -30,7 +30,7 @@ import { findAccessible } from '../access';
 import { budgetRateToEur } from '../budgetCurrency';
 import { lockLedgerParents, withLedgerWrite } from '../ledgerWrite';
 import { toSignedSavingsAmount, updateSavingsAccountBalanceByDelta } from '../savingsBalance';
-import { suggestColumns } from './normalize';
+import { guessDecimalSeparator, suggestColumns } from './normalize';
 import { CsvFormatError, parseCsv } from './parse';
 import {
   analyzeCsv,
@@ -52,12 +52,20 @@ export function describeCsv(csv: string, delimiter: CsvDelimiter) {
     if (error instanceof CsvFormatError) throw new ImportInputError(error.message);
     throw error;
   }
+  const suggestion = suggestColumns(parsed.headers);
+  const amountColumns = [suggestion.amount, suggestion.debit, suggestion.credit]
+    .map((header) => (header === undefined ? -1 : parsed.headers.indexOf(header)))
+    .filter((index) => index >= 0);
+  const amountCells = parsed.records.flatMap((record) =>
+    amountColumns.map((index) => record.cells[index] ?? ''),
+  );
   return {
     headers: parsed.headers,
     delimiter: parsed.delimiter,
+    decimalSeparator: guessDecimalSeparator(amountCells),
     rowCount: parsed.records.length,
     sample: parsed.records.slice(0, SAMPLE_ROWS).map((record) => record.cells),
-    suggestion: suggestColumns(parsed.headers),
+    suggestion,
   };
 }
 

@@ -8,6 +8,7 @@ import {
   toCents,
   type CsvColumnMapping,
   type CsvDateFormat,
+  type CsvDecimalSeparator,
   type CsvImportKind,
   type CsvImportMapping,
   type CurrencyCode,
@@ -510,8 +511,8 @@ export function deriveExternalIds(rows: readonly NormalizedRow[]): string[] {
 const COLUMN_KEYWORDS: Partial<Record<keyof CsvColumnMapping, readonly string[]>> = {
   date: ['date', 'datum'],
   amount: ['amount', 'bedrag'],
-  debit: ['debit', 'withdrawal', 'money out'],
-  credit: ['credit', 'deposit', 'money in'],
+  debit: ['debit', 'withdrawal', 'money out', '=af'],
+  credit: ['credit', 'deposit', 'money in', '=bij'],
   description: ['description', 'omschrijving', 'memo', 'details', 'narrative', 'payee'],
   currency: ['currency', 'valuta'],
   externalId: ['transaction id', 'reference', 'referentie', 'id'],
@@ -519,6 +520,27 @@ const COLUMN_KEYWORDS: Partial<Record<keyof CsvColumnMapping, readonly string[]>
   category: ['category', 'categorie'],
   merchant: ['merchant', 'counterparty', 'name'],
 };
+
+// A keyword starting with `=` must equal the whole header, so short words such as "af" do not
+// match every header that contains them.
+function matchesKeyword(header: string, keywords: readonly string[]): boolean {
+  const name = header.trim().toLowerCase();
+  return keywords.some((word) =>
+    word.startsWith('=') ? name === word.slice(1) : name.includes(word),
+  );
+}
+
+/**
+ * The decimal separator the amounts in `cells` use, when they show one: a comma before one or
+ * two final digits and no dot there means `,`; the reverse means `.`. Anything else is left to
+ * the person (`null`).
+ */
+export function guessDecimalSeparator(cells: readonly string[]): CsvDecimalSeparator | null {
+  const comma = cells.some((cell) => /,\d{1,2}\s*$/.test(cell));
+  const dot = cells.some((cell) => /\.\d{1,2}\s*$/.test(cell));
+  if (comma === dot) return null;
+  return comma ? ',' : '.';
+}
 
 /**
  * A first guess at the column mapping from the header names: for each field the first header
@@ -531,10 +553,7 @@ export function suggestColumns(headers: readonly string[]): Partial<CsvColumnMap
     keyof CsvColumnMapping,
     readonly string[],
   ][]) {
-    const match = headers.find(
-      (header) =>
-        !taken.has(header) && keywords.some((word) => header.toLowerCase().includes(word)),
-    );
+    const match = headers.find((header) => !taken.has(header) && matchesKeyword(header, keywords));
     if (match !== undefined) {
       suggestion[field] = match;
       taken.add(match);
