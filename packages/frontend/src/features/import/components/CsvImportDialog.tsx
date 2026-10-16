@@ -33,6 +33,7 @@ export function CsvImportDialog({ kind, account, onClose }: Readonly<Props>) {
       title={`Import a CSV · ${TITLES[step]}`}
       subtitle={subtitle}
       maxWidth="3xl"
+      scrollable
       onClose={running ? () => undefined : onClose}
       footer={<DialogFooter flow={flow} onClose={onClose} />}
     >
@@ -93,7 +94,7 @@ type BodyProps = {
 function DialogBody({ flow, kind, currency }: Readonly<BodyProps>) {
   const { step, preview, run } = flow;
   return (
-    <div className="space-y-3 p-4">
+    <div className="space-y-3">
       {flow.error ? (
         <p role="alert" className="text-cell text-danger">
           {flow.error}
