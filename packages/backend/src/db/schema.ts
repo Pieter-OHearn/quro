@@ -17,6 +17,7 @@ import {
 import { sql } from 'drizzle-orm';
 import {
   CURRENCY_CODES,
+  type CsvImportMapping,
   MAX_RETIREMENT_AGE,
   MAX_USER_AGE,
   MIN_RETIREMENT_AGE,
@@ -425,9 +426,21 @@ export const savingsTransactions = pgTable(
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
     bunqTransactionId: text('bunq_transaction_id'),
+    // Rows that came from a reviewed file import: the batch, the source it names and the row's
+    // key in that source. Rows entered by hand or synced have none.
+    importId: integer('import_id').references((): AnyPgColumn => csvImports.id, {
+      onDelete: 'set null',
+    }),
+    importSource: text('import_source'),
+    externalId: text('external_id'),
   },
   (table) => ({
     userIdx: index('savings_transactions_user_id_idx').on(table.userId),
+    importKeyUnique: uniqueIndex('savings_transactions_import_key_unique').on(
+      table.accountId,
+      table.importSource,
+      table.externalId,
+    ),
     accountIdx: index('savings_transactions_account_id_idx').on(table.accountId),
     userDateIdx: index('savings_transactions_user_date_idx').on(table.userId, table.date),
     bunqTransactionUnique: uniqueIndex('savings_transactions_user_bunq_transaction_id_unique').on(
@@ -1022,14 +1035,119 @@ export const budgetTransactions = pgTable(
     sourceAccountId: text('source_account_id'),
     sourceAccountName: text('source_account_name'),
     sourceAccountType: text('source_account_type'),
+    importId: integer('import_id').references((): AnyPgColumn => csvImports.id, {
+      onDelete: 'set null',
+    }),
+    importSource: text('import_source'),
+    externalId: text('external_id'),
   },
   (table) => ({
+    importKeyUnique: uniqueIndex('budget_transactions_import_key_unique').on(
+      table.userId,
+      table.importSource,
+      table.externalId,
+    ),
     currencyEur: check('budget_transactions_currency_eur', sql`${table.currency} = 'EUR'`),
     userIdx: index('budget_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('budget_transactions_user_date_idx').on(table.userId, table.date),
     bunqTransactionUnique: uniqueIndex('budget_transactions_user_bunq_transaction_id_unique').on(
       table.userId,
       table.bunqTransactionId,
+    ),
+  }),
+);
+
+// ── CSV imports ──────────────────────────────────────────────────────────────
+
+// A saved column mapping per source, so the next file from the same bank needs no mapping.
+export const importProfiles = pgTable(
+  'import_profiles',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    kind: text('kind').notNull(), // savings | budget
+    source: text('source').notNull(),
+    mapping: jsonb('mapping').$type<CsvImportMapping>().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    kindCheck: check('import_profiles_kind_check', sql`${table.kind} in ('savings', 'budget')`),
+    userKindSourceUnique: uniqueIndex('import_profiles_user_kind_source_unique').on(
+      table.userId,
+      table.kind,
+      table.source,
+    ),
+  }),
+);
+
+// One reviewed file import: the rows the user approved are staged here, then written to the
+// ledger in bounded batches. `userId` is whoever imported; a joint account's partner may import
+// into it, and the ledger rows belong to the account's owner as for any manual entry.
+export const csvImports = pgTable(
+  'csv_imports',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id)
+      .notNull(),
+    kind: text('kind').notNull(), // savings | budget
+    accountId: integer('account_id').references(() => savingsAccounts.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    fileName: text('file_name'),
+    fileSha256: text('file_sha256').notNull(),
+    mapping: jsonb('mapping').$type<CsvImportMapping>().notNull(),
+    status: text('status').notNull().default('staged'), // staged | committed | cancelled
+    closingBalance: numericAsNumber('closing_balance', { precision: 19, scale: 2 }),
+    closingDate: date('closing_date', { mode: 'string' }),
+    closingOrigin: text('closing_origin'), // column | entered
+    closingRowNumber: integer('closing_row_number'),
+    adjustmentTransactionId: integer('adjustment_transaction_id'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    committedAt: timestamp('committed_at'),
+  },
+  (table) => ({
+    userIdx: index('csv_imports_user_id_idx').on(table.userId),
+    accountIdx: index('csv_imports_account_id_idx').on(table.accountId),
+    kindCheck: check('csv_imports_kind_check', sql`${table.kind} in ('savings', 'budget')`),
+    statusCheck: check(
+      'csv_imports_status_check',
+      sql`${table.status} in ('staged', 'committed', 'cancelled')`,
+    ),
+  }),
+);
+
+export const csvImportRows = pgTable(
+  'csv_import_rows',
+  {
+    id: serial('id').primaryKey(),
+    importId: integer('import_id')
+      .references(() => csvImports.id, { onDelete: 'cascade' })
+      .notNull(),
+    rowNumber: integer('row_number').notNull(),
+    status: text('status').notNull().default('pending'), // pending | committed | duplicate | failed
+    externalId: text('external_id').notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
+    // Signed, in the row's own currency.
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
+    currency: currencyCodeEnum('currency').notNull(),
+    description: text('description').notNull(),
+    merchant: text('merchant'),
+    categoryName: text('category_name'),
+    error: text('error'),
+    // The ledger row written for this row. No foreign key: the ledger row may be deleted later.
+    transactionId: integer('transaction_id'),
+  },
+  (table) => ({
+    importRowUnique: uniqueIndex('csv_import_rows_import_row_unique').on(
+      table.importId,
+      table.rowNumber,
+    ),
+    importStatusIdx: index('csv_import_rows_import_status_idx').on(table.importId, table.status),
+    statusCheck: check(
+      'csv_import_rows_status_check',
+      sql`${table.status} in ('pending', 'committed', 'duplicate', 'failed')`,
     ),
   }),
 );

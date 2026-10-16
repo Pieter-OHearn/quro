@@ -302,6 +302,13 @@
       "when": 1792160835036,
       "tag": "0042_drop_write_only_bunq_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792163425244,
+      "tag": "0043_csv_imports",
+      "breakpoints": true
     }
   ]
 }
