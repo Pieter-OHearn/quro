@@ -174,7 +174,7 @@ function QueuedCancelConfirm({
           </p>
         </div>
       </ImportNotice>
-      <div className="flex justify-end gap-2 max-sm:flex-col max-sm:*:w-full">
+      <div className="flex justify-end gap-2 max-sm:flex-wrap max-sm:*:h-11 max-sm:*:min-w-[calc(50%-0.25rem)] max-sm:*:flex-1">
         <Button variant="secondary" onClick={() => onSetConfirmMode('none')}>
           Keep running
         </Button>

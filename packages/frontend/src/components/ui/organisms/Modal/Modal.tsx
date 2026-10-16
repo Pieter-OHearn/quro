@@ -1,8 +1,8 @@
 import { X } from 'lucide-react';
-import { useId, useRef } from 'react';
+import { useId, useRef, type CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '../../atoms';
-import { useFocusTrap } from '../../hooks';
+import { useFocusTrap, useVisualViewport, type VisualViewportBox } from '../../hooks';
 import { useExitTransition } from './useExitTransition';
 
 export type ModalHeaderProps = {
@@ -70,11 +70,13 @@ const PANEL_CLASS_NAME = cn(
   'relative w-full overflow-hidden rounded-lg border border-border-default bg-surface shadow-overlay',
   'transition-[opacity,translate] duration-base ease-standard starting:opacity-0 data-closing:opacity-0',
   'motion-safe:max-sm:starting:translate-y-full motion-safe:max-sm:data-closing:translate-y-full',
-  'max-sm:max-h-[calc(100dvh-1rem)] max-sm:max-w-none max-sm:rounded-b-none max-sm:rounded-t-xl max-sm:border-x-0 max-sm:border-b-0',
+  'max-sm:max-h-[calc(100%-0.5rem)] max-sm:max-w-none max-sm:rounded-b-none max-sm:rounded-t-xl max-sm:border-x-0 max-sm:border-b-0',
 );
-// Footer actions sit at the end on desktop and stack full width, 44px high, on phones.
+// Footer actions sit at the end on desktop. On phones they share one 44px row, so the sticky bar
+// stays short enough to leave room for fields above a virtual keyboard; a danger action takes a
+// row of its own above them.
 const FOOTER_CLASS_NAME =
-  'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:sticky max-sm:bottom-0 max-sm:flex-col max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:w-full max-sm:*:flex-none';
+  'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:sticky max-sm:bottom-0 max-sm:flex-wrap max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:min-w-[calc(50%-0.25rem)] max-sm:*:flex-1';
 
 export function ModalHeader({
   title,
@@ -148,6 +150,10 @@ function dialogNameProps(hasCustomHeader: boolean, title: React.ReactNode, title
   return { 'aria-label': typeof title === 'string' ? title : 'Dialog' };
 }
 
+function keyboardOverlayStyle(box: VisualViewportBox | null): CSSProperties | undefined {
+  return box ? { top: box.top, bottom: 'auto', height: box.height } : undefined;
+}
+
 export function Modal({
   title,
   subtitle,
@@ -168,10 +174,13 @@ export function Modal({
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap({ containerRef: dialogRef, active: open, onEscape: onClose });
   useExitTransition({ panelRef: dialogRef, open, onExited });
+  // While a virtual keyboard covers the page the overlay is sized to what is still visible.
+  const visibleBox = useVisualViewport(open);
 
   return (
     <div
       inert={!open}
+      style={keyboardOverlayStyle(visibleBox)}
       className="fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-clip p-4 max-sm:items-end max-sm:px-0 max-sm:pb-0"
     >
       <div
@@ -237,7 +246,11 @@ export function ModalFooter({
 }: ModalFooterProps) {
   return (
     <>
-      {danger ? <div className="mr-auto flex max-sm:mr-0">{danger}</div> : null}
+      {danger ? (
+        <div className="mr-auto flex max-sm:order-first max-sm:mr-0 max-sm:basis-full max-sm:*:flex-1">
+          {danger}
+        </div>
+      ) : null}
       <Button onClick={onCancel} variant="secondary">
         {cancelLabel}
       </Button>
