@@ -44,6 +44,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
     bunqConnections: 1,
     bunqOauthAttempts: 1,
     bunqPaymentProgress: 1,
+    oidcIdentities: 1,
     sessions: 1,
     table: 1,
   },

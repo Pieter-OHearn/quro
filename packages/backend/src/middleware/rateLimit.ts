@@ -116,12 +116,16 @@ const ONE_MINUTE_MS = 60_000;
 const FIFTEEN_MINUTES_MS = 15 * ONE_MINUTE_MS;
 const SIGNIN_MAX_ATTEMPTS = 5;
 const SIGNUP_MAX_ATTEMPTS = 3;
+const OIDC_MAX_REQUESTS = 20;
 const CHANGE_PASSWORD_MAX_ATTEMPTS = 5;
 const PASSWORD_RESET_MAX_ATTEMPTS = 5;
 const SIGNIN_EMAIL_MAX_ATTEMPTS = 5;
 const PARTNER_INVITE_MAX_ATTEMPTS = 10;
 
 export const signinRateLimit = createRateLimiter(ONE_MINUTE_MS, SIGNIN_MAX_ATTEMPTS);
+// Both single sign-on routes only redirect; this stops a client from making the backend call the
+// provider in a loop. The routes are browser navigations, so they answer a refusal themselves.
+export const oidcRateLimited = createRateLimitChecker(ONE_MINUTE_MS, OIDC_MAX_REQUESTS);
 export const signupRateLimit = createRateLimiter(FIFTEEN_MINUTES_MS, SIGNUP_MAX_ATTEMPTS);
 // This complements the IP limiter so rotating source addresses cannot bypass the attempt budget
 // for one account. Sign-in reserves an attempt before checking the password and refunds it only

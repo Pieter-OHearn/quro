@@ -10,6 +10,7 @@ const { storedDocuments } = providers;
 
 const { createApp } = await import('../app');
 const { clearBunqTestEnv, setBunqTestEnv } = await import('../test/bunq');
+const { applyTestSettings } = await import('../test/config');
 const { PUBLIC_PATHS } = await import('../lib/publicPaths');
 const { WORLD_EMAIL_DOMAIN, createWorld, destroyWorld, nonexistentRows, seedRows, snapshotWorld } =
   await import('../test/accessWorld');
@@ -151,14 +152,24 @@ function describeFailure(parts: string[]): string {
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 
+let restoreOidc: () => void = () => {};
+
 beforeAll(async () => {
   // Bank routes are mounted only while the integration is configured; the matrix covers them.
   setBunqTestEnv();
+  // Single sign-on routes are mounted only while a provider is configured.
+  restoreOidc = applyTestSettings({
+    OIDC_ISSUER: 'https://auth.example.test',
+    OIDC_CLIENT_ID: 'quro',
+    OIDC_CLIENT_SECRET: 'synthetic',
+    OIDC_REDIRECT_URI: 'https://quro.example.test/api/auth/oidc/callback',
+  });
   await useFixtureCurrencyRates('access-matrix');
   world = await createWorld((key, bytes) => storedDocuments.set(key, bytes));
 });
 
 afterAll(async () => {
+  restoreOidc();
   clearBunqTestEnv();
   await providers.restore();
   await destroyWorld(createIntegrationHelpers(WORLD_EMAIL_DOMAIN));
@@ -193,6 +204,8 @@ describe('route inventory', () => {
   test('the public paths are exactly the documented ones', () => {
     expect([...PUBLIC_PATHS].sort()).toEqual([
       '/api/auth/me',
+      '/api/auth/oidc/callback',
+      '/api/auth/oidc/login',
       '/api/auth/password-reset',
       '/api/auth/registration',
       '/api/auth/signin',

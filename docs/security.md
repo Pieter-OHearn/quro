@@ -196,6 +196,17 @@ holding a valid code learns that an address is already registered, and the code 
 `open` mode sign-up reveals it. Quro keeps that message because the household is small and the
 person signing up needs to know why it failed; the sign-up rate limit bounds probing.
 
+## Single sign-on
+
+With the `OIDC_*` settings ([configuration](configuration.md#single-sign-on)) the sign-in form also offers a provider. Without them there are no `/api/auth/oidc` routes. Password sign-in stays on either way: it is the way in when the provider is down, and the operator's recovery path.
+
+- **The flow.** The authorization code flow with PKCE (`S256`), a `state` and a `nonce`. `GET /api/auth/oidc/login` records the attempt and redirects to the provider; `GET /api/auth/oidc/callback` finishes it. Both routes redirect the browser, even when they refuse it, and are public GETs (CSRF-exempt) with a rate limit.
+- **One browser, one use.** The attempt is stored in `oidc_login_attempts` for 10 minutes. The browser keeps a random token in an HTTP-only `oidc_attempt` cookie scoped to `/api/auth/oidc`, and the table holds only its SHA-256 digest. A callback needs the cookie and the matching `state`, and takes the attempt in one `DELETE`, so a replayed callback, another browser or a link someone else started signs nobody in.
+- **What is checked.** The ID token comes from the token endpoint over TLS, so Quro checks its issuer, audience (and `azp` for several), expiry and nonce but not its signature, as OpenID Connect Core 3.1.3.7 allows. Quro reads the email address and name from the userinfo endpoint and requires its `sub` to equal the ID token's. The discovery document must name the configured issuer, and its endpoints must be `https` (`http` on localhost only).
+- **Which account.** A provider sign-in never creates an account, so the operator's invitations still decide who can use Quro. The first sign-in of a person links their provider subject to the account with the same email address, and only if the provider marks that address verified. Quro does not verify the email address of its own accounts, so in `open` registration mode, where anyone can register any address, linking by email is refused; a person who is already linked still signs in. Linking also ends the account's other sessions. Later sign-ins match the subject, so a changed email does not matter. An account can link one identity per provider; a second subject for it is refused. `oidc_identities` holds the link and is deleted with the account.
+- **Sessions.** The result is a normal Quro session (see [Sessions](#sessions)). Signing out of Quro does not sign out of the provider, and ending the provider's session or removing the person there does not end a Quro session. Revoke a session in **Settings → Security**, or reset the account's password, which signs out all sessions.
+- **Logs.** A refused sign-in logs `oidc.sign_in_refused` with the reason and, for a provider failure, the step that failed. Tokens, codes and profile data are never logged.
+
 ## Sessions
 
 - Session tokens are 256 random bits. The `sessions` table stores only their SHA-256 digest, so a
