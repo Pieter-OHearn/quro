@@ -36,6 +36,9 @@ any user appears in more than one link, it aborts with the user and link IDs and
 other data. Resolve those rows by hand and re-run the migration; it never repairs
 them automatically.
 
+`partner_links.responded_at` records when the addressee accepted. It is an audit field:
+nothing reads it, and it stays in the schema and in backups.
+
 ## Property debt
 
 `getPropertyDebt` resolves an active linked mortgage's outstanding balance. The

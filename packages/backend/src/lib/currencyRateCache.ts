@@ -124,14 +124,6 @@ function selectHistoricalRate(
   return { row: selectedRow, isEstimated: historicalRow === null };
 }
 
-export function buildRatesToBaseCurrencyAt(
-  rows: readonly HistoricalCurrencyRateRow[],
-  asOfDate: string,
-  baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
-): HistoricalRatesToBaseCurrency {
-  return createHistoricalRateResolver(rows, baseCurrency)(asOfDate);
-}
-
 // Group and sort once for all month lookups in a request.
 export function createHistoricalRateResolver(
   rows: readonly HistoricalCurrencyRateRow[],

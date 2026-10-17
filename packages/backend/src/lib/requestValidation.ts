@@ -187,11 +187,6 @@ export function parseOptionalIntegerField(
   return parsed === null || parsed < min || parsed > max ? err(error) : ok(parsed);
 }
 
-export function parsePositiveNumberField(value: unknown, error: string): ParseResult<number> {
-  const parsed = parseNumber(value);
-  return parsed === null || parsed <= 0 ? err(error) : ok(parsed);
-}
-
 export function parseOptionalDateField(value: unknown, error: string): ParseResult<string | null> {
   if (value == null || value === '') return ok(null);
   const parsed = parseDateString(value);

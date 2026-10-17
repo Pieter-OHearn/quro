@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   buildRatesToBaseCurrency,
-  buildRatesToBaseCurrencyAt,
+  createHistoricalRateResolver,
   convertToBaseCurrency,
   CurrencyRatesUnavailableError,
 } from './currencyRateCache';
@@ -62,14 +62,14 @@ describe('currency rate cache', () => {
   });
 
   test('selects the last historical rate at or before the cutoff', () => {
-    const result = buildRatesToBaseCurrencyAt(historicalRows, '2026-05-01');
+    const result = createHistoricalRateResolver(historicalRows)('2026-05-01');
 
     expect(result.rates.get('GBP')).toBeCloseTo(1.08);
     expect(result.isEstimated).toBe(false);
   });
 
   test('falls back to the latest rate and marks pre-history values as estimated', () => {
-    const result = buildRatesToBaseCurrencyAt(historicalRows, '2026-01-31');
+    const result = createHistoricalRateResolver(historicalRows)('2026-01-31');
 
     expect(result.rates.get('GBP')).toBe(1.18);
     expect(result.isEstimated).toBe(true);
@@ -82,6 +82,6 @@ describe('currency rate cache', () => {
         : row,
     );
 
-    expect(buildRatesToBaseCurrencyAt(rows, '2026-05-01').isEstimated).toBe(true);
+    expect(createHistoricalRateResolver(rows)('2026-05-01').isEstimated).toBe(true);
   });
 });

@@ -234,6 +234,7 @@ export const partnerLinks = pgTable(
       .notNull(),
     status: partnerLinkStatusEnum('status').notNull().default('pending'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    // Audit field: when the addressee accepted. Written on accept, read by no API or screen.
     respondedAt: timestamp('responded_at'),
   },
   (table) => ({
@@ -1234,6 +1235,8 @@ export const netWorthSnapshots = pgTable(
     liabilities: numericAsNumber('liabilities', { precision: 19, scale: 2 }).notNull(),
     totalValue: numericAsNumber('total_value', { precision: 19, scale: 2 }).notNull(),
     isEstimated: boolean('is_estimated').notNull().default(false),
+    // Audit field: when the snapshot row was last computed. Written on every upsert, read by no API
+    // or screen; the snapshot's own date is `snapshotDate`.
     computedAt: timestamp('computed_at').defaultNow().notNull(),
   },
   (table) => ({

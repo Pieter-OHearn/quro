@@ -24,6 +24,7 @@ run applicable checks before opening a PR and report commands, results and skipp
 | `bun run format:check`                      | Repository Prettier check; format only files you changed                                                                 |
 | `bun run docs:check`                        | Markdown links and anchors, repository paths, `bun run` script names and config variables; offline                       |
 | `bun run lint`                              | TypeScript/JS lint                                                                                                       |
+| `bun run dead-code`                         | Unused files, dependencies and exports (knip); offline, config in `knip.json`                                            |
 | `bun run typecheck`                         | Shared, frontend, backend and scripts                                                                                    |
 | `bun run test`                              | Shared/script, backend unit/integration and frontend Bun tests; isolated migrated PostgreSQL required                    |
 | `bun run test:ui`                           | Frontend Bun tests, including static shared UI markup; no browser or DB                                                  |

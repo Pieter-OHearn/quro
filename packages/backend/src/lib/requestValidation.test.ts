@@ -30,7 +30,6 @@ import {
   parseOptionalTextField,
   parseOptionalUnitPriceField,
   parsePatchFields,
-  parsePositiveNumberField,
   parseRequiredFields,
   parseString,
   parseTextField,
@@ -175,9 +174,7 @@ describe('object field parsing', () => {
 });
 
 describe('shared helpers', () => {
-  test('parses positive numbers and optional dates', () => {
-    expect(parsePositiveNumberField('2.5', 'bad')).toEqual(ok(2.5));
-    expect(parsePositiveNumberField(0, 'bad')).toEqual(err('bad'));
+  test('parses optional dates', () => {
     expect(parseOptionalDateField('', 'bad')).toEqual(ok(null));
     expect(parseOptionalDateField('2024-02-29', 'bad')).toEqual(ok('2024-02-29'));
     expect(parseOptionalDateField('2023-02-29', 'bad')).toEqual(err('bad'));

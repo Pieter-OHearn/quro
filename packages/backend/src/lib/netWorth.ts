@@ -150,16 +150,6 @@ export function earliestDate(left: string, right: string): string {
 
 export type HistoricalHoldingPrice = { eodDate: string; closePrice: unknown };
 
-export function resolveHistoricalHoldingPrice(
-  rows: readonly HistoricalHoldingPrice[],
-  cutoffDate: string,
-): number | null {
-  return resolvePreparedHoldingPrice(
-    [...rows].sort((left, right) => left.eodDate.localeCompare(right.eodDate)),
-    cutoffDate,
-  );
-}
-
 export function resolvePreparedHoldingPrice(
   sorted: readonly HistoricalHoldingPrice[],
   cutoffDate: string,
