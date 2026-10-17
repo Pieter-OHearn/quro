@@ -25,7 +25,7 @@ describe('TabBar', () => {
     expect(markup).toContain('<nav aria-label="Main"');
     expect(markup).toContain('fixed inset-x-0 bottom-0 z-40');
     expect(markup).toContain('border-t border-border-default bg-surface-nav');
-    expect(markup).toContain('pb-[env(safe-area-inset-bottom)] sm:hidden');
+    expect(markup).toContain('pb-[calc(env(safe-area-inset-bottom)/2)] sm:hidden');
   });
 
   test('labels the tabs as the pages name themselves, with More last', () => {

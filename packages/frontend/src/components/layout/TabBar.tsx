@@ -51,7 +51,7 @@ export function TabBar({ moreOpen, moreControls, onMore }: Readonly<TabBarProps>
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border-default bg-surface-nav pb-[env(safe-area-inset-bottom)] sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border-default bg-surface-nav pb-[calc(env(safe-area-inset-bottom)/2)] sm:hidden"
     >
       <div className="flex">
         {tabs.map(({ path, label, icon }) => (
