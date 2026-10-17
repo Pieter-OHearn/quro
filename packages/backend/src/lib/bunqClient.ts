@@ -62,15 +62,6 @@ export type BunqPayment = {
   subType: string;
 };
 
-export type BunqDataResult<T> = {
-  data: T;
-  tokens: BunqTokens;
-};
-
-export type BunqMonetaryAccountsResult = BunqDataResult<BunqMonetaryAccount[]> & {
-  bunqUserId: string;
-};
-
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 type UnknownRecord = Record<string, unknown>;

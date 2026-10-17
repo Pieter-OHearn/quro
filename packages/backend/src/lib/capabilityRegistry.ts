@@ -30,8 +30,7 @@ function disabled(message: string): ConfiguredState {
   return { enabled: false, reason: 'not_configured', message };
 }
 
-export const PENSION_IMPORT_UNCONFIGURED_MESSAGE =
-  'Statement import is not set up on this Quro server.';
+const PENSION_IMPORT_UNCONFIGURED_MESSAGE = 'Statement import is not set up on this Quro server.';
 
 export const CAPABILITIES: readonly CapabilityDefinition[] = [
   {

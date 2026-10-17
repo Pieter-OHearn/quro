@@ -1,7 +1,6 @@
 export type { ConvertToBaseFn, IsForeignFn } from '@/lib/CurrencyContext';
 import type {
   Holding,
-  HoldingPriceSyncResult,
   HoldingTransaction,
   Mortgage,
   Property,
@@ -130,12 +129,6 @@ export type HoldingModalsProps = {
   onDeleteHolding: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   onCloseAddHoldingTxn: () => void;
   onSaveHoldingTxn: (transaction: SaveHoldingTxnInput) => void;
-};
-
-export type BrokerageSyncProps = {
-  onSyncPrices: () => void;
-  isSyncingPrices: boolean;
-  syncSummary: HoldingPriceSyncResult | null;
 };
 
 export type PropertyModalsProps = {

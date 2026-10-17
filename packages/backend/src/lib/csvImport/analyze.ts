@@ -19,8 +19,8 @@ import {
 } from './normalize';
 import { CsvFormatError, parseCsv } from './parse';
 
-export const MIN_BUDGET_YEAR = 2000;
-export const MAX_BUDGET_YEAR = 9999;
+const MIN_BUDGET_YEAR = 2000;
+const MAX_BUDGET_YEAR = 9999;
 
 export type AnalyzedRow = {
   rowNumber: number;
@@ -49,7 +49,7 @@ export class ImportInputError extends Error {
   }
 }
 
-export const sha256Hex = (text: string) => createHash('sha256').update(text).digest('hex');
+const sha256Hex = (text: string) => createHash('sha256').update(text).digest('hex');
 
 export function budgetMonthOf(date: string): { month: BudgetMonth; year: number } {
   return {

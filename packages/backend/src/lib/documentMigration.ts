@@ -41,7 +41,7 @@ export type DocumentReference = {
   expectedSha256: string | null;
 };
 
-export type MigrationIssue = { key: string; reason: string; sources: string[] };
+type MigrationIssue = { key: string; reason: string; sources: string[] };
 
 export type MigrationReport = {
   /** Distinct keys the database refers to. */

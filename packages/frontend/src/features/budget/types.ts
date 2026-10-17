@@ -37,7 +37,6 @@ export type BudgetTx = Pick<
 };
 
 export type BudgetFormatFn = (n: number) => string;
-export type BudgetFormatBaseFn = (n: number, u?: undefined, c?: boolean) => string;
 
 export type PieEntry = {
   name: string;
@@ -83,24 +82,4 @@ export type EditCategoryForm = {
   emoji: string;
   budgeted: string;
   color: string;
-};
-
-export type BudgetPageData = {
-  isLoading: boolean;
-  fmt: BudgetFormatFn;
-  fmtDec: BudgetFormatFn;
-  categories: BudgetCategory[];
-  budgetTransactions: BudgetTx[];
-  totalBudgeted: number;
-  totalSpent: number;
-  remaining: number;
-  savingsRate: number;
-  overBudget: BudgetCategory[];
-  pieData: PieEntry[];
-  monthlyTransactions: RecentBudgetTx[];
-  isAddingCategory: boolean;
-  addCategoryDraft: BudgetCategory;
-  openAddCategory: () => void;
-  closeCategoryDialog: () => void;
-  handleAddCategory: (form: EditCategoryForm) => Promise<void>;
 };

@@ -18,7 +18,7 @@ const TYPE_VALUES: GoalType[] = [
   'annual',
 ];
 
-export type GoalSourceStatus = 'manual' | 'linked' | 'missing';
+type GoalSourceStatus = 'manual' | 'linked' | 'missing';
 
 export type GoalCurrentAmountResolution = {
   currentAmount: number;

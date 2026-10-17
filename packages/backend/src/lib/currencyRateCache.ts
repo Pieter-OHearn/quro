@@ -1,7 +1,6 @@
 import { CURRENCY_CODES, isCurrencyCode, type CurrencyCode } from '@quro/shared';
 
 export const FX_BASE_CURRENCY: CurrencyCode = 'EUR';
-export const SEED_RATE_PROVIDER = 'seed';
 
 const BINARY_SEARCH_DIVISOR = 2;
 

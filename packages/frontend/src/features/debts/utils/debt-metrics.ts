@@ -34,7 +34,7 @@ export function calculateDebtMonthsRemaining(
   return months === null ? null : Math.ceil(months);
 }
 
-export function calculateDebtPayoffDate(
+function calculateDebtPayoffDate(
   debt: Pick<Debt, 'remainingBalance' | 'interestRate' | 'monthlyPayment'>,
   today = new Date(),
 ): Date | null {

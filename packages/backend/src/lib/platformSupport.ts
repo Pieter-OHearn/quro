@@ -5,15 +5,15 @@
 export const SUPPORTED_POSTGRES_MAJOR = 18;
 
 /** Release images are built for these; `darwin` is a development checkout. */
-export const SUPPORTED_PLATFORMS = ['linux', 'darwin'] as const;
-export const SUPPORTED_ARCHITECTURES = ['x64', 'arm64'] as const;
+const SUPPORTED_PLATFORMS = ['linux', 'darwin'] as const;
+const SUPPORTED_ARCHITECTURES = ['x64', 'arm64'] as const;
 
 /** Oldest Bun release the backend supports; the image ships the version in `.bun-version`. */
 export const MINIMUM_BUN_VERSION = '1.4.0';
 
 export type RuntimeFacts = { platform: string; arch: string; bunVersion: string };
 
-export function currentRuntime(): RuntimeFacts {
+function currentRuntime(): RuntimeFacts {
   return { platform: process.platform, arch: process.arch, bunVersion: Bun.version };
 }
 

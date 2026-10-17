@@ -10,7 +10,7 @@ import { textLimitError } from './requestValidation';
 const PDF_MAGIC = Buffer.from('%PDF', 'ascii');
 
 export const PDF_MIME_TYPE = 'application/pdf' as const;
-export const PDF_EXTENSION = '.pdf';
+const PDF_EXTENSION = '.pdf';
 export const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
 export const PDF_TOO_LARGE_ERROR = 'PDF exceeds 20MB limit';
 export const INVALID_PDF_ERROR = 'Uploaded file is not a valid PDF';

@@ -3,7 +3,7 @@ import type { MiddlewareHandler } from 'hono';
 import { runWithRequestId } from '../lib/requestContext';
 
 export const REQUEST_ID_HEADER = 'X-Request-Id';
-export const REQUEST_ID_KEY = 'requestId';
+const REQUEST_ID_KEY = 'requestId';
 
 // A caller (the reverse proxy) may supply the identifier; anything that is not a short, plain token
 // is replaced, so a header can never inject line breaks or markup into a log.

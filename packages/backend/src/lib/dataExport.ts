@@ -20,13 +20,13 @@ import {
 // snapshot. Documents are read from storage one at a time while the archive is sent, so memory
 // holds the tables plus one document.
 
-export const EXPORT_FORMAT = 'quro-export';
-export const EXPORT_FORMAT_VERSION = 1;
+const EXPORT_FORMAT = 'quro-export';
+const EXPORT_FORMAT_VERSION = 1;
 
 const MIB = 1024 * 1024;
-export const MAX_EXPORT_ROWS = 250_000;
-export const MAX_EXPORT_DOCUMENTS = 2_000;
-export const MAX_EXPORT_DOCUMENT_BYTES = 512 * MIB;
+const MAX_EXPORT_ROWS = 250_000;
+const MAX_EXPORT_DOCUMENTS = 2_000;
+const MAX_EXPORT_DOCUMENT_BYTES = 512 * MIB;
 
 export class ExportLimitError extends Error {
   constructor(message: string) {
@@ -36,7 +36,7 @@ export class ExportLimitError extends Error {
 }
 
 /** The export stopped because the account may no longer download it, or the client left. */
-export class ExportStoppedError extends Error {
+class ExportStoppedError extends Error {
   constructor() {
     super('Export stopped');
     this.name = 'ExportStoppedError';
@@ -174,7 +174,7 @@ const SAFE_NAME = /[^A-Za-z0-9._-]+/g;
 const MAX_NAME_LENGTH = 80;
 
 /** A file name that is safe inside an archive: no path, no control characters, bounded length. */
-export function archiveFileName(fileName: string): string {
+function archiveFileName(fileName: string): string {
   const base = fileName.split(/[\\/]/).pop() ?? '';
   const cleaned = base
     .replace(SAFE_NAME, '_')
@@ -183,7 +183,7 @@ export function archiveFileName(fileName: string): string {
   return cleaned === '' ? 'document' : cleaned;
 }
 
-export const EXPORT_README = `Quro data export
+const EXPORT_README = `Quro data export
 ================
 
 This archive holds the data of one Quro account, exported by its owner. Nothing in it is needed

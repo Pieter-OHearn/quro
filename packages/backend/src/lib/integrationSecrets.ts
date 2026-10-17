@@ -23,7 +23,7 @@ import {
 // and writes every changed column in one UPDATE. An interrupted run leaves each row either as it
 // was or fully converted, and the next run continues with the rows that still need it.
 
-export const SECRETS_TABLE = 'bunq_connections';
+const SECRETS_TABLE = 'bunq_connections';
 
 /** Every column that holds an integration secret. `server_public_key` is public; not listed. */
 export const SECRET_COLUMNS = [
@@ -59,7 +59,7 @@ export function readSecretRows(executor: DbExecutor): Promise<SecretRow[]> {
 // ── Status ─────────────────────────────────────────────────────────────────
 
 /** Counts of stored secrets (non-null columns) by state. */
-export type SecretCounts = {
+type SecretCounts = {
   total: number;
   /** Sealed with the current key and verified by opening it. */
   current: number;
@@ -72,7 +72,7 @@ export type SecretCounts = {
   unreadable: number;
 };
 
-export type SecretsStatus =
+type SecretsStatus =
   /** Nothing stored. */
   | 'none'
   /** Every stored secret is sealed with the current key and opens. */

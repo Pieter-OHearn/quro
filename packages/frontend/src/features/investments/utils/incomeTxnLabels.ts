@@ -6,7 +6,7 @@ export type IncomeTxnLabels = {
   lowerSingular: 'dividend' | 'distribution';
 };
 
-export function isFundLikeHolding(holding: Holding): boolean {
+function isFundLikeHolding(holding: Holding): boolean {
   if (holding.itemType === 'etf' || holding.itemType === 'fund') {
     return true;
   }

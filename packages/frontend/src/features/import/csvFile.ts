@@ -1,6 +1,6 @@
 import { CSV_IMPORT_LIMITS } from '@quro/shared';
 
-export class CsvFileError extends Error {}
+class CsvFileError extends Error {}
 
 /**
  * Reads a chosen file as text. Bank exports are UTF-8 or Windows-1252; a file that does not

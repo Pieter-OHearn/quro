@@ -22,7 +22,7 @@ const DOCUMENT_CONTENT_TYPE = 'application/pdf';
 /** The part of the SDK client the store uses; tests pass a fake. */
 export type S3CommandSender = Pick<S3Client, 'send'>;
 
-export function createS3Client(connection: S3Connection): S3Client {
+function createS3Client(connection: S3Connection): S3Client {
   return new S3Client({
     endpoint: connection.endpoint,
     region: connection.region,
@@ -50,7 +50,7 @@ async function bodyToBuffer(body: unknown): Promise<Buffer> {
   return readableToBuffer(body as Readable);
 }
 
-export function isS3NotFoundError(error: unknown): boolean {
+function isS3NotFoundError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const maybeError = error as { name?: unknown; Code?: unknown; code?: unknown };
   const values = [maybeError.name, maybeError.Code, maybeError.code].map((value) =>

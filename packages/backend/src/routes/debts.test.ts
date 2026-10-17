@@ -1,10 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  computeDebtPrincipal,
-  parseDebtPayload,
-  parseDebtPaymentPayload,
-  validateDebtPrincipalAgainstBalance,
-} from './debts';
+import { computeDebtPrincipal, parseDebtPayload, parseDebtPaymentPayload } from './debts';
 
 describe('debt payload validation', () => {
   test('accepts a valid debt payload', () => {
@@ -98,9 +93,5 @@ describe('debt payment validation and balance helpers', () => {
       ok: false,
       error: 'Interest cannot exceed the total payment',
     });
-
-    expect(validateDebtPrincipalAgainstBalance(200, 150)).toBe(
-      'Principal portion cannot exceed the current remaining balance',
-    );
   });
 });

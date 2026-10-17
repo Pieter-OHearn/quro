@@ -87,7 +87,7 @@ type Account = typeof savingsAccounts.$inferSelect;
 const ACCOUNT_NOT_FOUND = 'Account not found';
 const KEY_CHUNK = 1_000;
 const ROW_INSERT_CHUNK = 500;
-export const SAMPLE_ROWS = 3;
+const SAMPLE_ROWS = 3;
 const RECONCILIATION_SOURCE = 'reconciliation';
 
 // ── Target ───────────────────────────────────────────────────────────────────

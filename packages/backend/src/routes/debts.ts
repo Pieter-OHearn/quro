@@ -154,17 +154,6 @@ export function computeDebtPrincipal(amount: number, interest: number): number {
   return Math.max(0, roundMoney(amount - interest));
 }
 
-export function validateDebtPrincipalAgainstBalance(
-  principal: number,
-  currentRemainingBalance: number,
-): string | null {
-  if (principal > currentRemainingBalance) {
-    return 'Principal portion cannot exceed the current remaining balance';
-  }
-
-  return null;
-}
-
 export function parseDebtPayload(raw: Record<string, unknown>): ParseResult<DebtPayload> {
   const parsed = parseRequiredFields(raw, debtParsers);
   if (!parsed.ok) return parsed;

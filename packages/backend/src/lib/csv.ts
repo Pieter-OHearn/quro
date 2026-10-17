@@ -14,7 +14,7 @@ const NEEDS_QUOTES = /[",\r\n]/;
 export const CSV_FORMULA_ESCAPE = "'";
 
 /** A text value as a spreadsheet will read it: formula-like text gets a leading apostrophe. */
-export function guardCsvText(value: string): string {
+function guardCsvText(value: string): string {
   return FORMULA_TRIGGER.test(value) ? `${CSV_FORMULA_ESCAPE}${value}` : value;
 }
 
@@ -28,7 +28,7 @@ function cellText(value: CsvValue): string {
   return JSON.stringify(value);
 }
 
-export function encodeCsvCell(value: CsvValue): string {
+function encodeCsvCell(value: CsvValue): string {
   const text = cellText(value);
   return NEEDS_QUOTES.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }

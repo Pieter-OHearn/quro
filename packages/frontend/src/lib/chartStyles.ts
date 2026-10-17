@@ -6,13 +6,13 @@ import type { CSSProperties } from 'react';
  */
 export const CHART_GRID_PROPS = { vertical: false, stroke: 'var(--chart-grid)' } as const;
 
-export const CHART_AXIS_TICK = {
+const CHART_AXIS_TICK = {
   fontSize: 11,
   fill: 'var(--chart-axis)',
   className: 'font-numeric',
 } as const;
 
-export const CHART_AXIS_PROPS = {
+const CHART_AXIS_PROPS = {
   tick: CHART_AXIS_TICK,
   axisLine: false,
   tickLine: false,

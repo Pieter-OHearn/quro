@@ -41,7 +41,7 @@ function parseRequestedMortgageId(raw: string | null): number | null {
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
-export function mortgageSelectionParams(previous: URLSearchParams, id: number | null) {
+function mortgageSelectionParams(previous: URLSearchParams, id: number | null) {
   const next = new URLSearchParams(previous);
   if (id === null) next.delete('mortgageId');
   else next.set('mortgageId', String(id));

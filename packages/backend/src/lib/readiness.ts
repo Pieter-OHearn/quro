@@ -88,7 +88,7 @@ export function getHealthReport(now = new Date()) {
   };
 }
 
-export async function checkDatabaseReadiness(now = new Date()): Promise<ReadinessCheck> {
+async function checkDatabaseReadiness(now = new Date()): Promise<ReadinessCheck> {
   try {
     await withTimeout(db.execute(sql`select 1`), READINESS_TIMEOUT_MS, 'Database readiness check');
     return createReadinessCheck(now, true, true, 'Database connection succeeded.');
@@ -181,7 +181,7 @@ export async function checkDocumentStorageReadiness(
   }
 }
 
-export async function checkPensionImportReadiness(
+async function checkPensionImportReadiness(
   now = new Date(),
   options: CheckPensionImportOptions = {},
 ): Promise<ReadinessCheck> {

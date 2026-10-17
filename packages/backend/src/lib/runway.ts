@@ -31,7 +31,7 @@ export type BudgetCategoryBurnInput = {
   wasDefaultClassified?: boolean;
 };
 
-export type ContractualBurnInput = {
+type ContractualBurnInput = {
   label: string;
   amount: number;
   source: 'mortgage' | 'debt';
@@ -74,7 +74,7 @@ export type LiquidityTier = {
   included: boolean;
 };
 
-export type PayslipInput = {
+type PayslipInput = {
   id: number;
   date: string;
   gross: number;

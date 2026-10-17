@@ -4,7 +4,7 @@ import type { FmtFn, SalaryChartEntry, SalaryHistoryEntry, SalaryStatCard } from
 const DATE_YEAR_LENGTH = 4;
 const MIN_GROWTH_POINTS = 2;
 
-export type BreakdownLineKey = 'gross' | 'bonus' | 'tax' | 'pension' | 'net';
+type BreakdownLineKey = 'gross' | 'bonus' | 'tax' | 'pension' | 'net';
 
 export type BreakdownLine = {
   key: BreakdownLineKey;

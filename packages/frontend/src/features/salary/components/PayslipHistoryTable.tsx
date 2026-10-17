@@ -112,7 +112,7 @@ const PAYSLIP_COLUMNS: readonly DataTableColumn<Payslip>[] = [
 ];
 
 // A year has about a dozen payslips; paging keeps an imported history from rendering thousands.
-export const PAYSLIP_PAGE_SIZE = 25;
+const PAYSLIP_PAGE_SIZE = 25;
 
 type ToBaseFn = (amount: number, fromCurrency: string) => number;
 

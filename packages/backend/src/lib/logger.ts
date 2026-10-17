@@ -7,7 +7,7 @@ import { currentRequestId } from './requestContext';
 // statement repeats the SQL and the values it carried. A field whose name looks like a credential
 // or personal data is replaced, whatever its value.
 
-export type LogLevel = 'info' | 'warn' | 'error';
+type LogLevel = 'info' | 'warn' | 'error';
 export type LogFields = Record<string, unknown>;
 
 const REDACTED = '[redacted]';

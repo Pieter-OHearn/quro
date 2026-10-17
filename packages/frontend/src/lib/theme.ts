@@ -9,7 +9,7 @@
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
 
-export const THEME_PREFERENCES: readonly ThemePreference[] = ['light', 'dark', 'system'];
+const THEME_PREFERENCES: readonly ThemePreference[] = ['light', 'dark', 'system'];
 export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system';
 export const THEME_STORAGE_KEY = 'quro-theme';
 export const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
@@ -20,7 +20,7 @@ export const THEME_COLORS: Readonly<Record<ResolvedTheme, string>> = {
   dark: '#0E1411',
 };
 
-export function isThemePreference(value: unknown): value is ThemePreference {
+function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && (THEME_PREFERENCES as readonly string[]).includes(value);
 }
 
@@ -43,11 +43,11 @@ export function storeTheme(preference: ThemePreference): void {
   }
 }
 
-export function systemPrefersDark(): boolean {
+function systemPrefersDark(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia(SYSTEM_DARK_QUERY).matches;
 }
 
-export function resolveTheme(preference: ThemePreference): ResolvedTheme {
+function resolveTheme(preference: ThemePreference): ResolvedTheme {
   if (preference === 'system') return systemPrefersDark() ? 'dark' : 'light';
   return preference;
 }

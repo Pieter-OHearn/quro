@@ -27,7 +27,7 @@ import { toNumberOrZero } from './numbers';
 const ISO_MONTH_LENGTH = 7;
 const DATE_END_OF_MONTH = 0;
 
-export type DerivedAllocation = AssetAllocation;
+type DerivedAllocation = AssetAllocation;
 export type DerivedAllocationSummary = DashboardAllocationsSummary;
 
 type MoneyRow = { currency: string };
