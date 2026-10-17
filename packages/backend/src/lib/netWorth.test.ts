@@ -3,19 +3,19 @@ import {
   earliestDate,
   monthEnd,
   monthStart,
-  resolveHistoricalHoldingPrice,
+  resolvePreparedHoldingPrice,
   sumBrokerageValue,
 } from './netWorth';
 
 describe('net worth history helpers', () => {
   test('resolves the last close at or before a cutoff', () => {
     const prices = [
-      { eodDate: '2026-03-31', closePrice: 101 },
       { eodDate: '2026-01-31', closePrice: 90 },
       { eodDate: '2026-02-28', closePrice: 95 },
+      { eodDate: '2026-03-31', closePrice: 101 },
     ];
-    expect(resolveHistoricalHoldingPrice(prices, '2026-02-15')).toBe(90);
-    expect(resolveHistoricalHoldingPrice(prices, '2025-12-31')).toBeNull();
+    expect(resolvePreparedHoldingPrice(prices, '2026-02-15')).toBe(90);
+    expect(resolvePreparedHoldingPrice(prices, '2025-12-31')).toBeNull();
   });
 
   test('normalizes snapshot boundaries and update invalidation dates', () => {

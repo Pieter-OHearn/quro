@@ -20,7 +20,7 @@ import { inspect } from 'node:util';
 // derived from it with HKDF-SHA256 under a label of its own, so the stored key id and the
 // encryption key are independent. docs/security.md describes the format for operators.
 
-export const ENVELOPE_PREFIX = 'quro-secret:';
+const ENVELOPE_PREFIX = 'quro-secret:';
 const VERSION = 'v1';
 const ALGORITHM = 'aes-256-gcm';
 const HEADER = `${ENVELOPE_PREFIX}${VERSION}:${ALGORITHM}`;
@@ -43,7 +43,7 @@ export type SecretPlace = { table: string; column: string; ownerId: number };
 /** A key file that is not 64 hexadecimal characters. The message never contains the content. */
 export class SecretsKeyFormatError extends Error {}
 
-export const SECRETS_KEY_FORMAT =
+const SECRETS_KEY_FORMAT =
   '64 hexadecimal characters (32 random bytes), for example from `openssl rand -hex 32`';
 
 function derive(material: Buffer, label: string, length: number): Buffer {

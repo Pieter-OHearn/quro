@@ -8,13 +8,13 @@ import { db, type DbExecutor } from '../db/client';
 import { sessions } from '../db/schema';
 import { DAY_MS, MINUTE_MS, MS_PER_SECOND } from '../constants/time';
 
-export const SESSION_COOKIE = 'session';
+const SESSION_COOKIE = 'session';
 export const CSRF_COOKIE = 'csrf_token';
 
 const TOKEN_BYTES = 32;
 const SESSION_DURATION_DAYS = 30;
 const USER_AGENT_MAX_LENGTH = 256;
-export const SESSION_DURATION_MS = SESSION_DURATION_DAYS * DAY_MS;
+const SESSION_DURATION_MS = SESSION_DURATION_DAYS * DAY_MS;
 // last_used_at is advisory (shown in the session list), so it is refreshed at most this often.
 const SESSION_TOUCH_INTERVAL_MINUTES = 5;
 export const SESSION_TOUCH_INTERVAL_MS = SESSION_TOUCH_INTERVAL_MINUTES * MINUTE_MS;

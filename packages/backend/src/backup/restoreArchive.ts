@@ -46,7 +46,7 @@ import { scanArchive } from './verifyArchive';
 // database in one transaction and the documents by rename, and then compares the restored
 // database and documents with the archive's manifest.
 
-export const RESTORE_CONFIRMATION = 'restore-db';
+const RESTORE_CONFIRMATION = 'restore-db';
 const MAINTENANCE_WAIT_SECONDS = 10;
 const SESSION_CLOSE_SECONDS = 5;
 
@@ -59,7 +59,7 @@ export class RestoreRefusedError extends Error {
 }
 
 /** The restore ran, but the result does not match the archive. */
-export class RestoreVerificationError extends Error {
+class RestoreVerificationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'RestoreVerificationError';

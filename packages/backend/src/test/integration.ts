@@ -177,7 +177,7 @@ function createSignUpPayload(email: string, overrides: SignUpOverrides, inviteCo
 const issuedInviteCodeIds = new Set<number>();
 
 // Registration is invite-only by default, so tests sign up the way an invited user does.
-export async function issueInviteCode(): Promise<string> {
+async function issueInviteCode(): Promise<string> {
   const issued = await issueRegistrationCode({ ttlMs: HOUR_MS });
   issuedInviteCodeIds.add(issued.id);
   return issued.code;

@@ -16,7 +16,7 @@ const FINAL_SECOND = 59;
 const FINAL_MILLISECOND = 999;
 const MIN_GROWTH_POINTS = 2;
 
-export function yearEndUtc(year: number): number {
+function yearEndUtc(year: number): number {
   return Date.UTC(
     year,
     DECEMBER_INDEX,

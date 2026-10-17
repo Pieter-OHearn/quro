@@ -4,7 +4,6 @@ import { CHART_TOOLTIP_CLASS } from '@/lib/chartStyles';
 // Axis labels (11px tabular figures, no axis or tick lines) and horizontal-only gridlines are
 // shared with the chart cards in `lib/chartStyles.ts`.
 export {
-  CHART_AXIS_PROPS,
   CHART_GRID_PROPS,
   CHART_TOOLTIP_WRAPPER_STYLE,
   CHART_X_AXIS_PROPS,

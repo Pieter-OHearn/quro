@@ -1,7 +1,6 @@
 import { CURRENCY_CODES, isCurrencyCode, type CurrencyCode } from '@quro/shared';
 
 export const FX_BASE_CURRENCY: CurrencyCode = 'EUR';
-export const SEED_RATE_PROVIDER = 'seed';
 
 const BINARY_SEARCH_DIVISOR = 2;
 
@@ -123,14 +122,6 @@ function selectHistoricalRate(
     throw new CurrencyRatesUnavailableError(`Missing FX rates for: ${currency}`);
   }
   return { row: selectedRow, isEstimated: historicalRow === null };
-}
-
-export function buildRatesToBaseCurrencyAt(
-  rows: readonly HistoricalCurrencyRateRow[],
-  asOfDate: string,
-  baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
-): HistoricalRatesToBaseCurrency {
-  return createHistoricalRateResolver(rows, baseCurrency)(asOfDate);
 }
 
 // Group and sort once for all month lookups in a request.

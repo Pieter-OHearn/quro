@@ -51,7 +51,7 @@ const COLUMN_FIELDS = [
 ] as const;
 const MAX_HEADER_LENGTH = 200;
 const MAX_CATEGORY_LENGTH = 80;
-export const DEFAULT_BUDGET_CATEGORY = 'Uncategorised';
+const DEFAULT_BUDGET_CATEGORY = 'Uncategorised';
 
 function parseColumnName(value: unknown, label: string, required: boolean): ParseResult<string> {
   if (value === undefined || value === null || value === '') {
@@ -333,8 +333,6 @@ export type NormalizedRow = {
   balance: number | null;
   formulaLike: boolean;
 };
-
-export type RowError = { rowNumber: number; line: number; error: string };
 
 export type ColumnIndexes = Record<keyof CsvColumnMapping, number | undefined>;
 

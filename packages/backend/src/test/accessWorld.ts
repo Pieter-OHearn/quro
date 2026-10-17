@@ -72,9 +72,9 @@ export type RowIds = {
   extraSession: string;
 };
 
-export type IdKey = Exclude<keyof RowIds, 'marker' | 'extraSession'>;
+type IdKey = Exclude<keyof RowIds, 'marker' | 'extraSession'>;
 
-export const ID_KEYS: readonly IdKey[] = [
+const ID_KEYS: readonly IdKey[] = [
   'savingsAccount',
   'savingsTxn',
   'csvImport',
@@ -102,7 +102,7 @@ export const ID_KEYS: readonly IdKey[] = [
 ];
 
 /** Ids that are valid integers but belong to no row. */
-export const NONEXISTENT_ID = 2_000_000_000;
+const NONEXISTENT_ID = 2_000_000_000;
 
 export function nonexistentRows(): RowIds {
   const rows = { marker: 's04-nonexistent', extraSession: 'f'.repeat(64) } as RowIds;
@@ -637,7 +637,7 @@ export async function seedRows(options: SeedOptions): Promise<RowIds> {
   } as RowIds;
 }
 
-export type Household = {
+type Household = {
   /** Rows only their owner may touch. */
   private: RowIds;
   /** Savings, property and mortgage rows shared with the partner. */
@@ -814,13 +814,6 @@ const SNAPSHOT_TABLES: Record<string, PgTable> = {
   partner_link_members: partnerLinkMembers,
 };
 
-/** Tables with a `user_id` column that the snapshot deliberately leaves out, and why. */
-export const SNAPSHOT_EXEMPT: Record<string, string> = {
-  sessions: 'compared by id below; last_used_at is refreshed by authenticated reads',
-  auth_codes: 'operator-issued codes, not household data',
-  bunq_oauth_attempts: 'short-lived OAuth state, not household data',
-};
-
 export function tablesWithUserColumn(): string[] {
   const names: string[] = [];
   for (const value of Object.values(schema) as unknown[]) {
@@ -828,11 +821,6 @@ export function tablesWithUserColumn(): string[] {
     if ('userId' in getTableColumns(value)) names.push(getTableName(value));
   }
   return names;
-}
-
-export function snapshotCoversEveryUserTable(): { missing: string[] } {
-  const covered = new Set([...Object.keys(SNAPSHOT_TABLES), ...Object.keys(SNAPSHOT_EXEMPT)]);
-  return { missing: tablesWithUserColumn().filter((name) => !covered.has(name)) };
 }
 
 /** A stable text image of every row the world's users own, to prove a request changed nothing. */

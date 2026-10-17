@@ -311,7 +311,7 @@ export function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
   return validationError ? err(validationError) : ok(value);
 }
 
-export function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>> {
+function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return err('Invalid goal payload');
   }

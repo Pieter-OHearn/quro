@@ -1,5 +1,4 @@
 import type {
-  MortgageTransactionType as MortgageTxnType,
   Mortgage as MortgageType,
   MortgageRateType,
   MortgageRepaymentType,
@@ -12,7 +11,6 @@ import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
 export type MortgageFormatFn = (n: number) => string;
 
 export type { MortgageTransactionType as MortgageTxnType } from '@quro/shared';
-export type MortgageTxnFilter = MortgageTxnType | 'all';
 
 export type SaveMortgageTxnInput = Omit<MortgageTransaction, 'id'> & { id?: number };
 

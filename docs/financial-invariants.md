@@ -275,6 +275,8 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
   from the list endpoints with the shared rules the pages use, and the same aggregate computed in
   SQL with each row rounded to cents agree to the cent. A stored snapshot's total matches the live
   figure, and its components add up to it exactly.
+- **Snapshot audit field.** `net_worth_snapshots.computed_at` records when a snapshot row was last
+  computed. It is an audit field that nothing reads, and it stays in the schema and in backups.
 
 ### Known exceptions
 

@@ -27,7 +27,7 @@ import { toNumberOrZero } from './numbers';
 const ISO_MONTH_LENGTH = 7;
 const DATE_END_OF_MONTH = 0;
 
-export type DerivedAllocation = AssetAllocation;
+type DerivedAllocation = AssetAllocation;
 export type DerivedAllocationSummary = DashboardAllocationsSummary;
 
 type MoneyRow = { currency: string };
@@ -149,16 +149,6 @@ export function earliestDate(left: string, right: string): string {
 }
 
 export type HistoricalHoldingPrice = { eodDate: string; closePrice: unknown };
-
-export function resolveHistoricalHoldingPrice(
-  rows: readonly HistoricalHoldingPrice[],
-  cutoffDate: string,
-): number | null {
-  return resolvePreparedHoldingPrice(
-    [...rows].sort((left, right) => left.eodDate.localeCompare(right.eodDate)),
-    cutoffDate,
-  );
-}
 
 export function resolvePreparedHoldingPrice(
   sorted: readonly HistoricalHoldingPrice[],

@@ -130,7 +130,7 @@ function choice<const V extends readonly string[]>(values: V, meta: Meta<V[numbe
   );
 }
 
-export function isHttpUrl(value: string): boolean {
+function isHttpUrl(value: string): boolean {
   if (!URL.canParse(value)) return false;
   const { protocol } = new URL(value);
   return protocol === 'http:' || protocol === 'https:';
@@ -173,12 +173,12 @@ const httpOrigin = (meta: Meta<string>) =>
     meta,
   );
 
-export const DOCUMENT_STORAGE_DRIVERS = ['filesystem', 's3'] as const;
+const DOCUMENT_STORAGE_DRIVERS = ['filesystem', 's3'] as const;
 export type DocumentStorageDriver = (typeof DOCUMENT_STORAGE_DRIVERS)[number];
 
-export const DEFAULT_DOCUMENTS_DIR = '/var/lib/quro/documents';
+const DEFAULT_DOCUMENTS_DIR = '/var/lib/quro/documents';
 
-export const DEFAULT_BACKUP_DIR = '/var/lib/quro/backups';
+const DEFAULT_BACKUP_DIR = '/var/lib/quro/backups';
 
 export const DEFAULT_SECRETS_KEY_FILE = '/run/secrets/secrets_key';
 

@@ -21,6 +21,7 @@
     "check:format": "prettier --check .",
     "check:docs": "bun scripts/check-docs.ts",
     "check:lint": "bunx eslint packages scripts playwright.config.ts --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts",
+    "check:dead-code": "knip --no-progress",
     "check:typecheck": "bun run typecheck",
     "check:test": "bun run test",
     "check:build": "bun run build",
@@ -41,6 +42,7 @@
     "db:clear": "bun run --filter '@quro/backend' db:clear",
     "db:bootstrap-runtime-role": "bun run --filter '@quro/backend' db:bootstrap-runtime-role",
     "lint": "bunx eslint packages scripts playwright.config.ts --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts",
+    "dead-code": "knip --no-progress",
     "lint:fix": "bunx eslint packages scripts playwright.config.ts --ext .ts,.tsx,.js,.jsx,.mjs,.cjs,.mts,.cts --fix",
     "format:check": "prettier --check .",
     "docs:check": "bun scripts/check-docs.ts",
@@ -81,6 +83,7 @@
     "eslint-plugin-sonarjs": "^4.0.3",
     "eslint-plugin-unicorn": "^73.0.0",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "knip": "^6.41.0",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3"
   }

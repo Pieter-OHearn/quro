@@ -39,7 +39,7 @@ export class BunqCredentialsUnavailableError extends Error {
 
 type ConnectionRow = typeof bunqConnections.$inferSelect;
 
-export type BunqCredentials = {
+type BunqCredentials = {
   accessToken: string;
   privateKey: string | null;
   installationToken: string | null;

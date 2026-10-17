@@ -23,8 +23,8 @@ import { getConfig } from '../config';
 // collide with the single-key locks the schedulers use.
 
 /** "QRO" in ASCII: the namespace of the application's two-key advisory locks. */
-export const QURO_LOCK_NAMESPACE = 0x51_52_4f;
-export const MAINTENANCE_LOCK_ID = 1;
+const QURO_LOCK_NAMESPACE = 0x51_52_4f;
+const MAINTENANCE_LOCK_ID = 1;
 
 const LOCK_NOT_AVAILABLE = '55P03';
 const GATE_CLOSE_TIMEOUT_SECONDS = 5;

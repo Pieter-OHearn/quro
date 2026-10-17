@@ -6,7 +6,7 @@ import { parseArchiveName } from './archiveNames';
 // written. It runs only after that archive has been verified, never touches labelled archives
 // (pre-restore, before-upgrade and other manual ones) and never touches other files.
 
-export class RetentionError extends Error {
+class RetentionError extends Error {
   constructor(
     readonly failed: string[],
     readonly deleted: string[],

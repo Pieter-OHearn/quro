@@ -9,12 +9,12 @@ import { documentKeySegments } from './documentStore';
 // what they find as ok, stale (older than expected), failing, or unknown. Unknown is never
 // reported as healthy: a missing record means nothing has proved the job or backup ran.
 
-export type Health = 'ok' | 'warn' | 'fail' | 'unknown';
+type Health = 'ok' | 'warn' | 'fail' | 'unknown';
 export type Finding = { id: string; health: Health; message: string };
 
 // ── Background jobs ──────────────────────────────────────────────────────────
 
-export const JOB_SUCCESS_PREFIX = 'scheduler:';
+const JOB_SUCCESS_PREFIX = 'scheduler:';
 export const JOB_FAILURE_PREFIX = 'scheduler-failed:';
 
 /** How often each job runs. The session cleanup interval is a setting, so it is not listed. */
@@ -42,7 +42,7 @@ export type JobExpectation = {
 const JOB_SLACK_MS = 10 * MINUTE_MS;
 const MISSED_CYCLES = 2;
 
-export function describeAge(ms: number): string {
+function describeAge(ms: number): string {
   if (ms < HOUR_MS) return `${Math.max(1, Math.round(ms / MINUTE_MS))} minute(s)`;
   if (ms < DAY_MS * 2) return `${Math.round(ms / HOUR_MS)} hour(s)`;
   return `${Math.round(ms / DAY_MS)} day(s)`;
@@ -192,7 +192,7 @@ export async function readDiskFacts(
 // ── Backups ──────────────────────────────────────────────────────────────────
 
 /** A scheduled daily backup is stale after this long; weekly schedules should widen it themselves. */
-export const BACKUP_STALE_MS = 2 * DAY_MS;
+const BACKUP_STALE_MS = 2 * DAY_MS;
 
 export function archiveTime(name: string): Date | null {
   const parsed = parseArchiveName(name);

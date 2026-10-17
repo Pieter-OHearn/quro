@@ -18,7 +18,7 @@ export function useCreateDebtPayment() {
   });
 }
 
-export type DeleteDebtMode = 'preservePayments' | 'deletePayments';
+type DeleteDebtMode = 'preservePayments' | 'deletePayments';
 
 type DeleteDebtInput = {
   id: number;

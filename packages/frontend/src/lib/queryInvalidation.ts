@@ -18,7 +18,7 @@ const pension = [keys.pensions.pots, keys.pensions.transactions, keys.pensions.d
 const budget = [keys.budget.categories, keys.budget.transactions];
 
 // Declare server-side dependencies here; hooks should not maintain their own sets.
-export const domainQueryDependencies = {
+const domainQueryDependencies = {
   goals: [keys.goals],
   budgetCategory: [...budget, keys.plan.all],
   budgetTransaction: [...budget, keys.dashboard.transactions, keys.dashboard.setup, keys.plan.all],

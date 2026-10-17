@@ -60,7 +60,7 @@ function addMonths(start: YearMonth, monthOffset: number): YearMonth {
   };
 }
 
-export function calculateContractRemainingMonths(
+function calculateContractRemainingMonths(
   mortgage: MortgageType,
   today = new Date(),
 ): number | null {

@@ -3,9 +3,9 @@
  * the exact plotted values. Both are built from the same rows as the chart, so they cannot drift.
  */
 
-export type ChartTableColumn = { label: string; align?: 'left' | 'right' };
+type ChartTableColumn = { label: string; align?: 'left' | 'right' };
 
-export type ChartTableRow = { key: string; cells: readonly string[]; estimated?: boolean };
+type ChartTableRow = { key: string; cells: readonly string[]; estimated?: boolean };
 
 export type ChartAlternative = {
   /** Read by assistive technology with the chart, not shown. */

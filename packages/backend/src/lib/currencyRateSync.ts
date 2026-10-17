@@ -15,13 +15,13 @@ type CurrencyRateQuote = {
   sourceDate: string;
 };
 
-export type CurrencyRateSyncIssue = {
+type CurrencyRateSyncIssue = {
   fromCurrency: CurrencyCode;
   toCurrency: CurrencyCode;
   reason: string;
 };
 
-export type CurrencyRateFetchResult = {
+type CurrencyRateFetchResult = {
   rates: CurrencyRateQuote[];
   issues: CurrencyRateSyncIssue[];
 };
@@ -63,7 +63,7 @@ function buildIssue(
   return { fromCurrency, toCurrency, reason };
 }
 
-export async function fetchYahooCurrencyRates(
+async function fetchYahooCurrencyRates(
   baseCurrency: CurrencyCode,
   fromCurrencies: CurrencyCode[],
 ): Promise<CurrencyRateFetchResult> {
@@ -101,7 +101,7 @@ export function getCurrencyRateSyncCurrencies(
   return CURRENCY_CODES.filter((currency) => currency !== baseCurrency);
 }
 
-export function loadCurrencyRateCacheRows(): Promise<CurrentCurrencyRateRow[]> {
+function loadCurrencyRateCacheRows(): Promise<CurrentCurrencyRateRow[]> {
   return db
     .select({
       id: currencyRates.id,
@@ -116,9 +116,7 @@ export function loadCurrencyRateCacheRows(): Promise<CurrentCurrencyRateRow[]> {
     .orderBy(asc(currencyRates.fromCurrency), asc(currencyRates.toCurrency));
 }
 
-export function loadCurrencyRateHistoryRows(
-  windowStart?: string,
-): Promise<HistoricalCurrencyRateDbRow[]> {
+function loadCurrencyRateHistoryRows(windowStart?: string): Promise<HistoricalCurrencyRateDbRow[]> {
   const columns = {
     fromCurrency: currencyRateHistory.fromCurrency,
     toCurrency: currencyRateHistory.toCurrency,

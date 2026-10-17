@@ -101,8 +101,3 @@ export async function stopIntervalJobs(): Promise<void> {
   timers.clear();
   await Promise.allSettled([...runningCycles]);
 }
-
-/** The number of job cycles running now. */
-export function runningIntervalJobs(): number {
-  return runningCycles.size;
-}

@@ -54,6 +54,8 @@ jobs:
       - uses: ./.github/actions/setup-bun-dependencies
       - name: Run linter
         run: bun run check:lint
+      - name: Check for dead code
+        run: bun run check:dead-code
 
   typecheck:
     name: Typecheck

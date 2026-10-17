@@ -10,7 +10,7 @@ type Props = {
 };
 
 /** Where a file's rows go, for the first line of the dialog. */
-export function importTarget(kind: CsvImportKind): string {
+function importTarget(kind: CsvImportKind): string {
   return kind === 'savings'
     ? 'Rows become deposits and withdrawals on this account.'
     : 'Rows become budget expenses, grouped by category and month.';

@@ -44,7 +44,7 @@ import { db, type DbExecutor } from '../db/client';
 // data), and the shared exchange-rate and stock-exchange reference tables.
 
 /** The row properties that describe a stored document. */
-export type DocumentColumns = {
+type DocumentColumns = {
   key: string;
   fileName: string;
   sizeBytes: string;

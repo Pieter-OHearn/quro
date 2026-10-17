@@ -3,7 +3,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { MAX_PDF_SIZE_BYTES, PDF_TOO_LARGE_ERROR } from './pdfDocuments';
 import { log } from './logger';
 
-export const INVALID_UPLOAD_ERROR = 'Invalid upload';
+const INVALID_UPLOAD_ERROR = 'Invalid upload';
 
 // Multipart framing and the small fields sent with the PDF.
 const FORM_OVERHEAD_BYTES = 1_048_576; // 1 MiB

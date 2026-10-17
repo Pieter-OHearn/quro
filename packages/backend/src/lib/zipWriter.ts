@@ -20,10 +20,10 @@ const MAX_UINT32 = 0xffffffff;
 const MAX_UINT16 = 0xffff;
 const DOS_EPOCH_YEAR = 1980;
 
-export const MAX_ZIP_ENTRIES = MAX_UINT16;
-export const MAX_ZIP_BYTES = MAX_UINT32;
+const MAX_ZIP_ENTRIES = MAX_UINT16;
+const MAX_ZIP_BYTES = MAX_UINT32;
 
-export class ZipLimitError extends Error {
+class ZipLimitError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ZipLimitError';

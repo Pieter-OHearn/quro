@@ -8,7 +8,7 @@ import type { TransactionSql } from 'postgres';
 
 const SCHEMAS = ['public', 'drizzle'];
 
-export type TableFingerprint = { rows: number; checksum: string };
+type TableFingerprint = { rows: number; checksum: string };
 
 export type DatabaseFingerprint = {
   tables: Record<string, TableFingerprint>;

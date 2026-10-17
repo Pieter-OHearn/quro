@@ -92,7 +92,7 @@ export function useCreatePensionTransaction() {
   });
 }
 
-export type DeletePensionPotMode = 'preserveTransactions' | 'deleteTransactions';
+type DeletePensionPotMode = 'preserveTransactions' | 'deleteTransactions';
 
 type DeletePensionPotInput = {
   id: number;

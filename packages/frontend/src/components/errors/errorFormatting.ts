@@ -13,7 +13,7 @@ export function formatErrorWithStack(error: Error): string {
   return `${error.name}: ${error.message}${error.stack ? `\n\n${error.stack}` : ''}`;
 }
 
-export function readApiErrorMessage(error: unknown): string | null {
+function readApiErrorMessage(error: unknown): string | null {
   if (typeof error !== 'object' || error === null) return null;
   const responseError = (error as { response?: { data?: { error?: unknown } } }).response?.data
     ?.error;

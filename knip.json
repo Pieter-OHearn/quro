@@ -1,0 +1,30 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "playwright": false,
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/**/*.{ts,mjs}", "tests/**/*.ts"],
+      "project": ["scripts/**/*.{ts,mjs}", "tests/**/*.ts"]
+    },
+    "packages/backend": {
+      "entry": [
+        "src/test/householdProbe.ts",
+        "src/db/*.ts",
+        "src/workers/*.ts",
+        "src/**/*.test.ts",
+        "src/**/index.ts"
+      ],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/frontend": {
+      "entry": ["src/**/index.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx,css}"]
+    },
+    "packages/shared": {
+      "entry": ["test/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": ["bun-types"],
+  "ignoreBinaries": ["ruff", "pip-audit"]
+}

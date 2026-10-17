@@ -248,6 +248,7 @@ Repository agent guidance starts at [AGENTS.md](../AGENTS.md).
 bun run dev:doctor # prerequisites; no database, no .env files
 bun run ci:check   # full suite, Python tooling and network audits required
 bun run typecheck
+bun run dead-code  # unused files, dependencies and exports (knip); offline
 bun run docs:check # Markdown links, paths, script names and config variables; offline
 bun run test       # shared/script, backend and frontend; migrated test DB required
 bun run test:ui    # all frontend Bun tests; no browser or DB
@@ -257,6 +258,10 @@ bun run test:smoke # Playwright browser tests; migrates and seeds the test DB
 The [verification table](../AGENTS.md#verification) lists every check with its
 coverage and prerequisites. The pre-commit mode skips DB-backed tests, so a passing
 hook alone does not prove the full suite passed. Report skipped checks with the reason.
+
+The dead-code check treats `index.ts` barrels, tests and the entry points in `knip.json` as
+used. A symbol that only its own file uses must not be exported; remove an export or
+declaration that nothing uses rather than ignoring it.
 
 Install the checked-in Git hook with `gitleaks` on your `PATH`:
 

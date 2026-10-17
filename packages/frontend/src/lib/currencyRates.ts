@@ -10,7 +10,7 @@ export type CurrencyRateApiRow = {
   updatedAt: string;
 };
 
-export type CurrencyRate = {
+type CurrencyRate = {
   id: number;
   fromCurrency: CurrencyCode;
   toCurrency: CurrencyCode;
