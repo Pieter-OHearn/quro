@@ -8,7 +8,7 @@
   in `src/components/ui/`, server state through TanStack Query.
 - `packages/shared`: API types, payloads and money/date helpers; public exports in
   `src/index.ts`. `services/pension-parser` is an optional Python service.
-- Use the Bun version in `.bun-version` (currently 1.4.2), `bun install --frozen-lockfile`,
+- Use the Bun version in `.bun-version` (currently 1.4.3), `bun install --frozen-lockfile`,
   and package manifests for framework versions. See [development](docs/development.md)
   for local setup, including the Docker development overlay and secret files.
 

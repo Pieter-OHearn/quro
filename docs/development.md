@@ -14,7 +14,7 @@ Then open `http://localhost:3000`. The bunq callback for the Docker setup is `ht
 
 | Tool                          | Version and source of truth                                                                                                          | Needed for                                                           |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Bun                           | Bun 1.4.2, pinned in `.bun-version`. CI, the Dockerfiles and these docs must match; `bun run check:bun-version` enforces it.         | Everything                                                           |
+| Bun                           | Bun 1.4.3, pinned in `.bun-version`. CI, the Dockerfiles and these docs must match; `bun run check:bun-version` enforces it.         | Everything                                                           |
 | Python                        | 3.12, as in CI (`.github/workflows/ci.yml`), the parser image and `services/pension-parser/ruff.toml`. Newer 3.x versions also work. | `ci:check` (ruff, compile check, `pip-audit`) and the pension parser |
 | Docker with Compose v2 plugin | `docker compose version` reports v2 or later                                                                                         | The Docker dev stack and a throwaway test database                   |
 | Gitleaks                      | Any current release                                                                                                                  | The checked-in pre-commit hook                                       |
