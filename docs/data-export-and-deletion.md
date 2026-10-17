@@ -23,7 +23,7 @@ The account's own rows: profile, employments, planning assumptions, savings acco
 - **Joint rows.** Joint accounts, properties and mortgages you own are exported in full, not halved, including ledger rows your partner entered on them (`enteredByPartner` is `true` on those). Rows your partner owns are not exported, joint or not: they belong to their account.
 - **Money and currency.** Amounts are numbers in the currency the row names (`currency`, or `sourceCurrency` and `baseCurrency` where a row carries them). Nothing is converted, negative balances and equity keep their sign, and empty values stay empty.
 - **Provenance.** Bank-synced rows keep their source fields, and imported rows keep `importId`, `importSource` and `externalId`.
-- **Never included:** password hash, sessions, sign-in codes, bank-link credentials, encryption keys and storage keys. Exchange rates, the stock exchange list and background job state are shared reference or housekeeping data, not yours.
+- **Never included:** password hash, sessions, sign-in codes, single sign-on links, bank-link credentials, encryption keys and storage keys. Exchange rates, the stock exchange list and background job state are shared reference or housekeeping data, not yours.
 
 ### CSV and spreadsheets
 
@@ -40,7 +40,7 @@ There is no import for this archive yet. Restoring a whole instance is [backup a
 
 ## Deletion
 
-**Settings → Your data → Delete account** asks for your email address and password and shows what will go. It then deletes, in one database transaction, the account and everything it owns: all the rows above, bank links, sessions, sign-in codes and the partner link. An audit row is written in the same transaction; if anything fails, nothing is deleted.
+**Settings → Your data → Delete account** asks for your email address and password and shows what will go. It then deletes, in one database transaction, the account and everything it owns: all the rows above, bank links, sessions, sign-in codes, single sign-on links and the partner link. An audit row is written in the same transaction; if anything fails, nothing is deleted.
 
 | Data                                                              | What happens                                                                                                                                                            |
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

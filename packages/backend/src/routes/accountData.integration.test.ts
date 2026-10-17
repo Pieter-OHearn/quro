@@ -69,6 +69,7 @@ describe('registry', () => {
       'auth_codes',
       'bunq_connections',
       'bunq_oauth_attempts',
+      'oidc_identities',
       'bunq_payment_progress',
       'partner_link_members',
     ]);

@@ -1272,6 +1272,44 @@ export const bunqOauthAttempts = pgTable(
   }),
 );
 
+// A person's identity at the single sign-on provider. The provider's subject never changes, so
+// it, not the email address, finds the account on every sign-in after the first.
+export const oidcIdentities = pgTable(
+  'oidc_identities',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    issuer: text('issuer').notNull(),
+    subject: text('subject').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    subjectIdx: uniqueIndex('oidc_identities_issuer_subject_idx').on(t.issuer, t.subject),
+    userIssuerIdx: uniqueIndex('oidc_identities_user_issuer_idx').on(t.userId, t.issuer),
+  }),
+);
+
+// One sign-in in progress. The browser holds a random token in a cookie and only its digest is
+// stored, so a callback is accepted only from the browser that started the sign-in. The state,
+// nonce and PKCE verifier are single use and live for minutes.
+export const oidcLoginAttempts = pgTable(
+  'oidc_login_attempts',
+  {
+    id: text('id').primaryKey(),
+    state: text('state').notNull(),
+    nonce: text('nonce').notNull(),
+    codeVerifier: text('code_verifier').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    expiresAtIdx: index('oidc_login_attempts_expires_at_idx').on(t.expiresAt),
+    idDigestCheck: check('oidc_login_attempts_id_digest_check', sql`${t.id} ~ '^[0-9a-f]{64}$'`),
+  }),
+);
+
 export const bunqConnections = pgTable(
   'bunq_connections',
   {

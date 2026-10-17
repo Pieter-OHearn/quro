@@ -84,6 +84,7 @@ describe('what the manifest says is required matches what the loader enforces', 
   const SELECTED: Record<keyof typeof FEATURES, Environment> = {
     s3Storage: { QRO_DOCUMENT_STORAGE: 's3' },
     bunq: {},
+    oidc: {},
   };
 
   test.each(Object.keys(FEATURES) as (keyof typeof FEATURES)[])(

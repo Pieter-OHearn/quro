@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FormField, Modal, PasswordInput, TextInput } from '@/components/ui';
-import { useSignInState } from '../hooks';
+import { useRegistrationPolicy, useSignInState } from '../hooks';
 import type { SignInState } from '../types';
+import { SSO_ERROR_PARAM, ssoErrorMessage } from '../utils/sso-error';
 import { PasswordResetForm } from './PasswordResetForm';
+import { SingleSignOnButton, SingleSignOnNotice } from './SingleSignOn';
 import { SubmitButton } from './SubmitButton';
 import { TextLinkButton } from './TextLinkButton';
 
@@ -82,8 +84,34 @@ function SignInForm({ state, onSwitchToSignUp, onForgotPassword }: Readonly<Sign
   );
 }
 
+function SingleSignOn({ name }: Readonly<{ name: string }>) {
+  return (
+    <div className="space-y-4">
+      <SingleSignOnButton name={name} />
+      <p className="text-center text-cell text-fg-muted">or use your email and password</p>
+    </div>
+  );
+}
+
+// The reason a provider sign-in failed, read once from the address and then removed from it.
+function useSsoFailure(): string | null {
+  const [message] = useState(() =>
+    ssoErrorMessage(new URLSearchParams(window.location.search).get(SSO_ERROR_PARAM)),
+  );
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has(SSO_ERROR_PARAM)) {
+      url.searchParams.delete(SSO_ERROR_PARAM);
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, []);
+  return message;
+}
+
 export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalProps>) {
   const state = useSignInState();
+  const { data: policy } = useRegistrationPolicy();
+  const ssoFailure = useSsoFailure();
   const [resetting, setResetting] = useState(false);
 
   return (
@@ -96,11 +124,15 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
       {resetting ? (
         <PasswordResetForm onBackToSignIn={() => setResetting(false)} />
       ) : (
-        <SignInForm
-          state={state}
-          onSwitchToSignUp={onSwitchToSignUp}
-          onForgotPassword={() => setResetting(true)}
-        />
+        <div className="space-y-4">
+          {ssoFailure && <SingleSignOnNotice message={ssoFailure} />}
+          {policy?.singleSignOn && <SingleSignOn name={policy.singleSignOn.name} />}
+          <SignInForm
+            state={state}
+            onSwitchToSignUp={onSwitchToSignUp}
+            onForgotPassword={() => setResetting(true)}
+          />
+        </div>
       )}
     </Modal>
   );

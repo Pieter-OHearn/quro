@@ -21,7 +21,6 @@ Version 1.0 is the release where a hobbyist or developer can install Quro, run i
 
 These are wanted but not part of 1.0:
 
-- Sign-in with an external identity provider (OIDC).
 - Household roles beyond the current partner model.
 - Notifications.
 

@@ -819,6 +819,7 @@ export const SNAPSHOT_EXEMPT: Record<string, string> = {
   sessions: 'compared by id below; last_used_at is refreshed by authenticated reads',
   auth_codes: 'operator-issued codes, not household data',
   bunq_oauth_attempts: 'short-lived OAuth state, not household data',
+  oidc_identities: 'the sign-in provider link of an account, not household data',
 };
 
 export function tablesWithUserColumn(): string[] {

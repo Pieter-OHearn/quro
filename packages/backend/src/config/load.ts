@@ -7,6 +7,7 @@ import {
   DEFAULT_CORS_ORIGINS,
   DEFAULT_SECRETS_KEY_FILE,
   FEATURES,
+  OIDC_PROVIDER_NAME_MAX_LENGTH,
   S3_SELECTION_SIGNALS,
   SETTINGS,
   SettingValueError,
@@ -97,6 +98,18 @@ export type BunqConfig =
       sandbox: boolean;
     };
 
+export type OidcConfig =
+  | { enabled: false }
+  | {
+      enabled: true;
+      /** Issuer URL without a trailing slash. */
+      issuer: string;
+      clientId: string;
+      clientSecret: Secret;
+      redirectUri: string;
+      providerName: string;
+    };
+
 export type RuntimeConfig = {
   environment: NodeEnvironment;
   port: number;
@@ -180,6 +193,7 @@ export type Config = {
   readonly documents: DocumentsConfig;
   readonly s3: S3SourceConfig;
   readonly bunq: BunqConfig;
+  readonly oidc: OidcConfig;
   readonly pensionImport: PensionImportConfig;
   readonly tracing: TracingConfig;
   readonly tools: ToolsConfig;
@@ -594,6 +608,32 @@ function buildBunq(r: Reader): BunqConfig {
   };
 }
 
+function buildOidc(r: Reader): OidcConfig {
+  if (!r.featureConfigured('oidc')) return { enabled: false };
+  const issuer = r.get('OIDC_ISSUER');
+  const clientId = r.get('OIDC_CLIENT_ID');
+  const clientSecret = r.secretValueOrFile('OIDC_CLIENT_SECRET', 'OIDC_CLIENT_SECRET_FILE');
+  const redirectUri = r.get('OIDC_REDIRECT_URI');
+  const providerName = r.must('OIDC_PROVIDER_NAME');
+  if (providerName !== undefined && providerName.length > OIDC_PROVIDER_NAME_MAX_LENGTH) {
+    r.fail('OIDC_PROVIDER_NAME', `must be at most ${OIDC_PROVIDER_NAME_MAX_LENGTH} characters`);
+  }
+  const present = new Set<SettingName>();
+  if (issuer) present.add('OIDC_ISSUER');
+  if (clientId) present.add('OIDC_CLIENT_ID');
+  if (clientSecret) present.add('OIDC_CLIENT_SECRET');
+  if (redirectUri) present.add('OIDC_REDIRECT_URI');
+  if (!r.requireFeatureSettings('oidc', present)) return { enabled: false };
+  return {
+    enabled: true,
+    issuer: issuer!,
+    clientId: clientId!,
+    clientSecret: clientSecret!,
+    redirectUri: redirectUri!,
+    providerName,
+  };
+}
+
 function buildPensionImport(r: Reader): PensionImportConfig {
   return {
     parserUrl: r.get('PENSION_PARSER_URL') ?? null,
@@ -690,6 +730,7 @@ const BUILDERS: SectionBuilders = {
   documents: buildDocuments,
   s3: buildS3Source,
   bunq: buildBunq,
+  oidc: buildOidc,
   pensionImport: buildPensionImport,
   tracing: buildTracing,
   tools: buildTools,

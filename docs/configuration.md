@@ -146,6 +146,21 @@ Bank linking with [bunq](https://www.bunq.com/) is off until one of these settin
 
 A secret file alone, at its default path, does not switch bunq on. To use the files, add the secrets to the `backend` service and declare them in the top-level `secrets` of `compose.yaml`, as for [S3](install.md#existing-s3-compatible-store).
 
+### Single sign-on
+
+Sign-in through an [OpenID Connect](https://openid.net/connect/) provider such as Authelia, Keycloak or Google is off until one of these settings is present; then `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` (as a value or a file) and `OIDC_REDIRECT_URI` are all required, and a partial set stops the backend. Passwords keep working next to it. [The security model](security.md#single-sign-on) says how a provider sign-in finds the account.
+
+| Setting                   | Default                           | Notes                                                                                                             |
+| ------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `OIDC_ISSUER`             | unset                             | The provider's issuer URL, which serves `/.well-known/openid-configuration`. `https`, or `http` on localhost only |
+| `OIDC_CLIENT_ID`          | unset                             | Quro's client id at the provider                                                                                  |
+| `OIDC_CLIENT_SECRET`      | unset                             | Client secret. Prefer the file                                                                                    |
+| `OIDC_CLIENT_SECRET_FILE` | `/run/secrets/oidc_client_secret` | File holding the client secret, used when `OIDC_CLIENT_SECRET` is unset                                           |
+| `OIDC_REDIRECT_URI`       | unset                             | The redirect URI registered with the provider: your origin followed by `/api/auth/oidc/callback`                  |
+| `OIDC_PROVIDER_NAME`      | `SSO`                             | Name on the sign-in button, "Sign in with NAME". At most 40 characters                                            |
+
+Register Quro at the provider as a confidential client for the authorization code flow with PKCE (`S256`), the scopes `openid`, `profile` and `email`, and client authentication with HTTP Basic (`client_secret_basic`). A secret file alone, at its default path, does not switch single sign-on on. To use the file, add the secret to the `backend` service and declare it in the top-level `secrets` of `compose.yaml`, as for [S3](install.md#existing-s3-compatible-store).
+
 ### Integration secrets
 
 Quro stores the bank-link tokens and keys of connected bunq accounts encrypted with a key that lives in a file, never in the database or a backup. [The security model](security.md#integration-secrets) describes the format; [backup and restore](backup-and-restore.md#what-an-archive-contains) says where to keep the key.
