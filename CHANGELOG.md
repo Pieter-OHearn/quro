@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [v1.0.0-rc.2] - 2026-10-17
+
+Quro 1.0.0-rc.2 fixes how Quro looks when it is opened from an iPhone's home screen. It has no migration and needs no operator action beyond pinning the new images; see the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc1-to-100-rc2).
+
+### Fixed
+
+- Opened from a phone's home screen, the app header, the navigation drawer, the landing page and the currency rates screen clear the faded strip below the status bar, so the top of the currency selector is drawn in full.
+- The tab bar and the page above it use half the bottom safe-area padding, so the labels sit closer to the bottom edge while still clearing the home indicator.
+
 ## [v1.0.0-rc.1] - 2026-10-16
 
 Quro 1.0.0-rc.1 is the release candidate for 1.0.0. It adds account export and deletion, a reviewed CSV import, first-run guidance, structured logs and operational checks in `quro doctor`, bounded text fields, and a phone layout with cards, accessible charts and honest stale-data notices. Read the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1) before you upgrade, and back up with 0.9.0 first: one migration drops columns and cannot be undone.
