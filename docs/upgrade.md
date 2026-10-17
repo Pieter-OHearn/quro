@@ -171,7 +171,7 @@ Needs no settings and no database.
   "version": "v1.0.0-rc.1",
   "revision": "<commit the image was built from>",
   "migrations": { "latest": "0043_csv_imports", "count": 44 },
-  "runtime": { "bun": "1.4.2", "platform": "linux", "arch": "arm64" }
+  "runtime": { "bun": "1.4.3", "platform": "linux", "arch": "arm64" }
 }
 ```
 
