@@ -1299,6 +1299,10 @@ export const EXEMPT_ROUTES: Record<string, string> = {
   'GET /api/readiness': 'public by design; reports service readiness only',
   'GET /api/readiness/pension-import': 'public by design; reports parser readiness only',
   'GET /api/auth/registration': 'public by design; covered by authAccess.integration.test.ts',
+  'GET /api/auth/oidc/login':
+    'public redirect to the provider; covered by oidc.integration.test.ts',
+  'GET /api/auth/oidc/callback':
+    'public; the attempt cookie identifies it; covered by oidc.integration.test.ts',
   'POST /api/auth/signup': 'public; covered by authAccess and the dynamic deployment tests',
   'POST /api/auth/signin': 'public; covered by authAccess and the dynamic deployment tests',
   'POST /api/auth/password-reset': 'public; covered by authAccess.integration.test.ts',

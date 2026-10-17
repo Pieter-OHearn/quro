@@ -19,6 +19,7 @@ export type SettingGroup =
   | 'Database'
   | 'Document storage'
   | 'bunq'
+  | 'Single sign-on'
   | 'Integration secrets'
   | 'Statement import'
   | 'Tracing'
@@ -28,7 +29,7 @@ export type SettingGroup =
 
 // Named up front because the settings below refer to their features and the features to the
 // settings; `FEATURES` is checked against this list.
-export type FeatureName = 's3Storage' | 'bunq';
+export type FeatureName = 's3Storage' | 'bunq' | 'oidc';
 
 /** When the loader reports a missing value for this setting. */
 export type SettingRequirement =
@@ -169,6 +170,43 @@ const httpOrigin = (meta: Meta<string>) =>
     (raw) => {
       if (!isHttpUrl(raw)) throw new SettingValueError('must be an http or https URL');
       return new URL(raw).origin;
+    },
+    meta,
+  );
+
+export const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+const OIDC_CALLBACK_PATH = '/api/auth/oidc/callback';
+export const OIDC_PROVIDER_NAME_MAX_LENGTH = 40;
+
+/** The provider's issuer URL without a trailing slash. Plain HTTP is for a provider on loopback. */
+const oidcIssuer = (meta: Meta<string>) =>
+  define(
+    'https URL',
+    (raw) => {
+      if (!isHttpUrl(raw)) throw new SettingValueError('must be an https URL');
+      const url = new URL(raw);
+      if (url.protocol !== 'https:' && !LOOPBACK_HOSTNAMES.has(url.hostname)) {
+        throw new SettingValueError('must be an https URL (http is accepted only on localhost)');
+      }
+      if (url.search || url.hash) {
+        throw new SettingValueError('must not have a query or a fragment');
+      }
+      return raw.replace(/\/+$/, '');
+    },
+    meta,
+  );
+
+const oidcRedirectUri = (meta: Meta<string>) =>
+  define(
+    'http(s) URL',
+    (raw) => {
+      if (!isHttpUrl(raw)) throw new SettingValueError('must be an http or https URL');
+      const url = new URL(raw);
+      if (url.pathname !== OIDC_CALLBACK_PATH || url.search || url.hash) {
+        throw new SettingValueError(`must have the path ${OIDC_CALLBACK_PATH}, with no query`);
+      }
+      return raw;
     },
     meta,
   );
@@ -495,6 +533,49 @@ export const SETTINGS = defineSettings({
     default: false,
   }),
 
+  // ── Single sign-on ───────────────────────────────────────────────────────
+  OIDC_ISSUER: oidcIssuer({
+    group: 'Single sign-on',
+    audience: 'operator',
+    description:
+      'Issuer URL of your OpenID Connect provider, the address that serves `/.well-known/openid-configuration`. Setting any OIDC_* setting turns single sign-on on.',
+    requirement: { kind: 'feature', feature: 'oidc' },
+    example: 'https://auth.example.com',
+  }),
+  OIDC_CLIENT_ID: text({
+    group: 'Single sign-on',
+    audience: 'operator',
+    description: 'Client id of Quro at the provider.',
+    requirement: { kind: 'feature', feature: 'oidc' },
+    example: 'quro',
+  }),
+  OIDC_CLIENT_SECRET: secretValue({
+    group: 'Single sign-on',
+    audience: 'operator',
+    description: 'Client secret. Alternatively use OIDC_CLIENT_SECRET_FILE.',
+    requirement: { kind: 'feature', feature: 'oidc' },
+  }),
+  OIDC_CLIENT_SECRET_FILE: path({
+    group: 'Single sign-on',
+    audience: 'operator',
+    description: 'File holding the client secret. Used when OIDC_CLIENT_SECRET is unset.',
+    secret: 'file',
+    default: '/run/secrets/oidc_client_secret',
+  }),
+  OIDC_REDIRECT_URI: oidcRedirectUri({
+    group: 'Single sign-on',
+    audience: 'operator',
+    description: `Redirect URI registered with the provider. Your origin followed by ${OIDC_CALLBACK_PATH}.`,
+    requirement: { kind: 'feature', feature: 'oidc' },
+    example: `https://quro.example.com${OIDC_CALLBACK_PATH}`,
+  }),
+  OIDC_PROVIDER_NAME: text({
+    group: 'Single sign-on',
+    audience: 'operator',
+    description: `Name on the sign-in button: "Sign in with NAME". At most ${OIDC_PROVIDER_NAME_MAX_LENGTH} characters.`,
+    default: 'SSO',
+  }),
+
   // ── Integration secrets ──────────────────────────────────────────────────
   QRO_SECRETS_KEY_FILE: path({
     group: 'Integration secrets',
@@ -688,6 +769,19 @@ export const FEATURES = {
       'FRONTEND_ORIGIN',
       'QRO_SECRETS_KEY_FILE',
     ],
+  },
+  // Accounts are never created from a provider login: the person must already have a Quro
+  // account, which the first sign-in links to their identity (docs/security.md).
+  oidc: {
+    label: 'single sign-on',
+    enabledBy: [
+      'OIDC_ISSUER',
+      'OIDC_CLIENT_ID',
+      'OIDC_CLIENT_SECRET',
+      'OIDC_CLIENT_SECRET_FILE',
+      'OIDC_REDIRECT_URI',
+    ],
+    requires: ['OIDC_ISSUER', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_REDIRECT_URI'],
   },
 } as const satisfies Record<
   FeatureName,

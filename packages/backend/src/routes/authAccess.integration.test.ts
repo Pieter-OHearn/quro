@@ -66,7 +66,7 @@ describe('registration policy', () => {
       const response = await integration.request('/api/auth/registration');
       expect(response.status).toBe(200);
       expect(await json(response)).toEqual({
-        data: { signUp: signUpRule, setupRequired: false },
+        data: { signUp: signUpRule, setupRequired: false, singleSignOn: null },
       });
     }
   });

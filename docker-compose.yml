@@ -77,6 +77,11 @@ services:
       BUNQ_CLIENT_SECRET: ${BUNQ_CLIENT_SECRET:-}
       BUNQ_REDIRECT_URI: ${BUNQ_REDIRECT_URI:-}
       BUNQ_SANDBOX: ${BUNQ_SANDBOX:-true}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-SSO}
     secrets:
       - postgres_app_password
     volumes:

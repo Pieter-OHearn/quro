@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ModalType } from '../types';
+import { SSO_ERROR_PARAM } from '../utils/sso-error';
 
 type LandingModalState = {
   modal: ModalType;
@@ -9,7 +10,10 @@ type LandingModalState = {
 };
 
 export function useLandingModal(): LandingModalState {
-  const [modal, setModal] = useState<ModalType>(null);
+  // A failed provider sign-in returns here with `?sso=<reason>`: open the sign-in form to show it.
+  const [modal, setModal] = useState<ModalType>(() =>
+    new URLSearchParams(window.location.search).has(SSO_ERROR_PARAM) ? 'signin' : null,
+  );
 
   return {
     modal,

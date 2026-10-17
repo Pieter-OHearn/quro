@@ -1,6 +1,6 @@
 import { getConfig } from '../config';
 import { db } from '../db/client';
-import { sessions } from '../db/schema';
+import { oidcLoginAttempts, sessions } from '../db/schema';
 import { lt } from 'drizzle-orm';
 import { startIntervalJob } from './intervalJob';
 import { purgeStaleAuthCodes } from './authCodes';
@@ -14,6 +14,7 @@ export function startSessionCleanup(): void {
     coordinated: true,
     run: async () => {
       await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
+      await db.delete(oidcLoginAttempts).where(lt(oidcLoginAttempts.expiresAt, new Date()));
       await purgeStaleAuthCodes();
     },
   });

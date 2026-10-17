@@ -144,6 +144,12 @@ export type RegistrationPolicy = {
   setupRequired: boolean;
 };
 
+/** What the sign-in and sign-up forms need to know before anyone is signed in. */
+export type PublicAuthPolicy = RegistrationPolicy & {
+  /** The provider's button label, or null when single sign-on is not set up. */
+  singleSignOn: { name: string } | null;
+};
+
 export type UserSession = {
   id: string;
   current: boolean;
