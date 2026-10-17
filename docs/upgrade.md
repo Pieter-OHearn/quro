@@ -168,7 +168,7 @@ Needs no settings and no database.
 
 ```json
 {
-  "version": "v1.0.0-rc.1",
+  "version": "v1.0.0-rc.2",
   "revision": "<commit the image was built from>",
   "migrations": { "latest": "0043_csv_imports", "count": 44 },
   "runtime": { "bun": "1.4.2", "platform": "linux", "arch": "arm64" }
@@ -477,3 +477,9 @@ What the operator does: nothing. The import needs no setting. The tables come wi
 What the operator does: nothing.
 
 After a failed cycle a background job waits a minute, then two, doubling up to its normal interval, instead of retrying at every poll. `quro doctor` shows a job that keeps failing.
+
+### Upgrade from 1.0.0-rc.1 to 1.0.0-rc.2
+
+1.0.0-rc.2 changes only the frontend's layout on phones. It has no migration, no setting changes and no API changes.
+
+What the operator does: pin the 1.0.0-rc.2 images of both services (step 2 of the general procedure) and restart as usual. A backup before the upgrade is still good practice, and the general procedure takes one, but nothing in this release changes your data.
