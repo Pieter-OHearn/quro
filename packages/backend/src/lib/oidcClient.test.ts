@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
+import { SignJWT } from 'jose';
 import {
   OidcError,
   buildAuthorizationUrl,
@@ -14,15 +15,17 @@ import {
   FAKE_CLIENT_ID,
   FAKE_CLIENT_SECRET,
   FAKE_REDIRECT_URI,
+  newSigningKey,
   startFakeProvider,
+  type SigningAlgorithm,
   type FakeProvider,
 } from '../test/oidcProvider';
 
 let provider: FakeProvider;
 let settings: OidcClientSettings;
 
-beforeAll(() => {
-  provider = startFakeProvider();
+beforeAll(async () => {
+  provider = await startFakeProvider();
   settings = {
     issuer: provider.issuer,
     clientId: FAKE_CLIENT_ID,
@@ -38,17 +41,19 @@ afterEach(() => {
 
 afterAll(() => provider.stop());
 
-function idToken(claims: Record<string, unknown>) {
-  const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  return `${part({ alg: 'RS256' })}.${part(claims)}.c2ln`;
-}
+const signed = (claims: Record<string, unknown>) => provider.sign(claims);
+const unsignedPart = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const verify = async (token: string, now = NOW, nonce = 'n-1') =>
+  verifyIdToken(token, await discoverEndpoints(settings, now), FAKE_CLIENT_ID, nonce, now);
 
+const MINUTE = 60_000;
 const NOW = Date.UTC(2026, 9, 17, 12);
 const goodClaims = () => ({
   iss: provider.issuer,
   aud: [FAKE_CLIENT_ID],
   sub: 'abc',
   nonce: 'n-1',
+  iat: NOW / 1000,
   exp: NOW / 1000 + 600,
 });
 
@@ -81,6 +86,7 @@ describe('discovery', () => {
         authorization_endpoint: 'https://auth.example/authorize',
         token_endpoint: token,
         userinfo_endpoint: 'https://auth.example/userinfo',
+        jwks_uri: 'https://auth.example/jwks',
       });
     const fetchSpy = spyOn(globalThis, 'fetch');
     try {
@@ -106,12 +112,19 @@ describe('discovery', () => {
     provider.discovery.issuer = `${provider.issuer}/`;
     const endpoints = await discoverEndpoints(settings);
     expect(endpoints.issuer).toBe(`${provider.issuer}/`);
-    const claims = { ...goodClaims(), iss: `${provider.issuer}/` };
-    const expected = { issuer: endpoints.issuer, clientId: FAKE_CLIENT_ID };
-    expect(verifyIdToken(idToken(claims), expected, 'n-1', NOW)).toBe('abc');
+    const slash = await signed({ ...goodClaims(), iss: `${provider.issuer}/` });
+    expect(await verify(slash)).toBe('abc');
     // The other spelling is a different issuer.
-    const bare = { ...goodClaims(), iss: provider.issuer };
-    expect(() => verifyIdToken(idToken(bare), expected, 'n-1', NOW)).toThrow('wrong issuer');
+    const bare = await signed({ ...goodClaims(), iss: provider.issuer });
+    await expect(verify(bare)).rejects.toThrow('wrong issuer');
+  });
+
+  test('refuses a document without a signing key address, or an insecure one', async () => {
+    provider.discovery.jwks_uri = undefined;
+    await expect(discoverEndpoints(settings)).rejects.toThrow('missing');
+    resetOidcDiscovery();
+    provider.discovery.jwks_uri = 'ftp://keys.example/jwks';
+    await expect(discoverEndpoints(settings)).rejects.toThrow('not https');
   });
 
   test('does not follow a redirect, so a secret is not sent on', async () => {
@@ -138,6 +151,7 @@ describe('discovery', () => {
         authorization: `${moved.issuer}/a`,
         token: `${moved.issuer}/t`,
         userinfo: `${moved.issuer}/u`,
+        jwks: `${moved.issuer}/k`,
       };
       await expect(exchangeCode(endpoints, settings, 'code', 'verifier')).rejects.toThrow(
         OidcError,
@@ -210,7 +224,7 @@ describe('token exchange', () => {
     const endpoints = await discoverEndpoints(settings);
     provider.grant('code-1', { nonce: 'n-1', challenge: pkceChallenge('v-1'), subject: 'abc' });
     const tokens = await exchangeCode(endpoints, settings, 'code-1', 'v-1');
-    expect(verifyIdToken(tokens.idToken, settings, 'n-1')).toBe('abc');
+    expect(await verifyIdToken(tokens.idToken, endpoints, FAKE_CLIENT_ID, 'n-1')).toBe('abc');
   });
 
   test('fails when the provider refuses the code', async () => {
@@ -234,47 +248,175 @@ describe('token exchange', () => {
 });
 
 describe('ID token', () => {
-  test('accepts a token for this client and sign-in', () => {
-    expect(verifyIdToken(idToken(goodClaims()), settings, 'n-1', NOW)).toBe('abc');
+  test('accepts a token for this client and sign-in', async () => {
+    expect(await verify(await signed(goodClaims()))).toBe('abc');
   });
 
-  test('checks the claims and not the signature', () => {
-    // The token came from the token endpoint over TLS (OpenID Connect Core 3.1.3.7), so its claims
-    // are checked and its signature is not. A token that fails any claim is refused.
-    const noSignature = idToken(goodClaims()).split('.').slice(0, 2).join('.') + '.';
-    expect(verifyIdToken(noSignature, settings, 'n-1', NOW)).toBe('abc');
-    expect(() =>
-      verifyIdToken(idToken({ ...goodClaims(), iss: undefined }), settings, 'n-1', NOW),
-    ).toThrow('wrong issuer');
-    expect(() =>
-      verifyIdToken(idToken({ ...goodClaims(), aud: undefined }), settings, 'n-1', NOW),
-    ).toThrow('wrong audience');
-    expect(() =>
-      verifyIdToken(idToken({ ...goodClaims(), nonce: undefined }), settings, 'n-1', NOW),
-    ).toThrow('wrong nonce');
+  test.each(['ES256', 'RS256', 'PS256', 'EdDSA'] as SigningAlgorithm[])(
+    'accepts a %s signature from the published key',
+    async (alg) => {
+      const original = provider.key;
+      try {
+        await provider.rotateKey(alg);
+        expect(await verify(await signed(goodClaims()))).toBe('abc');
+      } finally {
+        await provider.rotateKey(original.alg);
+      }
+    },
+  );
+
+  test('refuses a signature from a key the provider does not publish', async () => {
+    const stranger = await newSigningKey(provider.key.alg);
+    // Under the published key's id, so the right key is chosen and the signature fails.
+    const sameId = { ...stranger, kid: provider.key.kid };
+    const forged = await provider.sign(goodClaims(), { key: sameId });
+    await expect(verify(forged)).rejects.toThrow('does not verify');
+    // Under its own id, which the provider does not publish at all.
+    const unknown = await provider.sign(goodClaims(), { key: stranger });
+    await expect(verify(unknown, NOW + 2 * MINUTE)).rejects.toThrow('no signing key matches');
+  });
+
+  test('refuses a payload that was changed after signing', async () => {
+    const [header, , signature] = (await signed(goodClaims())).split('.');
+    const payload = unsignedPart({ ...goodClaims(), sub: 'someone-else' });
+    await expect(verify(`${header}.${payload}.${signature}`)).rejects.toThrow('does not verify');
+  });
+
+  test('refuses an unsigned token and the algorithm `none`', async () => {
+    const header = unsignedPart({ alg: 'none', typ: 'JWT' });
+    const payload = unsignedPart(goodClaims());
+    await expect(verify(`${header}.${payload}.`)).rejects.toThrow('algorithm is not allowed');
+    const stripped = (await signed(goodClaims())).split('.').slice(0, 2).join('.') + '.';
+    await expect(verify(stripped)).rejects.toThrow();
+  });
+
+  test('refuses HMAC algorithms, even keyed with the provider public key', async () => {
+    const secret = new TextEncoder().encode(JSON.stringify(provider.key.jwk));
+    for (const alg of ['HS256', 'HS384', 'HS512']) {
+      const token = await new SignJWT(goodClaims())
+        .setProtectedHeader({ alg, kid: provider.key.kid })
+        .sign(secret);
+      await expect(verify(token)).rejects.toThrow('algorithm is not allowed');
+    }
+  });
+
+  test('finds a rotated key once, and not more often than the interval', async () => {
+    const original = provider.key;
+    try {
+      await verify(await signed(goodClaims()));
+      const rotated = await provider.rotateKey('ES256');
+      const token = await provider.sign(goodClaims(), { key: rotated });
+      const fetches = () => provider.requests.filter((path) => path === '/jwks').length;
+      const before = fetches();
+      // Inside the interval the cached keys are not asked again.
+      await expect(verify(token, NOW + 10_000)).rejects.toThrow('no signing key matches');
+      expect(fetches()).toBe(before);
+      // After it, one fetch finds the new key.
+      expect(await verify(token, NOW + 2 * MINUTE)).toBe('abc');
+      expect(fetches()).toBe(before + 1);
+      // Tokens with invented key ids cause no further fetching within the interval.
+      const invented = await provider.sign(goodClaims(), {
+        key: { ...rotated, kid: 'invented' },
+      });
+      for (let index = 0; index < 5; index += 1) {
+        await expect(verify(invented, NOW + 2 * MINUTE + 1000)).rejects.toThrow();
+      }
+      expect(fetches()).toBe(before + 1);
+    } finally {
+      await provider.rotateKey(original.alg);
+    }
   });
 
   test.each([
     ['another issuer', { iss: 'https://evil.example' }, 'wrong issuer'],
+    ['no issuer', { iss: undefined }, 'wrong issuer'],
     ['another audience', { aud: ['someone-else'] }, 'wrong audience'],
+    ['no audience', { aud: undefined }, 'wrong audience'],
     ['several audiences without azp', { aud: [FAKE_CLIENT_ID, 'other'] }, 'authorized party'],
     ['a stale expiry', { exp: NOW / 1000 - 120 }, 'expired'],
     ['no expiry', { exp: undefined }, 'expired'],
+    ['not yet valid', { nbf: NOW / 1000 + 600 }, 'expired'],
+    ['issued in the future', { iat: NOW / 1000 + 600 }, 'future'],
+    ['no issue time', { iat: undefined }, 'missing'],
     ['another nonce', { nonce: 'n-2' }, 'wrong nonce'],
+    ['no nonce', { nonce: undefined }, 'wrong nonce'],
     ['no subject', { sub: '' }, 'no subject'],
-  ])('rejects %s', (_label, change, message) => {
-    const claims = { ...goodClaims(), ...change };
-    expect(() => verifyIdToken(idToken(claims), settings, 'n-1', NOW)).toThrow(message);
+  ])('rejects %s', async (_label, change, message) => {
+    const token = await signed({ ...goodClaims(), ...change });
+    await expect(verify(token)).rejects.toThrow(message);
   });
 
-  test('accepts several audiences when azp names this client', () => {
+  test('allows a minute of clock skew', async () => {
+    expect(await verify(await signed({ ...goodClaims(), exp: NOW / 1000 - 30 }))).toBe('abc');
+    expect(await verify(await signed({ ...goodClaims(), iat: NOW / 1000 + 30 }))).toBe('abc');
+  });
+
+  test('accepts several audiences when azp names this client', async () => {
     const claims = { ...goodClaims(), aud: [FAKE_CLIENT_ID, 'other'], azp: FAKE_CLIENT_ID };
-    expect(verifyIdToken(idToken(claims), settings, 'n-1', NOW)).toBe('abc');
+    expect(await verify(await signed(claims))).toBe('abc');
   });
 
-  test('rejects something that is not a JWT', () => {
-    expect(() => verifyIdToken('nonsense', settings, 'n-1', NOW)).toThrow('not a JWT');
-    expect(() => verifyIdToken('a.!!.c', settings, 'n-1', NOW)).toThrow('JSON object');
+  test('rejects something that is not a JWT', async () => {
+    await expect(verify('nonsense')).rejects.toThrow('not a JWT');
+    await expect(verify('a.!!.c')).rejects.toThrow('not a JWT');
+  });
+
+  test('reports keys that cannot be fetched as an ID token failure without the address', async () => {
+    provider.discovery.jwks_uri = 'http://127.0.0.1:1/jwks';
+    const error = await verify(await signed(goodClaims())).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OidcError);
+    expect((error as OidcError).reason).toBe('id_token');
+    expect((error as Error).message).not.toContain('127.0.0.1');
+  });
+
+  test('refuses key sets that are too large, empty or not a key set', async () => {
+    const answers: unknown[] = [
+      { filler: 'x'.repeat(1_100_000), keys: [] },
+      { keys: Array.from({ length: 60 }, () => provider.key.jwk) },
+      { keys: [] },
+      { keys: 'nope' },
+    ];
+    let next = 0;
+    const server = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: () => Response.json(answers[next++]),
+    });
+    try {
+      provider.discovery.jwks_uri = `http://127.0.0.1:${server.port}/jwks`;
+      const token = await signed(goodClaims());
+      for (let index = 0; index < answers.length; index += 1) {
+        resetOidcDiscovery();
+        await expect(verify(token)).rejects.toThrow(OidcError);
+      }
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  test('does not follow a redirect from the key address', async () => {
+    let reached = 0;
+    const elsewhere = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: () => {
+        reached += 1;
+        return Response.json({ keys: [provider.key.jwk] });
+      },
+    });
+    const redirecting = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: () => Response.redirect(`http://localhost:${elsewhere.port}/jwks`, 302),
+    });
+    try {
+      provider.discovery.jwks_uri = `http://127.0.0.1:${redirecting.port}/jwks`;
+      await expect(verify(await signed(goodClaims()))).rejects.toThrow(OidcError);
+      expect(reached).toBe(0);
+    } finally {
+      await redirecting.stop(true);
+      await elsewhere.stop(true);
+    }
   });
 });
 

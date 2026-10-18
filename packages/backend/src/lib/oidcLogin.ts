@@ -140,9 +140,10 @@ export async function finishOidcLogin(
   try {
     const endpoints = await discoverEndpoints(settings, now.getTime());
     const tokens = await exchangeCode(endpoints, settings, input.code, attempt.codeVerifier);
-    const subject = verifyIdToken(
+    const subject = await verifyIdToken(
       tokens.idToken,
-      { issuer: endpoints.issuer, clientId: settings.clientId },
+      endpoints,
+      settings.clientId,
       attempt.nonce,
       now.getTime(),
     );

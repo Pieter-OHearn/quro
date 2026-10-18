@@ -43,6 +43,7 @@ test('ignores expected auth endpoint 401 responses', () => {
 
   notifyUnauthorizedResponse(401, '/api/auth/me');
   notifyUnauthorizedResponse(401, '/api/auth/signin');
+  notifyUnauthorizedResponse(401, '/api/settings/single-sign-on');
   notifyUnauthorizedResponse(403, '/api/savings/accounts');
 
   expect(handler).not.toHaveBeenCalled();

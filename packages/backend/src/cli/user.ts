@@ -10,9 +10,11 @@ import {
   REGISTRATION_CODE_TTL_MS,
   revokeAuthCode,
 } from '../lib/authCodes';
+import { runUnlessMaintenance } from '../lib/maintenanceMode';
+import { listOidcLinks, removeOidcLinks } from '../lib/oidcLink';
 import { getRegistrationMode, getRegistrationPolicy } from '../lib/registration';
 import { revokeUserSessions } from '../lib/sessions';
-import { EXIT_FAILURE, EXIT_OK, UsageError, type CommandIo } from './io';
+import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, UsageError, type CommandIo } from './io';
 
 // Instance-operator commands. Operator authority comes from host access to the backend's
 // runtime configuration and database; there is no in-app operator role. Commands show account
@@ -22,6 +24,8 @@ const MAX_INVITE_DAYS = 30;
 const MAX_INVITE_HOURS = (MAX_INVITE_DAYS * DAY_MS) / HOUR_MS;
 const MAX_RESET_MINUTES = DAY_MS / MINUTE_MS;
 const OPTION_PREFIX = '--';
+// Options that stand alone, without a value.
+const FLAG_OPTIONS = new Set(['yes']);
 
 export const USER_USAGE = `Usage: quro user <command> [options]
 
@@ -32,6 +36,9 @@ Commands:
   reset-password <email> [--minutes <n>] Issue a single-use password reset code (default ${PASSWORD_RESET_CODE_TTL_MS / MINUTE_MS} min, max ${MAX_RESET_MINUTES} min)
   revoke-sessions <email>                Sign an account out of every browser
   list                                   List accounts with their active session count
+  oidc status <email>                     Whether the account is linked to the single sign-on provider
+  oidc unlink <email> --yes              Remove that link; the next provider sign-in links again by
+                                         verified email. Without --yes it changes nothing.
   codes                                  List issued codes (code values are never stored)
   revoke-code <id>                       Withdraw an unused code
 
@@ -39,23 +46,33 @@ In Docker Compose: docker compose exec backend quro user <command>`;
 
 type ParsedArgs = { positionals: string[]; options: Map<string, string> };
 
+/** Reads the option at `args[index]`; returns how many arguments it used. */
+function readOption(args: readonly string[], index: number, options: Map<string, string>): number {
+  const [name = '', ...inlineParts] = args[index]!.slice(OPTION_PREFIX.length).split('=');
+  if (FLAG_OPTIONS.has(name) && inlineParts.length === 0) {
+    options.set(name, 'true');
+    return 1;
+  }
+  const inline = inlineParts.length > 0;
+  const value = inline ? inlineParts.join('=') : args[index + 1];
+  if (!name || value === undefined || value.startsWith(OPTION_PREFIX)) {
+    throw new UsageError(`Missing value for --${name}`);
+  }
+  options.set(name, value);
+  return inline ? 1 : 2;
+}
+
 function parseArgs(args: readonly string[]): ParsedArgs {
   const positionals: string[] = [];
   const options = new Map<string, string>();
-  for (let i = 0; i < args.length; i += 1) {
+  for (let i = 0; i < args.length;) {
     const arg = args[i]!;
-    if (!arg.startsWith(OPTION_PREFIX)) {
+    if (arg.startsWith(OPTION_PREFIX)) {
+      i += readOption(args, i, options);
+    } else {
       positionals.push(arg);
-      continue;
+      i += 1;
     }
-    const [name = '', ...inlineParts] = arg.slice(OPTION_PREFIX.length).split('=');
-    const inline = inlineParts.length > 0;
-    const value = inline ? inlineParts.join('=') : args[i + 1];
-    if (!name || value === undefined || value.startsWith(OPTION_PREFIX)) {
-      throw new UsageError(`Missing value for --${name}`);
-    }
-    if (!inline) i += 1;
-    options.set(name, value);
   }
   return { positionals, options };
 }
@@ -175,6 +192,67 @@ async function revokeSessions(parsed: ParsedArgs, io: CommandIo) {
   return EXIT_OK;
 }
 
+function oidcStatus(
+  email: string,
+  links: Awaited<ReturnType<typeof listOidcLinks>>,
+  io: CommandIo,
+) {
+  if (links.length === 0) {
+    io.out(`${email} is not linked to a single sign-on provider.`);
+    return;
+  }
+  for (const link of links) {
+    io.out(`${email} is linked to ${link.issuer} since ${formatTime(link.linkedAt)}.`);
+  }
+}
+
+async function oidcUnlink(userId: number, email: string, confirmed: boolean, io: CommandIo) {
+  if (!confirmed) {
+    io.err(`This removes the single sign-on link of ${email}. Sessions stay signed in, and the`);
+    io.err('next provider sign-in links again by verified email. Nothing was changed.');
+    io.err('Run the command again with --yes to unlink.');
+    return EXIT_REFUSED;
+  }
+  const outcome = await runUnlessMaintenance(() => removeOidcLinks(userId));
+  if (!outcome.ran) {
+    io.err(
+      'Quro is being backed up or restored, so changes are paused. Run the command again when it has finished.',
+    );
+    return EXIT_FAILURE;
+  }
+  io.out(
+    `Removed ${outcome.value} single sign-on link${outcome.value === 1 ? '' : 's'} of ${email}.`,
+  );
+  return EXIT_OK;
+}
+
+async function oidcCommand(parsed: ParsedArgs, io: CommandIo) {
+  assertOnlyOptions(parsed, ['yes']);
+  const action = parsed.positionals[1];
+  if (action !== 'status' && action !== 'unlink') {
+    throw new UsageError(
+      'Usage: quro user oidc status <email> | quro user oidc unlink <email> --yes',
+    );
+  }
+  assertArguments(parsed, ['action', 'email']);
+  const email = parsed.positionals[2];
+  const userId = await findUserIdByEmail(email);
+  if (userId === null) {
+    io.err(`No account uses ${email}`);
+    return EXIT_FAILURE;
+  }
+  const links = await listOidcLinks(userId);
+  if (action === 'status') {
+    oidcStatus(email!, links, io);
+    return EXIT_OK;
+  }
+  if (links.length === 0) {
+    io.out(`${email} is not linked to a single sign-on provider. Nothing to do.`);
+    return EXIT_OK;
+  }
+  return oidcUnlink(userId, email!, parsed.options.get('yes') === 'true', io);
+}
+
 async function listUsers(io: CommandIo) {
   const rows = await db
     .select({
@@ -259,6 +337,7 @@ const COMMANDS: Record<string, CommandHandler> = {
   list: (parsed, io) => runWithoutArguments(parsed, listUsers, io),
   codes: (parsed, io) => runWithoutArguments(parsed, listCodes, io),
   'revoke-code': revokeCode,
+  oidc: oidcCommand,
 };
 
 /** Runs `quro user <command>`; `args` starts at the command name. Usage errors throw. */

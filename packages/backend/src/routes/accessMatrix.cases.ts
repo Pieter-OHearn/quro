@@ -1310,6 +1310,9 @@ export const EXEMPT_ROUTES: Record<string, string> = {
   'GET /api/settings/account': 'reads only the caller; covered by accountData.integration.test.ts',
   'DELETE /api/settings/account':
     'acts only on the caller; covered by accountData.integration.test.ts',
+  'GET /api/settings/single-sign-on': 'reads only the caller; covered by oidc.integration.test.ts',
+  'DELETE /api/settings/single-sign-on':
+    'acts only on the caller, with the password; covered by oidc.integration.test.ts',
   'GET /api/auth/me': 'returns only the caller; covered by the session lifecycle tests',
   'POST /api/auth/signout': 'ends only the caller session; covered by the session lifecycle tests',
   'GET /api/savings/banking-entities': 'static reference data, no household data',

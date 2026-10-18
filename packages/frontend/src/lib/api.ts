@@ -3,7 +3,12 @@ import { LIST_PAGE_MAX_LIMIT, type ListPage } from '@quro/shared';
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z\d+.-]*:\/\//i;
 const UNAUTHORIZED_STATUS = 401;
-const EXPECTED_AUTH_401_PATHS = new Set(['/api/auth/me', '/api/auth/signin']);
+// A 401 here is the answer to a wrong password, not a session that ended.
+const EXPECTED_AUTH_401_PATHS = new Set([
+  '/api/auth/me',
+  '/api/auth/signin',
+  '/api/settings/single-sign-on',
+]);
 
 type UnauthorizedHandler = () => void;
 

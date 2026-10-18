@@ -1,14 +1,15 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createLocalJWKSet, decodeProtectedHeader, errors, jwtVerify, type JWTPayload } from 'jose';
 import { LOOPBACK_HOSTNAMES } from '../config/settings';
 import { MINUTE_MS, MS_PER_SECOND } from '../constants/time';
 
 // The OpenID Connect authorization code flow with PKCE, as a relying party. It talks to the
 // provider's endpoints from discovery and holds no state; lib/oidcLogin.ts records the sign-ins.
 //
-// The ID token arrives from the token endpoint over TLS, so its claims are checked (issuer,
-// audience, expiry, nonce) without verifying its signature, which OpenID Connect Core 3.1.3.7
-// allows for a token received directly from the token endpoint. The user's email address and name
-// come from the userinfo endpoint, which the provider answers for the access token only.
+// The ID token arrives from the token endpoint over TLS and its signature is verified against the
+// provider's published keys (`jwks_uri` from the discovery document), with an allowlist of
+// algorithms, before any of its claims is trusted. The user's email address and name come from the
+// userinfo endpoint, which the provider answers for the access token only.
 
 const REQUEST_TIMEOUT_MS = 10 * MS_PER_SECOND;
 const DISCOVERY_CACHE_MS = 60 * MINUTE_MS;
@@ -16,6 +17,14 @@ const CLOCK_SKEW_MS = MINUTE_MS;
 const SECRET_BYTES = 32;
 const MAX_RESPONSE_BYTES = 1_000_000;
 const SCOPES = 'openid profile email';
+// Only asymmetric algorithms. `none` and every HMAC algorithm are refused: a shared secret cannot
+// be told apart from the public key a client is handed.
+const ID_TOKEN_ALGORITHMS = ['RS256', 'PS256', 'ES256', 'EdDSA'];
+const MAX_JWKS_KEYS = 50;
+// The keys are fetched again at most this often when a token names a key that is not cached, so a
+// stream of tokens with made-up key ids cannot make the backend fetch without end.
+const JWKS_REFETCH_MS = MINUTE_MS;
+const JWKS_CACHE_MS = 60 * MINUTE_MS;
 
 export type OidcClientSettings = {
   issuer: string;
@@ -30,6 +39,8 @@ export type OidcEndpoints = {
   authorization: string;
   token: string;
   userinfo: string;
+  /** Where the provider publishes the public keys its ID tokens are signed with. */
+  jwks: string;
 };
 
 export type OidcIdentity = {
@@ -83,6 +94,7 @@ let discovered: { key: string; at: number; endpoints: OidcEndpoints } | null = n
 /** Forgets the cached discovery document. Tests call it between providers. */
 export function resetOidcDiscovery(): void {
   discovered = null;
+  jwksCache = null;
 }
 
 /** One request to the provider, answered with a JSON object. Errors name the step, not the body. */
@@ -149,14 +161,16 @@ function readEndpoints(document: Record<string, unknown>, issuer: string): OidcE
   const authorization = document.authorization_endpoint;
   const token = document.token_endpoint;
   const userinfo = document.userinfo_endpoint;
+  const jwks = document.jwks_uri;
   if (
     !isSecureEndpoint(authorization, issuer) ||
     !isSecureEndpoint(token, issuer) ||
-    !isSecureEndpoint(userinfo, issuer)
+    !isSecureEndpoint(userinfo, issuer) ||
+    !isSecureEndpoint(jwks, issuer)
   ) {
     throw new OidcError('discovery', 'an endpoint is missing or not https');
   }
-  return { issuer: named, authorization, token, userinfo };
+  return { issuer: named, authorization, token, userinfo, jwks };
 }
 
 /** The provider's endpoints, read from its discovery document and kept for an hour. */
@@ -234,46 +248,114 @@ export async function exchangeCode(
   return { accessToken, idToken };
 }
 
-function readClaims(idToken: string): Record<string, unknown> {
-  const parts = idToken.split('.');
-  if (parts.length !== 3) throw new OidcError('id_token', 'not a JWT');
-  try {
-    const claims: unknown = JSON.parse(Buffer.from(parts[1]!, 'base64url').toString('utf8'));
-    if (typeof claims === 'object' && claims !== null && !Array.isArray(claims)) {
-      return claims as Record<string, unknown>;
-    }
-  } catch {
-    // Falls through to the error below.
+type Jwks = { keys: Record<string, unknown>[] };
+let jwksCache: { uri: string; at: number; jwks: Jwks } | null = null;
+
+async function fetchJwks(uri: string, now: number): Promise<Jwks> {
+  const { keys } = await requestJson('id_token', uri, { headers: { accept: 'application/json' } });
+  const isObject = (key: unknown) => typeof key === 'object' && key !== null && !Array.isArray(key);
+  if (!Array.isArray(keys) || keys.length === 0 || keys.length > MAX_JWKS_KEYS) {
+    throw new OidcError('id_token', 'the signing keys are not a usable key set');
   }
-  throw new OidcError('id_token', 'the payload is not a JSON object');
+  if (!keys.every(isObject)) {
+    throw new OidcError('id_token', 'the signing keys are not a usable key set');
+  }
+  const jwks = { keys: keys as Record<string, unknown>[] };
+  jwksCache = { uri, at: now, jwks };
+  return jwks;
 }
 
-function checkAudience(claims: Record<string, unknown>, clientId: string): void {
-  const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!audience.includes(clientId)) throw new OidcError('id_token', 'wrong audience');
-  if (audience.length > 1 && claims.azp !== clientId) {
-    throw new OidcError('id_token', 'wrong authorized party');
-  }
-}
-
-function isExpired(claims: Record<string, unknown>, now: number): boolean {
-  return typeof claims.exp !== 'number' || claims.exp * MS_PER_SECOND + CLOCK_SKEW_MS < now;
+/** The provider's keys, kept for an hour. */
+function cachedJwks(uri: string, now: number): Jwks | null {
+  return jwksCache?.uri === uri && now - jwksCache.at < JWKS_CACHE_MS ? jwksCache.jwks : null;
 }
 
 /**
- * Checks the ID token's claims against this sign-in and returns the subject. `issuer` is the one
- * the discovery document names, and `iss` must equal it exactly.
+ * The keys again, for a token that names one that is not cached: at most once a minute, and null
+ * when the interval has not passed, so made-up key ids cannot make the backend fetch without end.
  */
-export function verifyIdToken(
+function refetchJwks(uri: string, now: number): Promise<Jwks | null> {
+  if (jwksCache?.uri === uri && now - jwksCache.at < JWKS_REFETCH_MS) return Promise.resolve(null);
+  return fetchJwks(uri, now);
+}
+
+const CLAIM_FAILURES: Record<string, string> = {
+  iss: 'wrong issuer',
+  aud: 'wrong audience',
+  exp: 'expired',
+  nbf: 'expired',
+  iat: 'a claim is missing',
+  sub: 'no subject',
+};
+
+// A fixed description per failure: nothing of the token or the provider's answer is carried.
+function mapVerificationError(error: unknown): OidcError {
+  if (error instanceof OidcError) return error;
+  if (error instanceof errors.JWTClaimValidationFailed) {
+    return new OidcError('id_token', CLAIM_FAILURES[error.claim] ?? 'a claim is not acceptable');
+  }
+  const known: [new (...args: never[]) => Error, string][] = [
+    [errors.JWTExpired, 'expired'],
+    [errors.JWSSignatureVerificationFailed, 'the signature does not verify'],
+    [errors.JOSEAlgNotAllowed, 'the algorithm is not allowed'],
+    [errors.JWKSNoMatchingKey, 'no signing key matches'],
+  ];
+  const match = known.find(([type]) => error instanceof type);
+  return new OidcError('id_token', match ? match[1] : 'not a valid JWT');
+}
+
+function readAlgorithm(idToken: string): void {
+  let algorithm: string | undefined;
+  try {
+    algorithm = decodeProtectedHeader(idToken).alg;
+  } catch {
+    throw new OidcError('id_token', 'not a JWT');
+  }
+  if (algorithm === undefined || !ID_TOKEN_ALGORITHMS.includes(algorithm)) {
+    throw new OidcError('id_token', 'the algorithm is not allowed');
+  }
+}
+
+async function verifySignedClaims(
   idToken: string,
-  expected: { issuer: string; clientId: string },
-  nonce: string,
-  now = Date.now(),
-): string {
-  const claims = readClaims(idToken);
-  if (claims.iss !== expected.issuer) throw new OidcError('id_token', 'wrong issuer');
-  checkAudience(claims, expected.clientId);
-  if (isExpired(claims, now)) throw new OidcError('id_token', 'expired');
+  endpoints: Pick<OidcEndpoints, 'issuer' | 'jwks'>,
+  clientId: string,
+  now: number,
+): Promise<JWTPayload> {
+  const verify = async (jwks: Jwks) => {
+    const { payload } = await jwtVerify(idToken, createLocalJWKSet(jwks as never), {
+      issuer: endpoints.issuer,
+      audience: clientId,
+      algorithms: ID_TOKEN_ALGORITHMS,
+      clockTolerance: CLOCK_SKEW_MS / MS_PER_SECOND,
+      currentDate: new Date(now),
+      requiredClaims: ['iss', 'aud', 'exp', 'iat', 'sub'],
+    });
+    return payload;
+  };
+  try {
+    return await verify(cachedJwks(endpoints.jwks, now) ?? (await fetchJwks(endpoints.jwks, now)));
+  } catch (error) {
+    if (!(error instanceof errors.JWKSNoMatchingKey)) throw mapVerificationError(error);
+    // The provider may have rotated its keys: look once more, if the interval allows it.
+    try {
+      const fresh = await refetchJwks(endpoints.jwks, now);
+      if (!fresh) throw error;
+      return await verify(fresh);
+    } catch (second) {
+      throw mapVerificationError(second);
+    }
+  }
+}
+
+function checkClaims(claims: JWTPayload, clientId: string, nonce: string, now: number): string {
+  const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (audience.length > 1 && claims.azp !== clientId) {
+    throw new OidcError('id_token', 'wrong authorized party');
+  }
+  if (typeof claims.iat !== 'number' || claims.iat * MS_PER_SECOND - CLOCK_SKEW_MS > now) {
+    throw new OidcError('id_token', 'issued in the future');
+  }
   if (typeof claims.nonce !== 'string' || !safeEqual(claims.nonce, nonce)) {
     throw new OidcError('id_token', 'wrong nonce');
   }
@@ -281,6 +363,22 @@ export function verifyIdToken(
     throw new OidcError('id_token', 'no subject');
   }
   return claims.sub;
+}
+
+/**
+ * Verifies the ID token's signature against the provider's keys, checks its claims against this
+ * sign-in and returns the subject. `iss` must equal the discovery document's issuer exactly.
+ */
+export async function verifyIdToken(
+  idToken: string,
+  endpoints: Pick<OidcEndpoints, 'issuer' | 'jwks'>,
+  clientId: string,
+  nonce: string,
+  now = Date.now(),
+): Promise<string> {
+  readAlgorithm(idToken);
+  const claims = await verifySignedClaims(idToken, endpoints, clientId, now);
+  return checkClaims(claims, clientId, nonce, now);
 }
 
 /** The person's profile from the userinfo endpoint, which must describe the ID token's subject. */

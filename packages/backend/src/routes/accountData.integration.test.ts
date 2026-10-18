@@ -69,7 +69,6 @@ describe('registry', () => {
       'auth_codes',
       'bunq_connections',
       'bunq_oauth_attempts',
-      'oidc_identities',
       'bunq_payment_progress',
       'partner_link_members',
     ]);
@@ -110,6 +109,35 @@ describe('data export', () => {
     // Both the private and the joint set the owner holds are in the export.
     expect(manifest.tables.savings_accounts!.rows).toBe(3);
     expect(manifest.tables.payslips!.rows).toBe(3);
+  });
+
+  test('carries the provider link as issuer and subject, and nothing else about it', async () => {
+    const ownerId = w.owner.user.id;
+    const strangerId = w.stranger.user.id;
+    await db.insert(schema.oidcIdentities).values([
+      { userId: ownerId, issuer: 'https://auth.example', subject: 'owner-subject-1' },
+      { userId: strangerId, issuer: 'https://auth.example', subject: 'stranger-subject-1' },
+    ]);
+    try {
+      const { entries, manifest } = await exportArchive(w.owner);
+      const table = manifest.tables.oidc_identities!;
+      expect(table.rows).toBe(1);
+      expect(table.columns).toEqual(['id', 'issuer', 'subject']);
+      const rows = JSON.parse(entries.get(table.json.path)!.toString('utf8')) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows.map((row) => row.issuer)).toEqual(['https://auth.example']);
+      expect(rows.map((row) => row.subject)).toEqual(['owner-subject-1']);
+      expect(Object.keys(rows[0]!).sort()).toEqual(['id', 'issuer', 'subject']);
+      // Another account's link is not in this archive.
+      const everything = [...entries.values()].map((entry) => entry.toString('utf8')).join('\n');
+      expect(everything).not.toContain('stranger-subject-1');
+      expect(entries.get('README.txt')!.toString('utf8')).toContain('oidc_identities');
+    } finally {
+      await db
+        .delete(schema.oidcIdentities)
+        .where(inArray(schema.oidcIdentities.userId, [ownerId, strangerId]));
+    }
   });
 
   test('includes documents with their hashes and row links', async () => {
@@ -343,6 +371,9 @@ describe('account deletion', () => {
     expect(ownerKeys.length).toBeGreaterThan(0);
     const partnerBeforeEntry = await world.snapshotWorld([partnerId]);
     expect(partnerBeforeEntry).not.toBe(partnerBefore);
+    await db
+      .insert(schema.oidcIdentities)
+      .values({ userId: ownerId, issuer: 'https://auth.example', subject: 'deleted-subject' });
 
     const response = await w.integration.request('/api/settings/account', {
       method: 'DELETE',
@@ -371,6 +402,7 @@ describe('account deletion', () => {
     }
     for (const table of [
       schema.sessions,
+      schema.oidcIdentities,
       schema.bunqConnections,
       schema.partnerLinkMembers,
     ] as const) {
@@ -389,6 +421,8 @@ describe('account deletion', () => {
       .where(eq(schema.accountDeletions.id, data.auditId));
     expect(audit!.deletedUserId).toBe(ownerId);
     expect(audit!.rowCounts.savings_accounts).toBe(3);
+    expect(audit!.rowCounts.oidc_identities).toBe(1);
+    expect(JSON.stringify(audit)).not.toContain('deleted-subject');
     expect(audit!.documentCount).toBe(data.documentCount);
     expect(audit!.documentsFailedKeys).toEqual([]);
     expect(JSON.stringify(audit)).not.toContain(w.owner.user.email);

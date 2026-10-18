@@ -150,6 +150,13 @@ export type PublicAuthPolicy = RegistrationPolicy & {
   singleSignOn: { name: string } | null;
 };
 
+/** Whether the account is linked to a sign-in provider, and the name to show for it. */
+export type SingleSignOnLink = {
+  linked: boolean;
+  /** The provider's name when single sign-on is set up on this server. */
+  providerName: string | null;
+};
+
 export type UserSession = {
   id: string;
   current: boolean;

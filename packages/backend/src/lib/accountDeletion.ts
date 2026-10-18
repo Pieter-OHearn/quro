@@ -6,7 +6,6 @@ import {
   authCodes,
   bunqConnections,
   bunqOauthAttempts,
-  oidcIdentities,
   bunqPaymentProgress,
   mortgageTransactions,
   mortgages,
@@ -146,7 +145,6 @@ export async function deleteAccount(
       .where(eq(sessions.userId, userId))
       .returning({ id: sessions.id });
     counts.sessions = closedSessions.length;
-    await tx.delete(oidcIdentities).where(eq(oidcIdentities.userId, userId));
     await tx.delete(authCodes).where(eq(authCodes.userId, userId));
     await tx
       .delete(partnerLinks)
