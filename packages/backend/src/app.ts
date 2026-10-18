@@ -6,6 +6,7 @@ import { requireAuth } from './middleware/auth';
 import { requireCsrf } from './middleware/csrf';
 import { pauseWritesDuringMaintenance } from './middleware/maintenance';
 import auth from './routes/auth';
+import oidc from './routes/oidc';
 import savings from './routes/savings';
 import investments from './routes/investments';
 import pensions from './routes/pensions';
@@ -52,6 +53,8 @@ export function createApp(config: Config = getConfig()) {
   app.onError(errorHandler);
 
   // Public routes
+  // Before `auth`, which would otherwise answer for the longer path.
+  if (config.oidc.enabled) app.route('/api/auth/oidc', oidc);
   app.route('/api/auth', auth);
   app.get('/api/health', (c) => c.json(getHealthReport()));
   app.get('/api/readiness', async (c) => {

@@ -76,6 +76,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
     pensionPots: 1,
     pensionTransactions: 3,
   },
+  'lib/oidcLink.ts': { oidcIdentities: 2 },
   'lib/pensionTransactions.ts': { pensionPots: 1 },
   'lib/sessions.ts': { sessions: 4 },
   'lib/setupProgress.ts': { table: 1 },

@@ -28,11 +28,11 @@ If you have no backup yet, do these steps today. They take a few minutes.
 
 One archive is one file. It is a tar file (`.tar`), or an encrypted one (`.tar.enc`).
 
-| In the archive                                                                          | Notes                                                                                                                                  |
-| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `database.dump`: every table (accounts, ledgers, settings, sessions, bank links, users) | A PostgreSQL custom-format dump, taken with client tools at least as new as the server                                                 |
-| `documents/…`: every uploaded PDF, with [filesystem storage](document-storage.md)       | Payslips, pension statements and statement imports, under their storage keys                                                           |
-| `manifest.json`                                                                         | The Quro version, the last applied migration, a SHA-256 of the dump and of every document, and a row count and checksum of every table |
+| In the archive                                                                                                  | Notes                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `database.dump`: every table (accounts, ledgers, settings, sessions, bank links, sign-in provider links, users) | A PostgreSQL custom-format dump, taken with client tools at least as new as the server                                                 |
+| `documents/…`: every uploaded PDF, with [filesystem storage](document-storage.md)                               | Payslips, pension statements and statement imports, under their storage keys                                                           |
+| `manifest.json`                                                                                                 | The Quro version, the last applied migration, a SHA-256 of the dump and of every document, and a row count and checksum of every table |
 
 | Not in the archive                                                                                  | Keep it like this                                                                                                     |
 | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |

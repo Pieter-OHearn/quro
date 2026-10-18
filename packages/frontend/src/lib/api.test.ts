@@ -49,6 +49,44 @@ test('ignores expected auth endpoint 401 responses', () => {
   unregister();
 });
 
+test('a wrong password on a password-checked change is not an ended session', () => {
+  const handler = mock(() => undefined);
+  const unregister = registerUnauthorizedHandler(handler);
+  const paths = ['/api/settings/password', '/api/settings/account', '/api/settings/single-sign-on'];
+
+  for (const path of paths) {
+    for (const method of ['PUT', 'put', 'POST', 'DELETE', 'delete']) {
+      notifyUnauthorizedResponse(401, path, method);
+    }
+  }
+  expect(handler).not.toHaveBeenCalled();
+
+  // A read of the same path that gets 401, or a request with no method, is an ended session.
+  for (const path of paths) {
+    notifyUnauthorizedResponse(401, path, 'GET');
+    notifyUnauthorizedResponse(401, path);
+  }
+  expect(handler).toHaveBeenCalledTimes(paths.length * 2);
+  unregister();
+});
+
+test('other paths end the session on 401 whatever the method, and a query does not change a path', () => {
+  const handler = mock(() => undefined);
+  const unregister = registerUnauthorizedHandler(handler);
+
+  notifyUnauthorizedResponse(401, '/api/settings/profile', 'PUT');
+  notifyUnauthorizedResponse(401, '/api/settings/sessions', 'DELETE');
+  notifyUnauthorizedResponse(401, '/api/settings/password/other', 'PUT');
+  notifyUnauthorizedResponse(401, '/api/settings/account?x=1', 'GET');
+  expect(handler).toHaveBeenCalledTimes(4);
+
+  notifyUnauthorizedResponse(401, '/api/settings/password?x=1', 'PUT');
+  notifyUnauthorizedResponse(401, '/api/auth/signin', 'POST');
+  notifyUnauthorizedResponse(401, '/api/auth/me', 'GET');
+  expect(handler).toHaveBeenCalledTimes(4);
+  unregister();
+});
+
 // A real Axios adapter verifies envelope unwrapping without replacing the API client.
 test('typed API helpers unwrap payloads and preserve request configuration', async () => {
   const { apiGet, apiPost, apiPatch, apiPut, apiDelete } = await import('./api');

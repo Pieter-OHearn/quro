@@ -196,6 +196,19 @@ holding a valid code learns that an address is already registered, and the code 
 `open` mode sign-up reveals it. Quro keeps that message because the household is small and the
 person signing up needs to know why it failed; the sign-up rate limit bounds probing.
 
+## Single sign-on
+
+With the `OIDC_*` settings ([configuration](configuration.md#single-sign-on)) the sign-in form also offers a provider. Without them there are no `/api/auth/oidc` routes. Password sign-in stays on either way: it is the way in when the provider is down, and the operator's recovery path.
+
+- **The flow.** The authorization code flow with PKCE (`S256`), a `state` and a `nonce`. `GET /api/auth/oidc/login` records the attempt and redirects to the provider; `GET /api/auth/oidc/callback` finishes it. Both routes only redirect, even when they refuse: a refused browser lands on `/welcome?sso=<reason>` with a fixed reason word and no data, and no request parameter chooses where the browser goes. They are public GETs (CSRF-exempt, nothing in them changes state for a caller without the attempt cookie), rate limited per client address, and refuse with `paused` while `quro backup` or `quro restore` holds [maintenance mode](backup-and-restore.md).
+- **One browser, one use.** The attempt is stored in `oidc_login_attempts` for 10 minutes. The browser keeps a random token in an HTTP-only `oidc_attempt` cookie scoped to `/api/auth/oidc` (`Secure` follows `SECURE_COOKIES`), and the table holds only its SHA-256 digest. A callback needs the cookie and the matching `state`, and takes the attempt in one `DELETE`, so a replayed callback, a callback in another browser, concurrent callbacks and a link someone else started sign nobody in. A callback that fails also spends its attempt. The `state`, `nonce` and PKCE verifier are stored in the clear in that row, which lives for at most 10 minutes and is useless without the browser's cookie.
+- **What is checked.** The ID token comes from the token endpoint over TLS and is also verified against the provider's published keys. The keys are read from the discovery document's `jwks_uri`, and a token is accepted only if it is signed with `RS256`, `PS256`, `ES256` or `EdDSA` by the key its `kid` names; `none` and every HMAC algorithm are refused, so a token cannot be signed with a public key as a secret. The keys are cached for an hour, and when a token names a key that is not cached they are fetched again at most once a minute, so a provider that rotates its keys works and a stream of made-up key ids causes no fetching. Quro then checks the issuer (character for character against the discovery document's), audience (and `azp` for several), expiry, issue time (with a minute of clock skew) and the nonce. The connection is as strict as the checks: the issuer must be `https` (plain `http` only on `localhost`, `127.0.0.1` or `[::1]`), the certificate is verified against the system's trusted authorities (mount your own with `NODE_EXTRA_CA_CERTS` for a private one), every endpoint in the discovery document, the key address included, must be `https` too (plain `http` only when the issuer itself is plain `http` on loopback), the document must name the configured issuer, and a redirect from any provider endpoint is refused instead of followed, so the client secret is never sent anywhere else. Answers over 1 MB are refused and every request times out after ten seconds. Quro reads the email address and name from the userinfo endpoint and requires its `sub` to equal the ID token's. A failure is reported to the browser as one word and to the log as a fixed description such as `the signature does not verify`; a token is never logged.
+- **Which account.** A provider sign-in never creates an account, so the operator's invitations still decide who can use Quro. The first sign-in of a person links their provider subject to the account with the same email address, and only if the provider marks that address verified. Later sign-ins match the subject, so a changed email does not matter and an address that belongs to another account is ignored. An account can link one identity per provider; a second subject for it is refused. Linking ends the account's other sessions. `oidc_identities` holds the link; it is deleted with the account and its issuer and subject are part of the account's data export.
+- **Whom to trust.** Linking by email trusts two things. The provider must only mark an address verified when its person owns it, so use a provider that verifies addresses or where only people you know have accounts. And Quro does not verify the email address of its own accounts, and a signed-in person can change theirs in Settings. In `open` registration mode, where anyone can register any address, linking by email is therefore refused (a person who is already linked still signs in). In `invite` and `closed` modes every account holder is someone the operator let in, so turn single sign-on on for a household whose members trust each other.
+- **Unlinking.** An account holder removes the link in **Settings → Security** (asked for the password, with the same attempt limit as a password change), and the operator with `quro user oidc unlink EMAIL --yes` (it refuses while a backup or restore runs, prints the issuer and date but never the subject, and leaves sessions signed in). The next provider sign-in links again by verified email, so this is how a person whose provider account was recreated gets a new link.
+- **Sessions.** The result is a normal Quro session (see [Sessions](#sessions)). Signing out of Quro does not sign out of the provider, and ending the provider's session or removing the person there does not end a Quro session. Revoke a session in **Settings → Security**, or reset the account's password, which signs out all sessions.
+- **Logs.** A refused sign-in logs `oidc.sign_in_refused` with the reason and, for a provider failure, the step that failed and a fixed description such as `wrong audience` or the class of a network error. Tokens, codes, the state and nonce, the attempt cookie, email addresses and the subject are never logged, and neither are they in an error body: there are none. Your reverse proxy's access log does record the callback's query string, which holds the single-use authorization code and the state; both are useless without the browser's cookie and Quro's client secret, and expire in minutes.
+
 ## Sessions
 
 - Session tokens are 256 random bits. The `sessions` table stores only their SHA-256 digest, so a
@@ -220,15 +233,17 @@ container, which uses the backend's database credentials:
 docker compose exec backend quro user --help
 ```
 
-| Command                           | Effect                                                                             |
-| --------------------------------- | ---------------------------------------------------------------------------------- |
-| `quro user status`                | Registration mode, whether setup is pending, account and unused code counts        |
-| `quro user invite [--hours N]`    | Issues a registration code (7 days by default, at most 30)                         |
-| `quro user reset-password EMAIL`  | Issues a password reset code for the account (1 hour by default, at most 24 hours) |
-| `quro user revoke-sessions EMAIL` | Signs the account out of every browser                                             |
-| `quro user list`                  | Accounts with their creation time and active session count                         |
-| `quro user codes`                 | Issued codes and whether they were used; code values are never stored              |
-| `quro user revoke-code ID`        | Withdraws an unused code                                                           |
+| Command                             | Effect                                                                             |
+| ----------------------------------- | ---------------------------------------------------------------------------------- |
+| `quro user status`                  | Registration mode, whether setup is pending, account and unused code counts        |
+| `quro user invite [--hours N]`      | Issues a registration code (7 days by default, at most 30)                         |
+| `quro user reset-password EMAIL`    | Issues a password reset code for the account (1 hour by default, at most 24 hours) |
+| `quro user revoke-sessions EMAIL`   | Signs the account out of every browser                                             |
+| `quro user oidc status EMAIL`       | Whether the account is linked to the single sign-on provider, with issuer and date |
+| `quro user oidc unlink EMAIL --yes` | Removes that link (without `--yes` it changes nothing)                             |
+| `quro user list`                    | Accounts with their creation time and active session count                         |
+| `quro user codes`                   | Issued codes and whether they were used; code values are never stored              |
+| `quro user revoke-code ID`          | Withdraws an unused code                                                           |
 
 Codes are 24 Crockford base32 characters (120 bits) in four groups of six, shown once and stored
 only as a SHA-256 digest. They are single-use, expire, and tolerate lowercase, spaces and the

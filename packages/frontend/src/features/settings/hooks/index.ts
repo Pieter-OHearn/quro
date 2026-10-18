@@ -4,3 +4,4 @@ export type { CategoryMapping } from './useCategoryMappings';
 export { useDisconnectBunq, useSyncBunq, useUpdateCategoryMapping } from './mutations';
 export { useRevokeOtherSessions, useRevokeSession, useSessions } from './useSessions';
 export { useAccountDeletionPreview, useDeleteAccount, useExportData } from './useAccountData';
+export { useSingleSignOnLink, useUnlinkSingleSignOn } from './useSingleSignOn';

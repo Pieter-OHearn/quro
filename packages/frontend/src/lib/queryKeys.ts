@@ -92,5 +92,6 @@ export const queryKeys = {
   capabilities: ['app', 'capabilities'] as const,
   registrationPolicy: ['auth', 'registration'] as const,
   sessions: ['settings', 'sessions'] as const,
+  singleSignOn: ['settings', 'single-sign-on'] as const,
   accountDeletionPreview: ['settings', 'account'] as const,
 };

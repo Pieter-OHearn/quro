@@ -7,6 +7,7 @@ import {
   MIN_USER_AGE,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
+import { getConfig } from '../config';
 import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
@@ -191,7 +192,11 @@ function registrationError(reason: RegistrationRejection, firstAccount: boolean)
 
 // ── Registration policy ─────────────────────────────────────────────────────
 
-app.get('/registration', async (c) => c.json({ data: await getRegistrationPolicy() }));
+app.get('/registration', async (c) => {
+  const { oidc } = getConfig();
+  const singleSignOn = oidc.enabled ? { name: oidc.providerName } : null;
+  return c.json({ data: { ...(await getRegistrationPolicy()), singleSignOn } });
+});
 
 // ── Sign Up ─────────────────────────────────────────────────────────────────
 

@@ -18,7 +18,7 @@ manifest.json         Format version, row counts, SHA-256 of every file, documen
 
 ### What is in it
 
-The account's own rows: profile, employments, planning assumptions, savings accounts and transactions, holdings, transactions and price history, properties, mortgages, their transactions, pensions and their transactions, statement uploads and their rows, debts and payments, payslips, goals, budget categories and transactions, category mappings, saved CSV column mappings, CSV imports and their rows ([import a CSV](csv-import.md)) and monthly net worth snapshots.
+The account's own rows: profile, employments, planning assumptions, savings accounts and transactions, holdings, transactions and price history, properties, mortgages, their transactions, pensions and their transactions, statement uploads and their rows, debts and payments, payslips, goals, budget categories and transactions, category mappings, saved CSV column mappings, CSV imports and their rows ([import a CSV](csv-import.md)) and monthly net worth snapshots, and, if you sign in through a provider, the link to it (`oidc_identities`: the issuer and your subject there, nothing else).
 
 - **Joint rows.** Joint accounts, properties and mortgages you own are exported in full, not halved, including ledger rows your partner entered on them (`enteredByPartner` is `true` on those). Rows your partner owns are not exported, joint or not: they belong to their account.
 - **Money and currency.** Amounts are numbers in the currency the row names (`currency`, or `sourceCurrency` and `baseCurrency` where a row carries them). Nothing is converted, negative balances and equity keep their sign, and empty values stay empty.
@@ -40,7 +40,7 @@ There is no import for this archive yet. Restoring a whole instance is [backup a
 
 ## Deletion
 
-**Settings → Your data → Delete account** asks for your email address and password and shows what will go. It then deletes, in one database transaction, the account and everything it owns: all the rows above, bank links, sessions, sign-in codes and the partner link. An audit row is written in the same transaction; if anything fails, nothing is deleted.
+**Settings → Your data → Delete account** asks for your email address and password and shows what will go. It then deletes, in one database transaction, the account and everything it owns: all the rows above, bank links, sessions, sign-in codes, single sign-on links and the partner link. An audit row is written in the same transaction; if anything fails, nothing is deleted.
 
 | Data                                                              | What happens                                                                                                                                                            |
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

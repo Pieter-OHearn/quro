@@ -213,6 +213,8 @@ Reading the data
   when you read such a value back. The JSON files never change a value.
 - enteredByPartner (joint ledgers) says whether your partner entered the row.
 - Joint accounts, properties and mortgages you own are included in full, not halved.
+- oidc_identities (only if you signed in through a provider) holds the issuer and the subject
+  that link your account to your account at that provider.
 
 What is not in the archive
 --------------------------

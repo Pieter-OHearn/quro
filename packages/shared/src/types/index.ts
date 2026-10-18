@@ -144,6 +144,19 @@ export type RegistrationPolicy = {
   setupRequired: boolean;
 };
 
+/** What the sign-in and sign-up forms need to know before anyone is signed in. */
+export type PublicAuthPolicy = RegistrationPolicy & {
+  /** The provider's button label, or null when single sign-on is not set up. */
+  singleSignOn: { name: string } | null;
+};
+
+/** Whether the account is linked to a sign-in provider, and the name to show for it. */
+export type SingleSignOnLink = {
+  linked: boolean;
+  /** The provider's name when single sign-on is set up on this server. */
+  providerName: string | null;
+};
+
 export type UserSession = {
   id: string;
   current: boolean;

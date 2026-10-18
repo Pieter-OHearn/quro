@@ -1299,6 +1299,10 @@ export const EXEMPT_ROUTES: Record<string, string> = {
   'GET /api/readiness': 'public by design; reports service readiness only',
   'GET /api/readiness/pension-import': 'public by design; reports parser readiness only',
   'GET /api/auth/registration': 'public by design; covered by authAccess.integration.test.ts',
+  'GET /api/auth/oidc/login':
+    'public redirect to the provider; covered by oidc.integration.test.ts',
+  'GET /api/auth/oidc/callback':
+    'public; the attempt cookie identifies it; covered by oidc.integration.test.ts',
   'POST /api/auth/signup': 'public; covered by authAccess and the dynamic deployment tests',
   'POST /api/auth/signin': 'public; covered by authAccess and the dynamic deployment tests',
   'POST /api/auth/password-reset': 'public; covered by authAccess.integration.test.ts',
@@ -1306,6 +1310,9 @@ export const EXEMPT_ROUTES: Record<string, string> = {
   'GET /api/settings/account': 'reads only the caller; covered by accountData.integration.test.ts',
   'DELETE /api/settings/account':
     'acts only on the caller; covered by accountData.integration.test.ts',
+  'GET /api/settings/single-sign-on': 'reads only the caller; covered by oidc.integration.test.ts',
+  'DELETE /api/settings/single-sign-on':
+    'acts only on the caller, with the password; covered by oidc.integration.test.ts',
   'GET /api/auth/me': 'returns only the caller; covered by the session lifecycle tests',
   'POST /api/auth/signout': 'ends only the caller session; covered by the session lifecycle tests',
   'GET /api/savings/banking-entities': 'static reference data, no household data',

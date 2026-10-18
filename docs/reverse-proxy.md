@@ -104,6 +104,10 @@ Traefik, nginx, HAProxy or a hosted tunnel work the same way. The proxy must:
 
 With [bunq linking](configuration.md#bunq), register `https://quro.example.com/api/bunq/oauth/callback` as the redirect URI with bunq and set the same value as `BUNQ_REDIRECT_URI`. `FRONTEND_ORIGIN` must be `https://quro.example.com`.
 
+## Single sign-on behind the proxy
+
+With [single sign-on](configuration.md#single-sign-on), register `https://quro.example.com/api/auth/oidc/callback` as the redirect URI with your provider and set the same value as `OIDC_REDIRECT_URI`. The backend, not the browser, calls the provider's token and userinfo endpoints, so the host that runs Quro must reach the provider over `https`, and trust its certificate (a private authority goes in `NODE_EXTRA_CA_CERTS`). Register the redirect URI with the same origin that people open in the browser: the sign-in cookie belongs to that host, so a callback on another host is refused. The proxy's access log records the callback's query, which holds a single-use authorization code and a state that are useless without the browser's cookie.
+
 ## Back to plain HTTP
 
 To return to mode A, remove the `proxy` service and its volume, give `frontend` its `ports` again, set `SECURE_COOKIES=false` and remove `FRONTEND_ORIGIN` (unless bunq needs it), then run `docker compose up -d`. Browsers drop sessions that were created over HTTPS, so everyone signs in again.

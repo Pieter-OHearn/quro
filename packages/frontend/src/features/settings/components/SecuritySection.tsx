@@ -22,6 +22,7 @@ import {
   DEFAULT_ERROR_MESSAGE,
 } from './settingsForm';
 import { SessionsPanel } from './SessionsPanel';
+import { SingleSignOnPanel } from './SingleSignOnPanel';
 export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) {
   const [form, setForm] = useState<PasswordFormState>(() => createEmptyPasswordForm());
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -202,6 +203,8 @@ export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionP
 
         {formError ? <FormErrorNotice>{formError}</FormErrorNotice> : null}
       </SettingsCard>
+
+      <SingleSignOnPanel />
 
       <SessionsPanel />
     </div>
