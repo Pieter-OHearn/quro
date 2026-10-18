@@ -87,9 +87,12 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   (`packages/backend/src/lib/accountData.ts`), which drives the data export and account deletion;
   a new secret or internal key column is omitted from exports there. See
   [export and deletion](docs/data-export-and-deletion.md).
-- Sessions and operator codes are stored only as SHA-256 digests
-  (`packages/backend/src/lib/sessions.ts`, `packages/backend/src/lib/authCodes.ts`); never store or
-  log a raw token. Instance operations are `quro` CLI commands (`packages/backend/src/cli/`), not
+- Sessions, operator codes and the provider sign-in attempt cookie are stored only as SHA-256 digests
+  (`packages/backend/src/lib/sessions.ts`, `packages/backend/src/lib/authCodes.ts`,
+  `packages/backend/src/lib/oidcLogin.ts`); never store or log a raw token. Provider sign-in
+  (`packages/backend/src/routes/oidc.ts`) never creates an account, links by verified email only, and
+  its ID token is read from the token endpoint over TLS without a signature check, so keep its
+  https, issuer and redirect checks in `lib/oidcClient.ts`. Instance operations are `quro` CLI commands (`packages/backend/src/cli/`), not
   an in-app role, and print no household data. Cookie flags come from `SECURE_COOKIES`, never from
   request headers. Deployment modes and registration: [security model](docs/security.md).
 

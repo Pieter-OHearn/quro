@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import {
   OidcError,
   buildAuthorizationUrl,
@@ -73,6 +73,96 @@ describe('discovery', () => {
     await expect(discoverEndpoints(settings)).rejects.toThrow('not https');
   });
 
+  test('refuses plain http endpoints from a provider that is served over https', async () => {
+    const secure = { ...settings, issuer: 'https://auth.example' };
+    const document = (token: string) =>
+      Response.json({
+        issuer: 'https://auth.example',
+        authorization_endpoint: 'https://auth.example/authorize',
+        token_endpoint: token,
+        userinfo_endpoint: 'https://auth.example/userinfo',
+      });
+    const fetchSpy = spyOn(globalThis, 'fetch');
+    try {
+      for (const token of [
+        'http://127.0.0.1:9/token',
+        'http://localhost/token',
+        'https://user:pass@auth.example/token',
+        'ftp://auth.example/token',
+      ]) {
+        resetOidcDiscovery();
+        fetchSpy.mockResolvedValueOnce(document(token));
+        await expect(discoverEndpoints(secure)).rejects.toThrow('not https');
+      }
+      resetOidcDiscovery();
+      fetchSpy.mockResolvedValueOnce(document('https://login.example/token'));
+      expect((await discoverEndpoints(secure)).token).toBe('https://login.example/token');
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  test('names the issuer exactly as the document spells it', async () => {
+    provider.discovery.issuer = `${provider.issuer}/`;
+    const endpoints = await discoverEndpoints(settings);
+    expect(endpoints.issuer).toBe(`${provider.issuer}/`);
+    const claims = { ...goodClaims(), iss: `${provider.issuer}/` };
+    const expected = { issuer: endpoints.issuer, clientId: FAKE_CLIENT_ID };
+    expect(verifyIdToken(idToken(claims), expected, 'n-1', NOW)).toBe('abc');
+    // The other spelling is a different issuer.
+    const bare = { ...goodClaims(), iss: provider.issuer };
+    expect(() => verifyIdToken(idToken(bare), expected, 'n-1', NOW)).toThrow('wrong issuer');
+  });
+
+  test('does not follow a redirect, so a secret is not sent on', async () => {
+    let reachedElsewhere = 0;
+    const elsewhere = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: () => {
+        reachedElsewhere += 1;
+        return new Response('x');
+      },
+    });
+    const redirecting = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: () => Response.redirect(`http://localhost:${elsewhere.port}/`, 302),
+    });
+    try {
+      const moved = { ...settings, issuer: `http://127.0.0.1:${redirecting.port}` };
+      await expect(discoverEndpoints(moved)).rejects.toThrow(OidcError);
+      // A token endpoint that redirects is refused too, and never receives the client secret.
+      const endpoints = {
+        issuer: moved.issuer,
+        authorization: `${moved.issuer}/a`,
+        token: `${moved.issuer}/t`,
+        userinfo: `${moved.issuer}/u`,
+      };
+      await expect(exchangeCode(endpoints, settings, 'code', 'verifier')).rejects.toThrow(
+        OidcError,
+      );
+      expect(reachedElsewhere).toBe(0);
+    } finally {
+      await redirecting.stop(true);
+      await elsewhere.stop(true);
+    }
+  });
+
+  test('refuses an answer that is too large', async () => {
+    const big = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      fetch: () => new Response(JSON.stringify({ filler: 'x'.repeat(1_100_000) })),
+    });
+    try {
+      const huge = { ...settings, issuer: `http://127.0.0.1:${big.port}` };
+      await expect(discoverEndpoints(huge)).rejects.toThrow('too large');
+    } finally {
+      await big.stop(true);
+    }
+  });
+
   test('refuses a document without a userinfo endpoint', async () => {
     provider.discovery.userinfo_endpoint = null;
     await expect(discoverEndpoints(settings)).rejects.toThrow('missing');
@@ -83,6 +173,11 @@ describe('discovery', () => {
     const error = await discoverEndpoints(down).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OidcError);
     expect((error as Error).message).not.toContain('127.0.0.1');
+    // It names the class of the failure, which is what an operator needs to tell a refused
+    // connection from a certificate that does not verify.
+    expect((error as OidcError).detail).toMatch(
+      /^the provider did not answer( \([A-Za-z0-9_]+\))?$/,
+    );
   });
 });
 
@@ -141,6 +236,22 @@ describe('token exchange', () => {
 describe('ID token', () => {
   test('accepts a token for this client and sign-in', () => {
     expect(verifyIdToken(idToken(goodClaims()), settings, 'n-1', NOW)).toBe('abc');
+  });
+
+  test('checks the claims and not the signature', () => {
+    // The token came from the token endpoint over TLS (OpenID Connect Core 3.1.3.7), so its claims
+    // are checked and its signature is not. A token that fails any claim is refused.
+    const noSignature = idToken(goodClaims()).split('.').slice(0, 2).join('.') + '.';
+    expect(verifyIdToken(noSignature, settings, 'n-1', NOW)).toBe('abc');
+    expect(() =>
+      verifyIdToken(idToken({ ...goodClaims(), iss: undefined }), settings, 'n-1', NOW),
+    ).toThrow('wrong issuer');
+    expect(() =>
+      verifyIdToken(idToken({ ...goodClaims(), aud: undefined }), settings, 'n-1', NOW),
+    ).toThrow('wrong audience');
+    expect(() =>
+      verifyIdToken(idToken({ ...goodClaims(), nonce: undefined }), settings, 'n-1', NOW),
+    ).toThrow('wrong nonce');
   });
 
   test.each([

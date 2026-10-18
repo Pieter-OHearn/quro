@@ -106,7 +106,7 @@ With [bunq linking](configuration.md#bunq), register `https://quro.example.com/a
 
 ## Single sign-on behind the proxy
 
-With [single sign-on](configuration.md#single-sign-on), register `https://quro.example.com/api/auth/oidc/callback` as the redirect URI with your provider and set the same value as `OIDC_REDIRECT_URI`. The backend, not the browser, calls the provider's token and userinfo endpoints, so the host that runs Quro must reach the provider.
+With [single sign-on](configuration.md#single-sign-on), register `https://quro.example.com/api/auth/oidc/callback` as the redirect URI with your provider and set the same value as `OIDC_REDIRECT_URI`. The backend, not the browser, calls the provider's token and userinfo endpoints, so the host that runs Quro must reach the provider over `https`, and trust its certificate (a private authority goes in `NODE_EXTRA_CA_CERTS`). Register the redirect URI with the same origin that people open in the browser: the sign-in cookie belongs to that host, so a callback on another host is refused. The proxy's access log records the callback's query, which holds a single-use authorization code and a state that are useless without the browser's cookie.
 
 ## Back to plain HTTP
 

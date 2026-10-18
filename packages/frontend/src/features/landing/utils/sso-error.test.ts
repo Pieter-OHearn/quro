@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ssoErrorMessage } from './sso-error';
 
 describe('ssoErrorMessage', () => {
-  it.each(['denied', 'expired', 'failed', 'no_account', 'unverified_email', 'conflict'])(
+  it.each(['denied', 'expired', 'failed', 'no_account', 'unverified_email', 'conflict', 'paused'])(
     'explains %s',
     (code) => {
       expect(ssoErrorMessage(code)).toBeTruthy();

@@ -25,6 +25,8 @@ export type OidcClientSettings = {
 };
 
 export type OidcEndpoints = {
+  /** The issuer exactly as the provider's discovery document names it. */
+  issuer: string;
   authorization: string;
   token: string;
   userinfo: string;
@@ -41,7 +43,7 @@ export type OidcIdentity = {
 export class OidcError extends Error {
   constructor(
     readonly reason: 'discovery' | 'token' | 'id_token' | 'userinfo',
-    detail: string,
+    readonly detail: string,
   ) {
     super(`${reason}: ${detail}`);
     this.name = 'OidcError';
@@ -62,12 +64,18 @@ export function safeEqual(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-function isSecureEndpoint(value: unknown): value is string {
+function isLoopbackHttp(url: URL): boolean {
+  return url.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(url.hostname);
+}
+
+// An endpoint is https. Plain http on loopback is allowed only when the issuer is itself plain
+// http on loopback, so a document served over TLS cannot send the client secret or the
+// authorization code over plain http, even to the same machine.
+function isSecureEndpoint(value: unknown, issuer: string): value is string {
   if (typeof value !== 'string' || !URL.canParse(value)) return false;
   const url = new URL(value);
-  return (
-    url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(url.hostname))
-  );
+  if (url.username || url.password) return false;
+  return url.protocol === 'https:' || (isLoopbackHttp(url) && isLoopbackHttp(new URL(issuer)));
 }
 
 let discovered: { key: string; at: number; endpoints: OidcEndpoints } | null = null;
@@ -91,8 +99,7 @@ async function requestJson(
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) throw new OidcError(step, `status ${response.status}`);
-    const text = await response.text();
-    if (text.length > MAX_RESPONSE_BYTES) throw new OidcError(step, 'the answer is too large');
+    const text = await readBounded(response, step);
     const body: unknown = JSON.parse(text);
     if (typeof body !== 'object' || body === null || Array.isArray(body)) {
       throw new OidcError(step, 'the answer is not a JSON object');
@@ -100,22 +107,56 @@ async function requestJson(
     return body as Record<string, unknown>;
   } catch (error) {
     if (error instanceof OidcError) throw error;
-    throw new OidcError(step, 'the provider did not answer');
+    throw new OidcError(step, `the provider did not answer${networkErrorCode(error)}`);
   }
 }
 
+// The class of a failed request, such as a certificate that does not verify, without its address.
+function networkErrorCode(error: unknown): string {
+  const { code, name } = (error ?? {}) as { code?: unknown; name?: unknown };
+  const label = typeof code === 'string' ? code : name;
+  return typeof label === 'string' && /^[A-Za-z0-9_]{2,60}$/.test(label) ? ` (${label})` : '';
+}
+
+// Reads the body up to the limit, so a provider cannot make the backend buffer a huge answer.
+async function readBounded(response: Response, step: OidcError['reason']): Promise<string> {
+  const length = Number(response.headers.get('content-length'));
+  if (length > MAX_RESPONSE_BYTES) throw new OidcError(step, 'the answer is too large');
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new OidcError(step, 'the answer is too large');
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 function readEndpoints(document: Record<string, unknown>, issuer: string): OidcEndpoints {
-  // The document must belong to the issuer it was fetched for (RFC 8414 3.3).
-  if (typeof document.issuer !== 'string' || document.issuer.replace(/\/+$/, '') !== issuer) {
+  // The document must belong to the issuer it was fetched for (RFC 8414 3.3). The ID token's
+  // `iss` is later compared with the document's own spelling, character for character.
+  const named = document.issuer;
+  if (typeof named !== 'string' || named.replace(/\/+$/, '') !== issuer) {
     throw new OidcError('discovery', 'the issuer in the document is not the configured issuer');
   }
   const authorization = document.authorization_endpoint;
   const token = document.token_endpoint;
   const userinfo = document.userinfo_endpoint;
-  if (!isSecureEndpoint(authorization) || !isSecureEndpoint(token) || !isSecureEndpoint(userinfo)) {
+  if (
+    !isSecureEndpoint(authorization, issuer) ||
+    !isSecureEndpoint(token, issuer) ||
+    !isSecureEndpoint(userinfo, issuer)
+  ) {
     throw new OidcError('discovery', 'an endpoint is missing or not https');
   }
-  return { authorization, token, userinfo };
+  return { issuer: named, authorization, token, userinfo };
 }
 
 /** The provider's endpoints, read from its discovery document and kept for an hour. */
@@ -219,18 +260,19 @@ function isExpired(claims: Record<string, unknown>, now: number): boolean {
   return typeof claims.exp !== 'number' || claims.exp * MS_PER_SECOND + CLOCK_SKEW_MS < now;
 }
 
-/** Checks the ID token's claims against this sign-in and returns the subject. */
+/**
+ * Checks the ID token's claims against this sign-in and returns the subject. `issuer` is the one
+ * the discovery document names, and `iss` must equal it exactly.
+ */
 export function verifyIdToken(
   idToken: string,
-  settings: OidcClientSettings,
+  expected: { issuer: string; clientId: string },
   nonce: string,
   now = Date.now(),
 ): string {
   const claims = readClaims(idToken);
-  if (claims.iss !== settings.issuer && claims.iss !== `${settings.issuer}/`) {
-    throw new OidcError('id_token', 'wrong issuer');
-  }
-  checkAudience(claims, settings.clientId);
+  if (claims.iss !== expected.issuer) throw new OidcError('id_token', 'wrong issuer');
+  checkAudience(claims, expected.clientId);
   if (isExpired(claims, now)) throw new OidcError('id_token', 'expired');
   if (typeof claims.nonce !== 'string' || !safeEqual(claims.nonce, nonce)) {
     throw new OidcError('id_token', 'wrong nonce');

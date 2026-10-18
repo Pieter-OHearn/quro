@@ -8,6 +8,7 @@ const MESSAGES: Record<string, string> = {
   no_account:
     'No Quro account uses your email address. Ask the operator of this Quro instance for an invite, then sign in again.',
   unverified_email: 'Your provider has not verified your email address, so Quro cannot match it.',
+  paused: 'Quro is being backed up or restored. Try again in a minute.',
   conflict:
     'Your Quro account is already linked to a different identity at this provider. Ask the operator for help.',
 };

@@ -126,7 +126,10 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
       ) : (
         <div className="space-y-4">
           {ssoFailure && <SingleSignOnNotice message={ssoFailure} />}
-          {policy?.singleSignOn && <SingleSignOn name={policy.singleSignOn.name} />}
+          {/* A provider sign-in never creates an account, so it has nothing to offer before the first. */}
+          {policy?.singleSignOn && !policy.setupRequired && (
+            <SingleSignOn name={policy.singleSignOn.name} />
+          )}
           <SignInForm
             state={state}
             onSwitchToSignUp={onSwitchToSignUp}

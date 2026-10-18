@@ -22,7 +22,8 @@ const LOGIN_ATTEMPT_TTL_MINUTES = 10;
 export const LOGIN_ATTEMPT_TTL_MS = LOGIN_ATTEMPT_TTL_MINUTES * MINUTE_MS;
 
 /** Why a provider sign-in ended without a session. The browser is told this word, nothing more. */
-type OidcFailure = 'denied' | 'expired' | 'failed' | 'no_account' | 'unverified_email' | 'conflict';
+export type OidcFailure =
+  'denied' | 'expired' | 'failed' | 'no_account' | 'unverified_email' | 'conflict';
 
 export type OidcLoginResult =
   { ok: true; userId: number } | { ok: false; reason: OidcFailure; cause?: unknown };
@@ -139,7 +140,12 @@ export async function finishOidcLogin(
   try {
     const endpoints = await discoverEndpoints(settings, now.getTime());
     const tokens = await exchangeCode(endpoints, settings, input.code, attempt.codeVerifier);
-    const subject = verifyIdToken(tokens.idToken, settings, attempt.nonce, now.getTime());
+    const subject = verifyIdToken(
+      tokens.idToken,
+      { issuer: endpoints.issuer, clientId: settings.clientId },
+      attempt.nonce,
+      now.getTime(),
+    );
     const identity = await fetchIdentity(endpoints, tokens.accessToken, subject);
     const account = await resolveAccount(
       settings.issuer,

@@ -159,7 +159,7 @@ Sign-in through an [OpenID Connect](https://openid.net/connect/) provider such a
 | `OIDC_REDIRECT_URI`       | unset                             | The redirect URI registered with the provider: your origin followed by `/api/auth/oidc/callback`                  |
 | `OIDC_PROVIDER_NAME`      | `SSO`                             | Name on the sign-in button, "Sign in with NAME". At most 40 characters                                            |
 
-Register Quro at the provider as a confidential client for the authorization code flow with PKCE (`S256`), the scopes `openid`, `profile` and `email`, and client authentication with HTTP Basic (`client_secret_basic`). A secret file alone, at its default path, does not switch single sign-on on. To use the file, add the secret to the `backend` service and declare it in the top-level `secrets` of `compose.yaml`, as for [S3](install.md#existing-s3-compatible-store).
+The provider must only mark an email address verified when its person owns it, and Quro reaches it over `https` with the system's trusted authorities (add a private authority with `NODE_EXTRA_CA_CERTS`). Register Quro at the provider as a confidential client for the authorization code flow with PKCE (`S256`), the scopes `openid`, `profile` and `email`, and client authentication with HTTP Basic (`client_secret_basic`). A secret file alone, at its default path, does not switch single sign-on on. To use the file, add the secret to the `backend` service and declare it in the top-level `secrets` of `compose.yaml`, as for [S3](install.md#existing-s3-compatible-store).
 
 ### Integration secrets
 
