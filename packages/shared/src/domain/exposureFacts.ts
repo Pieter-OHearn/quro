@@ -12,6 +12,7 @@ import {
   EXPOSURE_DEFAULTS_VERSION,
   riskBandLabel,
   resolveRiskClass,
+  type ConcentrationThresholdKey,
   type ExposureSettings,
   type ReferenceMixId,
 } from './exposureSettings.js';
@@ -436,6 +437,13 @@ function largestBucket(
     : null;
 }
 
+const CHECK_SETTING_KEY: Record<string, ConcentrationThresholdKey> = {
+  single_holding: 'singleHoldingPct',
+  top_three: 'topThreePct',
+  sector: 'sectorPct',
+  currency: 'currencyPct',
+};
+
 function addCheck(
   scope: Scope,
   id: string,
@@ -443,20 +451,27 @@ function addCheck(
   threshold: number,
   applicable: boolean,
 ): void {
+  const enabled = scope.settings.noticesEnabled[CHECK_SETTING_KEY[id]];
   const measured = measure?.percent ?? null;
   scope.book.add({
     id: `exposure.check.${id}`,
     kind: 'check',
-    value: applicable && measured !== null ? measured > threshold : false,
+    value: enabled && applicable && measured !== null ? measured > threshold : false,
     unit: 'flag',
     methodId: 'threshold_check',
     inputs: [
       { ref: `fact:exposure.concentration.${id}`, value: measured, unit: 'percent' },
-      { ref: `setting:thresholds.${id}`, value: threshold, unit: 'percent' },
+      { ref: `setting:thresholds.${CHECK_SETTING_KEY[id]}`, value: threshold, unit: 'percent' },
+      {
+        ref: `setting:noticesEnabled.${CHECK_SETTING_KEY[id]}`,
+        value: enabled ? 1 : 0,
+        unit: 'flag',
+      },
     ],
     context: {
       measured,
       threshold,
+      enabled,
       applicable,
       subject: measure?.label ?? null,
     },

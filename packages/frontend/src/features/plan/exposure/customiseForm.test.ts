@@ -13,7 +13,10 @@ describe('customise form', () => {
     settings.selectedMix = 'D';
     settings.riskByAssetClass.crypto = null;
     settings.thresholds.sectorPct = 25.5;
+    settings.noticesEnabled.currencyPct = true;
     const form = toForm(settings);
+    expect(form.noticesEnabled.currencyPct).toBe(true);
+    expect(toForm(defaultExposureSettings()).noticesEnabled.currencyPct).toBe(false);
     expect(form.selectedMix).toBe('D');
     expect(form.risk.crypto).toBe('');
     expect(form.thresholds.sectorPct).toBe('25.5');

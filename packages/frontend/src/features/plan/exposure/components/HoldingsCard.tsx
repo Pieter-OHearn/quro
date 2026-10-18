@@ -33,7 +33,7 @@ const CLASS_OPTIONS = [
 ];
 
 const COLUMNS: readonly DataTableColumn<ExposureHoldingRow>[] = [
-  { key: 'select', header: '', priority: 'secondary', width: 40 },
+  { key: 'select', header: '', priority: 'actions', width: 40 },
   {
     key: 'holding',
     header: 'Holding',
@@ -78,17 +78,16 @@ function SelectBox({
   checked,
   label,
   onChange,
-  className,
+  caption,
 }: Readonly<{
   checked: boolean;
   label: string;
   onChange: (next: boolean) => void;
-  className?: string;
+  /** Words beside the box on a phone card, where it sits in the footer. */
+  caption?: string;
 }>) {
   return (
-    <label
-      className={`flex min-h-8 cursor-pointer items-center max-sm:min-h-11 max-sm:min-w-11 max-sm:justify-center ${className ?? ''}`}
-    >
+    <label className="flex min-h-8 cursor-pointer items-center gap-2 max-sm:min-h-11">
       <input
         type="checkbox"
         checked={checked}
@@ -96,29 +95,18 @@ function SelectBox({
         onChange={(event) => onChange(event.target.checked)}
         className="h-4 w-4 rounded-sm border-border-control focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
       />
+      {caption ? <span className="text-cell text-fg-muted md:hidden">{caption}</span> : null}
     </label>
   );
 }
 
-function HoldingCell({
-  row,
-  selected,
-  onSelect,
-}: Readonly<{ row: ExposureHoldingRow; selected: boolean; onSelect: (next: boolean) => void }>) {
+function HoldingCell({ row }: Readonly<{ row: ExposureHoldingRow }>) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <SelectBox
-        checked={selected}
-        label={`Select ${row.name}`}
-        onChange={onSelect}
-        className="md:hidden"
-      />
-      <div className="min-w-0">
-        <p className="truncate font-medium text-fg">{row.name}</p>
-        <p className="truncate text-caption text-fg-subtle max-md:whitespace-normal">
-          {[row.ticker, row.sector, row.currency].filter(Boolean).join(' · ')}
-        </p>
-      </div>
+    <div className="min-w-0">
+      <p className="truncate font-medium text-fg">{row.name}</p>
+      <p className="truncate text-caption text-fg-subtle max-md:whitespace-normal">
+        {[row.ticker, row.sector, row.currency].filter(Boolean).join(' · ')}
+      </p>
     </div>
   );
 }
@@ -255,11 +243,16 @@ function HoldingTableRow({
   const { fmtNative } = useCurrency();
   return (
     <DataTableRow selected={selected} cardDetails={false}>
-      <DataTableCell columnKey="select" contentClassName="max-md:hidden">
-        <SelectBox checked={selected} label={`Select ${row.name}`} onChange={onToggle} />
+      <DataTableCell columnKey="select" contentClassName="md:ml-auto">
+        <SelectBox
+          checked={selected}
+          label={`Select ${row.name}`}
+          onChange={onToggle}
+          caption="Select for bulk assign"
+        />
       </DataTableCell>
       <DataTableCell columnKey="holding" stacked>
-        <HoldingCell row={row} selected={selected} onSelect={onToggle} />
+        <HoldingCell row={row} />
       </DataTableCell>
       <DataTableCell columnKey="class" stacked>
         <ClassCell row={row} busy={busy} onUse={onUse} />

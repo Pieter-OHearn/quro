@@ -136,25 +136,43 @@ function MixSection({
 function ThresholdSection({
   form,
   onChange,
-}: Readonly<{ form: Form; onChange: (key: ConcentrationThresholdKey, value: string) => void }>) {
+  onToggle,
+}: Readonly<{
+  form: Form;
+  onChange: (key: ConcentrationThresholdKey, value: string) => void;
+  onToggle: (key: ConcentrationThresholdKey, enabled: boolean) => void;
+}>) {
   return (
     <Section
       title="Concentration notices"
-      description="A notice appears when a share of your investments is above its threshold, as a percentage."
+      description="A notice appears when a share of your investments is above its threshold, as a percentage. A notice that is switched off is not shown; the breakdown it reads from stays."
     >
-      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {CONCENTRATION_THRESHOLD_KEYS.map((key) => (
-          <FormField key={key} label={THRESHOLD_LABELS[key]}>
-            <TextInput
-              type="number"
-              inputMode="decimal"
-              min={0}
-              max={100}
-              step="any"
-              value={form.thresholds[key]}
-              onChange={(value) => onChange(key, value)}
-            />
-          </FormField>
+          <div key={key} className="space-y-1">
+            <FormField label={THRESHOLD_LABELS[key]}>
+              <TextInput
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                step="any"
+                value={form.thresholds[key]}
+                onChange={(value) => onChange(key, value)}
+                disabled={!form.noticesEnabled[key]}
+              />
+            </FormField>
+            <label className="flex min-h-8 cursor-pointer items-center gap-2 text-cell text-fg-muted max-sm:min-h-11">
+              <input
+                type="checkbox"
+                checked={form.noticesEnabled[key]}
+                onChange={(event) => onToggle(key, event.target.checked)}
+                aria-label={`Show the notice for ${THRESHOLD_LABELS[key].toLowerCase()}`}
+                className="h-4 w-4 rounded-sm border-border-control focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+              />
+              Show this notice
+            </label>
+          </div>
         ))}
       </div>
     </Section>
@@ -309,6 +327,12 @@ export function CustomiseModal({
         <ThresholdSection
           form={form}
           onChange={(key, value) => setForm((previous) => withThreshold(previous, key, value))}
+          onToggle={(key, enabled) =>
+            setForm((previous) => ({
+              ...previous,
+              noticesEnabled: { ...previous.noticesEnabled, [key]: enabled },
+            }))
+          }
         />
       </div>
     </Modal>

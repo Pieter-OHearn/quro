@@ -290,24 +290,57 @@ describe('exposure concentration', () => {
     expect(view.notices.map((notice) => notice.id)).not.toContain('sector');
   });
 
-  test('flags the largest currency outside EUR only', () => {
-    const view = buildExposureView(
-      run([
-        holding({ id: 1, shares: 10 }),
-        holding({ id: 2, currency: 'USD', shares: 20, unitPrice: 100 }),
-        holding({ id: 3, currency: 'GBP', shares: 5, unitPrice: 100 }),
-      ]),
+  test('keeps the currency notice off by default and still shows the currency breakdown', () => {
+    const holdings = [
+      holding({ id: 1, shares: 10 }),
+      holding({ id: 2, currency: 'USD', shares: 30, unitPrice: 100 }),
+    ];
+    const view = buildExposureView(run(holdings));
+    expect(view.notices.map((notice) => notice.id)).not.toContain('currency');
+    expect(view.currencies.map((row) => row.key)).toEqual(['USD', 'EUR']);
+    expect(defaultExposureSettings().noticesEnabled.currencyPct).toBe(false);
+  });
+
+  test('flags the largest currency outside EUR once the notice is switched on', () => {
+    const settings = defaultExposureSettings();
+    settings.noticesEnabled.currencyPct = true;
+    const small = buildExposureView(
+      run(
+        [
+          holding({ id: 1, shares: 10 }),
+          holding({ id: 2, currency: 'USD', shares: 20, unitPrice: 100 }),
+          holding({ id: 3, currency: 'GBP', shares: 5, unitPrice: 100 }),
+        ],
+        { settings },
+      ),
     );
     // USD is 1600 of 3200 EUR = 50%, which is not above the 50% threshold.
-    expect(view.notices.map((notice) => notice.id)).not.toContain('currency');
+    expect(small.notices.map((notice) => notice.id)).not.toContain('currency');
     const above = buildExposureView(
-      run([
-        holding({ id: 1, shares: 10 }),
-        holding({ id: 2, currency: 'USD', shares: 30, unitPrice: 100 }),
-      ]),
+      run(
+        [
+          holding({ id: 1, shares: 10 }),
+          holding({ id: 2, currency: 'USD', shares: 30, unitPrice: 100 }),
+        ],
+        { settings },
+      ),
     );
     const notice = above.notices.find((entry) => entry.id === 'currency');
     expect(notice?.message).toContain('70.6% of your portfolio is in USD, outside EUR');
+  });
+
+  test('a switched-off notice is not raised and its check says it is off', () => {
+    const settings = defaultExposureSettings();
+    settings.noticesEnabled.singleHoldingPct = false;
+    const facts = run([holding({ id: 1, shares: 90 }), holding({ id: 2, shares: 10 })], {
+      settings,
+    });
+    const check = fact(facts, 'exposure.check.single_holding');
+    expect(check.value).toBe(false);
+    expect(check.context).toMatchObject({ enabled: false, measured: 90 });
+    expect(buildExposureView(facts).notices.map((notice) => notice.id)).not.toContain(
+      'single_holding',
+    );
   });
 
   test('skips the top-three and spread notices for a very small portfolio', () => {
@@ -442,6 +475,26 @@ describe('exposure settings', () => {
     const fractional = defaultExposureSettings();
     fractional.riskByAssetClass.cash_money_market = 1.5;
     expect(parseExposureSettings(fractional).ok).toBe(false);
+  });
+
+  test('refuses a notice switch that is not a boolean, and a missing or unknown one', () => {
+    const settings = defaultExposureSettings() as unknown as Record<string, unknown>;
+    expect(
+      parseExposureSettings({
+        ...settings,
+        noticesEnabled: { ...(settings.noticesEnabled as object), currencyPct: 'yes' },
+      }).ok,
+    ).toBe(false);
+    expect(parseExposureSettings({ ...settings, noticesEnabled: undefined }).ok).toBe(false);
+    expect(
+      parseExposureSettings({
+        ...settings,
+        noticesEnabled: { ...(settings.noticesEnabled as object), extra: true },
+      }).ok,
+    ).toBe(false);
+    const on = defaultExposureSettings();
+    on.noticesEnabled.currencyPct = true;
+    expect(parseExposureSettings(on)).toEqual({ ok: true, value: on });
   });
 
   test('allows an unrated class and rounds percentages to two decimals', () => {

@@ -1,10 +1,12 @@
 import {
   ASSET_CLASSES,
   ASSET_CLASS_LABELS,
+  CONCENTRATION_THRESHOLD_KEYS,
   EXPOSURE_DEFAULT_SOURCES,
   MIX_GROUPS,
   MIX_GROUP_LABELS,
   REFERENCE_MIX_IDS,
+  THRESHOLD_LABELS,
   defaultExposureSettings,
   referenceMixName,
   riskBandLabel,
@@ -68,26 +70,15 @@ function InUse({ report }: Readonly<{ report: ExposureReport }>) {
       <div>
         <h4 className="text-label text-fg-muted">Concentration notices above</h4>
         <ul className="mt-2 space-y-1 text-cell">
-          <ThresholdRow
-            label="One holding"
-            value={settings.thresholds.singleHoldingPct}
-            fallback={DEFAULTS.thresholds.singleHoldingPct}
-          />
-          <ThresholdRow
-            label="Three largest holdings"
-            value={settings.thresholds.topThreePct}
-            fallback={DEFAULTS.thresholds.topThreePct}
-          />
-          <ThresholdRow
-            label="One sector"
-            value={settings.thresholds.sectorPct}
-            fallback={DEFAULTS.thresholds.sectorPct}
-          />
-          <ThresholdRow
-            label="One currency outside EUR"
-            value={settings.thresholds.currencyPct}
-            fallback={DEFAULTS.thresholds.currencyPct}
-          />
+          {CONCENTRATION_THRESHOLD_KEYS.map((key) => (
+            <ThresholdRow
+              key={key}
+              label={THRESHOLD_LABELS[key]}
+              value={settings.thresholds[key]}
+              fallback={DEFAULTS.thresholds[key]}
+              enabled={settings.noticesEnabled[key]}
+            />
+          ))}
         </ul>
       </div>
     </div>
@@ -98,12 +89,13 @@ function ThresholdRow({
   label,
   value,
   fallback,
-}: Readonly<{ label: string; value: number; fallback: number }>) {
+  enabled,
+}: Readonly<{ label: string; value: number; fallback: number; enabled: boolean }>) {
   return (
     <li className="flex justify-between gap-3">
       <span className="text-fg-muted">{label}</span>
       <span className="font-numeric text-fg">
-        {value}%
+        {enabled ? `${value}%` : `Off (${value}%)`}
         {value !== fallback ? (
           <span className="ml-1 text-caption text-fg-subtle">changed</span>
         ) : null}

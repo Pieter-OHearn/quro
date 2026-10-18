@@ -18,6 +18,7 @@ import {
   mortgageTransactions,
   mortgages,
   netWorthSnapshots,
+  oidcIdentities,
   payslips,
   pensionPots,
   pensionStatementImportRows,
@@ -87,6 +88,13 @@ export const ACCOUNT_TABLES: readonly AccountTable[] = [
     table: users,
     scope: (userId) => eq(users.id, userId),
     omit: ['passwordHash', 'passwordUpdatedAt'],
+  },
+  // Which provider account the sign-in is linked to: the issuer and the subject, nothing else.
+  {
+    name: 'oidc_identities',
+    table: oidcIdentities,
+    scope: owned(oidcIdentities),
+    omit: ['userId', 'createdAt'],
   },
   { name: 'employments', table: employments, scope: owned(employments), omit: OWNER },
   { name: 'plan_assumptions', table: planAssumptions, scope: owned(planAssumptions), omit: OWNER },

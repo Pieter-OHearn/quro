@@ -17,6 +17,7 @@ export type Form = {
   mixes: Record<ReferenceMixId, Record<MixGroup, RangeForm>>;
   selectedMix: string;
   thresholds: Record<ConcentrationThresholdKey, string>;
+  noticesEnabled: Record<ConcentrationThresholdKey, boolean>;
 };
 
 export function toForm(settings: ExposureSettings): Form {
@@ -47,6 +48,7 @@ export function toForm(settings: ExposureSettings): Form {
     thresholds: Object.fromEntries(
       CONCENTRATION_THRESHOLD_KEYS.map((key) => [key, String(settings.thresholds[key])]),
     ) as Form['thresholds'],
+    noticesEnabled: { ...settings.noticesEnabled },
   };
 }
 
@@ -79,5 +81,6 @@ export function toSettings(form: Form): unknown {
     thresholds: Object.fromEntries(
       CONCENTRATION_THRESHOLD_KEYS.map((key) => [key, toNumber(form.thresholds[key])]),
     ),
+    noticesEnabled: { ...form.noticesEnabled },
   };
 }

@@ -48,6 +48,8 @@ export type ExposureSettings = {
   selectedMix: ReferenceMixId | null;
   /** Percent of the portfolio above which a concentration notice is shown. */
   thresholds: Record<ConcentrationThresholdKey, number>;
+  /** Which notices are shown. A notice that is off is not raised; its breakdown stays. */
+  noticesEnabled: Record<ConcentrationThresholdKey, boolean>;
 };
 
 export const MIN_RISK_CLASS = 1;
@@ -123,6 +125,16 @@ const DEFAULT_THRESHOLDS: Record<ConcentrationThresholdKey, number> = {
   currencyPct: 50,
 };
 
+// The currency notice is off by default: a euro-based person who holds a global fund is mostly
+// exposed to other currencies, so the notice would fire for almost everyone. The breakdown by
+// currency is always shown, and the notice can be switched on with its own threshold.
+const DEFAULT_NOTICES_ENABLED: Record<ConcentrationThresholdKey, boolean> = {
+  singleHoldingPct: true,
+  topThreePct: true,
+  sectorPct: true,
+  currencyPct: false,
+};
+
 function buildDefaultSettings(): ExposureSettings {
   return {
     version: EXPOSURE_SETTINGS_VERSION,
@@ -132,6 +144,7 @@ function buildDefaultSettings(): ExposureSettings {
     referenceMixes: structuredClone(DEFAULT_MIXES),
     selectedMix: null,
     thresholds: { ...DEFAULT_THRESHOLDS },
+    noticesEnabled: { ...DEFAULT_NOTICES_ENABLED },
   };
 }
 
@@ -208,8 +221,9 @@ const THRESHOLD_SOURCES: { key: ConcentrationThresholdKey; covers: string; sourc
   },
   {
     key: 'currencyPct',
-    covers: 'Notice for one currency other than EUR',
-    source: 'Our assumption; no reputable threshold was found.',
+    covers: 'Notice for one currency other than EUR (off by default)',
+    source:
+      'Our assumption; no reputable threshold was found. The notice is off by default because a person based in euros who holds a global fund is mostly exposed to other currencies.',
   },
 ];
 
@@ -361,6 +375,21 @@ function parseThresholds(raw: unknown, errors: string[]): ExposureSettings['thre
   ) as ExposureSettings['thresholds'];
 }
 
+function parseNoticesEnabled(raw: unknown, errors: string[]): ExposureSettings['noticesEnabled'] {
+  const source = isPlainObject(raw) ? raw : {};
+  if (!isPlainObject(raw) || unknownKeys(raw, CONCENTRATION_THRESHOLD_KEYS).length > 0) {
+    errors.push('Notices must say, for each of the four concentration limits, whether it is on');
+  }
+  return Object.fromEntries(
+    CONCENTRATION_THRESHOLD_KEYS.map((key) => {
+      if (typeof source[key] !== 'boolean') {
+        errors.push(`The notice for ${THRESHOLD_LABELS[key].toLowerCase()} must be on or off`);
+      }
+      return [key, source[key] === true];
+    }),
+  ) as ExposureSettings['noticesEnabled'];
+}
+
 /**
  * Checks a settings document and returns it normalised (percentages to two decimals), or every
  * problem found. Unknown keys are refused so a typo cannot be stored and silently ignored.
@@ -374,6 +403,7 @@ export function parseExposureSettings(raw: unknown): ExposureSettingsResult {
     'referenceMixes',
     'selectedMix',
     'thresholds',
+    'noticesEnabled',
   ]);
   if (extra.length > 0) errors.push(`Unknown settings: ${extra.join(', ')}`);
   if (raw.version !== EXPOSURE_SETTINGS_VERSION) {
@@ -389,6 +419,7 @@ export function parseExposureSettings(raw: unknown): ExposureSettingsResult {
     referenceMixes: parseMixes(raw.referenceMixes, errors),
     selectedMix: errors.length === 0 ? (selectedMix as ReferenceMixId | null) : null,
     thresholds: parseThresholds(raw.thresholds, errors),
+    noticesEnabled: parseNoticesEnabled(raw.noticesEnabled, errors),
   };
   return errors.length > 0 ? { ok: false, errors } : { ok: true, value };
 }

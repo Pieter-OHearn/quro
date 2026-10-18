@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
-import { authCodes } from '../db/schema';
+import { authCodes, oidcIdentities, sessions } from '../db/schema';
+import postgres from 'postgres';
+import { getConfig } from '../config';
+import { enterMaintenance, leaveMaintenance } from '../lib/maintenanceMode';
 import { issuePasswordResetCode } from '../lib/authCodes';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
-import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from './io';
+import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, EXIT_USAGE } from './io';
 import { runQuro } from './quro';
 
 const integration = createIntegrationHelpers('operator-cli.integration.quro.test');
@@ -183,6 +186,10 @@ describe('quro user', () => {
       ['user', 'reset-password'],
       ['user', 'list', 'extra'],
       ['user', 'revoke-code', 'abc'],
+      ['user', 'oidc'],
+      ['user', 'oidc', 'bogus', 'a@b.test'],
+      ['user', 'oidc', 'status'],
+      ['user', 'oidc', 'status', 'a@b.test', 'extra'],
     ];
     for (const args of cases) {
       const result = await quro(...args);
@@ -194,5 +201,90 @@ describe('quro user', () => {
     expect((await quro()).exitCode).toBe(EXIT_USAGE);
     expect((await quro('--help')).out).toContain('Usage: quro <command>');
     expect((await quro('user', '--help')).out).toContain('reset-password <email>');
+  });
+});
+
+describe('quro user oidc', () => {
+  const issuer = 'https://auth.example';
+  const subject = 'cli-subject-0123456789abcdef';
+
+  async function linkedAccount(label: string) {
+    const account = await integration.signUp(label);
+    await db
+      .insert(oidcIdentities)
+      .values({ userId: account.user.id, issuer, subject: `${subject}-${account.user.id}` });
+    return account;
+  }
+
+  test('status says whether the account is linked, with the issuer and date and no subject', async () => {
+    const plain = await integration.signUp('oidc-plain');
+    const none = await quro('user', 'oidc', 'status', plain.user.email);
+    expect(none.exitCode).toBe(EXIT_OK);
+    expect(none.out).toContain('is not linked');
+
+    const account = await linkedAccount('oidc-linked');
+    const result = await quro('user', 'oidc', 'status', account.user.email);
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.out).toContain(`is linked to ${issuer} since`);
+    expect(result.out).not.toContain(subject);
+    expect(result.out).not.toContain(subject.slice(0, 8));
+    expect(result.err).toBe('');
+  });
+
+  test('unlink changes nothing without --yes', async () => {
+    const account = await linkedAccount('oidc-no-yes');
+    const result = await quro('user', 'oidc', 'unlink', account.user.email);
+    expect(result.exitCode).toBe(EXIT_REFUSED);
+    expect(result.err).toContain('Nothing was changed');
+    expect(result.err).not.toContain(subject);
+    const rows = await db
+      .select()
+      .from(oidcIdentities)
+      .where(eq(oidcIdentities.userId, account.user.id));
+    expect(rows).toHaveLength(1);
+  });
+
+  test('unlink --yes removes the link and keeps the sessions', async () => {
+    const account = await linkedAccount('oidc-unlink');
+    const other = await linkedAccount('oidc-other');
+    const before = await db.select().from(sessions).where(eq(sessions.userId, account.user.id));
+    const result = await quro('user', 'oidc', 'unlink', account.user.email, '--yes');
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.out).toContain('Removed 1 single sign-on link');
+    expect(result.out + result.err).not.toContain(subject);
+    expect(
+      await db.select().from(oidcIdentities).where(eq(oidcIdentities.userId, account.user.id)),
+    ).toEqual([]);
+    expect(
+      await db.select().from(oidcIdentities).where(eq(oidcIdentities.userId, other.user.id)),
+    ).toHaveLength(1);
+    const after = await db.select().from(sessions).where(eq(sessions.userId, account.user.id));
+    expect(after.map((row) => row.id)).toEqual(before.map((row) => row.id));
+    const again = await quro('user', 'oidc', 'unlink', account.user.email, '--yes');
+    expect(again.exitCode).toBe(EXIT_OK);
+    expect(again.out).toContain('Nothing to do');
+  });
+
+  test('an unknown account fails, and so does a run during backup or restore', async () => {
+    expect((await quro('user', 'oidc', 'status', 'nobody@example.test')).exitCode).toBe(
+      EXIT_FAILURE,
+    );
+    const account = await linkedAccount('oidc-maintenance');
+    const session = postgres(getConfig().adminDatabase.url.reveal(), {
+      max: 1,
+      onnotice: () => undefined,
+    });
+    try {
+      await enterMaintenance(session, 5);
+      const result = await quro('user', 'oidc', 'unlink', account.user.email, '--yes');
+      expect(result.exitCode).toBe(EXIT_FAILURE);
+      expect(result.err).toContain('backed up or restored');
+      expect(
+        await db.select().from(oidcIdentities).where(eq(oidcIdentities.userId, account.user.id)),
+      ).toHaveLength(1);
+      await leaveMaintenance(session);
+    } finally {
+      await session.end();
+    }
   });
 });

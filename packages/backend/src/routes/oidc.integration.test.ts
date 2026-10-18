@@ -18,11 +18,16 @@ import { deleteAccount } from '../lib/accountDeletion';
 import { enterMaintenance, leaveMaintenance } from '../lib/maintenanceMode';
 import { resetOidcDiscovery, pkceChallenge } from '../lib/oidcClient';
 import { applyTestSettings } from '../test/config';
-import { createIntegrationHelpers, insertPartnerLink } from '../test/integration';
+import {
+  createIntegrationHelpers,
+  insertPartnerLink,
+  integrationPassword,
+} from '../test/integration';
 import {
   FAKE_CLIENT_ID,
   FAKE_CLIENT_SECRET,
   FAKE_REDIRECT_URI,
+  newSigningKey,
   startFakeProvider,
   type FakeGrant,
   type FakeProvider,
@@ -42,7 +47,7 @@ const SETTINGS = (issuer: string) => ({
 
 beforeAll(async () => {
   await integration.cleanup();
-  provider = startFakeProvider();
+  provider = await startFakeProvider();
   restore = applyTestSettings(SETTINGS(provider.issuer));
 });
 
@@ -378,6 +383,15 @@ describe('a callback that must not sign anyone in', () => {
     await expectRefused(response, 'failed');
   });
 
+  test('refuses an ID token signed by a key the provider does not publish', async () => {
+    const response = await finish(await begin(), {
+      subject: 'sub-forged',
+      email: owner.user.email,
+      signWith: await newSigningKey(provider.key.alg),
+    });
+    await expectRefused(response, 'failed');
+  });
+
   test('refuses a callback without a code or without a state', async () => {
     const begun = await begin();
     await expectRefused(
@@ -463,7 +477,7 @@ describe('which account a provider sign-in reaches', () => {
   test('links the same email at a new issuer only as a second identity, never as a takeover', async () => {
     const owner = await integration.signUp('owner-issuer');
     await finish(await begin(), { subject: 'same-sub', email: owner.user.email });
-    const other = startFakeProvider();
+    const other = await startFakeProvider();
     const restoreOther = applyTestSettings({ OIDC_ISSUER: other.issuer });
     resetOidcDiscovery();
     try {
@@ -684,6 +698,111 @@ describe('maintenance', () => {
     } finally {
       await session.end();
     }
+  });
+});
+
+function sessionCookies(response: Response): string {
+  const header = response.headers.get('set-cookie') ?? '';
+  const session = header.match(/session=([^;]+)/)![1];
+  const csrf = header.match(/csrf_token=([^;]+)/)![1];
+  return `session=${session}; csrf_token=${csrf}`;
+}
+
+describe('unlinking from Settings', () => {
+  const ADDRESS_PREFIX = '198.51.100.';
+  let address = 0;
+  const nextAddress = () => `${ADDRESS_PREFIX}${(address += 1)}`;
+
+  async function linked(label: string, subject: string) {
+    const account = await integration.signUp(label);
+    const signedIn = await finish(await begin(), { subject, email: account.user.email });
+    return { account, cookie: sessionCookies(signedIn) };
+  }
+
+  test('shows the link, and removes it only for the password', async () => {
+    const { account, cookie } = await linked('owner-unlink', 'sub-unlink');
+    const remoteAddress = nextAddress();
+    const state = async () =>
+      (
+        (await (await integration.request('/api/settings/single-sign-on', { cookie })).json()) as {
+          data: { linked: boolean; providerName: string | null };
+        }
+      ).data;
+    expect(await state()).toEqual({ linked: true, providerName: 'Authelia' });
+
+    const unlink = (json: unknown) =>
+      integration.request('/api/settings/single-sign-on', {
+        method: 'DELETE',
+        cookie,
+        json,
+        remoteAddress,
+      });
+    expect((await unlink({})).status).toBe(400);
+    expect((await unlink({ password: 'not the password' })).status).toBe(401);
+    expect((await unlink({ password: 123 })).status).toBe(400);
+    expect(await identitiesOf(account.user.id)).toHaveLength(1);
+
+    const removed = await unlink({ password: integrationPassword });
+    expect(removed.status).toBe(200);
+    expect(await identitiesOf(account.user.id)).toHaveLength(0);
+    expect(await state()).toEqual({ linked: false, providerName: 'Authelia' });
+    // The session that asked stays signed in.
+    expect(await userOf(cookie.match(/session=([^;]+)/)![1]!)).toBe(account.user.id);
+
+    // The next provider sign-in links again by verified email, even as another subject.
+    const again = await finish(await begin(), { subject: 'sub-new', email: account.user.email });
+    expect(location(again)).toBe('/');
+    expect((await identitiesOf(account.user.id)).map((row) => row.subject)).toEqual(['sub-new']);
+  });
+
+  test('is for the signed-in account only, and needs a session', async () => {
+    const mine = await linked('owner-mine', 'sub-mine');
+    const theirs = await linked('owner-theirs', 'sub-theirs');
+    const anonymous = await integration.request('/api/settings/single-sign-on', {
+      method: 'DELETE',
+      json: { password: integrationPassword },
+    });
+    expect([401, 403]).toContain(anonymous.status);
+    await integration.request('/api/settings/single-sign-on', {
+      method: 'DELETE',
+      cookie: mine.cookie,
+      json: { password: integrationPassword },
+      remoteAddress: nextAddress(),
+    });
+    expect(await identitiesOf(mine.account.user.id)).toHaveLength(0);
+    expect(await identitiesOf(theirs.account.user.id)).toHaveLength(1);
+  });
+
+  test('limits wrong passwords like a password change', async () => {
+    const { account, cookie } = await linked('owner-limited', 'sub-limited');
+    const remoteAddress = nextAddress();
+    const statuses: number[] = [];
+    // The limiter is off in the test environment.
+    const restoreLimits = applyTestSettings({ NODE_ENV: 'development' });
+    try {
+      for (let attempt = 0; attempt < 7; attempt += 1) {
+        const response = await integration.request('/api/settings/single-sign-on', {
+          method: 'DELETE',
+          cookie,
+          json: { password: 'wrong password' },
+          remoteAddress,
+        });
+        statuses.push(response.status);
+      }
+    } finally {
+      restoreLimits();
+    }
+    expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
+    expect(statuses.slice(5)).toEqual([429, 429]);
+    expect(await identitiesOf(account.user.id)).toHaveLength(1);
+  });
+
+  test('says an unlinked account is unlinked', async () => {
+    const account = await integration.signUp('owner-plain');
+    const response = await integration.request('/api/settings/single-sign-on', {
+      cookie: account.cookie,
+    });
+    expect(((await response.json()) as { data: { linked: boolean } }).data.linked).toBe(false);
   });
 });
 

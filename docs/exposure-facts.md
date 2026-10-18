@@ -83,9 +83,14 @@ A failed load is a failed request: the page shows an error with a retry, never a
 
 Validation (`parseExposureSettings`): percentages are numbers from 0 to 100 (stored to two
 decimals), each range has `min` at most `max`, the minimums of a mix add up to at most 100 and its
-maximums to at least 100, risk classes are whole numbers from 1 to 7 or `null`, the version equals
+maximums to at least 100, risk classes are whole numbers from 1 to 7 or `null`, each notice switch is a boolean, the version equals
 the current one, and unknown keys are refused. The four mixes are named Reference mix A to D and are
-not tied to a risk tolerance.
+not tied to a risk tolerance. No mix is selected by default.
+
+The notice for one currency other than EUR is **off by default**: a person based in euros who holds
+a global fund is mostly exposed to other currencies, so it would fire for almost everyone. Its
+threshold stays editable and the breakdown by currency is always shown. A notice that is switched
+off is not raised, and its check fact says so (`context.enabled` is `false`).
 
 Every default has a source and a version date in `EXPOSURE_DEFAULT_SOURCES`, shown on the page under
 **How this is worked out**. The defaults (`EXPOSURE_DEFAULTS_VERSION`) are reviewed once a year. The
@@ -135,21 +140,21 @@ A **fact** is:
 
 Fact ids and their methods:
 
-| Id                                                                            | Method                         | Value                                                                                                          |
-| ----------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `exposure.total_value`                                                        | `sum_cents`                    | Total of the valued holdings, EUR                                                                              |
-| `exposure.holding.<id>.weight`                                                | `share_of_total`               | A holding's share of the total, percent                                                                        |
-| `exposure.asset_class.<class>.value` / `.share`                               | `sum_cents`, `share_of_total`  | Per asset class, including `unclassified`                                                                      |
-| `exposure.group.<stocks\|bonds\|cash\|other>.share`                           | `share_of_total`               | Per reference-mix group; unclassified is in none                                                               |
-| `exposure.currency.<code>.value` / `.share`                                   | as above                       | Per pricing currency                                                                                           |
-| `exposure.sector.<key>.value` / `.share`                                      | as above                       | Per sector (`context.sector` is the label, `context.generic` a broad label)                                    |
-| `exposure.concentration.hhi`                                                  | `hhi`                          | Sum of squared weights, with weights in percent (0 to 10,000)                                                  |
-| `exposure.concentration.effective_holdings`                                   | `effective_number_of_holdings` | 1 divided by the sum of squared weights as fractions (10,000 / HHI)                                            |
-| `exposure.concentration.single_holding` / `top_three` / `sector` / `currency` | `largest_share`                | The largest share of each kind, percent. Currency ignores EUR; sector ignores broad labels such as Diversified |
-| `exposure.check.single_holding` / `top_three` / `sector` / `currency`         | `threshold_check`              | `true` when the measure is above the threshold; `context` has `measured`, `threshold`, `applicable`            |
-| `exposure.risk.weighted_average`                                              | `weighted_average_risk`        | Sum of risk class times value over the value of rated holdings                                                 |
-| `exposure.risk.coverage`                                                      | `share_of_total`               | Share of the total that has a risk class                                                                       |
-| `exposure.reference_mix.<group>`                                              | `reference_range_check`        | Only with a selected mix: the group's share, `context` has `mix`, `min`, `max`, `status`                       |
+| Id                                                                            | Method                         | Value                                                                                                                               |
+| ----------------------------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `exposure.total_value`                                                        | `sum_cents`                    | Total of the valued holdings, EUR                                                                                                   |
+| `exposure.holding.<id>.weight`                                                | `share_of_total`               | A holding's share of the total, percent                                                                                             |
+| `exposure.asset_class.<class>.value` / `.share`                               | `sum_cents`, `share_of_total`  | Per asset class, including `unclassified`                                                                                           |
+| `exposure.group.<stocks\|bonds\|cash\|other>.share`                           | `share_of_total`               | Per reference-mix group; unclassified is in none                                                                                    |
+| `exposure.currency.<code>.value` / `.share`                                   | as above                       | Per pricing currency                                                                                                                |
+| `exposure.sector.<key>.value` / `.share`                                      | as above                       | Per sector (`context.sector` is the label, `context.generic` a broad label)                                                         |
+| `exposure.concentration.hhi`                                                  | `hhi`                          | Sum of squared weights, with weights in percent (0 to 10,000)                                                                       |
+| `exposure.concentration.effective_holdings`                                   | `effective_number_of_holdings` | 1 divided by the sum of squared weights as fractions (10,000 / HHI)                                                                 |
+| `exposure.concentration.single_holding` / `top_three` / `sector` / `currency` | `largest_share`                | The largest share of each kind, percent. Currency ignores EUR; sector ignores broad labels such as Diversified                      |
+| `exposure.check.single_holding` / `top_three` / `sector` / `currency`         | `threshold_check`              | `true` when the notice is on and the measure is above the threshold; `context` has `measured`, `threshold`, `enabled`, `applicable` |
+| `exposure.risk.weighted_average`                                              | `weighted_average_risk`        | Sum of risk class times value over the value of rated holdings                                                                      |
+| `exposure.risk.coverage`                                                      | `share_of_total`               | Share of the total that has a risk class                                                                                            |
+| `exposure.reference_mix.<group>`                                              | `reference_range_check`        | Only with a selected mix: the group's share, `context` has `mix`, `min`, `max`, `status`                                            |
 
 Notices other than the single-holding one apply only to a portfolio large enough to be spread (the
 top-three check needs four holdings, the sector and currency checks two); `context.applicable` says

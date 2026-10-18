@@ -29,7 +29,9 @@ import { deleteAccount, previewAccountDeletion } from '../lib/accountDeletion';
 import { ExportLimitError, exportStream, prepareExport } from '../lib/dataExport';
 import { getBuildInfo } from '../lib/buildInfo';
 import { getDocumentStore } from '../lib/documentStorage';
+import { getConfig } from '../config';
 import { changePasswordRateLimit } from '../middleware/rateLimit';
+import { listOidcLinks, removeOidcLinks } from '../lib/oidcLink';
 import {
   err,
   ok,
@@ -288,6 +290,40 @@ app.put('/password', changePasswordRateLimit, async (c) => {
   }
 
   return c.json({ data });
+});
+
+// ── Single sign-on link ─────────────────────────────────────────────────────
+
+// Whether this account is linked to the sign-in provider, for the Security settings.
+app.get('/single-sign-on', async (c) => {
+  const { oidc } = getConfig();
+  const links = await listOidcLinks(getAuthUser(c).id);
+  return c.json({
+    data: { linked: links.length > 0, providerName: oidc.enabled ? oidc.providerName : null },
+  });
+});
+
+// Removes the link. The next provider sign-in links again by verified email. Sessions stay, as
+// they do for a password change by the person who holds them. The password proves it is them.
+app.delete('/single-sign-on', changePasswordRateLimit, async (c) => {
+  const authUser = getAuthUser(c);
+  const body = await readJsonRecord(c.req, 'Invalid request body');
+  if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
+  const { password } = body.value;
+  if (typeof password !== 'string' || password === '') {
+    return c.json({ error: 'Password is required' }, HTTP_STATUS.BAD_REQUEST);
+  }
+  const [user] = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, authUser.id));
+  if (!user) return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
+  if (!(await Bun.password.verify(password, user.passwordHash))) {
+    return c.json({ error: 'Password is incorrect' }, HTTP_STATUS.UNAUTHORIZED);
+  }
+  await removeOidcLinks(authUser.id);
+  const { oidc } = getConfig();
+  return c.json({ data: { linked: false, providerName: oidc.enabled ? oidc.providerName : null } });
 });
 
 // ── Sessions ────────────────────────────────────────────────────────────────

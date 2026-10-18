@@ -64,6 +64,7 @@ const domainQueryDependencies = {
   ],
   bunqConnection: [keys.bunqConnection],
   sessions: [keys.sessions],
+  singleSignOn: [keys.singleSignOn],
   // A file import writes savings and budget ledgers, so everything those feed is refetched.
   csvImport: [...savings, ...budget, ...dashboard, keys.imports.all, keys.plan.all],
   bunqSync: [

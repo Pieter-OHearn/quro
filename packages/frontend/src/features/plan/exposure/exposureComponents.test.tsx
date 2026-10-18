@@ -148,6 +148,11 @@ describe('how this is worked out', () => {
     expect(markup).toContain('Method exposure-breakdown 1.0.0');
   });
 
+  test('lists the currency notice as off by default, with its threshold', () => {
+    expect(markup).toContain('One currency outside EUR');
+    expect(markup).toContain('Off (50%)');
+  });
+
   test('says it is information, not advice, and never names a mix after risk tolerance', () => {
     expect(markup).toContain('Information, not advice.');
     expect(markup).toMatch(
