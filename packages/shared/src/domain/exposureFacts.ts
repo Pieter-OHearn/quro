@@ -150,11 +150,13 @@ export function isGenericSector(sector: string): boolean {
 }
 
 export function sectorKey(sector: string): string {
+  // Split on runs of other characters and rejoin, rather than trimming underscores with a second
+  // pattern, which can take quadratic time on a long run of them.
   const key = sector
-    .trim()
     .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '_')
-    .replaceAll(/^_+|_+$/g, '');
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .join('_');
   return key || 'unspecified';
 }
 

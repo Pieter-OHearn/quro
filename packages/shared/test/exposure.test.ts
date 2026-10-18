@@ -8,6 +8,7 @@ import {
   defaultExposureSettings,
   formatShare,
   parseExposureSettings,
+  sectorKey,
   suggestAssetClass,
   type ExposureFxInput,
   type ExposureHoldingInput,
@@ -544,6 +545,14 @@ describe('asset class suggestions', () => {
     ).toBeNull();
     expect(suggestAssetClass({})).toBeNull();
   });
+});
+
+test('sector keys ignore punctuation and edge underscores, and stay quick on long runs', () => {
+  const started = Date.now();
+  const key = sectorKey(`__${'_'.repeat(50_000)}Health & Care${'_'.repeat(50_000)}__`);
+  expect(key).toBe('health_care');
+  expect(Date.now() - started).toBeLessThan(500);
+  expect(sectorKey('  ')).toBe('unspecified');
 });
 
 test('formatShare drops a trailing zero decimal', () => {
