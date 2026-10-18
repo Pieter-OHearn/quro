@@ -3,12 +3,15 @@ import { LIST_PAGE_MAX_LIMIT, type ListPage } from '@quro/shared';
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z\d+.-]*:\/\//i;
 const UNAUTHORIZED_STATUS = 401;
-// A 401 here is the answer to a wrong password, not a session that ended.
-const EXPECTED_AUTH_401_PATHS = new Set([
-  '/api/auth/me',
-  '/api/auth/signin',
+const EXPECTED_AUTH_401_PATHS = new Set(['/api/auth/me', '/api/auth/signin']);
+// These answer a wrong password with 401 when they change something, which is not a session that
+// ended. A GET of the same path that gets 401 still is one.
+const PASSWORD_CHECKED_PATHS = new Set([
+  '/api/settings/password',
+  '/api/settings/account',
   '/api/settings/single-sign-on',
 ]);
+const MUTATING_METHODS = new Set(['PUT', 'POST', 'PATCH', 'DELETE']);
 
 type UnauthorizedHandler = () => void;
 
@@ -21,10 +24,18 @@ export function registerUnauthorizedHandler(handler: UnauthorizedHandler): () =>
   };
 }
 
-export function notifyUnauthorizedResponse(status: number | undefined, url: string | undefined) {
+export function notifyUnauthorizedResponse(
+  status: number | undefined,
+  url: string | undefined,
+  method?: string,
+) {
   if (status !== UNAUTHORIZED_STATUS || !url) return;
   const path = new URL(url, 'http://quro.local').pathname;
-  if (!EXPECTED_AUTH_401_PATHS.has(path)) unauthorizedHandler?.();
+  if (EXPECTED_AUTH_401_PATHS.has(path)) return;
+  if (PASSWORD_CHECKED_PATHS.has(path) && MUTATING_METHODS.has((method ?? '').toUpperCase())) {
+    return;
+  }
+  unauthorizedHandler?.();
 }
 
 export function resolveApiBaseUrl(rawBaseUrl?: string): string {
@@ -67,7 +78,7 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(undefined, (error: unknown) => {
   if (axios.isAxiosError(error)) {
-    notifyUnauthorizedResponse(error.response?.status, error.config?.url);
+    notifyUnauthorizedResponse(error.response?.status, error.config?.url, error.config?.method);
   }
   return Promise.reject(error);
 });
