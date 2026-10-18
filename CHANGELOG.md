@@ -16,6 +16,30 @@ All notable changes to this project will be documented in this file. The format 
 
 - Migration 0045 adds `holdings.asset_class` and `holdings.risk_class_override` (both empty for existing holdings) and the `exposure_settings` table. It drops nothing; the account export and deletion include the new table.
 
+## [v1.0.0-rc.3] - 2026-10-18
+
+Quro 1.0.0-rc.3 adds optional sign-in through an OpenID Connect provider. It is off until you set the `OIDC_*` settings, passwords keep working, and it has one additive migration. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc2-to-100-rc3) before you upgrade.
+
+### Added
+
+- Sign in through an OpenID Connect provider such as Authelia, Keycloak or Google, next to passwords ([Single sign-on](docs/configuration.md#single-sign-on)). The flow is the authorization code flow with PKCE, state and a nonce. A provider sign-in never creates an account: the first sign-in links the provider's identity to the account with the same verified email address, and later sign-ins match the provider's subject.
+- `quro user oidc status EMAIL` and `quro user oidc unlink EMAIL --yes` show and remove a link, and Settings → Security has a Single sign-on card that unlinks after a password check. The next provider sign-in links the account again.
+- The personal data export includes the account's provider link (issuer and subject).
+
+### Fixed
+
+- A wrong password when you change your password, delete your account or unlink single sign-on shows the field error and keeps you signed in, instead of sending you to the sign-in page as if the session had ended.
+
+### Security
+
+- The ID token's signature is verified against the provider's published keys, with an allowlist of asymmetric algorithms (RS256, PS256, ES256, EdDSA); the issuer, audience, expiry, nonce and authorized party are checked. Provider requests need `https` (plain `http` only for a loopback provider), are size-limited and time-limited, and do not follow redirects.
+- Sign-in routes pause while a backup or restore holds the maintenance lock, and logs carry only an error class for provider failures, never a token, code or address.
+
+### Upgrade notes
+
+- **Migration `0044_oidc_sign_in`** adds the `oidc_identities` and `oidc_login_attempts` tables and changes no existing row. Quro 1.0.0-rc.2 does not ship it and refuses to run against a database that has it, so going back after the upgrade means restoring the backup you took before. Take one first, as in the general procedure.
+- **Nothing else to do** unless you want single sign-on; then register Quro at your provider and set the `OIDC_*` settings.
+
 ## [v1.0.0-rc.2] - 2026-10-17
 
 Quro 1.0.0-rc.2 fixes how Quro looks when it is opened from an iPhone's home screen. It has no migration and needs no operator action beyond pinning the new images; see the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc1-to-100-rc2).

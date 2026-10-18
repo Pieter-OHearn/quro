@@ -168,9 +168,9 @@ Needs no settings and no database.
 
 ```json
 {
-  "version": "v1.0.0-rc.2",
+  "version": "v1.0.0-rc.3",
   "revision": "<commit the image was built from>",
-  "migrations": { "latest": "0043_csv_imports", "count": 44 },
+  "migrations": { "latest": "0044_oidc_sign_in", "count": 45 },
   "runtime": { "bun": "1.4.3", "platform": "linux", "arch": "arm64" }
 }
 ```
