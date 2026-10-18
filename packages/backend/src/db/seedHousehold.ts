@@ -1,3 +1,4 @@
+import { defaultExposureSettings } from '@quro/shared';
 import { eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { createApp } from '../app';
 import { runUnlessMaintenance } from '../lib/maintenanceMode';
@@ -47,6 +48,7 @@ import {
   pensionPots,
   pensionTransactions,
   planAssumptions,
+  exposureSettings,
   properties,
   propertyTransactions,
   savingsAccounts,
@@ -128,6 +130,7 @@ async function resetHousehold(userIds: readonly number[]): Promise<void> {
     await tx.delete(employments).where(inArray(employments.userId, ids));
     await tx.delete(goals).where(inArray(goals.userId, ids));
     await tx.delete(planAssumptions).where(inArray(planAssumptions.userId, ids));
+    await tx.delete(exposureSettings).where(inArray(exposureSettings.userId, ids));
     await tx.delete(netWorthSnapshots).where(inArray(netWorthSnapshots.userId, ids));
     // Rate history is not tied to a user: only the rows this seed wrote are removed.
     await tx
@@ -222,6 +225,8 @@ async function seedHoldings(context: Context): Promise<void> {
       currency: holding.currency,
       sector: holding.sector,
       itemType: holding.itemType,
+      assetClass: holding.assetClass ?? null,
+      riskClassOverride: holding.riskClassOverride ?? null,
       priceUpdatedAt: HOUSEHOLD_TIMESTAMPS.pricesSyncedAt,
       excludeFromSync: true,
       eodDate: HOUSEHOLD_AS_OF,
@@ -260,6 +265,11 @@ async function seedHoldings(context: Context): Promise<void> {
         },
       });
   }
+  // The demo user has picked one reference mix, so the chart draws its ranges over the bar.
+  await context.api.demo.put('/api/exposure/settings', {
+    ...defaultExposureSettings(),
+    selectedMix: 'B',
+  });
 }
 
 async function seedProperties(context: Context): Promise<void> {

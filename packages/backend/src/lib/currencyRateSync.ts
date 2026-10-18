@@ -171,9 +171,12 @@ let currentRows: { rows: CurrentCurrencyRateRow[]; loadedAt: number } | null = n
 let currentLoad: Promise<CurrentCurrencyRateRow[]> | null = null;
 const syncs = new Map<CurrencyCode, Promise<CurrencyRateSyncSummary>>();
 
-export async function getCurrentCurrencyRateRows(
-  baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
-): Promise<CurrentCurrencyRateRow[]> {
+/**
+ * The cached current rates as stored, without requiring every currency to be present. Callers that
+ * can say "no rate for this currency" (the Exposure view) use it; everything that converts a total
+ * uses `getCurrentCurrencyRateRows`, which refuses an incomplete cache.
+ */
+export async function getStoredCurrentCurrencyRateRows(): Promise<CurrentCurrencyRateRow[]> {
   if (!currentRows || Date.now() - currentRows.loadedAt >= CURRENT_RATE_CACHE_MS) {
     const revision = cacheRevision;
     currentLoad ??= loadCurrencyRateCacheRows()
@@ -185,9 +188,15 @@ export async function getCurrentCurrencyRateRows(
         currentLoad = null;
       });
     await currentLoad;
-    if (!currentRows) return getCurrentCurrencyRateRows(baseCurrency);
+    if (!currentRows) return getStoredCurrentCurrencyRateRows();
   }
-  const rows = currentRows!.rows;
+  return currentRows!.rows;
+}
+
+export async function getCurrentCurrencyRateRows(
+  baseCurrency: CurrencyCode = FX_BASE_CURRENCY,
+): Promise<CurrentCurrencyRateRow[]> {
+  const rows = await getStoredCurrentCurrencyRateRows();
   // Provider refresh belongs to the scheduler, never to a dashboard request.
   buildRatesToBaseCurrency(rows, baseCurrency);
   return rows;

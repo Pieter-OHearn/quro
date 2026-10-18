@@ -18,12 +18,12 @@ manifest.json         Format version, row counts, SHA-256 of every file, documen
 
 ### What is in it
 
-The account's own rows: profile, employments, planning assumptions, savings accounts and transactions, holdings, transactions and price history, properties, mortgages, their transactions, pensions and their transactions, statement uploads and their rows, debts and payments, payslips, goals, budget categories and transactions, category mappings, saved CSV column mappings, CSV imports and their rows ([import a CSV](csv-import.md)) and monthly net worth snapshots, and, if you sign in through a provider, the link to it (`oidc_identities`: the issuer and your subject there, nothing else).
+The account's own rows: profile, employments, planning assumptions, exposure settings, savings accounts and transactions, holdings, transactions and price history, properties, mortgages, their transactions, pensions and their transactions, statement uploads and their rows, debts and payments, payslips, goals, budget categories and transactions, category mappings, saved CSV column mappings, CSV imports and their rows ([import a CSV](csv-import.md)) and monthly net worth snapshots, and, if you sign in through a provider, the link to it (`oidc_identities`: the issuer and your subject there, nothing else).
 
 - **Joint rows.** Joint accounts, properties and mortgages you own are exported in full, not halved, including ledger rows your partner entered on them (`enteredByPartner` is `true` on those). Rows your partner owns are not exported, joint or not: they belong to their account.
 - **Money and currency.** Amounts are numbers in the currency the row names (`currency`, or `sourceCurrency` and `baseCurrency` where a row carries them). Nothing is converted, negative balances and equity keep their sign, and empty values stay empty.
 - **Provenance.** Bank-synced rows keep their source fields, and imported rows keep `importId`, `importSource` and `externalId`.
-- **Never included:** password hash, sessions, sign-in codes, bank-link credentials, encryption keys and storage keys. Exchange rates, the stock exchange list and background job state are shared reference or housekeeping data, not yours.
+- **Never included:** password hash, sessions, sign-in codes, single sign-on links, bank-link credentials, encryption keys and storage keys. Exchange rates, the stock exchange list and background job state are shared reference or housekeeping data, not yours.
 
 ### CSV and spreadsheets
 

@@ -1,5 +1,6 @@
 import { getTableColumns, getTableName, inArray, isTable, like, or } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
+import { defaultExposureSettings } from '@quro/shared';
 import { db } from '../db/client';
 import * as schema from '../db/schema';
 import {
@@ -29,6 +30,7 @@ import {
   pensionStatementImports,
   pensionTransactions,
   planAssumptions,
+  exposureSettings,
   properties,
   propertyTransactions,
   savingsAccounts,
@@ -216,6 +218,8 @@ async function seedHoldings(ctx: SeedContext) {
       currentPrice: 10,
       currency: 'EUR',
       sector: 'Test',
+      assetClass: 'equity_developed',
+      riskClassOverride: 5,
     })
     .returning();
   const [holdingTxn] = await db
@@ -585,6 +589,10 @@ async function seedSingletons(ctx: SeedContext) {
 
   if (options.includeSingletons) {
     await db.insert(planAssumptions).values({ userId, leanBurnOverride: 1234 });
+    await db.insert(exposureSettings).values({
+      userId,
+      settings: { ...defaultExposureSettings(), selectedMix: 'C' },
+    });
     await db.insert(bunqConnections).values({
       userId,
       accessToken: `token-${marker}`,
@@ -808,6 +816,7 @@ const SNAPSHOT_TABLES: Record<string, PgTable> = {
   category_mappings: categoryMappings,
   employments,
   plan_assumptions: planAssumptions,
+  exposure_settings: exposureSettings,
   net_worth_snapshots: netWorthSnapshots,
   bunq_connections: bunqConnections,
   bunq_payment_progress: bunqPaymentProgress,

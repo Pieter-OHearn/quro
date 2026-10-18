@@ -4,7 +4,11 @@ import { findOwnedRow } from '../lib/access';
 import { Hono } from 'hono';
 import {
   HOLDING_TRANSACTION_TYPES,
+  MAX_RISK_CLASS,
+  MIN_RISK_CLASS,
+  isAssetClass,
   parseTickerItemType,
+  type AssetClass,
   type CurrencyCode,
   type HoldingTransactionType,
   type TickerItemType,
@@ -37,6 +41,7 @@ import {
   parseIntegerField,
   parseNormalizedDecimalField,
   parseOptionalDateField,
+  parseOptionalIntegerField,
   parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
   parseOptionalUnitPriceField,
@@ -69,6 +74,8 @@ const HOLDING_FIELDS = [
   'priceUpdatedAt',
   'manualPrice',
   'excludeFromSync',
+  'assetClass',
+  'riskClassOverride',
 ] as const;
 
 const HOLDING_CREATE_FIELDS = [...HOLDING_FIELDS, 'priceCurrency', 'eodDate'] as const;
@@ -155,6 +162,8 @@ type HoldingPayload = {
   priceUpdatedAt: Date | null;
   manualPrice: number | null;
   excludeFromSync: boolean;
+  assetClass: AssetClass | null;
+  riskClassOverride: number | null;
 };
 
 type HoldingCreatePayload = HoldingPayload & {
@@ -183,6 +192,20 @@ function parseHoldingItemTypeField(value: unknown): ParseResult<TickerItemType |
   return parsed ? ok(parsed) : err('Invalid holding item type');
 }
 
+function parseHoldingAssetClassField(value: unknown): ParseResult<AssetClass | null> {
+  if (value == null || value === '') return ok(null);
+  return isAssetClass(value) ? ok(value) : err('Invalid asset class');
+}
+
+function parseHoldingRiskClassField(value: unknown): ParseResult<number | null> {
+  return parseOptionalIntegerField(
+    value,
+    `Risk class must be a whole number from ${MIN_RISK_CLASS} to ${MAX_RISK_CLASS}`,
+    MIN_RISK_CLASS,
+    MAX_RISK_CLASS,
+  );
+}
+
 function parseHoldingTransactionTypeField(value: unknown): ParseResult<HoldingTransactionType> {
   return typeof value === 'string' &&
     HOLDING_TRANSACTION_TYPES.includes(value as HoldingTransactionType)
@@ -206,6 +229,8 @@ const holdingParsers: FieldParsers<HoldingPayload> = {
     value === undefined || typeof value === 'boolean'
       ? ok(value ?? false)
       : err('excludeFromSync must be a boolean'),
+  assetClass: parseHoldingAssetClassField,
+  riskClassOverride: parseHoldingRiskClassField,
 };
 
 const holdingTransactionParsers: FieldParsers<HoldingTransactionPayload> = {
@@ -332,6 +357,8 @@ function toHoldingInsertValues(
     priceUpdatedAt: payload.priceUpdatedAt,
     manualPrice: payload.manualPrice ?? null,
     excludeFromSync: payload.excludeFromSync,
+    assetClass: payload.assetClass,
+    riskClassOverride: payload.riskClassOverride,
   };
 }
 
@@ -350,6 +377,8 @@ function toHoldingUpdateValues(
     priceUpdatedAt: payload.priceUpdatedAt,
     manualPrice: payload.manualPrice === undefined ? undefined : (payload.manualPrice ?? null),
     excludeFromSync: payload.excludeFromSync,
+    assetClass: payload.assetClass,
+    riskClassOverride: payload.riskClassOverride,
   };
 }
 

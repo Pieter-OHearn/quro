@@ -8,6 +8,7 @@ import { pauseWritesDuringMaintenance } from './middleware/maintenance';
 import auth from './routes/auth';
 import oidc from './routes/oidc';
 import savings from './routes/savings';
+import exposure from './routes/exposure';
 import investments from './routes/investments';
 import pensions from './routes/pensions';
 import pensionImports from './routes/pension-imports';
@@ -68,6 +69,7 @@ export function createApp(config: Config = getConfig()) {
 
   // Protected routes
   app.route('/api/savings', savings);
+  app.route('/api/exposure', exposure);
   app.route('/api/investments', investments);
   // Before /api/pensions, which would otherwise answer for the longer path.
   if (enabled.has('pensionImport')) app.route('/api/pensions/imports', pensionImports);

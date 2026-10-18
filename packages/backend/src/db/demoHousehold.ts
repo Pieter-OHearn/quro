@@ -2,6 +2,7 @@
 import {
   fromCents,
   toCents,
+  type AssetClass,
   type CurrencyCode,
   type GoalType,
   type PensionPotType,
@@ -325,12 +326,188 @@ export type HoldingSpec = {
   ticker: string;
   currency: CurrencyCode;
   sector: string;
-  itemType: 'equity' | 'etf' | 'fund';
+  itemType: 'equity' | 'etf' | 'fund' | 'trust' | 'unit';
+  /** Left out for a holding the household has not classified yet. */
+  assetClass?: AssetClass;
+  /** A fund's own risk class from its KID. */
+  riskClassOverride?: number;
   currentPrice: number;
   transactions: readonly HoldingTransactionSpec[];
   /** Close prices in date order; the last one is the current price. */
   priceHistory: readonly (readonly [date: string, close: number])[];
 };
+
+// Month ends from January 2025, then the day the household stops: one close per date, so every
+// holding below has a price on or before each net worth point and nothing is estimated.
+const PRICE_DATES: readonly string[] = [
+  '2025-01-31',
+  '2025-02-28',
+  '2025-03-31',
+  '2025-04-30',
+  '2025-05-30',
+  '2025-06-30',
+  '2025-07-31',
+  '2025-08-29',
+  '2025-09-30',
+  '2025-10-31',
+  '2025-11-28',
+  '2025-12-31',
+  '2026-01-30',
+  '2026-02-27',
+  '2026-03-31',
+  '2026-04-30',
+  '2026-05-29',
+  '2026-06-30',
+  '2026-07-31',
+  '2026-08-31',
+  '2026-09-30',
+  HOUSEHOLD_AS_OF,
+];
+
+/** A drifting close per date from `start` to `end`, with a small fixed wobble; ends exactly at `end`. */
+function drift(start: number, end: number, wobble: number): HoldingSpec['priceHistory'] {
+  const last = PRICE_DATES.length - 1;
+  return PRICE_DATES.map((date, index): [string, number] => {
+    if (index === last) return [date, end];
+    const close = start + ((end - start) * index) / last + wobble * Math.sin(index * 1.7);
+    return [date, Math.round(close * 100) / 100];
+  });
+}
+
+// Varied holdings for the Exposure page, all the demo user's: one of each asset class the page
+// groups, a USD and a GBP position, one position large enough to raise the concentration notices,
+// and two holdings left unclassified (one with a suggestion to look at, one without).
+const EXPOSURE_HOLDINGS: readonly HoldingSpec[] = [
+  {
+    key: 'emergingFund',
+    owner: 'demo',
+    name: 'Example Emerging Markets Fund',
+    ticker: 'EXEM',
+    currency: 'EUR',
+    sector: 'Diversified',
+    itemType: 'fund',
+    assetClass: 'equity_emerging',
+    riskClassOverride: 6,
+    currentPrice: 45.2,
+    transactions: [{ type: 'buy', shares: 30, price: 41.8, date: '2025-04-14', note: 'Lump sum' }],
+    priceHistory: drift(40.5, 45.2, 0.9),
+  },
+  {
+    key: 'governmentBond',
+    owner: 'demo',
+    name: 'Sample Euro Government Bond ETF',
+    ticker: 'SEGB',
+    currency: 'EUR',
+    sector: 'Government bonds',
+    itemType: 'etf',
+    assetClass: 'bond_long_government',
+    currentPrice: 98.4,
+    transactions: [
+      { type: 'buy', shares: 15, price: 99.1, date: '2025-03-10', note: 'Monthly plan' },
+      { type: 'buy', shares: 10, price: 97.6, date: '2025-09-08', note: 'Monthly plan' },
+    ],
+    priceHistory: drift(99.6, 98.4, 0.7),
+  },
+  {
+    key: 'corporateBond',
+    owner: 'demo',
+    name: 'Sample Corporate Bond Fund',
+    ticker: 'SCBF',
+    currency: 'EUR',
+    sector: 'Corporate bonds',
+    itemType: 'fund',
+    assetClass: 'bond_investment_grade',
+    currentPrice: 52.3,
+    transactions: [{ type: 'buy', shares: 20, price: 51.4, date: '2025-05-12', note: 'Lump sum' }],
+    priceHistory: drift(50.9, 52.3, 0.3),
+  },
+  {
+    key: 'moneyMarket',
+    owner: 'demo',
+    name: 'Example Money Market Fund',
+    ticker: 'EXMM',
+    currency: 'EUR',
+    sector: 'Money market',
+    itemType: 'fund',
+    assetClass: 'cash_money_market',
+    currentPrice: 101.2,
+    transactions: [
+      { type: 'buy', shares: 15, price: 100.1, date: '2025-06-02', note: 'Parked cash' },
+    ],
+    priceHistory: drift(99.8, 101.2, 0.1),
+  },
+  {
+    key: 'goldEtc',
+    owner: 'demo',
+    name: 'Sample Gold ETC',
+    ticker: 'SGLD',
+    currency: 'EUR',
+    sector: 'Commodities',
+    itemType: 'etf',
+    assetClass: 'gold_commodities',
+    currentPrice: 58.6,
+    transactions: [{ type: 'buy', shares: 12, price: 49.3, date: '2025-07-07', note: 'Lump sum' }],
+    priceHistory: drift(44.2, 58.6, 1.4),
+  },
+  {
+    key: 'crypto',
+    owner: 'demo',
+    name: 'Sample Crypto Holding',
+    ticker: 'SCRY',
+    currency: 'USD',
+    sector: 'Crypto',
+    itemType: 'unit',
+    assetClass: 'crypto',
+    currentPrice: 64000,
+    transactions: [
+      { type: 'buy', shares: 0.02, price: 51000, date: '2025-08-04', note: 'Small stake' },
+    ],
+    priceHistory: drift(42000, 64000, 4000),
+  },
+  {
+    // Large enough to cross the one-holding, three-holdings, sector and currency thresholds.
+    key: 'singleStock',
+    owner: 'demo',
+    name: 'Fictional Cloud Software Corp',
+    ticker: 'FCSC',
+    currency: 'USD',
+    sector: 'Technology',
+    itemType: 'equity',
+    assetClass: 'equity_developed',
+    currentPrice: 130,
+    transactions: [
+      { type: 'buy', shares: 80, price: 104.5, date: '2025-02-24', note: 'First purchase' },
+      { type: 'buy', shares: 40, price: 118.2, date: '2026-01-19', note: 'Added to position' },
+    ],
+    priceHistory: drift(101, 130, 3.5),
+  },
+  {
+    // Unclassified, and nothing in its name or sector suggests a class.
+    key: 'unclassifiedFund',
+    owner: 'demo',
+    name: 'Example Opportunities Fund',
+    ticker: 'EXOP',
+    currency: 'EUR',
+    sector: 'Mixed',
+    itemType: 'fund',
+    currentPrice: 27.9,
+    transactions: [{ type: 'buy', shares: 40, price: 25.6, date: '2025-10-06', note: 'Lump sum' }],
+    priceHistory: drift(25.1, 27.9, 0.4),
+  },
+  {
+    // Unclassified, with a suggestion from its item type to look at.
+    key: 'unclassifiedTrust',
+    owner: 'demo',
+    name: 'Sample Water Utilities Trust',
+    ticker: 'SWUT',
+    currency: 'GBP',
+    sector: 'Utilities',
+    itemType: 'trust',
+    currentPrice: 8.4,
+    transactions: [{ type: 'buy', shares: 120, price: 7.9, date: '2026-02-09', note: 'Lump sum' }],
+    priceHistory: drift(7.7, 8.4, 0.15),
+  },
+];
 
 export const HOLDINGS: readonly HoldingSpec[] = [
   {
@@ -341,6 +518,7 @@ export const HOLDINGS: readonly HoldingSpec[] = [
     currency: 'EUR',
     sector: 'Diversified',
     itemType: 'etf',
+    assetClass: 'equity_developed',
     currentPrice: 112.4,
     transactions: [
       { type: 'buy', shares: 20, price: 90, date: '2025-02-03', note: 'Monthly plan' },
@@ -383,6 +561,7 @@ export const HOLDINGS: readonly HoldingSpec[] = [
     currency: 'USD',
     sector: 'Technology',
     itemType: 'fund',
+    assetClass: 'equity_developed',
     currentPrice: 187.2,
     transactions: [
       { type: 'buy', shares: 10, price: 143, date: '2025-03-03', note: 'Lump sum' },
@@ -424,6 +603,7 @@ export const HOLDINGS: readonly HoldingSpec[] = [
     currency: 'GBP',
     sector: 'Consumer',
     itemType: 'equity',
+    assetClass: 'equity_developed',
     currentPrice: 18.75,
     transactions: [
       { type: 'buy', shares: 100, price: 32.4, date: '2025-02-17', note: 'First purchase' },
@@ -462,6 +642,7 @@ export const HOLDINGS: readonly HoldingSpec[] = [
     currency: 'EUR',
     sector: 'Income',
     itemType: 'fund',
+    assetClass: 'equity_developed',
     currentPrice: 54.3,
     transactions: [
       { type: 'buy', shares: 40, price: 49.8, date: '2025-04-07', note: 'First purchase' },
@@ -479,6 +660,7 @@ export const HOLDINGS: readonly HoldingSpec[] = [
       [HOUSEHOLD_AS_OF, 54.3],
     ],
   },
+  ...EXPOSURE_HOLDINGS,
 ];
 
 /** Shares held: buys minus sells, floored at zero, as the app counts them. */

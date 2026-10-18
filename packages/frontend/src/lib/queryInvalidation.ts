@@ -12,6 +12,7 @@ const holdings = [
   keys.investments.holdings,
   keys.investments.holdingTransactions,
   keys.investments.prices,
+  keys.exposure.all,
 ];
 const properties = [keys.investments.properties, keys.investments.propertyTransactions];
 const pension = [keys.pensions.pots, keys.pensions.transactions, keys.pensions.documents];
@@ -30,6 +31,7 @@ const domainQueryDependencies = {
   holdingPrices: [
     keys.investments.holdings,
     keys.investments.prices,
+    keys.exposure.all,
     keys.dashboard.summary,
     keys.dashboard.netWorth,
     keys.plan.all,
@@ -45,6 +47,10 @@ const domainQueryDependencies = {
   salaryDocument: [keys.salary.payslips],
   employment: [keys.employments, keys.salary.all, keys.dashboard.insights, keys.plan.all],
   plan: [keys.plan.all],
+  // The exposure settings, and the class a holding is filed under, change only the exposure report
+  // (and the holdings list that carries the class).
+  exposureSettings: [keys.exposure.all],
+  holdingClassification: [keys.exposure.all, keys.investments.holdings],
   preferences: [keys.plan.all, ...dashboard],
   partner: [keys.partner],
   household: [

@@ -16,8 +16,11 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import {
+  ASSET_CLASSES,
   CURRENCY_CODES,
+  type AssetClass,
   type CsvImportMapping,
+  type ExposureSettings,
   MAX_RETIREMENT_AGE,
   MAX_USER_AGE,
   MIN_RETIREMENT_AGE,
@@ -489,9 +492,44 @@ export const holdings = pgTable(
     manualPrice: numericAsNumber('manual_price', UNIT_PRICE_NUMERIC),
     excludeFromSync: boolean('exclude_from_sync').default(false).notNull(),
     archivedAt: timestamp('archived_at'),
+    // Set by the person, never inferred: null is "Unclassified" in the Exposure view.
+    assetClass: text('asset_class').$type<AssetClass>(),
+    // A fund's own risk class (its KID value), used instead of the default for its asset class.
+    riskClassOverride: integer('risk_class_override'),
   },
   (table) => ({
     userIdx: index('holdings_user_id_idx').on(table.userId),
+    assetClassCheck: check(
+      'holdings_asset_class_check',
+      sql`${table.assetClass} is null or ${table.assetClass} in (${sql.raw(
+        ASSET_CLASSES.map((assetClass) => `'${assetClass}'`).join(', '),
+      )})`,
+    ),
+    riskClassOverrideCheck: check(
+      'holdings_risk_class_override_check',
+      sql`${table.riskClassOverride} is null or ${table.riskClassOverride} between 1 and 7`,
+    ),
+  }),
+);
+
+// One validated, versioned settings document per user for the Exposure view (risk mapping,
+// reference mixes, concentration thresholds). No row means the shipped defaults apply.
+export const exposureSettings = pgTable(
+  'exposure_settings',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    settings: jsonb('settings').$type<ExposureSettings>().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    userUnique: uniqueIndex('exposure_settings_user_id_unique').on(table.userId),
+    settingsObjectCheck: check(
+      'exposure_settings_object_check',
+      sql`jsonb_typeof(${table.settings}) = 'object'`,
+    ),
   }),
 );
 

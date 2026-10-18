@@ -14,6 +14,8 @@ const holding = {
   priceUpdatedAt: null,
   manualPrice: null,
   excludeFromSync: false,
+  assetClass: null,
+  riskClassOverride: null,
   archivedAt: null,
 };
 

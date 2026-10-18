@@ -1,4 +1,9 @@
-import { CURRENCY_CODES, isCurrencyCode, type CurrencyCode } from '@quro/shared';
+import {
+  CURRENCY_CODES,
+  CURRENCY_RATE_STALE_AFTER_HOURS,
+  isCurrencyCode,
+  type CurrencyCode,
+} from '@quro/shared';
 
 export type CurrencyRateApiRow = {
   id: number;
@@ -31,7 +36,6 @@ export type CurrencyRateTable = {
 };
 
 const EUR_CURRENCY: CurrencyCode = 'EUR';
-const CURRENCY_RATE_STALE_AFTER_HOURS = 48;
 const MINUTES_PER_HOUR = 60;
 const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;

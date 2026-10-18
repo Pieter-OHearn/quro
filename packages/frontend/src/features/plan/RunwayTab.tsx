@@ -1,0 +1,102 @@
+import { useState } from 'react';
+import { Button, ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
+import { CurrencyReviewNotice } from '@/components/finance/CurrencyReviewNotice';
+import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
+import { EmploymentCard } from '@/features/employment';
+import { useCurrency } from '@/lib/CurrencyContext';
+import {
+  AssumptionsDrawer,
+  BankingEntityReviewModal,
+  BurnRateCards,
+  CalculationReviewModal,
+  CategoryClassificationCard,
+  DepositGuaranteeNotice,
+  LiquidityTierBar,
+  RunwayHeroCard,
+  RunwayLedgerChart,
+} from './components';
+import { usePlanAssumptions, useRunway } from './hooks';
+import { RUNWAY_CITATIONS } from './utils/runway-display';
+
+// The tab intentionally keeps its section order and modal state together for readability.
+// eslint-disable-next-line max-lines-per-function
+export function RunwayTab() {
+  const runwayQuery = useRunway();
+  const assumptionsQuery = usePlanAssumptions();
+  const { fmtBase, convertToBase } = useCurrency();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [bankingReviewOpen, setBankingReviewOpen] = useState(false);
+
+  if (runwayQuery.isPending || assumptionsQuery.isPending) {
+    return <LoadingSpinner className="min-h-[60vh]" label="Building runway plan" />;
+  }
+  const failedQueries = [
+    { label: 'runway plan', ...runwayQuery },
+    { label: 'plan assumptions', ...assumptionsQuery },
+  ].filter((query) => query.isError);
+  if (failedQueries.length > 0) {
+    return <RouteQueryErrorState routeName="Plan" failedQueries={failedQueries} />;
+  }
+  const data = runwayQuery.data;
+  if (!data) return null;
+  const fmtPlanMoney = (value: number) => fmtBase(convertToBase(value, data.baseCurrency));
+
+  return (
+    <PageStack padding="none">
+      {data.budgetCurrencyNeedsReview && <CurrencyReviewNotice />}
+      <ContentSection className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-title-section text-fg">Financial resilience</h2>
+          <p className="mt-1 max-w-2xl text-cell text-fg-muted">
+            A derived planning view built from the balances, spending, and income already in Quro.
+          </p>
+        </div>
+        <Button variant="secondary" onClick={() => setDrawerOpen(true)}>
+          Advanced assumptions
+        </Button>
+      </ContentSection>
+      <ContentSection spacing="md">
+        <RunwayHeroCard data={data} onReview={() => setReviewOpen(true)} />
+        <BurnRateCards burn={data.burn} fmtBase={fmtPlanMoney} />
+      </ContentSection>
+      <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
+      <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
+      <ContentSection className="grid gap-4 xl:grid-cols-2">
+        <LiquidityTierBar tiers={data.tiers} fmtBase={fmtPlanMoney} />
+        <RunwayLedgerChart ledger={data.runway.ledger} fmtBase={fmtPlanMoney} />
+      </ContentSection>
+      <DepositGuaranteeNotice
+        guarantees={data.depositGuarantee}
+        fmtBase={fmtPlanMoney}
+        onReview={() => setBankingReviewOpen(true)}
+      />
+      {data.incomeSupport.unemployment.status === 'unknown' ? (
+        <p className="text-caption text-fg-subtle">
+          {data.jurisdiction.labels.unemploymentShort} is not included yet:{' '}
+          {data.incomeSupport.unemployment.reason}
+        </p>
+      ) : null}
+      <p className="text-caption text-fg-subtle">{RUNWAY_CITATIONS.advice}</p>
+      <AssumptionsDrawer
+        open={drawerOpen}
+        assumptions={assumptionsQuery.data ?? null}
+        jurisdiction={data.jurisdiction}
+        onClose={() => setDrawerOpen(false)}
+      />
+      {reviewOpen ? (
+        <CalculationReviewModal
+          data={data}
+          fmtBase={fmtPlanMoney}
+          onClose={() => setReviewOpen(false)}
+        />
+      ) : null}
+      {bankingReviewOpen ? (
+        <BankingEntityReviewModal
+          guarantees={data.depositGuarantee}
+          onClose={() => setBankingReviewOpen(false)}
+        />
+      ) : null}
+    </PageStack>
+  );
+}

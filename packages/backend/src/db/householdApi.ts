@@ -29,6 +29,7 @@ export type HouseholdApi = {
   get<T = unknown>(path: string): Promise<T>;
   post<T = unknown>(path: string, body?: unknown): Promise<T>;
   patch<T = unknown>(path: string, body: unknown): Promise<T>;
+  put<T = unknown>(path: string, body: unknown): Promise<T>;
   /** Removes the session this client used. */
   close(): Promise<void>;
 };
@@ -57,6 +58,9 @@ export async function openHouseholdApi(
     },
     patch<T>(path: string, body: unknown) {
       return send<T>('PATCH', path, body);
+    },
+    put<T>(path: string, body: unknown) {
+      return send<T>('PUT', path, body);
     },
     async close() {
       await db.delete(sessions).where(eq(sessions.id, sessionId));
