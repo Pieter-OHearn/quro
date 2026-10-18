@@ -87,7 +87,7 @@ function SelectBox({
 }>) {
   return (
     <label
-      className={`flex min-h-8 cursor-pointer items-center max-sm:min-h-11 ${className ?? ''}`}
+      className={`flex min-h-8 cursor-pointer items-center max-sm:min-h-11 max-sm:min-w-11 max-sm:justify-center ${className ?? ''}`}
     >
       <input
         type="checkbox"
@@ -128,7 +128,13 @@ function ClassCell({
   onUse,
   busy,
 }: Readonly<{ row: ExposureHoldingRow; onUse: (assetClass: AssetClass) => void; busy: boolean }>) {
-  if (row.assetClass) return <span className="text-fg">{ASSET_CLASS_LABELS[row.assetClass]}</span>;
+  if (row.assetClass) {
+    return (
+      <span className="block min-w-0 break-words text-fg">
+        {ASSET_CLASS_LABELS[row.assetClass]}
+      </span>
+    );
+  }
   const suggestion = suggestAssetClass(row);
   return (
     <div className="min-w-0">

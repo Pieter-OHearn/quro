@@ -105,9 +105,8 @@ app.put('/settings', async (c) => {
   const rawBody = await readJsonBody(c.req, 'Invalid exposure settings');
   if (!rawBody.ok) return c.json({ error: rawBody.error }, HTTP_STATUS.BAD_REQUEST);
   const parsed = parseExposureSettings(rawBody.value);
-  if (!parsed.ok) {
-    return c.json({ error: parsed.errors[0], errors: parsed.errors }, HTTP_STATUS.BAD_REQUEST);
-  }
+  // The page checks the same rules before it sends, so the first problem is enough here.
+  if (!parsed.ok) return c.json({ error: parsed.errors[0] }, HTTP_STATUS.BAD_REQUEST);
   return c.json({ data: await saveExposureSettings(user.id, parsed.value) });
 });
 

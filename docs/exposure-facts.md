@@ -43,7 +43,7 @@ this calculation calls a model or a service, and nothing leaves the instance.
 | Route                                 | Purpose                                                                                                                      |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/exposure`                   | `{ facts, view, settings }`: the facts document, the breakdowns derived from it, and the settings in use                     |
-| `PUT /api/exposure/settings`          | Saves a settings document after validating it. `400` with `errors` when it is invalid; nothing is stored                     |
+| `PUT /api/exposure/settings`          | Saves a settings document after validating it. `400` with the first problem in `error` when it is invalid; nothing is stored |
 | `DELETE /api/exposure/settings`       | Resets to the defaults by removing the saved document                                                                        |
 | `PATCH /api/exposure/classification`  | `{ updates: [{ id, assetClass?, riskClassOverride? }] }`: classify several holdings. All or none; a foreign id answers `404` |
 | `PATCH /api/investments/holdings/:id` | `assetClass` (one of the classes, or `null`) and `riskClassOverride` (1 to 7, or `null`) are ordinary holding fields         |
@@ -52,7 +52,7 @@ A failed load is a failed request: the page shows an error with a retry, never a
 
 ## Storage
 
-- `holdings.asset_class` (text, nullable, a check constraint lists the eleven classes) and
+- `holdings.asset_class` (text, nullable; a check constraint lists the eleven classes, so adding a class needs a migration) and
   `holdings.risk_class_override` (integer, nullable, 1 to 7). Both are set by the person; the
   suggestion from the name, sector and item type (`suggestAssetClass`) is only ever shown, never
   saved.

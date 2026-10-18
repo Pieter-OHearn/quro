@@ -415,8 +415,10 @@ describe('exposure settings', () => {
     bad.riskByAssetClass.crypto = 9;
     const response = await put(bad);
     expect(response.status).toBe(400);
-    const body = (await response.json()) as { error: string; errors: string[] };
-    expect(body.errors.length).toBeGreaterThanOrEqual(3);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toMatch(
+      /^Threshold for one sector must be a number from 0 to 100|^Reference mix B|^Risk class for Crypto/,
+    );
     expect((await put({ ...defaultExposureSettings(), version: 2 })).status).toBe(400);
     expect((await put({ ...defaultExposureSettings(), userId: owner.user.id })).status).toBe(400);
     expect((await put('nope')).status).toBe(400);

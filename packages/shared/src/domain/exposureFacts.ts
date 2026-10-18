@@ -299,6 +299,7 @@ type Scope = {
   totalCents: number;
   rates: RateIndex;
   settings: ExposureSettings;
+  baseCurrency: string;
 };
 
 function addAmountAndShare(
@@ -493,7 +494,7 @@ function addConcentration(scope: Scope): void {
   const currency = largestBucket(
     scope,
     (h) => [h.currency, h.currency],
-    (l) => l !== 'EUR',
+    (l) => l !== scope.baseCurrency,
   );
   const { thresholds } = scope.settings;
   const measures: [string, Measure | null, number, boolean][] = [
@@ -660,7 +661,14 @@ export function computeExposureFacts(input: ExposureInput): ExposureFacts {
   const totalCents = valued.reduce((sum, holding) => sum + toCents(holding.valueEur), 0);
   const book = new FactBook(input.settings.version);
   if (valued.length > 0 && totalCents > 0) {
-    const scope: Scope = { book, valued, totalCents, rates, settings: input.settings };
+    const scope: Scope = {
+      book,
+      valued,
+      totalCents,
+      rates,
+      settings: input.settings,
+      baseCurrency: input.baseCurrency,
+    };
     addTotals(scope);
     addBreakdowns(scope);
     addConcentration(scope);
