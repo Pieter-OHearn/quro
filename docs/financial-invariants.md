@@ -184,6 +184,15 @@ the dashboard, the net worth history, the runway and the investments page all us
 Liabilities are positive and subtracted from assets. Property equity is value minus debt and may
 be negative; Quro keeps negative equity rather than flooring it.
 
+### Exposure
+
+The Exposure view ([facts](exposure-facts.md)) values a holding as shares times the price in use,
+rounded to cents, then converts it to EUR and rounds to cents once, and sums cents. A price entered
+by hand is the price in use there, as on the Investments page; the dashboard's brokerage figure
+reads the synced price. A holding with no usable price or no stored rate is excluded and reported,
+never valued at a guess. Shares of the total are rounded to two decimals once, and the effective
+number of holdings is 1 divided by the sum of squared weights.
+
 ## FX conversion
 
 - Dashboard, snapshot and runway figures are computed in EUR on the backend and converted once

@@ -435,7 +435,11 @@ seed (`DEMO_USER_PASSWORD`, or its fixed default). The household has:
   deposits, withdrawals and interest (the partners write to the joint ones), a joint home with a
   linked mortgage and monthly repayments, and a buy-to-let flat in pounds that is worth less than
   its debt.
-- Holdings with buys, sells, dividends and a monthly price history, one of them at a loss.
+- Holdings with buys, sells, dividends and a monthly price history, one of them at a loss. For the
+  Exposure tab of the Plan page they cover every asset class: developed and emerging equity,
+  government and corporate bonds, a money market fund, gold, crypto, a USD and a GBP position, one
+  position large enough to raise the concentration notices and two holdings left unclassified. The
+  demo user has also picked Reference mix B.
 - Two pension pots with contributions, fees and annual statements, two debts with payments, two
   employments with payslips (no documents), five goals, and a budget from July to the start of
   October 2026 with a payment in pounds converted at the stored rate.

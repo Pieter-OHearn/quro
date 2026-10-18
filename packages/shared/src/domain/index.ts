@@ -3,3 +3,7 @@ export * from './household.js';
 export * from './ledgers.js';
 export * from './properties.js';
 export * from './textLimits.js';
+export * from './exposureClasses.js';
+export * from './exposureFacts.js';
+export * from './exposureSettings.js';
+export * from './exposureView.js';

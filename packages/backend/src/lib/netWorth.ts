@@ -43,7 +43,9 @@ type PensionRow = MoneyRow & { balance: unknown };
 type MortgageRow = { id: number; outstandingBalance: unknown };
 type DebtRow = MoneyRow & { remainingBalance: unknown };
 
-function computeSharesByHolding(txns: readonly HoldingTransactionRow[]): Map<number, number> {
+export function computeSharesByHolding(
+  txns: readonly HoldingTransactionRow[],
+): Map<number, number> {
   const byHolding = new Map<number, Array<{ type: string; shares: number }>>();
   for (const transaction of txns) {
     const rows = byHolding.get(transaction.holdingId) ?? [];

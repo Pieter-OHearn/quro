@@ -4,12 +4,16 @@ import type {
   PlanningLabels,
   UnemploymentModel,
 } from './jurisdiction.js';
+import type { AssetClass } from '../domain/exposureClasses.js';
 
 export * from './jurisdiction.js';
 
 export const CURRENCY_CODES = ['EUR', 'GBP', 'USD', 'AUD', 'NZD', 'CAD', 'CHF', 'SGD'] as const;
 
 export type CurrencyCode = (typeof CURRENCY_CODES)[number];
+
+/** A synced exchange rate older than this is reported as stale; it stays in use. */
+export const CURRENCY_RATE_STALE_AFTER_HOURS = 48;
 
 export const NUMBER_FORMATS = ['en-US', 'de-DE'] as const;
 
@@ -348,6 +352,10 @@ export type Holding = {
   manualPrice?: number | null;
   excludeFromSync?: boolean;
   archivedAt?: string | null;
+  /** Set by the person; null while the holding is unclassified. */
+  assetClass?: AssetClass | null;
+  /** A fund's own risk class (1 to 7), used instead of the default for its asset class. */
+  riskClassOverride?: number | null;
 };
 
 export const HOLDING_TRANSACTION_TYPES = ['buy', 'sell', 'dividend'] as const;

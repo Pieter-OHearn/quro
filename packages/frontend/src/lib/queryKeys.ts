@@ -80,6 +80,10 @@ export const queryKeys = {
     runway: ['plan', 'runway'] as const,
     assumptions: ['plan', 'assumptions'] as const,
   },
+  exposure: {
+    all: ['exposure'] as const,
+    report: ['exposure', 'report'] as const,
+  },
   imports: {
     all: ['imports'] as const,
     profiles: (kind: string) => ['imports', 'profiles', kind] as const,

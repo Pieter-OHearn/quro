@@ -13,8 +13,15 @@ import {
   DateInput,
 } from '@/components/ui';
 import {
+  ASSET_CLASSES,
+  ASSET_CLASS_LABELS,
   ITEM_TYPE_LABELS,
+  MAX_RISK_CLASS,
+  MIN_RISK_CLASS,
   TICKER_ITEM_TYPES,
+  isAssetClass,
+  riskBandLabel,
+  suggestAssetClass,
   type Holding,
   type TickerItemType,
   type TickerLookupResult,
@@ -56,6 +63,8 @@ type HoldingForm = {
   lookupEodDate: string;
   manualPrice: string;
   excludeFromSync: boolean;
+  assetClass: string;
+  riskClassOverride: string;
   initShares: string;
   initPrice: string;
   initDate: string;
@@ -64,6 +73,17 @@ type HoldingForm = {
 const ITEM_TYPE_OPTIONS = [
   { value: '', label: 'Select type' },
   ...TICKER_ITEM_TYPES.map((value) => ({ value, label: ITEM_TYPE_LABELS[value] })),
+];
+const ASSET_CLASS_OPTIONS = [
+  { value: '', label: 'Unclassified' },
+  ...ASSET_CLASSES.map((value) => ({ value, label: ASSET_CLASS_LABELS[value] })),
+];
+const RISK_CLASS_OPTIONS = [
+  { value: '', label: 'Use the default for the asset class' },
+  ...Array.from({ length: MAX_RISK_CLASS - MIN_RISK_CLASS + 1 }, (_, index) => {
+    const value = MIN_RISK_CLASS + index;
+    return { value: String(value), label: `${value} · ${riskBandLabel(value)}` };
+  }),
 ];
 const CURRENCY_SET = new Set<CurrencyCode>(CURRENCY_CODES);
 const CURRENCY_ALIASES: Partial<Record<string, CurrencyCode>> = {
@@ -332,7 +352,66 @@ function HoldingBaseFields({ form, errors, onChange }: HoldingBaseFieldsProps) {
           options={ITEM_TYPE_OPTIONS}
         />
       </FormField>
+      <AssetClassFields form={form} onChange={onChange} />
     </div>
+  );
+}
+
+/**
+ * The asset class the Exposure view files the holding under, and the fund's own risk class when
+ * it reports one. A suggestion from the name, sector and type is shown, never filled in.
+ */
+function AssetClassFields({
+  form,
+  onChange,
+}: Readonly<{ form: HoldingForm; onChange: (field: string, value: string) => void }>) {
+  const suggestion = form.assetClass
+    ? null
+    : suggestAssetClass({
+        name: form.name,
+        sector: form.sector,
+        itemType: form.itemType || null,
+      });
+  return (
+    <>
+      <FormField
+        label="Asset class"
+        className="col-span-2 sm:col-span-1"
+        hint={
+          suggestion ? (
+            <>
+              Suggested: {ASSET_CLASS_LABELS[suggestion.assetClass]}. {suggestion.reason}{' '}
+              <button
+                type="button"
+                onClick={() => onChange('assetClass', suggestion.assetClass)}
+                className="rounded-sm font-medium text-brand-fg underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:min-h-11"
+              >
+                Use the suggestion
+              </button>
+            </>
+          ) : (
+            'Used by the Exposure view on the Plan page'
+          )
+        }
+      >
+        <SelectInput
+          value={form.assetClass}
+          onChange={(value) => onChange('assetClass', value)}
+          options={ASSET_CLASS_OPTIONS}
+        />
+      </FormField>
+      <FormField
+        label="Risk class (optional)"
+        className="col-span-2 sm:col-span-1"
+        hint="A fund's own value from its KID, 1 to 7"
+      >
+        <SelectInput
+          value={form.riskClassOverride}
+          onChange={(value) => onChange('riskClassOverride', value)}
+          options={RISK_CLASS_OPTIONS}
+        />
+      </FormField>
+    </>
   );
 }
 
@@ -352,6 +431,14 @@ function buildHolding(form: HoldingForm, existing: Holding | undefined): Holding
     priceUpdatedAt: form.priceUpdatedAt || null,
     manualPrice: toNormalizedNumber(form.manualPrice),
     excludeFromSync: form.excludeFromSync,
+    ...buildClassification(form),
+  };
+}
+
+function buildClassification(form: HoldingForm): Pick<Holding, 'assetClass' | 'riskClassOverride'> {
+  return {
+    assetClass: isAssetClass(form.assetClass) ? form.assetClass : null,
+    riskClassOverride: form.riskClassOverride ? Number(form.riskClassOverride) : null,
   };
 }
 
@@ -372,6 +459,8 @@ function buildInitialForm(existing: Holding | undefined): HoldingForm {
       lookupEodDate: '',
       manualPrice: '',
       excludeFromSync: false,
+      assetClass: '',
+      riskClassOverride: '',
       initShares: '',
       initPrice: '',
       initDate: today,
@@ -391,6 +480,8 @@ function buildInitialForm(existing: Holding | undefined): HoldingForm {
     lookupEodDate: '',
     manualPrice: existing.manualPrice != null ? existing.manualPrice.toString() : '',
     excludeFromSync: existing.excludeFromSync ?? false,
+    assetClass: existing.assetClass ?? '',
+    riskClassOverride: existing.riskClassOverride ? String(existing.riskClassOverride) : '',
     initShares: '',
     initPrice: '',
     initDate: today,

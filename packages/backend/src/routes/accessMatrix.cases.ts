@@ -1,3 +1,4 @@
+import { defaultExposureSettings } from '@quro/shared';
 import type { RowIds } from '../test/accessWorld';
 
 /**
@@ -1245,6 +1246,36 @@ export const ACCESS_CASES: AccessCase[] = [
     route: 'PUT /api/plan/assumptions',
     build: (victim) =>
       send('PUT', '/api/plan/assumptions', { userId: victim, leanBurnOverride: 4321 }),
+  },
+  {
+    kind: 'list',
+    route: 'GET /api/exposure',
+    scope: 'owner',
+    build: () => get('/api/exposure'),
+  },
+  {
+    kind: 'caller',
+    route: 'PUT /api/exposure/settings',
+    build: (victim) =>
+      send('PUT', '/api/exposure/settings', {
+        ...defaultExposureSettings(),
+        userId: victim,
+        selectedMix: 'D',
+      }),
+  },
+  {
+    kind: 'caller',
+    route: 'DELETE /api/exposure/settings',
+    build: () => send('DELETE', '/api/exposure/settings'),
+  },
+  {
+    kind: 'row',
+    route: 'PATCH /api/exposure/classification',
+    scope: 'owner',
+    build: (r) =>
+      send('PATCH', '/api/exposure/classification', {
+        updates: [{ id: r.holding, assetClass: 'crypto' }],
+      }),
   },
   { kind: 'list', route: 'GET /api/settings', scope: 'owner', build: () => get('/api/settings') },
   {

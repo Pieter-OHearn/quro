@@ -1,131 +1,40 @@
-import { useState } from 'react';
-import {
-  Badge,
-  Button,
-  ContentSection,
-  LoadingSpinner,
-  PageStack,
-  SegmentedControl,
-} from '@/components/ui';
-import { CurrencyReviewNotice } from '@/components/finance/CurrencyReviewNotice';
-import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
-import { EmploymentCard } from '@/features/employment';
-import { useCurrency } from '@/lib/CurrencyContext';
-import {
-  AssumptionsDrawer,
-  BankingEntityReviewModal,
-  BurnRateCards,
-  CalculationReviewModal,
-  CategoryClassificationCard,
-  DepositGuaranteeNotice,
-  LiquidityTierBar,
-  RunwayHeroCard,
-  RunwayLedgerChart,
-} from './components';
-import { usePlanAssumptions, useRunway } from './hooks';
-import { RUNWAY_CITATIONS } from './utils/runway-display';
+import { useSearchParams } from 'react-router';
+import { PageStack, SegmentedControl, segmentedPanelId, segmentedTabId } from '@/components/ui';
+import { ExposureTab } from './exposure';
+import { PLAN_TABS, resolvePlanTab, type PlanTab } from './planTabs';
+import { RunwayTab } from './RunwayTab';
 
-const PLAN_SECTIONS = [
-  { value: 'runway', label: 'Runway' },
-  {
-    value: 'exposure',
-    label: 'Exposure',
-    badge: <Badge tone="neutral">Soon</Badge>,
-    disabled: true,
-  },
-  {
-    value: 'year-ahead',
-    label: 'Year ahead',
-    badge: <Badge tone="neutral">Soon</Badge>,
-    disabled: true,
-  },
-] as const;
+/** Ties the tab strip to the panel below it. */
+const PLAN_TABS_ID = 'plan-tabs';
 
-// The page intentionally keeps its section order and modal state together for readability.
-// eslint-disable-next-line max-lines-per-function
+// The URL names the tab (`?tab=exposure`), so a tab can be linked to and the back button leaves it.
+// Switching tabs drops the parameters of the tab it leaves.
 export function Plan() {
-  const runwayQuery = useRunway();
-  const assumptionsQuery = usePlanAssumptions();
-  const { fmtBase, convertToBase } = useCurrency();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [bankingReviewOpen, setBankingReviewOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = resolvePlanTab(searchParams.get('tab'));
 
-  if (runwayQuery.isPending || assumptionsQuery.isPending) {
-    return <LoadingSpinner className="min-h-[60vh]" label="Building runway plan" />;
-  }
-  const failedQueries = [
-    { label: 'runway plan', ...runwayQuery },
-    { label: 'plan assumptions', ...assumptionsQuery },
-  ].filter((query) => query.isError);
-  if (failedQueries.length > 0) {
-    return <RouteQueryErrorState routeName="Plan" failedQueries={failedQueries} />;
-  }
-  const data = runwayQuery.data;
-  if (!data) return null;
-  const fmtPlanMoney = (value: number) => fmtBase(convertToBase(value, data.baseCurrency));
+  const selectTab = (tab: PlanTab) => setSearchParams({ tab });
 
   return (
     <PageStack>
-      {data.budgetCurrencyNeedsReview && <CurrencyReviewNotice />}
-      <ContentSection className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-title-section text-fg">Financial resilience</h2>
-          <p className="mt-1 max-w-2xl text-cell text-fg-muted">
-            A derived planning view built from the balances, spending, and income already in Quro.
-          </p>
-        </div>
-        <Button variant="secondary" onClick={() => setDrawerOpen(true)}>
-          Advanced assumptions
-        </Button>
-      </ContentSection>
       <SegmentedControl
-        options={PLAN_SECTIONS}
-        value="runway"
-        onChange={() => undefined}
         aria-label="Plan sections"
+        variant="underline"
+        tabsId={PLAN_TABS_ID}
+        options={PLAN_TABS}
+        value={activeTab}
+        onChange={selectTab}
+        className="overflow-x-auto"
+        buttonClassName="flex-none max-sm:flex-1"
       />
-      <ContentSection spacing="md">
-        <RunwayHeroCard data={data} onReview={() => setReviewOpen(true)} />
-        <BurnRateCards burn={data.burn} fmtBase={fmtPlanMoney} />
-      </ContentSection>
-      <EmploymentCard employment={data.employment.primary} asOf={data.asOf} />
-      <CategoryClassificationCard defaultedCount={data.burn.unclassifiedCategoryCount} />
-      <ContentSection className="grid gap-4 xl:grid-cols-2">
-        <LiquidityTierBar tiers={data.tiers} fmtBase={fmtPlanMoney} />
-        <RunwayLedgerChart ledger={data.runway.ledger} fmtBase={fmtPlanMoney} />
-      </ContentSection>
-      <DepositGuaranteeNotice
-        guarantees={data.depositGuarantee}
-        fmtBase={fmtPlanMoney}
-        onReview={() => setBankingReviewOpen(true)}
-      />
-      {data.incomeSupport.unemployment.status === 'unknown' ? (
-        <p className="text-caption text-fg-subtle">
-          {data.jurisdiction.labels.unemploymentShort} is not included yet:{' '}
-          {data.incomeSupport.unemployment.reason}
-        </p>
-      ) : null}
-      <p className="text-caption text-fg-subtle">{RUNWAY_CITATIONS.advice}</p>
-      <AssumptionsDrawer
-        open={drawerOpen}
-        assumptions={assumptionsQuery.data ?? null}
-        jurisdiction={data.jurisdiction}
-        onClose={() => setDrawerOpen(false)}
-      />
-      {reviewOpen ? (
-        <CalculationReviewModal
-          data={data}
-          fmtBase={fmtPlanMoney}
-          onClose={() => setReviewOpen(false)}
-        />
-      ) : null}
-      {bankingReviewOpen ? (
-        <BankingEntityReviewModal
-          guarantees={data.depositGuarantee}
-          onClose={() => setBankingReviewOpen(false)}
-        />
-      ) : null}
+      <div
+        role="tabpanel"
+        id={segmentedPanelId(PLAN_TABS_ID, activeTab)}
+        aria-labelledby={segmentedTabId(PLAN_TABS_ID, activeTab)}
+      >
+        {activeTab === 'runway' ? <RunwayTab /> : null}
+        {activeTab === 'exposure' ? <ExposureTab /> : null}
+      </div>
     </PageStack>
   );
 }

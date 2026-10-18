@@ -19,6 +19,10 @@ Runway's “count full joint balances” assumption applies to liquidity and der
 cashflow. Contractual payments and deposit-protection exposure retain the person's
 50% share. This preserves the existing planning semantics.
 
+Brokerage holdings are not shared: a holding has no joint flag, so net worth, the Exposure view
+and every other holdings figure count only the caller's own holdings, whether or not a partner
+is linked. See [Exposure and its facts](exposure-facts.md).
+
 ## One partner link per user
 
 A user can belong to at most one link, as requester or addressee, whether it is

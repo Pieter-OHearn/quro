@@ -3,6 +3,7 @@ import { invalidateDomain } from '@/lib/queryInvalidation';
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router';
 import type {
   CurrencyCode,
   JurisdictionCode,
@@ -202,6 +203,23 @@ function PreferencesForm({
         </ChoiceGroup>
 
         {formError ? <FormErrorNotice>{formError}</FormErrorNotice> : null}
+      </SettingsCard>
+
+      <SettingsCard
+        title="Exposure view"
+        subtitle="Risk classes, reference mixes and concentration notices on the Plan page."
+      >
+        <p className="text-cell text-fg-muted">
+          The Exposure tab compares your investments with published reference mixes. Change the
+          mixes, the default risk class of each asset class and the notice thresholds there, or
+          reset them to the defaults.
+        </p>
+        <Link
+          to="/plan?tab=exposure&customise=1"
+          className="inline-flex min-h-8 items-center rounded-sm text-cell font-medium text-brand-fg underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:min-h-11"
+        >
+          Open exposure settings
+        </Link>
       </SettingsCard>
 
       <AppearanceSetting />
