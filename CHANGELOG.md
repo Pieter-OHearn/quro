@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
-## [Unreleased]
+## [v1.0.0-rc.4] - 2026-10-18
+
+Quro 1.0.0-rc.4 adds the Exposure tab on the Plan page: how your investments are spread, described against editable reference mixes. It is information, not advice, and it has one additive migration. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc3-to-100-rc4) before you upgrade.
 
 ### Added
 
@@ -12,9 +14,9 @@ All notable changes to this project will be documented in this file. The format 
 - `GET /api/exposure` returns the facts behind the page (each with its inputs, method and settings version) and the breakdowns derived from them; `PUT` and `DELETE /api/exposure/settings` and `PATCH /api/exposure/classification` change the settings and the classes. Nothing is sent to any service.
 - The demo household has holdings in every asset class, a USD and a GBP position, one large position and two unclassified holdings.
 
-### Changed
+### Upgrade notes
 
-- Migration 0045 adds `holdings.asset_class` and `holdings.risk_class_override` (both empty for existing holdings) and the `exposure_settings` table. It drops nothing; the account export and deletion include the new table.
+- **Migration `0045_exposure_classification`**: it adds `holdings.asset_class` and `holdings.risk_class_override` (both empty for existing holdings) and the `exposure_settings` table. It drops nothing and changes no existing row; 1.0.0-rc.3 refuses to run against a database that has it, so going back means restoring your pre-upgrade backup, which the general procedure takes first; the account export and deletion include the new table.
 
 ## [v1.0.0-rc.3] - 2026-10-18
 

@@ -168,9 +168,9 @@ Needs no settings and no database.
 
 ```json
 {
-  "version": "v1.0.0-rc.3",
+  "version": "v1.0.0-rc.4",
   "revision": "<commit the image was built from>",
-  "migrations": { "latest": "0044_oidc_sign_in", "count": 45 },
+  "migrations": { "latest": "0045_exposure_classification", "count": 46 },
   "runtime": { "bun": "1.4.3", "platform": "linux", "arch": "arm64" }
 }
 ```
@@ -491,3 +491,9 @@ What the operator does: pin the 1.0.0-rc.2 images of both services (step 2 of th
 What the operator does: nothing, unless you want single sign-on. Pin the 1.0.0-rc.3 images of both services (step 2 of the general procedure) and restart as usual; passwords keep working and no existing account, session or setting changes. Because the database then has a migration that 1.0.0-rc.2 does not ship, 1.0.0-rc.2 refuses to run on it; [restore the snapshot](#restore-the-snapshot-taken-before-the-upgrade) to go back.
 
 To enable it, register Quro at your provider and set the `OIDC_*` settings as described in [Single sign-on](configuration.md#single-sign-on) and [behind the proxy](reverse-proxy.md#single-sign-on-behind-the-proxy). Operators can inspect and remove a link with `quro user oidc status EMAIL` and `quro user oidc unlink EMAIL --yes`, and account holders unlink in **Settings → Security**. Read [how an account is matched](security.md#single-sign-on) first: a person must already have a Quro account, and their first provider sign-in is linked to the account with the same verified email address.
+
+### Upgrade from 1.0.0-rc.3 to 1.0.0-rc.4
+
+1.0.0-rc.4 adds the Exposure tab on the Plan page. It has one additive migration (`0045_exposure_classification` adds the nullable `holdings.asset_class` and `holdings.risk_class_override` columns and the `exposure_settings` table), no new settings and no change to existing routes.
+
+What the operator does: pin the 1.0.0-rc.4 images of both services (step 2 of the general procedure) and restart as usual. Take the backup of the general procedure first: 1.0.0-rc.3 does not ship the migration and refuses to run against a database that has it, so going back after the upgrade means restoring that backup. Existing holdings start unclassified and show as such on the Exposure tab until you classify them.
