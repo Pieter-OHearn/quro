@@ -7,6 +7,7 @@ import { compareSchema, describeSchema, readLatestAppliedWhen } from '../db/sche
 import { getBuildInfo, type BuildInfo } from '../lib/buildInfo';
 import { REFERENCES_SQL } from '../backup/createBackup';
 import { createDocumentStore } from '../lib/documentStorage';
+import { OidcError, discoverEndpoints } from '../lib/oidcClient';
 import { summarizeSecrets, type SecretRow, type SecretsReport } from '../lib/integrationSecrets';
 import {
   classifyBackup,
@@ -111,6 +112,37 @@ function settingsChecks(): DoctorCheck[] {
   }
   if (problems.length === 0) checks.unshift(ok('settings', 'Settings are valid.'));
   return checks;
+}
+
+/**
+ * Whether passwords work next to single sign-on. With passwords off the provider is the only way
+ * in, so a provider that cannot be reached locks everyone out: that is a warning, with the way back.
+ */
+async function signInCheck(): Promise<DoctorCheck> {
+  const web = section(() => getConfig().web);
+  const oidc = section(() => getConfig().oidc);
+  if (!web || !oidc) return skip('signin', 'Not checked: the settings above are invalid.');
+  // Off without a provider is a settings problem, reported above; it cannot be reached here.
+  if (web.passwordLogin || !oidc.enabled) {
+    return ok(
+      'signin',
+      oidc.enabled
+        ? 'Password sign-in is on, next to single sign-on.'
+        : 'Password sign-in is on; single sign-on is not configured.',
+    );
+  }
+  const off =
+    'Password sign-in is off (QRO_PASSWORD_LOGIN=false); single sign-on is the only way in.';
+  try {
+    await discoverEndpoints({ issuer: oidc.issuer });
+    return ok('signin', `${off} The provider's discovery document was read.`);
+  } catch (error) {
+    const detail = error instanceof OidcError ? ` (${error.detail})` : '';
+    return warn(
+      'signin',
+      `${off} The provider's discovery document cannot be read${detail}, so nobody can sign in until it can. To get back in, set QRO_PASSWORD_LOGIN=true and recreate the backend.`,
+    );
+  }
 }
 
 /** A section of the configuration, or null when it is invalid (already reported). */
@@ -452,6 +484,7 @@ export async function runDoctor(): Promise<DoctorReport> {
   const checks = [
     runtimeCheck(build),
     ...settingsChecks(),
+    await signInCheck(),
     ...owner.checks,
     await runtimeRoleCheck(),
     await backupToolCheck(owner.serverMajor),

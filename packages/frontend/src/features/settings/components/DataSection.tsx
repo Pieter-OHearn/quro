@@ -4,7 +4,12 @@ import type { AccountDeletionPreview, User } from '@quro/shared';
 import { Button, FormField, LoadingState, Modal, PasswordInput, TextInput } from '@/components/ui';
 import { resolveApiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/AuthContext';
-import { useAccountDeletionPreview, useDeleteAccount, useExportData } from '../hooks';
+import {
+  useAccountDeletionPreview,
+  useDeleteAccount,
+  useExportData,
+  useSingleSignOnLink,
+} from '../hooks';
 import { FormErrorNotice, SettingsCard } from './settingsForm';
 
 const DELETE_FAILED_MESSAGE = 'The account could not be deleted. Try again.';
@@ -62,10 +67,17 @@ export function DeletionSummary({ preview }: Readonly<{ preview: AccountDeletion
   );
 }
 
-type DeleteAccountDialogProps = { user: User; onClose: () => void; onDeleted: () => void };
+type DeleteAccountDialogProps = {
+  user: User;
+  /** False when the operator turned passwords off: a recent provider sign-in is asked instead. */
+  passwordLogin?: boolean;
+  onClose: () => void;
+  onDeleted: () => void;
+};
 
 export function DeleteAccountDialog({
   user,
+  passwordLogin = true,
   onClose,
   onDeleted,
 }: Readonly<DeleteAccountDialogProps>) {
@@ -75,7 +87,7 @@ export function DeleteAccountDialog({
   const [showPassword, setShowPassword] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState('');
   const emailMatches = confirmEmail.trim().toLowerCase() === user.email.toLowerCase();
-  const canDelete = emailMatches && password !== '' && !deleteAccount.isPending;
+  const canDelete = emailMatches && (!passwordLogin || password !== '') && !deleteAccount.isPending;
 
   return (
     <Modal
@@ -91,7 +103,9 @@ export function DeleteAccountDialog({
             variant="dangerSolid"
             disabled={!canDelete}
             loading={deleteAccount.isPending}
-            onClick={() => deleteAccount.mutate({ password, confirmEmail })}
+            onClick={() =>
+              deleteAccount.mutate(passwordLogin ? { password, confirmEmail } : { confirmEmail })
+            }
           >
             Delete account
           </Button>
@@ -111,14 +125,22 @@ export function DeleteAccountDialog({
             onChange={setConfirmEmail}
           />
         </FormField>
-        <FormField label="Password" required>
-          <PasswordInput
-            value={password}
-            show={showPassword}
-            onChange={setPassword}
-            onToggle={() => setShowPassword((current) => !current)}
-          />
-        </FormField>
+        {passwordLogin ? (
+          <FormField label="Password" required>
+            <PasswordInput
+              value={password}
+              show={showPassword}
+              onChange={setPassword}
+              onToggle={() => setShowPassword((current) => !current)}
+            />
+          </FormField>
+        ) : (
+          <p className="text-cell text-fg-muted" data-testid="delete-fresh-sign-in">
+            Passwords are turned off on this Quro instance. To delete your account you must have
+            signed in through single sign-on in the last 10 minutes. If you did not, sign out and
+            sign in again first.
+          </p>
+        )}
         {deleteAccount.error ? (
           <FormErrorNotice>
             {resolveApiErrorMessage(deleteAccount.error, DELETE_FAILED_MESSAGE)}
@@ -132,6 +154,7 @@ export function DeleteAccountDialog({
 function DeleteCard({ user }: Readonly<{ user: User }>) {
   const { replaceUser } = useAuth();
   const [open, setOpen] = useState(false);
+  const link = useSingleSignOnLink();
   return (
     <SettingsCard
       title="Delete your account"
@@ -153,6 +176,7 @@ function DeleteCard({ user }: Readonly<{ user: User }>) {
       {open ? (
         <DeleteAccountDialog
           user={user}
+          passwordLogin={link.data?.passwordLogin !== false}
           onClose={() => setOpen(false)}
           onDeleted={() => replaceUser(null)}
         />

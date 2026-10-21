@@ -13,7 +13,22 @@ const MESSAGES: Record<string, string> = {
     'Your Quro account is already linked to a different identity at this provider. Ask the operator for help.',
 };
 
-/** The message for an `sso` query value, or null when there is none or it is not one we know. */
-export function ssoErrorMessage(code: string | null): string | null {
-  return code !== null && Object.hasOwn(MESSAGES, code) ? MESSAGES[code]! : null;
+// With passwords turned off there is no password to fall back on, and accounts come from the operator.
+const SINGLE_SIGN_ON_ONLY_MESSAGES: Record<string, string> = {
+  denied: 'The provider did not let you sign in. Try again.',
+  failed: 'Single sign-on failed. Try again, or ask the operator of this Quro instance for help.',
+  no_account:
+    'No Quro account uses your email address. Ask the operator of this Quro instance to create one for you, then sign in again.',
+};
+
+/**
+ * The message for an `sso` query value, or null when there is none or it is not one we know.
+ * `passwordLogin` is false when the operator turned passwords off.
+ */
+export function ssoErrorMessage(code: string | null, passwordLogin = true): string | null {
+  if (code === null || !Object.hasOwn(MESSAGES, code)) return null;
+  if (!passwordLogin && Object.hasOwn(SINGLE_SIGN_ON_ONLY_MESSAGES, code)) {
+    return SINGLE_SIGN_ON_ONLY_MESSAGES[code]!;
+  }
+  return MESSAGES[code]!;
 }

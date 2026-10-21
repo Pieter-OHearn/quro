@@ -8,6 +8,12 @@ import { secretPlace } from '../lib/integrationSecrets';
 import { SecretsKey } from '../lib/secretEnvelope';
 import { migrateDatabase } from '../db/migrateDatabase';
 import { applyTestSettings } from '../test/config';
+import {
+  FAKE_CLIENT_ID,
+  FAKE_CLIENT_SECRET,
+  FAKE_REDIRECT_URI,
+  startFakeProvider,
+} from '../test/oidcProvider';
 import type { DoctorReport } from './doctor';
 import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, EXIT_UNAVAILABLE, EXIT_USAGE } from './io';
 import { runQuro } from './quro';
@@ -167,6 +173,74 @@ describe('quro doctor', () => {
     const run = await report(settingsFor(migrated, { QRO_PG_DUMP_BIN: old }));
     expect(run.exitCode).toBe(EXIT_FAILURE);
     expect(statusOf(run.report, 'backup.tools')).toBe('fail');
+  });
+
+  describe('the sign-in mode', () => {
+    const providerSettings = (issuer: string) => ({
+      OIDC_ISSUER: issuer,
+      OIDC_CLIENT_ID: FAKE_CLIENT_ID,
+      OIDC_CLIENT_SECRET: FAKE_CLIENT_SECRET,
+      OIDC_REDIRECT_URI: FAKE_REDIRECT_URI,
+    });
+
+    const messageOf = (doctorReport: DoctorReport) =>
+      doctorReport.checks.find((check) => check.id === 'signin')?.message ?? '';
+
+    test('says passwords are on, with or without a provider', async () => {
+      const plain = await report(settingsFor(migrated));
+      expect(statusOf(plain.report, 'signin')).toBe('ok');
+      expect(messageOf(plain.report)).toContain('Password sign-in is on');
+      const provider = await startFakeProvider();
+      try {
+        const withProvider = await report(settingsFor(migrated, providerSettings(provider.issuer)));
+        expect(messageOf(withProvider.report)).toContain('next to single sign-on');
+        // With passwords on the provider is not contacted: it is not the only way in.
+        expect(provider.requests).toEqual([]);
+      } finally {
+        provider.stop();
+      }
+    });
+
+    test('reports passwords off and reads the provider discovery document', async () => {
+      const provider = await startFakeProvider();
+      try {
+        const run = await report(
+          settingsFor(migrated, {
+            ...providerSettings(provider.issuer),
+            QRO_PASSWORD_LOGIN: 'false',
+          }),
+        );
+        expect(run.exitCode).toBe(EXIT_OK);
+        expect(statusOf(run.report, 'signin')).toBe('ok');
+        expect(messageOf(run.report)).toContain('Password sign-in is off');
+        expect(messageOf(run.report)).toContain('discovery document was read');
+        expect(provider.requests.length).toBeGreaterThan(0);
+        expect(run.out).not.toContain(FAKE_CLIENT_SECRET);
+      } finally {
+        provider.stop();
+      }
+    });
+
+    test('warns, and says the way back, when passwords are off and the provider is unreachable', async () => {
+      const run = await report(
+        settingsFor(migrated, {
+          ...providerSettings('http://127.0.0.1:1'),
+          QRO_PASSWORD_LOGIN: 'false',
+        }),
+      );
+      // A warning does not fail the run.
+      expect(run.exitCode).toBe(EXIT_OK);
+      expect(statusOf(run.report, 'signin')).toBe('warn');
+      expect(messageOf(run.report)).toContain('cannot be read');
+      expect(messageOf(run.report)).toContain('QRO_PASSWORD_LOGIN=true');
+      expect(run.out).not.toContain(FAKE_CLIENT_SECRET);
+    });
+
+    test('passwords off without a provider is a settings problem (exit 2)', async () => {
+      const run = await doctor(settingsFor(migrated, { QRO_PASSWORD_LOGIN: 'false' }));
+      expect(run.exitCode).toBe(EXIT_USAGE);
+      expect(run.out).toContain('QRO_PASSWORD_LOGIN');
+    });
   });
 
   test('exit codes: invalid settings 2, unreachable database 4, missing documents directory 1', async () => {

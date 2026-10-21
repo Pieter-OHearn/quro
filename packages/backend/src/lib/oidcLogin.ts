@@ -16,6 +16,7 @@ import {
 } from './oidcClient';
 import { getRegistrationMode } from './registration';
 import { isUniqueViolation } from './postgresErrors';
+import { passwordLoginEnabled } from './passwordLogin';
 import { revokeUserSessions } from './sessions';
 
 const LOGIN_ATTEMPT_TTL_MINUTES = 10;
@@ -85,8 +86,8 @@ type Profile = { subject: string; email: string | null; emailVerified: boolean }
  *
  * Quro does not verify the email address of an account, so in `open` registration mode anyone
  * could have registered an address that is not theirs and be handed its owner's provider login.
- * Linking by email is therefore refused there; the sign-in also ends the account's other
- * sessions, which a password holder from before the link could still use.
+ * Linking by email is therefore refused there, unless passwords are off and nobody can register.
+ * The sign-in also ends the account's other sessions, which a password holder from before the link could still use.
  */
 async function resolveAccount(
   issuer: string,
@@ -125,6 +126,12 @@ async function findIdentity(issuer: string, subject: string): Promise<number | n
   return row?.userId ?? null;
 }
 
+// Open registration is the one mode where anyone can register an address that is not theirs. With
+// passwords off nobody registers (the operator creates every account), so there is no such address.
+function linkingByEmailAllowed(): boolean {
+  return getRegistrationMode() !== 'open' || !passwordLoginEnabled();
+}
+
 /** Completes a sign-in from the provider's redirect. */
 export async function finishOidcLogin(
   settings: OidcClientSettings,
@@ -148,11 +155,7 @@ export async function finishOidcLogin(
       now.getTime(),
     );
     const identity = await fetchIdentity(endpoints, tokens.accessToken, subject);
-    const account = await resolveAccount(
-      settings.issuer,
-      identity,
-      getRegistrationMode() !== 'open',
-    );
+    const account = await resolveAccount(settings.issuer, identity, linkingByEmailAllowed());
     return 'userId' in account ? { ok: true, userId: account.userId } : { ok: false, ...account };
   } catch (error) {
     if (error instanceof OidcError) return { ok: false, reason: 'failed', cause: error };

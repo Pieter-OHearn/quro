@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import type { RegistrationPolicy } from '@quro/shared';
+import type { PublicAuthPolicy } from '@quro/shared';
 
 export type ModalType = 'signin' | 'signup' | null;
 
@@ -43,7 +43,7 @@ export type SignInState = {
 
 export type SignUpState = {
   /** Undefined while loading or when the policy could not be read; the server still decides. */
-  policy: RegistrationPolicy | undefined;
+  policy: PublicAuthPolicy | undefined;
   form: SignUpFormValues;
   setField: (field: keyof SignUpFormValues, value: string) => void;
   showPw: boolean;

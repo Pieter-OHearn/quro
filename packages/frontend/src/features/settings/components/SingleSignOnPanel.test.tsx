@@ -38,4 +38,14 @@ describe('SingleSignOnView', () => {
     expect(markup).toContain('Unlink Authelia');
     expect(markup).not.toContain('data-testid="sso-unlink"');
   });
+
+  it('leaves unlinking to the operator when passwords are turned off', () => {
+    const markup = render({ passwordLogin: false });
+    expect(markup).toContain('Linked to Authelia');
+    expect(markup).toContain('Only the operator can unlink it');
+    expect(markup).not.toContain('>Unlink<');
+    expect(markup).not.toContain('type="password"');
+    // Even if the form had been opened, no password is asked for.
+    expect(render({ passwordLogin: false, asking: true })).not.toContain('type="password"');
+  });
 });

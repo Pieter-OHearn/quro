@@ -1,4 +1,6 @@
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
+import { TEXT_FIELD_LIMITS } from '@quro/shared';
+import { getConfig } from '../config';
 import { db } from '../db/client';
 import { sessions, users } from '../db/schema';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../constants/time';
@@ -12,7 +14,12 @@ import {
 } from '../lib/authCodes';
 import { runUnlessMaintenance } from '../lib/maintenanceMode';
 import { listOidcLinks, removeOidcLinks } from '../lib/oidcLink';
-import { getRegistrationMode, getRegistrationPolicy } from '../lib/registration';
+import { passwordLoginEnabled } from '../lib/passwordLogin';
+import {
+  createAccountWithoutPassword,
+  getRegistrationMode,
+  getRegistrationPolicy,
+} from '../lib/registration';
 import { revokeUserSessions } from '../lib/sessions';
 import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, UsageError, type CommandIo } from './io';
 
@@ -30,10 +37,15 @@ const FLAG_OPTIONS = new Set(['yes']);
 export const USER_USAGE = `Usage: quro user <command> [options]
 
 Commands:
-  status                                 Registration mode, setup state and code counts
+  status                                 Password sign-in, registration mode, setup state and code counts
+  create <email> [--first-name <name>] [--last-name <name>]
+                                         Create an account without a password. It signs in through single
+                                         sign-on, which links it by verified email at the first sign-in.
   invite [--hours <n>]                   Issue a single-use registration code (default ${REGISTRATION_CODE_TTL_MS / HOUR_MS} h, max ${MAX_INVITE_HOURS} h).
                                          The first account of a new instance needs one in every mode.
-  reset-password <email> [--minutes <n>] Issue a single-use password reset code (default ${PASSWORD_RESET_CODE_TTL_MS / MINUTE_MS} min, max ${MAX_RESET_MINUTES} min)
+                                         Refused while QRO_PASSWORD_LOGIN=false.
+  reset-password <email> [--minutes <n>] Issue a single-use password reset code (default ${PASSWORD_RESET_CODE_TTL_MS / MINUTE_MS} min, max ${MAX_RESET_MINUTES} min).
+                                         Refused while QRO_PASSWORD_LOGIN=false.
   revoke-sessions <email>                Sign an account out of every browser
   list                                   List accounts with their active session count
   oidc status <email>                     Whether the account is linked to the single sign-on provider
@@ -123,22 +135,40 @@ async function status(io: CommandIo) {
   );
   const pendingOf = (purpose: string) => pending.filter((code) => code.purpose === purpose).length;
 
-  io.out(`Registration mode: ${mode}`);
-  io.out(`Sign-up currently: ${policy.signUp === 'code' ? 'requires a code' : policy.signUp}`);
-  io.out(`Accounts: ${count}`);
+  const passwordLogin = passwordLoginEnabled();
   io.out(
-    policy.setupRequired
-      ? 'Setup: pending. Run `quro user invite` and use the code to create the first account.'
-      : 'Setup: complete',
+    passwordLogin
+      ? 'Password sign-in: on'
+      : 'Password sign-in: off (QRO_PASSWORD_LOGIN=false); single sign-on is the only way in',
   );
+  io.out(`Registration mode: ${mode}`);
+  io.out(
+    passwordLogin
+      ? `Sign-up currently: ${policy.signUp === 'code' ? 'requires a code' : policy.signUp}`
+      : 'Sign-up currently: closed while password sign-in is off; accounts come from `quro user create`',
+  );
+  io.out(`Accounts: ${count}`);
+  const firstStep = passwordLogin
+    ? 'Run `quro user invite` and use the code to create the first account.'
+    : 'Run `quro user create <email>`, then sign in through single sign-on with that address.';
+  io.out(policy.setupRequired ? `Setup: pending. ${firstStep}` : 'Setup: complete');
   io.out(
     `Unused codes: ${pendingOf('registration')} registration, ${pendingOf('password_reset')} password reset`,
   );
 }
 
+function passwordsOffNotice(what: string): string {
+  return `Password sign-in is off (QRO_PASSWORD_LOGIN=false), so ${what} could not be used. Nothing was issued.`;
+}
+
 async function invite(parsed: ParsedArgs, io: CommandIo) {
   assertOnlyOptions(parsed, ['hours']);
   assertArguments(parsed, []);
+  if (!passwordLoginEnabled()) {
+    io.err(passwordsOffNotice('a registration code'));
+    io.err('Create the account with `quro user create <email>` instead.');
+    return EXIT_REFUSED;
+  }
   const hours = readDuration(parsed, 'hours', MAX_INVITE_HOURS);
   const issued = await issueRegistrationCode({ ttlMs: hours ? hours * HOUR_MS : undefined });
   const mode = getRegistrationMode();
@@ -152,11 +182,16 @@ async function invite(parsed: ParsedArgs, io: CommandIo) {
   if (!policy.setupRequired && mode === 'closed') {
     io.err('Warning: QRO_REGISTRATION_MODE=closed rejects sign-ups, so this code cannot be used.');
   }
+  return EXIT_OK;
 }
 
 async function resetPassword(parsed: ParsedArgs, io: CommandIo) {
   assertOnlyOptions(parsed, ['minutes']);
   assertArguments(parsed, ['email']);
+  if (!passwordLoginEnabled()) {
+    io.err(passwordsOffNotice('a reset code'));
+    return EXIT_REFUSED;
+  }
   const minutes = readDuration(parsed, 'minutes', MAX_RESET_MINUTES);
   const email = parsed.positionals[1];
   const userId = await findUserIdByEmail(email);
@@ -175,6 +210,55 @@ async function resetPassword(parsed: ParsedArgs, io: CommandIo) {
   io.out('It replaces any earlier reset code for this account and is shown only once.');
   io.out('The account holder redeems it with "Forgot password?" on the sign-in screen,');
   io.out('which sets a new password and signs out all of their sessions.');
+  return EXIT_OK;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function readName(parsed: ParsedArgs, option: string, fallback: string, max: number): string {
+  const value = (parsed.options.get(option) ?? fallback).trim();
+  if (value.length > max) throw new UsageError(`--${option} must be at most ${max} characters`);
+  return value;
+}
+
+// An account without a password is reached only through single sign-on. It takes the maintenance
+// lock like any other change, refuses an address that is taken, and prints no token or code.
+async function create(parsed: ParsedArgs, io: CommandIo) {
+  assertOnlyOptions(parsed, ['first-name', 'last-name']);
+  assertArguments(parsed, ['email']);
+  const email = parsed.positionals[1]?.trim().toLowerCase();
+  if (!email) throw new UsageError('An email address is required');
+  if (!EMAIL_PATTERN.test(email) || email.length > TEXT_FIELD_LIMITS.signUp.email) {
+    throw new UsageError('Enter a valid email address');
+  }
+  const limits = TEXT_FIELD_LIMITS.signUp;
+  // The name is the address's local part until the person sets theirs in Settings.
+  const firstName = readName(parsed, 'first-name', email.split('@')[0]!, limits.firstName);
+  const lastName = readName(parsed, 'last-name', '', limits.lastName);
+  if (!firstName) throw new UsageError('--first-name must not be empty');
+
+  const outcome = await runUnlessMaintenance(() =>
+    createAccountWithoutPassword({ firstName, lastName, email }),
+  );
+  if (!outcome.ran) {
+    io.err(
+      'Quro is being backed up or restored, so changes are paused. Run the command again when it has finished.',
+    );
+    return EXIT_FAILURE;
+  }
+  if (!outcome.value.ok) {
+    io.err(`An account already uses ${email}. Nothing was changed.`);
+    return EXIT_FAILURE;
+  }
+  io.out(`Created account #${outcome.value.user.id} for ${email}. It has no password.`);
+  io.out(
+    'The person signs in through single sign-on; the first sign-in links the account to their',
+  );
+  io.out('provider identity, and only if the provider marks this email address as verified.');
+  if (!getConfig().oidc.enabled) {
+    io.err('Warning: single sign-on is not configured, so this account cannot sign in until you');
+    io.err('issue a password reset code with `quro user reset-password`.');
+  }
   return EXIT_OK;
 }
 
@@ -328,10 +412,8 @@ type CommandHandler = (parsed: ParsedArgs, io: CommandIo) => Promise<number>;
 
 const COMMANDS: Record<string, CommandHandler> = {
   status: (parsed, io) => runWithoutArguments(parsed, status, io),
-  invite: async (parsed, io) => {
-    await invite(parsed, io);
-    return EXIT_OK;
-  },
+  create,
+  invite,
   'reset-password': resetPassword,
   'revoke-sessions': revokeSessions,
   list: (parsed, io) => runWithoutArguments(parsed, listUsers, io),

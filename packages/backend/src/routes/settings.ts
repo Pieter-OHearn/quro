@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   MAX_RETIREMENT_AGE,
   MAX_USER_AGE,
@@ -32,6 +32,14 @@ import { getDocumentStore } from '../lib/documentStorage';
 import { getConfig } from '../config';
 import { changePasswordRateLimit } from '../middleware/rateLimit';
 import { listOidcLinks, removeOidcLinks } from '../lib/oidcLink';
+import { hashPassword, verifyPassword } from '../lib/passwords';
+import {
+  FRESH_SIGN_IN_REQUIRED_MESSAGE,
+  PASSWORD_LOGIN_OFF_UNLINK_MESSAGE,
+  isFreshSignIn,
+  passwordLoginEnabled,
+  requirePasswordLogin,
+} from '../lib/passwordLogin';
 import {
   err,
   ok,
@@ -238,7 +246,7 @@ app.put('/preferences', async (c) => {
   return c.json({ data });
 });
 
-app.put('/password', changePasswordRateLimit, async (c) => {
+app.put('/password', requirePasswordLogin, changePasswordRateLimit, async (c) => {
   const authUser = getAuthUser(c);
   const currentSessionId = getSessionId(c);
   const body = await readJsonRecord(c.req, 'Invalid request body');
@@ -258,18 +266,12 @@ app.put('/password', changePasswordRateLimit, async (c) => {
     return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
   }
 
-  const passwordIsValid = await Bun.password.verify(
-    parsed.value.currentPassword,
-    user.passwordHash,
-  );
+  const passwordIsValid = await verifyPassword(parsed.value.currentPassword, user.passwordHash);
   if (!passwordIsValid) {
     return c.json({ error: 'Current password is incorrect' }, HTTP_STATUS.UNAUTHORIZED);
   }
 
-  const passwordHash = await Bun.password.hash(parsed.value.nextPassword, {
-    algorithm: 'bcrypt',
-    cost: 10,
-  });
+  const passwordHash = await hashPassword(parsed.value.nextPassword);
 
   // The new password and the sign-out of every other browser take effect together.
   const data = await db.transaction(async (tx) => {
@@ -299,13 +301,22 @@ app.get('/single-sign-on', async (c) => {
   const { oidc } = getConfig();
   const links = await listOidcLinks(getAuthUser(c).id);
   return c.json({
-    data: { linked: links.length > 0, providerName: oidc.enabled ? oidc.providerName : null },
+    data: {
+      linked: links.length > 0,
+      providerName: oidc.enabled ? oidc.providerName : null,
+      passwordLogin: passwordLoginEnabled(),
+    },
   });
 });
 
 // Removes the link. The next provider sign-in links again by verified email. Sessions stay, as
 // they do for a password change by the person who holds them. The password proves it is them.
 app.delete('/single-sign-on', changePasswordRateLimit, async (c) => {
+  // With passwords off there is no password to prove it is them, and the provider is the only way
+  // in, so the operator removes a link (`quro user oidc unlink`).
+  if (!passwordLoginEnabled()) {
+    return c.json({ error: PASSWORD_LOGIN_OFF_UNLINK_MESSAGE }, HTTP_STATUS.FORBIDDEN);
+  }
   const authUser = getAuthUser(c);
   const body = await readJsonRecord(c.req, 'Invalid request body');
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
@@ -318,12 +329,18 @@ app.delete('/single-sign-on', changePasswordRateLimit, async (c) => {
     .from(users)
     .where(eq(users.id, authUser.id));
   if (!user) return c.json({ error: 'User not found' }, HTTP_STATUS.NOT_FOUND);
-  if (!(await Bun.password.verify(password, user.passwordHash))) {
+  if (!(await verifyPassword(password, user.passwordHash))) {
     return c.json({ error: 'Password is incorrect' }, HTTP_STATUS.UNAUTHORIZED);
   }
   await removeOidcLinks(authUser.id);
   const { oidc } = getConfig();
-  return c.json({ data: { linked: false, providerName: oidc.enabled ? oidc.providerName : null } });
+  return c.json({
+    data: {
+      linked: false,
+      providerName: oidc.enabled ? oidc.providerName : null,
+      passwordLogin: true,
+    },
+  });
 });
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -413,18 +430,33 @@ app.get('/account', async (c) => {
   return c.json({ data: await previewAccountDeletion(getAuthUser(c).id) });
 });
 
+// The proof that it is the account holder asking: the password, or with passwords off a sign-in
+// through the provider in the last few minutes. Returns the refusal, or null when it holds.
+async function deletionProofRefusal(c: Context, user: { passwordHash: string }, password: unknown) {
+  if (!passwordLoginEnabled()) {
+    if (await isFreshSignIn(getSessionId(c))) return null;
+    return c.json({ error: FRESH_SIGN_IN_REQUIRED_MESSAGE }, HTTP_STATUS.FORBIDDEN);
+  }
+  if (typeof password === 'string' && (await verifyPassword(password, user.passwordHash))) {
+    return null;
+  }
+  return c.json({ error: 'Password is incorrect' }, HTTP_STATUS.UNAUTHORIZED);
+}
+
 // Deletes the account and everything it owns. The caller proves it is them with the password and
-// the account email.
+// the account email. With passwords off there is no password: a sign-in through the provider in the
+// last few minutes takes its place, next to the account email.
 app.delete('/account', changePasswordRateLimit, async (c) => {
   const authUser = getAuthUser(c);
   const body = await readJsonRecord(c.req, 'Invalid request body');
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
   const { password, confirmEmail } = body.value;
-  if (typeof password !== 'string' || typeof confirmEmail !== 'string') {
-    return c.json(
-      { error: 'Password and email confirmation are required' },
-      HTTP_STATUS.BAD_REQUEST,
-    );
+  const passwordsOn = passwordLoginEnabled();
+  if (typeof confirmEmail !== 'string' || (passwordsOn && typeof password !== 'string')) {
+    const error = passwordsOn
+      ? 'Password and email confirmation are required'
+      : 'Email confirmation is required';
+    return c.json({ error }, HTTP_STATUS.BAD_REQUEST);
   }
   const [user] = await db
     .select({ email: users.email, passwordHash: users.passwordHash })
@@ -434,9 +466,8 @@ app.delete('/account', changePasswordRateLimit, async (c) => {
   if (confirmEmail.toLowerCase().trim() !== user.email) {
     return c.json({ error: 'Type your email address to confirm' }, HTTP_STATUS.BAD_REQUEST);
   }
-  if (!(await Bun.password.verify(password, user.passwordHash))) {
-    return c.json({ error: 'Password is incorrect' }, HTTP_STATUS.UNAUTHORIZED);
-  }
+  const refusal = await deletionProofRefusal(c, user, password);
+  if (refusal) return refusal;
   const result = await deleteAccount(authUser.id);
   clearSessionCookies(c);
   return c.json({ data: result });

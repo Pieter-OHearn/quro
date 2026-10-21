@@ -9,9 +9,11 @@ import {
   SignInModal,
   SignUpModal,
 } from './components';
-import { useLandingModal } from './hooks';
+import { useLandingModal, useRegistrationPolicy } from './hooks';
 
 export function LandingPage() {
+  // Read the sign-in options now, so the sign-in form opens with them.
+  useRegistrationPolicy();
   const { modal, closeModal, openSignIn, openSignUp } = useLandingModal();
 
   return (

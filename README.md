@@ -125,6 +125,7 @@ Settings live in `config/quro.env`, which `quro init` writes with a comment for 
 | `TRUSTED_PROXIES`       | `172.16.0.0/12` | Docker uses other address ranges, or your reverse proxy runs on another machine             |
 | `QRO_REGISTRATION_MODE` | `invite`        | You want `closed` (no new accounts) or `open` (anyone who can reach Quro may sign up)       |
 | `QRO_DOCUMENT_STORAGE`  | `filesystem`    | You keep documents in an S3-compatible store: `s3` with the `S3_` settings                  |
+| `QRO_PASSWORD_LOGIN`    | `true`          | A [single sign-on](docs/configuration.md#single-sign-on-only) provider is the only way in   |
 | Published port          | `3000`          | Edit `ports` of the `frontend` service in `compose.yaml`, for example `'127.0.0.1:3000:80'` |
 
 The [configuration reference](docs/configuration.md) lists every service, port, directory and setting, with defaults.

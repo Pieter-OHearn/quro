@@ -43,4 +43,21 @@ describe('DeleteAccountDialog', () => {
     );
     expect(markup).toContain('bg-danger text-fg-inverted');
   });
+
+  it('asks for a recent single sign-on instead of a password when passwords are turned off', () => {
+    const user = { email: 'someone@example.test' } as User;
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <DeleteAccountDialog
+          user={user}
+          passwordLogin={false}
+          onClose={() => {}}
+          onDeleted={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    expect(markup).toContain('Type someone@example.test to confirm');
+    expect(markup).toContain('delete-fresh-sign-in');
+    expect(markup).not.toContain('type="password"');
+  });
 });

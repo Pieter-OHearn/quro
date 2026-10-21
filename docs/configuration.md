@@ -148,7 +148,7 @@ A secret file alone, at its default path, does not switch bunq on. To use the fi
 
 ### Single sign-on
 
-Sign-in through an [OpenID Connect](https://openid.net/connect/) provider such as Authelia, Keycloak or Google is off until one of these settings is present; then `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` (as a value or a file) and `OIDC_REDIRECT_URI` are all required, and a partial set stops the backend. Passwords keep working next to it. [The security model](security.md#single-sign-on) says how a provider sign-in finds the account.
+Sign-in through an [OpenID Connect](https://openid.net/connect/) provider such as Authelia, Keycloak or Google is off until one of these settings is present; then `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` (as a value or a file) and `OIDC_REDIRECT_URI` are all required, and a partial set stops the backend. Passwords keep working next to it unless you turn them off with `QRO_PASSWORD_LOGIN` ([single sign-on only](#single-sign-on-only)). [The security model](security.md#single-sign-on) says how a provider sign-in finds the account.
 
 | Setting                   | Default                           | Notes                                                                                                             |
 | ------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -158,8 +158,18 @@ Sign-in through an [OpenID Connect](https://openid.net/connect/) provider such a
 | `OIDC_CLIENT_SECRET_FILE` | `/run/secrets/oidc_client_secret` | File holding the client secret, used when `OIDC_CLIENT_SECRET` is unset                                           |
 | `OIDC_REDIRECT_URI`       | unset                             | The redirect URI registered with the provider: your origin followed by `/api/auth/oidc/callback`                  |
 | `OIDC_PROVIDER_NAME`      | `SSO`                             | Name on the sign-in button, "Sign in with NAME". At most 40 characters                                            |
+| `QRO_PASSWORD_LOGIN`      | `true`                            | `false` turns Quro's own passwords off so the provider is the only way in. Needs the `OIDC_*` settings. See below |
 
 The provider must only mark an email address verified when its person owns it, and Quro reaches it over `https` with the system's trusted authorities (add a private authority with `NODE_EXTRA_CA_CERTS`). Register Quro at the provider as a confidential client for the authorization code flow with PKCE (`S256`), the scopes `openid`, `profile` and `email`, and client authentication with HTTP Basic (`client_secret_basic`). A secret file alone, at its default path, does not switch single sign-on on. To use the file, add the secret to the `backend` service and declare it in the top-level `secrets` of `compose.yaml`, as for [S3](install.md#existing-s3-compatible-store).
+
+#### Single sign-on only
+
+`QRO_PASSWORD_LOGIN=false` makes the provider the only way in. Quro then refuses, with a fixed message and status 403, password sign-in, "Forgot password?" (and the reset codes), sign-up with a password and changing a password; the sign-in page shows only the provider's button. Everything else is unchanged: sessions that are already signed in stay valid, and the stored password hashes are kept. Requiring a passkey or a second factor is the provider's configuration, not Quro's.
+
+- **Needs a provider.** With `QRO_PASSWORD_LOGIN=false` and no `OIDC_*` settings the backend refuses to start (exit code 2, naming `QRO_PASSWORD_LOGIN`), because nobody could sign in.
+- **Accounts.** Nobody signs up, whatever `QRO_REGISTRATION_MODE` says. The operator creates each account without a password with `docker compose exec backend quro user create EMAIL`; the person's first provider sign-in links it, by the verified email address ([how an account is matched](security.md#single-sign-on)).
+- **Lock-out recovery.** The way back is the operator's environment, not the app: set `QRO_PASSWORD_LOGIN=true` (or remove it) in the settings file or `.env`, recreate the `backend` service (`docker compose up -d backend`; a plain `restart` does not re-read the file), then sign in with a password. Accounts that were created with a password get it back; accounts created with `quro user create` have none until `quro user reset-password EMAIL` issues a code. See [Recovery when the provider is unavailable](security.md#recovery-when-the-provider-is-unavailable).
+- **Check.** `quro doctor` reports the mode, and warns while it is `false` and the provider's discovery document cannot be reached.
 
 ### Integration secrets
 

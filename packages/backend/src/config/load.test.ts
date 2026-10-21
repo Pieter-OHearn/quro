@@ -57,6 +57,7 @@ describe('loadConfig defaults', () => {
     });
     expect(config.web.secureCookies).toBe(false);
     expect(config.web.registrationMode).toBe('invite');
+    expect(config.web.passwordLogin).toBe(true);
     expect(config.web.trustedProxies).toBeNull();
     expect(config.web.frontendOrigin).toBeNull();
     expect(config.web.corsOrigins).toEqual(['http://localhost:3000', 'http://localhost:5173']);
@@ -394,6 +395,65 @@ describe('document storage', () => {
     expect(problems.documents).toEqual([
       { setting: 'S3_ENDPOINT', message: 'must be an http or https URL' },
     ]);
+  });
+});
+
+describe('password login', () => {
+  const PROVIDER = {
+    OIDC_ISSUER: 'https://auth.example.com',
+    OIDC_CLIENT_ID: 'quro',
+    OIDC_CLIENT_SECRET: 'client-secret-value',
+    OIDC_REDIRECT_URI: 'https://quro.example.com/api/auth/oidc/callback',
+  };
+
+  test('is on by default, with or without a provider', () => {
+    expect(load(DATABASE_ENV).config.web.passwordLogin).toBe(true);
+    expect(load({ ...DATABASE_ENV, ...PROVIDER }).config.web.passwordLogin).toBe(true);
+    expect(load({ ...DATABASE_ENV, QRO_PASSWORD_LOGIN: '' }).config.web.passwordLogin).toBe(true);
+  });
+
+  test('can be turned off when a provider is configured', () => {
+    const { config, problems } = load({
+      ...DATABASE_ENV,
+      ...PROVIDER,
+      QRO_PASSWORD_LOGIN: 'false',
+    });
+    expect(config.web.passwordLogin).toBe(false);
+    expect(problems.web).toEqual([]);
+    expect(problems.oidc).toEqual([]);
+  });
+
+  test('turned off without a provider stops startup, naming the setting', () => {
+    const { problems } = load({ ...DATABASE_ENV, QRO_PASSWORD_LOGIN: 'false' });
+    expect(problems.web.map((problem) => problem.setting)).toEqual(['QRO_PASSWORD_LOGIN']);
+    expect(problems.web[0]!.message).toContain('single sign-on');
+  });
+
+  test.each(['0', 'no', 'FALSE'])('%s counts as off', (value) => {
+    const { problems } = load({ ...DATABASE_ENV, QRO_PASSWORD_LOGIN: value });
+    expect(problems.web.map((problem) => problem.setting)).toEqual(['QRO_PASSWORD_LOGIN']);
+  });
+
+  test('a secret file alone at its default path does not count as a provider', () => {
+    const { problems } = load(
+      { ...DATABASE_ENV, QRO_PASSWORD_LOGIN: 'false' },
+      { ...SECRETS, '/run/secrets/oidc_client_secret': 'client-secret-value\n' },
+    );
+    expect(problems.web.map((problem) => problem.setting)).toEqual(['QRO_PASSWORD_LOGIN']);
+  });
+
+  test('a partial provider with passwords off is still refused', () => {
+    const { problems } = load({
+      ...DATABASE_ENV,
+      OIDC_ISSUER: PROVIDER.OIDC_ISSUER,
+      QRO_PASSWORD_LOGIN: 'false',
+    });
+    expect(problems.oidc.length).toBeGreaterThan(0);
+  });
+
+  test('a value that is not a boolean is refused rather than read as on', () => {
+    const { problems } = load({ ...DATABASE_ENV, ...PROVIDER, QRO_PASSWORD_LOGIN: 'maybe' });
+    expect(problems.web.map((problem) => problem.setting)).toEqual(['QRO_PASSWORD_LOGIN']);
   });
 });
 

@@ -82,6 +82,7 @@ services:
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
       OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-SSO}
+      QRO_PASSWORD_LOGIN: ${QRO_PASSWORD_LOGIN:-true}
     secrets:
       - postgres_app_password
     volumes:
