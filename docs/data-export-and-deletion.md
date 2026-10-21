@@ -40,7 +40,7 @@ There is no import for this archive yet. Restoring a whole instance is [backup a
 
 ## Deletion
 
-**Settings → Your data → Delete account** asks for your email address and password and shows what will go. It then deletes, in one database transaction, the account and everything it owns: all the rows above, bank links, sessions, sign-in codes, single sign-on links and the partner link. An audit row is written in the same transaction; if anything fails, nothing is deleted.
+**Settings → Your data → Delete account** asks for your email address and password (with [passwords turned off](security.md#single-sign-on-only-mode), your email address and a single sign-on from the last 10 minutes) and shows what will go. It then deletes, in one database transaction, the account and everything it owns: all the rows above, bank links, sessions, sign-in codes, single sign-on links and the partner link. An audit row is written in the same transaction; if anything fails, nothing is deleted.
 
 | Data                                                              | What happens                                                                                                                                                            |
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

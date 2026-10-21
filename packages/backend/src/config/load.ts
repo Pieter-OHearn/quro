@@ -121,6 +121,8 @@ export type RuntimeConfig = {
 export type WebConfig = {
   secureCookies: boolean;
   registrationMode: RegistrationMode;
+  /** False when single sign-on is the only way in: Quro's own password paths are refused. */
+  passwordLogin: boolean;
   trustedProxies: TrustedProxies;
   corsOrigins: readonly string[];
   /** Normalised origin, or null when the deployment does not say. */
@@ -358,9 +360,18 @@ function buildWeb(r: Reader, notices: ConfigNotice[]): WebConfig {
     });
     corsOrigins = DEFAULT_CORS_ORIGINS;
   }
+  const passwordLogin = r.must('QRO_PASSWORD_LOGIN');
+  // With passwords off the provider is the only way in, so an instance without one has none.
+  if (passwordLogin === false && !r.featureConfigured('oidc')) {
+    r.fail(
+      'QRO_PASSWORD_LOGIN',
+      'false needs single sign-on (the OIDC_* settings); without it nobody could sign in. Set it to true or configure a provider',
+    );
+  }
   return {
     secureCookies: r.must('SECURE_COOKIES'),
     registrationMode: r.must('QRO_REGISTRATION_MODE'),
+    passwordLogin,
     trustedProxies: r.get('TRUSTED_PROXIES') ?? null,
     corsOrigins: corsOrigins.length > 0 ? corsOrigins : DEFAULT_CORS_ORIGINS,
     frontendOrigin: r.get('FRONTEND_ORIGIN') ?? null,

@@ -38,6 +38,18 @@ describe('RegistrationClosedNotice', () => {
   });
 });
 
+describe('RegistrationClosedNotice with passwords turned off', () => {
+  it('says the operator creates accounts and points to the provider', () => {
+    const markup = renderToStaticMarkup(
+      <RegistrationClosedNotice onSwitchToSignIn={() => {}} singleSignOnOnly="Authelia" />,
+    );
+    expect(markup).toContain('Accounts are created by the operator');
+    expect(markup).toContain('sign in with Authelia');
+    expect(markup).not.toContain('Registration is closed');
+    expect(markup).not.toContain('Create');
+  });
+});
+
 describe('PasswordResetHelp', () => {
   it('explains the operator recovery path without email', () => {
     const markup = renderToStaticMarkup(<PasswordResetHelp />);

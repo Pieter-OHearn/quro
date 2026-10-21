@@ -725,10 +725,14 @@ describe('unlinking from Settings', () => {
     const state = async () =>
       (
         (await (await integration.request('/api/settings/single-sign-on', { cookie })).json()) as {
-          data: { linked: boolean; providerName: string | null };
+          data: { linked: boolean; providerName: string | null; passwordLogin: boolean };
         }
       ).data;
-    expect(await state()).toEqual({ linked: true, providerName: 'Authelia' });
+    expect(await state()).toEqual({
+      linked: true,
+      providerName: 'Authelia',
+      passwordLogin: true,
+    });
 
     const unlink = (json: unknown) =>
       integration.request('/api/settings/single-sign-on', {
@@ -745,7 +749,11 @@ describe('unlinking from Settings', () => {
     const removed = await unlink({ password: integrationPassword });
     expect(removed.status).toBe(200);
     expect(await identitiesOf(account.user.id)).toHaveLength(0);
-    expect(await state()).toEqual({ linked: false, providerName: 'Authelia' });
+    expect(await state()).toEqual({
+      linked: false,
+      providerName: 'Authelia',
+      passwordLogin: true,
+    });
     // The session that asked stays signed in.
     expect(await userOf(cookie.match(/session=([^;]+)/)![1]!)).toBe(account.user.id);
 

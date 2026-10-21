@@ -5,7 +5,14 @@ import { db, type DbExecutor } from '../db/client';
 import { users } from '../db/schema';
 import { consumeAuthCode, recordAuthCodeUser } from './authCodes';
 import { isUniqueViolation } from './postgresErrors';
-import { publicUserColumns } from './users';
+import { NO_PASSWORD_HASH } from './passwords';
+import {
+  DEFAULT_BASE_CURRENCY,
+  DEFAULT_RETIREMENT_AGE,
+  DEFAULT_USER_AGE,
+  DEFAULT_USER_NUMBER_FORMAT,
+  publicUserColumns,
+} from './users';
 
 /** `QRO_REGISTRATION_MODE`: unset means invite-only, and an unknown value stops startup. */
 export function getRegistrationMode(): RegistrationMode {
@@ -100,6 +107,43 @@ export async function registerAccount(
     if (isUniqueViolation(error)) {
       return { ok: false, reason: 'email_taken' as RegistrationRejection, firstAccount } as const;
     }
+    throw error;
+  }
+}
+
+/**
+ * Creates an account for the operator (`quro user create`): no code, no password. The account is
+ * reached through single sign-on, which links it at the first sign-in by verified email. It takes
+ * the same lock as sign-ups, so it cannot race one for the same address.
+ */
+export async function createAccountWithoutPassword(
+  input: { firstName: string; lastName: string; email: string },
+  executor: DbExecutor = db,
+) {
+  try {
+    return await executor.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('quro:registration'))`);
+      const [existing] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, input.email));
+      if (existing) return { ok: false, reason: 'email_taken' } as const;
+      const [user] = await tx
+        .insert(users)
+        .values({
+          ...input,
+          location: '',
+          age: DEFAULT_USER_AGE,
+          retirementAge: DEFAULT_RETIREMENT_AGE,
+          baseCurrency: DEFAULT_BASE_CURRENCY,
+          numberFormat: DEFAULT_USER_NUMBER_FORMAT,
+          passwordHash: NO_PASSWORD_HASH,
+        })
+        .returning(publicUserColumns);
+      return { ok: true, user } as const;
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return { ok: false, reason: 'email_taken' } as const;
     throw error;
   }
 }

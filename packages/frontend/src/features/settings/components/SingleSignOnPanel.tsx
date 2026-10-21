@@ -5,6 +5,8 @@ import { useSingleSignOnLink, useUnlinkSingleSignOn } from '../hooks';
 
 type ViewProps = {
   providerName: string;
+  /** False when the operator turned passwords off: there is no password to unlink with. */
+  passwordLogin?: boolean;
   asking: boolean;
   password: string;
   showPassword: boolean;
@@ -19,6 +21,7 @@ type ViewProps = {
 
 export function SingleSignOnView({
   providerName,
+  passwordLogin = true,
   asking,
   password,
   showPassword,
@@ -39,18 +42,19 @@ export function SingleSignOnView({
             <p className="text-cell font-medium text-fg" data-testid="sso-linked">
               Linked to {providerName}
             </p>
-            <p className="max-w-md text-caption text-fg-subtle">
-              You can sign in with the provider. Unlinking keeps your password and your data; the
-              next provider sign-in links again by your verified email address.
+            <p className="max-w-md text-caption text-fg-subtle" data-testid="sso-note">
+              {passwordLogin
+                ? 'You can sign in with the provider. Unlinking keeps your password and your data; the next provider sign-in links again by your verified email address.'
+                : `Passwords are turned off on this Quro instance, so ${providerName} is the only way to sign in. Only the operator can unlink it.`}
             </p>
           </div>
-          {asking ? null : (
+          {asking || !passwordLogin ? null : (
             <Button variant="secondary" size="sm" onClick={onAsk} data-testid="sso-unlink">
               Unlink
             </Button>
           )}
         </div>
-        {asking ? (
+        {asking && passwordLogin ? (
           <form
             className="space-y-3"
             onSubmit={(event) => {
@@ -103,6 +107,7 @@ export function SingleSignOnPanel() {
   return (
     <SingleSignOnView
       providerName={link.data.providerName ?? 'your sign-in provider'}
+      passwordLogin={link.data.passwordLogin}
       asking={asking}
       password={password}
       showPassword={showPassword}

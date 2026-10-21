@@ -49,9 +49,30 @@ export function InviteCodeField({
   );
 }
 
+type RegistrationClosedNoticeProps = {
+  onSwitchToSignIn: () => void;
+  /** The provider's name when the operator turned passwords off, so nobody signs up. */
+  singleSignOnOnly?: string | null;
+};
+
 export function RegistrationClosedNotice({
   onSwitchToSignIn,
-}: Readonly<{ onSwitchToSignIn: () => void }>) {
+  singleSignOnOnly = null,
+}: Readonly<RegistrationClosedNoticeProps>) {
+  if (singleSignOnOnly) {
+    return (
+      <div className="space-y-2" data-testid="signup-sso-only">
+        <p className="text-title-section text-fg">Accounts are created by the operator</p>
+        <p className="text-body text-fg-muted">
+          This Quro instance has no sign-up and no passwords. Ask its operator to create an account
+          for your email address, then sign in with {singleSignOnOnly}.
+        </p>
+        <p className="text-cell text-fg-muted">
+          <TextLinkButton onClick={onSwitchToSignIn}>Sign in</TextLinkButton>
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2">
       <p className="text-title-section text-fg">Registration is closed</p>

@@ -193,7 +193,12 @@ export function SignUpModal({ onClose, onSwitchToSignIn }: Readonly<SignUpModalP
       scrollable
     >
       {state.policy?.signUp === 'closed' ? (
-        <RegistrationClosedNotice onSwitchToSignIn={onSwitchToSignIn} />
+        <RegistrationClosedNotice
+          onSwitchToSignIn={onSwitchToSignIn}
+          singleSignOnOnly={
+            state.policy?.passwordLogin === false ? state.policy.singleSignOn?.name : null
+          }
+        />
       ) : (
         <SignUpForm state={state} onSwitchToSignIn={onSwitchToSignIn} />
       )}

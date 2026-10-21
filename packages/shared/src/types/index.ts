@@ -120,9 +120,12 @@ export type AccountDeletionPreview = {
   hasPartner: boolean;
 };
 
-/** Both are required to delete the account (`DELETE /api/settings/account`). */
+/**
+ * Required to delete the account (`DELETE /api/settings/account`). The password is left out when
+ * the operator turned passwords off; a recent sign-in through the provider takes its place.
+ */
 export type DeleteAccountInput = {
-  password: string;
+  password?: string;
   confirmEmail: string;
 };
 
@@ -152,6 +155,11 @@ export type RegistrationPolicy = {
 export type PublicAuthPolicy = RegistrationPolicy & {
   /** The provider's button label, or null when single sign-on is not set up. */
   singleSignOn: { name: string } | null;
+  /**
+   * False when the operator turned Quro's own passwords off: the provider is the only way in, and
+   * `signUp` is `closed` because the operator creates every account.
+   */
+  passwordLogin: boolean;
 };
 
 /** Whether the account is linked to a sign-in provider, and the name to show for it. */
@@ -159,6 +167,8 @@ export type SingleSignOnLink = {
   linked: boolean;
   /** The provider's name when single sign-on is set up on this server. */
   providerName: string | null;
+  /** False when passwords are turned off on this server, so no password is asked for. */
+  passwordLogin: boolean;
 };
 
 export type UserSession = {

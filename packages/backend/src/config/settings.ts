@@ -303,6 +303,13 @@ export const SETTINGS = defineSettings({
       'Who may create an account once the first one exists. `invite`: a single-use code per account. `closed`: nobody. `open`: anyone who can reach Quro.',
     default: 'invite',
   }),
+  QRO_PASSWORD_LOGIN: flag({
+    group: 'Single sign-on',
+    audience: 'operator',
+    description:
+      "Whether Quro's own passwords work: sign-in, password reset, sign-up with a password and password change. `false` turns all of them off so the single sign-on provider is the only way in, and needs the OIDC_* settings (the backend stops otherwise). Stored password hashes stay, so setting it back to `true` restores password sign-in. Accounts are then created with `quro user create`.",
+    default: true,
+  }),
   TRUSTED_PROXIES: define<TrustedProxies>(
     'comma-separated IPs or IPv4 CIDRs',
     (raw) => {

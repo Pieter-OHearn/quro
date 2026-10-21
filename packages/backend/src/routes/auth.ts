@@ -34,6 +34,8 @@ import {
   registerAccount,
   type RegistrationRejection,
 } from '../lib/registration';
+import { hashPassword, verifyPassword } from '../lib/passwords';
+import { passwordLoginEnabled, requirePasswordLogin } from '../lib/passwordLogin';
 import {
   clearSessionCookies,
   createSession,
@@ -44,12 +46,6 @@ import {
 const app = new Hono();
 
 app.use('*', cookieTransportCheck);
-
-const BCRYPT_COST = 10;
-const DUMMY_PASSWORD_HASH = await Bun.password.hash('quro-dummy-password', {
-  algorithm: 'bcrypt',
-  cost: BCRYPT_COST,
-});
 
 type SignUpPayload = {
   firstName: string;
@@ -195,12 +191,22 @@ function registrationError(reason: RegistrationRejection, firstAccount: boolean)
 app.get('/registration', async (c) => {
   const { oidc } = getConfig();
   const singleSignOn = oidc.enabled ? { name: oidc.providerName } : null;
-  return c.json({ data: { ...(await getRegistrationPolicy()), singleSignOn } });
+  const passwordLogin = passwordLoginEnabled();
+  const policy = await getRegistrationPolicy();
+  // With passwords off nobody signs up: the operator creates accounts (`quro user create`).
+  return c.json({
+    data: {
+      ...policy,
+      signUp: passwordLogin ? policy.signUp : 'closed',
+      passwordLogin,
+      singleSignOn,
+    },
+  });
 });
 
 // ── Sign Up ─────────────────────────────────────────────────────────────────
 
-app.post('/signup', signupRateLimit, async (c) => {
+app.post('/signup', requirePasswordLogin, signupRateLimit, async (c) => {
   const body = await readJsonRecord(c.req, 'Invalid request body');
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
   const rawBody = body.value;
@@ -213,10 +219,7 @@ app.post('/signup', signupRateLimit, async (c) => {
   const { data } = validationResult;
   const lengths = await checkTextLimits(data, TEXT_FIELD_LIMITS.signUp);
   if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
-  const passwordHash = await Bun.password.hash(data.password, {
-    algorithm: 'bcrypt',
-    cost: BCRYPT_COST,
-  });
+  const passwordHash = await hashPassword(data.password);
 
   const result = await registerAccount({
     mode: getRegistrationMode(),
@@ -255,7 +258,7 @@ function parseSigninCredentials(body: Record<string, unknown>) {
   };
 }
 
-app.post('/signin', signinRateLimit, async (c) => {
+app.post('/signin', requirePasswordLogin, signinRateLimit, async (c) => {
   const body = await readJsonRecord(c.req, 'Invalid request body');
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
   const { email, password } = parseSigninCredentials(body.value);
@@ -279,8 +282,8 @@ app.post('/signin', signinRateLimit, async (c) => {
     .from(users)
     .where(eq(users.email, email));
 
-  const hashToVerify = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
-  const valid = await Bun.password.verify(password, hashToVerify);
+  // An unknown email and an account without a password take the same path as a wrong password.
+  const valid = await verifyPassword(password, user?.passwordHash);
 
   if (!user || !valid) {
     return c.json({ error: 'Invalid email or password' }, HTTP_STATUS.UNAUTHORIZED);
@@ -308,16 +311,13 @@ function parsePasswordResetPayload(body: Record<string, unknown>) {
 
 // Without SMTP, recovery goes through the operator: `quro user reset-password <email>` prints a
 // one-time code that the user redeems here. Every existing session of the account is revoked.
-app.post('/password-reset', passwordResetRateLimit, async (c) => {
+app.post('/password-reset', requirePasswordLogin, passwordResetRateLimit, async (c) => {
   const body = await readJsonRecord(c.req, 'Invalid request body');
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
   const payload = parsePasswordResetPayload(body.value);
   if ('error' in payload) return c.json({ error: payload.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const passwordHash = await Bun.password.hash(payload.nextPassword, {
-    algorithm: 'bcrypt',
-    cost: BCRYPT_COST,
-  });
+  const passwordHash = await hashPassword(payload.nextPassword);
 
   const userId = await db.transaction(async (tx) => {
     const consumed = await consumeAuthCode(tx, payload.code, 'password_reset');

@@ -1,11 +1,13 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 import { and, eq, isNull } from 'drizzle-orm';
+import { NO_PASSWORD_HASH } from '../lib/passwords';
 import { db } from '../db/client';
-import { authCodes, oidcIdentities, sessions } from '../db/schema';
+import { authCodes, oidcIdentities, sessions, users } from '../db/schema';
 import postgres from 'postgres';
 import { getConfig } from '../config';
 import { enterMaintenance, leaveMaintenance } from '../lib/maintenanceMode';
 import { issuePasswordResetCode } from '../lib/authCodes';
+import { applyTestSettings } from '../test/config';
 import { createIntegrationHelpers, integrationPassword } from '../test/integration';
 import { EXIT_FAILURE, EXIT_OK, EXIT_REFUSED, EXIT_USAGE } from './io';
 import { runQuro } from './quro';
@@ -286,5 +288,169 @@ describe('quro user oidc', () => {
     } finally {
       await session.end();
     }
+  });
+});
+
+const PROVIDER_SETTINGS = {
+  OIDC_ISSUER: 'https://auth.example',
+  OIDC_CLIENT_ID: 'quro-cli-test',
+  OIDC_CLIENT_SECRET: 'cli test secret',
+  OIDC_REDIRECT_URI: 'https://quro.example/api/auth/oidc/callback',
+};
+
+describe('quro user create', () => {
+  let restore: (() => void) | undefined;
+
+  afterEach(() => {
+    restore?.();
+    restore = undefined;
+  });
+
+  const accountOf = async (email: string) =>
+    (await db.select().from(users).where(eq(users.email, email)))[0];
+
+  test('creates an account without a password and prints no code or token', async () => {
+    const email = integration.buildEmail('created');
+    const result = await quro('user', 'create', email.toUpperCase());
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.out).toContain('It has no password');
+    expect(result.out + result.err).not.toMatch(CODE_PATTERN);
+
+    const account = await accountOf(email);
+    expect(account?.passwordHash).toBe(NO_PASSWORD_HASH);
+    expect(account?.passwordUpdatedAt).toBeNull();
+    expect(account?.firstName).toBe(email.split('@')[0]);
+    expect(account?.lastName).toBe('');
+    // No session, code or identity comes with it.
+    expect(await db.select().from(sessions).where(eq(sessions.userId, account!.id))).toEqual([]);
+    expect(await db.select().from(authCodes).where(eq(authCodes.userId, account!.id))).toEqual([]);
+    expect(
+      await db.select().from(oidcIdentities).where(eq(oidcIdentities.userId, account!.id)),
+    ).toEqual([]);
+  });
+
+  test('takes the names it is given', async () => {
+    const email = integration.buildEmail('named');
+    const result = await quro(
+      'user',
+      'create',
+      email,
+      '--first-name',
+      'Ada',
+      '--last-name=Lovelace',
+    );
+    expect(result.exitCode).toBe(EXIT_OK);
+    const account = await accountOf(email);
+    expect([account?.firstName, account?.lastName]).toEqual(['Ada', 'Lovelace']);
+  });
+
+  test('refuses an address that is taken and changes nothing', async () => {
+    const owner = await integration.signUp('create-taken');
+    const result = await quro('user', 'create', owner.user.email.toUpperCase());
+    expect(result.exitCode).toBe(EXIT_FAILURE);
+    expect(result.err).toContain('already uses');
+    const account = await accountOf(owner.user.email);
+    expect(account?.passwordHash).not.toBe(NO_PASSWORD_HASH);
+  });
+
+  test('refuses a bad address, an empty or oversized name and unknown options with usage', async () => {
+    const email = integration.buildEmail('bad-args');
+    const cases = [
+      ['user', 'create'],
+      ['user', 'create', 'not-an-address'],
+      ['user', 'create', email, 'extra'],
+      ['user', 'create', email, '--password', 'secret-value'],
+      ['user', 'create', email, '--first-name', ''],
+      ['user', 'create', email, '--last-name', 'x'.repeat(500)],
+    ];
+    for (const args of cases) {
+      const result = await quro(...args);
+      expect(result.exitCode).toBe(EXIT_USAGE);
+    }
+    expect(await accountOf(email)).toBeUndefined();
+  });
+
+  test('warns when single sign-on is not set up, because the account then has no way in', async () => {
+    const email = integration.buildEmail('no-provider');
+    const result = await quro('user', 'create', email);
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.err).toContain('single sign-on is not configured');
+
+    restore = applyTestSettings(PROVIDER_SETTINGS);
+    const withProvider = await quro('user', 'create', integration.buildEmail('with-provider'));
+    expect(withProvider.exitCode).toBe(EXIT_OK);
+    expect(withProvider.err).toBe('');
+  });
+
+  test('creates the first account of a new instance without a setup code', async () => {
+    restore = applyTestSettings({ ...PROVIDER_SETTINGS, QRO_PASSWORD_LOGIN: 'false' });
+    const email = integration.buildEmail('first');
+    expect((await quro('user', 'create', email)).exitCode).toBe(EXIT_OK);
+    expect(await accountOf(email)).toBeDefined();
+  });
+
+  test('is refused during backup or restore, like the other changes', async () => {
+    const email = integration.buildEmail('maintenance');
+    const session = postgres(getConfig().adminDatabase.url.reveal(), {
+      max: 1,
+      onnotice: () => undefined,
+    });
+    try {
+      await enterMaintenance(session, 5);
+      const result = await quro('user', 'create', email);
+      expect(result.exitCode).toBe(EXIT_FAILURE);
+      expect(result.err).toContain('backed up or restored');
+      expect(await accountOf(email)).toBeUndefined();
+      await leaveMaintenance(session);
+    } finally {
+      await session.end();
+    }
+  });
+
+  test('two runs for one address create one account', async () => {
+    const email = integration.buildEmail('race');
+    const results = await Promise.all([
+      quro('user', 'create', email),
+      quro('user', 'create', email),
+    ]);
+    expect(results.map((result) => result.exitCode).sort()).toEqual([EXIT_OK, EXIT_FAILURE]);
+    expect(await db.select().from(users).where(eq(users.email, email))).toHaveLength(1);
+  });
+});
+
+describe('quro user with password sign-in off', () => {
+  let restore: () => void;
+
+  beforeAll(() => {
+    restore = applyTestSettings({ ...PROVIDER_SETTINGS, QRO_PASSWORD_LOGIN: 'false' });
+  });
+
+  afterAll(() => restore());
+
+  test('invite and reset-password are refused and issue nothing', async () => {
+    const email = integration.buildEmail('off-reset');
+    expect((await quro('user', 'create', email)).exitCode).toBe(EXIT_OK);
+    const before = (await db.select().from(authCodes)).length;
+    const invite = await quro('user', 'invite');
+    expect(invite.exitCode).toBe(EXIT_REFUSED);
+    expect(invite.err).toContain('QRO_PASSWORD_LOGIN=false');
+    expect(invite.err).toContain('quro user create');
+    const reset = await quro('user', 'reset-password', email);
+    expect(reset.exitCode).toBe(EXIT_REFUSED);
+    expect(reset.err).toContain('QRO_PASSWORD_LOGIN=false');
+    expect(invite.out + reset.out).not.toMatch(CODE_PATTERN);
+    expect((await db.select().from(authCodes)).length).toBe(before);
+  });
+
+  test('status says passwords are off and how to create the first account', async () => {
+    const result = await quro('user', 'status');
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.out).toContain('Password sign-in: off');
+    expect(result.out).toContain('Sign-up currently: closed');
+  });
+
+  test('the other commands keep working', async () => {
+    expect((await quro('user', 'list')).exitCode).toBe(EXIT_OK);
+    expect((await quro('user', 'codes')).exitCode).toBe(EXIT_OK);
   });
 });

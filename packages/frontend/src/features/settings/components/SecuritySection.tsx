@@ -23,7 +23,42 @@ import {
 } from './settingsForm';
 import { SessionsPanel } from './SessionsPanel';
 import { SingleSignOnPanel } from './SingleSignOnPanel';
-export function SecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) {
+import { useSingleSignOnLink } from '../hooks';
+/** What replaces the password form when the operator turned passwords off. */
+export function PasswordsOffCard({ providerName }: Readonly<{ providerName: string | null }>) {
+  return (
+    <SettingsCard title="Security" subtitle="Sign out browsers you no longer use.">
+      <div className="flex items-start gap-2" data-testid="passwords-off">
+        <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
+        <div>
+          <p className="text-body font-medium text-fg">
+            Signed in through {providerName ?? 'single sign-on'}
+          </p>
+          <p className="text-caption text-fg-subtle">
+            Passwords are turned off on this Quro instance, so there is no password to change. Your
+            sign-in provider manages how you prove it is you.
+          </p>
+        </div>
+      </div>
+    </SettingsCard>
+  );
+}
+
+export function SecuritySection(props: Readonly<SecuritySectionProps>) {
+  const link = useSingleSignOnLink();
+  if (link.data?.passwordLogin === false) {
+    return (
+      <div className="space-y-4">
+        <PasswordsOffCard providerName={link.data.providerName} />
+        <SingleSignOnPanel />
+        <SessionsPanel />
+      </div>
+    );
+  }
+  return <PasswordSecuritySection {...props} />;
+}
+
+function PasswordSecuritySection({ user, replaceUser }: Readonly<SecuritySectionProps>) {
   const [form, setForm] = useState<PasswordFormState>(() => createEmptyPasswordForm());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);

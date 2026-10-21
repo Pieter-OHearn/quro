@@ -497,3 +497,11 @@ To enable it, register Quro at your provider and set the `OIDC_*` settings as de
 1.0.0-rc.4 adds the Exposure tab on the Plan page. It has one additive migration (`0045_exposure_classification` adds the nullable `holdings.asset_class` and `holdings.risk_class_override` columns and the `exposure_settings` table), no new settings and no change to existing routes.
 
 What the operator does: pin the 1.0.0-rc.4 images of both services (step 2 of the general procedure) and restart as usual. Take the backup of the general procedure first: 1.0.0-rc.3 does not ship the migration and refuses to run against a database that has it, so going back after the upgrade means restoring that backup. Existing holdings start unclassified and show as such on the Exposure tab until you classify them.
+
+### Upgrade from 1.0.0-rc.4 to 1.0.0-rc.5
+
+1.0.0-rc.5 adds the setting `QRO_PASSWORD_LOGIN` and the command `quro user create`. It has no migration and changes no existing setting, route, account or session. The default is the behaviour of 1.0.0-rc.4: passwords work.
+
+What the operator does: nothing, unless you want single sign-on to be the only way in. Pin the 1.0.0-rc.5 images of both services (step 2 of the general procedure) and restart as usual. 1.0.0-rc.4 runs on the same database, so going back is a matter of pinning the older images; an account made with `quro user create` has no password and cannot sign in with 1.0.0-rc.4 except through single sign-on.
+
+To turn passwords off, first [configure single sign-on](configuration.md#single-sign-on) and check that every person can sign in with it. Then set `QRO_PASSWORD_LOGIN=false` in `config/quro.env` and recreate the backend with `docker compose up -d backend`. Stored password hashes and existing sessions stay. Read [single sign-on only mode](security.md#single-sign-on-only-mode) and keep [the way back](security.md#recovery-when-the-provider-is-unavailable) at hand: set the value to `true` (or remove it) and recreate the backend. The backend refuses to start with the setting off and no `OIDC_*` settings, so a mistake in the file shows up as exit code 2 at once; `quro doctor` reports the mode and warns when the provider cannot be reached.

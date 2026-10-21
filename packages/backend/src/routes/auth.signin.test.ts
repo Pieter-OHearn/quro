@@ -8,8 +8,9 @@ describe('signin handler hardening', () => {
   const authRoute = readFileSync(AUTH_ROUTE_PATH, 'utf8');
 
   test('verifies a password hash even when the email is unknown', () => {
-    expect(authRoute).toContain('DUMMY_PASSWORD_HASH');
-    expect(authRoute).toContain('user?.passwordHash ?? DUMMY_PASSWORD_HASH');
+    // verifyPassword checks a dummy hash of the same cost for an unknown or passwordless account.
+    expect(authRoute).toContain('verifyPassword(password, user?.passwordHash)');
+    expect(authRoute).not.toContain('Bun.password');
     expect(authRoute).not.toMatch(
       /if \(!user\) \{\s*return c\.json\(\{ error: 'Invalid email or password' \}/,
     );
