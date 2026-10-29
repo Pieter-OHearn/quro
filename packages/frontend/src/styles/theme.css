@@ -460,6 +460,26 @@
     accent-color: var(--brand);
   }
 
+  /* iOS Safari gives date, month and time fields a native size of their own, so a date field in a
+   * two-column row grows past its column into the field beside it and stands taller than it.
+   * Without the native appearance they take the field chrome like any input, and the value starts
+   * at the left like typed text. The picker still opens on tap. */
+  @supports (-webkit-touch-callout: none) {
+    input[type='date'],
+    input[type='month'],
+    input[type='time'],
+    input[type='datetime-local'] {
+      -webkit-appearance: none;
+      appearance: none;
+      min-width: 0;
+    }
+  }
+
+  input::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+  }
+
   /**
    * Default typography styles for HTML elements (body, h1-h4, label, button, input).
    * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg)

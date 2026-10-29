@@ -13,6 +13,7 @@ import { navItems } from './navItems';
 import { SidebarButton, SidebarLink } from './SidebarItem';
 import { TabBar } from './TabBar';
 import { useScrollMemory } from './useScrollMemory';
+import { useShellScrollReset } from './useShellScrollReset';
 
 const SIDEBAR_ID = 'app-sidebar';
 // From 1024px the sidebar is part of the page; below it is a drawer (Tailwind's `lg`).
@@ -215,11 +216,14 @@ function AppHeader({ mobileOpen, setMobileOpen, currentPageLabel, today }: AppHe
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const isDrawer = !useMediaQuery(DESKTOP_MEDIA_QUERY);
   const drawerOpen = isDrawer && mobileOpen;
   const location = useLocation();
   useScrollMemory(mainRef, location.pathname);
+  useShellScrollReset(shellRef, columnRef);
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -243,9 +247,10 @@ export function Layout() {
   // The page scrolls inside `main`. Below 640px it is padded by the tab bar's height (60px tabs,
   // a 1px top border and the safe area) so nothing ends behind the bar, and `h-dvh` keeps the bar
   // on the visible viewport while a phone browser shows its toolbars. While the drawer is open
-  // everything behind it is inert.
+  // everything behind it is inert. Only `main` scrolls; the shell is kept at the top after a phone
+  // keyboard closes (see useShellScrollReset).
   return (
-    <div className="flex h-dvh bg-surface-sunken overflow-hidden">
+    <div ref={shellRef} className="flex h-dvh bg-surface-sunken overflow-hidden">
       <div inert={drawerOpen}>
         <TabBar
           moreOpen={mobileOpen}
@@ -267,7 +272,11 @@ export function Layout() {
         setCollapsed={setCollapsed}
         setMobileOpen={setMobileOpen}
       />
-      <div inert={drawerOpen} className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div
+        ref={columnRef}
+        inert={drawerOpen}
+        className="flex-1 flex flex-col overflow-hidden min-w-0"
+      >
         <AppHeader
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}

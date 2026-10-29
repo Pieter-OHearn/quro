@@ -79,22 +79,65 @@ type PensionPotDetailsProps = {
 
 function buildPotColumns(baseCurrency: string): readonly DataTableColumn[] {
   return [
-    { key: 'pot', header: 'Pot', width: '30%' },
-    { key: 'provider', header: 'Provider', priority: 'secondary', width: '26%' },
+    { key: 'pot', header: 'Pot', phoneCard: 'title', width: '30%' },
+    {
+      key: 'provider',
+      header: 'Provider',
+      priority: 'secondary',
+      phoneCard: 'metric',
+      width: '26%',
+    },
     {
       key: 'contributions',
       header: 'Contributions / year',
       numeric: true,
       priority: 'secondary',
+      phoneCard: 'metric',
       width: '15%',
     },
-    { key: 'balance', header: 'Balance', numeric: true, width: '14%' },
-    { key: 'value', header: `Value (${baseCurrency})`, numeric: true, width: '15%' },
+    { key: 'balance', header: 'Balance', numeric: true, phoneCard: 'headline', width: '14%' },
+    // The card leaves the converted value out: its details panel shows it as Balance (base).
+    {
+      key: 'value',
+      header: `Value (${baseCurrency})`,
+      numeric: true,
+      cellClassName: 'max-md:hidden',
+      width: '15%',
+    },
     { key: 'actions', header: '', priority: 'actions', width: 72 },
   ];
 }
 
 const POT_COLUMN_COUNT = 6;
+
+function PensionPotNameCell({
+  pot,
+  foreign,
+  txnCount,
+}: Readonly<{ pot: PensionPot; foreign: boolean; txnCount: number }>) {
+  return (
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:flex-nowrap">
+        <span className="flex min-w-0 items-center gap-2 max-md:basis-full">
+          <span className="shrink-0 leading-none" aria-hidden>
+            {pot.emoji}
+          </span>
+          <span className="min-w-0 font-medium text-fg max-md:break-words md:truncate">
+            {pot.name}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+          <Badge className="max-md:hidden">{displayLabel(pot.type)}</Badge>
+          {foreign && <Badge>{pot.currency}</Badge>}
+        </span>
+      </div>
+      {/* The card names the type in its caption instead of a badge, with the count. */}
+      <p className="mt-0.5 text-caption font-normal text-fg-subtle md:hidden">
+        {displayLabel(pot.type)} · {txnCount} transactions
+      </p>
+    </div>
+  );
+}
 
 function PensionPotNotes({ pot }: Readonly<{ pot: PensionPot }>) {
   const metadataEntries = Object.entries(pot.metadata ?? {});
@@ -260,8 +303,9 @@ function PensionPotActions({
   onToggle,
 }: Readonly<{ isOpen: boolean; onEdit: () => void; onToggle: () => void }>) {
   const toggleLabel = isOpen ? 'Collapse' : 'View transactions';
+  // The phone card's details button opens the transactions too, so the chevron is left out there.
   return (
-    <RowActions>
+    <RowActions className="max-md:justify-start">
       <IconButton
         onClick={stopRowClick(onEdit)}
         icon={Edit3}
@@ -278,6 +322,7 @@ function PensionPotActions({
         aria-expanded={isOpen}
         size="sm"
         variant="subtle"
+        className="max-md:hidden"
       />
     </RowActions>
   );
@@ -340,22 +385,26 @@ function PensionPotRow({
 
   return (
     <>
-      <DataTableRow interactive selected={isOpen} onClick={toggle}>
+      <DataTableRow
+        interactive
+        selected={isOpen}
+        onClick={toggle}
+        detailsOpen={isOpen}
+        onDetailsOpenChange={toggle}
+        detailsLabel={pot.name}
+      >
         <DataTableCell columnKey="pot">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 leading-none" aria-hidden>
-              {pot.emoji}
-            </span>
-            <span className="min-w-0 truncate font-medium text-fg">{pot.name}</span>
-            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-              <Badge>{displayLabel(pot.type)}</Badge>
-              {foreign && <Badge>{pot.currency}</Badge>}
-            </span>
-          </div>
+          <PensionPotNameCell pot={pot} foreign={foreign} txnCount={potTxns.length} />
         </DataTableCell>
-        <DataTableCell columnKey="provider" contentClassName="truncate text-fg-muted">
-          {pot.provider} · {fmtNative(totalMonthly, pot.currency)}/mo · {potTxns.length}{' '}
-          transactions
+        <DataTableCell
+          columnKey="provider"
+          contentClassName="text-fg-muted max-md:break-words md:truncate"
+        >
+          {pot.provider}
+          <span className="max-md:hidden">
+            {' '}
+            · {fmtNative(totalMonthly, pot.currency)}/mo · {potTxns.length} transactions
+          </span>
         </DataTableCell>
         <DataTableCell columnKey="contributions">
           +{fmtNative(totalMonthly * 12, pot.currency)}/yr
@@ -430,12 +479,16 @@ function PensionTotalRow({
   fmtBase,
 }: Readonly<{ totalInBase: number; fmtBase: PensionFormatBaseFn }>) {
   return (
-    <DataTableRow data-total>
+    <DataTableRow data-total cardDetails={false}>
       <DataTableCell columnKey="pot">Total</DataTableCell>
-      <DataTableCell columnKey="provider" />
-      <DataTableCell columnKey="contributions" />
-      <DataTableCell columnKey="balance" className="max-md:hidden" />
-      <DataTableCell columnKey="value">{fmtBase(totalInBase)}</DataTableCell>
+      <DataTableCell columnKey="provider" className="max-md:hidden" />
+      <DataTableCell columnKey="contributions" className="max-md:hidden" />
+      <DataTableCell columnKey="balance">
+        <span className="md:hidden">{fmtBase(totalInBase)}</span>
+      </DataTableCell>
+      <DataTableCell columnKey="value" className="max-md:hidden">
+        {fmtBase(totalInBase)}
+      </DataTableCell>
       <DataTableCell columnKey="actions" className="max-md:hidden" />
     </DataTableRow>
   );
