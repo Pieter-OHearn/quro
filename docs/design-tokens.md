@@ -263,6 +263,13 @@ the sticky actions and, for the first such field, moves focus to its control unl
 is being typed in. Pass the error to `FormField` rather than rendering your own message, so this
 behaviour and the `role="alert"` announcement stay shared.
 
+iOS Safari scrolls the window to bring a focused field above its keyboard and, in a home screen
+app, does not always scroll it back. Only `main` scrolls in the app shell, so `Layout` puts the
+window and the shell back at the top once no keyboard is open and no field has focus
+(`useShellScrollReset`). iOS also gives date, month and time fields a native size that ignores the
+field chrome; `theme.css` removes their native appearance there so a date field keeps to its column
+beside a text field.
+
 ## Dark mode
 
 Settings → Preferences → Appearance offers Light, Dark and System; System is the default and follows
@@ -513,8 +520,8 @@ A column with the `actions` priority becomes the footer: left aligned, 44px targ
 it. Give the `RowActions` inside it `className="max-md:justify-start"`. Pass
 `cardDetails={false}` to a row with nothing to reveal (a total) so it gets no details button. Cells
 without a `columnKey` and a role, and rows with `mobileCard={false}` (an expansion panel), keep the
-generic layout, so give every column of an opted-in table a role (or `max-md:hidden` its cells). Desktop is unchanged: roles only apply below 768px. The brokerage holdings and the
-payslip history use it.
+generic layout, so give every column of an opted-in table a role (or `max-md:hidden` its cells). Desktop is unchanged: roles only apply below 768px. The brokerage holdings, savings
+accounts, pension pots and the payslip history use it.
 
 ### Table slots
 
