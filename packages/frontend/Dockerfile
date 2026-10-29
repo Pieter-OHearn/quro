@@ -16,7 +16,9 @@ RUN bun run build
 
 FROM nginx:1.30.3-alpine3.23
 # Security updates published since the base image was built. The stock server configuration is
-# replaced by the template below.
+# replaced by the template below. A build cache keeps the upgrade layer as it was first built, so
+# the date below is raised whenever a scan reports a fixed package the layer still lacks.
+ARG OS_PACKAGES_AS_OF=2026-10-29
 RUN apk upgrade --no-cache && rm /etc/nginx/conf.d/default.conf
 COPY --from=build /app/packages/frontend/dist /usr/share/nginx/html
 # nginx runs unprivileged and writes only below /tmp: the pid file, temporary files and the
