@@ -1,8 +1,8 @@
-fastapi==0.143.0
-starlette==1.8.0
+fastapi==0.162.0
+starlette==1.10.0
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
-pypdf==6.21.1
+pypdf==6.21.2
 httpx==0.28.1
 pdf2image==1.17.0
 pytesseract==0.3.13
