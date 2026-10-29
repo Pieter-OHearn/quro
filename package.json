@@ -50,6 +50,8 @@
   },
   "overrides": {
     "@babel/core": "7.29.7",
+    "@hono/node-server": "2.1.5",
+    "body-parser": "2.4.0",
     "esbuild": ">=0.28.1",
     "brace-expansion": "5.0.12",
     "eslint-plugin-import/minimatch/brace-expansion": "1.1.21",
@@ -60,12 +62,13 @@
     "follow-redirects": "1.16.1",
     "form-data": "4.0.6",
     "picomatch": "4.0.4",
-    "qs": "6.16.0",
-    "fast-uri": "3.1.8",
+    "qs": "6.17.1",
+    "fast-uri": "3.1.9",
     "ip-address": "10.7.4",
     "hono": "4.13.13",
     "proxy-addr": "2.0.8",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
