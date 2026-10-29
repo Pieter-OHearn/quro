@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
-## [Unreleased]
+## [v1.0.0-rc.6] - 2026-10-29
+
+Quro 1.0.0-rc.6 gives a property and its mortgage separate ledgers: the property keeps its valuations, rent and expenses, the mortgage its repayments and rate changes, and each page shows the other's rows. A property's value follows its valuations and its equity is worked out from its linked mortgage, so the property card, the mortgage page and the dashboard agree. It has one migration that moves existing rows and drops columns, so take a backup first, and run the preflight count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6) before you upgrade.
 
 ### Changed
 
@@ -13,6 +15,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Fixed
 
+- Saving an edited property on the Investments page failed; the form now sends only the fields it edits.
+- A property's debt and equity, and a mortgage's property address and value, are read only from linked rows the viewer can access, so a row made private, for example after a partner link is removed, is no longer shown through the other.
 - The net worth history counted a mortgage's current balance for the months before its repayments, overstating debt in the past; it now adds back the principal the mortgage's repayments paid after each point. A valuation recorded on the mortgage page changed nothing; valuations now belong to the property.
 
 ### Upgrade notes
