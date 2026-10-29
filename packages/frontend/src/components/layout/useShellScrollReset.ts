@@ -1,8 +1,13 @@
 import { useEffect, type RefObject } from 'react';
-import { keyboardBoxFrom } from '@/components/ui';
+import { isPinchZoomed, keyboardBoxFrom } from '@/components/ui';
 
-const TEXT_ENTRY_SELECTOR = 'input, textarea, select, [contenteditable]';
-const ZOOM_TOLERANCE = 1.01;
+// Fields that bring up a keyboard or picker; a focused checkbox, radio, slider or button does not.
+const TEXT_ENTRY_SELECTOR = [
+  'input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="file"], [type="color"], [type="image"])',
+  'textarea',
+  'select',
+  '[contenteditable]:not([contenteditable="false"])',
+].join(', ');
 
 type ShellScrollState = {
   viewport: Pick<VisualViewport, 'height' | 'offsetTop' | 'scale'> | null;
@@ -17,7 +22,7 @@ type ShellScrollState = {
 export function shouldResetShellScroll({ viewport, layoutHeight, typing }: ShellScrollState) {
   if (typing) return false;
   if (!viewport) return true;
-  if (viewport.scale > ZOOM_TOLERANCE) return false;
+  if (isPinchZoomed(viewport)) return false;
   return keyboardBoxFrom(viewport, layoutHeight) === null;
 }
 

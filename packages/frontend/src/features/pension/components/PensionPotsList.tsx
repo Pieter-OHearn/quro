@@ -96,11 +96,12 @@ function buildPotColumns(baseCurrency: string): readonly DataTableColumn[] {
       width: '15%',
     },
     { key: 'balance', header: 'Balance', numeric: true, phoneCard: 'headline', width: '14%' },
+    // The card leaves the converted value out: its details panel shows it as Balance (base).
     {
       key: 'value',
       header: `Value (${baseCurrency})`,
       numeric: true,
-      phoneCard: 'hiddenUntilDetails',
+      cellClassName: 'max-md:hidden',
       width: '15%',
     },
     { key: 'actions', header: '', priority: 'actions', width: 72 },
