@@ -452,7 +452,7 @@ app.get('/properties', async (c) => {
     .from(properties)
     .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(properties.archivedAt)))
     .orderBy(asc(properties.id));
-  return c.json({ data: await withPropertyEquity(data) });
+  return c.json({ data: await withPropertyEquity(data, { userId: user.id, partnerId }) });
 });
 
 app.get('/properties/:id', async (c) => {
@@ -462,7 +462,7 @@ app.get('/properties/:id', async (c) => {
   const partnerId = getPartnerId(c);
   const data = await getAccessibleProperty(user.id, partnerId, id);
   if (!data) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data: (await withPropertyEquity([data]))[0] });
+  return c.json({ data: (await withPropertyEquity([data], { userId: user.id, partnerId }))[0] });
 });
 
 app.post('/properties', async (c) => {
@@ -514,7 +514,10 @@ app.post('/properties', async (c) => {
     });
     return created;
   });
-  return c.json({ data: (await withPropertyEquity([data]))[0] }, HTTP_STATUS.CREATED);
+  return c.json(
+    { data: (await withPropertyEquity([data], { userId: user.id, partnerId }))[0] },
+    HTTP_STATUS.CREATED,
+  );
 });
 
 app.patch('/properties/:id', async (c) => {
@@ -582,7 +585,9 @@ app.patch('/properties/:id', async (c) => {
     }),
   );
   if ('error' in result) return c.json({ error: result.error }, result.status);
-  return c.json({ data: (await withPropertyEquity([result.data]))[0] });
+  return c.json({
+    data: (await withPropertyEquity([result.data], { userId: user.id, partnerId }))[0],
+  });
 });
 
 async function hasActiveLinkedMortgage(
@@ -600,7 +605,7 @@ async function hasActiveLinkedMortgage(
 registerArchivableResource(app, {
   path: '/properties',
   table: properties,
-  serialize: async (property) => (await withPropertyEquity([property]))[0],
+  serialize: async (property, access) => (await withPropertyEquity([property], access))[0],
   label: 'Property',
   idLabel: 'property',
   beforeDelete: async (tx, property) => {

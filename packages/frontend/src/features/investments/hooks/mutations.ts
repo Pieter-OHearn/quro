@@ -140,8 +140,13 @@ export function useUpdateHoldingTransaction() {
   });
 }
 
+/** The fields the property form edits: the API refuses read-only and derived ones. */
+export type PropertyUpdate = { id: number } & Partial<
+  Pick<NewProperty, 'currentValue' | 'monthlyRent' | 'isJoint'>
+>;
+
 export function useUpdateProperty() {
-  return useDomainMutation('property', async ({ id, ...property }: Property) => {
+  return useDomainMutation('property', async ({ id, ...property }: PropertyUpdate) => {
     const payload = await apiPatch<Property>(`/api/investments/properties/${id}`, property);
     return normalizeProperty(payload);
   });

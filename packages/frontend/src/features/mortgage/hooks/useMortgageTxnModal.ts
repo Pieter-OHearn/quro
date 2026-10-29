@@ -123,11 +123,15 @@ function useMortgageTxnFormState(existing?: MortgageTransaction) {
     setError,
     touched,
     resetSuggestion: () => setTouched(new Set()),
+    // Switching type clears the amounts; a date or note the user typed stays theirs.
     clearValues: () => {
       setAmount('');
       setInterest('');
       setFixedYears('');
-      setTouched(new Set());
+      setTouched(
+        (previous) =>
+          new Set([...previous].filter((field) => field === 'date' || field === 'note')),
+      );
     },
   };
 }

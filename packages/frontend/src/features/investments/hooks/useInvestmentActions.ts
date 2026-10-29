@@ -29,6 +29,17 @@ function mutateTransaction<TCreate extends object, TUpdate extends TCreate & { i
   create(payload as TCreate);
 }
 
+// Only the edited fields are sent. An unchanged value is left out, so a value a valuation set is
+// never sent back from a stale copy.
+export function propertyUpdate(existing: Property, value: number, rent: number, isJoint: boolean) {
+  return {
+    id: existing.id,
+    monthlyRent: rent,
+    isJoint,
+    ...(value === existing.currentValue ? {} : { currentValue: value }),
+  };
+}
+
 export function useInvestmentActions(
   holdings: Holding[],
   properties: Property[],
@@ -89,9 +100,7 @@ export function useInvestmentActions(
     handleDeleteHoldingTxn: (id: number) => deleteHoldingTxn.mutate(id),
     handleUpdateProperty: (id: number, value: number, rent: number, isJoint: boolean) => {
       const existing = properties.find((property) => property.id === id);
-      if (existing) {
-        updateProperty.mutate({ ...existing, currentValue: value, monthlyRent: rent, isJoint });
-      }
+      if (existing) updateProperty.mutate(propertyUpdate(existing, value, rent, isJoint));
     },
     handleSaveProperty: (property) => {
       createProperty.mutate(property);

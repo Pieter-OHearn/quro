@@ -1,4 +1,5 @@
 import { inArray, isNull, and } from 'drizzle-orm';
+import { ownedOrJointPredicate } from './partner';
 import { propertyEquity, roundMoney, type PropertyDebtSource } from '@quro/shared';
 import { db, type DbExecutor } from '../db/client';
 import { mortgages } from '../db/schema';
@@ -17,12 +18,14 @@ export function getPropertyDebt(
   return property.mortgageId === null ? 0 : (mortgageBalances.get(property.mortgageId) ?? 0);
 }
 
-// Rows must already be access-checked. A linked mortgage can belong to the partner, so it is
-// resolved through the property link rather than its row owner. `debt` and `totalEquity` are the
-// whole property's; `equity` weights the value and the debt by their own rows' household shares,
-// exactly as the dashboard's net worth does.
+// Rows must already be access-checked. A linked mortgage can belong to the partner; it counts
+// only while the caller can read it (the caller's own, or the partner's joint), as in net worth,
+// so a mortgage made private or left behind by a removed partner link is never read through the
+// property. `debt` and `totalEquity` are the whole property's; `equity` weights the value and the
+// debt by their own rows' household shares, exactly as the dashboard's net worth does.
 export async function withPropertyEquity<T extends PropertyEquityRow>(
   rows: readonly T[],
+  access: { userId: number; partnerId: number | null },
   executor: DbExecutor = db,
 ): Promise<Array<T & { debt: number; totalEquity: number; equity: number }>> {
   const ids = rows.flatMap((row) => (row.mortgageId === null ? [] : [row.mortgageId]));
@@ -36,7 +39,13 @@ export async function withPropertyEquity<T extends PropertyEquityRow>(
             isJoint: mortgages.isJoint,
           })
           .from(mortgages)
-          .where(and(inArray(mortgages.id, ids), isNull(mortgages.archivedAt)));
+          .where(
+            and(
+              inArray(mortgages.id, ids),
+              isNull(mortgages.archivedAt),
+              ownedOrJointPredicate(mortgages, access.userId, access.partnerId),
+            ),
+          );
   const debts = new Map<number, PropertyDebtSource>(
     linked.map((row) => [
       row.id,

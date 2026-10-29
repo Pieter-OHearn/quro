@@ -21,7 +21,11 @@ type ResourceOptions<T extends ArchivableTable> = {
   scope?: (scope: Readonly<AccessScope>) => ReturnType<typeof accessPredicate>;
   beforeDelete?: LifecycleHook<T>;
   beforeUnarchive?: LifecycleHook<T>;
-  serialize?: (row: T['$inferSelect']) => Promise<T['$inferSelect']>;
+  /** Shapes a row for the response, with the caller's access for any row it reads beside it. */
+  serialize?: (
+    row: T['$inferSelect'],
+    access: { userId: number; partnerId: number | null },
+  ) => Promise<T['$inferSelect']>;
 };
 
 function mutateResource<T extends ArchivableTable>(
@@ -70,15 +74,18 @@ export function registerArchivableResource<T extends ArchivableTable>(
     if (id === null)
       return c.json({ error: `Invalid ${options.idLabel} id` }, HTTP_STATUS.BAD_REQUEST);
     const user = getAuthUser(c);
+    const access = { userId: user.id, partnerId: getPartnerId(c) };
     const result = await mutateResource(
       options,
       id,
-      { userId: user.id, partnerId: getPartnerId(c) },
+      access,
       action === 'archive' && c.req.query('cascade') === 'true' ? 'delete' : action,
     );
     if ('error' in result) return c.json({ error: result.error }, result.status);
     if (!result.data) return c.json({ error: `${options.label} not found` }, HTTP_STATUS.NOT_FOUND);
-    return c.json({ data: options.serialize ? await options.serialize(result.data) : result.data });
+    return c.json({
+      data: options.serialize ? await options.serialize(result.data, access) : result.data,
+    });
   };
   app.delete(`${options.path}/:id`, handle('archive'));
   app.post(`${options.path}/:id/unarchive`, handle('unarchive'));

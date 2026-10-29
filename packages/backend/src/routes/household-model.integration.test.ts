@@ -304,6 +304,35 @@ test('archiving, restoring and unlinking a mortgage never resurrects its propert
   expect(loan?.outstandingBalance).toBe(200000);
 });
 
+test("after the partner link is removed, neither side reads the other's linked row", async () => {
+  // The owner's property is linked to the partner's mortgage; removing the link makes both private.
+  const { owner, partner, property, mortgage } = await household();
+  const removed = await integration.request('/api/partner', {
+    method: 'DELETE',
+    cookie: owner.cookie,
+  });
+  expect(removed.status).toBe(200);
+
+  const ownProperty = await read<Property>(
+    await integration.request(`/api/investments/properties/${property.id}`, {
+      cookie: owner.cookie,
+    }),
+  );
+  // The partner's now private balance is not shown: the property carries no debt, as in net worth.
+  expect(ownProperty).toMatchObject({ debt: 0, totalEquity: 300000, equity: 300000 });
+  await assertTotals(owner, 300000);
+
+  const ownMortgage = await read<Mortgage>(
+    await integration.request(`/api/mortgages/${mortgage.id}`, { cookie: partner.cookie }),
+  );
+  // And the owner's now private property does not show through the partner's mortgage.
+  expect(ownMortgage).toMatchObject({
+    linkedPropertyId: null,
+    propertyAddress: null,
+    propertyValue: null,
+  });
+});
+
 test('runway uses EUR for foreign budgets and keeps joint liquidity overrides separate from contractual debt', async () => {
   const { owner, property } = await household();
   await db

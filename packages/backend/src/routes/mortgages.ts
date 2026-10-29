@@ -121,9 +121,12 @@ type MortgageRow = typeof mortgages.$inferSelect;
 
 // A mortgage's property address and value are the linked property's own, read on every response
 // so loan-to-value and equity follow the property's valuations. The mortgage rows are already
-// access-checked; the linked property can belong to the partner, so it is found by the link.
+// access-checked; the linked property can belong to the partner. It is read only while the
+// caller can read it (the caller's own, or the partner's joint), so a property made private or
+// left behind by a removed partner link never shows through the mortgage.
 async function withLinkedProperty<T extends MortgageRow>(
   rows: readonly T[],
+  access: Access,
   executor: DbExecutor = db,
 ): Promise<
   Array<
@@ -146,7 +149,12 @@ async function withLinkedProperty<T extends MortgageRow>(
             currentValue: properties.currentValue,
           })
           .from(properties)
-          .where(inArray(properties.mortgageId, ids))
+          .where(
+            and(
+              inArray(properties.mortgageId, ids),
+              ownedOrJointPredicate(properties, access.userId, access.partnerId),
+            ),
+          )
           .orderBy(asc(properties.id));
   const byMortgage = new Map<number, (typeof linked)[number]>();
   for (const property of linked) {
@@ -165,8 +173,10 @@ async function withLinkedProperty<T extends MortgageRow>(
   });
 }
 
-async function serializeMortgage(row: MortgageRow, executor: DbExecutor = db) {
-  return (await withLinkedProperty([row], executor))[0];
+type Access = { userId: number; partnerId: number | null };
+
+async function serializeMortgage(row: MortgageRow, access: Access, executor: DbExecutor = db) {
+  return (await withLinkedProperty([row], access, executor))[0];
 }
 
 function parseMortgageRateTypeField(value: unknown): ParseResult<MortgageRateType> {
@@ -676,7 +686,7 @@ app.get('/', async (c) => {
     .from(mortgages)
     .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(mortgages.archivedAt)))
     .orderBy(asc(mortgages.id));
-  return c.json({ data: await withLinkedProperty(data) });
+  return c.json({ data: await withLinkedProperty(data, { userId: user.id, partnerId }) });
 });
 
 // ── Mortgage Transactions ────────────────────────────────────────────────────
@@ -701,7 +711,7 @@ app.get('/:id', async (c) => {
   const partnerId = getPartnerId(c);
   const data = await getAccessibleMortgage(user.id, partnerId, id);
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data: await serializeMortgage(data) });
+  return c.json({ data: await serializeMortgage(data, { userId: user.id, partnerId }) });
 });
 
 app.post('/', async (c) => {
@@ -753,7 +763,10 @@ app.post('/', async (c) => {
     return created;
   });
 
-  return c.json({ data: await serializeMortgage(data) }, HTTP_STATUS.CREATED);
+  return c.json(
+    { data: await serializeMortgage(data, { userId: user.id, partnerId }) },
+    HTTP_STATUS.CREATED,
+  );
 });
 
 app.patch('/:id', async (c) => {
@@ -803,7 +816,7 @@ app.patch('/:id', async (c) => {
     );
     return updated;
   });
-  return c.json({ data: await serializeMortgage(data) });
+  return c.json({ data: await serializeMortgage(data, { userId: user.id, partnerId }) });
 });
 
 registerArchivableResource(app, {

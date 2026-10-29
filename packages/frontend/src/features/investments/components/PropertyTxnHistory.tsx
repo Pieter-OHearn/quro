@@ -174,7 +174,9 @@ function PropertyHistoryRow({
             fmtNative={fmtNative}
           />
         }
-        readOnlyAction={<LedgerOwnerLink to="/mortgage" page="Mortgage" />}
+        readOnlyAction={
+          <LedgerOwnerLink to={`/mortgage?mortgageId=${transaction.mortgageId}`} page="Mortgage" />
+        }
       />
     );
   }
