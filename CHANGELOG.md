@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [v1.0.0-rc.5] - 2026-10-29
+
+Quro 1.0.0-rc.5 adds an optional single sign-on only mode, so the provider can be the only way in, and fixes more phone layout problems. The new mode is off by default, there is no migration, and Quro behaves like rc.4 until you turn it on. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc4-to-100-rc5) before you turn it on.
+
+### Added
+
+- `QRO_PASSWORD_LOGIN` (default on). With it off and single sign-on configured, password sign-in, sign-up with a registration code, password reset and password change are refused with a fixed message, the sign-in page shows only the provider button, and the backend refuses to start if single sign-on is not configured. Your stored passwords stay, so switching it back on restores password sign-in.
+- `quro user create EMAIL` creates an account without a password, linked at its first provider sign-in by verified email address. `quro user status` shows the mode, and `quro user invite` and `reset-password` refuse while passwords are off.
+- `quro doctor` has a `signin` check that reports the mode and warns when passwords are off and the provider cannot be reached.
+
+### Changed
+
+- While passwords are off, deleting your account needs the typed email address and a provider sign-in from the last ten minutes, and the Settings unlink control is replaced by `quro user oidc unlink EMAIL --yes`.
+- Linking a provider identity by email address is allowed in `open` registration mode when passwords are off, because nobody can register then.
+
+### Fixed
+
+- On an iPhone, date, month and time fields keep the shared field style instead of the system's native look, the page scrolls back to the top after the keyboard closes, and pension pots show as phone cards like savings accounts and holdings.
+
+### Security
+
+- Updated dependencies for published advisories: hono, follow-redirects, vite, ip-address, body-parser, qs, zod, fast-uri and @hono/node-server, and Pillow 13.0.0, pypdf 6.21.2, FastAPI 0.162.0 and Starlette 1.10.0 in the optional statement import service. The frontend image installs the fixed Alpine packages (brotli, curl and expat) that an earlier cached build step had skipped.
+
+### Upgrade notes
+
+- No migration. Pin the new images and restart; going back to 1.0.0-rc.4 needs no restore.
+- To turn passwords off, check that everyone can sign in with the provider first. If the provider is ever unavailable, set `QRO_PASSWORD_LOGIN=true` and recreate the backend with `docker compose up -d backend`; a plain restart does not re-read the environment file.
+
 ## [v1.0.0-rc.4] - 2026-10-18
 
 Quro 1.0.0-rc.4 adds the Exposure tab on the Plan page: how your investments are spread, described against editable reference mixes. It is information, not advice, and it has one additive migration. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc3-to-100-rc4) before you upgrade.

@@ -39,7 +39,7 @@ Quro 0.8.0 is the first release that installs this way, and upgrades are support
 
    ```bash
    mkdir -p quro/config quro/data/documents quro/backups && cd quro
-   curl -fsSL -o compose.yaml https://raw.githubusercontent.com/Pieter-OHearn/quro/v1.0.0-rc.4/docs/compose.example.yaml
+   curl -fsSL -o compose.yaml https://raw.githubusercontent.com/Pieter-OHearn/quro/v1.0.0-rc.5/docs/compose.example.yaml
    ```
 
    Read `compose.yaml` before you start it. It is a plain file with four services and no template step: `db` (PostgreSQL 18), `migrate` (applies the schema, then exits), `backend` and `frontend`.
@@ -55,7 +55,7 @@ Quro 0.8.0 is the first release that installs this way, and upgrades are support
 3. Write the settings file and generate the database passwords:
 
    ```bash
-   docker run --rm -v "$PWD/config:/config" ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.4 init
+   docker run --rm -v "$PWD/config:/config" ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.5 init
    ```
 
    This creates `config/quro.env`, two password files and the key that encrypts bank-link secrets in `config/secrets/` (random bytes, readable by their owner only). The values are never printed. The defaults match the example Compose file, so you can review the settings later; the next step runs `quro migrate` for you.
