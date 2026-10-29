@@ -52,26 +52,23 @@ describe('dashboard debt integration helpers', () => {
           id: 1,
           currentValue: '400000',
           purchasePrice: '350000',
-          mortgage: '0',
           mortgageId: 10,
           currency: 'EUR',
         },
         // Linked to an archived mortgage (absent from the active set) →
-        // treated as unencumbered rather than using the stale snapshot.
+        // treated as unencumbered.
         {
           id: 2,
           currentValue: '300000',
           purchasePrice: '280000',
-          mortgage: '120000',
           mortgageId: 99,
           currency: 'EUR',
         },
-        // No linked mortgage → falls back to its own manual balance.
+        // No linked mortgage → no debt.
         {
           id: 3,
           currentValue: '250000',
           purchasePrice: '250000',
-          mortgage: '80000',
           mortgageId: null,
           currency: 'EUR',
         },
@@ -84,7 +81,7 @@ describe('dashboard debt integration helpers', () => {
     const propertyEquity = summary.allocations.find(
       (item) => item.name === 'Property Equity',
     )?.value;
-    expect(propertyEquity).toBe(150000 + 300000 + 170000);
+    expect(propertyEquity).toBe(150000 + 300000 + 250000);
   });
 
   test('subtracts non-mortgage debts from historical and current net worth', () => {
@@ -101,6 +98,7 @@ describe('dashboard debt integration helpers', () => {
       pensions: [] as any,
       pensionTransactions: [] as any,
       mortgages: [] as any,
+      mortgageRepayments: [] as any,
       debts: [{ id: 1, remainingBalance: '800', currency: 'EUR' }] as any,
       debtPayments: [
         {
@@ -140,6 +138,7 @@ describe('dashboard debt integration helpers', () => {
       pensions: [] as any,
       pensionTransactions: [] as any,
       mortgages: [] as any,
+      mortgageRepayments: [] as any,
       debts: [] as any,
       debtPayments: [] as any,
       snapshots: [

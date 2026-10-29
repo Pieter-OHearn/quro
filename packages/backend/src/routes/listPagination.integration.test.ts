@@ -199,7 +199,6 @@ async function seedInvestments(userId: number) {
       propertyType: 'Investment',
       purchasePrice: 100000,
       currentValue: 120000,
-      mortgage: 0,
       monthlyRent: 0,
       currency: 'EUR',
     })
@@ -229,12 +228,10 @@ async function seedMortgage(userId: number) {
     .insert(mortgages)
     .values({
       userId,
-      propertyAddress: 'Paged Street 1',
       lender: 'Synthetic Bank',
       currency: 'EUR',
       originalAmount: 100000,
       outstandingBalance: 90000,
-      propertyValue: 120000,
       monthlyPayment: 500,
       interestRate: 3,
       rateType: 'Fixed',

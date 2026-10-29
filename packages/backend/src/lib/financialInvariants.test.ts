@@ -66,7 +66,6 @@ function household(random: Random, idOffset = 0) {
     properties: Array.from({ length: random.int(3) }, () => ({
       currency: random.pick(CURRENCIES),
       currentValue: random.money(600_000),
-      mortgage: random.money(400_000),
       mortgageId: mortgageIds.length > 0 && random.next() < 0.5 ? random.pick(mortgageIds) : null,
     })),
     pensions: Array.from({ length: random.int(3) }, () => ({
@@ -187,7 +186,7 @@ describe('dashboard allocation invariants', () => {
         ...input,
         savings: inEur(input.savings, ['balance']),
         holdings: inEur(input.holdings, ['currentPrice']),
-        properties: inEur(unlinked, ['currentValue', 'mortgage']),
+        properties: inEur(unlinked, ['currentValue']),
         pensions: inEur(input.pensions, ['balance']),
         debts: inEur(input.debts, ['remainingBalance']),
       });
@@ -211,7 +210,7 @@ describe('dashboard allocation invariants', () => {
     ).toThrow('Missing FX rate for GBP -> EUR');
   });
 
-  test('linked property debt replaces the stored copy and never counts as a liability', () => {
+  test('a property owes only its linked mortgage, which never counts as a liability', () => {
     const random = seededRandom(16);
     for (let index = 0; index < CASES; index += 1) {
       const input = household(random);
@@ -223,7 +222,7 @@ describe('dashboard allocation invariants', () => {
         input.properties.map((property) => {
           const debt =
             property.mortgageId === null
-              ? property.mortgage
+              ? 0
               : (input.mortgages.find((row) => row.id === property.mortgageId)
                   ?.outstandingBalance ?? 0);
           return (property.currentValue - debt) * RATES.get(property.currency)!;
@@ -234,7 +233,8 @@ describe('dashboard allocation invariants', () => {
     // Negative equity is kept, not floored.
     const underwater = allocate({
       ...household(seededRandom(17)),
-      properties: [{ currency: 'EUR', currentValue: 100_000, mortgage: 130_000, mortgageId: null }],
+      properties: [{ currency: 'EUR', currentValue: 100_000, mortgageId: 1 }],
+      mortgages: [{ id: 1, outstandingBalance: 130_000 }],
     });
     expect(underwater.propertyEquity).toBe(-30_000);
   });
@@ -257,9 +257,10 @@ describe('household attribution', () => {
   const MONEY_COLUMNS = {
     savings: ['balance'],
     savingsTransactions: ['amount'],
-    properties: ['purchasePrice', 'currentValue', 'mortgage'],
-    propertyTransactions: ['amount', 'interest', 'principal'],
-    mortgages: ['outstandingBalance', 'monthlyPayment', 'originalAmount', 'propertyValue'],
+    properties: ['purchasePrice', 'currentValue'],
+    propertyTransactions: ['amount'],
+    mortgages: ['outstandingBalance', 'monthlyPayment', 'originalAmount'],
+    mortgageRepayments: ['amount', 'interest', 'principal', 'unappliedPrincipal'],
   } as const;
   type Kind = keyof typeof MONEY_COLUMNS;
 

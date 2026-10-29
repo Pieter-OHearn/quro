@@ -11,12 +11,7 @@ import {
   TxnTypeSelector,
   DateNoteRow,
 } from '@/components/ui';
-import {
-  todayIsoDate,
-  type Property,
-  type PropertyTransaction,
-  validateInterestWithinAmount,
-} from '@quro/shared';
+import { todayIsoDate, type Property, type PropertyTransaction } from '@quro/shared';
 import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import { TxnAmount } from '@/components/finance/TxnAmount';
 import type { SavePropertyTxnInput } from '../types';
@@ -24,7 +19,6 @@ import { isInvestmentProperty, type PropertyTxnType } from '../utils/position';
 
 type AddPropertyTxnModalProps = {
   property: Property;
-  mortgageBalance: number;
   existing?: PropertyTransaction;
   onClose: () => void;
   onSave: (t: SavePropertyTxnInput) => void;
@@ -33,24 +27,17 @@ type AddPropertyTxnModalProps = {
 type PropertyTxnInfoBarProps = {
   type: PropertyTxnType;
   property: Property;
-  mortgageBalance: number;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
-function infoBarFigure(type: PropertyTxnType, property: Property, mortgageBalance: number) {
-  if (type === 'repayment') return { label: 'Current mortgage', value: mortgageBalance };
+function infoBarFigure(type: PropertyTxnType, property: Property) {
   if (type === 'valuation') return { label: 'Current value', value: property.currentValue };
   if (type === 'rent_income') return { label: 'Monthly rent target', value: property.monthlyRent };
   return { label: 'Property value', value: property.currentValue };
 }
 
-function PropertyTxnInfoBar({
-  type,
-  property,
-  mortgageBalance,
-  fmtNative,
-}: PropertyTxnInfoBarProps) {
-  const { label, value } = infoBarFigure(type, property, mortgageBalance);
+function PropertyTxnInfoBar({ type, property, fmtNative }: PropertyTxnInfoBarProps) {
+  const { label, value } = infoBarFigure(type, property);
   return (
     <p className="text-caption text-fg-subtle">
       {label} ·{' '}
@@ -64,46 +51,11 @@ function PropertyTxnInfoBar({
 type PropertyTxnPreviewProps = {
   type: PropertyTxnType;
   parsedAmount: number;
-  parsedInterest: number;
-  derivedPrincipal: number;
   property: Property;
-  mortgageBalance: number;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
 type PreviewFmt = (value: number, currency: string, compact?: boolean) => string;
-
-type RepaymentPreviewProps = {
-  parsedAmount: number;
-  parsedInterest: number;
-  derivedPrincipal: number;
-  mortgageBalance: number;
-  currency: string;
-  fmtNative: PreviewFmt;
-};
-
-function RepaymentPreview({
-  parsedAmount,
-  parsedInterest,
-  derivedPrincipal,
-  mortgageBalance,
-  currency,
-  fmtNative,
-}: RepaymentPreviewProps) {
-  const format = (value: number) => fmtNative(value, currency, true);
-  return (
-    <>
-      <PreviewRow label="Total payment">{format(parsedAmount)}</PreviewRow>
-      <PreviewRow label="Interest (cost)">{format(parsedInterest)}</PreviewRow>
-      <PreviewRow label="Principal (reduces mortgage)">
-        <TxnAmount value={-derivedPrincipal} format={format} />
-      </PreviewRow>
-      <PreviewRow label="New mortgage balance" total>
-        {format(Math.max(0, mortgageBalance - derivedPrincipal))}
-      </PreviewRow>
-    </>
-  );
-}
 
 type ValuationPreviewProps = {
   parsedAmount: number;
@@ -169,27 +121,9 @@ function RentExpensePreview({
   );
 }
 
-function PropertyTxnPreview({
-  type,
-  parsedAmount,
-  parsedInterest,
-  derivedPrincipal,
-  property,
-  mortgageBalance,
-  fmtNative,
-}: PropertyTxnPreviewProps) {
+function PropertyTxnPreview({ type, parsedAmount, property, fmtNative }: PropertyTxnPreviewProps) {
   return (
     <PreviewPanel>
-      {type === 'repayment' && (
-        <RepaymentPreview
-          parsedAmount={parsedAmount}
-          parsedInterest={parsedInterest}
-          derivedPrincipal={derivedPrincipal}
-          mortgageBalance={mortgageBalance}
-          currency={property.currency}
-          fmtNative={fmtNative}
-        />
-      )}
       {type === 'valuation' && (
         <ValuationPreview
           parsedAmount={parsedAmount}
@@ -215,80 +149,18 @@ function getAmountLabel(type: PropertyTxnType, currency: string) {
   return `${PROPERTY_TXN_FORM[type].amountLabel} (${currency})`;
 }
 
-function validateRepayment(
-  type: PropertyTxnType,
-  mortgageBalance: number,
-  parsedInterest: number,
-  parsedAmount: number,
-): string {
-  if (type !== 'repayment') return '';
-  if (mortgageBalance <= 0) return 'Link a mortgage to record repayments';
-  if (parsedInterest < 0) return 'Interest cannot be negative';
-  return validateInterestWithinAmount(parsedAmount, parsedInterest) ?? '';
-}
-
-type RepaymentFieldProps = {
-  property: Property;
-  interest: string;
-  parsedInterest: number;
-  parsedAmount: number;
-  derivedPrincipal: number;
-  error: string;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
-  onInterestChange: (value: string) => void;
-};
-
-function RepaymentField({
-  property,
-  interest,
-  parsedInterest,
-  parsedAmount,
-  derivedPrincipal,
-  error,
-  fmtNative,
-  onInterestChange,
-}: RepaymentFieldProps) {
-  return (
-    <FormField
-      label={`Interest portion (${property.currency})`}
-      hint="— principal is auto-calculated"
-      error={error && parsedInterest > parsedAmount ? error : undefined}
-    >
-      <CurrencyInput
-        currency={property.currency}
-        value={interest}
-        onChange={onInterestChange}
-        error={Boolean(error) && parsedInterest > parsedAmount}
-      />
-      <p className="mt-1 flex gap-4 text-caption text-fg-subtle">
-        <span>
-          Interest:{' '}
-          <span className="font-numeric text-fg">
-            {fmtNative(parsedInterest, property.currency, true)}
-          </span>
-        </span>
-        <span>
-          Principal:{' '}
-          <span className="font-numeric text-fg">
-            {fmtNative(derivedPrincipal, property.currency, true)}
-          </span>
-        </span>
-      </p>
-    </FormField>
-  );
-}
-
+// Repayments are recorded on the mortgage, which owns them.
 function getSupportedPropertyTxnTypes(property: Property): PropertyTxnType[] {
   return isInvestmentProperty(property.propertyType)
-    ? (['repayment', 'valuation', 'rent_income', 'expense'] as PropertyTxnType[])
-    : (['repayment', 'valuation'] as PropertyTxnType[]);
+    ? (['valuation', 'rent_income', 'expense'] as PropertyTxnType[])
+    : (['valuation'] as PropertyTxnType[]);
 }
 
 function resolveInitialPropertyTxnType(
   transactionTypes: PropertyTxnType[],
   existing: PropertyTransaction | undefined,
 ): PropertyTxnType {
-  const fallbackType = transactionTypes[0] ?? 'repayment';
+  const fallbackType = transactionTypes[0] ?? 'valuation';
   const initialType = existing?.type ?? fallbackType;
   return transactionTypes.includes(initialType) ? initialType : fallbackType;
 }
@@ -299,37 +171,27 @@ function usePropertyTxnForm(property: Property, existing: PropertyTransaction | 
     resolveInitialPropertyTxnType(transactionTypes, existing),
   );
   const [amount, setAmount] = useState(existing ? formatFixedInputValue(existing.amount) : '');
-  const [interest, setInterest] = useState(
-    existing?.interest != null ? formatFixedInputValue(existing.interest) : '',
-  );
   const [date, setDate] = useState(existing?.date ?? todayIsoDate());
   const [note, setNote] = useState(existing?.note ?? '');
   const [error, setError] = useState('');
 
   const parsedAmount = parseFloat(amount) || 0;
-  const parsedInterest = parseFloat(interest) || 0;
-  const derivedPrincipal = Math.max(0, parsedAmount - parsedInterest);
 
   function handleTypeChange(txnType: PropertyTxnType) {
     setType(txnType);
     setError('');
     setAmount('');
-    setInterest('');
   }
 
   return {
     transactionTypes,
     type,
     amount,
-    interest,
     date,
     note,
     error,
     parsedAmount,
-    parsedInterest,
-    derivedPrincipal,
     setAmount,
-    setInterest,
     setDate,
     setNote,
     setError,
@@ -340,18 +202,16 @@ function usePropertyTxnForm(property: Property, existing: PropertyTransaction | 
 type PropertyTxnFormBodyProps = {
   form: ReturnType<typeof usePropertyTxnForm>;
   property: Property;
-  mortgageBalance: number;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
-type AmountAndRepaymentProps = {
+type AmountFieldProps = {
   form: ReturnType<typeof usePropertyTxnForm>;
   property: Property;
-  fmtNative: (value: number, currency: string, compact?: boolean) => string;
 };
 
-function AmountAndRepaymentFields({ form, property, fmtNative }: AmountAndRepaymentProps) {
-  const { type, amount, interest, error, parsedAmount, parsedInterest, derivedPrincipal } = form;
+function AmountField({ form, property }: AmountFieldProps) {
+  const { type, amount, error, parsedAmount } = form;
   return (
     <>
       <FormField
@@ -368,21 +228,6 @@ function AmountAndRepaymentFields({ form, property, fmtNative }: AmountAndRepaym
           error={Boolean(error) && parsedAmount <= 0}
         />
       </FormField>
-      {type === 'repayment' && (
-        <RepaymentField
-          property={property}
-          interest={interest}
-          parsedInterest={parsedInterest}
-          parsedAmount={parsedAmount}
-          derivedPrincipal={derivedPrincipal}
-          error={error}
-          fmtNative={fmtNative}
-          onInterestChange={(value) => {
-            form.setInterest(value);
-            form.setError('');
-          }}
-        />
-      )}
       {error && parsedAmount > 0 && (
         <p role="alert" className="text-caption text-danger">
           {error}
@@ -392,12 +237,7 @@ function AmountAndRepaymentFields({ form, property, fmtNative }: AmountAndRepaym
   );
 }
 
-function PropertyTxnFormBody({
-  form,
-  property,
-  mortgageBalance,
-  fmtNative,
-}: PropertyTxnFormBodyProps) {
+function PropertyTxnFormBody({ form, property, fmtNative }: PropertyTxnFormBodyProps) {
   return (
     <>
       <FormField label="Transaction type">
@@ -408,13 +248,8 @@ function PropertyTxnFormBody({
           columns={2}
         />
       </FormField>
-      <PropertyTxnInfoBar
-        type={form.type}
-        property={property}
-        mortgageBalance={mortgageBalance}
-        fmtNative={fmtNative}
-      />
-      <AmountAndRepaymentFields form={form} property={property} fmtNative={fmtNative} />
+      <PropertyTxnInfoBar type={form.type} property={property} fmtNative={fmtNative} />
+      <AmountField form={form} property={property} />
       <DateNoteRow
         date={form.date}
         note={form.note}
@@ -426,10 +261,7 @@ function PropertyTxnFormBody({
         <PropertyTxnPreview
           type={form.type}
           parsedAmount={form.parsedAmount}
-          parsedInterest={form.parsedInterest}
-          derivedPrincipal={form.derivedPrincipal}
           property={property}
-          mortgageBalance={mortgageBalance}
           fmtNative={fmtNative}
         />
       )}
@@ -439,18 +271,12 @@ function PropertyTxnFormBody({
 
 export function AddPropertyTxnModal({
   property,
-  mortgageBalance,
   existing,
   onClose,
   onSave,
 }: AddPropertyTxnModalProps) {
   const { fmtNative } = useCurrency();
   const form = usePropertyTxnForm(property, existing);
-  const existingPrincipal =
-    existing?.type === 'repayment'
-      ? (existing.principal ?? Math.max(0, existing.amount - (existing.interest ?? 0)))
-      : 0;
-  const effectiveMortgageBalance = mortgageBalance + existingPrincipal;
   const isEditing = Boolean(existing);
 
   function handleSave() {
@@ -458,22 +284,10 @@ export function AddPropertyTxnModal({
       form.setError('Enter a valid amount');
       return;
     }
-    const repaymentError = validateRepayment(
-      form.type,
-      effectiveMortgageBalance,
-      form.parsedInterest,
-      form.parsedAmount,
-    );
-    if (repaymentError) {
-      form.setError(repaymentError);
-      return;
-    }
     const payload = {
       propertyId: property.id,
       type: form.type,
       amount: form.parsedAmount,
-      interest: form.type === 'repayment' ? form.parsedInterest : null,
-      principal: form.type === 'repayment' ? form.derivedPrincipal : null,
       date: form.date,
       note: form.note,
     };
@@ -494,12 +308,7 @@ export function AddPropertyTxnModal({
         />
       }
     >
-      <PropertyTxnFormBody
-        form={form}
-        property={property}
-        mortgageBalance={effectiveMortgageBalance}
-        fmtNative={fmtNative}
-      />
+      <PropertyTxnFormBody form={form} property={property} fmtNative={fmtNative} />
     </Modal>
   );
 }

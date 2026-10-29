@@ -7,7 +7,8 @@ export function MortgageArchivedSection() {
   const deleteMortgage = useDeleteMortgage();
   const archived = (archivedQuery.data ?? []).map((mortgage) => ({
     ...mortgage,
-    name: mortgage.propertyAddress,
+    // An archived mortgage whose property was relinked has no address of its own.
+    name: mortgage.propertyAddress ?? mortgage.lender,
   }));
 
   return (

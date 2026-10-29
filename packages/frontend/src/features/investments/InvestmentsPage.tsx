@@ -7,6 +7,7 @@ import type {
   HoldingPriceSyncResult,
   HoldingTransaction,
   Mortgage,
+  MortgageTransaction,
   Property,
   PropertyTransaction,
 } from '@quro/shared';
@@ -41,7 +42,8 @@ import type {
   IsForeignFn,
   PortfolioHistoryPoint,
 } from './types';
-import type { Position } from './utils/position';
+import { groupMortgageRepayments, type Position } from './utils/position';
+import type { PropertyDebts } from './utils/portfolio';
 import { isPriceStale } from './utils/priceFreshness';
 import { buildHoldingModalsProps, buildPropertyModalsProps } from './utils/modal-props';
 
@@ -52,6 +54,7 @@ type InvestmentPageBodyProps = {
   properties: Property[];
   propertyTxns: PropertyTransaction[];
   mortgageById: Map<number, Mortgage>;
+  mortgageTxns: MortgageTransaction[];
   positions: Record<number, Position>;
   stats: InvestmentPortfolioStats;
   statTrends: InvestmentStatTrends;
@@ -77,6 +80,7 @@ function InvestmentPageBody({
   properties,
   propertyTxns,
   mortgageById,
+  mortgageTxns,
   positions,
   stats,
   statTrends,
@@ -108,7 +112,7 @@ function InvestmentPageBody({
           holdingTxns,
           positions,
         )}
-        propertyModals={buildPropertyModalsProps(ui, actions, properties, mortgageById)}
+        propertyModals={buildPropertyModalsProps(ui, actions, properties, propertyTxns)}
       />
       <InvestmentDataNotices
         staleHoldings={staleHoldings}
@@ -129,6 +133,7 @@ function InvestmentPageBody({
           properties={properties}
           propertyTxns={propertyTxns}
           mortgageById={mortgageById}
+          mortgageTxns={mortgageTxns}
           positions={positions}
           stats={stats}
           ui={ui}
@@ -147,18 +152,20 @@ function InvestmentPageBody({
   );
 }
 
-function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
-  const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
-  const { holdings, holdingTxns, properties, propertyTxns, mortgages } = data;
-  const syncHoldingPrices = useSyncHoldingPrices();
-  const ui = useInvestmentUIState();
+// The active mortgages by id, and with their repayments, what each property owes over time.
+function usePropertyDebts(mortgages: Mortgage[], mortgageTxns: MortgageTransaction[]) {
+  return useMemo(() => {
+    const mortgageById = new Map(mortgages.map((mortgage) => [mortgage.id, mortgage]));
+    const propertyDebts: PropertyDebts = {
+      mortgageById,
+      repaymentsByMortgage: groupMortgageRepayments(mortgageTxns),
+    };
+    return { mortgageById, propertyDebts };
+  }, [mortgages, mortgageTxns]);
+}
 
-  const mortgageById = useMemo(
-    () => new Map(mortgages.map((mortgage) => [mortgage.id, mortgage])),
-    [mortgages],
-  );
-  const positions = useInvestmentPositions(holdings, holdingTxns);
-  const { activeHoldings, closedHoldings } = useMemo(() => {
+function useHoldingsByPosition(holdings: Holding[], positions: Record<number, Position>) {
+  return useMemo(() => {
     const active: Holding[] = [];
     const closed: Holding[] = [];
 
@@ -170,12 +177,22 @@ function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
 
     return { activeHoldings: active, closedHoldings: closed };
   }, [holdings, positions]);
+}
+
+function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
+  const { fmtBase, convertToBase, isForeign, baseCurrency, fmtNative } = useCurrency();
+  const { holdings, holdingTxns, properties, propertyTxns, mortgages, mortgageTxns } = data;
+  const syncHoldingPrices = useSyncHoldingPrices();
+  const ui = useInvestmentUIState();
+
+  const { mortgageById, propertyDebts } = usePropertyDebts(mortgages, mortgageTxns);
+  const positions = useInvestmentPositions(holdings, holdingTxns);
+  const { activeHoldings, closedHoldings } = useHoldingsByPosition(holdings, positions);
   const stats = useInvestmentPortfolioStats(
     activeHoldings,
     positions,
     properties,
     propertyTxns,
-    mortgageById,
     convertToBase,
   );
   const statTrends = useInvestmentStatTrends(
@@ -183,7 +200,7 @@ function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
     holdingTxns,
     properties,
     propertyTxns,
-    mortgageById,
+    propertyDebts,
     convertToBase,
     stats,
     fmtBase,
@@ -197,7 +214,7 @@ function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
     holdingPriceHistory,
     properties,
     propertyTxns,
-    mortgageById,
+    propertyDebts,
     convertToBase,
   );
 
@@ -209,6 +226,7 @@ function LoadedInvestments({ data }: Readonly<{ data: InvestmentData }>) {
       properties={properties}
       propertyTxns={propertyTxns}
       mortgageById={mortgageById}
+      mortgageTxns={mortgageTxns}
       positions={positions}
       stats={stats}
       statTrends={statTrends}

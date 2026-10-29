@@ -3,12 +3,11 @@ import type {
   Holding,
   HoldingPriceHistoryEntry,
   HoldingTransaction,
-  Mortgage,
   Property,
   PropertyTransaction,
 } from '@quro/shared';
 import type { ConvertToBaseFn, PortfolioHistoryPoint } from '../types';
-import { computePortfolioHistory } from '../utils/portfolio';
+import { computePortfolioHistory, type PropertyDebts } from '../utils/portfolio';
 
 export function usePortfolioHistory(
   holdings: Holding[],
@@ -16,7 +15,7 @@ export function usePortfolioHistory(
   holdingPriceHistory: HoldingPriceHistoryEntry[],
   properties: Property[],
   propertyTxns: PropertyTransaction[],
-  mortgageById: Map<number, Mortgage>,
+  debts: PropertyDebts,
   convertToBase: ConvertToBaseFn,
 ): PortfolioHistoryPoint[] {
   return useMemo(
@@ -27,17 +26,9 @@ export function usePortfolioHistory(
         holdingPriceHistory,
         properties,
         propertyTxns,
-        mortgageById,
+        debts,
         convertToBase,
       ),
-    [
-      holdings,
-      holdingTxns,
-      holdingPriceHistory,
-      properties,
-      propertyTxns,
-      mortgageById,
-      convertToBase,
-    ],
+    [holdings, holdingTxns, holdingPriceHistory, properties, propertyTxns, debts, convertToBase],
   );
 }

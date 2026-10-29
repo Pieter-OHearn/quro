@@ -4,7 +4,7 @@ import { AddPropertyTxnModal } from './AddPropertyTxnModal';
 import { EditHoldingModal } from './EditHoldingModal';
 import { UpdatePropertyModal } from './UpdatePropertyModal';
 import type { HoldingModalsProps, PropertyModalsProps } from '../types';
-import { computePosition, getPropertyMortgageBalance } from '../utils/position';
+import { computePosition } from '../utils/position';
 import { EMPTY_POSITION } from '../utils/portfolio';
 
 type InvestmentModalsProps = {
@@ -92,7 +92,7 @@ function PropertyModals({
   addTxnForProperty,
   editingPropertyTxn,
   properties,
-  mortgageById,
+  propertyTxns,
   onCloseUpdateProperty,
   onSaveUpdateProperty,
   onDeleteProperty,
@@ -112,7 +112,9 @@ function PropertyModals({
       {updatingProperty && (
         <UpdatePropertyModal
           property={updatingProperty}
-          mortgageBalance={getPropertyMortgageBalance(updatingProperty, mortgageById)}
+          hasValuation={propertyTxns.some(
+            (txn) => txn.propertyId === updatingProperty.id && txn.type === 'valuation',
+          )}
           onClose={onCloseUpdateProperty}
           onSave={onSaveUpdateProperty}
           onDelete={onDeleteProperty}
@@ -125,7 +127,6 @@ function PropertyModals({
         <AddPropertyTxnModal
           property={modalProperty}
           existing={editingPropertyTxn ?? undefined}
-          mortgageBalance={getPropertyMortgageBalance(modalProperty, mortgageById)}
           onClose={onCloseAddPropertyTxn}
           onSave={onSavePropertyTxn}
         />

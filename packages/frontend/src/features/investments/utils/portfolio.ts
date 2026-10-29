@@ -16,9 +16,10 @@ import {
 } from '@quro/shared';
 import {
   formatMonthLabel,
-  getPropertyMortgageBalance,
   getPropertyOwnershipShare,
+  propertyEquityAt,
   type DatedHoldingTransaction,
+  type DatedMortgageRepayment,
   type DatedPropertyTransaction,
   type Position,
 } from './position';
@@ -119,47 +120,34 @@ function computeBrokerageForMonth(
   return { brokerage, isEstimated };
 }
 
-function getPropertyEquity(
-  property: Property,
-  txns: DatedPropertyTransaction[],
-  cutoff: number,
-  mortgageById: Map<number, Mortgage>,
-  convertToBase: (value: number, currency: string) => number,
-): number {
-  const hasValuationTxn = txns.some((t) => t.type === 'valuation');
-  let value = hasValuationTxn ? property.purchasePrice : property.currentValue;
-  for (const t of txns) {
-    if (t.timestamp > cutoff) break;
-    if (t.type === 'valuation') value = t.amount;
-  }
-  let mortgage = getPropertyMortgageBalance(property, mortgageById);
-  for (const t of txns) {
-    if (t.timestamp <= cutoff || t.type !== 'repayment') continue;
-    const principal = t.principal ?? Math.max(0, t.amount - (t.interest ?? 0));
-    mortgage += principal;
-  }
-  return convertToBase((value - mortgage) * getPropertyOwnershipShare(property), property.currency);
-}
-
 function computePropertyEquityForMonth(
   properties: Property[],
   propertyTxnMap: Map<number, DatedPropertyTransaction[]>,
   cutoff: number,
-  mortgageById: Map<number, Mortgage>,
+  debts: PropertyDebts,
   convertToBase: (value: number, currency: string) => number,
 ) {
   return sumMoney(
     properties.map((property) =>
-      getPropertyEquity(
-        property,
-        propertyTxnMap.get(property.id) ?? [],
-        cutoff,
-        mortgageById,
-        convertToBase,
+      convertToBase(
+        propertyEquityAt(
+          property,
+          propertyTxnMap.get(property.id) ?? [],
+          debts.repaymentsByMortgage.get(property.mortgageId ?? -1) ?? [],
+          property.mortgageId == null ? undefined : debts.mortgageById.get(property.mortgageId),
+          cutoff,
+        ),
+        property.currency,
       ),
     ),
   );
 }
+
+/** What a property owes over time: its active linked mortgage and that mortgage's repayments. */
+export type PropertyDebts = {
+  mortgageById: Map<number, Mortgage>;
+  repaymentsByMortgage: Map<number, DatedMortgageRepayment[]>;
+};
 
 export function computePortfolioHistory(
   holdings: Holding[],
@@ -167,7 +155,7 @@ export function computePortfolioHistory(
   holdingPriceHistory: HoldingPriceHistoryEntry[],
   properties: Property[],
   propertyTxns: PropertyTransaction[],
-  mortgageById: Map<number, Mortgage>,
+  debts: PropertyDebts,
   convertToBase: (value: number, currency: string) => number,
 ) {
   const datedHoldingTxns: DatedHoldingTransaction[] = holdingTxns
@@ -180,9 +168,13 @@ export function computePortfolioHistory(
     .map((pricePoint) => ({ ...pricePoint, timestamp: toUtcTimestamp(pricePoint.eodDate) }))
     .filter((pricePoint) => Number.isFinite(pricePoint.timestamp));
 
+  const linkedRepayments = properties.flatMap((property) =>
+    property.mortgageId == null ? [] : (debts.repaymentsByMortgage.get(property.mortgageId) ?? []),
+  );
   const allTimestamps = [
     ...datedHoldingTxns.map((transaction) => transaction.timestamp),
     ...datedPropertyTxns.map((transaction) => transaction.timestamp),
+    ...linkedRepayments.map((repayment) => repayment.timestamp),
   ];
 
   if (allTimestamps.length === 0) return [];
@@ -214,7 +206,7 @@ export function computePortfolioHistory(
       properties,
       propertyTxnMap,
       cutoff,
-      mortgageById,
+      debts,
       convertToBase,
     );
     return {

@@ -6,7 +6,6 @@ import {
   GOLDEN_DEBTS,
   GOLDEN_HOLDINGS,
   GOLDEN_HOLDING_TRANSACTIONS,
-  GOLDEN_MORTGAGES,
   GOLDEN_PENSIONS,
   GOLDEN_POSITIONS,
   GOLDEN_PROPERTIES,
@@ -30,7 +29,6 @@ describe('golden household: page totals', () => {
     positions,
     GOLDEN_PROPERTIES,
     [],
-    new Map(GOLDEN_MORTGAGES.map((mortgage) => [mortgage.id, mortgage])),
     toGoldenEur,
   );
   const pages = {

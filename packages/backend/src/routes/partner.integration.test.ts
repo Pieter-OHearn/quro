@@ -165,7 +165,6 @@ async function createMortgage(
         lender: 'Test Lender',
         originalAmount: 250000,
         outstandingBalance: 200000,
-        propertyValue: 300000,
         monthlyPayment: 1200,
         interestRate: 3.1,
         rateType: 'fixed',

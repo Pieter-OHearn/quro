@@ -7,7 +7,6 @@ import {
   toUtcTimestamp,
   type Holding,
   type HoldingTransaction,
-  type Mortgage,
   type Property,
   type PropertyTransaction,
 } from '@quro/shared';
@@ -17,7 +16,8 @@ import type {
   InvestmentPortfolioStats,
   InvestmentStatTrends,
 } from '../types';
-import { getPropertyMortgageBalance, getPropertyOwnershipShare } from '../utils/position';
+import { propertyEquityAt } from '../utils/position';
+import type { PropertyDebts } from '../utils/portfolio';
 
 type DatedHoldingTransaction = HoldingTransaction & { timestamp: number };
 type DatedPropertyTransaction = PropertyTransaction & { timestamp: number };
@@ -113,45 +113,25 @@ function computeHoldingTrendSnapshot(
   };
 }
 
-function computePropertyEquityAtMonthStart(
-  property: Property,
-  txns: DatedPropertyTransaction[],
-  monthStart: number,
-  mortgageById: Map<number, Mortgage>,
-  convertToBase: ConvertToBaseFn,
-): number {
-  const hasValuationTxn = txns.some((txn) => txn.type === 'valuation');
-  let value = hasValuationTxn ? property.purchasePrice : property.currentValue;
-  for (const txn of txns) {
-    if (txn.timestamp >= monthStart) break;
-    if (txn.type === 'valuation') value = txn.amount;
-  }
-
-  let mortgage = getPropertyMortgageBalance(property, mortgageById);
-  for (const txn of txns) {
-    if (txn.timestamp < monthStart || txn.type !== 'repayment') continue;
-    const principal = txn.principal ?? Math.max(0, txn.amount - (txn.interest ?? 0));
-    mortgage += principal;
-  }
-
-  return convertToBase((value - mortgage) * getPropertyOwnershipShare(property), property.currency);
-}
-
+// The equity just before this month: records dated this month are left out.
 function computePropertyEquityAtMonthStartBase(
   properties: Property[],
   propertyTxnMap: Map<number, DatedPropertyTransaction[]>,
   monthStart: number,
-  mortgageById: Map<number, Mortgage>,
+  debts: PropertyDebts,
   convertToBase: ConvertToBaseFn,
 ): number {
   return sumMoney(
     properties.map((property) =>
-      computePropertyEquityAtMonthStart(
-        property,
-        propertyTxnMap.get(property.id) ?? [],
-        monthStart,
-        mortgageById,
-        convertToBase,
+      convertToBase(
+        propertyEquityAt(
+          property,
+          propertyTxnMap.get(property.id) ?? [],
+          debts.repaymentsByMortgage.get(property.mortgageId ?? -1) ?? [],
+          property.mortgageId == null ? undefined : debts.mortgageById.get(property.mortgageId),
+          monthStart - 1,
+        ),
+        property.currency,
       ),
     ),
   );
@@ -162,7 +142,7 @@ export function useInvestmentStatTrends(
   holdingTxns: HoldingTransaction[],
   properties: Property[],
   propertyTxns: PropertyTransaction[],
-  mortgageById: Map<number, Mortgage>,
+  debts: PropertyDebts,
   convertToBase: ConvertToBaseFn,
   stats: InvestmentPortfolioStats,
   fmtBase: InvestmentFormatFn,
@@ -188,7 +168,7 @@ export function useInvestmentStatTrends(
       properties,
       propertyTxnMap,
       monthStart,
-      mortgageById,
+      debts,
       convertToBase,
     );
 
@@ -229,14 +209,5 @@ export function useInvestmentStatTrends(
         details: `Month-to-date change (${monthStartLabel} to ${todayLabel}). Now ${fmtBase(stats.totalPropertyEquityBase)} vs ${fmtBase(propertyEquityAtMonthStartBase)} at month start.`,
       },
     };
-  }, [
-    holdings,
-    holdingTxns,
-    properties,
-    propertyTxns,
-    mortgageById,
-    convertToBase,
-    stats,
-    fmtBase,
-  ]);
+  }, [holdings, holdingTxns, properties, propertyTxns, debts, convertToBase, stats, fmtBase]);
 }

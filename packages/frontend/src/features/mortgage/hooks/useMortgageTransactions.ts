@@ -17,3 +17,12 @@ export function useMortgageTransactions(mortgageId?: number) {
     },
   });
 }
+
+/** Every mortgage transaction the household can read: the property cards show their linked rows. */
+export function useAllMortgageTransactions() {
+  return useQuery({
+    queryKey: queryKeys.mortgages.allTransactions,
+    queryFn: async ({ signal }) =>
+      apiGetAllPages<MortgageTransaction>('/api/mortgages/transactions', { signal }),
+  });
+}

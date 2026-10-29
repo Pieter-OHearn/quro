@@ -1,4 +1,4 @@
-import { resolvePropertyDebts } from '../lib/propertyDebt';
+import { withPropertyEquity } from '../lib/propertyDebt';
 import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
 import { registerArchivableResource } from '../lib/archivableResource';
 import { findAccessible, findAccessibleChild } from '../lib/access';
@@ -8,28 +8,18 @@ import {
   PROPERTY_TRANSACTION_TYPES,
   type CurrencyCode,
   type PropertyTransactionType,
-  roundMoney,
-  validateRepaymentSplit,
   type PropertyTransactionPayload,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, properties, propertyTransactions } from '../db/schema';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { getAuthUser, getPartnerId } from '../lib/authUser';
-import {
-  type AppliedRepayment,
-  applyRepayment,
-  MORTGAGE_BALANCE,
-  PROPERTY_MORTGAGE_BALANCE,
-  reverseRepayment,
-} from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate } from '../lib/netWorth';
 import {
   answerRejectedEdit,
   LedgerEditRejected,
-  LEDGER_ROW_CHANGED,
   type LedgerRejection,
   lockCheckedLedgerRow,
   lockLedgerParents,
@@ -47,9 +37,7 @@ import {
   parseId,
   parseIntegerField,
   parseMoneyField,
-  parseNormalizedDecimal,
   parseOptionalId,
-  parseOptionalMoneyField,
   parseOptionalTextField,
   parsePatchFields,
   parseRequiredFields,
@@ -63,14 +51,14 @@ import {
 
 const app = new Hono();
 
-const REPAYMENT_EXCEEDS_BALANCE = 'Principal portion cannot exceed the current outstanding balance';
+const VALUE_FROM_VALUATIONS =
+  "This property's value comes from its latest valuation; record a valuation to change it";
 
 const PROPERTY_FIELDS = [
   'address',
   'propertyType',
   'purchasePrice',
   'currentValue',
-  'mortgage',
   'mortgageId',
   'monthlyRent',
   'currency',
@@ -78,22 +66,13 @@ const PROPERTY_FIELDS = [
   'isJoint',
 ] as const;
 
-const PROPERTY_TRANSACTION_FIELDS = [
-  'propertyId',
-  'type',
-  'amount',
-  'interest',
-  'principal',
-  'date',
-  'note',
-] as const;
+const PROPERTY_TRANSACTION_FIELDS = ['propertyId', 'type', 'amount', 'date', 'note'] as const;
 
 type PropertyPayload = {
   address: string;
   propertyType: string;
   purchasePrice: number;
   currentValue: number;
-  mortgage: number;
   mortgageId: number | null;
   monthlyRent: number;
   currency: CurrencyCode;
@@ -101,12 +80,14 @@ type PropertyPayload = {
   isJoint: boolean;
 };
 
-type PropertyCreateRequiredPayload = Omit<
-  PropertyPayload,
-  'mortgage' | 'mortgageId' | 'emoji' | 'isJoint'
->;
+type PropertyCreateRequiredPayload = Omit<PropertyPayload, 'mortgageId' | 'emoji' | 'isJoint'>;
 
+// A property's ledger records what happens to the asset; repayments and rate changes belong to
+// the mortgage's ledger.
 function parsePropertyTransactionTypeField(value: unknown): ParseResult<PropertyTransactionType> {
+  if (value === 'repayment' || value === 'rate_change') {
+    return err('Record repayments and rate changes on the mortgage');
+  }
   return typeof value === 'string' &&
     PROPERTY_TRANSACTION_TYPES.includes(value as PropertyTransactionType)
     ? ok(value as PropertyTransactionType)
@@ -128,13 +109,6 @@ const propertyParsers: FieldParsers<PropertyPayload> = {
       field: 'currentValue',
       error: 'Current value must be greater than zero',
       min: Number.MIN_VALUE,
-      localized: true,
-    }),
-  mortgage: (value) =>
-    parseMoneyField(value, {
-      field: 'mortgage',
-      error: 'Mortgage balance must be zero or greater',
-      min: 0,
       localized: true,
     }),
   mortgageId: (value) => {
@@ -173,20 +147,6 @@ const propertyTransactionParsers: FieldParsers<PropertyTransactionPayload> = {
       min: Number.MIN_VALUE,
       localized: true,
     }),
-  interest: (value) =>
-    parseOptionalMoneyField(value, {
-      field: 'interest',
-      error: 'Interest must be zero or greater',
-      min: 0,
-      localized: true,
-    }),
-  principal: (value) =>
-    parseOptionalMoneyField(value, {
-      field: 'principal',
-      error: 'Principal must be zero or greater',
-      min: 0,
-      localized: true,
-    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
 };
@@ -197,8 +157,6 @@ function parsePropertyCreate(body: unknown): ParseResult<PropertyPayload> {
   if (!strictCheck.ok) return strictCheck;
   const required = parseRequiredFields(body, propertyCreateRequiredParsers);
   if (!required.ok) return required;
-  const mortgage = propertyParsers.mortgage(body.mortgage ?? 0);
-  if (!mortgage.ok) return mortgage;
   const mortgageId = propertyParsers.mortgageId(body.mortgageId);
   if (!mortgageId.ok) return mortgageId;
   const emoji = propertyParsers.emoji(body.emoji);
@@ -208,7 +166,6 @@ function parsePropertyCreate(body: unknown): ParseResult<PropertyPayload> {
 
   return ok({
     ...required.value,
-    mortgage: mortgage.value,
     mortgageId: mortgageId.value,
     emoji: emoji.value,
     isJoint: isJoint.value,
@@ -227,9 +184,7 @@ function parsePropertyTransactionCreate(body: unknown): ParseResult<PropertyTran
   const strictCheck = rejectUnknownFields(body, PROPERTY_TRANSACTION_FIELDS);
   if (!strictCheck.ok) return strictCheck;
 
-  const parsed = parseRequiredFields(body, propertyTransactionParsers);
-  if (!parsed.ok) return parsed;
-  return ok(normalizePropertyTransactionPayload(parsed.value));
+  return parseRequiredFields(body, propertyTransactionParsers);
 }
 
 function parsePropertyTransactionPatch(
@@ -241,42 +196,6 @@ function parsePropertyTransactionPatch(
   return parsePatchFields(body, propertyTransactionParsers);
 }
 
-function normalizePropertyTransactionPayload(
-  payload: PropertyTransactionPayload,
-): PropertyTransactionPayload {
-  if (payload.type === 'repayment') {
-    const interest = payload.interest ?? 0;
-    const principal = payload.principal ?? roundMoney(payload.amount - interest);
-    return { ...payload, interest, principal };
-  }
-
-  return {
-    ...payload,
-    interest: null,
-    principal: null,
-  };
-}
-
-function validatePropertyRepaymentPayload(
-  payload: PropertyTransactionPayload,
-  property: typeof properties.$inferSelect,
-  keepsRecordedDebt: boolean,
-): string | null {
-  if (
-    !keepsRecordedDebt &&
-    (parseNormalizedDecimal(property.mortgage) ?? 0) <= 0 &&
-    property.mortgageId == null
-  ) {
-    return 'Property is not linked to a mortgage';
-  }
-
-  return validateRepaymentSplit({
-    amount: payload.amount,
-    interest: payload.interest ?? 0,
-    principal: payload.principal ?? 0,
-  });
-}
-
 function isRentOrExpenseTransaction(type: PropertyTransactionType): boolean {
   return type === 'rent_income' || type === 'expense';
 }
@@ -284,11 +203,7 @@ function isRentOrExpenseTransaction(type: PropertyTransactionType): boolean {
 function validatePropertyTransactionPayload(
   payload: PropertyTransactionPayload,
   property: typeof properties.$inferSelect,
-  keepsRecordedDebt = false,
 ): string | null {
-  if (payload.type === 'repayment') {
-    return validatePropertyRepaymentPayload(payload, property, keepsRecordedDebt);
-  }
   if (
     isRentOrExpenseTransaction(payload.type) &&
     !isInvestmentPropertyType(property.propertyType)
@@ -307,8 +222,6 @@ function mergePropertyTransactionPayload(
     propertyId: patch.propertyId ?? existing.propertyId,
     type: patch.type ?? existing.type,
     amount: patch.amount ?? existing.amount,
-    interest: patch.interest === undefined ? existing.interest : patch.interest,
-    principal: patch.principal === undefined ? existing.principal : patch.principal,
     date: patch.date ?? existing.date,
     note: patch.note === undefined ? existing.note : patch.note,
   });
@@ -324,7 +237,6 @@ function toPropertyInsertValues(
     propertyType: payload.propertyType,
     purchasePrice: payload.purchasePrice,
     currentValue: payload.currentValue,
-    mortgage: payload.mortgage,
     mortgageId: payload.mortgageId,
     monthlyRent: payload.monthlyRent,
     currency: payload.currency,
@@ -341,7 +253,6 @@ function toPropertyUpdateValues(
     propertyType: payload.propertyType,
     purchasePrice: payload.purchasePrice,
     currentValue: payload.currentValue,
-    mortgage: payload.mortgage,
     mortgageId: payload.mortgageId,
     monthlyRent: payload.monthlyRent,
     currency: payload.currency,
@@ -359,8 +270,6 @@ function toPropertyTransactionInsertValues(
     propertyId: payload.propertyId,
     type: payload.type,
     amount: payload.amount,
-    interest: payload.interest ?? null,
-    principal: payload.principal ?? null,
     date: payload.date,
     note: payload.note,
   };
@@ -373,8 +282,6 @@ function toPropertyTransactionUpdateValues(
     propertyId: payload.propertyId,
     type: payload.type,
     amount: payload.amount,
-    interest: payload.interest ?? null,
-    principal: payload.principal ?? null,
     date: payload.date,
     note: payload.note,
   };
@@ -389,134 +296,31 @@ function getAccessibleProperty(
   return findAccessible(properties, propertyId, { userId, partnerId }, { executor });
 }
 
-// The debt a property repayment reduces: a mortgage (null once that mortgage is deleted) or the
-// property's own debt. It is stored with the repayment, so an edit or delete reverses the effect
-// on the same debt even after the property is linked to a mortgage, relinked or unlinked.
-// `locked` marks a recorded mortgage the user can no longer access (a former partner's): the
-// repayment keeps pointing at it, but its balance is not changed from this household.
-type RepaymentDebt =
-  | { target: 'property'; propertyId: number }
-  | { target: 'mortgage'; mortgageId: number | null; locked?: boolean };
-
-type PropertyTransactionRow = typeof propertyTransactions.$inferSelect;
-
-// A new repayment reduces the linked mortgage (the source of truth) or, for a property with no
-// linked mortgage, the property's own debt.
-function currentRepaymentDebt(property: { id: number; mortgageId: number | null }): RepaymentDebt {
-  return property.mortgageId == null
-    ? { target: 'property', propertyId: property.id }
-    : { target: 'mortgage', mortgageId: property.mortgageId };
+// The latest valuation by date (ties by id), read inside the ledger transaction after the
+// property was locked, so concurrent valuation writes on one property apply one after another.
+async function latestValuation(tx: DbExecutor, propertyId: number): Promise<number | null> {
+  const [latest] = await tx
+    .select({ amount: propertyTransactions.amount })
+    .from(propertyTransactions)
+    .where(
+      and(
+        eq(propertyTransactions.propertyId, propertyId),
+        eq(propertyTransactions.type, 'valuation'),
+      ),
+    )
+    .orderBy(desc(propertyTransactions.date), desc(propertyTransactions.id))
+    .limit(1);
+  return latest?.amount ?? null;
 }
 
-// The debt a stored repayment reduced, or null for other types and for repayments recorded
-// before the debt was stored.
-function recordedRepaymentDebt(row: PropertyTransactionRow): RepaymentDebt | null {
-  if (row.type !== 'repayment') return null;
-  if (row.repaymentTarget === 'property') return { target: 'property', propertyId: row.propertyId };
-  if (row.repaymentTarget === 'mortgage') {
-    return { target: 'mortgage', mortgageId: row.repaymentMortgageId };
+// A property's current value is its latest valuation. A property whose last valuation was
+// removed keeps the value it had, which is the value it was last entered or valued at.
+async function syncCurrentValue(tx: DbTransaction, propertyIds: readonly number[]): Promise<void> {
+  for (const propertyId of new Set(propertyIds)) {
+    const amount = await latestValuation(tx, propertyId);
+    if (amount === null) continue;
+    await tx.update(properties).set({ currentValue: amount }).where(eq(properties.id, propertyId));
   }
-  return null;
-}
-
-function repaymentDebtColumns(debt: RepaymentDebt | null, unappliedPrincipal: number) {
-  return {
-    repaymentTarget: debt?.target ?? null,
-    repaymentMortgageId: debt?.target === 'mortgage' ? debt.mortgageId : null,
-    unappliedPrincipal,
-  };
-}
-
-function applyRepaymentToDebt(
-  tx: DbTransaction,
-  debt: RepaymentDebt,
-  principal: number,
-): Promise<AppliedRepayment | null> {
-  if (debt.target === 'property') {
-    return applyRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: debt.propertyId, principal });
-  }
-  // The mortgage was deleted or is out of reach: nothing is applied, so the whole principal is
-  // recorded as unapplied and a later reversal restores nothing.
-  if (debt.mortgageId == null || debt.locked) {
-    return Promise.resolve({ balance: 0, unapplied: principal });
-  }
-  return applyRepayment(tx, MORTGAGE_BALANCE, { id: debt.mortgageId, principal });
-}
-
-async function reverseRepaymentOnDebt(
-  tx: DbTransaction,
-  debt: RepaymentDebt,
-  row: Pick<PropertyTransactionRow, 'principal' | 'unappliedPrincipal'>,
-): Promise<void> {
-  const change = { principal: row.principal ?? 0, unapplied: row.unappliedPrincipal };
-  if (debt.target === 'property') {
-    await reverseRepayment(tx, PROPERTY_MORTGAGE_BALANCE, { id: debt.propertyId, ...change });
-  } else if (debt.mortgageId != null && !debt.locked) {
-    await reverseRepayment(tx, MORTGAGE_BALANCE, { id: debt.mortgageId, ...change });
-  }
-}
-
-// The debt a committed repayment reduced: the stored one, or for an older row the property's
-// current link (how those rows were always reversed). Null for other types.
-async function resolveRepaymentDebt(
-  tx: DbTransaction,
-  userId: number,
-  partnerId: number | null,
-  transaction: PropertyTransactionRow,
-): Promise<RepaymentDebt | null> {
-  if (transaction.type !== 'repayment') return null;
-  const recorded = recordedRepaymentDebt(transaction);
-  if (recorded?.target === 'mortgage' && recorded.mortgageId != null) {
-    const reachable = await findAccessible(
-      mortgages,
-      recorded.mortgageId,
-      { userId, partnerId },
-      { executor: tx },
-    );
-    return reachable ? recorded : { ...recorded, locked: true };
-  }
-  if (recorded) return recorded;
-  const property = await getAccessibleProperty(userId, partnerId, transaction.propertyId, tx);
-  return property ? currentRepaymentDebt(property) : null;
-}
-
-// Locks what an edit or delete of a property transaction may change, in the order every writer
-// uses: mortgages, then properties, then the transaction row. A cascade archive of a mortgage
-// locks it before unlinking its property, so this order cannot deadlock with it. Answers 409
-// when a link moved between the unlocked read and the lock.
-async function lockPropertyLedger(
-  tx: DbTransaction,
-  existing: PropertyTransactionRow,
-  nextPropertyId: number,
-): Promise<PropertyTransactionRow> {
-  const propertyIds = [existing.propertyId, nextPropertyId];
-  const links = await tx
-    .select({ mortgageId: properties.mortgageId })
-    .from(properties)
-    .where(inArray(properties.id, propertyIds));
-  const mortgageIds = new Set(
-    [existing.repaymentMortgageId, ...links.map((link) => link.mortgageId)].filter(
-      (id): id is number => id != null,
-    ),
-  );
-  await lockLedgerParents(tx, mortgages, [...mortgageIds]);
-  const locked = await lockLedgerParents(tx, properties, propertyIds);
-  if (
-    locked.some((property) => property.mortgageId != null && !mortgageIds.has(property.mortgageId))
-  ) {
-    throw new LedgerEditRejected<LedgerRejection>({
-      error: LEDGER_ROW_CHANGED,
-      status: HTTP_STATUS.CONFLICT,
-    });
-  }
-  return lockCheckedLedgerRow(
-    tx,
-    propertyTransactions,
-    existing.id,
-    (row) =>
-      row.propertyId === existing.propertyId &&
-      (row.repaymentMortgageId == null || mortgageIds.has(row.repaymentMortgageId)),
-  );
 }
 
 function getAccessiblePropertyTransaction(
@@ -579,8 +383,9 @@ async function getPropertyLinkedToMortgage(params: {
 }
 
 // Mortgage id comes from an access-checked property row, so the update is by
-// id only. Jointness propagates to keep the linked pair consistent for the
-// 50% dashboard weighting.
+// id only. The mortgage takes the property's currency, and jointness propagates
+// to keep the linked pair consistent for the 50% dashboard weighting. Its address
+// and value are read from the property, never copied.
 async function syncLinkedMortgageMetadata(params: {
   mortgageId: number | null;
   property: typeof properties.$inferSelect;
@@ -590,12 +395,7 @@ async function syncLinkedMortgageMetadata(params: {
 
   await (params.executor ?? db)
     .update(mortgages)
-    .set({
-      propertyAddress: params.property.address,
-      currency: params.property.currency,
-      propertyValue: params.property.currentValue,
-      isJoint: params.property.isJoint,
-    })
+    .set({ currency: params.property.currency, isJoint: params.property.isJoint })
     .where(eq(mortgages.id, params.mortgageId));
 }
 
@@ -606,24 +406,11 @@ async function resolvePropertyMortgagePatch(params: {
   existing: typeof properties.$inferSelect;
   patch: Partial<PropertyPayload>;
 }): Promise<
-  | { ok: true; value: { mortgageId: number | null; mortgage: number; isJoint?: boolean } }
+  | { ok: true; value: { mortgageId: number | null; isJoint?: boolean } }
   | { ok: false; error: string; status: 404 | 409 }
 > {
   const nextMortgageId = pickPatchedValue(params.patch.mortgageId, params.existing.mortgageId);
-  const requestedMortgageBalance = pickPatchedValue(
-    params.patch.mortgage,
-    parseNormalizedDecimal(params.existing.mortgage) ?? 0,
-  );
-
-  if (nextMortgageId === null) {
-    return {
-      ok: true,
-      value: {
-        mortgageId: null,
-        mortgage: params.patch.mortgageId === undefined ? requestedMortgageBalance : 0,
-      },
-    };
-  }
+  if (nextMortgageId === null) return { ok: true, value: { mortgageId: null } };
 
   const mortgage = await getAccessibleMortgageForPropertyLink(
     params.userId,
@@ -648,7 +435,6 @@ async function resolvePropertyMortgagePatch(params: {
     ok: true,
     value: {
       mortgageId: nextMortgageId,
-      mortgage: 0,
       isJoint: params.patch.isJoint ?? (params.existing.isJoint || mortgage.isJoint),
     },
   };
@@ -666,7 +452,7 @@ app.get('/properties', async (c) => {
     .from(properties)
     .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(properties.archivedAt)))
     .orderBy(asc(properties.id));
-  return c.json({ data: await resolvePropertyDebts(data) });
+  return c.json({ data: await withPropertyEquity(data) });
 });
 
 app.get('/properties/:id', async (c) => {
@@ -676,7 +462,7 @@ app.get('/properties/:id', async (c) => {
   const partnerId = getPartnerId(c);
   const data = await getAccessibleProperty(user.id, partnerId, id);
   if (!data) return c.json({ error: 'Property not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data: (await resolvePropertyDebts([data]))[0] });
+  return c.json({ data: (await withPropertyEquity([data]))[0] });
 });
 
 app.post('/properties', async (c) => {
@@ -690,7 +476,6 @@ app.post('/properties', async (c) => {
   if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
   const partnerId = getPartnerId(c);
-  let mortgageBalance = body.value.mortgage;
   let isJoint = body.value.isJoint;
   if (body.value.mortgageId !== null) {
     const mortgage = await getAccessibleMortgageForPropertyLink(
@@ -707,7 +492,6 @@ app.post('/properties', async (c) => {
       return c.json({ error: 'Mortgage already linked to another property' }, HTTP_STATUS.CONFLICT);
     }
 
-    mortgageBalance = 0;
     // A property linked to a joint mortgage is joint too (and vice versa).
     isJoint = isJoint || mortgage.isJoint;
   }
@@ -715,11 +499,7 @@ app.post('/properties', async (c) => {
   const jointError = assertJointAllowed(getPartnerId(c), isJoint);
   if (jointError) return c.json({ error: jointError }, HTTP_STATUS.BAD_REQUEST);
 
-  const propertyPayload = {
-    ...body.value,
-    mortgage: mortgageBalance,
-    isJoint,
-  };
+  const propertyPayload = { ...body.value, isJoint };
 
   const data = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -734,7 +514,7 @@ app.post('/properties', async (c) => {
     });
     return created;
   });
-  return c.json({ data: (await resolvePropertyDebts([data]))[0] }, HTTP_STATUS.CREATED);
+  return c.json({ data: (await withPropertyEquity([data]))[0] }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/properties/:id', async (c) => {
@@ -768,24 +548,41 @@ app.patch('/properties/:id', async (c) => {
     ...mortgagePatch.value,
   };
 
-  const data = await db.transaction(async (tx) => {
-    // The linked mortgages first, then the property: the order a mortgage's cascade archive and
-    // a repayment edit use.
-    await lockLedgerParents(tx, mortgages, [existing.mortgageId, updates.mortgageId]);
-    const [updated] = await tx
-      .update(properties)
-      .set(toPropertyUpdateValues(updates))
-      .where(eq(properties.id, id))
-      .returning();
+  const result = await answerRejectedEdit<
+    { data: typeof properties.$inferSelect },
+    LedgerRejection
+  >(() =>
+    db.transaction(async (tx) => {
+      // The linked mortgages first, then the property: the order a mortgage's cascade archive uses.
+      await lockLedgerParents(tx, mortgages, [existing.mortgageId, updates.mortgageId]);
+      const [locked] = await lockLedgerParents(tx, properties, [id]);
+      if (
+        updates.currentValue !== undefined &&
+        locked &&
+        updates.currentValue !== locked.currentValue &&
+        (await latestValuation(tx, id)) !== null
+      ) {
+        throw new LedgerEditRejected({
+          error: VALUE_FROM_VALUATIONS,
+          status: HTTP_STATUS.BAD_REQUEST,
+        });
+      }
+      const [updated] = await tx
+        .update(properties)
+        .set(toPropertyUpdateValues(updates))
+        .where(eq(properties.id, id))
+        .returning();
 
-    await syncLinkedMortgageMetadata({
-      mortgageId: updated.mortgageId,
-      property: updated,
-      executor: tx,
-    });
-    return updated;
-  });
-  return c.json({ data: (await resolvePropertyDebts([data]))[0] });
+      await syncLinkedMortgageMetadata({
+        mortgageId: updated.mortgageId,
+        property: updated,
+        executor: tx,
+      });
+      return { data: updated };
+    }),
+  );
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: (await withPropertyEquity([result.data]))[0] });
 });
 
 async function hasActiveLinkedMortgage(
@@ -803,7 +600,7 @@ async function hasActiveLinkedMortgage(
 registerArchivableResource(app, {
   path: '/properties',
   table: properties,
-  serialize: async (property) => (await resolvePropertyDebts([property]))[0],
+  serialize: async (property) => (await withPropertyEquity([property]))[0],
   label: 'Property',
   idLabel: 'property',
   beforeDelete: async (tx, property) => {
@@ -851,23 +648,13 @@ app.post('/property-transactions', async (c) => {
     if (validationError)
       return { error: validationError, status: HTTP_STATUS.BAD_REQUEST } as const;
 
-    let debtColumns = repaymentDebtColumns(null, 0);
-    if (body.value.type === 'repayment') {
-      const debt = currentRepaymentDebt(property);
-      const applied = await applyRepaymentToDebt(tx, debt, body.value.principal ?? 0);
-      if (!applied) {
-        return { error: REPAYMENT_EXCEEDS_BALANCE, status: HTTP_STATUS.BAD_REQUEST } as const;
-      }
-      debtColumns = repaymentDebtColumns(debt, applied.unapplied);
-    }
-
+    // The property is locked before its current value is recomputed from its valuations.
+    await lockLedgerParents(tx, properties, [property.id]);
     const [created] = await tx
       .insert(propertyTransactions)
-      .values({
-        ...toPropertyTransactionInsertValues(body.value, property.userId ?? user.id),
-        ...debtColumns,
-      })
+      .values(toPropertyTransactionInsertValues(body.value, property.userId ?? user.id))
       .returning();
+    if (body.value.type === 'valuation') await syncCurrentValue(tx, [property.id]);
     await withLedgerWrite(
       tx,
       { table: properties, id: body.value.propertyId, partnerId, actorId: user.id },
@@ -878,41 +665,6 @@ app.post('/property-transactions', async (c) => {
   if ('error' in result) return c.json({ error: result.error }, result.status);
   return c.json({ data: result.data }, HTTP_STATUS.CREATED);
 });
-
-// Applies an edited property transaction after its old effect was reversed, and returns the debt
-// columns to store with it. A repayment edited on its own property stays with the debt it paid;
-// one moved to another property, or a row that becomes a repayment, pays that property's current
-// debt. Throws `LedgerEditRejected` so the reversal rolls back on a refusal.
-async function applyEditedTransaction(
-  tx: DbTransaction,
-  edit: {
-    previous: PropertyTransactionRow;
-    previousDebt: RepaymentDebt | null;
-    next: PropertyTransactionPayload;
-    property: typeof properties.$inferSelect;
-  },
-): Promise<ReturnType<typeof repaymentDebtColumns>> {
-  const { next, property } = edit;
-  const keptDebt =
-    next.type === 'repayment' && next.propertyId === edit.previous.propertyId
-      ? edit.previousDebt
-      : null;
-  const validationError = validatePropertyTransactionPayload(next, property, keptDebt !== null);
-  if (validationError) {
-    throw new LedgerEditRejected({ error: validationError, status: HTTP_STATUS.BAD_REQUEST });
-  }
-  if (next.type !== 'repayment') return repaymentDebtColumns(null, 0);
-
-  const debt = keptDebt ?? currentRepaymentDebt(property);
-  const applied = await applyRepaymentToDebt(tx, debt, next.principal ?? 0);
-  if (!applied) {
-    throw new LedgerEditRejected({
-      error: REPAYMENT_EXCEEDS_BALANCE,
-      status: HTTP_STATUS.BAD_REQUEST,
-    });
-  }
-  return repaymentDebtColumns(debt, applied.unapplied);
-}
 
 // eslint-disable-next-line complexity
 app.patch('/property-transactions/:id', async (c) => {
@@ -951,15 +703,20 @@ app.patch('/property-transactions/:id', async (c) => {
     LedgerRejection
   >(() =>
     db.transaction(async (tx) => {
-      // Undo the committed repayment's balance effect, then apply the edited one. Once the old
-      // effect is undone, a refusal must roll it back.
-      const previous = await lockPropertyLedger(tx, existing, nextPropertyId);
+      // Both properties, then the row, in the order a cascade archive uses. The edit reads the
+      // committed row from the lock, and both current values are recomputed from the valuations
+      // that remain once it is written.
+      await lockLedgerParents(tx, properties, [existing.propertyId, nextPropertyId]);
+      const previous = await lockCheckedLedgerRow(
+        tx,
+        propertyTransactions,
+        id,
+        (row) => row.propertyId === existing.propertyId,
+      );
       const next = mergePropertyTransactionPayload(body.value, previous);
       if (!next.ok) {
         throw new LedgerEditRejected({ error: next.error, status: HTTP_STATUS.BAD_REQUEST });
       }
-      const previousDebt = await resolveRepaymentDebt(tx, user.id, partnerId, previous);
-      if (previousDebt) await reverseRepaymentOnDebt(tx, previousDebt, previous);
 
       const property = await getAccessibleProperty(user.id, partnerId, next.value.propertyId, tx);
       if (!property) {
@@ -968,23 +725,22 @@ app.patch('/property-transactions/:id', async (c) => {
           status: HTTP_STATUS.NOT_FOUND,
         });
       }
-
-      const debtColumns = await applyEditedTransaction(tx, {
-        previous,
-        previousDebt,
-        next: next.value,
-        property,
-      });
+      const validationError = validatePropertyTransactionPayload(next.value, property);
+      if (validationError) {
+        throw new LedgerEditRejected({ error: validationError, status: HTTP_STATUS.BAD_REQUEST });
+      }
 
       const [updated] = await tx
         .update(propertyTransactions)
         .set({
           ...toPropertyTransactionUpdateValues(next.value),
-          ...debtColumns,
           userId: property.userId ?? user.id,
         })
         .where(eq(propertyTransactions.id, id))
         .returning();
+      if (previous.type === 'valuation' || next.value.type === 'valuation') {
+        await syncCurrentValue(tx, [previous.propertyId, next.value.propertyId]);
+      }
       await withLedgerWrite(
         tx,
         [
@@ -1013,15 +769,18 @@ app.delete('/property-transactions/:id', async (c) => {
     LedgerRejection
   >(() =>
     db.transaction(async (tx) => {
-      // Restore the balance this repayment had reduced before removing it.
-      const previous = await lockPropertyLedger(tx, existing, existing.propertyId);
-      const debt = await resolveRepaymentDebt(tx, user.id, partnerId, previous);
-      if (debt) await reverseRepaymentOnDebt(tx, debt, previous);
-
+      await lockLedgerParents(tx, properties, [existing.propertyId]);
+      const previous = await lockCheckedLedgerRow(
+        tx,
+        propertyTransactions,
+        id,
+        (row) => row.propertyId === existing.propertyId,
+      );
       const [deleted] = await tx
         .delete(propertyTransactions)
         .where(eq(propertyTransactions.id, id))
         .returning();
+      if (previous.type === 'valuation') await syncCurrentValue(tx, [previous.propertyId]);
       await withLedgerWrite(
         tx,
         { table: properties, id: previous.propertyId, partnerId, actorId: user.id },

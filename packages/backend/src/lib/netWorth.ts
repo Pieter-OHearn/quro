@@ -36,7 +36,6 @@ type HoldingRow = MoneyRow & { id: number; currentPrice: unknown };
 type HoldingTransactionRow = { holdingId: number; type: string; shares: unknown };
 type PropertyRow = MoneyRow & {
   currentValue: unknown;
-  mortgage: unknown;
   mortgageId: number | null;
 };
 type PensionRow = MoneyRow & { balance: unknown };

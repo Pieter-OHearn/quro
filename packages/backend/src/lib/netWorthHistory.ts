@@ -24,6 +24,7 @@ import {
   holdingTransactions,
   holdings,
   mortgages,
+  mortgageTransactions,
   netWorthSnapshots,
   pensionPots,
   pensionTransactions,
@@ -96,7 +97,6 @@ type PropertyRow = {
   id: number;
   purchasePrice: unknown;
   currentValue: unknown;
-  mortgage: unknown;
   mortgageId: number | null;
   currency: string;
 } & Archivable;
@@ -104,8 +104,15 @@ type PropertyTransactionRow = {
   propertyId: number;
   type: string;
   amount: unknown;
+  date: string;
+};
+type MortgageRepaymentRow = {
+  mortgageId: number;
+  type: string;
+  amount: unknown;
   interest: unknown;
   principal: unknown;
+  unappliedPrincipal: unknown;
   date: string;
 };
 type PensionPotRow = { id: number; balance: unknown; currency: string } & Archivable;
@@ -148,12 +155,15 @@ type HoldingPriceRow = {
   closePrice: unknown;
 };
 
-type DatedPropertyTransaction = {
+type DatedPropertyValuation = {
   propertyId: number;
-  type: 'valuation' | 'repayment';
   amount: number;
-  interest: number | null;
-  principal: number | null;
+  timestamp: number;
+};
+
+type DatedMortgageRepayment = {
+  mortgageId: number;
+  principal: number;
   timestamp: number;
 };
 
@@ -190,6 +200,7 @@ type JointScopedSourceRows = {
   properties: Array<typeof properties.$inferSelect>;
   propertyTransactions: Array<typeof propertyTransactions.$inferSelect>;
   mortgages: Array<typeof mortgages.$inferSelect>;
+  mortgageRepayments: MortgageRepaymentRow[];
 };
 
 // Retain a boundary row so old-only ledgers still produce the same points as the full ledger.
@@ -229,7 +240,7 @@ function loadPropertyHistory(access: SQL | undefined, start: string) {
       desc(propertyTransactions.date),
       desc(propertyTransactions.id),
     );
-  // A second boundary row preserves history presence for repayment-only ledgers.
+  // A second boundary row preserves history presence for ledgers without a valuation.
   const boundary = db
     .selectDistinctOn([propertyTransactions.propertyId], columns)
     .from(propertyTransactions)
@@ -247,6 +258,38 @@ function loadPropertyHistory(access: SQL | undefined, start: string) {
     .where(and(access, gte(propertyTransactions.date, start)))
     .union(before)
     .union(boundary);
+}
+
+// A property's past debt is its mortgage's balance plus the principal repaid after the cutoff, so
+// only repayments inside the window matter; one boundary row per mortgage keeps history presence
+// for a household whose only records are repayments before the window.
+function loadMortgageRepaymentHistory(access: SQL | undefined, start: string) {
+  const columns = {
+    mortgageId: mortgageTransactions.mortgageId,
+    type: mortgageTransactions.type,
+    amount: mortgageTransactions.amount,
+    interest: mortgageTransactions.interest,
+    principal: mortgageTransactions.principal,
+    unappliedPrincipal: mortgageTransactions.unappliedPrincipal,
+    date: mortgageTransactions.date,
+  };
+  const repayments = and(access, eq(mortgageTransactions.type, 'repayment'));
+  const boundary = db
+    .selectDistinctOn([mortgageTransactions.mortgageId], columns)
+    .from(mortgageTransactions)
+    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+    .where(and(repayments, lt(mortgageTransactions.date, start)))
+    .orderBy(
+      mortgageTransactions.mortgageId,
+      desc(mortgageTransactions.date),
+      desc(mortgageTransactions.id),
+    );
+  return db
+    .select(columns)
+    .from(mortgageTransactions)
+    .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+    .where(and(repayments, gte(mortgageTransactions.date, start)))
+    .unionAll(boundary);
 }
 
 function loadHoldingHistory(userId: number, start: string) {
@@ -355,14 +398,17 @@ async function loadJointScopedRows(
 ): Promise<JointScopedSourceRows> {
   const savingsAccess = ownedOrJointPredicate(savingsAccounts, userId, partnerId);
   const propertyAccess = ownedOrJointPredicate(properties, userId, partnerId);
+  const mortgageAccess = ownedOrJointPredicate(mortgages, userId, partnerId);
 
-  const [savings, savingsTxns, propertyRows, propertyTxns, mortgageRows] = await Promise.all([
-    loadHouseholdRows(savingsAccounts, userId, partnerId, { includeArchived: true }),
-    loadSavingsHistory(savingsAccess, windowStart),
-    loadHouseholdRows(properties, userId, partnerId, { includeArchived: true }),
-    loadPropertyHistory(propertyAccess, windowStart),
-    loadHouseholdRows(mortgages, userId, partnerId, { includeArchived: true }),
-  ]);
+  const [savings, savingsTxns, propertyRows, propertyTxns, mortgageRows, repayments] =
+    await Promise.all([
+      loadHouseholdRows(savingsAccounts, userId, partnerId, { includeArchived: true }),
+      loadSavingsHistory(savingsAccess, windowStart),
+      loadHouseholdRows(properties, userId, partnerId, { includeArchived: true }),
+      loadPropertyHistory(propertyAccess, windowStart),
+      loadHouseholdRows(mortgages, userId, partnerId, { includeArchived: true }),
+      loadMortgageRepaymentHistory(mortgageAccess, windowStart),
+    ]);
 
   return {
     savings,
@@ -370,6 +416,7 @@ async function loadJointScopedRows(
     properties: propertyRows,
     propertyTransactions: propertyTxns,
     mortgages: mortgageRows,
+    mortgageRepayments: repayments,
   };
 }
 
@@ -409,20 +456,41 @@ function buildDatedHoldingTransactions(
     .sort((left, right) => left.timestamp - right.timestamp);
 }
 
-function buildDatedPropertyTransactions(
+function buildDatedPropertyValuations(
   transactions: readonly PropertyTransactionRow[],
-): DatedPropertyTransaction[] {
+): DatedPropertyValuation[] {
   return transactions
-    .filter((transaction) => transaction.type === 'valuation' || transaction.type === 'repayment')
+    .filter((transaction) => transaction.type === 'valuation')
     .map((transaction) => ({
       propertyId: transaction.propertyId,
-      type: transaction.type as DatedPropertyTransaction['type'],
       amount: toNumberOrZero(transaction.amount),
-      interest: transaction.interest == null ? null : toNumberOrZero(transaction.interest),
-      principal: transaction.principal == null ? null : toNumberOrZero(transaction.principal),
       timestamp: toUtcTimestamp(transaction.date),
     }))
     .filter((transaction) => Number.isFinite(transaction.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+}
+
+// The principal a repayment applied to its mortgage: its principal (the amount less interest when
+// it was recorded without a split) less what the zero clamp absorbed.
+function appliedPrincipal(repayment: MortgageRepaymentRow): number {
+  const principal =
+    repayment.principal == null
+      ? Math.max(0, toNumberOrZero(repayment.amount) - toNumberOrZero(repayment.interest))
+      : toNumberOrZero(repayment.principal);
+  return Math.max(0, principal - toNumberOrZero(repayment.unappliedPrincipal));
+}
+
+function buildDatedMortgageRepayments(
+  repayments: readonly MortgageRepaymentRow[],
+): DatedMortgageRepayment[] {
+  return repayments
+    .filter((repayment) => repayment.type === 'repayment')
+    .map((repayment) => ({
+      mortgageId: repayment.mortgageId,
+      principal: appliedPrincipal(repayment),
+      timestamp: toUtcTimestamp(repayment.date),
+    }))
+    .filter((repayment) => Number.isFinite(repayment.timestamp))
     .sort((left, right) => left.timestamp - right.timestamp);
 }
 
@@ -691,63 +759,56 @@ function computeHoldingAtCutoff(
   };
 }
 
+// Each active mortgage's balance at the cutoff: its outstanding balance plus the principal its
+// repayments applied after the cutoff.
 function buildActiveMortgageBalanceAtCutoff(
   userMortgages: readonly MortgageRow[],
+  repaymentsByMortgageId: ReadonlyMap<number, readonly DatedMortgageRepayment[]>,
   cutoff: number,
 ): Map<number, number> {
   const balances = new Map<number, number>();
   for (const mortgage of userMortgages) {
     if (isArchivedAtCutoff(mortgage, cutoff)) continue;
-    balances.set(mortgage.id, toNumberOrZero(mortgage.outstandingBalance));
+    let balance = toNumberOrZero(mortgage.outstandingBalance);
+    for (const repayment of repaymentsByMortgageId.get(mortgage.id) ?? []) {
+      if (repayment.timestamp > cutoff) balance += repayment.principal;
+    }
+    balances.set(mortgage.id, balance);
   }
   return balances;
 }
 
+// A property's value at the cutoff is its latest valuation by then: the purchase price before
+// its first valuation, or the current value when it has none.
+function resolvePropertyValueAtCutoff(
+  property: PropertyRow,
+  valuations: readonly DatedPropertyValuation[],
+  cutoff: number,
+): number {
+  let propertyValue =
+    valuations.length > 0
+      ? toNumberOrZero(property.purchasePrice)
+      : toNumberOrZero(property.currentValue);
+  for (const valuation of valuations) {
+    if (valuation.timestamp > cutoff) break;
+    propertyValue = valuation.amount;
+  }
+  return propertyValue;
+}
+
 function computePropertyEquityAtCutoff(
   userProperties: readonly PropertyRow[],
-  txnsByPropertyId: ReadonlyMap<number, readonly DatedPropertyTransaction[]>,
+  valuationsByPropertyId: ReadonlyMap<number, readonly DatedPropertyValuation[]>,
   mortgageBalanceById: ReadonlyMap<number, number>,
   cutoff: number,
   rates: Map<string, number>,
 ): number {
-  function resolvePropertyValueAtCutoff(
-    property: PropertyRow,
-    transactions: readonly DatedPropertyTransaction[],
-  ): number {
-    const hasValuationTransaction = transactions.some(
-      (transaction) => transaction.type === 'valuation',
-    );
-    let propertyValue = hasValuationTransaction
-      ? toNumberOrZero(property.purchasePrice)
-      : toNumberOrZero(property.currentValue);
-
-    for (const transaction of transactions) {
-      if (transaction.timestamp > cutoff) break;
-      if (transaction.type === 'valuation') propertyValue = transaction.amount;
-    }
-    return propertyValue;
-  }
-
-  function resolveMortgageBalanceAtCutoff(
-    property: PropertyRow,
-    transactions: readonly DatedPropertyTransaction[],
-  ): number {
-    let mortgageBalance = getPropertyDebt(property, mortgageBalanceById);
-    for (const transaction of transactions) {
-      if (transaction.timestamp <= cutoff || transaction.type !== 'repayment') continue;
-      const principal =
-        transaction.principal ?? Math.max(0, transaction.amount - (transaction.interest ?? 0));
-      mortgageBalance += principal;
-    }
-    return mortgageBalance;
-  }
-
   return sumMoney(
     userProperties.map((property) => {
       if (isArchivedAtCutoff(property, cutoff)) return 0;
-      const transactions = txnsByPropertyId.get(property.id) ?? [];
-      const propertyValue = resolvePropertyValueAtCutoff(property, transactions);
-      const mortgageBalance = resolveMortgageBalanceAtCutoff(property, transactions);
+      const valuations = valuationsByPropertyId.get(property.id) ?? [];
+      const propertyValue = resolvePropertyValueAtCutoff(property, valuations, cutoff);
+      const mortgageBalance = getPropertyDebt(property, mortgageBalanceById);
       return convertToBase(propertyValue - mortgageBalance, property.currency, rates);
     }),
   );
@@ -766,6 +827,8 @@ type NetWorthSourceData = {
   pensions: PensionPotRow[];
   pensionTransactions: PensionTransactionRow[];
   mortgages: MortgageRow[];
+  /** Mortgage repayments: the history adds back the principal they applied after a cutoff. */
+  mortgageRepayments: MortgageRepaymentRow[];
   debts: DebtRow[];
   debtPayments: DebtPaymentRow[];
   snapshots: Array<typeof netWorthSnapshots.$inferSelect>;
@@ -787,8 +850,8 @@ type NetWorthHistoryPoint = {
 
 /**
  * The household's first dated record: the earliest row of the ledgers the history replays (the
- * caller's own and the partner's joint savings and property rows, the caller's holding, pension
- * and debt rows) or of the caller's stored snapshots. Null when there is none.
+ * caller's own and the partner's joint savings, property and mortgage rows, the caller's holding,
+ * pension and debt rows) or of the caller's stored snapshots. Null when there is none.
  */
 async function loadFirstRecordDate(userId: number, partnerId: number | null) {
   const rows = await db
@@ -802,6 +865,13 @@ async function loadFirstRecordDate(userId: number, partnerId: number | null) {
         .from(propertyTransactions)
         .innerJoin(properties, eq(propertyTransactions.propertyId, properties.id))
         .where(ownedOrJointPredicate(properties, userId, partnerId)),
+    )
+    .unionAll(
+      db
+        .select({ first: min(mortgageTransactions.date) })
+        .from(mortgageTransactions)
+        .innerJoin(mortgages, eq(mortgageTransactions.mortgageId, mortgages.id))
+        .where(ownedOrJointPredicate(mortgages, userId, partnerId)),
     )
     .unionAll(
       db
@@ -927,6 +997,13 @@ export async function loadNetWorthSourceData(
     pensions,
     pensionTransactions: pensionTransactionsData,
     mortgages: scopeHouseholdRows('mortgages', jointScoped.mortgages, (row) => row.isJoint),
+    // A repayment inherits its mortgage's jointness.
+    mortgageRepayments: scopeHouseholdRows(
+      'mortgageRepayments',
+      jointScoped.mortgageRepayments,
+      (row) =>
+        jointScoped.mortgages.some((parent) => parent.id === row.mortgageId && parent.isJoint),
+    ),
     debts: debtsData,
     debtPayments: debtPaymentsData,
     snapshots,
@@ -1013,7 +1090,8 @@ type NetWorthHistoryContext = {
   savingsByAccount: Map<number, DatedSavingsTransaction[]>;
   holdingsById: Map<number, DatedHoldingTransaction[]>;
   holdingPricesById: Map<number, HoldingPriceRow[]>;
-  propertiesById: Map<number, DatedPropertyTransaction[]>;
+  valuationsByPropertyId: Map<number, DatedPropertyValuation[]>;
+  repaymentsByMortgageId: Map<number, DatedMortgageRepayment[]>;
   pensionsByPotId: Map<number, DatedPensionTransaction[]>;
   debtPaymentsByDebtId: Map<number, DatedDebtPayment[]>;
   ratesAt: ReturnType<typeof createHistoricalRateResolver> | null;
@@ -1023,7 +1101,8 @@ type NetWorthHistoryContext = {
 function buildNetWorthHistoryContext(sourceData: NetWorthSourceData): NetWorthHistoryContext {
   const datedSavingsTransactions = buildDatedSavingsTransactions(sourceData.savingsTransactions);
   const datedHoldingTransactions = buildDatedHoldingTransactions(sourceData.holdingTransactions);
-  const datedPropertyTransactions = buildDatedPropertyTransactions(sourceData.propertyTransactions);
+  const datedPropertyValuations = buildDatedPropertyValuations(sourceData.propertyTransactions);
+  const datedMortgageRepayments = buildDatedMortgageRepayments(sourceData.mortgageRepayments);
   const datedPensionTransactions = buildDatedPensionTransactions(sourceData.pensionTransactions);
   const datedDebtPayments = buildDatedDebtPayments(sourceData.debtPayments);
   const holdingPricesById = groupByNumericId(
@@ -1039,7 +1118,8 @@ function buildNetWorthHistoryContext(sourceData: NetWorthSourceData): NetWorthHi
     savingsByAccount: groupByNumericId(datedSavingsTransactions, (item) => item.accountId),
     holdingsById: groupByNumericId(datedHoldingTransactions, (item) => item.holdingId),
     holdingPricesById,
-    propertiesById: groupByNumericId(datedPropertyTransactions, (item) => item.propertyId),
+    valuationsByPropertyId: groupByNumericId(datedPropertyValuations, (item) => item.propertyId),
+    repaymentsByMortgageId: groupByNumericId(datedMortgageRepayments, (item) => item.mortgageId),
     pensionsByPotId: groupByNumericId(datedPensionTransactions, (item) => item.potId),
     debtPaymentsByDebtId: groupByNumericId(datedDebtPayments, (item) => item.debtId),
     snapshotByDate: new Map(
@@ -1055,7 +1135,8 @@ function hasNetWorthHistory(
   const transactionCounts = [
     context.savingsByAccount.size,
     context.holdingsById.size,
-    context.propertiesById.size,
+    context.valuationsByPropertyId.size,
+    context.repaymentsByMortgageId.size,
     context.pensionsByPotId.size,
     context.debtPaymentsByDebtId.size,
   ];
@@ -1104,8 +1185,12 @@ function buildNetWorthHistoryPoint(
   );
   const propertyEquity = computePropertyEquityAtCutoff(
     sourceData.properties,
-    context.propertiesById,
-    buildActiveMortgageBalanceAtCutoff(sourceData.mortgages, period.cutoff),
+    context.valuationsByPropertyId,
+    buildActiveMortgageBalanceAtCutoff(
+      sourceData.mortgages,
+      context.repaymentsByMortgageId,
+      period.cutoff,
+    ),
     period.cutoff,
     historicalRates.rates,
   );

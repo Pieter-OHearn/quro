@@ -8,6 +8,7 @@ import type {
   HoldingPriceSyncResult,
 } from '@quro/shared';
 import { normalizeHolding, normalizeProperty } from '../utils/normalizers';
+import type { NewProperty } from '../types';
 
 type CreateHoldingPayload = Omit<Holding, 'id'> & {
   priceCurrency?: string | null;
@@ -32,7 +33,7 @@ export function useCreateHoldingTransaction() {
 }
 
 export function useCreateProperty() {
-  return useDomainMutation('property', async (property: Omit<Property, 'id'>) => {
+  return useDomainMutation('property', async (property: NewProperty) => {
     const payload = await apiPost<Property>('/api/investments/properties', property);
     return normalizeProperty(payload);
   });

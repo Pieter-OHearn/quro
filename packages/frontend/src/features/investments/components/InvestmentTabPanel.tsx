@@ -4,6 +4,7 @@ import type {
   HoldingPriceSyncResult,
   HoldingTransaction,
   Mortgage,
+  MortgageTransaction,
   Property,
   PropertyTransaction,
 } from '@quro/shared';
@@ -31,6 +32,7 @@ type InvestmentTabPanelProps = {
   properties: Property[];
   propertyTxns: PropertyTransaction[];
   mortgageById: Map<number, Mortgage>;
+  mortgageTxns: MortgageTransaction[];
   positions: Record<number, Position>;
   stats: InvestmentPortfolioStats;
   ui: InvestmentUIState;
@@ -114,6 +116,7 @@ function renderPropertyTab({
   properties,
   propertyTxns,
   mortgageById,
+  mortgageTxns,
   ui,
   actions,
   fmtNative,
@@ -135,6 +138,7 @@ function renderPropertyTab({
       properties={properties}
       propertyTxns={propertyTxns}
       mortgageById={mortgageById}
+      mortgageTxns={mortgageTxns}
       expandedPropertyId={ui.expandedPropertyId}
       fmtNative={fmtNative}
       onAddProperty={handleAddProperty}

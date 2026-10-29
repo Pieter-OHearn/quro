@@ -596,8 +596,10 @@ export const properties = pgTable(
     address: text('address').notNull(),
     propertyType: text('property_type').notNull(),
     purchasePrice: numericAsNumber('purchase_price', { precision: 19, scale: 2 }).notNull(),
+    // The latest valuation by date (ties by id) once the property has one; otherwise the value
+    // entered with the property.
     currentValue: numericAsNumber('current_value', { precision: 19, scale: 2 }).notNull(),
-    mortgage: numericAsNumber('mortgage', { precision: 19, scale: 2 }).notNull(),
+    // The property's only debt: its linked mortgage, while that mortgage is active.
     mortgageId: integer('mortgage_id').references(() => mortgages.id, { onDelete: 'set null' }),
     monthlyRent: numericAsNumber('monthly_rent', { precision: 19, scale: 2 }).notNull(),
     currency: currencyCodeEnum('currency').notNull(),
@@ -621,21 +623,8 @@ export const propertyTransactions = pgTable(
     propertyId: integer('property_id')
       .references(() => properties.id, { onDelete: 'cascade' })
       .notNull(),
-    type: text('type').notNull(), // repayment | valuation | rent_income | expense
+    type: text('type').notNull(), // valuation | rent_income | expense
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
-    interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
-    principal: numericAsNumber('principal', { precision: 19, scale: 2 }),
-    // Principal the debt could not take because its balance reached zero.
-    unappliedPrincipal: numericAsNumber('unapplied_principal', { precision: 19, scale: 2 })
-      .notNull()
-      .default(0),
-    // The debt a repayment reduced: the property's own debt or a mortgage (null once that
-    // mortgage is deleted). Both null for other types and for repayments recorded before
-    // the debt was stored, which follow the property's current link.
-    repaymentTarget: text('repayment_target'), // property | mortgage
-    repaymentMortgageId: integer('repayment_mortgage_id').references(() => mortgages.id, {
-      onDelete: 'set null',
-    }),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
@@ -643,13 +632,6 @@ export const propertyTransactions = pgTable(
     userIdx: index('property_transactions_user_id_idx').on(table.userId),
     propertyIdx: index('property_transactions_property_id_idx').on(table.propertyId),
     userDateIdx: index('property_transactions_user_date_idx').on(table.userId, table.date),
-    repaymentMortgageIdx: index('property_transactions_repayment_mortgage_id_idx').on(
-      table.repaymentMortgageId,
-    ),
-    repaymentTargetCheck: check(
-      'property_transactions_repayment_target_check',
-      sql`${table.repaymentTarget} is null or ${table.repaymentTarget} = 'mortgage' or (${table.repaymentTarget} = 'property' and ${table.repaymentMortgageId} is null)`,
-    ),
   }),
 );
 
@@ -825,7 +807,6 @@ export const mortgages = pgTable(
     userId: integer('user_id')
       .references(() => users.id)
       .notNull(),
-    propertyAddress: text('property_address').notNull(),
     lender: text('lender').notNull(),
     currency: currencyCodeEnum('currency').notNull(),
     originalAmount: numericAsNumber('original_amount', { precision: 19, scale: 2 }).notNull(),
@@ -833,7 +814,6 @@ export const mortgages = pgTable(
       precision: 19,
       scale: 2,
     }).notNull(),
-    propertyValue: numericAsNumber('property_value', { precision: 19, scale: 2 }).notNull(),
     monthlyPayment: numericAsNumber('monthly_payment', { precision: 19, scale: 2 }).notNull(),
     interestRate: numericAsNumber('interest_rate', { precision: 7, scale: 4 }).notNull(),
     rateType: text('rate_type').notNull(),
@@ -861,7 +841,7 @@ export const mortgageTransactions = pgTable(
     mortgageId: integer('mortgage_id')
       .references(() => mortgages.id, { onDelete: 'cascade' })
       .notNull(),
-    type: text('type').notNull(), // repayment | valuation | rate_change
+    type: text('type').notNull(), // repayment | rate_change
     amount: numericAsNumber('amount', { precision: 19, scale: 2 }).notNull(),
     interest: numericAsNumber('interest', { precision: 19, scale: 2 }),
     principal: numericAsNumber('principal', { precision: 19, scale: 2 }),

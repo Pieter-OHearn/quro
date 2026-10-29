@@ -4,6 +4,7 @@ import type {
   MortgageRepaymentType,
   MortgageTransaction,
   Property,
+  PropertyTransaction,
 } from '@quro/shared';
 import type { CurrencyCode } from '@/lib/CurrencyContext';
 import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
@@ -14,11 +15,14 @@ export type { MortgageTransactionType as MortgageTxnType } from '@quro/shared';
 
 export type SaveMortgageTxnInput = Omit<MortgageTransaction, 'id'> & { id?: number };
 
-export type CreateMortgagePayload = Omit<MortgageType, 'id'> & {
+/** The fields a mortgage reads from its linked property; the API never takes them. */
+type LinkedPropertyField = 'linkedPropertyId' | 'propertyAddress' | 'propertyValue';
+
+export type CreateMortgagePayload = Omit<MortgageType, 'id' | LinkedPropertyField> & {
   linkedPropertyId: number;
 };
 
-export type UpdateMortgagePayload = Partial<Omit<MortgageType, 'id'>> & {
+export type UpdateMortgagePayload = Partial<Omit<MortgageType, 'id' | LinkedPropertyField>> & {
   id: number;
   linkedPropertyId?: number;
 };
@@ -27,11 +31,13 @@ export type MortgageFormPayload = (CreateMortgagePayload | UpdateMortgagePayload
 
 export type MortgageFormState = {
   linkedPropertyId: string;
+  /** Shown from the linked property; never sent. */
   propertyAddress: string;
   lender: string;
   currency: CurrencyCode;
   originalAmount: string;
   outstandingBalance: string;
+  /** Shown from the linked property, for the loan-to-value preview; never sent. */
   propertyValue: string;
   monthlyPayment: string;
   interestRate: string;
@@ -64,6 +70,8 @@ export type MortgagePageState = {
   properties: Property[];
   mortgage: MortgageType | undefined;
   txns: MortgageTransaction[];
+  /** The linked property's ledger; the page shows its valuations read-only. */
+  propertyTxns: PropertyTransaction[];
   showTxnModal: boolean;
   setShowTxnModal: (v: boolean) => void;
   editingTxn: MortgageTransaction | null;

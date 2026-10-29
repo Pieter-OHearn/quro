@@ -81,7 +81,7 @@ export function buildMortgageExpiryNotification(
     updatedAt: actionWindowStart.toISOString(),
     timeLabel: expiryLabel,
     title: 'Fixed rate ending soon',
-    body: `${mortgage.propertyAddress} · ${mortgage.interestRate}% fixed rate ends ${expiryLabel}`,
+    body: `${mortgage.propertyAddress ?? mortgage.lender} · ${mortgage.interestRate}% fixed rate ends ${expiryLabel}`,
     unread: true,
     actionable: true,
     dismissible: true,

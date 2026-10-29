@@ -18,7 +18,8 @@ import type { DeletePropertyMode } from '../hooks/mutations';
 
 type UpdatePropertyModalProps = {
   property: Property;
-  mortgageBalance: number;
+  /** Whether a valuation sets the value: it is then changed by recording another valuation. */
+  hasValuation: boolean;
   onClose: () => void;
   onSave: (id: number, value: number, rent: number, isJoint: boolean) => void;
   onDelete?: (id: number, mode?: DeletePropertyMode) => void;
@@ -59,7 +60,6 @@ function useUpdatePropertyForm(property: Property) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const numericValue = parseFloat(value) || 0;
-  const equity = numericValue; // mortgage balance is passed in separately
   const appreciation = numericValue - property.purchasePrice;
   const appreciationPct =
     ((numericValue || property.currentValue) / property.purchasePrice - 1) * 100;
@@ -75,7 +75,6 @@ function useUpdatePropertyForm(property: Property) {
     isJoint,
     errors,
     numericValue,
-    equity,
     appreciation,
     appreciationPct,
     setRent,
@@ -160,15 +159,56 @@ function PropertyDeleteDialog({
   );
 }
 
+type CurrentValueFieldProps = {
+  property: Property;
+  hasValuation: boolean;
+  form: ReturnType<typeof useUpdatePropertyForm>;
+  fmtNative: (value: number, currency: string, compact?: boolean) => string;
+};
+
+// Once a valuation sets the value, the field shows it and the property's ledger changes it.
+function CurrentValueField({ property, hasValuation, form, fmtNative }: CurrentValueFieldProps) {
+  const label = `Current value (${property.currency})`;
+  if (hasValuation) {
+    return (
+      <FormField label={label}>
+        <p className="font-numeric text-cell text-fg">
+          {fmtNative(property.currentValue, property.currency)}
+        </p>
+        <p className="mt-1 text-caption text-fg-subtle">
+          Set by the latest valuation. Record a valuation to change it.
+        </p>
+      </FormField>
+    );
+  }
+  return (
+    <FormField label={label} required error={form.errors.value}>
+      <TextInput
+        type="number"
+        inputMode="decimal"
+        step="0.01"
+        value={form.value}
+        onChange={form.handleValueChange}
+        error={Boolean(form.errors.value)}
+      />
+      <p className="mt-1 text-caption text-fg-subtle">
+        Previously {fmtNative(property.currentValue, property.currency)}
+      </p>
+    </FormField>
+  );
+}
+
 export function UpdatePropertyModal({
   property,
-  mortgageBalance,
+  hasValuation,
   onClose,
   onSave,
   onDelete,
 }: UpdatePropertyModalProps) {
   const { fmtNative } = useCurrency();
   const form = useUpdatePropertyForm(property);
+  // The debt is the linked mortgage's, read on the server.
+  const mortgageBalance = property.debt;
   const equity = form.numericValue - mortgageBalance;
   const handleSave = buildUpdateSaveHandler(form, property, onSave, onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -198,19 +238,12 @@ export function UpdatePropertyModal({
         />
       }
     >
-      <FormField label={`Current value (${property.currency})`} required error={form.errors.value}>
-        <TextInput
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          value={form.value}
-          onChange={form.handleValueChange}
-          error={Boolean(form.errors.value)}
-        />
-        <p className="mt-1 text-caption text-fg-subtle">
-          Previously {fmtNative(property.currentValue, property.currency)}
-        </p>
-      </FormField>
+      <CurrentValueField
+        property={property}
+        hasValuation={hasValuation}
+        form={form}
+        fmtNative={fmtNative}
+      />
       <MortgageBalanceField
         mortgageBalance={mortgageBalance}
         currency={property.currency}

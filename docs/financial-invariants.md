@@ -40,6 +40,8 @@ Money is rounded to cents, half away from zero, at these points and nowhere else
 - When a request is parsed ([money input](#money-input)).
 - When a budget amount is converted to EUR on write.
 - When a repayment's principal is derived as `amount - interest`.
+- When the expected mortgage repayment is worked out (`expectedMortgageRepayment` in
+  `@quro/shared`): interest, principal and amount are each whole cents.
 - In the clamped balance helpers in `packages/backend/src/lib/balance.ts`.
 - When a holding is valued or a trade is costed: shares × the stored six-decimal price, never a
   price rounded for display (`holdingValue`, and each buy or sell in the position rule below).
@@ -59,18 +61,18 @@ Request money is parsed by `parseMoneyField` and `parseOptionalMoneyField` in
 zero, apply the field's minimum after rounding (so `0.004` is not "greater than zero"), and
 refuse an absolute value of 10^13 or more with a 400 that names the field.
 
-| Family           | Money fields                                                                                                                                         |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Savings          | account `balance`, deposit guarantee `cap`, transaction `amount`                                                                                     |
-| Budget           | category `budgeted` and `spent`, transaction `amount`                                                                                                |
-| Pensions         | pot `balance`, `employeeMonthly`, `employerMonthly`; transaction and import row `amount`, `taxAmount`                                                |
-| Properties       | `purchasePrice`, `currentValue`, `mortgage`, `monthlyRent`; transaction `amount`, `interest`, `principal`                                            |
-| Mortgages        | `originalAmount`, `outstandingBalance`, `propertyValue`, `monthlyPayment`; transaction `interest`, `principal`, and `amount` except on a rate change |
-| Debts            | `originalAmount`, `remainingBalance`, `monthlyPayment`; payment `amount`, `interest`                                                                 |
-| Holdings         | a dividend transaction's `price` (the amount received)                                                                                               |
-| Payslips         | `gross`, `tax`, `pension`, `net`, `bonus`                                                                                                            |
-| Goals            | `currentAmount`, `targetAmount`, `monthlyContribution`, `monthlyTarget`                                                                              |
-| Plan assumptions | `leanBurnOverride`, `benefitMonthlyOverride`, `severanceMonthlySalaryOverride`                                                                       |
+| Family           | Money fields                                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Savings          | account `balance`, deposit guarantee `cap`, transaction `amount`                                                                    |
+| Budget           | category `budgeted` and `spent`, transaction `amount`                                                                               |
+| Pensions         | pot `balance`, `employeeMonthly`, `employerMonthly`; transaction and import row `amount`, `taxAmount`                               |
+| Properties       | `purchasePrice`, `currentValue`, `monthlyRent`; transaction `amount`                                                                |
+| Mortgages        | `originalAmount`, `outstandingBalance`, `monthlyPayment`; transaction `interest`, `principal`, and `amount` except on a rate change |
+| Debts            | `originalAmount`, `remainingBalance`, `monthlyPayment`; payment `amount`, `interest`                                                |
+| Holdings         | a dividend transaction's `price` (the amount received)                                                                              |
+| Payslips         | `gross`, `tax`, `pension`, `net`, `bonus`                                                                                           |
+| Goals            | `currentAmount`, `targetAmount`, `monthlyContribution`, `monthlyTarget`                                                             |
+| Plan assumptions | `leanBurnOverride`, `benefitMonthlyOverride`, `severanceMonthlySalaryOverride`                                                      |
 
 Not money, and parsed without the rule: holding `currentPrice` and `manualPrice` and a buy or
 sell's `price` (unit prices, see below) and `shares`; every interest rate; a mortgage rate
@@ -152,13 +154,14 @@ prove nulls, negative equity, native currencies and provenance survive.
 
 Amounts on ledger rows are positive; the row type gives the effect.
 
-| Ledger                   | Effect on its balance                                                                                                              |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Savings                  | `deposit` and `interest` add, `withdrawal` subtracts; the stored sign is ignored; any other type does nothing.                     |
-| Pension                  | `contribution` adds `amount - taxAmount`, `fee` subtracts, `annual_statement` adds its signed amount, any other type does nothing. |
-| Mortgage, property, debt | A repayment's principal reduces the outstanding balance, never below zero; the part a zero balance cannot take is recorded.        |
-| Holdings                 | Shares are buys minus sells, floored at zero per holding; dividends do not move shares (see [positions](#holding-positions)).      |
-| Budget                   | A transaction's EUR amount adds to its category's `spent`.                                                                         |
+| Ledger         | Effect on its balance                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Savings        | `deposit` and `interest` add, `withdrawal` subtracts; the stored sign is ignored; any other type does nothing.                     |
+| Pension        | `contribution` adds `amount - taxAmount`, `fee` subtracts, `annual_statement` adds its signed amount, any other type does nothing. |
+| Mortgage, debt | A repayment's principal reduces the outstanding balance, never below zero; the part a zero balance cannot take is recorded.        |
+| Property       | The latest valuation by date sets `currentValue`; rent income and expenses move no balance.                                        |
+| Holdings       | Shares are buys minus sells, floored at zero per holding; dividends do not move shares (see [positions](#holding-positions)).      |
+| Budget         | A transaction's EUR amount adds to its category's `spent`.                                                                         |
 
 The savings and pension rules are `signedSavingsAmount` and `pensionTransactionDelta` in
 `@quro/shared`; the server's ledger writes and history and the pages' previews and charts all
@@ -192,6 +195,24 @@ by hand is the price in use there, as on the Investments page; the dashboard's b
 reads the synced price. A holding with no usable price or no stored rate is excluded and reported,
 never valued at a guess. Shares of the total are rounded to two decimals once, and the effective
 number of holdings is 1 divided by the sum of squared weights.
+
+### Expected mortgage repayment
+
+`suggestMortgageRepayment` in `@quro/shared` gives the repayment a mortgage expects on a date.
+The new-repayment form suggests it and the amortisation projection follows it month by month.
+
+- **Interest** is the balance before the payment × the annual rate in effect on that date / 12.
+  The rate is the latest rate change dated on or before it, otherwise the mortgage's current
+  rate (the rate before the first recorded change is not known).
+- **Principal** is the original amount / (term × 12) for a linear loan and the monthly payment
+  less the interest for an annuity, never below zero and capped at the balance.
+- **Amount** is principal plus interest. Each figure is whole cents.
+
+The form uses the current balance as the balance before the payment, dates the suggestion a
+month after the latest repayment (otherwise today), and never guesses a part month or an
+overpayment. Every field stays editable, a field the user changed is not overwritten, and an
+edited repayment is never re-suggested. A linear mortgage's current payment is this figure for
+today's balance rather than the payment stored when the mortgage was created.
 
 ## FX conversion
 
@@ -238,9 +259,19 @@ counted as 3,000.01 for each partner).
 
 ## Ledger invariants
 
-- **Balance equals its ledger.** A manual savings account, pension pot, mortgage, unlinked
-  property debt and debt each keep `balance = opening balance + effect of the rows still in its
-ledger`. A budget category keeps `spent = opening spent + its transactions`.
+- **Balance equals its ledger.** A manual savings account, pension pot, mortgage and debt each
+  keep `balance = opening balance + effect of the rows still in its ledger`. A budget category
+  keeps `spent = opening spent + its transactions`. A property with valuations keeps
+  `currentValue` equal to its latest valuation by date (ties by id).
+- **Each ledger owns its rows.** A property's ledger keeps what happens to the asset: valuations,
+  rent income and expenses. A mortgage's keeps what happens to the loan: repayments and rate
+  changes. Each API refuses the other's types with `400` on create and edit, and each page shows
+  the other's rows read-only with a link to the page that edits them.
+- **Valuations set the value.** Creating, editing, moving or deleting a valuation recomputes
+  `currentValue` of every property it touched, inside the transaction, after the properties and
+  then the row are locked. A property whose last valuation is deleted keeps the value it had;
+  while a property has a valuation, its value is changed by recording another one, and a request
+  that sets a different value by hand is refused with `400`.
 - **Edits and deletes are reversible.** An edit reverses the old row's effect and applies the new
   one; a delete reverses it. Editing a row and editing it back, or creating a row and deleting it,
   leaves the balance as it was.
@@ -248,11 +279,9 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
   one cent leaves the balance at zero and records the principal it could not apply
   (`unappliedPrincipal`). An edit or delete restores only what was applied, so a debt of 100.00
   with a payment of 100.01 returns to 100.00 when the payment is deleted.
-- **Repayments stay with their debt.** A property repayment records the debt it reduced: the
-  property's own debt or a mortgage (`repaymentTarget`, `repaymentMortgageId`). Editing it on the
-  same property or deleting it reverses the effect on that debt, even after the property was
-  linked to a mortgage, relinked or unlinked. A repayment whose mortgage was deleted moves no
-  balance. Moving a repayment to another property pays that property's current debt.
+- **Repayments stay with their debt.** A repayment lives in the mortgage's ledger it paid, so
+  editing or deleting it reverses the effect on that mortgage whatever the property's link is
+  later. A property records no repayment of its own.
 - **Moves conserve.** Moving a transaction to another account or pot removes its effect from the
   old parent and adds it to the new one.
 - **Concurrent writes serialise.** An edit or delete locks the ledger row before reversing it, so a
@@ -279,7 +308,13 @@ ledger`. A budget category keeps `spent = opening spent + its transactions`.
   one import run one at a time, so concurrent commits and overlapping imports write each row once.
 - **Linked debt is read, not copied.** A property linked to an active mortgage takes its debt from
   the mortgage; an archived or missing linked mortgage contributes no debt. Mortgage debt is
-  deducted inside property equity and never counted again as a liability.
+  deducted inside property equity and never counted again as a liability. Equity is derived on
+  the server on every read and never stored; a mortgage reads its property's address and value
+  the same way, so loan-to-value follows the property's valuations.
+- **Past debt comes from the debt's ledger.** The net worth history values a property at a past
+  point by its latest valuation by then (its purchase price before the first, its current value
+  when it has none), and its debt by its mortgage's balance plus the principal the mortgage's
+  repayments applied after that point (less what a zero balance absorbed).
 - **Totals reconcile.** For each partner, the dashboard allocations, the totals a client derives
   from the list endpoints with the shared rules the pages use, and the same aggregate computed in
   SQL with each row rounded to cents agree to the cent. A stored snapshot's total matches the live
@@ -294,9 +329,9 @@ These are recorded, not yet fixed:
 - **Odd-cent joint amounts.** Each partner's total rounds its half of an odd-cent joint amount
   away from zero, so the two partners' totals can exceed the household's by one cent per such
   amount.
-- **Repayments recorded before 0.9.0.** They carry no clamped principal and no debt. One that was
-  clamped still restores its full principal (at most one cent too much), and a property repayment
-  is still reversed against the property's current link. Quro does not guess either for old rows.
+- **Repayments recorded before 0.9.0.** They carry no clamped principal. One that was clamped
+  still restores its full principal (at most one cent too much). Quro does not guess it for old
+  rows.
 - **Provider balances.** A bunq-synced savings account takes its balance from bunq; its imported
   transactions are a record and do not move the balance.
 
@@ -404,21 +439,23 @@ cents (for example 4.762747 → 4.762749 months).
 
 ## Where the tests live
 
-| Invariant                                                       | Tests                                                                                                                                                                       |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cent rounding, round trips, float sums                          | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                                                                 |
-| Money input: cents, the 10^13 limit, non-money untouched        | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                                                          |
-| Unit prices: six decimals, dividends in cents, value            | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`                                           |
-| Allocation identities, order, additivity, FX, linked debt       | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                                                      |
-| Joint shares, signs, missing data                               | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                                                          |
-| Positions, signs, property types, shares, sums, percents        | `packages/shared/test/domainMaths.test.ts`                                                                                                                                  |
-| Dashboard and page totals agree (golden household)              | `packages/backend/src/lib/goldenHousehold.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`                                                                |
-| FX cut-offs and fail-closed rates                               | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                                                        |
-| Ledger balances under random edits, moves and deletes           | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                                                          |
-| Concurrent edits, deletes and import commits                    | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                                                         |
-| Clamped repayments, repayment debt, archive vs edit             | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                                                         |
-| One committed import per statement (migration preflight)        | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                                                                |
-| Golden household reconciliation across API, pages and SQL       | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                                                                   |
-| CSV import: parsing, locale, duplicates, batches, balance check | `packages/backend/src/lib/csvImport/csvImport.test.ts`, `packages/backend/src/routes/csvImports.integration.test.ts`, `packages/backend/src/db/csvImportsMigration.test.ts` |
-| Repeated bunq imports                                           | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts`                                      |
-| Stale and extrapolated rules                                    | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                                                      |
+| Invariant                                                         | Tests                                                                                                                                                                       |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cent rounding, round trips, float sums                            | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                                                                 |
+| Money input: cents, the 10^13 limit, non-money untouched          | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                                                          |
+| Unit prices: six decimals, dividends in cents, value              | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`                                           |
+| Allocation identities, order, additivity, FX, linked debt         | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                                                      |
+| Joint shares, signs, missing data                                 | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                                                          |
+| Positions, signs, property types, shares, sums, percents          | `packages/shared/test/domainMaths.test.ts`                                                                                                                                  |
+| Dashboard and page totals agree (golden household)                | `packages/backend/src/lib/goldenHousehold.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`                                                                |
+| FX cut-offs and fail-closed rates                                 | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                                                        |
+| Ledger balances under random edits, moves and deletes             | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                                                          |
+| Concurrent edits, deletes and import commits                      | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                                                         |
+| Clamped repayments, valuations and current value, archive vs edit | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                                                         |
+| Property and mortgage ledgers separated (migration preflight)     | `packages/backend/src/db/propertyMortgageLedgerMigration.test.ts`                                                                                                           |
+| Expected mortgage repayment                                       | `packages/shared/test/mortgageRepayment.test.ts`                                                                                                                            |
+| One committed import per statement (migration preflight)          | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                                                                |
+| Golden household reconciliation across API, pages and SQL         | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                                                                   |
+| CSV import: parsing, locale, duplicates, batches, balance check   | `packages/backend/src/lib/csvImport/csvImport.test.ts`, `packages/backend/src/routes/csvImports.integration.test.ts`, `packages/backend/src/db/csvImportsMigration.test.ts` |
+| Repeated bunq imports                                             | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts`                                      |
+| Stale and extrapolated rules                                      | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                                                      |

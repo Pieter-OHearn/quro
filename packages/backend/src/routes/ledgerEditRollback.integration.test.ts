@@ -24,7 +24,6 @@ async function createProperty(owner: AuthSession, address: string) {
         propertyType: 'primary_home',
         purchasePrice: 280000,
         currentValue: 300000,
-        mortgage: 100000,
         monthlyRent: 0,
         currency: 'EUR',
       },
@@ -60,9 +59,9 @@ async function outstandingBalance(mortgageId: number) {
   return Number(row!.outstandingBalance);
 }
 
-async function manualMortgage(propertyId: number) {
+async function currentValue(propertyId: number) {
   const [row] = await db.select().from(properties).where(eq(properties.id, propertyId));
-  return Number(row!.mortgage);
+  return Number(row!.currentValue);
 }
 
 describe('mortgage transaction edits', () => {
@@ -142,18 +141,11 @@ describe('property transaction edits', () => {
       await integration.request('/api/investments/property-transactions', {
         method: 'POST',
         cookie: owner.cookie,
-        json: {
-          propertyId,
-          type: 'repayment',
-          amount: 1200,
-          interest: 200,
-          principal: 1000,
-          date: '2026-03-01',
-        },
+        json: { propertyId, type: 'valuation', amount: 310000, date: '2026-03-01' },
       }),
     );
     transactionId = transaction.id;
-    expect(await manualMortgage(propertyId)).toBe(99000);
+    expect(await currentValue(propertyId)).toBe(310000);
   });
 
   const edit = (json: unknown) =>
@@ -163,24 +155,24 @@ describe('property transaction edits', () => {
       json,
     });
 
-  test('a valid edit moves the balance by the difference', async () => {
-    expect((await edit({ principal: 800, interest: 400 })).status).toBe(200);
-    expect(await manualMortgage(propertyId)).toBe(99200);
-    expect((await edit({ principal: 1000, interest: 200 })).status).toBe(200);
-    expect(await manualMortgage(propertyId)).toBe(99000);
+  test('a valid edit moves the current value with the valuation', async () => {
+    expect((await edit({ amount: 305000 })).status).toBe(200);
+    expect(await currentValue(propertyId)).toBe(305000);
+    expect((await edit({ amount: 310000 })).status).toBe(200);
+    expect(await currentValue(propertyId)).toBe(310000);
   });
 
-  test('an edit that would overdraw the balance is refused and changes nothing', async () => {
-    const response = await edit({ amount: 500000, principal: 500000, interest: 0 });
+  test('an edit into a type the property ledger does not keep is refused and changes nothing', async () => {
+    const response = await edit({ type: 'repayment' });
     expect(response.status).toBe(400);
-    expect(await manualMortgage(propertyId)).toBe(99000);
+    expect(await currentValue(propertyId)).toBe(310000);
   });
 
   test('an edit that points at a property the user cannot see is refused and changes nothing', async () => {
     const response = await edit({ propertyId: strangerPropertyId });
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'Property not found' });
-    expect(await manualMortgage(propertyId)).toBe(99000);
-    expect(await manualMortgage(strangerPropertyId)).toBe(100000);
+    expect(await currentValue(propertyId)).toBe(310000);
+    expect(await currentValue(strangerPropertyId)).toBe(300000);
   });
 });

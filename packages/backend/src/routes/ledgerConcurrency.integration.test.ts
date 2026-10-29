@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { toCents } from '@quro/shared';
 import { db } from '../db/client';
 import {
@@ -248,7 +248,6 @@ describe('concurrent edits and deletes of one ledger row', () => {
         lender: 'Synthetic Lender',
         originalAmount: 200000,
         outstandingBalance: 200000,
-        propertyValue: 320000,
         monthlyPayment: 1000,
         interestRate: 3,
         rateType: 'fixed',
@@ -296,11 +295,11 @@ describe('concurrent edits and deletes of one ledger row', () => {
     const read = await integration.request(`/api/investments/properties/${property.id}`, {
       cookie: owner.cookie,
     });
-    const linked = ((await read.json()) as { data: { mortgage: number } }).data;
-    expect(toCents(linked.mortgage)).toBe(toCents(row!.outstandingBalance));
+    const linked = ((await read.json()) as { data: { debt: number } }).data;
+    expect(toCents(linked.debt)).toBe(toCents(row!.outstandingBalance));
   });
 
-  test('property: the manual debt of an unlinked property follows its repayments', async () => {
+  test('property: the current value stays the latest remaining valuation', async () => {
     const owner = await integration.signUp('property');
     const property = await created<{ id: number }>(
       await post(owner, '/api/investments/properties', {
@@ -308,33 +307,25 @@ describe('concurrent edits and deletes of one ledger row', () => {
         propertyType: 'primary_home',
         purchasePrice: 250000,
         currentValue: 260000,
-        mortgage: 150000,
         monthlyRent: 0,
         currency: 'EUR',
         emoji: 'P',
       }),
     );
-    const repayment = {
-      propertyId: property.id,
-      type: 'repayment',
-      amount: 900,
-      interest: 300,
-      principal: 600,
-      date: DATE,
-    };
+    const valuation = { propertyId: property.id, type: 'valuation', amount: 270000, date: DATE };
 
     for (let round = 0; round < ROUNDS; round += 1) {
       const edited = await created<{ id: number }>(
-        await post(owner, '/api/investments/property-transactions', repayment),
+        await post(owner, '/api/investments/property-transactions', valuation),
       );
       await editTwiceAtOnce(
         owner,
         `/api/investments/property-transactions/${edited.id}`,
-        { amount: 1000, principal: 700 },
-        { amount: 1100, principal: 800 },
+        { amount: 280000 + round },
+        { amount: 290000 + round },
       );
       const deleted = await created<{ id: number }>(
-        await post(owner, '/api/investments/property-transactions', repayment),
+        await post(owner, '/api/investments/property-transactions', valuation),
       );
       await deleteTwiceAtOnce(owner, `/api/investments/property-transactions/${deleted.id}`);
     }
@@ -343,11 +334,10 @@ describe('concurrent edits and deletes of one ledger row', () => {
     const ledger = await db
       .select()
       .from(propertyTransactions)
-      .where(eq(propertyTransactions.propertyId, property.id));
+      .where(eq(propertyTransactions.propertyId, property.id))
+      .orderBy(desc(propertyTransactions.date), desc(propertyTransactions.id));
     expect(ledger).toHaveLength(ROUNDS);
-    expect(toCents(row!.mortgage)).toBe(
-      toCents(150000) - sumCents(ledger.map((txn) => txn.principal ?? 0)),
-    );
+    expect(row!.currentValue).toBe(ledger[0]!.amount);
   });
 
   test('debt: the remaining balance follows the remaining payments', async () => {

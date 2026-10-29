@@ -162,7 +162,6 @@ async function seedHousehold(): Promise<Household> {
     lender: 'Synthetic Lender',
     originalAmount: 300_000,
     outstandingBalance: 250_000,
-    propertyValue: 400_000,
     monthlyPayment: 1_500,
     interestRate: 3,
     rateType: 'fixed',
@@ -235,9 +234,11 @@ async function pageTotals(session: AuthSession): Promise<Components> {
       holdingValue(netHoldingShares(txns), holding.currentPrice) * rate(holding.currency),
     );
   }
-  const homes = await get<
-    Array<Money & { currentValue: number; mortgage: number; isJoint: boolean }>
-  >(session, '/api/investments/properties');
+  // A property's equity comes from the API, already weighted by each side's household share.
+  const homes = await get<Array<Money & { equity: number }>>(
+    session,
+    '/api/investments/properties',
+  );
   const pots = await get<Array<Money & { balance: number }>>(session, '/api/pensions/pots');
   const debts = await get<Array<Money & { remainingBalance: number }>>(session, '/api/debts');
   return {
@@ -245,12 +246,7 @@ async function pageTotals(session: AuthSession): Promise<Components> {
       accounts.map((row) => row.balance * householdShare(row.isJoint) * rate(row.currency)),
     ),
     brokerage: sumMoney(holdingValues),
-    propertyEquity: sumMoney(
-      homes.map(
-        (row) =>
-          (row.currentValue - row.mortgage) * householdShare(row.isJoint) * rate(row.currency),
-      ),
-    ),
+    propertyEquity: sumMoney(homes.map((row) => row.equity * rate(row.currency))),
     pension: sumMoney(pots.map((row) => row.balance * rate(row.currency))),
     liabilities: sumMoney(debts.map((row) => row.remainingBalance * rate(row.currency))),
   };
@@ -277,9 +273,8 @@ async function databaseTotals(userId: number, partnerId: number): Promise<Compon
         left join (select holding_id, sum(case type when 'buy' then shares when 'sell' then -shares
           else 0 end) as net from holding_transactions group by holding_id) t on t.holding_id = h.id
         where h.user_id = ${userId} and h.archived_at is null)::text as brokerage,
-      (select coalesce(sum(round((p.current_value * ${jointShare('p')} - case when p.mortgage_id is null
-          then p.mortgage * ${jointShare('p')} else coalesce(m.outstanding_balance * ${jointShare('m')}, 0)
-          end) * r.rate, 2)), 0)
+      (select coalesce(sum(round((p.current_value * ${jointShare('p')}
+          - coalesce(m.outstanding_balance * ${jointShare('m')}, 0)) * r.rate, 2)), 0)
         from properties p join ${rates} r on r.currency = p.currency::text
         left join mortgages m on m.id = p.mortgage_id and m.archived_at is null
         where ${visible('p')})::text as property_equity,
@@ -375,13 +370,12 @@ describe('golden household totals reconcile across the API, the pages and the da
     await expectReconciled(household.owner, household.partner.user.id, owner);
     await expectReconciled(household.partner, household.owner.user.id, partner);
     // Each joint row is counted once across the two partners: the halves add up to the whole.
-    const [home] = await get<Array<{ currentValue: number; mortgage: number }>>(
+    const [home] = await get<Array<{ currentValue: number; debt: number; totalEquity: number }>>(
       household.owner,
       '/api/investments/properties',
     );
-    expect(toCents(owner.propertyEquity + partner.propertyEquity)).toBe(
-      toCents(home!.currentValue - home!.mortgage),
-    );
+    expect(toCents(home!.totalEquity)).toBe(toCents(home!.currentValue - home!.debt));
+    expect(toCents(owner.propertyEquity + partner.propertyEquity)).toBe(toCents(home!.totalEquity));
   };
 
   test('baseline: private rows stay private and joint rows split 50/50', async () => {

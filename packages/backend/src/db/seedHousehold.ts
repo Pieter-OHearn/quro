@@ -13,7 +13,7 @@ import {
   HOUSEHOLD_AS_OF,
   HOUSEHOLD_EMAILS,
   HOUSEHOLD_TIMESTAMPS,
-  MORTGAGE,
+  MORTGAGES,
   PENSION_POTS,
   PROPERTIES,
   SAVINGS_ACCOUNTS,
@@ -279,7 +279,6 @@ async function seedProperties(context: Context): Promise<void> {
       propertyType: property.propertyType,
       purchasePrice: property.purchasePrice,
       currentValue: property.currentValue,
-      mortgage: property.manualMortgage,
       monthlyRent: property.monthlyRent,
       currency: property.currency,
       emoji: property.emoji,
@@ -289,42 +288,46 @@ async function seedProperties(context: Context): Promise<void> {
   }
 }
 
-async function seedMortgage(context: Context): Promise<void> {
-  const owner = context.api[MORTGAGE.owner];
-  const created = await owner.post<Created>('/api/mortgages', {
-    linkedPropertyId: idOf(context, `property:${MORTGAGE.propertyKey}`),
-    lender: MORTGAGE.lender,
-    originalAmount: MORTGAGE.originalAmount,
-    outstandingBalance: MORTGAGE.openingBalance,
-    monthlyPayment: MORTGAGE.monthlyPayment,
-    interestRate: MORTGAGE.interestRate,
-    rateType: 'Fixed',
-    repaymentType: 'Annuity',
-    fixedUntil: MORTGAGE.fixedUntil,
-    termYears: MORTGAGE.termYears,
-    startDate: MORTGAGE.startDate,
-    endDate: MORTGAGE.endDate,
-    overpaymentLimit: MORTGAGE.overpaymentLimit,
-    isJoint: MORTGAGE.isJoint,
-  });
-  const mortgageId = rememberId(context, 'mortgage:home', created);
-  await owner.post('/api/mortgages/transactions', {
-    mortgageId,
-    type: 'rate_change',
-    amount: MORTGAGE.rateChange.rate,
-    fixedYears: MORTGAGE.rateChange.fixedYears,
-    date: MORTGAGE.rateChange.date,
-    note: MORTGAGE.rateChange.note,
-  });
-  for (const repayment of MORTGAGE.repayments) {
-    await context.api[repayment.by].post('/api/mortgages/transactions', {
-      mortgageId,
-      type: 'repayment',
-      amount: repayment.amount,
-      interest: repayment.interest,
-      date: repayment.date,
-      note: repayment.note,
+async function seedMortgages(context: Context): Promise<void> {
+  for (const mortgage of MORTGAGES) {
+    const owner = context.api[mortgage.owner];
+    const created = await owner.post<Created>('/api/mortgages', {
+      linkedPropertyId: idOf(context, `property:${mortgage.propertyKey}`),
+      lender: mortgage.lender,
+      originalAmount: mortgage.originalAmount,
+      outstandingBalance: mortgage.openingBalance,
+      monthlyPayment: mortgage.monthlyPayment,
+      interestRate: mortgage.interestRate,
+      rateType: mortgage.rateType,
+      repaymentType: 'Annuity',
+      fixedUntil: mortgage.fixedUntil,
+      termYears: mortgage.termYears,
+      startDate: mortgage.startDate,
+      endDate: mortgage.endDate,
+      overpaymentLimit: mortgage.overpaymentLimit,
+      isJoint: mortgage.isJoint,
     });
+    const mortgageId = rememberId(context, `mortgage:${mortgage.key}`, created);
+    if (mortgage.rateChange) {
+      await owner.post('/api/mortgages/transactions', {
+        mortgageId,
+        type: 'rate_change',
+        amount: mortgage.rateChange.rate,
+        fixedYears: mortgage.rateChange.fixedYears,
+        date: mortgage.rateChange.date,
+        note: mortgage.rateChange.note,
+      });
+    }
+    for (const repayment of mortgage.repayments) {
+      await context.api[repayment.by].post('/api/mortgages/transactions', {
+        mortgageId,
+        type: 'repayment',
+        amount: repayment.amount,
+        interest: repayment.interest,
+        date: repayment.date,
+        note: repayment.note,
+      });
+    }
   }
 }
 
@@ -336,7 +339,6 @@ async function seedPropertyLedgers(context: Context): Promise<void> {
         propertyId,
         type: transaction.type,
         amount: transaction.amount,
-        interest: transaction.type === 'repayment' ? transaction.interest : undefined,
         date: transaction.date,
         note: transaction.note,
       });
@@ -541,7 +543,7 @@ async function writeHousehold(
     await confirmBankingEntities(context);
     await seedHoldings(context);
     await seedProperties(context);
-    await seedMortgage(context);
+    await seedMortgages(context);
     await seedPropertyLedgers(context);
     await seedPensions(context);
     await seedDebts(context);

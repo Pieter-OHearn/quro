@@ -26,6 +26,7 @@ import {
   mortgages,
   payslips,
   planAssumptions,
+  properties,
   savingsAccounts,
   savingsTransactions,
   users,
@@ -289,7 +290,14 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
       .from(holdings)
       .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
     db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-    loadHouseholdRows(mortgages, userId, partnerId),
+    // A mortgage is labelled with its linked property's address.
+    db
+      .select({ ...getTableColumns(mortgages), propertyAddress: properties.address })
+      .from(mortgages)
+      .leftJoin(properties, eq(properties.mortgageId, mortgages.id))
+      .where(
+        and(ownedOrJointPredicate(mortgages, userId, partnerId), isNull(mortgages.archivedAt)),
+      ),
     db
       .select()
       .from(debts)

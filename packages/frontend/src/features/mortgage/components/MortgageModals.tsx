@@ -9,6 +9,8 @@ type MortgageModalsProps = {
   editingTxn: MortgageTransaction | null;
   showMortgageModal: boolean;
   mortgage: MortgageType;
+  /** The mortgage's ledger, for the suggested repayment. */
+  transactions: MortgageTransaction[];
   editingMortgage: MortgageType | null;
   properties: Property[];
   editingLinkedPropertyId: number | null;
@@ -24,6 +26,7 @@ export function MortgageModals({
   editingTxn,
   showMortgageModal,
   mortgage,
+  transactions,
   editingMortgage,
   properties,
   editingLinkedPropertyId,
@@ -38,6 +41,7 @@ export function MortgageModals({
       {(showTxnModal || editingTxn) && (
         <AddMortgageTxnModal
           mortgage={mortgage}
+          transactions={transactions}
           existing={editingTxn ?? undefined}
           onClose={onCloseTxnModal}
           onSave={onSaveTxn}

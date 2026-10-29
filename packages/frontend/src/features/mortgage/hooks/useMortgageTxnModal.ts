@@ -8,13 +8,24 @@ import {
 } from '@quro/shared';
 import { formatFixedInputValue } from '@/lib/utils';
 import type { MortgageTxnType, SaveMortgageTxnInput } from '../types';
+import {
+  nextRepaymentDate,
+  repaymentNote,
+  suggestRepayment,
+  type RepaymentSuggestion,
+} from '../utils/repayment-suggestion';
 
 type UseMortgageTxnModalParams = {
   mortgage: MortgageType;
+  /** The mortgage's ledger: the latest repayment and the rate changes shape the suggestion. */
+  transactions: readonly MortgageTransaction[];
   existing?: MortgageTransaction;
   onSave: (t: SaveMortgageTxnInput) => void;
   onClose: () => void;
 };
+
+/** The fields a new repayment pre-fills; one the user changed keeps the user's value. */
+type SuggestedField = 'amount' | 'interest' | 'date' | 'note';
 
 function validateTxn(
   type: MortgageTxnType,
@@ -76,34 +87,99 @@ function useMortgageTxnFormState(existing?: MortgageTransaction) {
   const [date, setDate] = useState(initial.date);
   const [note, setNote] = useState(initial.note);
   const [error, setError] = useState('');
+  // An edited transaction keeps what was recorded: every field counts as the user's.
+  const [touched, setTouched] = useState<ReadonlySet<SuggestedField>>(
+    () => new Set(existing ? (['amount', 'interest', 'date', 'note'] as const) : []),
+  );
+  const touch = (field: SuggestedField) =>
+    setTouched((previous) => (previous.has(field) ? previous : new Set([...previous, field])));
 
   return {
     type,
     setType,
     amount,
-    setAmount,
+    setAmount: (value: string) => {
+      setAmount(value);
+      touch('amount');
+    },
     interest,
-    setInterest,
+    setInterest: (value: string) => {
+      setInterest(value);
+      touch('interest');
+    },
     fixedYears,
     setFixedYears,
     date,
-    setDate,
+    setDate: (value: string) => {
+      setDate(value);
+      touch('date');
+    },
     note,
-    setNote,
+    setNote: (value: string) => {
+      setNote(value);
+      touch('note');
+    },
     error,
     setError,
+    touched,
+    resetSuggestion: () => setTouched(new Set()),
+    clearValues: () => {
+      setAmount('');
+      setInterest('');
+      setFixedYears('');
+      setTouched(new Set());
+    },
+  };
+}
+
+type FormState = ReturnType<typeof useMortgageTxnFormState>;
+
+// A new repayment starts from what the loan expects: dated a month after the latest repayment,
+// noted with its month, its amount and interest from the rate and loan type. Each field the
+// user has not changed follows the suggestion, so a new date also moves the note and the rate.
+function resolveRepaymentSuggestion(
+  form: FormState,
+  mortgage: MortgageType,
+  transactions: readonly MortgageTransaction[],
+  existing: MortgageTransaction | undefined,
+) {
+  const suggests = !existing && form.type === 'repayment';
+  const date =
+    form.touched.has('date') || !suggests
+      ? form.date
+      : nextRepaymentDate(transactions, todayIsoDate());
+  const suggestion: RepaymentSuggestion | null = suggests
+    ? suggestRepayment(mortgage, transactions, date)
+    : null;
+  const pick = (field: SuggestedField, own: string, suggested: string) =>
+    suggestion && !form.touched.has(field) ? suggested : own;
+  return {
+    suggestion,
+    date,
+    amount: pick('amount', form.amount, suggestion ? formatFixedInputValue(suggestion.amount) : ''),
+    interest: pick(
+      'interest',
+      form.interest,
+      suggestion ? formatFixedInputValue(suggestion.interest) : '',
+    ),
+    note: pick('note', form.note, repaymentNote(date)),
+    // The reset link restores every field the user changed.
+    canReset: suggestion !== null && form.touched.size > 0,
   };
 }
 
 export function useMortgageTxnModal({
   mortgage,
+  transactions,
   existing,
   onSave,
   onClose,
 }: UseMortgageTxnModalParams) {
   const formState = useMortgageTxnFormState(existing);
-  const { type, amount, interest, fixedYears, date, note } = formState;
-  const { setType, setError, setAmount, setInterest, setFixedYears } = formState;
+  const { type, fixedYears } = formState;
+  const { setType, setError } = formState;
+  const suggested = resolveRepaymentSuggestion(formState, mortgage, transactions, existing);
+  const { amount, interest, date, note } = suggested;
 
   const parsedAmount = parseFloat(amount) || 0;
   const parsedInterest = parseFloat(interest) || 0;
@@ -114,9 +190,7 @@ export function useMortgageTxnModal({
   const handleTypeChange = (nextType: MortgageTxnType) => {
     setType(nextType);
     setError('');
-    setAmount('');
-    setInterest('');
-    setFixedYears('');
+    formState.clearValues();
   };
 
   const handleSave = () => {
@@ -142,6 +216,12 @@ export function useMortgageTxnModal({
 
   return {
     ...formState,
+    amount,
+    interest,
+    date,
+    note,
+    suggestion: suggested.suggestion,
+    canResetSuggestion: suggested.canReset,
     parsedAmount,
     parsedInterest,
     parsedFixedYears,

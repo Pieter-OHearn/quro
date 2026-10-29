@@ -106,30 +106,44 @@ const property = (
   id: number,
   propertyType: string,
   currentValue: number,
-  mortgage: number,
   mortgageId: number | null,
   currency: CurrencyCode,
   isJoint: boolean,
+  // What the API derives from the linked mortgage: its balance, and the equity it leaves.
+  derived: Pick<Property, 'debt' | 'totalEquity' | 'equity'>,
 ): Property => ({
   id,
   address: `${id} Synthetic Lane`,
   propertyType,
   purchasePrice: currentValue,
   currentValue,
-  mortgage,
   mortgageId,
   monthlyRent: 0,
   currency,
   emoji: 'H',
   isJoint,
+  ...derived,
 });
 
 export const GOLDEN_PROPERTIES: readonly Property[] = [
   // Joint home with a linked joint mortgage: (400,000.01 - 250,000.03) × 0.5 = 74,999.99.
-  property(1, 'primary_home', 400_000.01, 0, 1, 'EUR', true),
-  // Negative equity is kept: (180,000 - 210,000) × 1.18 = -35,400.00.
-  property(2, 'rental', 180_000, 210_000, null, 'GBP', false),
-  property(3, ' Buy-To-Let ', 150_000, 0, null, 'EUR', false), // 150,000.00
+  property(1, 'primary_home', 400_000.01, 1, 'EUR', true, {
+    debt: 250_000.03,
+    totalEquity: 149_999.98,
+    equity: 74_999.99,
+  }),
+  // Negative equity is kept, with its own mortgage: (180,000 - 210,000) × 1.18 = -35,400.00.
+  property(2, 'rental', 180_000, 2, 'GBP', false, {
+    debt: 210_000,
+    totalEquity: -30_000,
+    equity: -30_000,
+  }),
+  // 150,000.00
+  property(3, ' Buy-To-Let ', 150_000, null, 'EUR', false, {
+    debt: 0,
+    totalEquity: 150_000,
+    equity: 150_000,
+  }),
 ];
 
 export const GOLDEN_MORTGAGES: readonly Mortgage[] = [
@@ -137,11 +151,11 @@ export const GOLDEN_MORTGAGES: readonly Mortgage[] = [
     id: 1,
     linkedPropertyId: 1,
     propertyAddress: '1 Synthetic Lane',
+    propertyValue: 400_000.01,
     lender: 'Synthetic Lender',
     currency: 'EUR',
     originalAmount: 300_000,
     outstandingBalance: 250_000.03,
-    propertyValue: 400_000,
     monthlyPayment: 1_500,
     interestRate: 3,
     rateType: 'Fixed',
@@ -152,6 +166,26 @@ export const GOLDEN_MORTGAGES: readonly Mortgage[] = [
     endDate: '2051-01-01',
     overpaymentLimit: 10,
     isJoint: true,
+  },
+  {
+    id: 2,
+    linkedPropertyId: 2,
+    propertyAddress: '2 Synthetic Lane',
+    propertyValue: 180_000,
+    lender: 'Synthetic Lender',
+    currency: 'GBP',
+    originalAmount: 220_000,
+    outstandingBalance: 210_000,
+    monthlyPayment: 1_000,
+    interestRate: 4,
+    rateType: 'Variable',
+    repaymentType: 'Annuity',
+    fixedUntil: 'N/A',
+    termYears: 25,
+    startDate: '2022-01-01',
+    endDate: '2047-01-01',
+    overpaymentLimit: 10,
+    isJoint: false,
   },
 ];
 

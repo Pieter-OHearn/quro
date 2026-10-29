@@ -49,6 +49,8 @@ export const queryKeys = {
     all: ['mortgages'] as const,
     archived: ['mortgages', 'archived'] as const,
     transactions: (mortgageId?: number) => ['mortgages', 'transactions', mortgageId] as const,
+    /** Every mortgage ledger the household can read, for the property cards. */
+    allTransactions: ['mortgages', 'transactions', 'all'] as const,
   },
   debts: {
     all: ['debts'] as const,
