@@ -168,9 +168,9 @@ Needs no settings and no database.
 
 ```json
 {
-  "version": "v1.0.0-rc.5",
+  "version": "v1.0.0-rc.6",
   "revision": "<commit the image was built from>",
-  "migrations": { "latest": "0045_exposure_classification", "count": 46 },
+  "migrations": { "latest": "0046_property_mortgage_ledger_ownership", "count": 47 },
   "runtime": { "bun": "1.4.3", "platform": "linux", "arch": "arm64" }
 }
 ```
