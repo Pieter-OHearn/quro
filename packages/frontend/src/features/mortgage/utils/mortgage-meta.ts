@@ -1,5 +1,5 @@
 import { MORTGAGE_TRANSACTION_TYPES } from '@quro/shared';
-import { Home, Landmark, Percent } from 'lucide-react';
+import { Landmark, Percent } from 'lucide-react';
 import type { MortgageTxnType } from '../types';
 
 export const TXN_META: Record<
@@ -18,13 +18,6 @@ export const TXN_META: Record<
     color: 'text-brand',
     bg: 'bg-brand-soft',
     borderColor: 'border-brand',
-  },
-  valuation: {
-    label: 'Valuation',
-    icon: Home,
-    color: 'text-success',
-    bg: 'bg-success-soft',
-    borderColor: 'border-success',
   },
   rate_change: {
     label: 'Rate change',

@@ -12,7 +12,7 @@ import {
   type WwWeeklyRequirementStatus,
   toIsoDate,
 } from '@quro/shared';
-import { and, asc, desc, eq, getTableColumns, gte, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTP_STATUS } from '../constants/http';
 import { db } from '../db/client';
@@ -26,6 +26,7 @@ import {
   mortgages,
   payslips,
   planAssumptions,
+  properties,
   savingsAccounts,
   savingsTransactions,
   users,
@@ -289,7 +290,21 @@ async function loadRunwayData(userId: number, partnerId: number | null, now: Dat
       .from(holdings)
       .where(and(eq(holdings.userId, userId), isNull(holdings.archivedAt))),
     db.select().from(holdingTransactions).where(eq(holdingTransactions.userId, userId)),
-    loadHouseholdRows(mortgages, userId, partnerId),
+    // A mortgage is labelled with its linked property's address. A subquery rather than a join,
+    // so a mortgage is one row of contractual payments however many properties point at it.
+    db
+      .select({
+        ...getTableColumns(mortgages),
+        propertyAddress: sql<string | null>`(
+          select ${properties.address} from ${properties}
+          where ${properties.mortgageId} = ${mortgages.id}
+          order by ${properties.id} limit 1
+        )`,
+      })
+      .from(mortgages)
+      .where(
+        and(ownedOrJointPredicate(mortgages, userId, partnerId), isNull(mortgages.archivedAt)),
+      ),
     db
       .select()
       .from(debts)

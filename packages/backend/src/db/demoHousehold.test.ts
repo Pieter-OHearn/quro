@@ -15,7 +15,7 @@ import {
   HOLDINGS,
   HOUSEHOLD_AS_OF,
   HOUSEHOLD_EMAILS,
-  MORTGAGE,
+  MORTGAGES,
   PENSION_POTS,
   PROPERTIES,
   SAVINGS_ACCOUNTS,
@@ -52,8 +52,10 @@ function datedRows(): { source: string; date: string }[] {
     ...HOLDINGS.flatMap((h) => h.transactions.map((t) => ({ source: h.key, date: t.date }))),
     ...HOLDINGS.flatMap((h) => h.priceHistory.map(([date]) => ({ source: h.key, date }))),
     ...PROPERTIES.flatMap((p) => p.transactions.map((t) => ({ source: p.key, date: t.date }))),
-    ...MORTGAGE.repayments.map((r) => ({ source: 'mortgage', date: r.date })),
-    { source: 'rate change', date: MORTGAGE.rateChange.date },
+    ...MORTGAGES.flatMap((m) => [
+      ...m.repayments.map((r) => ({ source: m.key, date: r.date })),
+      ...(m.rateChange ? [{ source: m.key, date: m.rateChange.date }] : []),
+    ]),
     ...PENSION_POTS.flatMap((p) => p.transactions.map((t) => ({ source: p.key, date: t.date }))),
     ...DEBTS.flatMap((d) => d.payments.map((t) => ({ source: d.key, date: t.date }))),
     ...EMPLOYMENTS.flatMap((e) => e.payslips.map((t) => ({ source: e.key, date: t.date }))),
@@ -95,14 +97,15 @@ describe('demo household data', () => {
       ...PROPERTIES.flatMap((p) => [
         p.purchasePrice,
         p.currentValue,
-        p.manualMortgage,
         p.monthlyRent,
         ...p.transactions.map((t) => t.amount),
       ]),
-      MORTGAGE.originalAmount,
-      MORTGAGE.openingBalance,
-      MORTGAGE.monthlyPayment,
-      ...MORTGAGE.repayments.flatMap((r) => [r.amount, r.interest]),
+      ...MORTGAGES.flatMap((m) => [
+        m.originalAmount,
+        m.openingBalance,
+        m.monthlyPayment,
+        ...m.repayments.flatMap((r) => [r.amount, r.interest]),
+      ]),
       ...PENSION_POTS.flatMap((p) => [
         p.openingBalance,
         ...p.transactions.flatMap((t) => [t.amount, t.taxAmount]),
@@ -161,13 +164,14 @@ describe('demo household data', () => {
     }
     expect(PROPERTIES.some((p) => p.isJoint)).toBe(true);
     expect(PROPERTIES.some((p) => !p.isJoint)).toBe(true);
-    expect(MORTGAGE.isJoint).toBe(true);
+    const homeMortgage = MORTGAGES.find((m) => m.propertyKey === 'home')!;
+    expect(homeMortgage.isJoint).toBe(true);
     // Both partners write to a joint ledger.
     const jointAuthors = SAVINGS_ACCOUNTS.filter((a) => a.isJoint).flatMap((a) =>
       a.transactions.map((t) => t.by),
     );
     expect(new Set(jointAuthors)).toEqual(new Set(['demo', 'partner']));
-    expect(new Set(MORTGAGE.repayments.map((r) => r.by))).toEqual(new Set(['demo', 'partner']));
+    expect(new Set(homeMortgage.repayments.map((r) => r.by))).toEqual(new Set(['demo', 'partner']));
   });
 
   test('covers every ledger type the pages show', () => {
@@ -182,8 +186,13 @@ describe('demo household data', () => {
       new Set(['contribution', 'fee', 'annual_statement']),
     );
     expect(types(PROPERTIES.flatMap((p) => [...p.transactions]))).toEqual(
-      new Set(['valuation', 'rent_income', 'expense', 'repayment']),
+      new Set(['valuation', 'rent_income', 'expense']),
     );
+    // Repayments belong to a mortgage, and every mortgage is linked to a household property.
+    expect(MORTGAGES.every((m) => m.repayments.length > 0)).toBe(true);
+    for (const mortgage of MORTGAGES) {
+      expect(PROPERTIES.some((p) => p.key === mortgage.propertyKey)).toBe(true);
+    }
     expect(GOALS.map((goal): string => goal.type).sort()).toEqual(
       ['invest_habit', 'portfolio', 'salary', 'savings', 'savings'].sort(),
     );
@@ -227,11 +236,7 @@ describe('demo household data', () => {
   });
 
   test('splits every repayment into interest and principal that add up', () => {
-    const rows = [
-      ...MORTGAGE.repayments,
-      ...DEBTS.flatMap((d) => d.payments),
-      ...PROPERTIES.flatMap((p) => p.transactions.filter((t) => t.type === 'repayment')),
-    ];
+    const rows = [...MORTGAGES.flatMap((m) => m.repayments), ...DEBTS.flatMap((d) => d.payments)];
     for (const row of rows) {
       const interest = 'interest' in row ? row.interest : 0;
       expect(interest).toBeGreaterThan(0);
@@ -242,9 +247,11 @@ describe('demo household data', () => {
   });
 
   test('never repays more principal than was owed', () => {
-    expect(expectedMortgageBalance(MORTGAGE)).toBeGreaterThan(0);
-    expect(expectedMortgageBalance(MORTGAGE)).toBeLessThan(MORTGAGE.openingBalance);
-    expect(MORTGAGE.openingBalance).toBeLessThanOrEqual(MORTGAGE.originalAmount);
+    for (const mortgage of MORTGAGES) {
+      expect(expectedMortgageBalance(mortgage)).toBeGreaterThan(0);
+      expect(expectedMortgageBalance(mortgage)).toBeLessThan(mortgage.openingBalance);
+      expect(mortgage.openingBalance).toBeLessThanOrEqual(mortgage.originalAmount);
+    }
     for (const debt of DEBTS) {
       expect(expectedDebtBalance(debt)).toBeGreaterThan(0);
       expect(debt.openingBalance).toBeLessThanOrEqual(debt.originalAmount);
@@ -288,7 +295,7 @@ describe('demo household data', () => {
       SAVINGS_ACCOUNTS,
       HOLDINGS,
       PROPERTIES,
-      MORTGAGE,
+      MORTGAGES,
       PENSION_POTS,
       DEBTS,
       EMPLOYMENTS,

@@ -20,7 +20,7 @@ import {
 } from '@quro/shared';
 import { db, type DbExecutor, type DbTransaction } from '../db/client';
 import { mortgages, mortgageTransactions, properties } from '../db/schema';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { applyRepayment, MORTGAGE_BALANCE, reverseRepayment } from '../lib/balance';
 import { HTTP_STATUS } from '../constants/http';
@@ -46,7 +46,6 @@ import {
   parseIntegerField,
   parseMoneyField,
   parseNormalizedDecimalField,
-  parseNumber,
   parseOptionalId,
   parseOptionalMoneyField,
   parseOptionalNormalizedDecimalField,
@@ -65,12 +64,10 @@ import {
 const app = new Hono();
 const MORTGAGE_FIELDS = [
   'linkedPropertyId',
-  'propertyAddress',
   'lender',
   'currency',
   'originalAmount',
   'outstandingBalance',
-  'propertyValue',
   'monthlyPayment',
   'interestRate',
   'rateType',
@@ -95,12 +92,10 @@ const MORTGAGE_TRANSACTION_FIELDS = [
 
 type MortgagePayload = {
   linkedPropertyId: number;
-  propertyAddress: string;
   lender: string;
   currency: CurrencyCode;
   originalAmount: number;
   outstandingBalance: number;
-  propertyValue: number;
   monthlyPayment: number;
   interestRate: number;
   rateType: MortgageRateType;
@@ -118,10 +113,71 @@ type LinkedProperty = {
   userId: number | null;
   address: string;
   currency: string;
-  currentValue: unknown;
   mortgageId: number | null;
   isJoint: boolean;
 };
+
+type MortgageRow = typeof mortgages.$inferSelect;
+
+// A mortgage's property address and value are the linked property's own, read on every response
+// so loan-to-value and equity follow the property's valuations. The mortgage rows are already
+// access-checked; the linked property can belong to the partner. It is read only while the
+// caller can read it (the caller's own, or the partner's joint), so a property made private or
+// left behind by a removed partner link never shows through the mortgage.
+async function withLinkedProperty<T extends MortgageRow>(
+  rows: readonly T[],
+  access: Access,
+  executor: DbExecutor = db,
+): Promise<
+  Array<
+    T & {
+      linkedPropertyId: number | null;
+      propertyAddress: string | null;
+      propertyValue: number | null;
+    }
+  >
+> {
+  const ids = rows.map((row) => row.id);
+  const linked =
+    ids.length === 0
+      ? []
+      : await executor
+          .select({
+            id: properties.id,
+            mortgageId: properties.mortgageId,
+            address: properties.address,
+            currentValue: properties.currentValue,
+          })
+          .from(properties)
+          .where(
+            and(
+              inArray(properties.mortgageId, ids),
+              ownedOrJointPredicate(properties, access.userId, access.partnerId),
+            ),
+          )
+          .orderBy(asc(properties.id));
+  const byMortgage = new Map<number, (typeof linked)[number]>();
+  for (const property of linked) {
+    if (property.mortgageId != null && !byMortgage.has(property.mortgageId)) {
+      byMortgage.set(property.mortgageId, property);
+    }
+  }
+  return rows.map((row) => {
+    const property = byMortgage.get(row.id);
+    return {
+      ...row,
+      linkedPropertyId: property?.id ?? null,
+      propertyAddress: property?.address ?? null,
+      propertyValue: property?.currentValue ?? null,
+    };
+  });
+}
+
+type Access = { userId: number; partnerId: number | null };
+
+async function serializeMortgage(row: MortgageRow, access: Access, executor: DbExecutor = db) {
+  return (await withLinkedProperty([row], access, executor))[0];
+}
 
 function parseMortgageRateTypeField(value: unknown): ParseResult<MortgageRateType> {
   if (typeof value !== 'string') return err('Invalid mortgage rate type');
@@ -140,7 +196,12 @@ function parseMortgageRepaymentTypeField(value: unknown): ParseResult<MortgageRe
   return repaymentType ? ok(repaymentType) : err('Invalid mortgage repayment type');
 }
 
+// A mortgage's ledger records what happens to the loan; valuations, rent and expenses belong to
+// the property's ledger.
 function parseMortgageTransactionTypeField(value: unknown): ParseResult<MortgageTransactionType> {
+  if (value === 'valuation' || value === 'rent_income' || value === 'expense') {
+    return err('Record valuations, rent and expenses on the property');
+  }
   return typeof value === 'string' &&
     MORTGAGE_TRANSACTION_TYPES.includes(value as MortgageTransactionType)
     ? ok(value as MortgageTransactionType)
@@ -149,7 +210,6 @@ function parseMortgageTransactionTypeField(value: unknown): ParseResult<Mortgage
 
 const mortgageParsers: FieldParsers<MortgagePayload> = {
   linkedPropertyId: (value) => parseIntegerField(value, 'linkedPropertyId is required', 1),
-  propertyAddress: (value) => parseTextField(value, 'Property address is required'),
   lender: (value) => parseTextField(value, 'Lender is required'),
   currency: parseCurrencyField,
   originalAmount: (value) =>
@@ -164,13 +224,6 @@ const mortgageParsers: FieldParsers<MortgagePayload> = {
       field: 'outstandingBalance',
       error: 'Outstanding balance must be zero or greater',
       min: 0,
-      localized: true,
-    }),
-  propertyValue: (value) =>
-    parseMoneyField(value, {
-      field: 'propertyValue',
-      error: 'Property value must be greater than zero',
-      min: Number.MIN_VALUE,
       localized: true,
     }),
   monthlyPayment: (value) =>
@@ -425,7 +478,8 @@ async function prepareMortgagePatch(params: {
 
 // Property ids come from access-checked resolution, so updates are by id only.
 // Jointness propagates to the linked property to keep the pair's 50% dashboard
-// weighting consistent (equity = value - mortgage balance).
+// weighting consistent (equity = value - mortgage balance). A property's debt is
+// its linked mortgage, so unlinking leaves it with none.
 async function syncLinkedProperty(
   executor: DbExecutor,
   prevId: number | null,
@@ -434,16 +488,10 @@ async function syncLinkedProperty(
   isJoint: boolean,
 ) {
   if (prevId != null && prevId !== nextId) {
-    await executor
-      .update(properties)
-      .set({ mortgageId: null, mortgage: 0 })
-      .where(eq(properties.id, prevId));
+    await executor.update(properties).set({ mortgageId: null }).where(eq(properties.id, prevId));
   }
   if (nextId != null) {
-    await executor
-      .update(properties)
-      .set({ mortgageId, mortgage: 0, isJoint })
-      .where(eq(properties.id, nextId));
+    await executor.update(properties).set({ mortgageId, isJoint }).where(eq(properties.id, nextId));
   }
 }
 
@@ -538,28 +586,15 @@ function normalizeRateChangeMortgageTransaction(
   });
 }
 
-function normalizeInformationalMortgageTransaction(
-  payload: MortgageTransactionPayload,
-): ParseResult<MortgageTransactionPayload> {
-  return ok({
-    ...payload,
-    interest: null,
-    principal: null,
-    fixedYears: null,
-  });
-}
-
 function validateMortgageTransactionPayload(
   payload: MortgageTransactionPayload,
 ): ParseResult<MortgageTransactionPayload> {
-  // A rate change carries the new interest rate in `amount`; every other type carries money.
+  // A rate change carries the new interest rate in `amount`; a repayment carries money.
   if (payload.type === 'rate_change') return normalizeRateChangeMortgageTransaction(payload);
   const amount = toMoneyAmount(payload.amount, 'amount');
   if (!amount.ok) return amount;
   if (amount.value <= 0) return err('Transaction amount must be greater than zero');
-  const money = { ...payload, amount: amount.value };
-  if (money.type === 'repayment') return normalizeRepaymentMortgageTransaction(money);
-  return normalizeInformationalMortgageTransaction(money);
+  return normalizeRepaymentMortgageTransaction({ ...payload, amount: amount.value });
 }
 
 function mergeMortgagePayload(
@@ -569,12 +604,10 @@ function mergeMortgagePayload(
 ): ParseResult<MortgagePayload> {
   return parseMortgageCreate({
     linkedPropertyId,
-    propertyAddress: pickPatchedValue(patch.propertyAddress, existing.propertyAddress),
     lender: pickPatchedValue(patch.lender, existing.lender),
     currency: pickPatchedValue(patch.currency, existing.currency),
     originalAmount: pickPatchedValue(patch.originalAmount, existing.originalAmount),
     outstandingBalance: pickPatchedValue(patch.outstandingBalance, existing.outstandingBalance),
-    propertyValue: pickPatchedValue(patch.propertyValue, existing.propertyValue),
     monthlyPayment: pickPatchedValue(patch.monthlyPayment, existing.monthlyPayment),
     interestRate: pickPatchedValue(patch.interestRate, existing.interestRate),
     rateType: pickPatchedValue(patch.rateType, existing.rateType),
@@ -609,12 +642,10 @@ function toMortgageValues(
   property: LinkedProperty,
 ): Omit<typeof mortgages.$inferInsert, 'userId'> {
   return {
-    propertyAddress: property.address,
     lender: payload.lender,
     currency: property.currency as CurrencyCode,
     originalAmount: payload.originalAmount,
     outstandingBalance: payload.outstandingBalance,
-    propertyValue: parseNumber(property.currentValue) ?? payload.propertyValue,
     monthlyPayment: payload.monthlyPayment,
     interestRate: payload.interestRate,
     rateType: payload.rateType,
@@ -655,7 +686,7 @@ app.get('/', async (c) => {
     .from(mortgages)
     .where(includeArchived ? accessPredicate : and(accessPredicate, isNull(mortgages.archivedAt)))
     .orderBy(asc(mortgages.id));
-  return c.json({ data });
+  return c.json({ data: await withLinkedProperty(data, { userId: user.id, partnerId }) });
 });
 
 // ── Mortgage Transactions ────────────────────────────────────────────────────
@@ -680,10 +711,9 @@ app.get('/:id', async (c) => {
   const partnerId = getPartnerId(c);
   const data = await getAccessibleMortgage(user.id, partnerId, id);
   if (!data) return c.json({ error: 'Mortgage not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+  return c.json({ data: await serializeMortgage(data, { userId: user.id, partnerId }) });
 });
 
-// eslint-disable-next-line complexity
 app.post('/', async (c) => {
   const user = getAuthUser(c);
   const rawBody = await readJsonBody(c.req, 'Invalid mortgage payload');
@@ -705,17 +735,8 @@ app.post('/', async (c) => {
   const propertyResult = await fetchLinkedProperty(user.id, partnerId, linkedPropertyId.value, 0);
   if (!propertyResult.ok) return c.json({ error: propertyResult.error }, propertyResult.status);
   const property = propertyResult.property;
-  const propertyValue = parseNumber(property.currentValue);
-  if (propertyValue === null || propertyValue <= 0) {
-    return c.json({ error: 'Property value must be greater than zero' }, HTTP_STATUS.BAD_REQUEST);
-  }
 
-  const body = parseMortgageCreate({
-    ...rawBody.value,
-    propertyAddress: property.address,
-    currency: property.currency,
-    propertyValue,
-  });
+  const body = parseMortgageCreate({ ...rawBody.value, currency: property.currency });
   if (!body.ok) return c.json({ error: body.error }, HTTP_STATUS.BAD_REQUEST);
   const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.mortgage);
   if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
@@ -736,17 +757,16 @@ app.post('/', async (c) => {
 
     await tx
       .update(properties)
-      .set({
-        mortgageId: created.id,
-        mortgage: 0,
-        isJoint,
-      })
+      .set({ mortgageId: created.id, isJoint })
       .where(eq(properties.id, property.id));
 
     return created;
   });
 
-  return c.json({ data }, HTTP_STATUS.CREATED);
+  return c.json(
+    { data: await serializeMortgage(data, { userId: user.id, partnerId }) },
+    HTTP_STATUS.CREATED,
+  );
 });
 
 app.patch('/:id', async (c) => {
@@ -796,18 +816,19 @@ app.patch('/:id', async (c) => {
     );
     return updated;
   });
-  return c.json({ data });
+  return c.json({ data: await serializeMortgage(data, { userId: user.id, partnerId }) });
 });
 
 registerArchivableResource(app, {
   path: '',
   table: mortgages,
+  serialize: serializeMortgage,
   label: 'Mortgage',
   idLabel: 'mortgage',
   beforeDelete: async (tx, mortgage) => {
     await tx
       .update(properties)
-      .set({ mortgageId: null, mortgage: 0 })
+      .set({ mortgageId: null })
       .where(eq(properties.mortgageId, mortgage.id));
     return null;
   },

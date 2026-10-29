@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** a property and its mortgage keep separate ledgers. A property records valuations, rent income and expenses; a mortgage records repayments and rate changes. Each refuses the other's types, and each page lists the other's rows read-only with a link to the page that edits them, so a property card now counts and lists its mortgage's repayments. The property, mortgage and transaction APIs change accordingly ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6)).
+- **Breaking:** a property's only debt is its linked mortgage. A balance typed on the property itself is no longer kept, and the mortgage reads the property's address and value instead of keeping copies.
+- A property valuation sets the property's current value from its date: a valuation dated in the future takes effect on that day. The property's equity is worked out on the server, so the property card, the mortgage page and the dashboard show the same figure.
+- Recording a repayment suggests the date, a note, the amount and the interest and principal split from the loan type, the rate in effect and the balance; every field stays editable. A linear mortgage's current payment is worked out from today's balance.
+
+### Fixed
+
+- The net worth history counted a mortgage's current balance for the months before its repayments, overstating debt in the past; it now adds back the principal the mortgage's repayments paid after each point. A valuation recorded on the mortgage page changed nothing; valuations now belong to the property.
+
+### Upgrade notes
+
+- **Migration `0046_property_mortgage_ledger_ownership`** moves existing rows to the ledger that owns them and drops the columns that let each ledger hold the other's rows. Take a backup first: going back means restoring it. Rows it cannot assign stop the migration with their ids and change nothing; run the read-only count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6) before you upgrade.
+
 ## [v1.0.0-rc.5] - 2026-10-29
 
 Quro 1.0.0-rc.5 adds an optional single sign-on only mode, so the provider can be the only way in, and fixes more phone layout problems. The new mode is off by default, there is no migration, and Quro behaves like rc.4 until you turn it on. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc4-to-100-rc5) before you turn it on.

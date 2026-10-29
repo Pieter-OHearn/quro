@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
+import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
 import { EmptyState, LoadingState, PageStack } from '@/components/ui';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import {
@@ -62,27 +62,39 @@ type MortgageContentProps = {
   mortgage: MortgageType;
 };
 
-function useMortgageMetrics(mortgage: MortgageType, transactions: MortgageTransaction[]) {
+function useMortgageMetrics(
+  mortgage: MortgageType,
+  transactions: MortgageTransaction[],
+  linkedProperty: Property | undefined,
+) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const currentDay = today.getTime();
   return useMemo(
-    () => computeMortgageMetrics(mortgage, transactions, new Date(currentDay)),
-    [mortgage, transactions, currentDay],
+    () => computeMortgageMetrics(mortgage, transactions, linkedProperty, new Date(currentDay)),
+    [mortgage, transactions, linkedProperty, currentDay],
+  );
+}
+
+// The property the mortgage is linked to, and its valuations, which its ledger owns.
+function useLinkedProperty(state: MortgagePageState, mortgage: MortgageType) {
+  return useMemo(
+    () => ({
+      linkedProperty: state.properties.find(
+        (property) => property.id === mortgage.linkedPropertyId,
+      ),
+      valuations: state.propertyTxns.filter(
+        (txn) => txn.propertyId === mortgage.linkedPropertyId && txn.type === 'valuation',
+      ),
+    }),
+    [state.properties, state.propertyTxns, mortgage.linkedPropertyId],
   );
 }
 
 function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
-  const {
-    ltv,
-    equity,
-    paid,
-    paidPct,
-    monthsRemaining,
-    yearsRemaining,
-    amortization,
-    paymentBreakdown,
-  } = useMortgageMetrics(mortgage, state.txns);
+  const { linkedProperty, valuations } = useLinkedProperty(state, mortgage);
+  const metrics = useMortgageMetrics(mortgage, state.txns, linkedProperty);
+  const { paid, paidPct } = metrics;
 
   return (
     <PageStack>
@@ -91,6 +103,7 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
         editingTxn={state.editingTxn}
         showMortgageModal={state.showMortgageModal}
         mortgage={mortgage}
+        transactions={state.txns}
         editingMortgage={state.editingMortgage}
         properties={state.properties}
         editingLinkedPropertyId={state.editingLinkedPropertyId}
@@ -112,8 +125,8 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
       <MortgageHeroCard
         mortgage={mortgage}
         fmt={state.fmt}
-        yearsRemaining={yearsRemaining}
-        monthsRemaining={monthsRemaining}
+        yearsRemaining={metrics.yearsRemaining}
+        monthsRemaining={metrics.monthsRemaining}
         onEdit={() => {
           state.setEditingMortgage(mortgage);
           state.setShowMortgageModal(true);
@@ -122,8 +135,9 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
       <MortgageStatCards
         mortgage={mortgage}
         fmt={state.fmt}
-        equity={equity}
-        ltv={ltv}
+        equity={metrics.equity}
+        totalEquity={metrics.totalEquity}
+        ltv={metrics.ltv}
         paid={paid}
         paidPct={paidPct}
       />
@@ -135,13 +149,14 @@ function MortgageContent({ state, mortgage }: Readonly<MortgageContentProps>) {
       />
       <MortgageCharts
         fmt={state.fmt}
-        amortization={amortization}
-        paymentBreakdown={paymentBreakdown}
+        amortization={metrics.amortization}
+        paymentBreakdown={metrics.paymentBreakdown}
         repaymentType={mortgage.repaymentType}
       />
       <MortgageTxnHistory
         mortgage={mortgage}
         transactions={state.txns}
+        propertyValuations={valuations}
         onAdd={() => state.setShowTxnModal(true)}
         onEdit={state.setEditingTxn}
         onDelete={state.handleDeleteTxn}

@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { TxnHistoryPanel, TxnRow } from '@/components/ui';
-import type { Mortgage as MortgageType, MortgageTransaction } from '@quro/shared';
+import { LedgerOwnerLink } from '@/components/finance/LedgerOwnerLink';
+import type {
+  Mortgage as MortgageType,
+  MortgageTransaction,
+  PropertyTransaction,
+} from '@quro/shared';
+import { PROPERTY_TXN_META } from '@/features/investments/constants';
 import type { MortgageTxnType } from '../types';
 import { formatAsNegative } from '@/lib/liability';
 import { MORTGAGE_TXN_FILTER_OPTIONS, TXN_META } from '../utils/mortgage-meta';
@@ -10,6 +16,8 @@ type MortgageTxnHistoryProps = {
   mortgage: MortgageType;
   currency?: string;
   transactions: MortgageTransaction[];
+  /** The linked property's valuations, shown read-only: the property's ledger owns them. */
+  propertyValuations: PropertyTransaction[];
   onAdd: () => void;
   onEdit: (transaction: MortgageTransaction) => void;
   onDelete: (id: number) => void;
@@ -28,7 +36,6 @@ function describeMortgageTxn(t: MortgageTransaction, fmt: (n: number) => string)
       details: [`${fmt(t.interest ?? 0)} int`, `${fmt(t.principal ?? 0)} prin`],
     };
   }
-  if (t.type === 'valuation') return { amount: fmt(t.amount), details: ['new value'] };
   return {
     amount: `${t.amount}%`,
     details: [t.fixedYears ? `fixed ${t.fixedYears}yr` : 'new rate'],
@@ -71,6 +78,38 @@ function MortgageTxnRow({ t, fmt, onEdit, onDelete }: MortgageTxnRowProps) {
   );
 }
 
+function PropertyValuationRow({
+  valuation,
+  fmt,
+}: Readonly<{ valuation: PropertyTransaction; fmt: (n: number) => string }>) {
+  const meta = PROPERTY_TXN_META.valuation;
+  return (
+    <TxnRow
+      icon={meta.icon}
+      iconColor="text-fg-muted"
+      iconContainerClassName="max-sm:hidden"
+      label={valuation.note || meta.label}
+      date={valuation.date}
+      badge={{ text: 'Property', className: 'max-sm:hidden' }}
+      amount={
+        <span className="flex items-baseline justify-end gap-2 max-sm:flex-col max-sm:items-end max-sm:gap-0">
+          <span className="text-caption text-fg-subtle max-sm:order-last max-sm:leading-4">
+            new value
+          </span>
+          <span className="text-cell text-fg">{fmt(valuation.amount)}</span>
+        </span>
+      }
+      readOnlyAction={<LedgerOwnerLink to="/investments" page="Investments" />}
+    />
+  );
+}
+
+type HistoryFilter = MortgageTxnType | 'valuation' | 'all';
+
+type HistoryRow =
+  | { ledger: 'mortgage'; transaction: MortgageTransaction }
+  | { ledger: 'property'; transaction: PropertyTransaction };
+
 type MortgageSummaryStatsProps = {
   transactions: MortgageTransaction[];
   fmt: (n: number) => string;
@@ -89,42 +128,71 @@ function buildMortgageTxnStats({ transactions, fmt }: MortgageSummaryStatsProps)
   ];
 }
 
+function filterLabel(option: HistoryFilter): string {
+  if (option === 'all') return 'All';
+  if (option === 'valuation') return 'Valuations';
+  return `${TXN_META[option].label}s`;
+}
+
 export function MortgageTxnHistory({
   mortgage: _mortgage,
   currency,
   transactions,
+  propertyValuations,
   onAdd,
   onEdit,
   onDelete,
 }: MortgageTxnHistoryProps) {
   const { fmtBase } = useCurrency();
   const fmt = (n: number) => fmtBase(n, currency);
-  const [filter, setFilter] = useState<MortgageTxnType | 'all'>('all');
-  const sorted = [...transactions]
-    .filter((t) => filter === 'all' || t.type === filter)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const [filter, setFilter] = useState<HistoryFilter>('all');
+  const rows: HistoryRow[] = [
+    ...transactions.map((transaction) => ({ ledger: 'mortgage' as const, transaction })),
+    ...propertyValuations.map((transaction) => ({ ledger: 'property' as const, transaction })),
+  ];
+  const sorted = rows
+    .filter((row) => filter === 'all' || row.transaction.type === filter)
+    .sort((a, b) => b.transaction.date.localeCompare(a.transaction.date));
+  const filterOptions: HistoryFilter[] = [
+    ...MORTGAGE_TXN_FILTER_OPTIONS,
+    ...(propertyValuations.length > 0 ? (['valuation'] as const) : []),
+  ];
 
   return (
     <TxnHistoryPanel
       title="Transaction history"
-      subtitle={`${transactions.length} transactions recorded`}
+      subtitle={`${rows.length} transactions recorded`}
       variant="card"
       addButtonPlacement="header"
-      filterOptions={MORTGAGE_TXN_FILTER_OPTIONS.map((option) => ({
+      filterOptions={filterOptions.map((option) => ({
         key: option,
-        label: option === 'all' ? 'All' : `${TXN_META[option].label}s`,
+        label: filterLabel(option),
       }))}
       filter={filter}
-      onFilterChange={(key) => setFilter(key as MortgageTxnType | 'all')}
+      onFilterChange={(key) => setFilter(key as HistoryFilter)}
       stats={buildMortgageTxnStats({ transactions, fmt })}
       statsColumns={4}
       onAdd={onAdd}
       addLabel="Record transaction"
       isEmpty={sorted.length === 0}
     >
-      {sorted.map((t) => (
-        <MortgageTxnRow key={t.id} t={t} fmt={fmt} onEdit={onEdit} onDelete={onDelete} />
-      ))}
+      {sorted.map((row) =>
+        row.ledger === 'mortgage' ? (
+          <MortgageTxnRow
+            key={`mortgage-${row.transaction.id}`}
+            t={row.transaction}
+            fmt={fmt}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ) : (
+          <PropertyValuationRow
+            key={`property-${row.transaction.id}`}
+            valuation={row.transaction}
+            fmt={fmt}
+          />
+        ),
+      )}
     </TxnHistoryPanel>
   );
 }

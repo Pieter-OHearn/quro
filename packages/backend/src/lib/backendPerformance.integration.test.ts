@@ -13,6 +13,7 @@ import {
   pensionPots,
   pensionTransactions,
   mortgages,
+  mortgageTransactions,
   debts,
   debtPayments,
   netWorthSnapshots,
@@ -50,6 +51,7 @@ async function loadFullSource(userId: number) {
     pensions,
     pensionTxns,
     mortgageRows,
+    mortgageTxns,
     debtRows,
     payments,
     snapshots,
@@ -66,6 +68,7 @@ async function loadFullSource(userId: number) {
     db.select().from(pensionPots).where(eq(pensionPots.userId, userId)),
     db.select().from(pensionTransactions).where(eq(pensionTransactions.userId, userId)),
     db.select().from(mortgages).where(eq(mortgages.userId, userId)),
+    db.select().from(mortgageTransactions).where(eq(mortgageTransactions.userId, userId)),
     db.select().from(debts).where(eq(debts.userId, userId)),
     db.select().from(debtPayments).where(eq(debtPayments.userId, userId)),
     db.select().from(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId)),
@@ -83,6 +86,7 @@ async function loadFullSource(userId: number) {
     pensions,
     pensionTransactions: pensionTxns,
     mortgages: mortgageRows,
+    mortgageRepayments: mortgageTxns,
     debts: debtRows,
     debtPayments: payments,
     snapshots,
@@ -149,6 +153,22 @@ async function seedLedger(userId: number) {
     { userId, holdingId: holding.id, eodDate: '2021-01-01', closePrice: 20, priceCurrency: 'EUR' },
     { userId, holdingId: holding.id, eodDate: recent, closePrice: 25, priceCurrency: 'EUR' },
   ]);
+  const [mortgage] = await db
+    .insert(mortgages)
+    .values({
+      userId,
+      lender: 'Test',
+      currency: 'EUR',
+      originalAmount: 30000,
+      outstandingBalance: 20000,
+      monthlyPayment: 100,
+      interestRate: 1,
+      rateType: 'Variable',
+      termYears: 30,
+      startDate: old,
+      endDate: '2050-01-01',
+    })
+    .returning();
   const [property] = await db
     .insert(properties)
     .values({
@@ -158,16 +178,27 @@ async function seedLedger(userId: number) {
       monthlyRent: 0,
       purchasePrice: 100000,
       currentValue: 150000,
-      mortgage: 20000,
+      mortgageId: mortgage.id,
       currency: 'EUR',
     })
     .returning();
   await db.insert(propertyTransactions).values([
     { userId, propertyId: property.id, type: 'valuation', amount: 110000, date: old },
     { userId, propertyId: property.id, type: 'valuation', amount: 150000, date: '2021-01-01' },
+  ]);
+  await db.insert(mortgageTransactions).values([
     {
       userId,
-      propertyId: property.id,
+      mortgageId: mortgage.id,
+      type: 'repayment',
+      amount: 100,
+      principal: 80,
+      interest: 20,
+      date: old,
+    },
+    {
+      userId,
+      mortgageId: mortgage.id,
       type: 'repayment',
       amount: 100,
       principal: 80,
@@ -176,13 +207,14 @@ async function seedLedger(userId: number) {
     },
     {
       userId,
-      propertyId: property.id,
+      mortgageId: mortgage.id,
       type: 'repayment',
       amount: 100,
       principal: 80,
       interest: 20,
       date: future,
     },
+    { userId, mortgageId: mortgage.id, type: 'rate_change', amount: 1, fixedYears: 5, date: old },
   ]);
   const [pot] = await db
     .insert(pensionPots)
@@ -236,6 +268,8 @@ test('bounded history matches full ledgers with opening positions and future rep
   expect(bounded.holdingTransactions).toHaveLength(2);
   expect(bounded.savingsTransactions).toHaveLength(3);
   expect(bounded.holdingPrices).toHaveLength(2);
+  // The repayments in the window, plus one boundary row from before it; never the rate change.
+  expect(bounded.mortgageRepayments).toHaveLength(3);
   // With the year-start point the window reaches 31 December; the point matches the full ledger.
   const withYearStart = await loadNetWorthSourceData(owner.user.id, null, '6m', {
     yearStart: true,

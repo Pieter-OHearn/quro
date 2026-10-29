@@ -45,19 +45,25 @@ nothing reads it, and it stays in the schema and in backups.
 
 ## Property debt
 
-`getPropertyDebt` resolves an active linked mortgage's outstanding balance. The
-stored `properties.mortgage` amount is used only for unlinked properties. Linked
-repayments update the mortgage ledger, and property API responses resolve the debt
-on read. Existing stale copies are ignored; no destructive data migration is needed.
-Each repayment records the debt it reduced, so editing or deleting it reverses the effect on that
-debt (the property's own debt or a specific mortgage) even after the property is linked to a
-mortgage, remortgaged or unlinked. Repayments recorded before 0.9.0 follow the current link.
+A property is the asset and a mortgage is the loan. A property's only debt is its linked
+mortgage while that mortgage is active; a property without one has no debt, and there is no
+debt kept on the property itself. `getPropertyDebt` resolves the linked mortgage's outstanding
+balance on read, and nothing copies it: the property stores no balance, and the mortgage stores
+neither the property's address nor its value, which mortgage responses read from the linked
+property (`linkedPropertyId`, `propertyAddress`, `propertyValue`).
 
-As before, archived mortgages contribute no current debt, restoring a mortgage
-restores its contribution, and unlinking clears the property's manual debt. A new
-manual balance can then be entered. Mortgage debt is deducted in property equity;
-`liabilitiesTotal` contains non-mortgage debts, avoiding double counting. Negative
-equity is preserved. Completed monthly snapshots retain their historical values.
+Property responses carry three server-derived figures: `debt` (the linked active mortgage's
+whole outstanding balance, 0 without one), `totalEquity` (`currentValue - debt`) and `equity`.
+`equity` weights the value by the property's household share and the debt by the mortgage's own
+share, exactly as the dashboard's net worth does, so the property card, the mortgage page and the
+dashboard show one figure even when the two rows' jointness differ. Negative equity is preserved.
+
+Archived mortgages contribute no current debt, restoring a mortgage restores its contribution, and
+unlinking leaves the property with no debt. Mortgage debt is deducted in property equity;
+`liabilitiesTotal` contains non-mortgage debts, avoiding double counting. Completed monthly
+snapshots retain their historical values. The net worth history rebuilds a property's past debt
+from its mortgage: the current balance plus the principal its repayments applied after the
+point, each repayment weighted by its mortgage's share.
 
 ## API contract
 
@@ -147,7 +153,8 @@ model retain their existing rules and effective dates.
 
 - Fixed pre-refactor allocation and runway numbers, mixed currencies and negative equity.
 - Both partners' allocations, snapshots and current history agree after either ledger's repayments.
-- Stale property copies, repayment edits/reversals, archive/restore, unlink and manual debt.
+- Linked debt and equity on property reads, repayment edits/reversals, archive/restore and unlink;
+  each ledger refusing the other's transaction types.
 - Private/archived assets and unauthorized property reads.
 - Foreign budget conversion, monetary overrides, joint liquidity and contractual payments.
 - Authoritative client totals with empty allocations and translated allocation names.

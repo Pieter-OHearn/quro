@@ -134,6 +134,7 @@ describe('year-to-date baseline in the dashboard history', () => {
       pensions: [],
       pensionTransactions: [],
       mortgages: [],
+      mortgageRepayments: [],
       debts: [],
       debtPayments: [],
       snapshots: [],
@@ -182,5 +183,79 @@ describe('year-to-date baseline in the dashboard history', () => {
   test('without a record there is no year-start point', () => {
     const none = { ...source([], '2026-01-01'), yearStart: buildYearStartPeriod(OCTOBER, null) };
     expect(buildDashboardHistory(none).yearStart).toBeNull();
+  });
+});
+
+describe('property equity in the history', () => {
+  const NOVEMBER = Date.UTC(2026, 10, 15, 12);
+  // A linear mortgage of 705,000.00 repaid at 1,468.75 a month from July: 699,125.00 is left.
+  const repayment = (date: string) => ({
+    mortgageId: 7,
+    type: 'repayment',
+    amount: 3730.63,
+    interest: 2261.88,
+    principal: 1468.75,
+    unappliedPrincipal: 0,
+    date,
+  });
+  const source = () =>
+    ({
+      rates: new Map([['EUR', 1]]),
+      historicalRates: [],
+      savings: [],
+      savingsTransactions: [],
+      holdings: [],
+      holdingTransactions: [],
+      holdingPrices: [],
+      properties: [
+        {
+          id: 3,
+          purchasePrice: 800_000,
+          currentValue: 850_000,
+          mortgageId: 7,
+          currency: 'EUR',
+          archivedAt: null,
+        },
+      ],
+      propertyTransactions: [
+        { propertyId: 3, type: 'valuation', amount: 850_000, date: '2026-09-30' },
+        { propertyId: 3, type: 'rent_income', amount: 999_999, date: '2026-08-01' },
+        // Dated after today: it counts from its date, so it moves no point yet.
+        { propertyId: 3, type: 'valuation', amount: 999_999, date: '2999-01-01' },
+      ],
+      pensions: [],
+      pensionTransactions: [],
+      mortgages: [{ id: 7, outstandingBalance: 699_125, archivedAt: null }],
+      mortgageRepayments: [
+        ...['2026-07-01', '2026-08-01', '2026-09-01', '2026-10-01'].map(repayment),
+        { ...repayment('2026-08-15'), type: 'rate_change', amount: 3.9, principal: null },
+      ],
+      debts: [],
+      debtPayments: [],
+      snapshots: [],
+      periods: buildHistoryPeriods('6m', NOVEMBER),
+    }) as unknown as Parameters<typeof buildNetWorthHistory>[0];
+
+  test('values the property by its valuations in effect and its debt by the mortgage repayments', () => {
+    const points = buildNetWorthHistory(source());
+    expect(points.map((point) => [point.date, point.totalValue])).toEqual([
+      // Before the first repayment the whole loan is owed, against the purchase price.
+      ['2026-05-31', 800_000 - 705_000],
+      ['2026-06-30', 800_000 - 705_000],
+      ['2026-07-31', 800_000 - 703_531.25],
+      ['2026-08-31', 800_000 - 702_062.5],
+      // The valuation of 30 September applies from then on.
+      ['2026-09-30', 850_000 - 700_593.75],
+      ['2026-10-31', 850_000 - 699_125],
+      ['2026-11-15', 850_000 - 699_125],
+    ]);
+  });
+
+  test('adds back only the principal a repayment applied', () => {
+    const data = source();
+    // The last repayment found 100.00 of the balance already cleared by the zero clamp.
+    (data.mortgageRepayments[3] as { unappliedPrincipal: number }).unappliedPrincipal = 100;
+    const [first] = buildNetWorthHistory(data);
+    expect(first!.totalValue).toBe(800_000 - 704_900);
   });
 });

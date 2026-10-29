@@ -4,7 +4,8 @@ import { CURRENCY_CODES, type CurrencyCode, useCurrency } from '@/lib/CurrencyCo
 import { Change, Modal, ModalFooter, FormField, SelectInput, TextInput } from '@/components/ui';
 import { PreviewPanel, PreviewRow } from '@/components/finance/PreviewPanel';
 import { JointToggleField } from '@/features/partner';
-import { DEFAULT_EMOJI, type Property, TEXT_FIELD_LIMITS } from '@quro/shared';
+import { DEFAULT_EMOJI, TEXT_FIELD_LIMITS } from '@quro/shared';
+import type { NewProperty } from '../types';
 
 const PROPERTY_TYPES = [
   'Buy-to-Let',
@@ -16,7 +17,7 @@ const PROPERTY_TYPES = [
 
 type AddPropertyModalProps = {
   onClose: () => void;
-  onSave: (p: Omit<Property, 'id'>) => void;
+  onSave: (p: NewProperty) => void;
 };
 
 type PropertyEquityPreviewProps = {
@@ -221,7 +222,6 @@ export function AddPropertyModal({ onClose, onSave }: AddPropertyModalProps) {
       currency: form.currency,
       purchasePrice: parsed.purchasePrice,
       currentValue: parsed.currentValue,
-      mortgage: 0,
       mortgageId: null,
       monthlyRent: parsed.monthlyRent,
       isJoint: form.isJoint,

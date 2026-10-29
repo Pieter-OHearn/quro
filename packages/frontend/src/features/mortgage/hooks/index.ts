@@ -11,5 +11,5 @@ export {
 
 export { useMortgageModals } from './useMortgageModals';
 export { useArchivedMortgages, useMortgages } from './useMortgages';
-export { useMortgageTransactions } from './useMortgageTransactions';
+export { useAllMortgageTransactions, useMortgageTransactions } from './useMortgageTransactions';
 export { useMortgageTxnModal } from './useMortgageTxnModal';

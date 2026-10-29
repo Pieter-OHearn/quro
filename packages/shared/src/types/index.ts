@@ -403,8 +403,8 @@ export type Property = {
   address: string;
   propertyType: string;
   purchasePrice: number;
+  /** The latest valuation by date, or the entered value while the property has none. */
   currentValue: number;
-  mortgage: number;
   mortgageId: number | null;
   monthlyRent: number;
   currency: CurrencyCode;
@@ -412,14 +412,19 @@ export type Property = {
   isJoint: boolean;
   userId?: number;
   archivedAt?: string | null;
+  /** Derived on the server: the linked active mortgage's outstanding balance, in full; 0 without one. */
+  debt: number;
+  /** Derived on the server: the whole property's value less `debt`; negative equity is kept. */
+  totalEquity: number;
+  /** Derived on the server: what the property adds to net worth, each side at its household share. */
+  equity: number;
 };
 
-export const PROPERTY_TRANSACTION_TYPES = [
-  'repayment',
-  'valuation',
-  'rent_income',
-  'expense',
-] as const;
+/** The fields of a property the server derives, never sent by a client. */
+export type PropertyDerivedField = 'debt' | 'totalEquity' | 'equity';
+
+/** A property's ledger records what happens to the asset; repayments belong to its mortgage. */
+export const PROPERTY_TRANSACTION_TYPES = ['valuation', 'rent_income', 'expense'] as const;
 export type PropertyTransactionType = (typeof PROPERTY_TRANSACTION_TYPES)[number];
 
 export type PropertyTransaction = {
@@ -427,8 +432,6 @@ export type PropertyTransaction = {
   propertyId: number;
   type: PropertyTransactionType;
   amount: number;
-  interest: number | null;
-  principal: number | null;
   date: string;
   note: string;
 };
@@ -612,13 +615,15 @@ export type MortgageRepaymentType = (typeof MORTGAGE_REPAYMENT_TYPES)[number];
 
 export type Mortgage = {
   id: number;
-  linkedPropertyId?: number | null;
-  propertyAddress: string;
+  /** The property this mortgage is linked to, read from that property; null when unlinked. */
+  linkedPropertyId: number | null;
+  propertyAddress: string | null;
+  /** The linked property's current value; loan-to-value and equity use it. */
+  propertyValue: number | null;
   lender: string;
   currency: CurrencyCode;
   originalAmount: number;
   outstandingBalance: number;
-  propertyValue: number;
   monthlyPayment: number;
   interestRate: number;
   rateType: MortgageRateType;
@@ -634,7 +639,8 @@ export type Mortgage = {
   archivedAt?: string | null;
 };
 
-export const MORTGAGE_TRANSACTION_TYPES = ['repayment', 'valuation', 'rate_change'] as const;
+/** A mortgage's ledger records what happens to the loan; valuations belong to its property. */
+export const MORTGAGE_TRANSACTION_TYPES = ['repayment', 'rate_change'] as const;
 export type MortgageTransactionType = (typeof MORTGAGE_TRANSACTION_TYPES)[number];
 
 export type MortgageTransaction = {
@@ -647,6 +653,8 @@ export type MortgageTransaction = {
   date: string;
   note: string;
   fixedYears: number | null;
+  /** The principal a repayment could not apply because the balance reached zero. */
+  unappliedPrincipal?: number;
 };
 
 export const DEBT_TYPES = [

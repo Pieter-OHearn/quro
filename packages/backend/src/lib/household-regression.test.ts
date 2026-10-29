@@ -20,11 +20,14 @@ test('preserves mixed-currency allocations and net worth, including negative equ
       { holdingId: 1, type: 'sell', shares: 5 },
     ],
     [
-      { currentValue: 150000, mortgage: 999999, mortgageId: 1, currency: 'EUR' },
-      { currentValue: 40000, mortgage: 50000, mortgageId: null, currency: 'USD' },
+      { currentValue: 150000, mortgageId: 1, currency: 'EUR' },
+      { currentValue: 40000, mortgageId: 2, currency: 'USD' },
     ],
     [{ balance: 20000, currency: 'EUR' }],
-    [{ id: 1, outstandingBalance: 100000 }],
+    [
+      { id: 1, outstandingBalance: 100000 },
+      { id: 2, outstandingBalance: 50000 },
+    ],
     [{ remainingBalance: 3000, currency: 'USD' }],
   );
   expect(summary.allocations.map((item) => item.value)).toEqual([14000, 2000, 42000, 20000]);

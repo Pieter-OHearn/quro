@@ -437,7 +437,7 @@ function MortgageDeleteDialog({
   return (
     <ArchiveOrDeleteDialog
       entityLabel="Mortgage"
-      entityName={existing.propertyAddress}
+      entityName={existing.propertyAddress ?? existing.lender}
       balance={existing.outstandingBalance}
       balanceCurrency={existing.currency}
       balanceLabel="outstanding balance"

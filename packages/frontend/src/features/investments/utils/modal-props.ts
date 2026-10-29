@@ -1,4 +1,4 @@
-import type { Holding, HoldingTransaction, Mortgage, Property } from '@quro/shared';
+import type { Holding, HoldingTransaction, Property, PropertyTransaction } from '@quro/shared';
 import type {
   HoldingModalsProps,
   InvestmentActions,
@@ -40,7 +40,7 @@ export function buildPropertyModalsProps(
   ui: InvestmentUIState,
   actions: InvestmentActions,
   properties: Property[],
-  mortgageById: Map<number, Mortgage>,
+  propertyTxns: PropertyTransaction[],
 ): PropertyModalsProps {
   return {
     updatingProperty: ui.updatingProperty,
@@ -48,7 +48,7 @@ export function buildPropertyModalsProps(
     addTxnForProperty: ui.addTxnForProperty,
     editingPropertyTxn: ui.editingPropertyTxn,
     properties,
-    mortgageById,
+    propertyTxns,
     onCloseUpdateProperty: () => ui.setUpdatingProperty(null),
     onSaveUpdateProperty: actions.handleUpdateProperty,
     onDeleteProperty: actions.handleDeleteProperty,

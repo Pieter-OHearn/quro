@@ -2,9 +2,12 @@ import {
   computeHoldingPosition,
   householdShare,
   isInvestmentPropertyType,
+  propertyEquity,
+  toUtcTimestamp,
   type HoldingPosition,
   type HoldingTransaction,
   type Mortgage,
+  type MortgageTransaction,
   type Property,
   type PropertyTransaction,
 } from '@quro/shared';
@@ -51,15 +54,61 @@ export function isInvestmentProperty(propertyType: string): boolean {
   return isInvestmentPropertyType(propertyType);
 }
 
-export function getPropertyMortgageBalance(
-  property: Property,
-  mortgageById: Map<number, Mortgage>,
-): number {
-  if (property.mortgageId != null) {
-    const linked = mortgageById.get(property.mortgageId);
-    if (linked) return linked.outstandingBalance;
+/** A mortgage repayment by date: the principal it applied to the balance. */
+export type DatedMortgageRepayment = { principal: number; timestamp: number };
+
+/** Each mortgage's repayments by date, oldest first. */
+export function groupMortgageRepayments(
+  txns: readonly MortgageTransaction[],
+): Map<number, DatedMortgageRepayment[]> {
+  const byMortgage = new Map<number, DatedMortgageRepayment[]>();
+  for (const txn of txns) {
+    const timestamp = toUtcTimestamp(txn.date);
+    if (txn.type !== 'repayment' || !Number.isFinite(timestamp)) continue;
+    const principal = txn.principal ?? Math.max(0, txn.amount - (txn.interest ?? 0));
+    const repayment = { principal: principal - (txn.unappliedPrincipal ?? 0), timestamp };
+    const rows = byMortgage.get(txn.mortgageId);
+    if (rows) rows.push(repayment);
+    else byMortgage.set(txn.mortgageId, [repayment]);
   }
-  return property.mortgage;
+  for (const rows of byMortgage.values()) rows.sort((a, b) => a.timestamp - b.timestamp);
+  return byMortgage;
+}
+
+/**
+ * A property's equity in its own currency as of `cutoff` (records dated at or before it count),
+ * as net worth weights it: the value then (its latest valuation by then, the purchase price
+ * before its first, or the current value when none is in effect yet) less its linked mortgage's balance
+ * then (the server's current debt plus the principal repaid after the cutoff).
+ */
+export function propertyEquityAt(
+  property: Property,
+  valuations: readonly { type: string; amount: number; timestamp: number }[],
+  repayments: readonly DatedMortgageRepayment[],
+  linkedMortgage: Mortgage | undefined,
+  cutoff: number,
+): number {
+  // A valuation counts from its date: one dated after today sets nothing yet.
+  const now = Date.now();
+  const ownValuations = valuations.filter(
+    (txn) => txn.type === 'valuation' && txn.timestamp <= now,
+  );
+  let value = ownValuations.length > 0 ? property.purchasePrice : property.currentValue;
+  for (const txn of ownValuations) {
+    if (txn.timestamp > cutoff) break;
+    value = txn.amount;
+  }
+  // An archived or missing mortgage is not among the active ones and carries no debt.
+  if (!linkedMortgage)
+    return propertyEquity({ currentValue: value, isJoint: property.isJoint }, null);
+  let debt = property.debt;
+  for (const repayment of repayments) {
+    if (repayment.timestamp > cutoff) debt += repayment.principal;
+  }
+  return propertyEquity(
+    { currentValue: value, isJoint: property.isJoint },
+    { outstandingBalance: debt, isJoint: linkedMortgage.isJoint },
+  );
 }
 
 /** The portfolio is personal, so a joint property contributes the household share. */

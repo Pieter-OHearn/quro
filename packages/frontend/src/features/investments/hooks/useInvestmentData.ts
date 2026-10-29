@@ -1,4 +1,4 @@
-import { useMortgages } from '../../mortgage/hooks';
+import { useAllMortgageTransactions, useMortgages } from '../../mortgage/hooks';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import type { InvestmentData } from '../types';
 import { useHoldings } from './useHoldings';
@@ -12,6 +12,15 @@ export function useInvestmentData(): InvestmentData {
   const propertiesQuery = useProperties();
   const propertyTransactionsQuery = usePropertyTransactions();
   const mortgagesQuery = useMortgages();
+  const mortgageTransactionsQuery = useAllMortgageTransactions();
+  const queries = [
+    { label: 'holdings', ...holdingsQuery },
+    { label: 'holding transactions', ...holdingTransactionsQuery },
+    { label: 'properties', ...propertiesQuery },
+    { label: 'property transactions', ...propertyTransactionsQuery },
+    { label: 'mortgages', ...mortgagesQuery },
+    { label: 'mortgage transactions', ...mortgageTransactionsQuery },
+  ];
 
   return {
     holdings: holdingsQuery.data ?? [],
@@ -19,18 +28,8 @@ export function useInvestmentData(): InvestmentData {
     properties: propertiesQuery.data ?? [],
     propertyTxns: propertyTransactionsQuery.data ?? [],
     mortgages: mortgagesQuery.data ?? [],
-    isLoading:
-      holdingsQuery.isLoading ||
-      holdingTransactionsQuery.isLoading ||
-      propertiesQuery.isLoading ||
-      propertyTransactionsQuery.isLoading ||
-      mortgagesQuery.isLoading,
-    queryFailures: getFailedRouteQueries([
-      { label: 'holdings', ...holdingsQuery },
-      { label: 'holding transactions', ...holdingTransactionsQuery },
-      { label: 'properties', ...propertiesQuery },
-      { label: 'property transactions', ...propertyTransactionsQuery },
-      { label: 'mortgages', ...mortgagesQuery },
-    ]),
+    mortgageTxns: mortgageTransactionsQuery.data ?? [],
+    isLoading: queries.some((query) => query.isLoading),
+    queryFailures: getFailedRouteQueries(queries),
   };
 }

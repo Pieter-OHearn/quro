@@ -3,9 +3,21 @@ import { AddPropertyModal } from './AddPropertyModal';
 import { AddPropertyTxnModal } from './AddPropertyTxnModal';
 import { EditHoldingModal } from './EditHoldingModal';
 import { UpdatePropertyModal } from './UpdatePropertyModal';
+import { toIsoDate } from '@quro/shared';
 import type { HoldingModalsProps, PropertyModalsProps } from '../types';
-import { computePosition, getPropertyMortgageBalance } from '../utils/position';
+import { computePosition } from '../utils/position';
 import { EMPTY_POSITION } from '../utils/portfolio';
+
+// Whether a valuation sets the property's value today: one dated later counts from its date.
+function hasValuationInEffect(
+  propertyTxns: PropertyModalsProps['propertyTxns'],
+  propertyId: number,
+) {
+  const today = toIsoDate(new Date());
+  return propertyTxns.some(
+    (txn) => txn.propertyId === propertyId && txn.type === 'valuation' && txn.date <= today,
+  );
+}
 
 type InvestmentModalsProps = {
   holdingModals: HoldingModalsProps;
@@ -92,7 +104,7 @@ function PropertyModals({
   addTxnForProperty,
   editingPropertyTxn,
   properties,
-  mortgageById,
+  propertyTxns,
   onCloseUpdateProperty,
   onSaveUpdateProperty,
   onDeleteProperty,
@@ -112,7 +124,7 @@ function PropertyModals({
       {updatingProperty && (
         <UpdatePropertyModal
           property={updatingProperty}
-          mortgageBalance={getPropertyMortgageBalance(updatingProperty, mortgageById)}
+          hasValuation={hasValuationInEffect(propertyTxns, updatingProperty.id)}
           onClose={onCloseUpdateProperty}
           onSave={onSaveUpdateProperty}
           onDelete={onDeleteProperty}
@@ -125,7 +137,6 @@ function PropertyModals({
         <AddPropertyTxnModal
           property={modalProperty}
           existing={editingPropertyTxn ?? undefined}
-          mortgageBalance={getPropertyMortgageBalance(modalProperty, mortgageById)}
           onClose={onCloseAddPropertyTxn}
           onSave={onSavePropertyTxn}
         />

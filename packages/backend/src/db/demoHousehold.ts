@@ -677,9 +677,12 @@ export function expectedShares(holding: HoldingSpec): number {
 
 type RepaymentSpec = { by: Member; date: string; amount: number; interest: number; note: string };
 
-type PropertyTransactionSpec =
-  | { type: 'valuation' | 'rent_income' | 'expense'; amount: number; date: string; note: string }
-  | { type: 'repayment'; amount: number; interest: number; date: string; note: string };
+type PropertyTransactionSpec = {
+  type: 'valuation' | 'rent_income' | 'expense';
+  amount: number;
+  date: string;
+  note: string;
+};
 
 export type PropertySpec = {
   key: string;
@@ -692,12 +695,12 @@ export type PropertySpec = {
   monthlyRent: number;
   emoji: string;
   isJoint: boolean;
-  /** Debt kept on the property itself, for a property without a linked mortgage. */
-  manualMortgage: number;
   transactions: readonly PropertyTransactionSpec[];
 };
 
 export type MortgageSpec = {
+  /** Key of the mortgage, for seeded ids. */
+  key: string;
   /** Key of the property it is linked to. */
   propertyKey: string;
   owner: Member;
@@ -713,7 +716,8 @@ export type MortgageSpec = {
   endDate: string;
   overpaymentLimit: number;
   isJoint: boolean;
-  rateChange: { date: string; rate: number; fixedYears: number; note: string };
+  rateType: 'Fixed' | 'Variable';
+  rateChange: { date: string; rate: number; fixedYears: number; note: string } | null;
   repayments: readonly RepaymentSpec[];
 };
 
@@ -761,13 +765,14 @@ const HOME_PAYMENT_DATES = [
   '2026-09-01',
 ];
 
-export const MORTGAGE: MortgageSpec = ((): MortgageSpec => {
+const HOME_MORTGAGE: MortgageSpec = ((): MortgageSpec => {
   const base = {
     openingBalance: 284500,
     monthlyPayment: 1428,
     interestRate: 3.45,
   };
   return {
+    key: 'home',
     propertyKey: 'home',
     owner: 'demo',
     lender: 'Example Mortgages',
@@ -779,6 +784,7 @@ export const MORTGAGE: MortgageSpec = ((): MortgageSpec => {
     endDate: '2053-04-01',
     overpaymentLimit: 10,
     isJoint: true,
+    rateType: 'Fixed',
     rateChange: {
       date: '2025-04-01',
       rate: 3.45,
@@ -801,8 +807,6 @@ export const MORTGAGE: MortgageSpec = ((): MortgageSpec => {
   };
 })();
 
-const FLAT_OPENING_MORTGAGE = 192500;
-const FLAT_PAYMENT = 760;
 const FLAT_PAYMENT_DATES = [
   '2026-04-05',
   '2026-05-05',
@@ -811,6 +815,42 @@ const FLAT_PAYMENT_DATES = [
   '2026-08-05',
   '2026-09-05',
 ];
+
+// The buy-to-let's own loan, worth more than the flat: negative equity, in pounds.
+const FLAT_MORTGAGE: MortgageSpec = ((): MortgageSpec => {
+  const base = { openingBalance: 192500, monthlyPayment: 760, interestRate: 3.2 };
+  return {
+    key: 'flat',
+    propertyKey: 'flat',
+    owner: 'demo',
+    lender: 'Sample Building Society',
+    originalAmount: 200000,
+    ...base,
+    fixedUntil: 'N/A',
+    termYears: 35,
+    startDate: '2024-04-05',
+    endDate: '2059-04-05',
+    overpaymentLimit: 10,
+    isJoint: false,
+    rateType: 'Variable',
+    rateChange: null,
+    repayments: amortise(
+      base.openingBalance,
+      base.interestRate,
+      base.monthlyPayment,
+      FLAT_PAYMENT_DATES,
+    ).map((row) => ({
+      by: 'demo',
+      date: row.date,
+      amount: row.amount,
+      interest: row.interest,
+      note: 'Monthly instalment',
+    })),
+  };
+})();
+
+/** The household's mortgages, each linked to the property of `propertyKey`. */
+export const MORTGAGES: readonly MortgageSpec[] = [HOME_MORTGAGE, FLAT_MORTGAGE];
 const FLAT_RENT_DATES = [
   '2026-04-28',
   '2026-05-28',
@@ -832,7 +872,6 @@ export const PROPERTIES: readonly PropertySpec[] = [
     monthlyRent: 0,
     emoji: '🏠',
     isJoint: true,
-    manualMortgage: 0,
     transactions: [
       {
         type: 'valuation',
@@ -860,19 +899,9 @@ export const PROPERTIES: readonly PropertySpec[] = [
     monthlyRent: 950,
     emoji: '🏢',
     isJoint: false,
-    manualMortgage: FLAT_OPENING_MORTGAGE,
     transactions: [
       { type: 'valuation', amount: 178000, date: '2026-03-01', note: 'Lender valuation' },
       { type: 'expense', amount: 420, date: '2026-03-18', note: 'Boiler service' },
-      ...amortise(FLAT_OPENING_MORTGAGE, 3.2, FLAT_PAYMENT, FLAT_PAYMENT_DATES).map(
-        (row): PropertyTransactionSpec => ({
-          type: 'repayment',
-          amount: row.amount,
-          interest: row.interest,
-          date: row.date,
-          note: 'Monthly instalment',
-        }),
-      ),
       ...FLAT_RENT_DATES.map((date): PropertyTransactionSpec => ({
         type: 'rent_income',
         amount: 950,
@@ -894,17 +923,10 @@ export function expectedMortgageBalance(mortgage: MortgageSpec): number {
   );
 }
 
-/** The same for a property that carries its own debt. */
+/** A property's debt after the ledgers: its linked mortgage's balance, or none. */
 export function expectedPropertyDebt(property: PropertySpec): number {
-  return fromCents(
-    property.transactions.reduce(
-      (balance, transaction) =>
-        transaction.type === 'repayment'
-          ? balance - (toCents(transaction.amount) - toCents(transaction.interest))
-          : balance,
-      toCents(property.manualMortgage),
-    ),
-  );
+  const mortgage = MORTGAGES.find((candidate) => candidate.propertyKey === property.key);
+  return mortgage ? expectedMortgageBalance(mortgage) : 0;
 }
 
 // ── Pensions ─────────────────────────────────────────────────────────────────

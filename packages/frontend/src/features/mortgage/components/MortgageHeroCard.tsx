@@ -4,6 +4,7 @@ import { Button, Card } from '@/components/ui';
 import { JointBadge } from '@/features/partner';
 import type { MortgageFormatFn } from '../types';
 import { formatAsNegative } from '@/lib/liability';
+import { expectedNextPayment } from '../utils/mortgage-metrics';
 
 type MortgageHeroCardProps = {
   mortgage: MortgageType;
@@ -21,12 +22,13 @@ function buildMortgageMetrics(
 ) {
   const annualAllowance = (mortgage.outstandingBalance * mortgage.overpaymentLimit) / 100;
   const hasAllowance = Number.isFinite(annualAllowance) && annualAllowance > 0;
+  // A linear loan's payment falls with its interest, so it is worked out from today's balance.
+  const isLinear = mortgage.repaymentType === 'Linear';
   return [
     {
-      label: mortgage.repaymentType === 'Linear' ? 'Current payment' : 'Monthly payment',
-      value: fmt(mortgage.monthlyPayment),
-      sub:
-        mortgage.repaymentType === 'Linear' ? 'Declines as interest falls' : 'Fixed total payment',
+      label: isLinear ? 'Current payment' : 'Monthly payment',
+      value: fmt(isLinear ? expectedNextPayment(mortgage) : mortgage.monthlyPayment),
+      sub: isLinear ? 'Declines as interest falls' : 'Fixed total payment',
     },
     {
       label: 'Interest rate',
@@ -56,7 +58,9 @@ export function MortgageHeroCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-title-section text-fg">{mortgage.propertyAddress}</h2>
+            <h2 className="text-title-section text-fg">
+              {mortgage.propertyAddress ?? mortgage.lender}
+            </h2>
             <JointBadge isJoint={mortgage.isJoint} ownerUserId={mortgage.userId} />
           </div>
           <p className="text-caption text-fg-subtle">

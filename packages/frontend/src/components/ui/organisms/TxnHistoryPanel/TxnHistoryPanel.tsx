@@ -371,7 +371,12 @@ export type TxnRowProps = {
   badge?: { text: string; className: string };
   amount: ReactNode;
   onEdit?: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
+  /**
+   * Shown instead of the edit and delete buttons on a row this view only reads, such as a link
+   * to the page whose ledger owns it. Always visible.
+   */
+  readOnlyAction?: ReactNode;
   className?: string;
   actionsClassName?: string;
 };
@@ -382,6 +387,47 @@ const TXN_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   month: 'short',
   year: 'numeric',
 };
+
+function TxnRowActions({
+  onEdit,
+  onDelete,
+  readOnlyAction,
+  className,
+}: Pick<TxnRowProps, 'onEdit' | 'onDelete' | 'readOnlyAction'> & { className?: string }) {
+  if (readOnlyAction) {
+    return <div className={cn('flex shrink-0 items-center', className)}>{readOnlyAction}</div>;
+  }
+  return (
+    <RowActions
+      className={cn(
+        'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100 max-[359px]:basis-full max-[359px]:justify-end',
+        className,
+      )}
+    >
+      {/* The 28px buttons may overlap the 1px row rule so the row stays 28px high. */}
+      {onEdit && (
+        <IconButton
+          onClick={onEdit}
+          icon={Edit3}
+          label="Edit transaction"
+          title="Edit transaction"
+          size="sm"
+          variant="ghost"
+        />
+      )}
+      {onDelete && (
+        <IconButton
+          onClick={onDelete}
+          icon={Trash2}
+          label="Delete transaction"
+          title="Delete transaction"
+          size="sm"
+          variant="danger"
+        />
+      )}
+    </RowActions>
+  );
+}
 
 /**
  * One transaction on one 28px line on desktop: date, type icon, label, amount and actions.
@@ -403,6 +449,7 @@ export function TxnRow({
   amount,
   onEdit,
   onDelete,
+  readOnlyAction,
   className,
   actionsClassName,
 }: TxnRowProps) {
@@ -438,32 +485,12 @@ export function TxnRow({
         </div>
       </div>
       <div className="shrink-0 text-right font-numeric">{amount}</div>
-      <RowActions
-        className={cn(
-          'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100 max-[359px]:basis-full max-[359px]:justify-end',
-          actionsClassName,
-        )}
-      >
-        {/* The 28px buttons may overlap the 1px row rule so the row stays 28px high. */}
-        {onEdit && (
-          <IconButton
-            onClick={onEdit}
-            icon={Edit3}
-            label="Edit transaction"
-            title="Edit transaction"
-            size="sm"
-            variant="ghost"
-          />
-        )}
-        <IconButton
-          onClick={onDelete}
-          icon={Trash2}
-          label="Delete transaction"
-          title="Delete transaction"
-          size="sm"
-          variant="danger"
-        />
-      </RowActions>
+      <TxnRowActions
+        onEdit={onEdit}
+        onDelete={onDelete}
+        readOnlyAction={readOnlyAction}
+        className={actionsClassName}
+      />
     </div>
   );
 }

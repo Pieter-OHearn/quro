@@ -8,42 +8,62 @@ const GOOD_LTV_THRESHOLD = 70;
 type MortgageStatCardsProps = {
   mortgage: MortgageType;
   fmt: MortgageFormatFn;
-  equity: number;
-  ltv: number;
+  /** The linked property's equity as net worth counts it; null without a linked property. */
+  equity: number | null;
+  totalEquity: number | null;
+  ltv: number | null;
   paid: number;
   paidPct: number;
 };
+
+const NO_PROPERTY = 'No linked property';
+
+function ltvSubtitle(ltv: number | null): string {
+  if (ltv == null) return NO_PROPERTY;
+  return ltv < GOOD_LTV_THRESHOLD ? `Good — below ${GOOD_LTV_THRESHOLD}%` : 'High LTV';
+}
+
+function valueChangeOf(propertyValue: number, originalAmount: number, fmt: MortgageFormatFn) {
+  const change = propertyValue - originalAmount;
+  return { value: change >= 0 ? `+${fmt(change)}` : fmt(change), positive: change >= 0 };
+}
 
 export function MortgageStatCards({
   mortgage,
   fmt,
   equity,
+  totalEquity,
   ltv,
   paid,
   paidPct,
 }: Readonly<MortgageStatCardsProps>) {
   const { numberFormat } = useCurrency();
-  const valueChange = mortgage.propertyValue - mortgage.originalAmount;
+  const propertyValue = mortgage.propertyValue;
   return (
     <StatsGrid>
       <StatCard
         label="Property value"
-        value={fmt(mortgage.propertyValue)}
-        change={{
-          value: valueChange >= 0 ? `+${fmt(valueChange)}` : fmt(valueChange),
-          positive: valueChange >= 0,
-        }}
-        subtitle="since purchase"
+        value={propertyValue == null ? '—' : fmt(propertyValue)}
+        change={
+          propertyValue == null
+            ? undefined
+            : valueChangeOf(propertyValue, mortgage.originalAmount, fmt)
+        }
+        subtitle={propertyValue == null ? NO_PROPERTY : 'since purchase'}
       />
       <StatCard
-        label="Equity built"
-        value={fmt(equity)}
-        subtitle={`${formatPercent((equity / mortgage.propertyValue) * 100, numberFormat, 0)} of property value`}
+        label={mortgage.isJoint ? 'Your equity (50%)' : 'Equity built'}
+        value={equity == null ? '—' : fmt(equity)}
+        subtitle={
+          totalEquity == null || !propertyValue
+            ? NO_PROPERTY
+            : `${formatPercent((totalEquity / propertyValue) * 100, numberFormat, 0)} of property value`
+        }
       />
       <StatCard
         label="Loan-to-Value"
-        value={formatPercent(ltv, numberFormat, 1)}
-        subtitle={ltv < GOOD_LTV_THRESHOLD ? `Good — below ${GOOD_LTV_THRESHOLD}%` : 'High LTV'}
+        value={ltv == null ? '—' : formatPercent(ltv, numberFormat, 1)}
+        subtitle={ltvSubtitle(ltv)}
       />
       <StatCard
         label="Capital repaid"

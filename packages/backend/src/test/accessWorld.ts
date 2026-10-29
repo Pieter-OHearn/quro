@@ -257,7 +257,6 @@ async function seedProperties(ctx: SeedContext) {
       propertyType: 'House',
       purchasePrice: 200000,
       currentValue: 250000,
-      mortgage: 100000,
       monthlyRent: 0,
       currency: 'EUR',
       isJoint,
@@ -268,10 +267,8 @@ async function seedProperties(ctx: SeedContext) {
     .values({
       userId,
       propertyId: property.id,
-      type: 'repayment',
-      amount: 1200,
-      interest: 200,
-      principal: 1000,
+      type: 'valuation',
+      amount: 250000,
       date: '2026-03-01',
       note: m('property-note'),
     })
@@ -288,12 +285,10 @@ async function seedMortgages(ctx: SeedContext) {
     .insert(mortgages)
     .values({
       userId,
-      propertyAddress: m('mortgage-address'),
       lender: m('lender'),
       currency: 'EUR',
       originalAmount: 300000,
       outstandingBalance: 250000,
-      propertyValue: 400000,
       monthlyPayment: 1500,
       interestRate: 3,
       rateType: 'Fixed',
@@ -327,7 +322,6 @@ async function seedMortgages(ctx: SeedContext) {
       propertyType: 'House',
       purchasePrice: 400000,
       currentValue: 400000,
-      mortgage: 0,
       mortgageId: mortgage.id,
       monthlyRent: 0,
       currency: 'EUR',

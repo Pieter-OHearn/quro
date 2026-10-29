@@ -1,5 +1,4 @@
 import {
-  Change,
   Modal,
   ModalFooter,
   ModalHeader,
@@ -23,6 +22,8 @@ import { MORTGAGE_TXN_TYPES, TXN_META } from '../utils/mortgage-meta';
 
 type AddMortgageTxnModalProps = {
   mortgage: MortgageType;
+  /** The mortgage's ledger, for the suggested repayment. */
+  transactions: readonly MortgageTransaction[];
   existing?: MortgageTransaction;
   onClose: () => void;
   onSave: (t: SaveMortgageTxnInput) => void;
@@ -61,13 +62,6 @@ function ContextPill({ type, mortgage, fmt }: ContextPillProps) {
           <span className="font-medium font-numeric text-fg">
             {fmt(mortgage.outstandingBalance)}
           </span>
-        </>
-      )}
-      {type === 'valuation' && (
-        <>
-          <span>Current value</span>
-          <span className="text-fg-faint">·</span>
-          <span className="font-medium font-numeric text-fg">{fmt(mortgage.propertyValue)}</span>
         </>
       )}
       {type === 'rate_change' && (
@@ -127,41 +121,6 @@ function RepaymentPreview({
   );
 }
 
-function ValuationPreview({
-  parsedAmount,
-  mortgage,
-  fmt,
-}: Pick<LivePreviewProps, 'parsedAmount' | 'mortgage' | 'fmt'>) {
-  const { numberFormat, baseCurrency } = useCurrency();
-  return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between gap-3 text-cell">
-        <span className="text-fg-muted">Previous value</span>
-        <span className="font-medium font-numeric text-fg">{fmt(mortgage.propertyValue)}</span>
-      </div>
-      <div className="flex justify-between gap-3 text-cell">
-        <span className="text-fg-muted">New value</span>
-        <span className="font-medium font-numeric text-fg">{fmt(parsedAmount)}</span>
-      </div>
-      <div className="flex justify-between gap-3 text-cell">
-        <span className="text-fg-muted">Change</span>
-        <Change
-          format="amount"
-          currency={baseCurrency}
-          value={parsedAmount - mortgage.propertyValue}
-          showArrow={false}
-        />
-      </div>
-      <div className="mt-1 flex justify-between gap-3 border-t border-border-strong pt-1.5 text-cell">
-        <span className="text-fg-muted">New LTV</span>
-        <span className="font-medium font-numeric text-fg">
-          {formatPercent((mortgage.outstandingBalance / parsedAmount) * 100, numberFormat, 1)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 function RateChangePreview({
   parsedAmount,
   computedFixedUntil,
@@ -200,7 +159,6 @@ function LivePreview(props: LivePreviewProps) {
   return (
     <div className="rounded-lg border border-border-default bg-surface-sunken p-3">
       {type === 'repayment' && <RepaymentPreview {...props} />}
-      {type === 'valuation' && <ValuationPreview {...props} />}
       {type === 'rate_change' && <RateChangePreview {...props} />}
     </div>
   );
@@ -228,7 +186,6 @@ function TxnAmountField({
 }: TxnAmountFieldProps) {
   const labels = {
     repayment: `Total repayment amount (${mortgage.currency})`,
-    valuation: `New estimated value (${mortgage.currency})`,
     rate_change: 'New interest rate (%)',
   };
   return (
@@ -379,6 +336,36 @@ function TxnConditionalFields({ state, mortgage, fmt }: TxnModalFormBodyProps) {
   );
 }
 
+// A new repayment is pre-filled from the loan type and rate; this says so and undoes the user's
+// changes. The fields stay editable.
+function SuggestionHint({
+  state,
+  repaymentType,
+}: Readonly<{ state: TxnModalState; repaymentType: MortgageType['repaymentType'] }>) {
+  const { numberFormat } = useCurrency();
+  if (!state.suggestion) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 text-caption text-fg-subtle">
+      <span>
+        Suggested from{' '}
+        <span className="font-numeric text-fg">
+          {formatPercent(state.suggestion.rate, numberFormat, 2)}
+        </span>
+        , {repaymentType}
+      </span>
+      {state.canResetSuggestion && (
+        <button
+          type="button"
+          onClick={state.resetSuggestion}
+          className="inline-flex min-h-7 items-center rounded-sm text-label text-brand-fg underline-offset-2 hover:underline max-sm:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
+        >
+          Reset to suggestion
+        </button>
+      )}
+    </p>
+  );
+}
+
 function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
   return (
     <div className="space-y-4 p-4">
@@ -386,6 +373,7 @@ function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
         <TxnTypeSelector types={TXN_TYPES} value={state.type} onChange={state.handleTypeChange} />
       </FormField>
       <ContextPill type={state.type} mortgage={mortgage} fmt={fmt} />
+      <SuggestionHint state={state} repaymentType={mortgage.repaymentType} />
       <TxnAmountField
         type={state.type}
         error={state.error}
@@ -420,6 +408,7 @@ function TxnModalFormBody({ state, mortgage, fmt }: TxnModalFormBodyProps) {
 
 export function AddMortgageTxnModal({
   mortgage,
+  transactions,
   existing,
   onClose,
   onSave,
@@ -427,14 +416,21 @@ export function AddMortgageTxnModal({
   const { fmtBase } = useCurrency();
   const fmt = (v: number) => fmtBase(v);
   const effectiveMortgage = buildEffectiveMortgage(mortgage, existing);
-  const state = useMortgageTxnModal({ mortgage: effectiveMortgage, existing, onSave, onClose });
+  const state = useMortgageTxnModal({
+    mortgage: effectiveMortgage,
+    transactions,
+    existing,
+    onSave,
+    onClose,
+  });
+  const subtitle = `${DEFAULT_EMOJI.property} ${mortgage.propertyAddress ?? mortgage.lender}`;
   const isEditing = Boolean(existing);
   const title = isEditing ? 'Edit transaction' : 'Record transaction';
 
   return (
     <Modal
       title={title}
-      subtitle={`${DEFAULT_EMOJI.property} ${mortgage.propertyAddress}`}
+      subtitle={subtitle}
       onClose={onClose}
       maxWidth="md"
       bodyClassName="p-0 space-y-0"
@@ -442,7 +438,7 @@ export function AddMortgageTxnModal({
         <ModalHeader
           onClose={onClose}
           title={title}
-          subtitle={`${DEFAULT_EMOJI.property} ${mortgage.propertyAddress}`}
+          subtitle={subtitle}
           contentClassName="min-w-0"
           subtitleClassName="truncate max-w-[240px]"
         />

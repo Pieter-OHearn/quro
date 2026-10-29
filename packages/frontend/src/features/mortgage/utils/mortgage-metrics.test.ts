@@ -5,6 +5,7 @@ import type { Mortgage } from '@quro/shared';
 import {
   computeMortgageMetrics,
   computePaymentBreakdownRows,
+  expectedNextPayment,
   generateSchedule,
 } from './mortgage-metrics';
 
@@ -12,11 +13,11 @@ const mortgageBase: Mortgage = {
   id: 1,
   linkedPropertyId: 1,
   propertyAddress: '1 Canal Street',
+  propertyValue: 300000,
   lender: 'Quro Bank',
   currency: 'EUR',
   originalAmount: 2400,
   outstandingBalance: 2400,
-  propertyValue: 300000,
   monthlyPayment: 100,
   interestRate: 0,
   rateType: 'Fixed',
@@ -67,7 +68,7 @@ test('shows contractual time remaining instead of the estimated payoff time', ()
     endDate: '1 August 2056',
   };
 
-  const metrics = computeMortgageMetrics(mortgage, [], new Date(2026, 7, 5, 12));
+  const metrics = computeMortgageMetrics(mortgage, [], undefined, new Date(2026, 7, 5, 12));
 
   expect(metrics.monthsRemaining).toBe(360);
   expect(metrics.yearsRemaining).toBe(30);
@@ -87,7 +88,7 @@ test('projects a linear mortgage with fixed principal through the contractual en
     endDate: '1 August 2056',
   };
 
-  const metrics = computeMortgageMetrics(mortgage, [], new Date(2026, 7, 5, 12));
+  const metrics = computeMortgageMetrics(mortgage, [], undefined, new Date(2026, 7, 5, 12));
 
   expect(metrics.amortization.at(-1)?.year).toBe('2056');
   expect(metrics.amortization.at(-1)?.balance).toBe(0);
@@ -131,4 +132,31 @@ test('keeps payment breakdown amounts at cent precision', () => {
     } as never,
   ]);
   expect(rows).toEqual([{ month: 'Aug', principal: 1958.41, interest: 2262.1 }]);
+});
+
+test('the projection and the next payment follow the shared repayment rule', () => {
+  const linear: Mortgage = {
+    ...mortgageBase,
+    originalAmount: 705000,
+    outstandingBalance: 699125,
+    monthlyPayment: 4220.21,
+    interestRate: 3.85,
+    repaymentType: 'Linear',
+    termYears: 30,
+  };
+  // The stored payment is the first one; the next is 1,958.33 plus interest on 699,125.00.
+  expect(expectedNextPayment(linear)).toBe(4201.36);
+  // Two years at 1,958.33 a month, with interest on the falling balance.
+  const [, twoYears] = generateSchedule(linear, 360, new Date('2026-11-15T12:00:00Z'));
+  expect(twoYears!.principal).toBe(1958.33 * 24);
+
+  const metrics = computeMortgageMetrics(linear, [], {
+    debt: 699125,
+    totalEquity: 100875,
+    equity: 50437.5,
+  } as never);
+  expect(metrics).toMatchObject({ equity: 50437.5, totalEquity: 100875 });
+  expect(metrics.ltv).toBeCloseTo((699125 / 300000) * 100, 6);
+  // Without a linked property there is no value to measure against.
+  expect(computeMortgageMetrics({ ...linear, propertyValue: null }, [], undefined).ltv).toBeNull();
 });

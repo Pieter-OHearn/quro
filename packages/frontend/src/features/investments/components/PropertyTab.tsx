@@ -10,10 +10,11 @@ import { JointBadge } from '@/features/partner';
 import {
   formatPercent,
   type Mortgage,
+  type MortgageTransaction,
   type Property,
   type PropertyTransaction,
 } from '@quro/shared';
-import { getPropertyMortgageBalance, getPropertyOwnershipShare } from '../utils/position';
+import { getPropertyOwnershipShare } from '../utils/position';
 import { PropertiesArchivedSection } from './PropertiesArchivedSection';
 import { PropertyTxnHistory } from './PropertyTxnHistory';
 
@@ -21,6 +22,8 @@ type PropertyTabProps = {
   properties: Property[];
   propertyTxns: PropertyTransaction[];
   mortgageById: Map<number, Mortgage>;
+  /** Every mortgage ledger: a card lists its linked mortgage's rows read-only. */
+  mortgageTxns: MortgageTransaction[];
   expandedPropertyId: number | null;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
   onAddProperty: () => void;
@@ -49,14 +52,14 @@ type PropertyCardStats = {
 
 const HEALTHY_LTV_THRESHOLD = 70;
 
+// Debt and equity are the server's: the figures the mortgage page and the dashboard read.
 function computePropertyCardStats(
   property: Property,
-  propertyTxns: PropertyTransaction[],
-  mortgageById: Map<number, Mortgage>,
+  propertyTransactions: PropertyTransaction[],
+  linkedMortgageTxns: MortgageTransaction[],
 ): PropertyCardStats {
-  const mortgageBalance = getPropertyMortgageBalance(property, mortgageById);
-  const totalEquity = property.currentValue - mortgageBalance;
-  const equity = totalEquity * getPropertyOwnershipShare(property);
+  const mortgageBalance = property.debt;
+  const { totalEquity, equity } = property;
   const appreciation = property.currentValue - property.purchasePrice;
   const appreciationPct = (property.currentValue / property.purchasePrice - 1) * 100;
   const ltv =
@@ -64,8 +67,7 @@ function computePropertyCardStats(
       ? (mortgageBalance / property.currentValue) * 100
       : 0;
 
-  const propertyTransactions = propertyTxns.filter((t) => t.propertyId === property.id);
-  const txnCount = propertyTransactions.length;
+  const txnCount = propertyTransactions.length + linkedMortgageTxns.length;
   const totalRent = propertyTransactions
     .filter((t) => t.type === 'rent_income')
     .reduce((sum, t) => sum + t.amount, 0);
@@ -277,6 +279,7 @@ type PropertyCardProps = {
   property: Property;
   propertyTxns: PropertyTransaction[];
   mortgageById: Map<number, Mortgage>;
+  mortgageTxns: MortgageTransaction[];
   isExpanded: boolean;
   fmtNative: (value: number, currency: string, compact?: boolean) => string;
   onUpdateProperty: (property: Property) => void;
@@ -375,11 +378,17 @@ function PropertyDetailsToggle({
 }
 
 function PropertyCard(props: PropertyCardProps) {
-  const { property, propertyTxns, mortgageById, isExpanded, fmtNative } = props;
+  const { property, propertyTxns, mortgageById, mortgageTxns, isExpanded, fmtNative } = props;
   const { onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onEditTxn, onDeleteTxn } = props;
   const linkedMortgage =
     property.mortgageId != null ? mortgageById.get(property.mortgageId) : undefined;
-  const stats = computePropertyCardStats(property, propertyTxns, mortgageById);
+  const ownTxns = propertyTxns.filter((t) => t.propertyId === property.id);
+  // The linked mortgage's rows, archived mortgage or not: the repayments still paid this property.
+  const linkedMortgageTxns =
+    property.mortgageId == null
+      ? []
+      : mortgageTxns.filter((t) => t.mortgageId === property.mortgageId);
+  const stats = computePropertyCardStats(property, ownTxns, linkedMortgageTxns);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const detailsId = useId();
 
@@ -423,7 +432,8 @@ function PropertyCard(props: PropertyCardProps) {
       {isExpanded && (
         <PropertyTxnHistory
           property={property}
-          transactions={propertyTxns.filter((t) => t.propertyId === property.id)}
+          transactions={ownTxns}
+          mortgageTransactions={linkedMortgageTxns}
           onAdd={() => onAddTxnForProperty(property)}
           onEdit={onEditTxn}
           onDelete={onDeleteTxn}
@@ -441,6 +451,7 @@ function PropertyCardsList({
   properties,
   propertyTxns,
   mortgageById,
+  mortgageTxns,
   expandedPropertyId,
   fmtNative,
   onUpdateProperty,
@@ -457,6 +468,7 @@ function PropertyCardsList({
           property={property}
           propertyTxns={propertyTxns}
           mortgageById={mortgageById}
+          mortgageTxns={mortgageTxns}
           isExpanded={expandedPropertyId === property.id}
           fmtNative={fmtNative}
           onUpdateProperty={onUpdateProperty}
@@ -474,6 +486,7 @@ export function PropertyTab({
   properties,
   propertyTxns,
   mortgageById,
+  mortgageTxns,
   expandedPropertyId,
   fmtNative,
   onAddProperty,
@@ -512,6 +525,7 @@ export function PropertyTab({
           properties={properties}
           propertyTxns={propertyTxns}
           mortgageById={mortgageById}
+          mortgageTxns={mortgageTxns}
           expandedPropertyId={expandedPropertyId}
           fmtNative={fmtNative}
           onUpdateProperty={onUpdateProperty}

@@ -264,9 +264,7 @@ describe('household snapshot invalidation', () => {
         linkedPropertyId: property.id,
         lender: 'Test lender',
         originalAmount: 250000,
-        propertyAddress: 'Snapshot test property',
         currency: 'EUR',
-        propertyValue: 300000,
         outstandingBalance: 200000,
         monthlyPayment: 1200,
         interestRate: 3,
@@ -282,22 +280,21 @@ describe('household snapshot invalidation', () => {
     expect(mortgageResponse.status).toBe(201);
     const mortgage = ((await mortgageResponse.json()) as { data: { id: number } }).data;
     const ids = [owner.user.id, partner.user.id, outsider.user.id];
-    for (const [path, parent] of [
-      ['/api/mortgages/transactions', { mortgageId: mortgage.id }],
-      ['/api/investments/property-transactions', { propertyId: property.id }],
+    for (const [path, row] of [
+      [
+        '/api/mortgages/transactions',
+        { mortgageId: mortgage.id, type: 'repayment', amount: 100, principal: 100, interest: 0 },
+      ],
+      [
+        '/api/investments/property-transactions',
+        { propertyId: property.id, type: 'valuation', amount: 310000 },
+      ],
     ] as const) {
       await seedSnapshots(ids);
       const created = await integration.request(path, {
         method: 'POST',
         cookie: partner.cookie,
-        json: {
-          ...parent,
-          type: 'repayment',
-          amount: 100,
-          principal: 100,
-          interest: 0,
-          date: '2026-04-10',
-        },
+        json: { ...row, date: '2026-04-10' },
       });
       expect(created.status).toBe(201);
       const transaction = ((await created.json()) as { data: { id: number } }).data;

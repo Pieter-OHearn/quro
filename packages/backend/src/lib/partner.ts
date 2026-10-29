@@ -13,9 +13,11 @@ export { householdShare, type HouseholdWeight };
 const HOUSEHOLD_MONEY_COLUMNS = {
   savings: ['balance'],
   savingsTransactions: ['amount'],
-  properties: ['purchasePrice', 'currentValue', 'mortgage'],
-  propertyTransactions: ['amount', 'interest', 'principal'],
-  mortgages: ['outstandingBalance', 'monthlyPayment', 'originalAmount', 'propertyValue'],
+  properties: ['purchasePrice', 'currentValue'],
+  propertyTransactions: ['amount'],
+  mortgages: ['outstandingBalance', 'monthlyPayment', 'originalAmount'],
+  // Repayment rows only: a rate change carries a rate in `amount`, which is never weighted.
+  mortgageRepayments: ['amount', 'interest', 'principal', 'unappliedPrincipal'],
 } as const;
 
 export function scopeHouseholdRows<T extends object>(

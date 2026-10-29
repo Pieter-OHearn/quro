@@ -7,7 +7,7 @@ import {
   DEBTS,
   EMPLOYMENTS,
   HOLDINGS,
-  MORTGAGE,
+  MORTGAGES,
   PENSION_POTS,
   PROPERTIES,
   RATE_HISTORY_FIRST_DAY,
@@ -339,8 +339,8 @@ describe('the seeded household', () => {
         ) all_currencies order by 1`;
       expect(currencies.map((row) => row.currency)).toEqual(['CHF', 'EUR', 'GBP', 'USD']);
       const [equity] = await sql<{ equity: string }[]>`
-        select (p.current_value - p.mortgage)::text as equity from properties p
-        where p.mortgage_id is null`;
+        select (p.current_value - m.outstanding_balance)::text as equity from properties p
+        join mortgages m on m.id = p.mortgage_id where not p.is_joint`;
       expect(Number(equity!.equity)).toBeLessThan(0);
       const [loss] = await sql<{ cost: string; value: string }[]>`
         select (sum(case when t.type = 'buy' then t.shares * t.price end)
@@ -434,32 +434,29 @@ describe('the seeded household', () => {
         expect(balance(row!.balance)).toBe(expectedDebtBalance(debt));
         expect(balance(row!.balance) + balance(row!.principal)).toBeCloseTo(debt.openingBalance, 2);
       }
-      const [mortgage] = await sql<{ balance: string; principal: string; split: number }[]>`
-        select m.outstanding_balance::text as balance, sum(t.principal)::text as principal,
-               count(*) filter (where t.amount <> t.interest + t.principal)::int as split
-        from mortgages m join mortgage_transactions t on t.mortgage_id = m.id
-        where t.type = 'repayment' group by m.id`;
-      expect(balance(mortgage!.balance)).toBe(expectedMortgageBalance(MORTGAGE));
-      expect(balance(mortgage!.balance) + balance(mortgage!.principal)).toBeCloseTo(
-        MORTGAGE.openingBalance,
-        2,
-      );
-      expect(mortgage!.split).toBe(0);
-      const flat = PROPERTIES.find((property) => property.key === 'flat')!;
-      const [property] = await sql<{ mortgage: string; principal: string }[]>`
-        select p.mortgage::text as mortgage, sum(t.principal)::text as principal
-        from properties p join property_transactions t on t.property_id = p.id
-        where t.type = 'repayment' group by p.id`;
-      expect(balance(property!.mortgage)).toBe(expectedPropertyDebt(flat));
-      expect(balance(property!.mortgage) + balance(property!.principal)).toBeCloseTo(
-        flat.manualMortgage,
-        2,
-      );
-      // A linked mortgage replaces the property's own debt.
-      const [linked] = await sql<{ mortgage: string; linked: boolean }[]>`
-        select mortgage::text, mortgage_id is not null as linked from properties
-        where address like '12 Voorbeeldstraat%'`;
-      expect(linked).toEqual({ mortgage: '0.00', linked: true });
+      for (const spec of MORTGAGES) {
+        const property = PROPERTIES.find((candidate) => candidate.key === spec.propertyKey)!;
+        // A mortgage is found through the property it is linked to: its address and value are
+        // the property's own.
+        const [mortgage] = await sql<{ balance: string; principal: string; split: number }[]>`
+          select m.outstanding_balance::text as balance, sum(t.principal)::text as principal,
+                 count(*) filter (where t.amount <> t.interest + t.principal)::int as split
+          from mortgages m
+          join properties p on p.mortgage_id = m.id
+          join mortgage_transactions t on t.mortgage_id = m.id
+          where t.type = 'repayment' and p.address = ${property.address} group by m.id`;
+        expect(balance(mortgage!.balance)).toBe(expectedMortgageBalance(spec));
+        expect(balance(mortgage!.balance)).toBe(expectedPropertyDebt(property));
+        expect(balance(mortgage!.balance) + balance(mortgage!.principal)).toBeCloseTo(
+          spec.openingBalance,
+          2,
+        );
+        expect(mortgage!.split).toBe(0);
+      }
+      // A property's ledger keeps no repayment.
+      const [repayments] = await sql<{ count: number }[]>`
+        select count(*)::int as count from property_transactions where type = 'repayment'`;
+      expect(repayments!.count).toBe(0);
     });
   });
 
@@ -561,9 +558,8 @@ describe('the seeded household through the application', () => {
             left join (select holding_id, sum(case type when 'buy' then shares when 'sell' then -shares
               else 0 end) as net from holding_transactions group by holding_id) t on t.holding_id = h.id
             where h.user_id = $1 and h.archived_at is null)::text as brokerage,
-          (select coalesce(sum(round((p.current_value * ${share('p')} - case when p.mortgage_id is null
-              then p.mortgage * ${share('p')} else coalesce(m.outstanding_balance * ${share('m')}, 0)
-              end) * r.rate, 2)), 0)
+          (select coalesce(sum(round((p.current_value * ${share('p')}
+              - coalesce(m.outstanding_balance * ${share('m')}, 0)) * r.rate, 2)), 0)
             from properties p join ${rates} r on r.currency = p.currency::text
             left join mortgages m on m.id = p.mortgage_id and m.archived_at is null
             where ${visible('p')})::text as property_equity,

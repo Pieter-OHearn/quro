@@ -1,9 +1,14 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
+import type {
+  Mortgage as MortgageType,
+  MortgageTransaction,
+  Property,
+  PropertyTransaction,
+} from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
-import { useProperties } from '../../investments/hooks';
+import { useProperties, usePropertyTransactions } from '../../investments/hooks';
 import type {
   CreateMortgagePayload,
   MortgageFormPayload,
@@ -35,6 +40,7 @@ function buildLinkedPropertyMap(properties: Property[]): Map<number, Property> {
 
 const EMPTY_PROPERTIES: Property[] = [];
 const EMPTY_TRANSACTIONS: MortgageTransaction[] = [];
+const EMPTY_PROPERTY_TRANSACTIONS: PropertyTransaction[] = [];
 
 function parseRequestedMortgageId(raw: string | null): number | null {
   const value = Number(raw);
@@ -46,6 +52,17 @@ function mortgageSelectionParams(previous: URLSearchParams, id: number | null) {
   if (id === null) next.delete('mortgageId');
   else next.set('mortgageId', String(id));
   return next;
+}
+
+// The linked property's ledger: its valuations are shown read-only beside the repayments.
+function useLinkedPropertyLedger(mortgage: MortgageType | undefined) {
+  const propertyId = mortgage?.linkedPropertyId ?? null;
+  const propertyTransactionsQuery = usePropertyTransactions(propertyId ?? undefined);
+  const propertyTxns =
+    propertyId === null
+      ? EMPTY_PROPERTY_TRANSACTIONS
+      : (propertyTransactionsQuery.data ?? EMPTY_PROPERTY_TRANSACTIONS);
+  return { propertyTxns, propertyTransactionsQuery };
 }
 
 export function useMortgagePageState(): MortgagePageState {
@@ -63,6 +80,7 @@ export function useMortgagePageState(): MortgagePageState {
   const mortgage = mortgages.find((entry) => entry.id === activeMortgageId) ?? mortgages[0];
   const transactionsQuery = useMortgageTransactions(mortgage?.id);
   const txns = transactionsQuery.data ?? EMPTY_TRANSACTIONS;
+  const { propertyTxns, propertyTransactionsQuery } = useLinkedPropertyLedger(mortgage);
 
   const createMortgageMut = useCreateMortgage();
   const updateMortgageMut = useUpdateMortgage();
@@ -116,6 +134,7 @@ export function useMortgagePageState(): MortgagePageState {
     properties,
     mortgage,
     txns,
+    propertyTxns,
     ...modals,
     editingLinkedPropertyId,
     setActiveMortgageId,
@@ -123,13 +142,14 @@ export function useMortgagePageState(): MortgagePageState {
     handleSaveMortgage,
     handleDeleteTxn,
     handleDeleteMortgage,
-    isLoading: [mortgagesQuery, propertiesQuery, transactionsQuery].some(
+    isLoading: [mortgagesQuery, propertiesQuery, transactionsQuery, propertyTransactionsQuery].some(
       (query) => query.isLoading,
     ),
     queryFailures: getFailedRouteQueries([
       { label: 'mortgages', ...mortgagesQuery },
       { label: 'properties', ...propertiesQuery },
       { label: 'mortgage transactions', ...transactionsQuery },
+      { label: 'property transactions', ...propertyTransactionsQuery },
     ]),
   };
 }

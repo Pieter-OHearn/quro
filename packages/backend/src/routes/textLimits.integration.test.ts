@@ -201,10 +201,8 @@ const families: Family[] = [
     create: (o) =>
       send('POST', '/api/investments/property-transactions', {
         propertyId: state.mortgageProperty,
-        type: 'repayment',
+        type: 'valuation',
         amount: 100,
-        principal: 80,
-        interest: 20,
         date: DATE,
         ...o,
       }),
@@ -226,7 +224,6 @@ const families: Family[] = [
         lender: 'Synthetic Lender',
         originalAmount: 350000,
         outstandingBalance: 300000,
-        propertyValue: 450000,
         monthlyPayment: 1500,
         interestRate: 2.4,
         rateType: 'fixed',
@@ -378,7 +375,6 @@ describe('create requests', () => {
       lender: 'Synthetic Lender',
       originalAmount: 350000,
       outstandingBalance: 300000,
-      propertyValue: 450000,
       monthlyPayment: 1500,
       interestRate: 2.4,
       rateType: 'fixed',

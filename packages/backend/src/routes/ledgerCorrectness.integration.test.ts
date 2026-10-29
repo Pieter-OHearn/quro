@@ -11,13 +11,13 @@ import {
   pensionStatementImports,
   pensionTransactions,
   properties,
-  propertyTransactions,
 } from '../db/schema';
+import { applyDueValuations } from '../lib/propertyValuation';
 import { createIntegrationHelpers, type AuthSession } from '../test/integration';
 
-// Ledger edge cases: a repayment that the zero clamp cuts short, a repayment whose property is
-// linked to a mortgage afterwards, a cascade archive racing an edit, and two imports of one
-// statement committed together.
+// Ledger edge cases: a repayment that the zero clamp cuts short, valuations that set a property's
+// current value, a cascade archive racing an edit, and two imports of one statement committed
+// together.
 
 const integration = createIntegrationHelpers('ledger-correctness.integration.quro.test');
 const DATE = '2026-03-02';
@@ -58,19 +58,13 @@ async function mortgageBalance(id: number) {
   return toCents(row!.outstandingBalance);
 }
 
-async function manualPropertyDebt(id: number) {
-  const [row] = await db.select().from(properties).where(eq(properties.id, id));
-  return toCents(row!.mortgage);
-}
-
-async function createProperty(owner: AuthSession, address: string, mortgage = 0) {
+async function createProperty(owner: AuthSession, address: string) {
   return created<{ id: number }>(
     await post(owner, '/api/investments/properties', {
       address,
       propertyType: 'primary_home',
       purchasePrice: 300000,
       currentValue: 320000,
-      mortgage,
       monthlyRent: 0,
       currency: 'EUR',
       emoji: 'H',
@@ -85,7 +79,6 @@ async function createMortgage(owner: AuthSession, propertyId: number, outstandin
       lender: 'Synthetic Lender',
       originalAmount: Math.max(outstandingBalance, 1000),
       outstandingBalance,
-      propertyValue: 320000,
       monthlyPayment: 100,
       interestRate: 3,
       rateType: 'Variable',
@@ -165,28 +158,6 @@ describe('a repayment that the zero clamp cuts short', () => {
     await expectStatus(await remove(owner, `/api/mortgages/transactions/${repayment.id}`), 200);
     expect(await mortgageBalance(mortgage.id)).toBe(toCents(100));
   });
-
-  test('property: deleting the repayment restores exactly the manual debt it reduced', async () => {
-    const owner = await integration.signUp('clamp-property');
-    const property = await createProperty(owner, '2 Clamp Street', 100);
-    const repayment = await created<{ id: number }>(
-      await post(owner, '/api/investments/property-transactions', {
-        propertyId: property.id,
-        type: 'repayment',
-        amount: 100.01,
-        interest: 0,
-        principal: 100.01,
-        date: DATE,
-      }),
-    );
-    expect(await manualPropertyDebt(property.id)).toBe(0);
-
-    await expectStatus(
-      await remove(owner, `/api/investments/property-transactions/${repayment.id}`),
-      200,
-    );
-    expect(await manualPropertyDebt(property.id)).toBe(toCents(100));
-  });
 });
 
 // Budget spending is the other balance clamped at zero. Its transactions are positive and only
@@ -236,103 +207,123 @@ test('budget: creating, editing, moving and deleting transactions returns spendi
   expect(await spent(dining.id)).toBe(0);
 });
 
-describe('a property repayment stays with the debt it paid', () => {
-  const repayment = (propertyId: number, principal: number) => ({
+describe('a property valuation sets the current value', () => {
+  const valuation = (propertyId: number, amount: number, date: string) => ({
     propertyId,
-    type: 'repayment',
-    amount: principal,
-    interest: 0,
-    principal,
-    date: DATE,
+    type: 'valuation',
+    amount,
+    date,
   });
+  const currentValue = async (id: number) => {
+    const [row] = await db.select().from(properties).where(eq(properties.id, id));
+    return toCents(row!.currentValue);
+  };
 
-  test('linked to a mortgage afterwards: edits and deletes leave the mortgage alone', async () => {
-    const owner = await integration.signUp('link-after-repayment');
-    const property = await createProperty(owner, '3 Link Street', 1000);
-    const deleted = await created<{ id: number }>(
-      await post(owner, '/api/investments/property-transactions', repayment(property.id, 100)),
+  test('to the latest by date, ties by id, through edits, moves and deletes', async () => {
+    const owner = await integration.signUp('valuation-current-value');
+    const home = await createProperty(owner, '3 Value Street');
+    const flat = await createProperty(owner, '4 Value Street');
+    const later = await created<{ id: number }>(
+      await post(
+        owner,
+        '/api/investments/property-transactions',
+        valuation(home.id, 330000, '2026-02-01'),
+      ),
     );
-    const edited = await created<{ id: number }>(
-      await post(owner, '/api/investments/property-transactions', repayment(property.id, 200)),
+    await created(
+      await post(
+        owner,
+        '/api/investments/property-transactions',
+        valuation(home.id, 310000, '2026-01-01'),
+      ),
     );
-    expect(await manualPropertyDebt(property.id)).toBe(toCents(700));
-
-    const mortgage = await createMortgage(owner, property.id, 50000);
-    expect(await mortgageBalance(mortgage.id)).toBe(toCents(50000));
+    expect(await currentValue(home.id)).toBe(toCents(330000));
+    // Same date: the later row wins.
+    const tie = await created<{ id: number }>(
+      await post(
+        owner,
+        '/api/investments/property-transactions',
+        valuation(home.id, 335000, '2026-02-01'),
+      ),
+    );
+    expect(await currentValue(home.id)).toBe(toCents(335000));
 
     await expectStatus(
-      await patch(owner, `/api/investments/property-transactions/${edited.id}`, {
-        note: 'Corrected note',
+      await patch(owner, `/api/investments/property-transactions/${tie.id}`, { amount: 336000 }),
+      200,
+    );
+    expect(await currentValue(home.id)).toBe(toCents(336000));
+    // Moved to another property: both values follow their remaining valuations.
+    await expectStatus(
+      await patch(owner, `/api/investments/property-transactions/${tie.id}`, {
+        propertyId: flat.id,
       }),
       200,
     );
+    expect(await currentValue(home.id)).toBe(toCents(330000));
+    expect(await currentValue(flat.id)).toBe(toCents(336000));
+    // Dated earlier: the other valuation becomes the latest.
     await expectStatus(
-      await patch(owner, `/api/investments/property-transactions/${edited.id}`, {
-        amount: 150,
-        principal: 150,
+      await patch(owner, `/api/investments/property-transactions/${later.id}`, {
+        date: '2025-12-01',
       }),
       200,
     );
+    expect(await currentValue(home.id)).toBe(toCents(310000));
+    // While valuations set the value, it cannot be edited by hand.
     await expectStatus(
-      await remove(owner, `/api/investments/property-transactions/${deleted.id}`),
+      await patch(owner, `/api/investments/properties/${home.id}`, { currentValue: 1 }),
+      400,
+    );
+    await expectStatus(
+      await remove(owner, `/api/investments/property-transactions/${tie.id}`),
       200,
     );
-    // The mortgage never received these repayments, so it is not charged for them either.
-    expect(await mortgageBalance(mortgage.id)).toBe(toCents(50000));
-  });
-
-  test('remortgaged: deleting a repayment restores the mortgage it reduced', async () => {
-    const owner = await integration.signUp('remortgage');
-    const property = await createProperty(owner, '4 Link Street');
-    const first = await createMortgage(owner, property.id, 40000);
-    const paid = await created<{ id: number }>(
-      await post(owner, '/api/investments/property-transactions', repayment(property.id, 500)),
-    );
-    expect(await mortgageBalance(first.id)).toBe(toCents(39500));
-
-    await expectStatus(await remove(owner, `/api/mortgages/${first.id}`), 200);
-    const second = await createMortgage(owner, property.id, 60000);
-
+    // The flat's last valuation is gone: it keeps the value it had.
+    expect(await currentValue(flat.id)).toBe(toCents(336000));
     await expectStatus(
-      await remove(owner, `/api/investments/property-transactions/${paid.id}`),
+      await patch(owner, `/api/investments/properties/${flat.id}`, { currentValue: 300000 }),
       200,
     );
-    expect(await mortgageBalance(second.id)).toBe(toCents(60000));
-    expect(await mortgageBalance(first.id)).toBe(toCents(40000));
+    expect(await currentValue(flat.id)).toBe(toCents(300000));
   });
-});
 
-test('a repayment recorded against a mortgage outside the household leaves it alone', async () => {
-  const owner = await integration.signUp('repayment-foreign-mortgage');
-  const other = await integration.signUp('repayment-foreign-owner');
-  const property = await createProperty(owner, '6 Link Street', 1000);
-  const foreign = await createMortgage(
-    other,
-    (await createProperty(other, '7 Link Street')).id,
-    9000,
-  );
-  // A repayment recorded while that mortgage was shared, as a former partner link leaves it.
-  const [row] = await db
-    .insert(propertyTransactions)
-    .values({
-      userId: owner.user.id,
-      propertyId: property.id,
-      type: 'repayment',
-      amount: 100,
-      interest: 0,
-      principal: 100,
-      date: DATE,
-      repaymentTarget: 'mortgage',
-      repaymentMortgageId: foreign.id,
-    })
-    .returning();
-
-  await expectStatus(
-    await patch(owner, `/api/investments/property-transactions/${row!.id}`, { note: 'Kept' }),
-    200,
-  );
-  await expectStatus(await remove(owner, `/api/investments/property-transactions/${row!.id}`), 200);
-  expect(await mortgageBalance(foreign.id)).toBe(toCents(9000));
+  test('from its date: a valuation dated later sets the value when that date comes', async () => {
+    const owner = await integration.signUp('valuation-future-date');
+    const home = await createProperty(owner, '5 Value Street');
+    await created(
+      await post(
+        owner,
+        '/api/investments/property-transactions',
+        valuation(home.id, 330000, '2026-02-01'),
+      ),
+    );
+    const future = await created<{ id: number }>(
+      await post(
+        owner,
+        '/api/investments/property-transactions',
+        valuation(home.id, 360000, '2999-01-01'),
+      ),
+    );
+    // Not yet in effect: the latest valuation dated on or before today sets the value, and the
+    // value can still not be edited by hand.
+    expect(await currentValue(home.id)).toBe(toCents(330000));
+    await expectStatus(
+      await patch(owner, `/api/investments/properties/${home.id}`, { currentValue: 1 }),
+      400,
+    );
+    // The daily job applies it once its date has come; a second run changes nothing.
+    expect(await applyDueValuations('2998-12-31')).toBe(0);
+    expect(await applyDueValuations('2999-01-01')).toBeGreaterThanOrEqual(1);
+    expect(await currentValue(home.id)).toBe(toCents(360000));
+    expect(await applyDueValuations('2999-01-01')).toBe(0);
+    // Deleting it goes back to the latest valuation in effect today.
+    await expectStatus(
+      await remove(owner, `/api/investments/property-transactions/${future.id}`),
+      200,
+    );
+    expect(await currentValue(home.id)).toBe(toCents(330000));
+  });
 });
 
 // Waits until `count` other backends of this database wait for a lock.

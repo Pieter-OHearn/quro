@@ -505,3 +505,43 @@ What the operator does: pin the 1.0.0-rc.4 images of both services (step 2 of th
 What the operator does: nothing, unless you want single sign-on to be the only way in. Pin the 1.0.0-rc.5 images of both services (step 2 of the general procedure) and restart as usual. 1.0.0-rc.4 runs on the same database, so going back is a matter of pinning the older images; an account made with `quro user create` has no password and cannot sign in with 1.0.0-rc.4 except through single sign-on.
 
 To turn passwords off, first [configure single sign-on](configuration.md#single-sign-on) and check that every person can sign in with it. Then set `QRO_PASSWORD_LOGIN=false` in `config/quro.env` and recreate the backend with `docker compose up -d backend`. Stored password hashes and existing sessions stay. Read [single sign-on only mode](security.md#single-sign-on-only-mode) and keep [the way back](security.md#recovery-when-the-provider-is-unavailable) at hand: set the value to `true` (or remove it) and recreate the backend. The backend refuses to start with the setting off and no `OIDC_*` settings, so a mistake in the file shows up as exit code 2 at once; `quro doctor` reports the mode and warns when the provider cannot be reached.
+
+### Upgrade from 1.0.0-rc.5 to 1.0.0-rc.6
+
+1.0.0-rc.6 separates the property and mortgage ledgers. A property keeps what happens to the asset (valuations, rent income and expenses) and a mortgage what happens to the loan (repayments and rate changes). A property's only debt is its linked mortgage, its value is its latest valuation, and its equity is worked out from the two on every read. Migration `0046_property_mortgage_ledger_ownership` moves existing rows to the ledger that owns them and drops the columns that let each ledger hold the other's rows. It changes no balance: a repayment already reduced the mortgage it paid.
+
+What the operator does: take the backup of the general procedure first and keep it until you have checked the upgraded install. The migration drops `properties.mortgage`, the property repayment columns and `mortgages.property_value` and `property_address`; only the backup holds them afterwards, and 1.0.0-rc.5 refuses to run against the migrated database, so going back means [restoring that backup](#restore-the-snapshot-taken-before-the-upgrade). Before you upgrade, with 1.0.0-rc.5 still running, open the database (with the bundled one, `docker compose exec db psql -U quro_admin -d quro`) and run this read-only count:
+
+```sql
+SELECT
+  (SELECT count(*) FROM property_transactions WHERE type = 'repayment') AS property_repayments,
+  (SELECT count(*) FROM property_transactions WHERE type = 'repayment' AND repayment_target IS DISTINCT FROM 'mortgage') AS property_repayments_own_debt,
+  (SELECT count(*) FROM mortgage_transactions WHERE type = 'valuation') AS mortgage_valuations,
+  (SELECT count(*) FROM properties WHERE mortgage_id IS NULL AND mortgage <> 0) AS manual_debts;
+```
+
+`property_repayments` and `mortgage_valuations` are rows the migration moves. If `property_repayments_own_debt` or `manual_debts` is not 0, the migration will refuse; resolve those rows first, as below.
+
+#### What the migration does
+
+- A property repayment recorded against a mortgage moves to that mortgage's ledger with its amount, interest, principal, the principal a zero balance absorbed, date, note and the person who entered it.
+- A mortgage valuation moves to the ledger of the property the mortgage is linked to.
+- A property with valuations takes its latest valuation dated on or before the day of the upgrade (UTC, ties by id) as its current value; a property without one keeps its value. A valuation dated later takes effect on its date: the daily net worth snapshot job applies it.
+- The migration runs in one transaction and changes nothing when it refuses. Run again after a refusal, it starts over; run on a database it already migrated, it changes nothing.
+
+#### When the migration refuses
+
+`quro migrate` stops with `Property and mortgage ledgers cannot be separated:` followed by one entry for each problem it found, naming row ids only, and `Nothing was changed.` The install keeps running 1.0.0-rc.5's schema, so pin the 1.0.0-rc.5 images again, resolve each entry in the app, and upgrade again.
+
+- **Property repayments `…` paid a debt kept on the property or no recorded mortgage.** The repayment was recorded against a balance typed on the property, before 0.9.0 recorded which debt a repayment paid, or against a mortgage that was deleted since. Quro cannot tell which mortgage it belongs to. On the Investments page, delete it from the property's transactions, and record it on the Mortgage page if it paid the property's mortgage.
+- **Mortgage valuations `…` belong to a mortgage that is not linked to exactly one property.** The mortgage is unlinked, usually because its property was linked to a new mortgage after this one was archived, so Quro cannot tell which property was valued. A valuation recorded on a mortgage never changed any figure. If the mortgage can be linked to its property again, link it and upgrade; the valuation then moves to that property. Otherwise record each valuation you want to keep on the property (Investments page, transaction type Valuation), then remove the mortgage's valuations with `docker compose exec db psql -U quro_admin -d quro -c "DELETE FROM mortgage_transactions WHERE type = 'valuation' AND id IN (…)"`, listing the ids the migration named.
+- **Properties `…` carry a mortgage balance without a linked mortgage.** The property has a debt typed on it and no mortgage. Add the mortgage on the Mortgage page and link it to the property (its repayments then go there), or set the property's mortgage balance to 0 if it has no debt.
+
+#### API changes
+
+What the operator does: nothing, unless a script or client of your own calls these endpoints.
+
+- `POST` and `PATCH /api/investments/property-transactions` accept the types `valuation`, `rent_income` and `expense` and no longer accept `interest` or `principal`; `repayment` and `rate_change` answer `400`. `POST` and `PATCH /api/mortgages/transactions` accept `repayment` and `rate_change`; `valuation`, `rent_income` and `expense` answer `400`.
+- Property requests no longer accept `mortgage`, and responses carry `debt`, `totalEquity` and `equity` (see [property debt](household-model.md#property-debt)) instead of `mortgage`. Property transaction responses no longer carry `interest`, `principal`, `unappliedPrincipal`, `repaymentTarget` or `repaymentMortgageId`.
+- Mortgage requests no longer accept `propertyAddress` or `propertyValue`; responses read `linkedPropertyId`, `propertyAddress` and `propertyValue` from the linked property, and they are `null` for a mortgage without one.
+- A property valuation sets the property's `currentValue` from its date: at once when it is dated on or before today (UTC), otherwise when the daily net worth snapshot job runs on or after that date. While a valuation sets the value, a `PATCH` that sets a different `currentValue` answers `400`.

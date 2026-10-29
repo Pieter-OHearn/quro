@@ -1,13 +1,12 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import type { DashboardAllocationsSummary, Property, RunwayResponse } from '@quro/shared';
+import type { DashboardAllocationsSummary, Mortgage, Property, RunwayResponse } from '@quro/shared';
 import { db } from '../db/client';
 import {
   budgetCategories,
   budgetTransactions,
   mortgages,
   netWorthSnapshots,
-  properties,
   savingsAccounts,
   savingsTransactions,
   users,
@@ -170,9 +169,6 @@ test('allocations, snapshots, history and property reads share linked debt witho
       archivedAt: new Date(),
     },
   ]);
-  // Emulate a legacy stale copy: every reader must ignore it, and neither
-  // repayment path may maintain it any more.
-  await db.update(properties).set({ mortgage: 999999 }).where(eq(properties.id, property.id));
   await assertTotals(owner, 59600);
   await assertTotals(partner, 54600);
   const repayment = await read<{ id: number }>(
@@ -192,14 +188,14 @@ test('allocations, snapshots, history and property reads share linked debt witho
   );
   await assertTotals(owner, 60100);
   await assertTotals(partner, 55100);
+  // The property reads its debt from the linked mortgage, and its equity weights each side by
+  // its own row's share, as the dashboard does.
   const resolved = await read<Property>(
     await integration.request(`/api/investments/properties/${property.id}`, {
       cookie: partner.cookie,
     }),
   );
-  expect(resolved.mortgage).toBe(199000);
-  const [stored] = await db.select().from(properties).where(eq(properties.id, property.id));
-  expect(stored?.mortgage).toBe(999999);
+  expect(resolved).toMatchObject({ debt: 199000, totalEquity: 101000, equity: 50500 });
   await read(
     await integration.request(`/api/mortgages/transactions/${repayment.id}`, {
       method: 'DELETE',
@@ -207,37 +203,47 @@ test('allocations, snapshots, history and property reads share linked debt witho
     }),
   );
   await assertTotals(owner, 59600);
-  const propertyRepayment = await read<{ id: number }>(
+  // A repayment belongs to the mortgage and a valuation to the property: each ledger refuses
+  // the other's rows.
+  const today = new Date().toISOString().slice(0, 10);
+  const refusedRepayment = await integration.request('/api/investments/property-transactions', {
+    method: 'POST',
+    cookie: partner.cookie,
+    json: { propertyId: property.id, type: 'repayment', amount: 1200, date: today },
+  });
+  expect(refusedRepayment.status).toBe(400);
+  const refusedValuation = await integration.request('/api/mortgages/transactions', {
+    method: 'POST',
+    cookie: partner.cookie,
+    json: { mortgageId: mortgage.id, type: 'valuation', amount: 320000, date: today },
+  });
+  expect(refusedValuation.status).toBe(400);
+  // A property valuation moves the value every reader uses: (320,000 - 200,000) × 0.5.
+  const valuation = await read<{ id: number }>(
     await integration.request('/api/investments/property-transactions', {
       method: 'POST',
       cookie: partner.cookie,
-      json: {
-        propertyId: property.id,
-        type: 'repayment',
-        amount: 1200,
-        principal: 1000,
-        interest: 200,
-        date: new Date().toISOString().slice(0, 10),
-      },
+      json: { propertyId: property.id, type: 'valuation', amount: 320000, date: today },
     }),
     201,
   );
-  await assertTotals(partner, 55100);
-  await read(
-    await integration.request(`/api/investments/property-transactions/${propertyRepayment.id}`, {
-      method: 'PATCH',
-      cookie: owner.cookie,
-      json: { amount: 700, principal: 500, interest: 200 },
-    }),
+  await assertTotals(partner, 64600);
+  const mortgageRead = await read<Mortgage>(
+    await integration.request(`/api/mortgages/${mortgage.id}`, { cookie: owner.cookie }),
   );
-  await assertTotals(partner, 54850);
+  expect(mortgageRead).toMatchObject({
+    linkedPropertyId: property.id,
+    propertyAddress: 'Shared home',
+    propertyValue: 320000,
+  });
   await read(
-    await integration.request(`/api/investments/property-transactions/${propertyRepayment.id}`, {
+    await integration.request(`/api/investments/property-transactions/${valuation.id}`, {
       method: 'DELETE',
       cookie: owner.cookie,
     }),
   );
-  await assertTotals(partner, 54600);
+  // The last valuation is gone: the property keeps the value it had.
+  await assertTotals(partner, 64600);
 });
 
 test('archiving, restoring and unlinking a mortgage never resurrects its property copy', async () => {
@@ -248,7 +254,7 @@ test('archiving, restoring and unlinking a mortgage never resurrects its propert
       cookie: owner.cookie,
     }),
   );
-  expect(archivedProperty.mortgage).toBe(200000);
+  expect(archivedProperty.debt).toBe(200000);
   await assertTotals(partner, 0);
   const restoredProperty = await read<Property>(
     await integration.request(`/api/investments/properties/${property.id}/unarchive`, {
@@ -256,7 +262,7 @@ test('archiving, restoring and unlinking a mortgage never resurrects its propert
       cookie: owner.cookie,
     }),
   );
-  expect(restoredProperty.mortgage).toBe(200000);
+  expect(restoredProperty.debt).toBe(200000);
   await assertTotals(partner, 50000);
   await read(
     await integration.request(`/api/mortgages/${mortgage.id}`, {
@@ -270,7 +276,7 @@ test('archiving, restoring and unlinking a mortgage never resurrects its propert
       cookie: owner.cookie,
     }),
   );
-  expect(archived.mortgage).toBe(0);
+  expect(archived.debt).toBe(0);
   await read(
     await integration.request(`/api/mortgages/${mortgage.id}/unarchive`, {
       method: 'POST',
@@ -286,16 +292,45 @@ test('archiving, restoring and unlinking a mortgage never resurrects its propert
     }),
   );
   await assertTotals(owner, 150000);
-  await read(
-    await integration.request(`/api/investments/properties/${property.id}`, {
-      method: 'PATCH',
-      cookie: owner.cookie,
-      json: { mortgage: 40000 },
-    }),
-  );
-  await assertTotals(partner, 130000);
+  // An unlinked property has no debt, and a debt kept on the property is no longer accepted.
+  const manualDebt = await integration.request(`/api/investments/properties/${property.id}`, {
+    method: 'PATCH',
+    cookie: owner.cookie,
+    json: { mortgage: 40000 },
+  });
+  expect(manualDebt.status).toBe(400);
+  await assertTotals(partner, 150000);
   const [loan] = await db.select().from(mortgages).where(eq(mortgages.id, mortgage.id));
   expect(loan?.outstandingBalance).toBe(200000);
+});
+
+test("after the partner link is removed, neither side reads the other's linked row", async () => {
+  // The owner's property is linked to the partner's mortgage; removing the link makes both private.
+  const { owner, partner, property, mortgage } = await household();
+  const removed = await integration.request('/api/partner', {
+    method: 'DELETE',
+    cookie: owner.cookie,
+  });
+  expect(removed.status).toBe(200);
+
+  const ownProperty = await read<Property>(
+    await integration.request(`/api/investments/properties/${property.id}`, {
+      cookie: owner.cookie,
+    }),
+  );
+  // The partner's now private balance is not shown: the property carries no debt, as in net worth.
+  expect(ownProperty).toMatchObject({ debt: 0, totalEquity: 300000, equity: 300000 });
+  await assertTotals(owner, 300000);
+
+  const ownMortgage = await read<Mortgage>(
+    await integration.request(`/api/mortgages/${mortgage.id}`, { cookie: partner.cookie }),
+  );
+  // And the owner's now private property does not show through the partner's mortgage.
+  expect(ownMortgage).toMatchObject({
+    linkedPropertyId: null,
+    propertyAddress: null,
+    propertyValue: null,
+  });
 });
 
 test('runway uses EUR for foreign budgets and keeps joint liquidity overrides separate from contractual debt', async () => {

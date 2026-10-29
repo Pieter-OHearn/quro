@@ -1,10 +1,12 @@
 import {
+  expectedMortgageRepayment,
   fromCents,
   monthsToPayoff,
   roundMoney,
   toCents,
   type Mortgage as MortgageType,
   type MortgageTransaction,
+  type Property,
 } from '@quro/shared';
 import type { AmortizationRow, PaymentBreakdownRow } from '../types';
 
@@ -128,6 +130,10 @@ function calculateProjectedRemainingMonths(
   return monthsToPayoff(mortgage.outstandingBalance, monthlyRate, mortgage.monthlyPayment);
 }
 
+/**
+ * The projected balance every other year: each month repays what the shared repayment rule
+ * expects at the current rate (the one the repayment form suggests).
+ */
 export function generateSchedule(
   mortgage: MortgageType,
   monthsRemainingRaw: number | null,
@@ -136,23 +142,20 @@ export function generateSchedule(
   let balance = mortgage.outstandingBalance;
   const schedule: AmortizationRow[] = [];
   const start = getCurrentYearMonth(today);
-  const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
   const projectionMonths = calculateProjectionMonths(mortgage, monthsRemainingRaw, today);
-  const linearMonthlyPrincipal = calculateLinearMonthlyPrincipal(mortgage);
   let principalSinceLastPoint = 0;
   let interestSinceLastPoint = 0;
 
   schedule.push(buildScheduleRow(start, balance, 0, 0));
 
   for (let monthNumber = 1; monthNumber <= projectionMonths && balance > 0; monthNumber += 1) {
-    const interest = Math.max(0, balance * monthlyRate);
-    const principal = Math.min(
-      balance,
-      mortgage.repaymentType === 'Linear'
-        ? (linearMonthlyPrincipal ?? 0)
-        : Math.max(0, mortgage.monthlyPayment - interest),
-    );
-    balance = Math.max(0, balance - principal);
+    const expected = expectedMortgageRepayment(mortgage, balance, mortgage.interestRate);
+    const { interest } = expected;
+    // A linear loan's last instalment also repays the cents its rounded instalments left.
+    const isLastLinearMonth =
+      mortgage.repaymentType === 'Linear' && monthNumber === projectionMonths;
+    const principal = isLastLinearMonth ? balance : expected.principal;
+    balance = fromCents(toCents(balance) - toCents(principal));
     principalSinceLastPoint += principal;
     interestSinceLastPoint += interest;
 
@@ -203,9 +206,20 @@ export function computePaymentBreakdownRows(txns: MortgageTransaction[]): Paymen
     }));
 }
 
+/** The payment the shared repayment rule expects next, at the current balance and rate. */
+export function expectedNextPayment(mortgage: MortgageType): number {
+  return expectedMortgageRepayment(mortgage, mortgage.outstandingBalance, mortgage.interestRate)
+    .amount;
+}
+
+/**
+ * The mortgage page's figures. Loan-to-value uses the linked property's value, and equity is the
+ * property's own (derived on the server), so the page and the property card show one figure.
+ */
 export function computeMortgageMetrics(
   mortgage: MortgageType,
   txns: MortgageTransaction[],
+  linkedProperty: Property | undefined,
   today = new Date(),
 ) {
   const monthlyRate = mortgage.interestRate / 100 / MONTHS_PER_YEAR;
@@ -215,9 +229,11 @@ export function computeMortgageMetrics(
   const paid = mortgage.originalAmount - mortgage.outstandingBalance;
   const paymentBreakdown = computePaymentBreakdownRows(txns);
 
+  const propertyValue = mortgage.propertyValue;
   return {
-    ltv: (mortgage.outstandingBalance / mortgage.propertyValue) * 100,
-    equity: mortgage.propertyValue - mortgage.outstandingBalance,
+    ltv: propertyValue ? (mortgage.outstandingBalance / propertyValue) * 100 : null,
+    equity: linkedProperty?.equity ?? null,
+    totalEquity: linkedProperty?.totalEquity ?? null,
     paid,
     paidPct: (paid / mortgage.originalAmount) * 100,
     monthsRemaining,

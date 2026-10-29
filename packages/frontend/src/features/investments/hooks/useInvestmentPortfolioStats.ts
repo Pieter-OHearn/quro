@@ -3,17 +3,12 @@ import {
   holdingValue,
   sumMoney,
   type Holding,
-  type Mortgage,
   type Property,
   type PropertyTransaction,
 } from '@quro/shared';
 import type { ConvertToBaseFn, InvestmentPortfolioStats } from '../types';
 import { computeTotalRental } from '../utils/portfolio';
-import {
-  getPropertyMortgageBalance,
-  getPropertyOwnershipShare,
-  type Position,
-} from '../utils/position';
+import type { Position } from '../utils/position';
 
 /** The investments page totals in the display currency. */
 export function computeInvestmentPortfolioStats(
@@ -21,7 +16,6 @@ export function computeInvestmentPortfolioStats(
   positions: Readonly<Record<number, Position>>,
   properties: readonly Property[],
   propertyTxns: readonly PropertyTransaction[],
-  mortgageById: Map<number, Mortgage>,
   convertToBase: ConvertToBaseFn,
 ): InvestmentPortfolioStats {
   // Totals are sums of cents, like the dashboard: each holding is worth its shares × its
@@ -38,14 +32,9 @@ export function computeInvestmentPortfolioStats(
   const totalCostBase = sumHoldings((_, position) => position.costBasis);
   const totalDividendsBase = sumHoldings((_, position) => position.totalDividends);
   const totalRealizedBase = sumHoldings((_, position) => position.realizedGain);
+  // Each property's equity is the server's figure, the one the dashboard sums.
   const totalPropertyEquityBase = sumMoney(
-    properties.map((property) =>
-      convertToBase(
-        (property.currentValue - getPropertyMortgageBalance(property, mortgageById)) *
-          getPropertyOwnershipShare(property),
-        property.currency,
-      ),
-    ),
+    properties.map((property) => convertToBase(property.equity, property.currency)),
   );
   const totalRentalBase = computeTotalRental(propertyTxns, properties, convertToBase);
   const totalGainBase = sumMoney([totalBrokerageBase, -totalCostBase]);
@@ -67,19 +56,11 @@ export function useInvestmentPortfolioStats(
   positions: Record<number, Position>,
   properties: Property[],
   propertyTxns: PropertyTransaction[],
-  mortgageById: Map<number, Mortgage>,
   convertToBase: ConvertToBaseFn,
 ): InvestmentPortfolioStats {
   return useMemo(
     () =>
-      computeInvestmentPortfolioStats(
-        holdings,
-        positions,
-        properties,
-        propertyTxns,
-        mortgageById,
-        convertToBase,
-      ),
-    [holdings, positions, properties, propertyTxns, mortgageById, convertToBase],
+      computeInvestmentPortfolioStats(holdings, positions, properties, propertyTxns, convertToBase),
+    [holdings, positions, properties, propertyTxns, convertToBase],
   );
 }

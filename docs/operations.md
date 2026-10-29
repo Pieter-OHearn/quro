@@ -34,7 +34,7 @@ Application and schema versions are in the first line of the text output and in 
 - `unknown`: nothing proves it either way: a job has no recorded run, or no backup could be found. Unknown is never reported as healthy, and it does not change the exit code. Read it as "check this yourself".
 - `skip`: the check could not run, for example because the schema is not migrated.
 
-A core job (`session-cleanup`, `holding-price-sync`, `currency-rate-sync`, `net-worth-snapshot`) that stops is a failure; the optional `bunq-sync` job is a warning, so an outage at the bank never marks the core as down. Readiness is unaffected by any of this.
+A core job (`session-cleanup`, `holding-price-sync`, `currency-rate-sync`, `net-worth-snapshot`) that stops is a failure (`net-worth-snapshot` also applies property valuations whose date has come, so while it is stopped a valuation dated in the future does not take effect); the optional `bunq-sync` job is a warning, so an outage at the bank never marks the core as down. Readiness is unaffected by any of this.
 
 ## Backups and CI jobs you run
 

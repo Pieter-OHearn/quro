@@ -3,7 +3,9 @@ import type {
   Holding,
   HoldingTransaction,
   Mortgage,
+  MortgageTransaction,
   Property,
+  PropertyDerivedField,
   PropertyTransaction,
 } from '@quro/shared';
 import type { Position } from './utils/position';
@@ -27,6 +29,8 @@ export type PortfolioHistoryPoint = {
 
 export type SaveHoldingTxnInput = Omit<HoldingTransaction, 'id'> & { id?: number };
 export type SavePropertyTxnInput = Omit<PropertyTransaction, 'id'> & { id?: number };
+/** A property as a client creates it: the server derives its debt and equity. */
+export type NewProperty = Omit<Property, 'id' | PropertyDerivedField>;
 
 export type InvestmentUIState = {
   tab: Tab;
@@ -92,7 +96,7 @@ export type InvestmentActions = {
   handleAddHoldingTxn: (transaction: SaveHoldingTxnInput) => void;
   handleDeleteHoldingTxn: (id: number) => void;
   handleUpdateProperty: (id: number, value: number, rent: number, isJoint: boolean) => void;
-  handleSaveProperty: (property: Omit<Property, 'id'>) => void;
+  handleSaveProperty: (property: NewProperty) => void;
   handleDeleteProperty: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   handleAddPropertyTxn: (transaction: SavePropertyTxnInput) => void;
   handleDeletePropertyTxn: (id: number) => void;
@@ -104,6 +108,8 @@ export type InvestmentData = {
   properties: Property[];
   propertyTxns: PropertyTransaction[];
   mortgages: Mortgage[];
+  /** The household's mortgage ledgers, shown read-only on the linked property cards. */
+  mortgageTxns: MortgageTransaction[];
   isLoading: boolean;
   queryFailures: FailedRouteQuery[];
 };
@@ -137,12 +143,12 @@ export type PropertyModalsProps = {
   addTxnForProperty: Property | null;
   editingPropertyTxn: PropertyTransaction | null;
   properties: Property[];
-  mortgageById: Map<number, Mortgage>;
+  propertyTxns: PropertyTransaction[];
   onCloseUpdateProperty: () => void;
   onSaveUpdateProperty: (id: number, value: number, rent: number, isJoint: boolean) => void;
   onDeleteProperty: (id: number, mode?: 'preserveTransactions' | 'deleteTransactions') => void;
   onCloseAddProperty: () => void;
-  onSaveAddProperty: (property: Omit<Property, 'id'>) => void;
+  onSaveAddProperty: (property: NewProperty) => void;
   onCloseAddPropertyTxn: () => void;
   onSavePropertyTxn: (transaction: SavePropertyTxnInput) => void;
 };

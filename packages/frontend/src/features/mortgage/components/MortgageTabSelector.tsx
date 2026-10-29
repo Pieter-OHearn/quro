@@ -24,7 +24,9 @@ export function MortgageTabSelector({
         options={mortgages.map((entry) => ({
           value: entry.id,
           label: (
-            <span className="max-w-[180px] truncate">{entry.propertyAddress.split(',')[0]}</span>
+            <span className="max-w-[180px] truncate">
+              {(entry.propertyAddress ?? entry.lender).split(',')[0]}
+            </span>
           ),
           icon: <Home size={13} aria-hidden />,
         }))}

@@ -640,10 +640,11 @@ describe('finance integration', () => {
     const createPropertyBody = await parseJson<
       ApiDataResponse<{
         id: number;
-        mortgage: string;
+        debt: number;
+        equity: number;
       }>
     >(createPropertyResponse, 201);
-    expect(Number(createPropertyBody.data.mortgage)).toBe(0);
+    expect(createPropertyBody.data).toMatchObject({ debt: 0, equity: 330000 });
 
     const patchPropertyResponse = await integration.request(
       `/api/investments/properties/${createPropertyBody.data.id}`,
@@ -761,7 +762,6 @@ describe('finance integration', () => {
         lender: 'ING',
         originalAmount: 350000,
         outstandingBalance: 300000,
-        propertyValue: 499999,
         monthlyPayment: 1550,
         interestRate: 2.4,
         rateType: 'fixed',
@@ -798,11 +798,11 @@ describe('finance integration', () => {
     const linkedPropertyOneBody = await parseJson<
       ApiDataResponse<{
         mortgageId: number | null;
-        mortgage: string;
+        debt: number;
       }>
     >(linkedPropertyOneResponse, 200);
     expect(linkedPropertyOneBody.data.mortgageId).toBe(createMortgageBody.data.id);
-    expect(Number(linkedPropertyOneBody.data.mortgage)).toBe(300000);
+    expect(Number(linkedPropertyOneBody.data.debt)).toBe(300000);
 
     const conflictMortgageResponse = await integration.request('/api/mortgages', {
       method: 'POST',
@@ -879,11 +879,11 @@ describe('finance integration', () => {
     const propertyOneAfterMoveBody = await parseJson<
       ApiDataResponse<{
         mortgageId: number | null;
-        mortgage: string;
+        debt: number;
       }>
     >(propertyOneAfterMoveResponse, 200);
     expect(propertyOneAfterMoveBody.data.mortgageId).toBeNull();
-    expect(Number(propertyOneAfterMoveBody.data.mortgage)).toBe(0);
+    expect(Number(propertyOneAfterMoveBody.data.debt)).toBe(0);
 
     const propertyTwoAfterMoveResponse = await integration.request(
       `/api/investments/properties/${ownerPropertyTwoBody.data.id}`,
@@ -894,11 +894,11 @@ describe('finance integration', () => {
     const propertyTwoAfterMoveBody = await parseJson<
       ApiDataResponse<{
         mortgageId: number | null;
-        mortgage: string;
+        debt: number;
       }>
     >(propertyTwoAfterMoveResponse, 200);
     expect(propertyTwoAfterMoveBody.data.mortgageId).toBe(createMortgageBody.data.id);
-    expect(Number(propertyTwoAfterMoveBody.data.mortgage)).toBe(295000);
+    expect(Number(propertyTwoAfterMoveBody.data.debt)).toBe(295000);
 
     const createMortgageTxnResponse = await integration.request('/api/mortgages/transactions', {
       method: 'POST',
@@ -999,11 +999,11 @@ describe('finance integration', () => {
     const propertyTwoAfterDeleteBody = await parseJson<
       ApiDataResponse<{
         mortgageId: number | null;
-        mortgage: string;
+        debt: number;
       }>
     >(propertyTwoAfterDeleteResponse, 200);
     expect(propertyTwoAfterDeleteBody.data.mortgageId).toBeNull();
-    expect(Number(propertyTwoAfterDeleteBody.data.mortgage)).toBe(0);
+    expect(Number(propertyTwoAfterDeleteBody.data.debt)).toBe(0);
   });
 
   test('covers property archive, mortgage link lifecycle, and balance reconciliation', async () => {
@@ -1032,7 +1032,6 @@ describe('finance integration', () => {
         lender: 'ABN',
         originalAmount: 320000,
         outstandingBalance: 300000,
-        propertyValue: 400000,
         monthlyPayment: 1400,
         interestRate: 2.1,
         rateType: 'fixed',
@@ -1047,7 +1046,7 @@ describe('finance integration', () => {
 
     const readProperty = async () =>
       (
-        await parseJson<ApiDataResponse<{ mortgageId: number | null; mortgage: string }>>(
+        await parseJson<ApiDataResponse<{ mortgageId: number | null; debt: number }>>(
           await integration.request(`/api/investments/properties/${property.id}`, {
             cookie: owner.cookie,
           }),
@@ -1085,7 +1084,7 @@ describe('finance integration', () => {
     const repayment = (await parseJson<ApiDataResponse<{ id: number }>>(repaymentResponse, 201))
       .data;
     expect(Number((await readMortgage()).outstandingBalance)).toBe(299000);
-    expect(Number((await readProperty()).mortgage)).toBe(299000);
+    expect(Number((await readProperty()).debt)).toBe(299000);
 
     // Removing the repayment restores both balances.
     await integration.request(`/api/mortgages/transactions/${repayment.id}`, {
@@ -1093,7 +1092,7 @@ describe('finance integration', () => {
       cookie: owner.cookie,
     });
     expect(Number((await readMortgage()).outstandingBalance)).toBe(300000);
-    expect(Number((await readProperty()).mortgage)).toBe(300000);
+    expect(Number((await readProperty()).debt)).toBe(300000);
 
     // A repayment whose principal exceeds the balance is rejected.
     const overpayResponse = await integration.request('/api/mortgages/transactions', {
@@ -1163,61 +1162,134 @@ describe('finance integration', () => {
     await parseJson<ApiDataResponse<{ id: number }>>(unarchivePropertyResponse, 200);
   });
 
-  test('covers property repayment balance reconciliation without a linked mortgage', async () => {
-    const owner = await integration.signUp('property-repayment');
+  test('keeps each ledger to its own transaction types and refuses the removed copies', async () => {
+    const owner = await integration.signUp('ledger-ownership');
+    const send = (method: string, path: string, json: unknown) =>
+      integration.request(path, { method, cookie: owner.cookie, json });
+    const property = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await send('POST', '/api/investments/properties', {
+          address: '8 Ledger Way',
+          propertyType: 'Buy-to-Let',
+          purchasePrice: 200000,
+          currentValue: 240000,
+          monthlyRent: 1200,
+          currency: 'EUR',
+          emoji: 'M',
+        }),
+        201,
+      )
+    ).data;
+    const mortgage = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await send('POST', '/api/mortgages', {
+          linkedPropertyId: property.id,
+          lender: 'Synthetic Lender',
+          originalAmount: 150000,
+          outstandingBalance: 120000,
+          monthlyPayment: 700,
+          interestRate: 3,
+          rateType: 'variable',
+          termYears: 25,
+          startDate: '2022-01-01',
+          endDate: '2047-01-01',
+        }),
+        201,
+      )
+    ).data;
 
-    const propertyResponse = await integration.request('/api/investments/properties', {
-      method: 'POST',
-      cookie: owner.cookie,
-      json: {
-        address: '8 Manual Mortgage Way',
-        propertyType: 'Buy-to-Let',
-        purchasePrice: 200000,
-        currentValue: 240000,
-        mortgage: 50000,
-        monthlyRent: 1200,
-        currency: 'EUR',
-        emoji: 'M',
-      },
-    });
-    const property = (await parseJson<ApiDataResponse<{ id: number }>>(propertyResponse, 201)).data;
-
-    const repaymentResponse = await integration.request('/api/investments/property-transactions', {
-      method: 'POST',
-      cookie: owner.cookie,
-      json: {
+    // A property keeps valuations, rent and expenses; a repayment or rate change is the mortgage's.
+    for (const type of ['repayment', 'rate_change']) {
+      const refused = await send('POST', '/api/investments/property-transactions', {
         propertyId: property.id,
-        type: 'repayment',
-        amount: 12000,
-        interest: 2000,
-        principal: 10000,
+        type,
+        amount: 1000,
+        interest: 200,
+        principal: 800,
         date: '2026-03-01',
+      });
+      expect(refused.status).toBe(400);
+    }
+    expect(
+      await (
+        await send('POST', '/api/investments/property-transactions', {
+          propertyId: property.id,
+          type: 'repayment',
+          amount: 1000,
+          date: '2026-03-01',
+        })
+      ).json(),
+    ).toEqual({ error: 'Record repayments and rate changes on the mortgage' });
+    const rent = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await send('POST', '/api/investments/property-transactions', {
+          propertyId: property.id,
+          type: 'rent_income',
+          amount: 1200,
+          date: '2026-03-01',
+        }),
+        201,
+      )
+    ).data;
+    const editedToRepayment = await send(
+      'PATCH',
+      `/api/investments/property-transactions/${rent.id}`,
+      {
+        type: 'repayment',
       },
-    });
-    const repayment = (await parseJson<ApiDataResponse<{ id: number }>>(repaymentResponse, 201))
-      .data;
+    );
+    expect(editedToRepayment.status).toBe(400);
 
-    const readMortgageBalance = async () =>
-      Number(
-        (
-          await parseJson<ApiDataResponse<{ mortgage: string }>>(
-            await integration.request(`/api/investments/properties/${property.id}`, {
-              cookie: owner.cookie,
-            }),
-            200,
-          )
-        ).data.mortgage,
-      );
-    expect(await readMortgageBalance()).toBe(40000);
-
-    await integration.request(`/api/investments/property-transactions/${repayment.id}`, {
-      method: 'DELETE',
-      cookie: owner.cookie,
+    // A mortgage keeps repayments and rate changes; a valuation, rent or expense is the property's.
+    for (const type of ['valuation', 'rent_income', 'expense']) {
+      const refused = await send('POST', '/api/mortgages/transactions', {
+        mortgageId: mortgage.id,
+        type,
+        amount: 250000,
+        date: '2026-03-01',
+      });
+      expect(refused.status).toBe(400);
+      expect(await refused.json()).toEqual({
+        error: 'Record valuations, rent and expenses on the property',
+      });
+    }
+    const repayment = (
+      await parseJson<ApiDataResponse<{ id: number }>>(
+        await send('POST', '/api/mortgages/transactions', {
+          mortgageId: mortgage.id,
+          type: 'repayment',
+          amount: 700,
+          interest: 300,
+          date: '2026-03-01',
+        }),
+        201,
+      )
+    ).data;
+    const editedToValuation = await send('PATCH', `/api/mortgages/transactions/${repayment.id}`, {
+      type: 'valuation',
     });
-    expect(await readMortgageBalance()).toBe(50000);
+    expect(editedToValuation.status).toBe(400);
+
+    // The debt a property used to keep and the property fields a mortgage used to copy are gone.
+    for (const [method, path, json] of [
+      ['PATCH', `/api/investments/properties/${property.id}`, { mortgage: 1000 }],
+      ['PATCH', `/api/mortgages/${mortgage.id}`, { propertyValue: 250000 }],
+      ['PATCH', `/api/mortgages/${mortgage.id}`, { propertyAddress: 'Elsewhere' }],
+    ] as const) {
+      expect((await send(method, path, json)).status).toBe(400);
+    }
+    const read = (
+      await parseJson<ApiDataResponse<{ debt: number; totalEquity: number; equity: number }>>(
+        await integration.request(`/api/investments/properties/${property.id}`, {
+          cookie: owner.cookie,
+        }),
+        200,
+      )
+    ).data;
+    expect(read).toMatchObject({ debt: 119600, totalEquity: 120400, equity: 120400 });
   });
 
-  test('preserves concurrent debt, mortgage, and property balance updates', async () => {
+  test('preserves concurrent debt and mortgage balance updates', async () => {
     const owner = await integration.signUp('concurrent-balances');
 
     const debt = (
@@ -1256,51 +1328,6 @@ describe('finance integration', () => {
     );
     expect(Number(debtAfter.data.remainingBalance)).toBe(800);
 
-    const unlinkedProperty = (
-      await parseJson<ApiDataResponse<{ id: number }>>(
-        await integration.request('/api/investments/properties', {
-          method: 'POST',
-          cookie: owner.cookie,
-          json: {
-            address: '1 Concurrent Property Lane',
-            propertyType: 'primary_home',
-            purchasePrice: 2000,
-            currentValue: 2000,
-            mortgage: 1000,
-            monthlyRent: 0,
-            currency: 'EUR',
-            emoji: 'P',
-          },
-        }),
-        201,
-      )
-    ).data;
-    const createPropertyRepayment = () =>
-      integration.request('/api/investments/property-transactions', {
-        method: 'POST',
-        cookie: owner.cookie,
-        json: {
-          propertyId: unlinkedProperty.id,
-          type: 'repayment',
-          amount: 100,
-          interest: 0,
-          principal: 100,
-          date: '2026-03-01',
-        },
-      });
-    const propertyRepayments = await Promise.all([
-      createPropertyRepayment(),
-      createPropertyRepayment(),
-    ]);
-    expect(propertyRepayments.map((response) => response.status)).toEqual([201, 201]);
-    const propertyAfter = await parseJson<ApiDataResponse<{ mortgage: string }>>(
-      await integration.request(`/api/investments/properties/${unlinkedProperty.id}`, {
-        cookie: owner.cookie,
-      }),
-      200,
-    );
-    expect(Number(propertyAfter.data.mortgage)).toBe(800);
-
     const linkedProperty = (
       await parseJson<ApiDataResponse<{ id: number }>>(
         await integration.request('/api/investments/properties', {
@@ -1329,7 +1356,6 @@ describe('finance integration', () => {
             lender: 'Concurrent Bank',
             originalAmount: 1000,
             outstandingBalance: 1000,
-            propertyValue: 2000,
             monthlyPayment: 100,
             interestRate: 2,
             rateType: 'fixed',
@@ -1365,14 +1391,14 @@ describe('finance integration', () => {
       await integration.request(`/api/mortgages/${mortgage.id}`, { cookie: owner.cookie }),
       200,
     );
-    const linkedPropertyAfter = await parseJson<ApiDataResponse<{ mortgage: string }>>(
+    const linkedPropertyAfter = await parseJson<ApiDataResponse<{ debt: number }>>(
       await integration.request(`/api/investments/properties/${linkedProperty.id}`, {
         cookie: owner.cookie,
       }),
       200,
     );
     expect(Number(mortgageAfter.data.outstandingBalance)).toBe(800);
-    expect(Number(linkedPropertyAfter.data.mortgage)).toBe(800);
+    expect(Number(linkedPropertyAfter.data.debt)).toBe(800);
   });
 
   test('returns nullable presentation fields for a pension pot created without them', async () => {
@@ -1801,7 +1827,6 @@ describe('finance integration', () => {
         propertyType: 'Primary Residence',
         purchasePrice: 425000,
         currentValue: 480000,
-        mortgage: 0,
         mortgageId: null,
         monthlyRent: 0,
         currency: 'EUR',
@@ -1822,8 +1847,6 @@ describe('finance integration', () => {
           propertyId: createPrimaryHomeBody.data.id,
           type: 'rent_income',
           amount: 1200,
-          interest: null,
-          principal: null,
           date: '2026-03-15',
           note: 'Should fail',
         },
@@ -1843,8 +1866,6 @@ describe('finance integration', () => {
           propertyId: createPrimaryHomeBody.data.id,
           type: 'repayment',
           amount: 900,
-          interest: 250,
-          principal: 650,
           date: '2026-03-16',
           note: 'Should fail',
         },
@@ -1852,7 +1873,7 @@ describe('finance integration', () => {
     );
     expect(invalidRepaymentTxnResponse.status).toBe(400);
     expect(await invalidRepaymentTxnResponse.json()).toEqual({
-      error: 'Property is not linked to a mortgage',
+      error: 'Record repayments and rate changes on the mortgage',
     });
 
     const invalidMortgageResponse = await integration.request('/api/mortgages', {
@@ -1860,12 +1881,10 @@ describe('finance integration', () => {
       cookie: owner.cookie,
       json: {
         linkedPropertyId: createPrimaryHomeBody.data.id,
-        propertyAddress: 'Ignored',
         lender: 'ING',
         currency: 'EUR',
         originalAmount: 250000,
         outstandingBalance: 260000,
-        propertyValue: 480000,
         monthlyPayment: 1250,
         interestRate: 3.1,
         rateType: 'fixed',
@@ -2158,7 +2177,6 @@ describe('finance integration', () => {
         propertyType: 'house',
         purchasePrice: 250000,
         currentValue: 300000,
-        mortgage: 0,
         monthlyRent: 0,
         currency: 'EUR',
       },

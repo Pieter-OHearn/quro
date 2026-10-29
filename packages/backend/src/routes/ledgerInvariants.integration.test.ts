@@ -325,7 +325,6 @@ describe('metamorphic: an edit and its inverse, or a write and its deletion, cha
         lender: 'Synthetic Lender',
         originalAmount: 150_000,
         outstandingBalance: 123_456.78,
-        propertyValue: 210_000,
         monthlyPayment: 800,
         interestRate: 2.5,
         rateType: 'fixed',
@@ -338,7 +337,7 @@ describe('metamorphic: an edit and its inverse, or a write and its deletion, cha
     );
     const balance = async () => {
       const read = await send(owner, 'GET', `/api/investments/properties/${home.id}`);
-      return toCents(((await read.json()) as { data: { mortgage: number } }).data.mortgage);
+      return toCents(((await read.json()) as { data: { debt: number } }).data.debt);
     };
     const repayment = await read<{ id: number }>(
       await send(owner, 'POST', '/api/mortgages/transactions', {
