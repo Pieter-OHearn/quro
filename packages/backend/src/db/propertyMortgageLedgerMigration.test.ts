@@ -101,7 +101,8 @@ const SEPARABLE = `
     (3, 2, 1, 'repayment', 1500, 480, 1020, 20, 'mortgage', 10, '2026-03-01', NULL),
     (4, 1, 2, 'rent_income', 900, NULL, NULL, 0, NULL, NULL, '2026-03-28', NULL),
     (5, 1, 1, 'valuation', 305000, NULL, NULL, 0, NULL, NULL, '2026-01-01', NULL),
-    (6, 1, 2, 'repayment', 800, NULL, NULL, 0, 'mortgage', 11, '2026-03-05', NULL);
+    (6, 1, 2, 'repayment', 800, NULL, NULL, 0, 'mortgage', 11, '2026-03-05', NULL),
+    (10, 1, 3, 'valuation', 125000, NULL, NULL, 0, NULL, NULL, '2999-01-01', NULL);
   INSERT INTO mortgage_transactions
     (id, user_id, mortgage_id, type, amount, interest, principal, unapplied_principal, date,
      note, fixed_years)
@@ -139,7 +140,7 @@ test('the migration moves every row to the ledger that owns it and drops the sha
       { id: 1, value: '320000.00' },
       // Its only valuation, moved from the mortgage.
       { id: 2, value: '240000.00' },
-      // No valuation: the entered value stays.
+      // Its only valuation is dated in the future, so the entered value stays until that date.
       { id: 3, value: '100000.00' },
     ]);
     expect(await rowsOf(tx, PROPERTY_LEDGER)).toEqual([
@@ -181,6 +182,14 @@ test('the migration moves every row to the ledger that owns it and drops the sha
         type: 'rent_income',
         amount: '900.00',
         date: '2026-03-28',
+        note: null,
+      },
+      {
+        user_id: 1,
+        property_id: 3,
+        type: 'valuation',
+        amount: '125000.00',
+        date: '2999-01-01',
         note: null,
       },
     ]);

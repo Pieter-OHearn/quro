@@ -220,6 +220,8 @@ describe('property equity in the history', () => {
       propertyTransactions: [
         { propertyId: 3, type: 'valuation', amount: 850_000, date: '2026-09-30' },
         { propertyId: 3, type: 'rent_income', amount: 999_999, date: '2026-08-01' },
+        // Dated after today: it counts from its date, so it moves no point yet.
+        { propertyId: 3, type: 'valuation', amount: 999_999, date: '2999-01-01' },
       ],
       pensions: [],
       pensionTransactions: [],
@@ -234,7 +236,7 @@ describe('property equity in the history', () => {
       periods: buildHistoryPeriods('6m', NOVEMBER),
     }) as unknown as Parameters<typeof buildNetWorthHistory>[0];
 
-  test('values the property by its valuations and its debt by the mortgage repayments', () => {
+  test('values the property by its valuations in effect and its debt by the mortgage repayments', () => {
     const points = buildNetWorthHistory(source());
     expect(points.map((point) => [point.date, point.totalValue])).toEqual([
       // Before the first repayment the whole loan is owed, against the purchase price.

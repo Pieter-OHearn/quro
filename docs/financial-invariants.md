@@ -159,7 +159,7 @@ Amounts on ledger rows are positive; the row type gives the effect.
 | Savings        | `deposit` and `interest` add, `withdrawal` subtracts; the stored sign is ignored; any other type does nothing.                     |
 | Pension        | `contribution` adds `amount - taxAmount`, `fee` subtracts, `annual_statement` adds its signed amount, any other type does nothing. |
 | Mortgage, debt | A repayment's principal reduces the outstanding balance, never below zero; the part a zero balance cannot take is recorded.        |
-| Property       | The latest valuation by date sets `currentValue`; rent income and expenses move no balance.                                        |
+| Property       | The latest valuation dated on or before today sets `currentValue`; rent income and expenses move no balance.                       |
 | Holdings       | Shares are buys minus sells, floored at zero per holding; dividends do not move shares (see [positions](#holding-positions)).      |
 | Budget         | A transaction's EUR amount adds to its category's `spent`.                                                                         |
 
@@ -261,8 +261,8 @@ counted as 3,000.01 for each partner).
 
 - **Balance equals its ledger.** A manual savings account, pension pot, mortgage and debt each
   keep `balance = opening balance + effect of the rows still in its ledger`. A budget category
-  keeps `spent = opening spent + its transactions`. A property with valuations keeps
-  `currentValue` equal to its latest valuation by date (ties by id).
+  keeps `spent = opening spent + its transactions`. A property with a valuation in effect keeps
+  `currentValue` equal to its latest valuation dated on or before today (ties by id).
 - **Each ledger owns its rows.** A property's ledger keeps what happens to the asset: valuations,
   rent income and expenses. A mortgage's keeps what happens to the loan: repayments and rate
   changes. Each API refuses the other's types with `400` on create and edit, and each page shows
@@ -270,8 +270,13 @@ counted as 3,000.01 for each partner).
 - **Valuations set the value.** Creating, editing, moving or deleting a valuation recomputes
   `currentValue` of every property it touched, inside the transaction, after the properties and
   then the row are locked. A property whose last valuation is deleted keeps the value it had;
-  while a property has a valuation, its value is changed by recording another one, and a request
-  that sets a different value by hand is refused with `400`.
+  while a valuation sets the value, it is changed by recording another one, and a request that
+  sets a different value by hand is refused with `400`.
+- **Valuations count from their date.** "Today" is the calendar date in UTC, the calendar the net
+  worth history uses. A valuation dated later is stored but sets neither `currentValue` nor any
+  history point until its date; the daily `net-worth-snapshot` job then applies it, locking the
+  property as a valuation write does, before it writes the day's snapshots. Until then the value
+  can still be edited by hand.
 - **Edits and deletes are reversible.** An edit reverses the old row's effect and applies the new
   one; a delete reverses it. Editing a row and editing it back, or creating a row and deleting it,
   leaves the balance as it was.
@@ -313,7 +318,7 @@ counted as 3,000.01 for each partner).
   the same way, so loan-to-value follows the property's valuations.
 - **Past debt comes from the debt's ledger.** The net worth history values a property at a past
   point by its latest valuation by then (its purchase price before the first, its current value
-  when it has none), and its debt by its mortgage's balance plus the principal the mortgage's
+  when none is in effect yet), and its debt by its mortgage's balance plus the principal the mortgage's
   repayments applied after that point (less what a zero balance absorbed).
 - **Totals reconcile.** For each partner, the dashboard allocations, the totals a client derives
   from the list endpoints with the shared rules the pages use, and the same aggregate computed in

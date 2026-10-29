@@ -6,6 +6,7 @@ import { forEachConcurrent } from './concurrency';
 import { JOB_INTERVAL_MS } from './operationalStatus';
 import { startIntervalJob } from './intervalJob';
 import { upsertCurrentNetWorthSnapshot } from './netWorth';
+import { applyDueValuations } from './propertyValuation';
 import { log, errorFields } from './logger';
 
 const SNAPSHOT_INTERVAL_MS = JOB_INTERVAL_MS['net-worth-snapshot'];
@@ -25,6 +26,10 @@ async function snapshotUser(
 }
 
 export async function runSnapshots(): Promise<void> {
+  // A valuation counts from its date: one whose date has come sets its property's value before
+  // the snapshots read it.
+  const valued = await applyDueValuations();
+  if (valued > 0) log.info('job.net_worth_snapshot.valuations_applied', { properties: valued });
   const [rates, links, owners] = await Promise.all([
     getCurrentRatesToBaseCurrency(),
     db.select().from(partnerLinks).where(eq(partnerLinks.status, 'accepted')),

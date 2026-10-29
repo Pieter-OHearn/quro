@@ -1,4 +1,5 @@
 import { withPropertyEquity } from '../lib/propertyDebt';
+import { latestValuation, syncCurrentValue } from '../lib/propertyValuation';
 import { registerTransactionReadRoutes } from '../lib/transactionRoutes';
 import { registerArchivableResource } from '../lib/archivableResource';
 import { findAccessible, findAccessibleChild } from '../lib/access';
@@ -11,9 +12,9 @@ import {
   type PropertyTransactionPayload,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
-import { db, type DbExecutor, type DbTransaction } from '../db/client';
+import { db, type DbExecutor } from '../db/client';
 import { mortgages, properties, propertyTransactions } from '../db/schema';
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { getAuthUser, getPartnerId } from '../lib/authUser';
 import { HTTP_STATUS } from '../constants/http';
 import { earliestDate } from '../lib/netWorth';
@@ -294,33 +295,6 @@ function getAccessibleProperty(
   executor: DbExecutor = db,
 ) {
   return findAccessible(properties, propertyId, { userId, partnerId }, { executor });
-}
-
-// The latest valuation by date (ties by id), read inside the ledger transaction after the
-// property was locked, so concurrent valuation writes on one property apply one after another.
-async function latestValuation(tx: DbExecutor, propertyId: number): Promise<number | null> {
-  const [latest] = await tx
-    .select({ amount: propertyTransactions.amount })
-    .from(propertyTransactions)
-    .where(
-      and(
-        eq(propertyTransactions.propertyId, propertyId),
-        eq(propertyTransactions.type, 'valuation'),
-      ),
-    )
-    .orderBy(desc(propertyTransactions.date), desc(propertyTransactions.id))
-    .limit(1);
-  return latest?.amount ?? null;
-}
-
-// A property's current value is its latest valuation. A property whose last valuation was
-// removed keeps the value it had, which is the value it was last entered or valued at.
-async function syncCurrentValue(tx: DbTransaction, propertyIds: readonly number[]): Promise<void> {
-  for (const propertyId of new Set(propertyIds)) {
-    const amount = await latestValuation(tx, propertyId);
-    if (amount === null) continue;
-    await tx.update(properties).set({ currentValue: amount }).where(eq(properties.id, propertyId));
-  }
 }
 
 function getAccessiblePropertyTransaction(

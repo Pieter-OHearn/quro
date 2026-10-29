@@ -88,14 +88,14 @@ BEGIN
   ORDER BY valuation.id;
   DELETE FROM mortgage_transactions WHERE type = 'valuation';
 
-  -- The current value is the latest valuation by date (ties by id); a property without one keeps
-  -- the value it was entered with.
+  -- The current value is the latest valuation dated on or before today in UTC (ties by id); a
+  -- valuation dated later takes effect on its date. A property without one keeps its value.
   UPDATE properties AS property
   SET current_value = latest.amount
   FROM (
     SELECT DISTINCT ON (property_id) property_id, amount
     FROM property_transactions
-    WHERE type = 'valuation'
+    WHERE type = 'valuation' AND date <= (now() AT TIME ZONE 'UTC')::date
     ORDER BY property_id, date DESC, id DESC
   ) AS latest
   WHERE latest.property_id = property.id

@@ -78,7 +78,7 @@ export function groupMortgageRepayments(
 /**
  * A property's equity in its own currency as of `cutoff` (records dated at or before it count),
  * as net worth weights it: the value then (its latest valuation by then, the purchase price
- * before its first, or the current value when it has none) less its linked mortgage's balance
+ * before its first, or the current value when none is in effect yet) less its linked mortgage's balance
  * then (the server's current debt plus the principal repaid after the cutoff).
  */
 export function propertyEquityAt(
@@ -88,7 +88,11 @@ export function propertyEquityAt(
   linkedMortgage: Mortgage | undefined,
   cutoff: number,
 ): number {
-  const ownValuations = valuations.filter((txn) => txn.type === 'valuation');
+  // A valuation counts from its date: one dated after today sets nothing yet.
+  const now = Date.now();
+  const ownValuations = valuations.filter(
+    (txn) => txn.type === 'valuation' && txn.timestamp <= now,
+  );
   let value = ownValuations.length > 0 ? property.purchasePrice : property.currentValue;
   for (const txn of ownValuations) {
     if (txn.timestamp > cutoff) break;

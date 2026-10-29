@@ -12,6 +12,7 @@ import {
   pensionTransactions,
   properties,
 } from '../db/schema';
+import { applyDueValuations } from '../lib/propertyValuation';
 import { createIntegrationHelpers, type AuthSession } from '../test/integration';
 
 // Ledger edge cases: a repayment that the zero clamp cuts short, valuations that set a property's
@@ -285,6 +286,43 @@ describe('a property valuation sets the current value', () => {
       200,
     );
     expect(await currentValue(flat.id)).toBe(toCents(300000));
+  });
+
+  test('from its date: a valuation dated later sets the value when that date comes', async () => {
+    const owner = await integration.signUp('valuation-future-date');
+    const home = await createProperty(owner, '5 Value Street');
+    await created(
+      await post(
+        owner,
+        '/api/investments/property-transactions',
+        valuation(home.id, 330000, '2026-02-01'),
+      ),
+    );
+    const future = await created<{ id: number }>(
+      await post(
+        owner,
+        '/api/investments/property-transactions',
+        valuation(home.id, 360000, '2999-01-01'),
+      ),
+    );
+    // Not yet in effect: the latest valuation dated on or before today sets the value, and the
+    // value can still not be edited by hand.
+    expect(await currentValue(home.id)).toBe(toCents(330000));
+    await expectStatus(
+      await patch(owner, `/api/investments/properties/${home.id}`, { currentValue: 1 }),
+      400,
+    );
+    // The daily job applies it once its date has come; a second run changes nothing.
+    expect(await applyDueValuations('2998-12-31')).toBe(0);
+    expect(await applyDueValuations('2999-01-01')).toBeGreaterThanOrEqual(1);
+    expect(await currentValue(home.id)).toBe(toCents(360000));
+    expect(await applyDueValuations('2999-01-01')).toBe(0);
+    // Deleting it goes back to the latest valuation in effect today.
+    await expectStatus(
+      await remove(owner, `/api/investments/property-transactions/${future.id}`),
+      200,
+    );
+    expect(await currentValue(home.id)).toBe(toCents(330000));
   });
 });
 

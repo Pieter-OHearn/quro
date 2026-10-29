@@ -456,8 +456,11 @@ function buildDatedHoldingTransactions(
     .sort((left, right) => left.timestamp - right.timestamp);
 }
 
+// A valuation counts from its date, so one dated after today is left out: it sets neither a point
+// nor the value before the first valuation, just as it does not set the current value yet.
 function buildDatedPropertyValuations(
   transactions: readonly PropertyTransactionRow[],
+  now = Date.now(),
 ): DatedPropertyValuation[] {
   return transactions
     .filter((transaction) => transaction.type === 'valuation')
@@ -466,7 +469,7 @@ function buildDatedPropertyValuations(
       amount: toNumberOrZero(transaction.amount),
       timestamp: toUtcTimestamp(transaction.date),
     }))
-    .filter((transaction) => Number.isFinite(transaction.timestamp))
+    .filter((transaction) => Number.isFinite(transaction.timestamp) && transaction.timestamp <= now)
     .sort((left, right) => left.timestamp - right.timestamp);
 }
 

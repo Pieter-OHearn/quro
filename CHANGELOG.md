@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 - **Breaking:** a property and its mortgage keep separate ledgers. A property records valuations, rent income and expenses; a mortgage records repayments and rate changes. Each refuses the other's types, and each page lists the other's rows read-only with a link to the page that edits them, so a property card now counts and lists its mortgage's repayments. The property, mortgage and transaction APIs change accordingly ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6)).
 - **Breaking:** a property's only debt is its linked mortgage. A balance typed on the property itself is no longer kept, and the mortgage reads the property's address and value instead of keeping copies.
-- A property valuation sets the property's current value, and the property's equity is worked out on the server, so the property card, the mortgage page and the dashboard show the same figure.
+- A property valuation sets the property's current value from its date: a valuation dated in the future takes effect on that day. The property's equity is worked out on the server, so the property card, the mortgage page and the dashboard show the same figure.
 - Recording a repayment suggests the date, a note, the amount and the interest and principal split from the loan type, the rate in effect and the balance; every field stays editable. A linear mortgage's current payment is worked out from today's balance.
 
 ### Fixed

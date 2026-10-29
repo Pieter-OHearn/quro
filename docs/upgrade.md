@@ -526,7 +526,7 @@ SELECT
 
 - A property repayment recorded against a mortgage moves to that mortgage's ledger with its amount, interest, principal, the principal a zero balance absorbed, date, note and the person who entered it.
 - A mortgage valuation moves to the ledger of the property the mortgage is linked to.
-- A property with valuations takes its latest valuation by date (ties by id) as its current value; a property without one keeps its value.
+- A property with valuations takes its latest valuation dated on or before the day of the upgrade (UTC, ties by id) as its current value; a property without one keeps its value. A valuation dated later takes effect on its date: the daily net worth snapshot job applies it.
 - The migration runs in one transaction and changes nothing when it refuses. Run again after a refusal, it starts over; run on a database it already migrated, it changes nothing.
 
 #### When the migration refuses
@@ -544,4 +544,4 @@ What the operator does: nothing, unless a script or client of your own calls the
 - `POST` and `PATCH /api/investments/property-transactions` accept the types `valuation`, `rent_income` and `expense` and no longer accept `interest` or `principal`; `repayment` and `rate_change` answer `400`. `POST` and `PATCH /api/mortgages/transactions` accept `repayment` and `rate_change`; `valuation`, `rent_income` and `expense` answer `400`.
 - Property requests no longer accept `mortgage`, and responses carry `debt`, `totalEquity` and `equity` (see [property debt](household-model.md#property-debt)) instead of `mortgage`. Property transaction responses no longer carry `interest`, `principal`, `unappliedPrincipal`, `repaymentTarget` or `repaymentMortgageId`.
 - Mortgage requests no longer accept `propertyAddress` or `propertyValue`; responses read `linkedPropertyId`, `propertyAddress` and `propertyValue` from the linked property, and they are `null` for a mortgage without one.
-- A property valuation sets the property's `currentValue`. While a property has a valuation, a `PATCH` that sets a different `currentValue` answers `400`.
+- A property valuation sets the property's `currentValue` from its date: at once when it is dated on or before today (UTC), otherwise when the daily net worth snapshot job runs on or after that date. While a valuation sets the value, a `PATCH` that sets a different `currentValue` answers `400`.
