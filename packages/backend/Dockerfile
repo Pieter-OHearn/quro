@@ -1,5 +1,5 @@
 # Production dependencies of the backend workspace only: no frontend, build, lint or test tooling.
-FROM oven/bun:1.4.3-slim AS deps
+FROM oven/bun:1.4.4-slim AS deps
 WORKDIR /app
 # Bun workspaces include frontend too; copy every manifest to keep the lockfile consistent
 COPY packages/shared/package.json packages/shared/
@@ -9,14 +9,14 @@ COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile --production --filter @quro/backend
 
 # Application source without tests and test helpers.
-FROM oven/bun:1.4.3-slim AS source
+FROM oven/bun:1.4.4-slim AS source
 WORKDIR /app
 COPY packages/shared packages/shared
 COPY packages/backend packages/backend
 RUN rm -rf packages/shared/test packages/backend/src/test packages/backend/drizzle.config.ts && \
     find packages \( -name '*.test.ts' -o -name '*.cases.ts' \) -delete
 
-FROM oven/bun:1.4.3-slim
+FROM oven/bun:1.4.4-slim
 WORKDIR /app
 
 # Backup and restore need client tools at least as new as the database server, and Debian
