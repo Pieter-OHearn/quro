@@ -13,6 +13,7 @@ const WARNING_TONE = 'border-warning bg-warning-soft text-warning';
 
 const TONE_CLASSES = {
   brand: 'border-brand bg-brand-soft text-brand-fg',
+  danger: 'border-danger bg-danger-soft text-danger',
   info: 'border-info bg-info-soft text-info',
   neutral: NEUTRAL_TONE,
   muted: NEUTRAL_TONE,

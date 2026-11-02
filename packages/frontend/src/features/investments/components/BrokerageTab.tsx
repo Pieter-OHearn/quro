@@ -69,7 +69,8 @@ type HoldingHistoryHandlers = Pick<
 type HoldingRowMetrics = {
   nativeValue: number;
   valueInBase: number;
-  gain: number;
+  /** Value less cost, both in the base currency; the cost converts at today's rate. */
+  gainBase: number;
   gainPctHolding: number;
   foreign: boolean;
   txnCount: number;
@@ -152,8 +153,8 @@ function buildBrokerageHoldingColumns(
     },
     {
       key: 'gain',
-      sortValue: (row) => metricsById[row.id].gain,
-      header: 'Gain / loss',
+      sortValue: (row) => metricsById[row.id].gainBase,
+      header: `Gain / loss (${baseCurrency})`,
       phoneCard: 'headlineNote',
       numeric: true,
       sortable: true,
@@ -221,12 +222,13 @@ function computeHoldingRowMetrics(
   const price = getEffectivePrice(holding);
   const nativeValue = holdingValue(position.shares, price);
   const valueInBase = convertToBase(nativeValue, holding.currency);
-  const gain = sumMoney([nativeValue, -position.costBasis]);
+  // No purchase-date rate is stored, so the cost converts at today's rate, like the totals.
+  const gainBase = sumMoney([valueInBase, -convertToBase(position.costBasis, holding.currency)]);
   const gainPctHolding =
     position.avgCost > 0 ? ((price - position.avgCost) / position.avgCost) * 100 : 0;
   const foreign = isForeign(holding.currency);
   const txnCount = holdingTxns.filter((t) => t.holdingId === holding.id).length;
-  return { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount };
+  return { nativeValue, valueInBase, gainBase, gainPctHolding, foreign, txnCount };
 }
 
 /** Name on the first line; ticker, type, sector, currency and the count as a caption. */
@@ -421,6 +423,7 @@ type HoldingRowProps = HoldingHistoryHandlers & {
   holdingTxns: HoldingTransaction[];
   position: Position;
   isExpanded: boolean;
+  baseCurrency: string;
   fmtBase: FormatBaseFn;
   fmtNative: FormatNativeFn;
   fmtPrice: UnitPriceFormatFn;
@@ -434,6 +437,7 @@ function HoldingRow({
   holdingTxns,
   position,
   isExpanded,
+  baseCurrency,
   fmtBase,
   fmtNative,
   fmtPrice,
@@ -441,7 +445,7 @@ function HoldingRow({
   onToggleExpanded,
   ...handlers
 }: Readonly<HoldingRowProps>) {
-  const { nativeValue, valueInBase, gain, gainPctHolding, foreign, txnCount } = metrics;
+  const { nativeValue, valueInBase, gainBase, gainPctHolding, foreign, txnCount } = metrics;
 
   return (
     <>
@@ -472,7 +476,7 @@ function HoldingRow({
         <DataTableCell columnKey="gain">
           <FigureWithCaption
             inlineOnPhone
-            figure={<Change value={gain} format="amount" currency={holding.currency} />}
+            figure={<Change value={gainBase} format="amount" currency={baseCurrency} />}
             caption={<Change value={gainPctHolding} format="percent" className="text-caption" />}
           />
         </DataTableCell>
@@ -616,6 +620,35 @@ function HoldingsPagination({
   );
 }
 
+/**
+ * The table footer: the rate note when a holding is in another currency and the pager for a long
+ * list, or nothing, so the table draws no empty footer.
+ */
+function holdingsFooter({
+  pagination,
+  totalCount,
+  baseCurrency,
+  hasForeignHolding,
+}: Readonly<{
+  pagination: ReturnType<typeof usePagination<Holding>>;
+  totalCount: number;
+  baseCurrency: string;
+  hasForeignHolding: boolean;
+}>): ReactNode {
+  if (!hasForeignHolding && totalCount <= HOLDINGS_PAGE_SIZE) return null;
+  return (
+    <div className="space-y-2">
+      {hasForeignHolding && (
+        <p className="text-caption text-fg-subtle">
+          Gain / loss in {baseCurrency} converts each holding's cost at today's rate; the rate on
+          the purchase date is not stored.
+        </p>
+      )}
+      <HoldingsPagination pagination={pagination} totalCount={totalCount} />
+    </div>
+  );
+}
+
 function BrokerageHoldingsList({
   holdings,
   holdingTxns,
@@ -665,7 +698,12 @@ function BrokerageHoldingsList({
       minWidth={960}
       isEmpty={holdings.length === 0}
       emptyState="No active holdings yet."
-      footer={<HoldingsPagination pagination={pagination} totalCount={holdings.length} />}
+      footer={holdingsFooter({
+        pagination,
+        totalCount: holdings.length,
+        baseCurrency: totals.baseCurrency,
+        hasForeignHolding: holdings.some((holding) => metricsById[holding.id].foreign),
+      })}
     >
       {pagination.pageItems.map((holding) => (
         <HoldingRow
@@ -675,6 +713,7 @@ function BrokerageHoldingsList({
           holdingTxns={holdingTxns}
           position={positions[holding.id]}
           isExpanded={expandedHoldingId === holding.id}
+          baseCurrency={totals.baseCurrency}
           fmtBase={totals.fmtBase}
           fmtNative={fmtNative}
           fmtPrice={fmtPrice}

@@ -1,3 +1,4 @@
+import { useState, type CSSProperties, type FocusEvent, type MouseEvent } from 'react';
 import { NavLink } from 'react-router';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,8 @@ const REST_CLASSES =
   'text-fg-muted hover:bg-surface-muted hover:text-fg active:bg-surface-muted active:text-fg';
 const ACTIVE_CLASSES = 'bg-brand-soft font-semibold text-brand-fg';
 const ICON_SIZE_PX = 16;
+// The gap between an item's right edge and its tooltip.
+const TOOLTIP_OFFSET_PX = 8;
 
 type SidebarItemProps = {
   icon: LucideIcon;
@@ -18,17 +21,48 @@ type SidebarItemProps = {
   collapsed: boolean;
 };
 
+type TooltipAnchor = {
+  /** Places the tooltip beside the item that was hovered or focused. */
+  onAnchor: (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>) => void;
+  style: CSSProperties | undefined;
+};
+
 function itemClassName(active: boolean, collapsed: boolean) {
   return cn(ITEM_CLASSES, active ? ACTIVE_CLASSES : REST_CLASSES, collapsed && 'justify-center');
 }
 
+/**
+ * The collapsed nav scrolls on a short window, and a scroll container clips what sticks out of
+ * it, so the label tooltip is fixed to the viewport and placed beside its item when the pointer
+ * or keyboard focus reaches the item.
+ */
+function useTooltipAnchor(collapsed: boolean): TooltipAnchor {
+  const [style, setStyle] = useState<CSSProperties>();
+  return {
+    onAnchor: (event) => {
+      if (!collapsed) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      setStyle({ top: rect.top + rect.height / 2, left: rect.right + TOOLTIP_OFFSET_PX });
+    },
+    style,
+  };
+}
+
 // The collapsed sidebar shows only the icon; the label is a tooltip that also names the link.
-function ItemContent({ icon: Icon, label, collapsed }: Readonly<SidebarItemProps>) {
+function ItemContent({
+  icon: Icon,
+  label,
+  collapsed,
+  tooltipStyle,
+}: Readonly<SidebarItemProps & { tooltipStyle: CSSProperties | undefined }>) {
   return (
     <>
       <Icon size={ICON_SIZE_PX} className="flex-shrink-0" aria-hidden="true" />
       {collapsed ? (
-        <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-surface-inverse px-2 py-1 text-caption font-normal text-fg-on-inverse opacity-0 shadow-popover transition-opacity duration-fast group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span
+          style={tooltipStyle}
+          className="pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-surface-inverse px-2 py-1 text-caption font-normal text-fg-on-inverse opacity-0 shadow-popover transition-opacity duration-fast group-hover:opacity-100 group-focus-visible:opacity-100"
+        >
           {label}
         </span>
       ) : (
@@ -44,13 +78,16 @@ type SidebarLinkProps = SidebarItemProps & {
 };
 
 export function SidebarLink({ to, onNavigate, ...item }: Readonly<SidebarLinkProps>) {
+  const tooltip = useTooltipAnchor(item.collapsed);
   return (
     <NavLink
       to={to}
       onClick={onNavigate}
+      onMouseEnter={tooltip.onAnchor}
+      onFocus={tooltip.onAnchor}
       className={({ isActive }) => itemClassName(isActive, item.collapsed)}
     >
-      <ItemContent {...item} />
+      <ItemContent {...item} tooltipStyle={tooltip.style} />
     </NavLink>
   );
 }
@@ -60,13 +97,16 @@ type SidebarButtonProps = SidebarItemProps & {
 };
 
 export function SidebarButton({ onClick, ...item }: Readonly<SidebarButtonProps>) {
+  const tooltip = useTooltipAnchor(item.collapsed);
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={tooltip.onAnchor}
+      onFocus={tooltip.onAnchor}
       className={cn(itemClassName(false, item.collapsed), 'font-normal')}
     >
-      <ItemContent {...item} />
+      <ItemContent {...item} tooltipStyle={tooltip.style} />
     </button>
   );
 }
