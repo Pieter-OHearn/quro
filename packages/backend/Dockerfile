@@ -1,5 +1,5 @@
 # Production dependencies of the backend workspace only: no frontend, build, lint or test tooling.
-FROM oven/bun:1.4.3-slim AS deps
+FROM oven/bun:1.4.3-alpine AS deps
 WORKDIR /app
 # Bun workspaces include frontend too; copy every manifest to keep the lockfile consistent
 COPY packages/shared/package.json packages/shared/
@@ -9,38 +9,24 @@ COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile --production --filter @quro/backend
 
 # Application source without tests and test helpers.
-FROM oven/bun:1.4.3-slim AS source
+FROM oven/bun:1.4.3-alpine AS source
 WORKDIR /app
 COPY packages/shared packages/shared
 COPY packages/backend packages/backend
 RUN rm -rf packages/shared/test packages/backend/src/test packages/backend/drizzle.config.ts && \
     find packages \( -name '*.test.ts' -o -name '*.cases.ts' \) -delete
 
-FROM oven/bun:1.4.3-slim
+FROM oven/bun:1.4.3-alpine
 WORKDIR /app
 
-# Backup and restore need client tools at least as new as the database server, and Debian
-# trixie only ships PostgreSQL 17, so install the baseline major from the PGDG repository.
+# Backup and restore need client tools at least as new as the database server. Alpine packages
+# each PostgreSQL major on its own (client tools without perl), so install the baseline major.
 # Keep POSTGRES_CLIENT_MAJOR equal to the major of the `db` image in docker-compose.yml
-# (scripts/postgres-baseline.test.ts checks it). The repository's signing key is pinned by
-# fingerprint. Security updates published since the base image was built are applied too.
+# (scripts/postgres-baseline.test.ts checks it). Security updates published since the base image
+# was built are applied too.
 ARG POSTGRES_CLIENT_MAJOR=18
-ARG PGDG_FINGERPRINT=B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
-RUN apt-get update && \
-    apt-get upgrade -y --no-install-recommends && \
-    apt-get install -y --no-install-recommends ca-certificates curl gnupg && \
-    install -d /usr/share/postgresql-common/pgdg && \
-    curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-      https://www.postgresql.org/media/keys/ACCC4CF8.asc && \
-    gpg --show-keys --with-colons /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-      | awk -F: '$1 == "fpr" { print $10 }' | grep -qx "$PGDG_FINGERPRINT" && \
-    . /etc/os-release && \
-    echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
-      > /etc/apt/sources.list.d/pgdg.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends "postgresql-client-${POSTGRES_CLIENT_MAJOR}" && \
-    apt-get purge -y --auto-remove curl gnupg && \
-    rm -rf /var/lib/apt/lists/* /root/.gnupg
+RUN apk upgrade --no-cache && \
+    apk add --no-cache "postgresql${POSTGRES_CLIENT_MAJOR}-client"
 
 COPY --from=deps /app /app
 COPY --from=source /app/packages /app/packages

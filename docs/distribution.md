@@ -11,7 +11,7 @@ This page states what Quro publishes, how anyone can check that it can be pulled
 | `postgres:18` (official image, not Quro's)      | Docker Hub                | Public                                      |
 | `ghcr.io/pieter-ohearn/quro-auto-updater`       | GitHub Container Registry | Retired. Old tags stay; no new releases     |
 
-Both Quro images are multi-platform: `linux/amd64` and `linux/arm64`. A release tag (`vX.Y.Z`) and, for a stable release, `latest` point at one image index per package. The pension parser and the model server are not published; the optional statement import builds them from a checkout.
+Both Quro images are multi-platform: `linux/amd64` and `linux/arm64`, and both are built on Alpine Linux: the backend on the `oven/bun` Alpine image with Alpine's PostgreSQL 18 client tools (`pg_dump`, `pg_restore` and `psql`), the frontend on the `nginx` Alpine image. A release tag (`vX.Y.Z`) and, for a stable release, `latest` point at one image index per package. The pension parser and the model server are not published; the optional statement import builds them from a checkout.
 
 Core artifacts stay public. A release is blocked when the two core images cannot be read anonymously (see [the release check](#the-release-check)). Nothing in the release workflow changes package visibility, and a release requires nothing from the retired auto-updater: its image and the assets of earlier releases stay published as history, and no release builds, tags or attaches them.
 
