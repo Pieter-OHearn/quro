@@ -1,3 +1,4 @@
+import { ModalPresence } from '@/components/ui';
 import type { PensionPageState } from '../types';
 import { AddPensionTxnModal } from './AddPensionTxnModal';
 import { ImportPensionStatementModal } from './ImportPensionStatementModal';
@@ -24,45 +25,58 @@ function closeTxnEditor(state: PensionPageState): void {
 }
 
 function PensionEditorModal({ state }: Readonly<PensionModalsProps>) {
-  if (!state.showModal && !state.editing) return null;
+  const open = state.showModal || Boolean(state.editing);
 
   return (
-    <PensionModal
-      existing={state.editing}
-      onClose={() => closePensionEditor(state)}
-      onSave={state.handleSave}
-    />
+    <ModalPresence open={open}>
+      {open && (
+        <PensionModal
+          existing={state.editing}
+          onClose={() => closePensionEditor(state)}
+          onSave={state.handleSave}
+        />
+      )}
+    </ModalPresence>
   );
 }
 
 function TxnEditorModal({ state }: Readonly<PensionModalsProps>) {
   const modalPot = resolveTxnModalPot(state);
-  if (!modalPot) return null;
 
   return (
-    <AddPensionTxnModal
-      pot={modalPot}
-      existing={state.editingTxn ?? undefined}
-      existingDocument={
-        state.editingTxn ? (state.documentsByTransactionId.get(state.editingTxn.id) ?? null) : null
-      }
-      onClose={() => closeTxnEditor(state)}
-      onSave={state.handleAddPensionTxn}
-    />
+    <ModalPresence open={Boolean(modalPot)}>
+      {modalPot && (
+        <AddPensionTxnModal
+          pot={modalPot}
+          existing={state.editingTxn ?? undefined}
+          existingDocument={
+            state.editingTxn
+              ? (state.documentsByTransactionId.get(state.editingTxn.id) ?? null)
+              : null
+          }
+          onClose={() => closeTxnEditor(state)}
+          onSave={state.handleAddPensionTxn}
+        />
+      )}
+    </ModalPresence>
   );
 }
 
 function ImportEditorModal({ state }: Readonly<PensionModalsProps>) {
-  if (!state.importModal) return null;
+  const { importModal } = state;
 
   return (
-    <ImportPensionStatementModal
-      pot={state.importModal.pot}
-      initialImportId={state.importModal.importId}
-      onClose={() => {
-        state.closeImportModal();
-      }}
-    />
+    <ModalPresence open={importModal !== null}>
+      {importModal && (
+        <ImportPensionStatementModal
+          pot={importModal.pot}
+          initialImportId={importModal.importId}
+          onClose={() => {
+            state.closeImportModal();
+          }}
+        />
+      )}
+    </ModalPresence>
   );
 }
 

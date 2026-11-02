@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { ModalPresence } from '../Modal';
 import { Archive, ChevronDown, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '../../atoms/Button';
 import { Card } from '../../atoms/Card';
@@ -167,22 +168,24 @@ function ArchivedItemsList<T extends ArchivedItem>({
           ))}
         </div>
       ) : null}
-      {pendingDelete ? (
-        <ArchiveOrDeleteDialog
-          entityLabel={entityLabel}
-          entityName={pendingDelete.name}
-          balance={balance?.value ?? null}
-          balanceCurrency={balance?.currency}
-          balanceLabel={balance?.label}
-          childrenLabel={childrenLabel}
-          hideArchive
-          onDelete={() => {
-            onHardDelete(pendingDelete);
-            setPendingDelete(null);
-          }}
-          onCancel={() => setPendingDelete(null)}
-        />
-      ) : null}
+      <ModalPresence open={Boolean(pendingDelete)}>
+        {pendingDelete ? (
+          <ArchiveOrDeleteDialog
+            entityLabel={entityLabel}
+            entityName={pendingDelete.name}
+            balance={balance?.value ?? null}
+            balanceCurrency={balance?.currency}
+            balanceLabel={balance?.label}
+            childrenLabel={childrenLabel}
+            hideArchive
+            onDelete={() => {
+              onHardDelete(pendingDelete);
+              setPendingDelete(null);
+            }}
+            onCancel={() => setPendingDelete(null)}
+          />
+        ) : null}
+      </ModalPresence>
     </Card>
   );
 }

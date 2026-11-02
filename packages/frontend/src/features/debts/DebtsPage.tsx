@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Debt, DebtPayment } from '@quro/shared';
-import { ArchiveOrDeleteDialog, LoadingState, PageStack } from '@/components/ui';
+import { ArchiveOrDeleteDialog, LoadingState, PageStack, ModalPresence } from '@/components/ui';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import { DebtFormModal } from './components/DebtFormModal';
@@ -67,17 +67,21 @@ function DebtModals({
 }: Readonly<DebtModalsProps>) {
   return (
     <>
-      {debtModalOpen ? (
-        <DebtFormModal debt={editingDebt} onClose={onCloseDebtModal} onSubmit={onSaveDebt} />
-      ) : null}
+      <ModalPresence open={debtModalOpen}>
+        {debtModalOpen ? (
+          <DebtFormModal debt={editingDebt} onClose={onCloseDebtModal} onSubmit={onSaveDebt} />
+        ) : null}
+      </ModalPresence>
 
-      {paymentDebt ? (
-        <DebtPaymentModal
-          debt={paymentDebt}
-          onClose={onClosePaymentModal}
-          onSubmit={onCreatePayment}
-        />
-      ) : null}
+      <ModalPresence open={Boolean(paymentDebt)}>
+        {paymentDebt ? (
+          <DebtPaymentModal
+            debt={paymentDebt}
+            onClose={onClosePaymentModal}
+            onSubmit={onCreatePayment}
+          />
+        ) : null}
+      </ModalPresence>
     </>
   );
 }
@@ -189,19 +193,21 @@ export function Debts() {
           await state.createDebtPayment.mutateAsync(payload);
         }}
       />
-      {state.debtPendingDelete ? (
-        <ArchiveOrDeleteDialog
-          entityLabel="Debt"
-          entityName={state.debtPendingDelete.name}
-          balance={state.debtPendingDelete.remainingBalance}
-          balanceCurrency={state.debtPendingDelete.currency}
-          balanceLabel="outstanding balance"
-          childrenLabel="payment history"
-          onArchive={() => confirmDeleteDebt('preservePayments')}
-          onDelete={() => confirmDeleteDebt('deletePayments')}
-          onCancel={() => state.setDebtPendingDelete(null)}
-        />
-      ) : null}
+      <ModalPresence open={Boolean(state.debtPendingDelete)}>
+        {state.debtPendingDelete ? (
+          <ArchiveOrDeleteDialog
+            entityLabel="Debt"
+            entityName={state.debtPendingDelete.name}
+            balance={state.debtPendingDelete.remainingBalance}
+            balanceCurrency={state.debtPendingDelete.currency}
+            balanceLabel="outstanding balance"
+            childrenLabel="payment history"
+            onArchive={() => confirmDeleteDebt('preservePayments')}
+            onDelete={() => confirmDeleteDebt('deletePayments')}
+            onCancel={() => state.setDebtPendingDelete(null)}
+          />
+        ) : null}
+      </ModalPresence>
       <DebtsArchivedSection />
     </PageStack>
   );

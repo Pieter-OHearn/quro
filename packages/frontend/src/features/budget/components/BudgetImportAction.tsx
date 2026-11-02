@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button, ModalPresence } from '@/components/ui';
 import { CsvImportDialog } from '@/features/import/components';
 
 /** The budget page's entry to the reviewed CSV import. */
@@ -16,7 +16,9 @@ export function BudgetImportAction() {
       >
         Import CSV
       </Button>
-      {open && <CsvImportDialog kind="budget" onClose={() => setOpen(false)} />}
+      <ModalPresence open={open}>
+        {open && <CsvImportDialog kind="budget" onClose={() => setOpen(false)} />}
+      </ModalPresence>
     </div>
   );
 }

@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { Download, Trash2 } from 'lucide-react';
 import type { AccountDeletionPreview, User } from '@quro/shared';
-import { Button, FormField, LoadingState, Modal, PasswordInput, TextInput } from '@/components/ui';
+import {
+  Button,
+  FormField,
+  LoadingState,
+  Modal,
+  PasswordInput,
+  TextInput,
+  ModalPresence,
+} from '@/components/ui';
 import { resolveApiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/AuthContext';
 import {
@@ -91,6 +99,7 @@ export function DeleteAccountDialog({
 
   return (
     <Modal
+      confirmDiscard={false}
       title="Delete your account"
       subtitle="This cannot be undone. Export your data first if you want a copy."
       onClose={onClose}
@@ -173,14 +182,16 @@ function DeleteCard({ user }: Readonly<{ user: User }>) {
         Deleting is immediate and permanent on this instance. Backups of the instance keep older
         copies until the operator deletes them.
       </p>
-      {open ? (
-        <DeleteAccountDialog
-          user={user}
-          passwordLogin={link.data?.passwordLogin !== false}
-          onClose={() => setOpen(false)}
-          onDeleted={() => replaceUser(null)}
-        />
-      ) : null}
+      <ModalPresence open={open}>
+        {open ? (
+          <DeleteAccountDialog
+            user={user}
+            passwordLogin={link.data?.passwordLogin !== false}
+            onClose={() => setOpen(false)}
+            onDeleted={() => replaceUser(null)}
+          />
+        ) : null}
+      </ModalPresence>
     </SettingsCard>
   );
 }

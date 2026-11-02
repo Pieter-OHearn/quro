@@ -235,6 +235,8 @@ test('wide pension review keeps compact fields editable and the footer visible o
     dialog.getByRole('button', { name: 'Commit transactions', exact: true }),
   ).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath('import-mobile.png') });
+  // The review has unsaved edits, so closing asks before it discards them.
   await page.keyboard.press('Escape');
+  await dialog.getByRole('button', { name: 'Discard changes' }).click();
   await expect(dialog).toBeHidden();
 });

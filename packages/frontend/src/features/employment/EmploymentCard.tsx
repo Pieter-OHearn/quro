@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { todayIsoDate, type Employment } from '@quro/shared';
 import { BriefcaseBusiness, CalendarDays } from 'lucide-react';
-import { Button, Card } from '@/components/ui';
+import { Button, Card, ModalPresence } from '@/components/ui';
 import { EmploymentEditorModal } from './EmploymentEditorModal';
 
 function completedMonths(startDate: string, asOf: string): number {
@@ -81,9 +81,11 @@ export function EmploymentCard({
           </Button>
         </div>
       </Card>
-      {editing ? (
-        <EmploymentEditorModal employment={employment} onClose={() => setEditing(false)} />
-      ) : null}
+      <ModalPresence open={editing}>
+        {editing ? (
+          <EmploymentEditorModal employment={employment} onClose={() => setEditing(false)} />
+        ) : null}
+      </ModalPresence>
     </>
   );
 }

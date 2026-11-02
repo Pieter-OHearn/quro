@@ -8,6 +8,7 @@ import {
   LoadingSpinner,
   PageStack,
   StateNotice,
+  ModalPresence,
 } from '@/components/ui';
 import { resolveApiErrorMessage } from '@/lib/api';
 import { AllocationCard } from './components/AllocationCard';
@@ -142,13 +143,15 @@ export function ExposureTab() {
         <NothingToShow status={view.status} />
       )}
       <MethodPanel report={report} />
-      {customising ? (
-        <CustomiseModal
-          settings={report.settings.settings}
-          source={report.settings.source}
-          onClose={() => setCustomising(false)}
-        />
-      ) : null}
+      <ModalPresence open={customising}>
+        {customising ? (
+          <CustomiseModal
+            settings={report.settings.settings}
+            source={report.settings.source}
+            onClose={() => setCustomising(false)}
+          />
+        ) : null}
+      </ModalPresence>
     </PageStack>
   );
 }

@@ -12,6 +12,7 @@ import {
   IconButton,
   RowActions,
   type DataTableColumn,
+  ModalPresence,
 } from '@/components/ui';
 import { stopRowClick } from '@/components/finance/stopRowClick';
 import type {
@@ -559,14 +560,16 @@ export function PensionPotsList(props: Readonly<PensionPotsListProps>) {
         <PensionPotRows {...props} onRequestDelete={setPotPendingDelete} />
         {pensions.length > 0 && <PensionTotalRow totalInBase={totalInBase} fmtBase={fmtBase} />}
       </DataTable>
-      {potPendingDelete ? (
-        <PensionPotDeleteDialog
-          pot={potPendingDelete}
-          pensionTxns={pensionTxns}
-          deletePot={props.deletePot}
-          onClose={() => setPotPendingDelete(null)}
-        />
-      ) : null}
+      <ModalPresence open={Boolean(potPendingDelete)}>
+        {potPendingDelete ? (
+          <PensionPotDeleteDialog
+            pot={potPendingDelete}
+            pensionTxns={pensionTxns}
+            deletePot={props.deletePot}
+            onClose={() => setPotPendingDelete(null)}
+          />
+        ) : null}
+      </ModalPresence>
     </>
   );
 }

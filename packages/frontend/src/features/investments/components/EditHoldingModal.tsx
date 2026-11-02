@@ -11,6 +11,7 @@ import {
   TextInput,
   IconButton,
   DateInput,
+  ModalPresence,
 } from '@/components/ui';
 import {
   ASSET_CLASSES,
@@ -742,15 +743,17 @@ export function EditHoldingModal({
         set={set}
         onToggleExcludeFromSync={setExcludeFromSync}
       />
-      {confirmingDelete && existing && onDelete ? (
-        <HoldingDeleteDialog
-          existing={existing}
-          currentValue={currentValue}
-          onDelete={onDelete}
-          onCancel={() => setConfirmingDelete(false)}
-          onClose={onClose}
-        />
-      ) : null}
+      <ModalPresence open={confirmingDelete && Boolean(existing) && Boolean(onDelete)}>
+        {confirmingDelete && existing && onDelete ? (
+          <HoldingDeleteDialog
+            existing={existing}
+            currentValue={currentValue}
+            onDelete={onDelete}
+            onCancel={() => setConfirmingDelete(false)}
+            onClose={onClose}
+          />
+        ) : null}
+      </ModalPresence>
     </Modal>
   );
 }

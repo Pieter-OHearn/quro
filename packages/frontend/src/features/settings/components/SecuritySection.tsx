@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { UpdateUserPasswordInput, User } from '@quro/shared';
 import { MIN_PASSWORD_LENGTH } from '@quro/shared';
 import { AlertTriangle, Check, ShieldCheck } from 'lucide-react';
-import { FormField, PasswordInput } from '@/components/ui';
+import { FormField, PasswordInput, UnsavedChangesGuard } from '@/components/ui';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
 import { invalidateDomain } from '@/lib/queryInvalidation';
 import { cn } from '@/lib/utils';
@@ -88,6 +88,8 @@ function PasswordSecuritySection({ user, replaceUser }: Readonly<SecuritySection
   const formError = message === 'Current password is incorrect' ? '' : message;
   const isSaving = save.isPending;
   const strength = getPasswordStrength(form.nextPassword);
+  // A password manager may fill the current password on its own, so only a new one counts.
+  const hasChanges = form.nextPassword !== '' || form.confirmPassword !== '';
 
   const handleSave = () => {
     const nextErrors: Record<string, string> = {};
@@ -113,6 +115,7 @@ function PasswordSecuritySection({ user, replaceUser }: Readonly<SecuritySection
 
   return (
     <div className="space-y-4">
+      <UnsavedChangesGuard when={hasChanges && !isSaving} />
       <SettingsCard
         title="Security"
         subtitle="Change your password and sign out browsers you no longer use."

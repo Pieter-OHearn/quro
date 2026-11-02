@@ -35,7 +35,7 @@ import { TxnTypeSelector } from './molecules/TxnTypeSelector';
 import { ArchiveOrDeleteDialog } from './organisms/ArchiveOrDeleteDialog';
 import { ChartCard } from './organisms/ChartCard';
 import { DataTable, DataTableCell, DataTableRow } from './organisms/DataTable';
-import { Modal, ModalFooter } from './organisms/Modal';
+import { Modal, ModalFooter, ModalPresence } from './organisms/Modal';
 import { ArchivedItemsSection } from './organisms/ArchivedItemsSection';
 import { StatCard } from './organisms/StatCard';
 import { TxnHistoryPanel, TxnRow } from './organisms/TxnHistoryPanel';
@@ -988,6 +988,30 @@ const smokeCases: readonly SmokeCase[] = [
       </Modal>
     ),
     includes: ['inert=""', 'data-closing=""', 'overflow-clip'],
+  },
+  {
+    name: 'ModalPresence shows an open dialog and hands it its open state',
+    element: (
+      <ModalPresence open>
+        <Modal title="Edit account" onClose={noop}>
+          <div>Body</div>
+        </Modal>
+      </ModalPresence>
+    ),
+    includes: ['aria-modal="true"', 'Edit account'],
+    excludes: ['inert=""', 'data-closing=""'],
+  },
+  {
+    name: 'ModalPresence renders nothing while closed',
+    element: (
+      <ModalPresence open={false}>
+        <Modal title="Edit account" onClose={noop}>
+          <div>Body</div>
+        </Modal>
+      </ModalPresence>
+    ),
+    includes: [],
+    excludes: ['role="dialog"', 'Edit account'],
   },
   {
     name: 'Modal that is open is not inert',

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
-import { EmptyState, LoadingState, PageStack } from '@/components/ui';
+import { EmptyState, LoadingState, PageStack, ModalPresence } from '@/components/ui';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import {
   AddMortgageModal,
@@ -29,14 +29,16 @@ function MortgageEmptyState({ state }: Readonly<MortgageEmptyStateProps>) {
 
   return (
     <PageStack>
-      {state.showMortgageModal && (
-        <AddMortgageModal
-          properties={state.properties}
-          linkedPropertyId={null}
-          onClose={state.closeMortgageModal}
-          onSave={state.handleSaveMortgage}
-        />
-      )}
+      <ModalPresence open={state.showMortgageModal}>
+        {state.showMortgageModal && (
+          <AddMortgageModal
+            properties={state.properties}
+            linkedPropertyId={null}
+            onClose={state.closeMortgageModal}
+            onSave={state.handleSaveMortgage}
+          />
+        )}
+      </ModalPresence>
       <EmptyState
         icon={Home}
         title="No mortgages yet"

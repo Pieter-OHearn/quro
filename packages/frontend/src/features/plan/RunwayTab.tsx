@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
+import { Button, ContentSection, LoadingSpinner, PageStack, ModalPresence } from '@/components/ui';
 import { CurrencyReviewNotice } from '@/components/finance/CurrencyReviewNotice';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { EmploymentCard } from '@/features/employment';
@@ -84,19 +84,23 @@ export function RunwayTab() {
         jurisdiction={data.jurisdiction}
         onClose={() => setDrawerOpen(false)}
       />
-      {reviewOpen ? (
-        <CalculationReviewModal
-          data={data}
-          fmtBase={fmtPlanMoney}
-          onClose={() => setReviewOpen(false)}
-        />
-      ) : null}
-      {bankingReviewOpen ? (
-        <BankingEntityReviewModal
-          guarantees={data.depositGuarantee}
-          onClose={() => setBankingReviewOpen(false)}
-        />
-      ) : null}
+      <ModalPresence open={reviewOpen}>
+        {reviewOpen ? (
+          <CalculationReviewModal
+            data={data}
+            fmtBase={fmtPlanMoney}
+            onClose={() => setReviewOpen(false)}
+          />
+        ) : null}
+      </ModalPresence>
+      <ModalPresence open={bankingReviewOpen}>
+        {bankingReviewOpen ? (
+          <BankingEntityReviewModal
+            guarantees={data.depositGuarantee}
+            onClose={() => setBankingReviewOpen(false)}
+          />
+        ) : null}
+      </ModalPresence>
     </PageStack>
   );
 }

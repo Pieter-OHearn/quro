@@ -1,4 +1,5 @@
 import type { SavingsAccount, SavingsTransaction } from '@quro/shared';
+import { ModalPresence } from '@/components/ui';
 import { AccountModal } from './AccountModal';
 import { AddTxnModal } from './AddTxnModal';
 import type { DeleteSavingsAccountMode, SaveAccountInput, SaveTransactionInput } from '../types';
@@ -34,22 +35,26 @@ export function SavingsModals({
 
   return (
     <>
-      {(showAccountModal || editing) && (
-        <AccountModal
-          existing={editing}
-          onClose={onCloseAccountModal}
-          onSave={onSaveAccount}
-          onDelete={onDeleteAccount}
-        />
-      )}
-      {transactionAccount && (
-        <AddTxnModal
-          account={transactionAccount}
-          existing={editingTxn ?? undefined}
-          onClose={onCloseTxnModal}
-          onSave={onSaveTxn}
-        />
-      )}
+      <ModalPresence open={showAccountModal || Boolean(editing)}>
+        {(showAccountModal || editing) && (
+          <AccountModal
+            existing={editing}
+            onClose={onCloseAccountModal}
+            onSave={onSaveAccount}
+            onDelete={onDeleteAccount}
+          />
+        )}
+      </ModalPresence>
+      <ModalPresence open={Boolean(transactionAccount)}>
+        {transactionAccount && (
+          <AddTxnModal
+            account={transactionAccount}
+            existing={editingTxn ?? undefined}
+            onClose={onCloseTxnModal}
+            onSave={onSaveTxn}
+          />
+        )}
+      </ModalPresence>
     </>
   );
 }

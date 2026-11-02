@@ -1,3 +1,4 @@
+import { ModalPresence } from '@/components/ui';
 import {
   CtaSection,
   FeaturesSection,
@@ -18,8 +19,12 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-surface-sunken pt-[calc(1rem+env(safe-area-inset-top))] text-fg">
-      {modal === 'signin' && <SignInModal onClose={closeModal} onSwitchToSignUp={openSignUp} />}
-      {modal === 'signup' && <SignUpModal onClose={closeModal} onSwitchToSignIn={openSignIn} />}
+      <ModalPresence open={modal === 'signin'}>
+        {modal === 'signin' && <SignInModal onClose={closeModal} onSwitchToSignUp={openSignUp} />}
+      </ModalPresence>
+      <ModalPresence open={modal === 'signup'}>
+        {modal === 'signup' && <SignUpModal onClose={closeModal} onSwitchToSignIn={openSignIn} />}
+      </ModalPresence>
       <Navbar onSignIn={openSignIn} onSignUp={openSignUp} />
       <HeroSection onSignUp={openSignUp} onSignIn={openSignIn} />
       <FeaturesSection />

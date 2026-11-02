@@ -1,4 +1,5 @@
 import { AddHoldingTxnModal } from './AddHoldingTxnModal';
+import { ModalPresence } from '@/components/ui';
 import { AddPropertyModal } from './AddPropertyModal';
 import { AddPropertyTxnModal } from './AddPropertyTxnModal';
 import { EditHoldingModal } from './EditHoldingModal';
@@ -72,28 +73,32 @@ function HoldingModals({
 
   return (
     <>
-      {(showAddHolding || editingHolding) && (
-        <EditHoldingModal
-          existing={editingHolding ?? undefined}
-          currentValue={
-            editingHolding
-              ? (positions[editingHolding.id]?.shares ?? 0) * editingHolding.currentPrice
-              : null
-          }
-          onClose={onCloseEditHolding}
-          onSave={onSaveHolding}
-          onDelete={onDeleteHolding}
-        />
-      )}
-      {modalHolding && (
-        <AddHoldingTxnModal
-          holding={modalHolding}
-          existing={editingHoldingTxn ?? undefined}
-          currentPosition={effectivePosition}
-          onClose={onCloseAddHoldingTxn}
-          onSave={onSaveHoldingTxn}
-        />
-      )}
+      <ModalPresence open={showAddHolding || Boolean(editingHolding)}>
+        {(showAddHolding || editingHolding) && (
+          <EditHoldingModal
+            existing={editingHolding ?? undefined}
+            currentValue={
+              editingHolding
+                ? (positions[editingHolding.id]?.shares ?? 0) * editingHolding.currentPrice
+                : null
+            }
+            onClose={onCloseEditHolding}
+            onSave={onSaveHolding}
+            onDelete={onDeleteHolding}
+          />
+        )}
+      </ModalPresence>
+      <ModalPresence open={Boolean(modalHolding)}>
+        {modalHolding && (
+          <AddHoldingTxnModal
+            holding={modalHolding}
+            existing={editingHoldingTxn ?? undefined}
+            currentPosition={effectivePosition}
+            onClose={onCloseAddHoldingTxn}
+            onSave={onSaveHoldingTxn}
+          />
+        )}
+      </ModalPresence>
     </>
   );
 }
@@ -121,26 +126,32 @@ function PropertyModals({
 
   return (
     <>
-      {updatingProperty && (
-        <UpdatePropertyModal
-          property={updatingProperty}
-          hasValuation={hasValuationInEffect(propertyTxns, updatingProperty.id)}
-          onClose={onCloseUpdateProperty}
-          onSave={onSaveUpdateProperty}
-          onDelete={onDeleteProperty}
-        />
-      )}
-      {showAddProperty && (
-        <AddPropertyModal onClose={onCloseAddProperty} onSave={onSaveAddProperty} />
-      )}
-      {modalProperty && (
-        <AddPropertyTxnModal
-          property={modalProperty}
-          existing={editingPropertyTxn ?? undefined}
-          onClose={onCloseAddPropertyTxn}
-          onSave={onSavePropertyTxn}
-        />
-      )}
+      <ModalPresence open={Boolean(updatingProperty)}>
+        {updatingProperty && (
+          <UpdatePropertyModal
+            property={updatingProperty}
+            hasValuation={hasValuationInEffect(propertyTxns, updatingProperty.id)}
+            onClose={onCloseUpdateProperty}
+            onSave={onSaveUpdateProperty}
+            onDelete={onDeleteProperty}
+          />
+        )}
+      </ModalPresence>
+      <ModalPresence open={showAddProperty}>
+        {showAddProperty && (
+          <AddPropertyModal onClose={onCloseAddProperty} onSave={onSaveAddProperty} />
+        )}
+      </ModalPresence>
+      <ModalPresence open={Boolean(modalProperty)}>
+        {modalProperty && (
+          <AddPropertyTxnModal
+            property={modalProperty}
+            existing={editingPropertyTxn ?? undefined}
+            onClose={onCloseAddPropertyTxn}
+            onSave={onSavePropertyTxn}
+          />
+        )}
+      </ModalPresence>
     </>
   );
 }

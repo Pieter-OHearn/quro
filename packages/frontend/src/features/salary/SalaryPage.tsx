@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Payslip } from '@quro/shared';
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { EmploymentCard, selectCurrentEmployment, useEmployments } from '@/features/employment';
-import { LoadingState, PageStack, SegmentedControl } from '@/components/ui';
+import { LoadingState, PageStack, SegmentedControl, ModalPresence } from '@/components/ui';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { getFailedRouteQueries } from '@/lib/routeQueryErrors';
 import {
@@ -156,16 +156,18 @@ function SalaryPageContent({
 }: Readonly<SalaryPageContentProps>) {
   return (
     <PageStack>
-      {(state.showAdd || state.editingPayslip) && (
-        <AddPayslipModal
-          existing={state.editingPayslip ?? undefined}
-          onClose={onCloseModal}
-          onSave={onSave}
-          onDelete={onDelete}
-          baseCurrency={state.baseCurrency}
-          employments={state.employments}
-        />
-      )}
+      <ModalPresence open={state.showAdd || Boolean(state.editingPayslip)}>
+        {(state.showAdd || state.editingPayslip) && (
+          <AddPayslipModal
+            existing={state.editingPayslip ?? undefined}
+            onClose={onCloseModal}
+            onSave={onSave}
+            onDelete={onDelete}
+            baseCurrency={state.baseCurrency}
+            employments={state.employments}
+          />
+        )}
+      </ModalPresence>
 
       <SegmentedControl
         aria-label="Salary year"
