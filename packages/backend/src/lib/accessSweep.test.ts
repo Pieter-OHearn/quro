@@ -90,11 +90,11 @@ const INLINE_OWNER_PREDICATES: Inventory = {
   'routes/employments.ts': { employments: 9 },
   'routes/exposure.ts': { holdings: 2 },
   'routes/goals.ts': { goals: 3, savingsAccounts: 1 },
-  'routes/holdings.ts': { holdingPriceHistory: 1, holdingTransactions: 2, holdings: 5 },
+  'routes/holdings.ts': { holdingPriceHistory: 1, holdingTransactions: 1, holdings: 5 },
   'routes/partner.ts': { mortgages: 1, properties: 1, savingsAccounts: 1 },
   'routes/pension-imports.ts': {
     pensionPots: 2,
-    pensionStatementImports: 3,
+    pensionStatementImports: 4,
     pensionTransactions: 1,
   },
   'routes/pensions.ts': { pensionPots: 3, pensionTransactions: 12 },
