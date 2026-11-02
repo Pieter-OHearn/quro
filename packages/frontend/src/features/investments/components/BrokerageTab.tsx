@@ -212,7 +212,7 @@ function buildClosedHoldingColumns(
   ];
 }
 
-function computeHoldingRowMetrics(
+export function computeHoldingRowMetrics(
   holding: Holding,
   holdingTxns: readonly HoldingTransaction[],
   position: Position,

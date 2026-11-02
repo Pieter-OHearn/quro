@@ -431,7 +431,8 @@ function TxnRowActions({
 
 // Below 360px the row's edit and delete buttons fold into one menu button, so the row keeps one
 // line. The menu is a light-dismiss popover in the top layer (Escape or a tap outside closes
-// it), placed under the button, or above it near the bottom of the screen.
+// it), placed under the button, or above it near the bottom of the screen. It is fixed where it
+// opened, so scrolling the page closes it rather than leaving it behind.
 const MENU_GAP_PX = 4;
 const MENU_ROOM_PX = 112;
 const MENU_ITEM_CLASS_NAME =
@@ -455,6 +456,7 @@ function TxnRowActionsMenu({
   const anchorRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>();
+  const closeOnScroll = useRef<AbortController | null>(null);
   const choose = (action: () => void) => () => {
     menuRef.current?.hidePopover();
     action();
@@ -478,6 +480,15 @@ function TxnRowActionsMenu({
         onBeforeToggle={(event) => {
           const anchor = anchorRef.current;
           if (event.newState === 'open' && anchor) setMenuStyle(menuPosition(anchor));
+        }}
+        onToggle={(event) => {
+          closeOnScroll.current?.abort();
+          closeOnScroll.current = null;
+          if (event.newState !== 'open') return;
+          const controller = new AbortController();
+          closeOnScroll.current = controller;
+          const close = () => menuRef.current?.hidePopover();
+          window.addEventListener('scroll', close, { capture: true, signal: controller.signal });
         }}
         className="m-0 min-w-44 rounded-lg border border-border-default bg-surface p-1 text-fg shadow-popover"
       >
