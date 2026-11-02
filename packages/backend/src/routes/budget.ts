@@ -12,6 +12,7 @@ import {
   type BudgetMonth,
   type ExpenseClass,
   type CurrencyCode,
+  sumMoney,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
@@ -19,7 +20,7 @@ import { db, type DbTransaction } from '../db/client';
 import { budgetCategories, budgetTransactions, categoryMappings } from '../db/schema';
 import { getAuthUser } from '../lib/authUser';
 import { LEDGER_ROW_CHANGED, lockLedgerParents } from '../lib/ledgerWrite';
-import { isForeignKeyViolation } from '../lib/postgresErrors';
+import { isForeignKeyViolation, isUniqueViolation } from '../lib/postgresErrors';
 import { ledgerOrder, ledgerPosition, parseListPageQuery, readListPage } from '../lib/listPage';
 import { CATEGORY_PRESETS } from '../services/bunqCategoryRules';
 import {
@@ -263,6 +264,8 @@ function toBudgetTransactionUpdateValues(
   };
 }
 
+// `spent` is the amount entered for the category plus its transactions, exactly: a delete or an
+// edit reverses what its row added, never floored at zero, so no later write absorbs a difference.
 async function adjustCategorySpent(
   tx: DbTransaction,
   categoryId: number,
@@ -270,7 +273,7 @@ async function adjustCategorySpent(
 ): Promise<void> {
   await tx
     .update(budgetCategories)
-    .set({ spent: sql`GREATEST(0, ${budgetCategories.spent} + ${delta}::numeric)` })
+    .set({ spent: sql`${budgetCategories.spent} + ${delta}::numeric` })
     .where(eq(budgetCategories.id, categoryId));
 }
 
@@ -386,6 +389,18 @@ app.get('/categories/:id', async (c) => {
   return c.json({ data });
 });
 
+// A user's categories are unique by name within a month (`budget_categories_user_month_name_unique`).
+const DUPLICATE_CATEGORY = 'A category with this name already exists for that month';
+
+async function refuseDuplicateCategory<T>(write: () => Promise<T>): Promise<T | 'duplicate'> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isUniqueViolation(error)) return 'duplicate';
+    throw error;
+  }
+}
+
 app.post('/categories', async (c) => {
   const user = getAuthUser(c);
   const rawBody = await readJsonBody(c.req, 'Invalid budget category payload');
@@ -396,14 +411,17 @@ app.post('/categories', async (c) => {
   const lengths = await checkTextLimits(body.value, TEXT_FIELD_LIMITS.budgetCategory);
   if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .insert(budgetCategories)
-    .values({
-      ...toBudgetCategoryInsertValues(body.value, user.id),
-      ...(await normalizeBudgetCategoryMoney(body.value)),
-    })
-    .returning();
-  return c.json({ data }, HTTP_STATUS.CREATED);
+  const values = {
+    ...toBudgetCategoryInsertValues(body.value, user.id),
+    ...(await normalizeBudgetCategoryMoney(body.value)),
+  };
+  const inserted = await refuseDuplicateCategory(() =>
+    db.insert(budgetCategories).values(values).returning(),
+  );
+  if (inserted === 'duplicate') {
+    return c.json({ error: DUPLICATE_CATEGORY }, HTTP_STATUS.CONFLICT);
+  }
+  return c.json({ data: inserted[0] }, HTTP_STATUS.CREATED);
 });
 
 app.patch('/categories/:id', async (c) => {
@@ -424,14 +442,21 @@ app.patch('/categories/:id', async (c) => {
   );
   if (!lengths.ok) return c.json({ error: lengths.error }, HTTP_STATUS.BAD_REQUEST);
 
-  const [data] = await db
-    .update(budgetCategories)
-    .set({
-      ...toBudgetCategoryUpdateValues(body.value),
-      ...(await normalizeBudgetCategoryMoney(body.value)),
-    })
-    .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)))
-    .returning();
+  const values = {
+    ...toBudgetCategoryUpdateValues(body.value),
+    ...(await normalizeBudgetCategoryMoney(body.value)),
+  };
+  const updated = await refuseDuplicateCategory(() =>
+    db
+      .update(budgetCategories)
+      .set(values)
+      .where(and(eq(budgetCategories.id, id), eq(budgetCategories.userId, user.id)))
+      .returning(),
+  );
+  if (updated === 'duplicate') {
+    return c.json({ error: DUPLICATE_CATEGORY }, HTTP_STATUS.CONFLICT);
+  }
+  const [data] = updated;
   if (!data) return c.json({ error: 'Category not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data });
 });
@@ -595,7 +620,7 @@ app.patch('/transactions/:id', async (c) => {
       await adjustCategorySpent(tx, existing.categoryId, -existingAmount);
       await adjustCategorySpent(tx, nextCategoryId, nextAmount);
     } else if (nextAmount !== existingAmount) {
-      await adjustCategorySpent(tx, existing.categoryId, nextAmount - existingAmount);
+      await adjustCategorySpent(tx, existing.categoryId, sumMoney([nextAmount, -existingAmount]));
     }
     return updated;
   });

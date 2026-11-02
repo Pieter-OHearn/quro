@@ -70,6 +70,7 @@ type HoldingActivityRow = {
   holdingId: number;
   shares: unknown;
   price: unknown;
+  amount: unknown;
 };
 
 type MortgageActivityRow = ActivityRow & { mortgageId: number };
@@ -142,7 +143,7 @@ function mapHoldingTxn(row: HoldingActivityRow, currencyByHoldingId: ReadonlyMap
     return {
       name: row.note || 'Dividend',
       type: 'income' as const,
-      amount: Math.abs(toNumberOrZero(row.price)),
+      amount: Math.abs(toNumberOrZero(row.amount)),
       date: row.date,
       category: 'Investment',
       currency,

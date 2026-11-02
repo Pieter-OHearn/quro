@@ -2,6 +2,7 @@
 
 import { expect, test } from 'bun:test';
 import type { CurrencyCode, Payslip } from '@quro/shared';
+import { describeAnnualisedYears } from '../components/SalaryHistoryChart';
 import { buildBreakdownLines, computeSalaryMetrics, findPreviousPayslip } from './salary-data';
 
 const convertToEur = (amount: number, fromCurrency: CurrencyCode) => {
@@ -75,6 +76,53 @@ test('uses payslip net/gross for years that have payslips, falls back to history
     { year: '2025', gross: 60_000, net: 60_000 },
     { year: '2026', gross: 10_000, net: 7_600 },
   ]);
+});
+
+test('growth compares full years: partial payslip years are annualised by their months', () => {
+  // 2024: four months at 4,000 and a 2,000 bonus → 4,000 × 12 + 2,000 = 50,000 for a full year.
+  // 2025: twelve months at 4,500 → 54,000. 2026: three months at 5,000 → 60,000 for a full year.
+  const month = (year: number, index: number, gross: number, bonus: number | null = null) =>
+    createPayslip({
+      id: year * 100 + index,
+      date: `${year}-${String(index).padStart(2, '0')}-28`,
+      gross,
+      bonus,
+    });
+  const payslips = [
+    ...[9, 10, 11].map((index) => month(2024, index, 4_000)),
+    month(2024, 12, 4_000, 2_000),
+    ...Array.from({ length: 12 }, (_, index) => month(2025, index + 1, 4_500)),
+    ...[1, 2, 3].map((index) => month(2026, index, 5_000)),
+  ];
+  const metrics = computeSalaryMetrics([], payslips, [], convertToEur, 2026);
+
+  // The chart still shows what was paid in each year.
+  expect(metrics.salaryChartData.map((entry) => entry.gross)).toEqual([18_000, 54_000, 15_000]);
+  // Growth is 60,000 against 50,000, not 15,000 against 18,000 (a fall of 17%).
+  expect(metrics.salaryGrowth!.pct).toBeCloseTo(20, 10);
+  expect(metrics.salaryGrowth!.fromYear).toBe('2024');
+  expect(metrics.salaryGrowth!.annualised).toEqual([
+    { year: '2024', months: 4 },
+    { year: '2026', months: 3 },
+  ]);
+  expect(describeAnnualisedYears(metrics.salaryGrowth!)).toBe(
+    'Partial years are annualised from their payslips: 2024 from 4 months and 2026 from 3 months.',
+  );
+});
+
+test('growth between full years and salary history needs no annualising', () => {
+  const metrics = computeSalaryMetrics(
+    [],
+    [],
+    [
+      { year: 2024, annualSalary: 50_000, currency: 'EUR' },
+      { year: 2025, annualSalary: 55_000, currency: 'EUR' },
+    ],
+    convertToEur,
+    2026,
+  );
+  expect(metrics.salaryGrowth).toEqual({ pct: 10, fromYear: '2024', annualised: [] });
+  expect(describeAnnualisedYears(metrics.salaryGrowth!)).toBeNull();
 });
 
 test('lines read deductions as negative amounts and the change as a gain or a loss', () => {

@@ -545,3 +545,38 @@ What the operator does: nothing, unless a script or client of your own calls the
 - Property requests no longer accept `mortgage`, and responses carry `debt`, `totalEquity` and `equity` (see [property debt](household-model.md#property-debt)) instead of `mortgage`. Property transaction responses no longer carry `interest`, `principal`, `unappliedPrincipal`, `repaymentTarget` or `repaymentMortgageId`.
 - Mortgage requests no longer accept `propertyAddress` or `propertyValue`; responses read `linkedPropertyId`, `propertyAddress` and `propertyValue` from the linked property, and they are `null` for a mortgage without one.
 - A property valuation sets the property's `currentValue` from its date: at once when it is dated on or before today (UTC), otherwise when the daily net worth snapshot job runs on or after that date. While a valuation sets the value, a `PATCH` that sets a different `currentValue` answers `400`.
+
+### Upgrade from 1.0.0-rc.6 to the next release
+
+The next release stores a dividend's amount in its own money column. Until now a dividend kept the amount it paid in `holding_transactions.price`, the six-decimal column for a price per share. Migration `0047_holding_dividend_amount` adds `holding_transactions.amount` (`numeric(19,2)`), moves each dividend's amount there, leaves the dividend's `price` empty, and adds a check that a dividend has an amount and no price and that any other row has a price and no amount. No balance or total changes: dividends were already rounded to cents.
+
+What the operator does: take the backup of the general procedure first. 1.0.0-rc.6 refuses to run against the migrated database (`Status: ahead.`), so going back means [restoring that backup](#restore-the-snapshot-taken-before-the-upgrade). Before you upgrade, with 1.0.0-rc.6 still running, open the database (with the bundled one, `docker compose exec db psql -U quro_admin -d quro`) and run this read-only count:
+
+```sql
+SELECT
+  count(*) FILTER (WHERE type = 'dividend') AS dividends,
+  count(*) FILTER (WHERE type = 'dividend' AND price <> round(price, 2)) AS dividends_not_whole_cents
+FROM holding_transactions;
+```
+
+`dividends` is the number of rows the migration moves. If `dividends_not_whole_cents` is not 0, the migration will refuse, as below.
+
+#### When the migration refuses
+
+`quro migrate` stops with `Dividend amounts cannot move to their own column: holding transactions … are dividends of an amount that is not whole cents`, naming row ids only, and `Nothing was changed.` Such an amount can only come from an install that stored dividends before they were rounded on input. Pin the 1.0.0-rc.6 images again, open each named dividend on the Investments page, save its amount (the form rounds it to cents), and upgrade again.
+
+#### Figures that move
+
+What the operator does: nothing. These are corrections a user may notice after the upgrade.
+
+- A holding with a price entered by hand is valued at that price on the dashboard, in net worth, in the current snapshot and in the latest point of the net worth history and the portfolio chart, as it already was on its Investments row and in Exposure. The brokerage total on the Investments page is now the sum of its rows.
+- A budget category's spent amount is no longer floored at zero when a transaction is deleted or a bunq payment is revalued, so it stays the amount entered plus its transactions. A category whose spent amount was set by hand below its transactions can show a negative spent amount after a delete.
+- Salary growth compares full years: a year with fewer than twelve months of payslips is annualised from those months, and the chart says which years were.
+
+#### API changes
+
+What the operator does: nothing, unless a script or client of your own calls these endpoints.
+
+- `POST` and `PATCH /api/investments/holding-transactions` take a dividend's amount in `amount`; a dividend with a `price`, or a buy or sell with an `amount`, answers `400`. Responses carry `amount` (a number for a dividend, `null` otherwise), and a dividend's `price` is `null`. Changing a buy or sell into a dividend needs an `amount`, and a dividend into a buy or sell a `price`; the other one is not carried over.
+- Creating or renaming a budget category onto the name of another category in the same month answers `409` instead of `500`.
+- The bunq callback (`GET /api/bunq/oauth/callback`) holds the maintenance lock like a write request. While `quro backup` or `quro restore` runs it changes nothing and redirects to `/settings?bunq=paused`; start the connection again afterwards.

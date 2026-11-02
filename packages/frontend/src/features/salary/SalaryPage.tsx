@@ -88,7 +88,7 @@ function useSalaryPageState() {
     [payslips, activeYear, currentYear],
   );
 
-  const { annualGross, annualNet, annualTax, annualPension, salaryChartData, salaryGrowthPct } =
+  const { annualGross, annualNet, annualTax, annualPension, salaryChartData, salaryGrowth } =
     useMemo(
       () => computeSalaryMetrics(yearPayslips, payslips, salaryHistory, convertToBase, currentYear),
       [yearPayslips, payslips, salaryHistory, convertToBase, currentYear],
@@ -133,7 +133,7 @@ function useSalaryPageState() {
     currentYear,
     statCards,
     salaryChartData,
-    salaryGrowthPct,
+    salaryGrowth,
     yearPayslips,
     employments,
   };
@@ -192,7 +192,7 @@ function SalaryPageContent({
         <PayBreakdownPanel selected={state.selected} payslips={state.payslips} />
         <SalaryHistoryChart
           data={state.salaryChartData}
-          growthPct={state.salaryGrowthPct}
+          growth={state.salaryGrowth}
           fmtBase={state.fmtBase}
           baseCurrency={state.baseCurrency}
         />

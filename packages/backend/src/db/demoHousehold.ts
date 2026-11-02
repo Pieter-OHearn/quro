@@ -310,14 +310,10 @@ export const DEPOSIT_PROTECTION: Record<
 
 // ── Investments ──────────────────────────────────────────────────────────────
 
-type HoldingTransactionSpec = {
-  type: 'buy' | 'sell' | 'dividend';
-  /** Null for a dividend, whose `price` is the amount received. */
-  shares: number | null;
-  price: number;
-  date: string;
-  note: string;
-};
+/** A buy or sell has shares and a price per share; a dividend has the amount it paid. */
+type HoldingTransactionSpec =
+  | { type: 'buy' | 'sell'; shares: number; price: number; date: string; note: string }
+  | { type: 'dividend'; shares: null; amount: number; date: string; note: string };
 
 export type HoldingSpec = {
   key: string;
@@ -524,9 +520,9 @@ export const HOLDINGS: readonly HoldingSpec[] = [
       { type: 'buy', shares: 20, price: 90, date: '2025-02-03', note: 'Monthly plan' },
       { type: 'buy', shares: 15, price: 96.5, date: '2025-06-02', note: 'Monthly plan' },
       { type: 'buy', shares: 10, price: 105, date: '2025-11-03', note: 'Monthly plan' },
-      { type: 'dividend', shares: null, price: 36.8, date: '2025-12-15', note: 'Dividend' },
+      { type: 'dividend', shares: null, amount: 36.8, date: '2025-12-15', note: 'Dividend' },
       { type: 'sell', shares: 5, price: 109.5, date: '2026-04-01', note: 'Rebalancing' },
-      { type: 'dividend', shares: null, price: 41.25, date: '2026-06-15', note: 'Dividend' },
+      { type: 'dividend', shares: null, amount: 41.25, date: '2026-06-15', note: 'Dividend' },
     ],
     priceHistory: [
       ['2025-01-31', 88.2],
@@ -566,7 +562,7 @@ export const HOLDINGS: readonly HoldingSpec[] = [
     transactions: [
       { type: 'buy', shares: 10, price: 143, date: '2025-03-03', note: 'Lump sum' },
       { type: 'buy', shares: 6, price: 172, date: '2025-09-01', note: 'Lump sum' },
-      { type: 'dividend', shares: null, price: 8.4, date: '2026-03-25', note: 'Dividend' },
+      { type: 'dividend', shares: null, amount: 8.4, date: '2026-03-25', note: 'Dividend' },
       { type: 'sell', shares: 4, price: 190.5, date: '2026-05-04', note: 'Took some profit' },
     ],
     priceHistory: [
@@ -647,7 +643,7 @@ export const HOLDINGS: readonly HoldingSpec[] = [
     transactions: [
       { type: 'buy', shares: 40, price: 49.8, date: '2025-04-07', note: 'First purchase' },
       { type: 'buy', shares: 20, price: 52.6, date: '2026-01-12', note: 'Top-up' },
-      { type: 'dividend', shares: null, price: 62, date: '2026-03-20', note: 'Dividend' },
+      { type: 'dividend', shares: null, amount: 62, date: '2026-03-20', note: 'Dividend' },
     ],
     priceHistory: [
       ['2025-03-31', 49.1],

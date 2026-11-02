@@ -5,6 +5,7 @@ import {
   computeHoldingPosition,
   formatPercent,
   holdingValue,
+  holdingValuePrice,
   householdAmount,
   householdShare,
   isInvestmentPropertyType,
@@ -30,13 +31,17 @@ function seededRandom(seed: number) {
   return { next, int: (max: number) => Math.floor(next() * max) };
 }
 
+// `value` is a buy's or sell's price per share, or the amount a dividend paid.
 const trade = (
   id: number,
   type: string,
   shares: number | null,
-  price: number,
+  value: number,
   date = `2026-01-${String(id).padStart(2, '0')}`,
-): HoldingLedgerRow => ({ id, type, shares, price, date });
+): HoldingLedgerRow =>
+  type === 'dividend'
+    ? { id, type, shares, amount: value, date }
+    : { id, type, shares, price: value, date };
 
 describe('holding position', () => {
   test('golden positions of the shared fixture', () => {
@@ -141,6 +146,29 @@ describe('holding position', () => {
     expect(holdingValue(3.3333, 111.111111)).toBe(370.37); // 370.3703... not 3.3333 × 111.11
     expect(holdingValue(12, 50.123457)).toBe(601.48);
     expect(holdingValue(-5, 10)).toBe(0);
+  });
+});
+
+describe('holding value price', () => {
+  const now = new Date('2026-06-15T12:00:00Z');
+  const synced = { currentPrice: 50, priceUpdatedAt: '2026-06-14T16:00:00Z' };
+
+  test('a manual price wins over the synced one and is never stale', () => {
+    expect(holdingValuePrice({ ...synced, manualPrice: 61.5 }, now)).toEqual({
+      price: 61.5,
+      source: 'manual',
+      stale: false,
+    });
+    // A manual price of zero is a price; a non-numeric one falls back to the synced price.
+    expect(holdingValuePrice({ ...synced, manualPrice: 0 }, now).price).toBe(0);
+    expect(holdingValuePrice({ ...synced, manualPrice: 'n/a' }, now).source).toBe('synced');
+  });
+
+  test('a synced price is used, and marked stale after seven days', () => {
+    expect(holdingValuePrice(synced, now)).toEqual({ price: 50, source: 'synced', stale: false });
+    const old = { currentPrice: '50.5', priceUpdatedAt: new Date('2026-06-07T12:00:00Z') };
+    expect(holdingValuePrice(old, now)).toEqual({ price: 50.5, source: 'synced', stale: true });
+    expect(holdingValuePrice({ ...old, excludeFromSync: true }, now).stale).toBe(false);
   });
 });
 

@@ -140,7 +140,7 @@ The bunq integration is optional and runs inside the main backend process. There
 
 The Settings page starts OAuth by sending the browser to `/api/bunq/oauth/start`. The backend records a single-use OAuth attempt for the user and destination in `bunq_oauth_attempts` (only a hash of the random state is stored), sets the state in an HTTP-only `bunq_oauth_state` cookie for 10 minutes, and redirects to bunq's OAuth authorisation URL.
 
-bunq redirects back to `/api/bunq/oauth/callback`. The backend requires the state cookie to match the returned state, atomically consumes the recorded attempt, exchanges the authorisation code with `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI`, then upserts a row in `bunq_connections` with the returned access token. The frontend reads connection status through `GET /api/bunq/connection` and disconnects with `DELETE /api/bunq/connection`.
+bunq redirects back to `/api/bunq/oauth/callback`. The backend requires the state cookie to match the returned state, atomically consumes the recorded attempt, exchanges the authorisation code with `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET`, and `BUNQ_REDIRECT_URI`, then upserts a row in `bunq_connections` with the returned access token. The callback holds the maintenance lock in shared mode while it consumes the attempt and writes, like a write request: while `quro backup` or `quro restore` runs it changes nothing and returns to Settings with `bunq=paused`, which the page explains. The frontend reads connection status through `GET /api/bunq/connection` and disconnects with `DELETE /api/bunq/connection`.
 
 Manual sync endpoints are mounted under the same protected route group:
 
@@ -230,7 +230,7 @@ The frontend polls the import list and shows the import when `status = 'ready_fo
 
 **6. Commit**
 
-When the user confirms, the frontend calls `POST /api/pensions/imports/:id/commit`. The backend re-validates all non-deleted rows, checks for duplicates one final time, then in a single DB transaction:
+When the user confirms, the frontend calls `POST /api/pensions/imports/:id/commit`. The backend re-validates all non-deleted rows, checks that no other import of the same file (by SHA-256) is already committed to the pot, which is what the unique index on committed imports enforces, then in a single DB transaction:
 
 - Inserts each row as a real `pension_transactions` record.
 - For the mandatory `annual_statement` row, attaches the PDF document metadata (storage key, filename, size) inline on the transaction record.

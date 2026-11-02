@@ -238,7 +238,9 @@ async function seedHoldings(context: Context): Promise<void> {
         holdingId,
         type: transaction.type,
         shares: transaction.shares,
-        price: transaction.price,
+        ...(transaction.type === 'dividend'
+          ? { amount: transaction.amount }
+          : { price: transaction.price }),
         date: transaction.date,
         note: transaction.note,
       });

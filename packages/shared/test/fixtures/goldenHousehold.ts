@@ -70,18 +70,20 @@ export const GOLDEN_HOLDINGS: readonly Holding[] = [
 ];
 
 let nextTransactionId = 1;
+// `value` is a buy's or sell's price per share, or the amount a dividend paid.
 const trade = (
   holdingId: number,
   type: HoldingTransaction['type'],
   shares: number | null,
-  price: number,
+  value: number,
   date: string,
 ): HoldingTransaction => ({
   id: nextTransactionId++,
   holdingId,
   type,
   shares,
-  price,
+  price: type === 'dividend' ? null : value,
+  amount: type === 'dividend' ? value : null,
   date,
   note: '',
 });

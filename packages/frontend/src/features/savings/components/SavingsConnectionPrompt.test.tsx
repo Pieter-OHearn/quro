@@ -57,4 +57,13 @@ describe('SavingsConnectionPromptCard', () => {
     expect(errorMarkup).toContain('Could not connect bunq');
     expect(errorMarkup).toContain('Try connecting again');
   });
+
+  it('says a connection refused during a backup or restore was not saved', () => {
+    const markup = renderToStaticMarkup(
+      <SavingsConnectionOutcome outcome="paused" onDismiss={() => undefined} />,
+    );
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain('bunq was not connected');
+    expect(markup).toContain('being backed up or restored');
+  });
 });

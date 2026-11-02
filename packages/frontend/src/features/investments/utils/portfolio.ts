@@ -2,6 +2,7 @@ import {
   addMonthsUtc,
   computeHoldingPosition,
   EMPTY_HOLDING_POSITION,
+  holdingUnitPrice,
   holdingValue,
   monthEndUtc,
   monthStartUtc,
@@ -98,11 +99,13 @@ function resolveHoldingMarketPrice(
   return Number.isFinite(close) ? close : null;
 }
 
+// The current month values a holding at its value price (`holdingUnitPrice`), as the totals and
+// the dashboard do; a past month uses the close stored for it, then the latest trade.
 function computeBrokerageForMonth(
   holdings: Holding[],
   holdingTxnMap: Map<number, DatedHoldingTransaction[]>,
   holdingPriceMap: Map<number, DatedHoldingPriceHistoryEntry[]>,
-  cutoff: number,
+  { cutoff, isCurrent }: { cutoff: number; isCurrent: boolean },
   convertToBase: (value: number, currency: string) => number,
 ) {
   let isEstimated = false;
@@ -110,6 +113,12 @@ function computeBrokerageForMonth(
     holdings.map((holding) => {
       const txns = holdingTxnMap.get(holding.id) ?? [];
       const state = computeHoldingStateAtCutoff(txns, cutoff);
+      if (isCurrent) {
+        return convertToBase(
+          holdingValue(state.shares, holdingUnitPrice(holding)),
+          holding.currency,
+        );
+      }
       const marketPrice = resolveHoldingMarketPrice(holdingPriceMap.get(holding.id) ?? [], cutoff);
       const resolvedPrice =
         marketPrice ?? state.lastTradePrice ?? (state.avgCost > 0 ? state.avgCost : 0);
@@ -199,7 +208,7 @@ export function computePortfolioHistory(
       holdings,
       holdingTxnMap,
       holdingPriceMap,
-      cutoff,
+      { cutoff, isCurrent: month === currentMonthStart },
       convertToBase,
     );
     const propertyEquity = computePropertyEquityForMonth(

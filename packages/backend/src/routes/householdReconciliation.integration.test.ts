@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
 import {
+  holdingUnitPrice,
   holdingValue,
   householdShare,
   netHoldingShares,
@@ -40,6 +41,7 @@ type Components = {
 type Household = {
   owner: AuthSession;
   partner: AuthSession;
+  holdingId: number;
   ownerPrivateEur: number;
   partnerJointEur: number;
   mortgageId: number;
@@ -207,6 +209,7 @@ async function seedHousehold(): Promise<Household> {
   return {
     owner,
     partner,
+    holdingId: holding.id,
     ownerPrivateEur: ownerPrivateEur.id,
     partnerJointEur: partnerJointEur.id,
     mortgageId: mortgage.id,
@@ -220,10 +223,9 @@ async function pageTotals(session: AuthSession): Promise<Components> {
     session,
     '/api/savings/accounts',
   );
-  const holdings = await get<Array<Money & { id: number; currentPrice: number }>>(
-    session,
-    '/api/investments/holdings',
-  );
+  const holdings = await get<
+    Array<Money & { id: number; currentPrice: number; manualPrice: number | null }>
+  >(session, '/api/investments/holdings');
   const holdingValues: number[] = [];
   for (const holding of holdings) {
     const txns = await get<Array<{ type: string; shares: number }>>(
@@ -231,7 +233,7 @@ async function pageTotals(session: AuthSession): Promise<Components> {
       `/api/investments/holding-transactions?holdingId=${holding.id}`,
     );
     holdingValues.push(
-      holdingValue(netHoldingShares(txns), holding.currentPrice) * rate(holding.currency),
+      holdingValue(netHoldingShares(txns), holdingUnitPrice(holding)) * rate(holding.currency),
     );
   }
   // A property's equity comes from the API, already weighted by each side's household share.
@@ -268,7 +270,8 @@ async function databaseTotals(userId: number, partnerId: number): Promise<Compon
     select
       (select coalesce(sum(round(s.balance * ${jointShare('s')} * r.rate, 2)), 0) from savings_accounts s
         join ${rates} r on r.currency = s.currency::text where ${visible('s')})::text as savings,
-      (select coalesce(sum(round(round(greatest(0, coalesce(t.net, 0)) * h.current_price, 2) * r.rate, 2)), 0)
+      (select coalesce(sum(round(round(greatest(0, coalesce(t.net, 0))
+          * coalesce(h.manual_price, h.current_price), 2) * r.rate, 2)), 0)
         from holdings h join ${rates} r on r.currency = h.currency::text
         left join (select holding_id, sum(case type when 'buy' then shares when 'sell' then -shares
           else 0 end) as net from holding_transactions group by holding_id) t on t.holding_id = h.id
@@ -333,6 +336,9 @@ async function expectReconciled(session: AuthSession, otherId: number, expected:
   expect(cents(fromApi(dashboard.allocations))).toEqual(golden);
   const history = await get<Array<{ totalValue: number }>>(session, '/api/dashboard/net-worth');
   expect(toCents(history.at(-1)!.totalValue)).toBe(golden.netWorth);
+  // Exposure values the holdings at the same price: its total is the brokerage figure.
+  const exposure = await get<{ view: { totalValue: number } }>(session, '/api/exposure');
+  expect(toCents(exposure.view.totalValue)).toBe(golden.brokerage);
 
   // A stored snapshot keeps each component and the total in whole cents: the components add up to
   // the total exactly, and the total matches the live figure.
@@ -426,6 +432,24 @@ describe('golden household totals reconcile across the API, the pages and the da
 
     // Deleting it restores the state before the deposit exactly.
     await read(await send(household.owner, 'DELETE', `/api/savings/transactions/${deposit.id}`));
+    await expectBoth(afterRepayment.owner, afterRepayment.partner);
+  });
+
+  test('a manual price values the holding at that price in every total', async () => {
+    const afterRepayment = {
+      owner: plus(OWNER_BASELINE, { propertyEquity: 500 }),
+      partner: plus(PARTNER_BASELINE, { propertyEquity: 500 }),
+    };
+    // 12 shares at a manual USD 60.125 instead of the synced 50: 721.50 USD, 663.78 EUR.
+    const path = `/api/investments/holdings/${household.holdingId}`;
+    await read(await send(household.owner, 'PATCH', path, { manualPrice: 60.125 }));
+    await expectBoth(
+      plus(afterRepayment.owner, { brokerage: 663.78 - 552 }),
+      afterRepayment.partner,
+    );
+
+    // Clearing it returns every total to the synced price.
+    await read(await send(household.owner, 'PATCH', path, { manualPrice: null }));
     await expectBoth(afterRepayment.owner, afterRepayment.partner);
   });
 });

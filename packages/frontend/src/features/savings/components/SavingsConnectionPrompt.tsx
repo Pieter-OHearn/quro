@@ -102,6 +102,22 @@ export function SavingsConnectionPromptView({
   return <SavingsConnectionPromptCard {...cardProps} />;
 }
 
+const OUTCOME_TEXT: Record<BunqOAuthOutcome, { title: string; detail: string }> = {
+  connected: {
+    title: 'bunq connected',
+    detail: 'Your savings balances and transactions will now update automatically.',
+  },
+  error: {
+    title: 'Could not connect bunq',
+    detail: 'Nothing was changed. Try connecting again when you are ready.',
+  },
+  paused: {
+    title: 'bunq was not connected',
+    detail:
+      'Quro is being backed up or restored, so changes are paused. Nothing was changed. Try connecting again in a minute.',
+  },
+};
+
 type SavingsConnectionOutcomeProps = {
   className?: string;
   outcome: BunqOAuthOutcome;
@@ -128,12 +144,8 @@ export function SavingsConnectionOutcome({
     >
       <Icon size={16} className="mt-0.5 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">{connected ? 'bunq connected' : 'Could not connect bunq'}</p>
-        <p className="mt-0.5 text-fg-muted">
-          {connected
-            ? 'Your savings balances and transactions will now update automatically.'
-            : 'Nothing was changed. Try connecting again when you are ready.'}
-        </p>
+        <p className="font-semibold">{OUTCOME_TEXT[outcome].title}</p>
+        <p className="mt-0.5 text-fg-muted">{OUTCOME_TEXT[outcome].detail}</p>
       </div>
       <IconButton
         icon={X}

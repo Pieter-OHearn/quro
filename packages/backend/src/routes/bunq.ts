@@ -24,13 +24,14 @@ import { syncBunqBudget } from '../services/bunqBudgetSync';
 import { syncBunqSavings } from '../services/bunqSavingsSync';
 import { secureCookiesEnabled } from '../lib/sessions';
 import { log, errorFields } from '../lib/logger';
+import { runUnlessMaintenance, type MaintenanceOutcome } from '../lib/maintenanceMode';
 
 const app = new Hono();
 
 export const STATE_COOKIE = 'bunq_oauth_state';
 const STATE_MAX_AGE_SECONDS = OAUTH_ATTEMPT_TTL_MS / 1000;
 
-type BunqOAuthStatus = 'connected' | 'error';
+type BunqOAuthStatus = 'connected' | 'error' | 'paused';
 
 function resolveOAuthDestination(value: string | undefined): BunqOAuthDestination {
   return value === 'savings' ? 'savings' : 'settings';
@@ -101,8 +102,7 @@ app.get('/oauth/callback', async (c) => {
   const storedState = getCookie(c, STATE_COOKIE);
   const queryState = c.req.query('state');
   const code = c.req.query('code');
-  const fail = (destination: BunqOAuthDestination = 'settings') =>
-    c.redirect(buildFrontendRedirect(config.frontendOrigin, destination, 'error'));
+  const fail = () => c.redirect(buildFrontendRedirect(config.frontendOrigin, 'settings', 'error'));
 
   deleteCookie(c, STATE_COOKIE, { path: '/' });
 
@@ -113,8 +113,28 @@ app.get('/oauth/callback', async (c) => {
   // bunq token on the attacker's Quro account.
   if (!storedState || storedState !== queryState) return fail();
 
-  const attempt = await consumeOAuthAttempt(queryState);
-  if (attempt === null) return fail();
+  // The callback is a GET, so the write gate does not see it, yet it writes: it holds the
+  // maintenance lock in shared mode like a write request. While `quro backup` or `quro restore`
+  // runs it consumes and writes nothing, and the browser returns with `bunq=paused`.
+  let outcome: MaintenanceOutcome<OAuthResult>;
+  try {
+    outcome = await runUnlessMaintenance(() => completeOAuthCallback(queryState, code));
+  } catch (e) {
+    logBunqError('bunq.oauth_callback_failed', e);
+    return fail();
+  }
+  if (!outcome.ran) {
+    return c.redirect(buildFrontendRedirect(config.frontendOrigin, 'settings', 'paused'));
+  }
+  const { destination, status } = outcome.value;
+  return c.redirect(buildFrontendRedirect(config.frontendOrigin, destination, status));
+});
+
+type OAuthResult = { destination: BunqOAuthDestination; status: BunqOAuthStatus };
+
+async function completeOAuthCallback(state: string, code: string): Promise<OAuthResult> {
+  const attempt = await consumeOAuthAttempt(state);
+  if (attempt === null) return { destination: 'settings', status: 'error' };
   const { userId, destination } = attempt;
 
   try {
@@ -148,12 +168,12 @@ app.get('/oauth/callback', async (c) => {
       await tx.delete(bunqPaymentProgress).where(eq(bunqPaymentProgress.userId, userId));
     });
 
-    return c.redirect(buildFrontendRedirect(config.frontendOrigin, destination, 'connected'));
+    return { destination, status: 'connected' };
   } catch (e) {
     logBunqError('bunq.oauth_callback_failed', e);
-    return fail(destination);
+    return { destination, status: 'error' };
   }
-});
+}
 
 app.get('/connection', async (c) => {
   const user = getAuthUser(c);

@@ -25,7 +25,8 @@ this calculation calls a model or a service, and nothing leaves the instance.
 - Holdings are private to their owner. A holding has no joint flag, so an accepted partner's
   holdings never appear in a person's exposure, and theirs never appear in the partner's.
 - A holding is worth its shares times the price in use, rounded to cents (`holdingValue`). The price
-  in use is the manual price when one is set, otherwise the synced price. The value is converted to
+  in use is the manual price when one is set, otherwise the synced price (`holdingValuePrice`, the
+  rule every current figure uses, so the total matches the dashboard's brokerage figure). The value is converted to
   EUR with the stored exchange rate and rounded to cents once; totals are sums of cents (`sumMoney`
   rules). Aggregation is always in EUR on the backend; the web app converts a EUR figure once, to
   the display currency. Native values are shown beside converted ones.

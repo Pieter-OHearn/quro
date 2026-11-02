@@ -5,6 +5,8 @@ import { db } from '../db/client';
 import {
   budgetCategories,
   debts,
+  holdingTransactions,
+  holdings,
   mortgages,
   pensionPots,
   pensionStatementImportRows,
@@ -207,6 +209,78 @@ test('budget: creating, editing, moving and deleting transactions returns spendi
   expect(await spent(dining.id)).toBe(0);
 });
 
+test('budget: spent stays its entered amount plus its transactions, never floored at zero', async () => {
+  const owner = await integration.signUp('unclamped-budget');
+  const categoryPath = (id: number) => `/api/budget/categories/${id}`;
+  const food = await created<{ id: number }>(
+    await post(owner, '/api/budget/categories', {
+      name: 'Unclamped food',
+      emoji: 'B',
+      budgeted: 100,
+      spent: 0,
+      color: '#f59e0b',
+      month: 'Mar',
+      year: 2026,
+    }),
+  );
+  const spent = async () => {
+    const [row] = await db.select().from(budgetCategories).where(eq(budgetCategories.id, food.id));
+    return toCents(row!.spent);
+  };
+  const shop = await created<{ id: number }>(
+    await post(owner, '/api/budget/transactions', {
+      categoryId: food.id,
+      description: 'Shop',
+      amount: 40,
+      date: DATE,
+      merchant: 'Synthetic Market',
+    }),
+  );
+  // Spent set by hand below the transactions: the entered amount is now 10 - 40 = -30.
+  await expectStatus(await patch(owner, categoryPath(food.id), { spent: 10 }), 200);
+  await expectStatus(await remove(owner, `/api/budget/transactions/${shop.id}`), 200);
+  expect(await spent()).toBe(-3000);
+  // Adding the same spending back restores what was entered, instead of absorbing 30.
+  await created(
+    await post(owner, '/api/budget/transactions', {
+      categoryId: food.id,
+      description: 'Shop again',
+      amount: 40,
+      date: DATE,
+      merchant: 'Synthetic Market',
+    }),
+  );
+  expect(await spent()).toBe(1000);
+});
+
+test('budget: a second category of the same name and month is answered 409', async () => {
+  const owner = await integration.signUp('duplicate-category');
+  const category = (name: string, month: string) =>
+    post(owner, '/api/budget/categories', {
+      name,
+      emoji: 'B',
+      budgeted: 100,
+      spent: 0,
+      color: '#f59e0b',
+      month,
+      year: 2026,
+    });
+  await created(await category('Groceries', 'Mar'));
+  const april = await created<{ id: number }>(await category('Groceries', 'Apr'));
+  const other = await created<{ id: number }>(await category('Dining', 'Mar'));
+
+  const duplicate = await category('Groceries', 'Mar');
+  expect(duplicate.status).toBe(409);
+  expect(((await duplicate.json()) as { error: string }).error).toBe(
+    'A category with this name already exists for that month',
+  );
+  // Renaming or moving another category onto it is refused the same way.
+  const renamed = await patch(owner, `/api/budget/categories/${other.id}`, { name: 'Groceries' });
+  expect(renamed.status).toBe(409);
+  const moved = await patch(owner, `/api/budget/categories/${april.id}`, { month: 'Mar' });
+  expect(moved.status).toBe(409);
+});
+
 describe('a property valuation sets the current value', () => {
   const valuation = (propertyId: number, amount: number, date: string) => ({
     propertyId,
@@ -388,6 +462,72 @@ test('a cascade archive of a mortgage and an edit of its repayment do not deadlo
   expect(await db.select().from(mortgages).where(eq(mortgages.id, mortgage.id))).toHaveLength(0);
 });
 
+test('a holding deleted while its ledger is written refuses the write with 404', async () => {
+  const owner = await integration.signUp('holding-archive-vs-write');
+  const holding = async (name: string) =>
+    created<{ id: number }>(
+      await post(owner, '/api/investments/holdings', {
+        name,
+        ticker: name.toUpperCase(),
+        currentPrice: 10,
+        currency: 'EUR',
+        sector: 'Index',
+        excludeFromSync: true,
+      }),
+    );
+  const kept = await holding('Kept');
+  const deleted = await holding('Gone');
+  const trade = await created<{ id: number }>(
+    await post(owner, '/api/investments/holding-transactions', {
+      holdingId: kept.id,
+      type: 'buy',
+      shares: 2,
+      price: 10,
+      date: DATE,
+    }),
+  );
+
+  // A cascade archive of the second holding has deleted it but not committed yet. A trade added
+  // to it and a trade moved onto it wait for it, then find the holding gone.
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let removing!: () => void;
+  const removed = new Promise<void>((resolve) => {
+    removing = resolve;
+  });
+  const archive = db.transaction(async (tx) => {
+    await tx.delete(holdings).where(eq(holdings.id, deleted.id));
+    removing();
+    await released;
+  });
+  await removed;
+
+  const create = post(owner, '/api/investments/holding-transactions', {
+    holdingId: deleted.id,
+    type: 'buy',
+    shares: 1,
+    price: 10,
+    date: DATE,
+  });
+  const move = patch(owner, `/api/investments/holding-transactions/${trade.id}`, {
+    holdingId: deleted.id,
+  });
+  await waitForLockWaiters(2);
+  release();
+  await archive;
+
+  const [createdResponse, moved] = await Promise.all([create, move]);
+  expect(createdResponse.status).toBe(404);
+  expect(moved.status).toBe(404);
+  const ledger = await db
+    .select({ holdingId: holdingTransactions.holdingId })
+    .from(holdingTransactions)
+    .where(eq(holdingTransactions.userId, owner.user.id));
+  expect(ledger).toEqual([{ holdingId: kept.id }]);
+});
+
 describe('two imports of one pension statement', () => {
   async function seedImport(owner: AuthSession, potId: number, hash: string, periodEnd: string) {
     const [record] = await db
@@ -461,5 +601,36 @@ describe('two imports of one pension statement', () => {
       .from(pensionStatementImports)
       .where(eq(pensionStatementImports.potId, pot.id));
     expect(statuses.map((entry) => entry.status).sort()).toEqual(['committed', 'ready_for_review']);
+  });
+
+  test('one in review does not block the other: only a committed one does', async () => {
+    const owner = await integration.signUp('duplicate-import-review');
+    const pot = await created<{ id: number }>(
+      await post(owner, '/api/pensions/pots', {
+        name: 'Reviewed pension',
+        provider: 'Synthetic Provider',
+        type: 'Workplace Pension',
+        balance: 1000,
+        currency: 'EUR',
+        employeeMonthly: 0,
+        employerMonthly: 0,
+        investmentStrategy: 'Balanced',
+        color: '#1d4ed8',
+        emoji: 'R',
+      }),
+    );
+    // Two uploads of the same file, read with the same period, both waiting for review.
+    const hash = crypto.randomUUID().replaceAll('-', '');
+    const first = await seedImport(owner, pot.id, hash, '2025-12-31');
+    const second = await seedImport(owner, pot.id, hash, '2025-12-31');
+
+    await expectStatus(await post(owner, `/api/pensions/imports/${first}/commit`, {}), 200);
+    const repeated = await post(owner, `/api/pensions/imports/${second}/commit`, {});
+    expect(repeated.status).toBe(409);
+    const ledger = await db
+      .select()
+      .from(pensionTransactions)
+      .where(eq(pensionTransactions.potId, pot.id));
+    expect(ledger).toHaveLength(2);
   });
 });

@@ -1,12 +1,11 @@
 /// <reference types="bun-types" />
 
 import { expect, test } from 'bun:test';
-import { unitPriceDecimals, type Holding } from '@quro/shared';
+import { holdingUnitPrice, unitPriceDecimals, type Holding } from '@quro/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildPositionMeasures,
   describePriceSource,
-  getEffectivePrice,
   HoldingPositionTable,
 } from './HoldingPositionPanel';
 import type { Position } from '../utils/position';
@@ -114,7 +113,7 @@ test('the unrealized gain keeps its sign and a loss reads as a loss in both curr
 test('rows use the manual price over the synced one and flag it', () => {
   const manual = { ...holding, manualPrice: 20 };
 
-  expect(getEffectivePrice(manual)).toBe(20);
+  expect(holdingUnitPrice(manual)).toBe(20);
   expect(buildPositionMeasures(manual, position)[0].value).toBe(20);
   expect(render({ manualPrice: 20 })).toContain('Manual price');
   expect(describePriceSource(manual, fmtPrice)).toBe(

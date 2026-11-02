@@ -13,11 +13,12 @@ import {
 } from '@/lib/chartStyles';
 import type { TooltipContentProps } from 'recharts';
 import type { FmtFn, SalaryChartEntry } from '../types';
+import type { SalaryGrowth } from '../utils/salary-data';
 import { formatPercent } from '@quro/shared';
 
 type SalaryHistoryChartProps = {
   data: readonly SalaryChartEntry[];
-  growthPct: number;
+  growth: SalaryGrowth | null;
   fmtBase: FmtFn;
   baseCurrency: string;
 };
@@ -56,15 +57,25 @@ function SalaryChartLegend() {
   );
 }
 
+/** Names the partial years a growth figure scaled to twelve months, or null when none. */
+export function describeAnnualisedYears(growth: SalaryGrowth): string | null {
+  if (growth.annualised.length === 0) return null;
+  const years = growth.annualised
+    .map(({ year, months }) => `${year} from ${months} ${months === 1 ? 'month' : 'months'}`)
+    .join(' and ');
+  return `Partial years are annualised from their payslips: ${years}.`;
+}
+
 export function SalaryHistoryChart({
   data,
-  growthPct,
+  growth,
   fmtBase,
   baseCurrency,
 }: Readonly<SalaryHistoryChartProps>) {
   const { numberFormat } = useCurrency();
   const motion = useChartMotion();
   const chartData = data.map((entry) => ({ ...entry, deductions: entry.gross - entry.net }));
+  const annualisedNote = growth ? describeAnnualisedYears(growth) : null;
 
   return (
     <ChartCard
@@ -86,13 +97,14 @@ export function SalaryHistoryChart({
       footer={
         <>
           <SalaryChartLegend />
-          {growthPct > 0 ? (
+          {growth && growth.pct > 0 ? (
             <p className="mt-2 border-t border-border-subtle pt-2 text-caption text-fg-muted">
               Salary has grown by{' '}
               <span className="font-medium font-numeric text-gain">
-                +{formatPercent(growthPct, numberFormat, 0)}
+                +{formatPercent(growth.pct, numberFormat, 0)}
               </span>{' '}
-              since {data[0].year}
+              since {growth.fromYear}
+              {annualisedNote ? `. ${annualisedNote}` : null}
             </p>
           ) : null}
         </>

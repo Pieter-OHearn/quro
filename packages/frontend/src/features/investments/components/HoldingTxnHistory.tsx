@@ -18,9 +18,10 @@ type HoldingTxnHistoryProps = {
 
 /** Buys move money out, sells and income move money in. */
 function signedHoldingCashflow(transaction: HoldingTransaction): number {
-  if (transaction.type === 'buy') return -holdingValue(transaction.shares ?? 0, transaction.price);
-  if (transaction.type === 'sell') return holdingValue(transaction.shares ?? 0, transaction.price);
-  return transaction.price;
+  const price = transaction.price ?? 0;
+  if (transaction.type === 'buy') return -holdingValue(transaction.shares ?? 0, price);
+  if (transaction.type === 'sell') return holdingValue(transaction.shares ?? 0, price);
+  return transaction.amount ?? 0;
 }
 
 export function HoldingTxnHistory({
@@ -68,7 +69,7 @@ export function HoldingTxnHistory({
         const meta = txnMeta[transaction.type as HoldingTxnType];
         const isTrade = transaction.type === 'buy' || transaction.type === 'sell';
         const trade = isTrade
-          ? ` · ${transaction.shares ?? 0} @ ${fmtPrice(transaction.price, holding.currency)}`
+          ? ` · ${transaction.shares ?? 0} @ ${fmtPrice(transaction.price ?? 0, holding.currency)}`
           : '';
         return (
           <TxnRow

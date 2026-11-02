@@ -27,8 +27,9 @@ export function shouldShowSavingsConnectionPrompt({
   return userId !== undefined && !isLoading && !isError && !hasConnection && dismissed === false;
 }
 
-export type BunqOAuthOutcome = 'connected' | 'error';
+/** `paused`: a backup or restore was running, so the connection was not saved. */
+export type BunqOAuthOutcome = 'connected' | 'error' | 'paused';
 
 export function resolveBunqOAuthOutcome(value: string | null): BunqOAuthOutcome | null {
-  return value === 'connected' || value === 'error' ? value : null;
+  return value === 'connected' || value === 'error' || value === 'paused' ? value : null;
 }

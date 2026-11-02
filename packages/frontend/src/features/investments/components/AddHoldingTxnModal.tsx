@@ -418,6 +418,12 @@ function computeRealizedGainEstimate(
   return sumMoney([next.realizedGain, -currentPosition.realizedGain]);
 }
 
+// One field takes a buy's or sell's price per share, or the amount a dividend paid.
+function storedTxnValue(existing: HoldingTransaction | undefined): string {
+  if (existing == null) return '';
+  return String(existing.type === 'dividend' ? existing.amount : existing.price);
+}
+
 function buildInitialHoldingTxnValues(
   existing: HoldingTransaction | undefined,
 ): InitialHoldingTxnFormValues {
@@ -425,7 +431,7 @@ function buildInitialHoldingTxnValues(
   return {
     type: existing?.type ?? 'buy',
     shares: existing?.shares != null ? String(existing.shares) : '',
-    price: existing != null ? String(existing.price) : '',
+    price: storedTxnValue(existing),
     date: existing?.date ?? today,
     note: existing?.note ?? '',
   };
@@ -504,11 +510,13 @@ function buildHoldingTxnSaveHandler(
       form.setError(validationError);
       return;
     }
+    const dividend = form.type === 'dividend';
     const payload = {
       holdingId: holding.id,
       type: form.type,
-      shares: form.type === 'buy' || form.type === 'sell' ? form.parsedShares : null,
-      price: form.parsedPrice,
+      shares: dividend ? null : form.parsedShares,
+      price: dividend ? null : form.parsedPrice,
+      amount: dividend ? form.parsedPrice : null,
       date: form.date,
       note: form.note,
     };
