@@ -355,12 +355,12 @@ function secretsCheckFor(report: SecretsReport, keyId: string | null): DoctorChe
     case 'unencrypted':
       return warn(
         'secrets',
-        `${counts.unencrypted} of ${counts.total} bank-link secret(s) are stored unencrypted. ${keyId ? 'Run `quro secrets encrypt`.' : 'Set QRO_SECRETS_KEY_FILE, then run `quro secrets encrypt`.'}`,
+        `${counts.unencrypted} of ${counts.total} bank-link secret(s) are stored unencrypted, which Quro does not read. Have users ${report.reconnectUserIds.join(', ')} connect bunq again in Settings.`,
       );
     default:
       // This container has no key, so it cannot tell a wrong key from a missing one: the server's
       // own settings check decides whether bunq can run.
-      if (!keyId && counts.unreadable === 0) {
+      if (!keyId && counts.unreadable === 0 && counts.unencrypted === 0) {
         return warn(
           'secrets',
           `${counts.unknownKey} bank-link secret(s) are encrypted with key ${report.unknownKeyIds.join(', ')}, and no secrets key is configured here, so they were not checked. Mount the key file to check them.`,
@@ -369,7 +369,7 @@ function secretsCheckFor(report: SecretsReport, keyId: string | null): DoctorChe
       return fail(
         'secrets',
         'failed',
-        `${counts.unknownKey + counts.unreadable} of ${counts.total} bank-link secret(s) cannot be opened with ${keyText} (users ${report.reconnectUserIds.join(', ')}). Configure the key they were encrypted with, or have those users connect bunq again. \`quro secrets status\` shows the details.`,
+        `${counts.unknownKey + counts.unreadable + counts.unencrypted} of ${counts.total} bank-link secret(s) cannot be opened with ${keyText} (users ${report.reconnectUserIds.join(', ')}). Configure the key they were encrypted with, or have those users connect bunq again. \`quro secrets status\` shows the details.`,
       );
   }
 }

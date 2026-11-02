@@ -44,7 +44,7 @@ One archive is one file. It is a tar file (`.tar`), or an encrypted one (`.tar.e
 
 The manifest records this split under `secrets`. Treat every archive as sensitive: the dump holds your financial records and password hashes. Unencrypted archives are written readable by their owner only.
 
-The bank-link tokens and keys of connected bunq accounts are in the dump only in encrypted form ([integration secrets](security.md#integration-secrets)). The manifest records the key id of the secrets key that encrypted them, and `quro backup` prints it: `Bank-link secrets: encrypted with secrets key <key id>`. Keep that key file for as long as you keep the archive. `quro secrets status` prints the key id of the key an instance has, so you can tell which file belongs to which archive; after a [key rotation](security.md#rotate-the-secrets-key), older archives need the old key. A restore without the matching key still restores everything; the users then connect bunq again in **Settings**.
+The bank-link tokens and keys of connected bunq accounts are in the dump only in encrypted form ([integration secrets](security.md#integration-secrets)). The manifest records the key id of the secrets key that encrypted them, and `quro backup` prints it: `Bank-link secrets: encrypted with secrets key <key id>`. Keep that key file for as long as you keep the archive. `quro secrets status` prints the key id of the key an instance has, so you can tell which file belongs to which archive; after a [key rotation](security.md#rotate-the-secrets-key), older archives need the old key. A restore without the matching key still restores everything; the users then connect bunq again in **Settings**. Restoring an archive that holds unencrypted bank-link secrets, which `quro backup` warns about, is not supported: Quro does not read them, so those users connect bunq again too.
 
 ## How a backup stays consistent
 
@@ -243,7 +243,7 @@ If something is wrong, restore the pre-restore archive the command wrote, with t
 
 Restore your latest archive on another machine, or into a second install directory with its own `compose.yaml` (change the project `name:` and the published port), following [Restore on a new machine](#restore-on-a-new-machine) and [Verify a restore](#verify-a-restore). Do it once now and after every upgrade.
 
-The project runs the same rehearsal on every change: `scripts/recovery-drill.sh` (the `Recovery Drill` CI job) builds a synthetic instance with the demo seed, a partner with a joint and a private account, ledgers and uploaded PDFs, backs it up with `quro backup`, checks that missing, damaged, cut-off, wrong-key and newer-release archives are refused without changes, restores into an isolated PostgreSQL and documents volume, and compares every table, the ledger totals, the runtime role's privileges, every document's SHA-256, and sign-in and downloads through the API. It also takes a backup while a client keeps writing and checks retention and a restore over existing data. A synthetic bunq connection is encrypted with `quro secrets encrypt` before the backup; the drill checks that neither the database nor the archive's dump contains its plaintext, that the restored connection opens with the key, and that without the key the restore still succeeds, `quro secrets status` reports the missing key, and a sync asks the user to reconnect instead of failing. Run it with Docker:
+The project runs the same rehearsal on every change: `scripts/recovery-drill.sh` (the `Recovery Drill` CI job) builds a synthetic instance with the demo seed, a partner with a joint and a private account, ledgers and uploaded PDFs, backs it up with `quro backup`, checks that missing, damaged, cut-off, wrong-key and newer-release archives are refused without changes, restores into an isolated PostgreSQL and documents volume, and compares every table, the ledger totals, the runtime role's privileges, every document's SHA-256, and sign-in and downloads through the API. It also takes a backup while a client keeps writing and checks retention and a restore over existing data. A synthetic bunq connection is stored encrypted with the secrets key before the backup; the drill checks that neither the database nor the archive's dump contains its plaintext, that the restored connection opens with the key, and that without the key the restore still succeeds, `quro secrets status` reports the missing key, and a sync asks the user to reconnect instead of failing. Run it with Docker:
 
 ```bash
 sh scripts/recovery-drill.sh
@@ -274,29 +274,16 @@ Limits:
 - Backup and restore are tested on PostgreSQL 18, the only supported server, and refuse any other major with exit code 3 before they pause changes or write anything. The drill passes on 18.6.
 - Not measured: amd64, a Raspberry Pi or a NAS, network storage for the documents or the off-device directory, and restoring an S3 bucket.
 
-## Restore a database dump
-
-Files that end in `.dump` are bare PostgreSQL dumps: from the `db-tools backup` command of earlier releases, from `bun run db:backup`, or from `pg_dump` in the database container before an upgrade. `quro restore` does not take them. Restore one with the older command, which keeps the same confirmation guards and writes a `-pre-restore.dump` into `./backups/db` before it overwrites data. Put the dump into `./backups`, then:
-
-```bash
-docker compose stop backend
-docker compose run --rm -e QRO_RESTORE_CONFIRM=restore-db --entrypoint bun \
-  migrate run db:restore -- /var/lib/quro/backups/<dump-file>.dump
-```
-
-Add `-e QRO_RESTORE_ALLOW_NON_EMPTY=1` to restore over data. A dump does not contain the documents; put back the documents directory from the copy you took with it. A dump from an earlier release goes into a new, empty database before `quro migrate` runs: start only the database (`docker compose up -d --wait db`), restore, then start Quro. Restoring it over a database the newer release has migrated stops without changes. In the Compose stack of this repository the same command is `docker compose --profile maintenance run --rm -e QRO_RESTORE_CONFIRM=restore-db db-tools restore backups/db/<dump-file>.dump`.
-
 ## Compose stack of this repository
 
-The `docker-compose.yml` in a checkout runs the same commands through its `db-tools` service (profile `maintenance`), whose volumes map `./backups` and `./data/documents`, and keeps settings in `.env` and secrets in `secrets/*.txt`. Read the commands above with these changes:
+The `docker-compose.yml` in a checkout runs the same commands through its `migrate` service, whose volumes map `./backups` and `./data/documents`, and keeps settings in `.env` and secrets in `secrets/*.txt`. Read the commands above with these changes:
 
-| In the commands above                                   | In the repository stack                                                           |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `docker compose run --rm migrate backup` (or `restore`) | `docker compose --profile maintenance run --rm --entrypoint quro db-tools backup` |
-| `compose.yaml`, service `migrate` in the override file  | `docker-compose.yml`, service `db-tools`                                          |
-| `config/secrets/backup_encryption_key`                  | `secrets/backup_encryption_key.txt`                                               |
-| `docker compose stop backend`                           | `docker compose stop backend pension-import-worker`                               |
-| Migrations after a restore                              | `docker compose run --rm migrate`, then `docker compose up -d`                    |
+| In the commands above                                  | In the repository stack                                        |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| `compose.yaml`, service `migrate` in the override file | `docker-compose.yml`, service `migrate` in the override file   |
+| `config/secrets/backup_encryption_key`                 | `secrets/backup_encryption_key.txt`                            |
+| `docker compose stop backend`                          | `docker compose stop backend pension-import-worker`            |
+| Migrations after a restore                             | `docker compose run --rm migrate`, then `docker compose up -d` |
 
 ## Without Compose
 

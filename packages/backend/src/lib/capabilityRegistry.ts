@@ -4,8 +4,8 @@ import { BUNQ_UNAVAILABLE_MESSAGE } from './bunqConfig';
 
 // The registry is the single source of truth for optional features. Each entry answers one
 // question from configuration alone: is this feature switched on? The application wires routes
-// and schedulers to those answers (src/app.ts), `GET /api/capabilities` reports them (merged with
-// runtime state such as the import worker's heartbeat), and `quro doctor` reads the same list.
+// and schedulers to those answers (src/app.ts), and `GET /api/capabilities` reports them (merged
+// with runtime state such as the import worker's heartbeat).
 // Each entry also says how far it is supported: `stable`, or `experimental` for a feature that may
 // change or go away in a minor release. Settings shows both to the user.
 
@@ -85,14 +85,4 @@ export function enabledCapabilities(config: Config = getConfig()): ReadonlySet<C
       (capability) => capability.id,
     ),
   );
-}
-
-/** Every capability with its configured state, for diagnostics such as `quro doctor`. */
-export function describeCapabilities(config: Config = getConfig()) {
-  return CAPABILITIES.map(({ id, label, lifecycle, evaluate }) => ({
-    id,
-    label,
-    lifecycle,
-    ...evaluate(config),
-  }));
 }

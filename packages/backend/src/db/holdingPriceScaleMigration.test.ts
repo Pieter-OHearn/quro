@@ -8,8 +8,8 @@ type Tx = Pick<typeof db, 'execute'>;
 
 class Rollback extends Error {}
 
-// Prices as release 0.8.0 stored them, at the edges of numeric(19,2): zero, one cent, an ordinary
-// price, the largest storable value, and a null manual price.
+// Prices as the schema before this migration stored them, at the edges of numeric(19,2): zero,
+// one cent, an ordinary price, the largest storable value, and a null manual price.
 const PRICES = ['0.00', '0.01', '123.45', '99999999999999999.99'];
 
 async function withTwoDecimalPrices(run: (tx: Tx) => Promise<void>) {

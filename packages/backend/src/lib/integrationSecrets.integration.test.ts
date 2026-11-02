@@ -18,10 +18,9 @@ import {
 import { enterMaintenance, leaveMaintenance, openMaintenanceSession } from './maintenanceMode';
 import { classifySecret, openSecret, SecretsKey, type SecretsKeyring } from './secretEnvelope';
 
-// The encryption of stored bank-link secrets, run against rows in the shape releases up to 0.8.0
-// stored them (unencrypted text in bunq_connections), in a database created for this suite. The
-// `quro secrets` commands run as separate processes, the way an operator runs them, so exit codes
-// and printed output are checked as well. Synthetic values only; keys are random per run.
+// The stored bank-link secrets and the `quro secrets` commands, in a database created for this
+// suite. The commands run as separate processes, the way an operator runs them, so exit codes and
+// printed output are checked as well. Synthetic values only; keys are random per run.
 
 const BACKEND_DIR = join(import.meta.dir, '../..');
 const serverUrl = new URL(process.env.DATABASE_URL!);
@@ -93,29 +92,34 @@ async function insertUser(label: string): Promise<number> {
   return row!.id;
 }
 
-/** Inserts one connection with the given (synthetic) column values, as 0.8.0 stored them. */
-async function insertConnection(label: string, values: Values) {
+/**
+ * Inserts one connection with the given (synthetic) values, sealed with `key` for their column and
+ * owner, or stored as they are without one.
+ */
+async function insertConnection(label: string, values: Values, key: SecretsKey | null = null) {
   const userId = await insertUser(label);
-  for (const value of Object.values(values)) {
-    if (value && !value.startsWith('quro-secret:')) seededPlaintext.add(value);
+  const stored: Values = { accessToken: `synthetic-access-${label}`, ...values };
+  for (const { column, field } of SECRET_COLUMNS) {
+    const value = stored[field];
+    if (value === undefined) continue;
+    if (!value.startsWith('quro-secret:')) seededPlaintext.add(value);
+    if (key) stored[field] = key.seal(value, secretPlace(column, userId));
   }
   await sql`
     insert into bunq_connections (user_id, access_token, private_key, installation_token,
       session_token, server_public_key, session_id, bunq_user_id, sync_status, sync_error)
-    values (${userId}, ${values.accessToken ?? `synthetic-access-${label}`},
-      ${values.privateKey ?? null}, ${values.installationToken ?? null},
-      ${values.sessionToken ?? null}, ${'synthetic-server-public-key'}, ${7}, ${'4242'},
-      ${'idle'}, ${null})
+    values (${userId}, ${stored.accessToken!}, ${stored.privateKey ?? null},
+      ${stored.installationToken ?? null}, ${stored.sessionToken ?? null},
+      ${'synthetic-server-public-key'}, ${7}, ${'4242'}, ${'idle'}, ${null})
   `;
-  seededPlaintext.add(values.accessToken ?? `synthetic-access-${label}`);
   return userId;
 }
 
-/** Three connections in the shapes a 0.8.0 instance holds: new, fully synced, session only. */
-async function seedLegacyRows(count = 3): Promise<Map<number, Values>> {
+/** Connections in three shapes, new, fully synced and session only, sealed with `key` or not. */
+async function seedRows(count: number, key: SecretsKey | null): Promise<Map<number, Values>> {
   const seeded = new Map<number, Values>();
   for (let index = 0; index < count; index += 1) {
-    const label = `legacy${index}`;
+    const label = `row${index}`;
     const values: Values = { accessToken: `synthetic-access-${label}` };
     if (index % 3 === 1) {
       values.privateKey = `synthetic-private-key-${label}`;
@@ -124,7 +128,7 @@ async function seedLegacyRows(count = 3): Promise<Map<number, Values>> {
     } else if (index % 3 === 2) {
       values.sessionToken = `synthetic-session-${label}`;
     }
-    seeded.set(await insertConnection(label, values), values);
+    seeded.set(await insertConnection(label, values, key), values);
   }
   return seeded;
 }
@@ -207,26 +211,31 @@ function expectOpensToSeeded(rows: Row[], seeded: Map<number, Values>, keyring: 
 }
 
 /** Within each row, every stored secret is in one state: none half converted. */
-function expectRowsWhole(rows: Row[]) {
+function expectRowsWhole(rows: Row[], keyring: SecretsKeyring) {
   for (const row of rows) {
     const states = new Set(
       SECRET_COLUMNS.map(({ field }) => row[field])
         .filter((value): value is string => value !== null)
-        .map((value) => value.startsWith('quro-secret:')),
+        .map((value) => classifySecret(value, keyring)),
     );
     expect(states.size).toBe(1);
   }
 }
 
-describe('quro secrets status before encryption', () => {
-  test('reports the unencrypted secrets and the key id, and prints no value', async () => {
-    await seedLegacyRows(3);
+const rotating = { current: second.key, previous: first.key };
+const rotateKeys: Keys = { key: second.path, previous: first.path };
+
+describe('quro secrets status', () => {
+  test('reports unencrypted secrets as not read, names their users and prints no value', async () => {
+    const seeded = await seedRows(3, null);
     const run = await quro(['status'], { key: first.path });
     expect(run.exitCode).toBe(1);
     expect(run.out).toContain(`Secrets key: ${first.key.id}`);
     expect(run.out).toContain('bunq connections: 3, holding 7 stored secret(s).');
     expect(run.out).toContain('  unencrypted: 7');
-    expect(run.out).toContain('Status: unencrypted. Some secrets are stored unencrypted.');
+    expect(run.out).toContain(
+      'Status: unencrypted. Some secrets are stored unencrypted, which Quro does not read.',
+    );
     expectNoPlaintext(run.all);
 
     const json = await quro(['status', '--json'], { key: first.path });
@@ -236,212 +245,33 @@ describe('quro secrets status before encryption', () => {
       key: { configured: true, id: first.key.id },
       connections: 3,
       secrets: { total: 7, unencrypted: 7, current: 0 },
+      reconnectUserIds: [...seeded.keys()].sort((a, b) => a - b),
       exitCode: 1,
     });
   });
 
-  test('without a key it says so and still changes nothing', async () => {
-    await seedLegacyRows(2);
+  test('without a key it says so and changes nothing', async () => {
+    await seedRows(2, first.key);
     const before = await tableText();
     const run = await quro(['status']);
     expect(run.exitCode).toBe(1);
     expect(run.out).toContain('Secrets key: not configured (QRO_SECRETS_KEY_FILE).');
     expect(await tableText()).toBe(before);
   });
-});
 
-describe('quro secrets encrypt', () => {
-  test('without a key it exits 2 and changes nothing', async () => {
-    await seedLegacyRows(2);
+  test('there is no command that encrypts unencrypted secrets', async () => {
+    await seedRows(2, null);
     const before = await tableText();
-    const run = await quro(['encrypt']);
+    const run = await quro(['encrypt'], { key: first.path });
     expect(run.exitCode).toBe(2);
-    expect(run.err).toContain('QRO_SECRETS_KEY_FILE: required for `quro secrets encrypt`');
+    expect(run.err).toContain('Unknown command: secrets encrypt');
     expect(await tableText()).toBe(before);
-  });
-
-  test('a dry run reports and changes nothing', async () => {
-    await seedLegacyRows(2);
-    const before = await tableText();
-    const run = await quro(['encrypt', '--dry-run'], { key: first.path });
-    expect(run.exitCode).toBe(0);
-    expect(run.out).toContain(`Would encrypt 5 secret(s) with key ${first.key.id}.`);
-    expect(await tableText()).toBe(before);
-  });
-
-  test('encrypts every row, keeps nulls and other columns, and a second run changes nothing', async () => {
-    const seeded = await seedLegacyRows(6);
-    const before = await readRows();
-    const run = await quro(['encrypt'], { key: first.path });
-    expect(run.exitCode).toBe(0);
-    expect(run.out).toContain(
-      `Encrypted 14 secret(s) in 6 bank connection(s) with key ${first.key.id}.`,
-    );
-    expect(run.out).toContain('Status: current.');
-    expectNoPlaintext(run.all);
-
-    const after = await readRows();
-    expectOpensToSeeded(after, seeded, keyringOf(first.key));
-    for (const [index, row] of after.entries()) {
-      expect(row).toMatchObject({
-        id: before[index]!.id,
-        serverPublicKey: 'synthetic-server-public-key',
-        sessionId: 7,
-        bunqUserId: '4242',
-      });
-    }
-    expectNoPlaintext(await tableText());
-
-    const snapshot = await tableText();
-    const again = await quro(['encrypt'], { key: first.path });
-    expect(again.exitCode).toBe(0);
-    expect(again.out).toContain('Nothing to encrypt.');
-    expect(await tableText()).toBe(snapshot);
-    expect((await quro(['status'], { key: first.path })).exitCode).toBe(0);
-  });
-
-  test('an interruption leaves each row as it was or fully converted, and a rerun finishes', async () => {
-    const seeded = await seedLegacyRows(3);
-    const keyring = { current: first.key, previous: null };
-    let calls = 0;
-    // The second row fails after its UPDATE, before its commit: a crash inside a row.
-    await expect(
-      sealAllRows(database, keyring, 'encrypt', {
-        beforeCommit: () => {
-          calls += 1;
-          if (calls === 2) throw new Error('simulated interruption');
-        },
-      }),
-    ).rejects.toThrow('simulated interruption');
-    let rows = await readRows();
-    expectRowsWhole(rows);
-    expect(rows.map((row) => classifySecret(row.accessToken!, keyring))).toEqual([
-      'current',
-      'unencrypted',
-      'unencrypted',
-    ]);
-
-    // A crash right after the next row's commit.
-    await expect(
-      sealAllRows(database, keyring, 'encrypt', {
-        afterRow: (outcome) => {
-          if (outcome.sealed.length > 0) throw new Error('simulated interruption');
-        },
-      }),
-    ).rejects.toThrow('simulated interruption');
-    rows = await readRows();
-    expectRowsWhole(rows);
-    expect(rows.map((row) => classifySecret(row.accessToken!, keyring))).toEqual([
-      'current',
-      'current',
-      'unencrypted',
-    ]);
-
-    const resumed = await quro(['encrypt'], { key: first.path });
-    expect(resumed.exitCode).toBe(0);
-    expect(resumed.out).toContain('Encrypted 2 secret(s) in 1 bank connection(s)');
-    expectOpensToSeeded(await readRows(), seeded, keyringOf(first.key));
-  });
-
-  test('a process killed part way never leaves a row half converted', async () => {
-    const seeded = await seedLegacyRows(150);
-    const child = Bun.spawn([process.execPath, 'src/cli/quro.ts', 'secrets', 'encrypt'], {
-      cwd: BACKEND_DIR,
-      env: {
-        ...process.env,
-        NODE_ENV: 'development',
-        DATABASE_URL: databaseUrl(),
-        ADMIN_DATABASE_URL: databaseUrl(),
-        APP_DATABASE_URL: databaseUrl(),
-        QRO_SECRETS_KEY_FILE: first.path,
-        QRO_SECRETS_PREVIOUS_KEY_FILE: '',
-      },
-      stdout: 'ignore',
-      stderr: 'ignore',
-    });
-    // Kill it as soon as the first row is committed.
-    for (let attempt = 0; attempt < 2000; attempt += 1) {
-      const [row] = await sql<{ n: number }[]>`
-        select count(*)::int as n from bunq_connections where access_token like 'quro-secret:%'
-      `;
-      if (row!.n > 0) break;
-      await Bun.sleep(2);
-    }
-    child.kill('SIGKILL');
-    await child.exited;
-    expectRowsWhole(await readRows());
-
-    const resumed = await quro(['encrypt'], { key: first.path });
-    expect(resumed.exitCode).toBe(0);
-    expectOpensToSeeded(await readRows(), seeded, keyringOf(first.key));
-  });
-
-  test('two runs at the same time encrypt each value exactly once', async () => {
-    const seeded = await seedLegacyRows(30);
-    const [one, two] = await Promise.all([
-      quro(['encrypt'], { key: first.path }),
-      quro(['encrypt'], { key: first.path }),
-    ]);
-    expect(one.exitCode).toBe(0);
-    expect(two.exitCode).toBe(0);
-    // A value encrypted twice would open to an envelope, not to the seeded text.
-    expectOpensToSeeded(await readRows(), seeded, keyringOf(first.key));
-  });
-
-  test('mixed states: converts unencrypted values and leaves the others as they are', async () => {
-    const plain = await insertConnection('mixed-plain', {
-      sessionToken: 'synthetic-session-mixed-plain',
-    });
-    const done = await insertUser('mixed-done');
-    const doneValue = first.key.seal('synthetic-access-done', secretPlace('access_token', done));
-    await sql`insert into bunq_connections (user_id, access_token) values (${done}, ${doneValue})`;
-    const foreign = await insertUser('mixed-foreign');
-    const foreignValue = unrelated.key.seal(
-      'synthetic-access-foreign',
-      secretPlace('access_token', foreign),
-    );
-    await sql`insert into bunq_connections (user_id, access_token) values (${foreign}, ${foreignValue})`;
-    const damaged = await insertUser('mixed-damaged');
-    await sql`insert into bunq_connections (user_id, access_token) values (${damaged}, ${'quro-secret:v1:damaged'})`;
-    const half = await insertUser('mixed-half');
-    const halfAccess = first.key.seal('synthetic-access-half', secretPlace('access_token', half));
-    seededPlaintext.add('synthetic-session-half');
-    await sql`insert into bunq_connections (user_id, access_token, session_token)
-      values (${half}, ${halfAccess}, ${'synthetic-session-half'})`;
-
-    const run = await quro(['encrypt'], { key: first.path });
-    expect(run.exitCode).toBe(0);
-    expect(run.out).toContain('Encrypted 3 secret(s) in 2 bank connection(s)');
-    expect(run.out).toContain('  encrypted with a key that is not configured: 1');
-    expect(run.out).toContain('  damaged, moved or failing their check: 1');
-
-    const byUser = new Map((await readRows()).map((row) => [row.userId, row]));
-    const keyring = keyringOf(first.key);
-    expect(
-      openSecret(byUser.get(plain)!.sessionToken!, secretPlace('session_token', plain), keyring)
-        .value,
-    ).toBe('synthetic-session-mixed-plain');
-    expect(byUser.get(done)!.accessToken).toBe(doneValue);
-    expect(byUser.get(foreign)!.accessToken).toBe(foreignValue);
-    expect(byUser.get(damaged)!.accessToken).toBe('quro-secret:v1:damaged');
-    expect(byUser.get(half)!.accessToken).toBe(halfAccess);
-    expect(classifySecret(byUser.get(half)!.sessionToken!, keyring)).toBe('current');
-    expectNoPlaintext(await tableText());
-
-    const status = await quro(['status', '--json'], { key: first.path });
-    expect(status.exitCode).toBe(1);
-    expect(JSON.parse(status.out)).toMatchObject({
-      status: 'unreadable',
-      unknownKeyIds: [unrelated.key.id],
-      reconnectUserIds: [foreign, damaged].sort((a, b) => a - b),
-    });
   });
 });
 
 describe('wrong, missing and tampered keys', () => {
   test('with another key the stored secrets are reported unreadable and nothing changes', async () => {
-    await seedLegacyRows(3);
-    expect((await quro(['encrypt'], { key: first.path })).exitCode).toBe(0);
+    await seedRows(3, first.key);
     const snapshot = await tableText();
 
     const wrong = await quro(['status', '--json'], { key: unrelated.path });
@@ -451,9 +281,9 @@ describe('wrong, missing and tampered keys', () => {
       secrets: { unknownKey: 7, current: 0 },
       unknownKeyIds: [first.key.id],
     });
-    const encrypt = await quro(['encrypt'], { key: unrelated.path });
-    expect(encrypt.exitCode).toBe(0);
-    expect(encrypt.out).toContain('Nothing to encrypt.');
+    const rotate = await quro(['rotate'], { key: unrelated.path, previous: second.path });
+    expect(rotate.exitCode).toBe(0);
+    expect(rotate.out).toContain('Nothing to rotate.');
     expect(await tableText()).toBe(snapshot);
 
     const missing = await quro(['status']);
@@ -464,8 +294,7 @@ describe('wrong, missing and tampered keys', () => {
   });
 
   test('a changed byte in the database is found by status and never opened', async () => {
-    await seedLegacyRows(2);
-    expect((await quro(['encrypt'], { key: first.path })).exitCode).toBe(0);
+    await seedRows(2, first.key);
     const [row] = await readRows();
     const parts = row!.accessToken!.split(':');
     parts[5] = `${parts[5]![0] === 'A' ? 'B' : 'A'}${parts[5]!.slice(1)}`;
@@ -491,61 +320,218 @@ describe('wrong, missing and tampered keys', () => {
 });
 
 describe('quro secrets rotate', () => {
-  test('needs the previous key, and a different one', async () => {
+  test('needs both keys, and different ones', async () => {
+    await seedRows(2, first.key);
+    const before = await tableText();
+    const noKey = await quro(['rotate']);
+    expect(noKey.exitCode).toBe(2);
+    expect(noKey.err).toContain('QRO_SECRETS_KEY_FILE: required for `quro secrets rotate`');
     expect((await quro(['rotate'], { key: second.path })).exitCode).toBe(2);
     const same = await quro(['rotate'], { key: first.path, previous: first.path });
     expect(same.exitCode).toBe(2);
     expect(same.err).toContain('holds the same key as QRO_SECRETS_KEY_FILE');
+    expect(await tableText()).toBe(before);
   });
 
-  test('moves every secret to the new key through an interruption, readable all along', async () => {
-    const seeded = await seedLegacyRows(4);
-    expect((await quro(['encrypt'], { key: first.path })).exitCode).toBe(0);
+  test('a dry run reports and changes nothing', async () => {
+    await seedRows(2, first.key);
+    const before = await tableText();
+    const run = await quro(['rotate', '--dry-run'], rotateKeys);
+    expect(run.exitCode).toBe(0);
+    expect(run.out).toContain(`Would encrypt 5 secret(s) with key ${second.key.id}.`);
+    expect(await tableText()).toBe(before);
+  });
 
-    // Interrupted after the first row: rows on both keys.
-    const rotating = { current: second.key, previous: first.key };
-    await expect(
-      sealAllRows(database, rotating, 'rotate', {
-        afterRow: () => {
-          throw new Error('simulated interruption');
-        },
-      }),
-    ).rejects.toThrow('simulated interruption');
-    const mixed = await readRows();
-    expectRowsWhole(mixed);
-    expect(new Set(mixed.map((row) => classifySecret(row.accessToken!, rotating)))).toEqual(
-      new Set(['current', 'previous']),
+  test('moves every row, keeps nulls and other columns, and a second run changes nothing', async () => {
+    const seeded = await seedRows(6, first.key);
+    const before = await readRows();
+    const run = await quro(['rotate'], rotateKeys);
+    expect(run.exitCode).toBe(0);
+    expect(run.out).toContain(
+      `Encrypted 14 secret(s) in 6 bank connection(s) with key ${second.key.id}.`,
     );
-    // With both keys configured every row still opens, as the server needs during a rotation.
-    expectOpensToSeeded(mixed, seeded, rotating);
-    const pending = await quro(['status', '--json'], { key: second.path, previous: first.path });
-    expect(pending.exitCode).toBe(1);
-    expect(JSON.parse(pending.out)).toMatchObject({ status: 'rotation_pending' });
+    expect(run.out).toContain('Status: current.');
+    expectNoPlaintext(run.all);
 
-    const resumed = await quro(['rotate'], { key: second.path, previous: first.path });
-    expect(resumed.exitCode).toBe(0);
-    expect(resumed.out).toContain('Status: current.');
-    expectNoPlaintext(resumed.all);
+    const after = await readRows();
+    expectOpensToSeeded(after, seeded, keyringOf(second.key));
+    for (const [index, row] of after.entries()) {
+      expect(row).toMatchObject({
+        id: before[index]!.id,
+        serverPublicKey: 'synthetic-server-public-key',
+        sessionId: 7,
+        bunqUserId: '4242',
+      });
+    }
+    expectNoPlaintext(await tableText());
 
-    expectOpensToSeeded(await readRows(), seeded, keyringOf(second.key));
+    const snapshot = await tableText();
+    const again = await quro(['rotate'], rotateKeys);
+    expect(again.exitCode).toBe(0);
+    expect(again.out).toContain('Nothing to rotate.');
+    expect(await tableText()).toBe(snapshot);
     expect((await quro(['status'], { key: second.path })).exitCode).toBe(0);
     // The old key alone no longer opens anything.
     expect(JSON.parse((await quro(['status', '--json'], { key: first.path })).out)).toMatchObject({
       status: 'unreadable',
       unknownKeyIds: [second.key.id],
     });
-    expectNoPlaintext(await tableText());
+  });
+
+  test('an interruption leaves each row as it was or fully converted, readable all along', async () => {
+    const seeded = await seedRows(3, first.key);
+    let calls = 0;
+    // The second row fails after its UPDATE, before its commit: a crash inside a row.
+    await expect(
+      sealAllRows(database, rotating, {
+        beforeCommit: () => {
+          calls += 1;
+          if (calls === 2) throw new Error('simulated interruption');
+        },
+      }),
+    ).rejects.toThrow('simulated interruption');
+    let rows = await readRows();
+    expectRowsWhole(rows, rotating);
+    expect(rows.map((row) => classifySecret(row.accessToken!, rotating))).toEqual([
+      'current',
+      'previous',
+      'previous',
+    ]);
+
+    // A crash right after the next row's commit.
+    await expect(
+      sealAllRows(database, rotating, {
+        afterRow: (outcome) => {
+          if (outcome.sealed.length > 0) throw new Error('simulated interruption');
+        },
+      }),
+    ).rejects.toThrow('simulated interruption');
+    rows = await readRows();
+    expectRowsWhole(rows, rotating);
+    expect(rows.map((row) => classifySecret(row.accessToken!, rotating))).toEqual([
+      'current',
+      'current',
+      'previous',
+    ]);
+    // With both keys configured every row still opens, as the server needs during a rotation.
+    expectOpensToSeeded(rows, seeded, rotating);
+    const pending = await quro(['status', '--json'], rotateKeys);
+    expect(pending.exitCode).toBe(1);
+    expect(JSON.parse(pending.out)).toMatchObject({ status: 'rotation_pending' });
+
+    const resumed = await quro(['rotate'], rotateKeys);
+    expect(resumed.exitCode).toBe(0);
+    expect(resumed.out).toContain('Encrypted 2 secret(s) in 1 bank connection(s)');
+    expectOpensToSeeded(await readRows(), seeded, keyringOf(second.key));
+  });
+
+  test('a process killed part way never leaves a row half converted', async () => {
+    const seeded = await seedRows(150, first.key);
+    const secondKeyPrefix = `quro-secret:v1:aes-256-gcm:${second.key.id}:`;
+    const child = Bun.spawn([process.execPath, 'src/cli/quro.ts', 'secrets', 'rotate'], {
+      cwd: BACKEND_DIR,
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        DATABASE_URL: databaseUrl(),
+        ADMIN_DATABASE_URL: databaseUrl(),
+        APP_DATABASE_URL: databaseUrl(),
+        QRO_SECRETS_KEY_FILE: second.path,
+        QRO_SECRETS_PREVIOUS_KEY_FILE: first.path,
+      },
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    // Kill it as soon as the first row is committed.
+    for (let attempt = 0; attempt < 2000; attempt += 1) {
+      const [row] = await sql<{ n: number }[]>`
+        select count(*)::int as n from bunq_connections
+         where starts_with(access_token, ${secondKeyPrefix})
+      `;
+      if (row!.n > 0) break;
+      await Bun.sleep(2);
+    }
+    child.kill('SIGKILL');
+    await child.exited;
+    expectRowsWhole(await readRows(), rotating);
+
+    const resumed = await quro(['rotate'], rotateKeys);
+    expect(resumed.exitCode).toBe(0);
+    expectOpensToSeeded(await readRows(), seeded, keyringOf(second.key));
+  });
+
+  test('two runs at the same time encrypt each value exactly once', async () => {
+    const seeded = await seedRows(30, first.key);
+    const [one, two] = await Promise.all([
+      quro(['rotate'], rotateKeys),
+      quro(['rotate'], rotateKeys),
+    ]);
+    expect(one.exitCode).toBe(0);
+    expect(two.exitCode).toBe(0);
+    // A value encrypted twice would open to an envelope, not to the seeded text.
+    expectOpensToSeeded(await readRows(), seeded, keyringOf(second.key));
+  });
+
+  test('mixed states: moves values on the previous key and leaves the others as they are', async () => {
+    const plain = await insertConnection('mixed-plain', {
+      sessionToken: 'synthetic-session-mixed-plain',
+    });
+    const plainRow = (await readRows()).find((row) => row.userId === plain)!;
+    const done = await insertConnection('mixed-done', {}, second.key);
+    const doneRow = (await readRows()).find((row) => row.userId === done)!;
+    const foreign = await insertConnection('mixed-foreign', {}, unrelated.key);
+    const foreignRow = (await readRows()).find((row) => row.userId === foreign)!;
+    const damaged = await insertUser('mixed-damaged');
+    await sql`insert into bunq_connections (user_id, access_token) values (${damaged}, ${'quro-secret:v1:damaged'})`;
+    const half = await insertConnection(
+      'mixed-half',
+      { sessionToken: 'synthetic-session-half' },
+      first.key,
+    );
+    const halfAccess = second.key.seal('synthetic-access-half', secretPlace('access_token', half));
+    await sql`update bunq_connections set access_token = ${halfAccess} where user_id = ${half}`;
+
+    const run = await quro(['rotate'], rotateKeys);
+    expect(run.exitCode).toBe(0);
+    expect(run.out).toContain('Encrypted 1 secret(s) in 1 bank connection(s)');
+    expect(run.out).toContain('  unencrypted: 2');
+    expect(run.out).toContain('  encrypted with a key that is not configured: 1');
+    expect(run.out).toContain('  damaged, moved or failing their check: 1');
+
+    const byUser = new Map((await readRows()).map((row) => [row.userId, row]));
+    const keyring = keyringOf(second.key);
+    // Unencrypted values are neither read nor encrypted.
+    expect(byUser.get(plain)).toMatchObject({
+      accessToken: plainRow.accessToken,
+      sessionToken: 'synthetic-session-mixed-plain',
+    });
+    expect(byUser.get(done)!.accessToken).toBe(doneRow.accessToken);
+    expect(byUser.get(foreign)!.accessToken).toBe(foreignRow.accessToken);
+    expect(byUser.get(damaged)!.accessToken).toBe('quro-secret:v1:damaged');
+    expect(byUser.get(half)!.accessToken).toBe(halfAccess);
+    expect(
+      openSecret(byUser.get(half)!.sessionToken!, secretPlace('session_token', half), keyring)
+        .value,
+    ).toBe('synthetic-session-half');
+
+    const status = await quro(['status', '--json'], { key: second.path });
+    expect(status.exitCode).toBe(1);
+    expect(JSON.parse(status.out)).toMatchObject({
+      status: 'unreadable',
+      unknownKeyIds: [unrelated.key.id],
+      reconnectUserIds: [plain, foreign, damaged].sort((a, b) => a - b),
+    });
   });
 });
 
 describe('maintenance mode', () => {
-  test('encrypt refuses while a backup or restore holds maintenance mode', async () => {
-    await seedLegacyRows(2);
+  test('rotate refuses while a backup or restore holds maintenance mode', async () => {
+    await seedRows(2, first.key);
     const before = await tableText();
     const session = openMaintenanceSession(databaseUrl(), 'secrets-test-backup');
     try {
       await enterMaintenance(session, 0);
-      const run = await quro(['encrypt'], { key: first.path });
+      const run = await quro(['rotate'], rotateKeys);
       expect(run.exitCode).toBe(1);
       expect(run.err).toContain('changes are paused');
       expect(await tableText()).toBe(before);
@@ -553,6 +539,6 @@ describe('maintenance mode', () => {
     } finally {
       await session.end({ timeout: 5 });
     }
-    expect((await quro(['encrypt'], { key: first.path })).exitCode).toBe(0);
+    expect((await quro(['rotate'], rotateKeys)).exitCode).toBe(0);
   });
 });

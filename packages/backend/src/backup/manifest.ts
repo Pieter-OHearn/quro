@@ -115,7 +115,7 @@ function requireShape(condition: boolean, what: string): asserts condition {
 
 const KEY_ID = /^[0-9a-f]{16}$/;
 
-/** Optional (archives before 0.9.0 lack it); when present, key ids only, as backups write them. */
+/** Optional (older archives lack it); when present, key ids only, as backups write them. */
 function checkIntegrationKeys(keys: unknown): void {
   if (keys === undefined) return;
   requireShape(

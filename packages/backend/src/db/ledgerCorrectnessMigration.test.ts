@@ -23,8 +23,8 @@ async function runMigration(tx: Pick<typeof db, 'execute'>) {
   }
 }
 
-// The tables this migration changes, as release 0.8.0 left them, in a schema of their own that
-// shadows the real ones for this transaction. Every row is synthetic.
+// The tables this migration changes, as the schema before it left them, in a schema of their own
+// that shadows the real ones for this transaction. Every row is synthetic.
 async function withRelease080Tables(imports: string, run: (tx: Tx) => Promise<void>) {
   await db
     .transaction(async (tx) => {

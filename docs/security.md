@@ -369,31 +369,19 @@ key, and is reported as unreadable rather than used. The code is
 `packages/backend/src/lib/secretEnvelope.ts`; the list of secret columns is
 `packages/backend/src/lib/integrationSecrets.ts`.
 
-### Encrypting stored secrets
+### Unencrypted values are refused
 
-`quro secrets encrypt` encrypts every stored value that is not yet encrypted. Releases up to 0.8.0
-stored them unencrypted; the [0.9.0 upgrade notes](upgrade.md#secrets-key-for-bank-links) say when
-to run it.
-
-- It works one bank connection at a time: a transaction locks the row, reads it again, and writes
-  every converted column in one `UPDATE`. A row is never left with some columns converted by a run
-  and others not; an interrupted run (a killed container, a lost connection) leaves each row as it
-  was or fully converted, and running the command again converts the rest. Values that are already
-  encrypted are skipped, so a second run changes nothing.
-- It holds the maintenance lock in shared mode, like any write: it waits for nothing and refuses
-  while `quro backup` or `quro restore` runs. Row locks keep it safe next to a running 0.9.0
-  server, which also writes only encrypted values. Stop older servers first: they would use the
-  encrypted text as a token.
-- Nulls stay null, and values it cannot open (sealed with an unknown key, or damaged) are left as
-  they are and reported.
-- The server does the same for a connection it is about to use that still holds unencrypted values
-  (for example after restoring an older backup), so a configured server never keeps using
-  plaintext. `quro doctor` warns while any value is unencrypted.
+Quro reads a stored bank-link secret only when it is encrypted. An unencrypted value is never read,
+encrypted or sent to bunq: a sync answers with `bunq_reauthorization_required`, Settings asks the
+user to connect bunq again, and connecting again replaces every stored credential of that
+connection. `quro secrets status` and `quro doctor` count unencrypted values and list the users
+they belong to. Restoring an archive that holds unencrypted values is not supported: the restore
+succeeds, but those users connect bunq again.
 
 `quro secrets status` (read-only) reports how many values are encrypted with the current key, with
 the previous key, with a key that is not configured, unencrypted or damaged, opening each encrypted
 value in memory to check its tag. It exits 0 when every stored value is on the current key (or none
-is stored) and 1 otherwise, with the command to run. `--json` gives the same report for scripts.
+is stored) and 1 otherwise, saying what to do. `--json` gives the same report for scripts.
 
 ### Rotate the secrets key
 
@@ -406,9 +394,11 @@ files):
 3. Stop the backend (`docker compose stop backend`).
 4. Point `QRO_SECRETS_KEY_FILE` at the new key and `QRO_SECRETS_PREVIOUS_KEY_FILE` at the old one
    (mount both files), then run `quro secrets rotate`. It re-encrypts, one connection per
-   transaction, every value the previous key opens (and any unencrypted value) with the new key.
-   An interrupted run leaves some rows on each key; both stay readable, and running it again
-   finishes the rest.
+   transaction, every value the previous key opens with the new key. It holds the maintenance
+   lock in shared mode, like any write, so it refuses while `quro backup` or `quro restore` runs.
+   An interrupted run leaves each row as it was or fully converted, some rows on each key; both
+   stay readable, and running it again finishes the rest. Values it cannot open are left as they
+   are and reported.
 5. `quro secrets status` with the new key alone must exit 0. Then remove
    `QRO_SECRETS_PREVIOUS_KEY_FILE`, start the backend and run a bunq sync.
 
@@ -604,8 +594,8 @@ The bundled nginx sets these headers on every response:
 | App (`quro_app`)     | `POSTGRES_APP_USER`   | Table-level `SELECT`, `INSERT`, `UPDATE`, `DELETE`; no schema DDL or `TRUNCATE` |
 
 The `backend` and `pension-import-worker` containers, and the `quro` command, connect as the app
-role. The admin role is used only by the `migrate` service (schema migrations and role bootstrap)
-and the `db-tools` service (backup, restore, manual SQL). An application bug therefore cannot drop
+role. The admin role is used only by the `migrate` service: schema migrations, role bootstrap,
+`quro backup` and `quro restore`. An application bug therefore cannot drop
 tables or run migrations. The app role keeps `DELETE` for normal flows such as deleting a pension
 pot.
 

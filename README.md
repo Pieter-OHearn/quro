@@ -23,7 +23,7 @@ Quro is for people who are comfortable running a few containers at home. It is p
 
 This installs Quro on one host from the published images, with the example Compose file. CI runs these commands on every change, with images built from that change standing in for the release.
 
-Quro 0.8.0 is the first release that installs this way, and upgrades are supported from 0.8.0 on (see [Upgrade](#upgrade)).
+Upgrades are supported from the last 1.0.0 release candidate on (see [Upgrade](#upgrade)).
 
 | You need                   | Details                                                                                                                                                             |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -134,7 +134,7 @@ The [configuration reference](docs/configuration.md) lists every service, port, 
 
 Quro never updates itself. To move to a new release: read the upgrade notes of every version you skip, take a backup with the version you run, pin the new tag and digest in `compose.yaml`, and run `docker compose pull`. `docker compose run --rm migrate migrate --status` then compares the database with the new image and says whether migrations are pending, without changing anything. Stop the backend and run `docker compose up -d --wait`: `migrate` applies the new schema before the backend starts. Migrations only move forward: an older image runs only while it knows every migration the database has, and otherwise going back means restoring the backup. [Upgrade Quro](docs/upgrade.md) has every step, how to roll back, and what to do when an upgrade fails.
 
-Upgrades are supported from 0.8.0 on, with PostgreSQL 18 as the only supported database server. An install of 0.7.0 or earlier first moves to 0.8.0 with the upgrade notes published with that release, linked from [Upgrade Quro](docs/upgrade.md).
+Upgrades are supported from the last 1.0.0 release candidate on, with PostgreSQL 18 as the only supported database server.
 
 ## Backup and restore
 

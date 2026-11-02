@@ -102,8 +102,8 @@ describe('Compose topology', () => {
     }
     // `quro backup` reads the documents and `quro restore` writes them back; archives go to
     // ./backups, the default QRO_BACKUP_DIR inside the container.
-    expect(services['db-tools']?.volumes).toContain('./data/documents:/var/lib/quro/documents');
-    expect(services['db-tools']?.volumes).toContain('./backups:/var/lib/quro/backups');
+    expect(services.migrate?.volumes).toContain('./data/documents:/var/lib/quro/documents');
+    expect(services.migrate?.volumes).toContain('./backups:/var/lib/quro/backups');
   });
 });
 
@@ -186,7 +186,7 @@ describe('the example Compose file', () => {
     const { services } = await example();
     expect(services.migrate?.healthcheck).toEqual({ disable: true });
     const repository = (await readCompose('docker-compose.yml')).services;
-    for (const name of ['migrate', 'pension-import-worker', 'db-tools']) {
+    for (const name of ['migrate', 'pension-import-worker']) {
       expect(`${name}: ${repository[name]?.healthcheck?.disable}`).toBe(`${name}: true`);
     }
   });

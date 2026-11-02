@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 // package visibility. Visibility is a property of the whole package on GHCR, not of a tag,
 // so a package that turned private (or never was public) fails here whatever tag is asked for.
 //
-//   bun scripts/lib/image-access.ts --tag v0.7.0
+//   bun scripts/lib/image-access.ts --tag v1.0.0
 //   bun scripts/lib/image-access.ts --tag latest --full
 //   bun scripts/lib/image-access.ts --tag sha-<commit> --expect quro-backend=sha256:<digest>
 //

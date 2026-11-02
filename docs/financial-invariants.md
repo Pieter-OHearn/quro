@@ -358,7 +358,7 @@ These are recorded, not yet fixed:
 - **Odd-cent joint amounts.** Each partner's total rounds its half of an odd-cent joint amount
   away from zero, so the two partners' totals can exceed the household's by one cent per such
   amount.
-- **Repayments recorded before 0.9.0.** They carry no clamped principal. One that was clamped
+- **Repayments recorded before the clamped principal was stored.** They carry no clamped principal. One that was clamped
   still restores its full principal (at most one cent too much). Quro does not guess it for old
   rows.
 - **Provider balances.** A bunq-synced savings account takes its balance from bunq; its imported

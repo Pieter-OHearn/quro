@@ -19,17 +19,24 @@ All notable changes to this project will be documented in this file. The format 
 - Committing a pension statement import is refused only when another import of the same file is already committed to the pot, as the database enforces; an import of the same file still in review no longer blocks it.
 - The scheduled holding price sync reports each price as stored (six decimals), not as the provider quoted it.
 
+### Removed
+
+- **Breaking:** the tools that only installs before 1.0.0 needed. The `db-tools` service of the repository's `docker-compose.yml`, the `db:backup`, `db:restore` and `db:clear` scripts, the `QRO_CLEAR_CONFIRM` and `QRO_CLEAR_ALLOW_NON_EMPTY` settings and the image's `/app/backups` link are gone; `quro backup` and `quro restore` are the only way to back up and restore, and a bare `.dump` file is no longer restored. In a checkout they run through the `migrate` service, which now mounts `./backups` and `./data/documents`.
+- **Breaking:** `quro secrets encrypt`, and the server's encryption of unencrypted bank-link secrets when it uses them. An unencrypted secret is now refused, never read: the user connects bunq again, and `quro secrets status` and `quro doctor` name the users. `quro secrets rotate` moves secrets from the previous key only.
+- The upgrade notes of releases before the last 1.0.0 candidate. Upgrades are supported from the last 1.0.0 release candidate on; each release's notes stay in its tagged copy of the upgrade guide.
+
 ### Upgrade notes
 
 - **Migration `0047_holding_dividend_amount`** moves each dividend's amount to the new `holding_transactions.amount` column. Take a backup first: going back means restoring it. A dividend that is not whole cents stops the migration with its id and changes nothing; run the read-only count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-the-next-release) before you upgrade.
+- **Check the bank-link secrets before upgrading.** With 1.0.0-rc.6 still running, `docker compose run --rm migrate secrets status` must exit 0; if it reports unencrypted secrets, run `secrets encrypt` with 1.0.0-rc.6 first. See the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-the-next-release).
 
 ## [v1.0.0-rc.6] - 2026-10-29
 
-Quro 1.0.0-rc.6 gives a property and its mortgage separate ledgers: the property keeps its valuations, rent and expenses, the mortgage its repayments and rate changes, and each page shows the other's rows. A property's value follows its valuations and its equity is worked out from its linked mortgage, so the property card, the mortgage page and the dashboard agree. It has one migration that moves existing rows and drops columns, so take a backup first, and run the preflight count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6) before you upgrade.
+Quro 1.0.0-rc.6 gives a property and its mortgage separate ledgers: the property keeps its valuations, rent and expenses, the mortgage its repayments and rate changes, and each page shows the other's rows. A property's value follows its valuations and its equity is worked out from its linked mortgage, so the property card, the mortgage page and the dashboard agree. It has one migration that moves existing rows and drops columns, so take a backup first, and run the preflight count in the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.6/docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6) before you upgrade.
 
 ### Changed
 
-- **Breaking:** a property and its mortgage keep separate ledgers. A property records valuations, rent income and expenses; a mortgage records repayments and rate changes. Each refuses the other's types, and each page lists the other's rows read-only with a link to the page that edits them, so a property card now counts and lists its mortgage's repayments. The property, mortgage and transaction APIs change accordingly ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6)).
+- **Breaking:** a property and its mortgage keep separate ledgers. A property records valuations, rent income and expenses; a mortgage records repayments and rate changes. Each refuses the other's types, and each page lists the other's rows read-only with a link to the page that edits them, so a property card now counts and lists its mortgage's repayments. The property, mortgage and transaction APIs change accordingly ([upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.6/docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6)).
 - **Breaking:** a property's only debt is its linked mortgage. A balance typed on the property itself is no longer kept, and the mortgage reads the property's address and value instead of keeping copies.
 - A property valuation sets the property's current value from its date: a valuation dated in the future takes effect on that day. The property's equity is worked out on the server, so the property card, the mortgage page and the dashboard show the same figure.
 - Recording a repayment suggests the date, a note, the amount and the interest and principal split from the loan type, the rate in effect and the balance; every field stays editable. A linear mortgage's current payment is worked out from today's balance.
@@ -42,11 +49,11 @@ Quro 1.0.0-rc.6 gives a property and its mortgage separate ledgers: the property
 
 ### Upgrade notes
 
-- **Migration `0046_property_mortgage_ledger_ownership`** moves existing rows to the ledger that owns them and drops the columns that let each ledger hold the other's rows. Take a backup first: going back means restoring it. Rows it cannot assign stop the migration with their ids and change nothing; run the read-only count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6) before you upgrade.
+- **Migration `0046_property_mortgage_ledger_ownership`** moves existing rows to the ledger that owns them and drops the columns that let each ledger hold the other's rows. Take a backup first: going back means restoring it. Rows it cannot assign stop the migration with their ids and change nothing; run the read-only count in the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.6/docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6) before you upgrade.
 
 ## [v1.0.0-rc.5] - 2026-10-29
 
-Quro 1.0.0-rc.5 adds an optional single sign-on only mode, so the provider can be the only way in, and fixes more phone layout problems. The new mode is off by default, there is no migration, and Quro behaves like rc.4 until you turn it on. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc4-to-100-rc5) before you turn it on.
+Quro 1.0.0-rc.5 adds an optional single sign-on only mode, so the provider can be the only way in, and fixes more phone layout problems. The new mode is off by default, there is no migration, and Quro behaves like rc.4 until you turn it on. Read the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.6/docs/upgrade.md#upgrade-from-100-rc4-to-100-rc5) before you turn it on.
 
 ### Added
 
@@ -74,7 +81,7 @@ Quro 1.0.0-rc.5 adds an optional single sign-on only mode, so the provider can b
 
 ## [v1.0.0-rc.4] - 2026-10-18
 
-Quro 1.0.0-rc.4 adds the Exposure tab on the Plan page: how your investments are spread, described against editable reference mixes. It is information, not advice, and it has one additive migration. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc3-to-100-rc4) before you upgrade.
+Quro 1.0.0-rc.4 adds the Exposure tab on the Plan page: how your investments are spread, described against editable reference mixes. It is information, not advice, and it has one additive migration. Read the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.4/docs/upgrade.md#upgrade-from-100-rc3-to-100-rc4) before you upgrade.
 
 ### Added
 
@@ -90,7 +97,7 @@ Quro 1.0.0-rc.4 adds the Exposure tab on the Plan page: how your investments are
 
 ## [v1.0.0-rc.3] - 2026-10-18
 
-Quro 1.0.0-rc.3 adds optional sign-in through an OpenID Connect provider. It is off until you set the `OIDC_*` settings, passwords keep working, and it has one additive migration. Read the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc2-to-100-rc3) before you upgrade.
+Quro 1.0.0-rc.3 adds optional sign-in through an OpenID Connect provider. It is off until you set the `OIDC_*` settings, passwords keep working, and it has one additive migration. Read the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.3/docs/upgrade.md#upgrade-from-100-rc2-to-100-rc3) before you upgrade.
 
 ### Added
 
@@ -114,7 +121,7 @@ Quro 1.0.0-rc.3 adds optional sign-in through an OpenID Connect provider. It is 
 
 ## [v1.0.0-rc.2] - 2026-10-17
 
-Quro 1.0.0-rc.2 fixes how Quro looks when it is opened from an iPhone's home screen. It has no migration and needs no operator action beyond pinning the new images; see the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc1-to-100-rc2).
+Quro 1.0.0-rc.2 fixes how Quro looks when it is opened from an iPhone's home screen. It has no migration and needs no operator action beyond pinning the new images; see the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.2/docs/upgrade.md#upgrade-from-100-rc1-to-100-rc2).
 
 ### Fixed
 
@@ -123,24 +130,24 @@ Quro 1.0.0-rc.2 fixes how Quro looks when it is opened from an iPhone's home scr
 
 ## [v1.0.0-rc.1] - 2026-10-16
 
-Quro 1.0.0-rc.1 is the release candidate for 1.0.0. It adds account export and deletion, a reviewed CSV import, first-run guidance, structured logs and operational checks in `quro doctor`, bounded text fields, and a phone layout with cards, accessible charts and honest stale-data notices. Read the [upgrade notes](docs/upgrade.md#upgrade-from-090-to-100-rc1) before you upgrade, and back up with 0.9.0 first: one migration drops columns and cannot be undone.
+Quro 1.0.0-rc.1 is the release candidate for 1.0.0. It adds account export and deletion, a reviewed CSV import, first-run guidance, structured logs and operational checks in `quro doctor`, bounded text fields, and a phone layout with cards, accessible charts and honest stale-data notices. Read the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#upgrade-from-090-to-100-rc1) before you upgrade, and back up with 0.9.0 first: one migration drops columns and cannot be undone.
 
 ### Breaking changes
 
 Each item needs action from some operators or API clients and links to what to change in the upgrade notes.
 
-- **Migration 0042 drops three unused `budget_transactions` columns, `bunq_mcc`, `bunq_payment_type` and `counterparty_iban`.** Their values exist only in a backup afterwards, and the older image cannot run on the upgraded database. Back up with 0.9.0 first. [Details](docs/upgrade.md#migrations-and-the-backup-to-take-first)
-- **Server and import worker logs are JSON lines, not bracketed text.** Anything that parses the old lines (a log collector, an alert rule) must change. Responses carry an `X-Request-Id` header, and error messages are no longer logged. [Details](docs/upgrade.md#json-logs-and-request-ids)
-- **`quro doctor` checks more and reports a new `unknown` status.** A stopped core job, a referenced document missing from the store or a nearly full disk now makes it exit with code 1, and a script that reads each check's `status` must accept `unknown`. [Details](docs/upgrade.md#doctor-checks-and-the-unknown-status)
-- **`GET /api/capabilities` no longer has an `ai` key, and every capability has a `lifecycle` field.** Use `pensionStatementImport` where a client read `ai`. [Details](docs/upgrade.md#capabilities-and-the-setup-endpoint)
-- **The API answers `400` for a text value over its length limit.** Names and labels are limited to 100 characters, descriptions to 500, notes to 2000 and emails to 254. A value that is already longer stays editable while that field is left unchanged. [Details](docs/upgrade.md#text-field-length-limits)
+- **Migration 0042 drops three unused `budget_transactions` columns, `bunq_mcc`, `bunq_payment_type` and `counterparty_iban`.** Their values exist only in a backup afterwards, and the older image cannot run on the upgraded database. Back up with 0.9.0 first. [Details](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#migrations-and-the-backup-to-take-first)
+- **Server and import worker logs are JSON lines, not bracketed text.** Anything that parses the old lines (a log collector, an alert rule) must change. Responses carry an `X-Request-Id` header, and error messages are no longer logged. [Details](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#json-logs-and-request-ids)
+- **`quro doctor` checks more and reports a new `unknown` status.** A stopped core job, a referenced document missing from the store or a nearly full disk now makes it exit with code 1, and a script that reads each check's `status` must accept `unknown`. [Details](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#doctor-checks-and-the-unknown-status)
+- **`GET /api/capabilities` no longer has an `ai` key, and every capability has a `lifecycle` field.** Use `pensionStatementImport` where a client read `ai`. [Details](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#capabilities-and-the-setup-endpoint)
+- **The API answers `400` for a text value over its length limit.** Names and labels are limited to 100 characters, descriptions to 500, notes to 2000 and emails to 254. A value that is already longer stays editable while that field is left unchanged. [Details](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#text-field-length-limits)
 
 ### Added
 
 - Every account can download its data in **Settings → Your data**: one ZIP with JSON and CSV for each table, the stored documents and a manifest with row counts and SHA-256 hashes (`GET /api/settings/export`). Text that a spreadsheet would run as a formula is escaped in the CSV. [Details](docs/data-export-and-deletion.md#export)
 - Every account can delete itself there (`DELETE /api/settings/account`, with the password and the email address). The rows, bank links, sessions and stored documents go in one step, an audit row (`account_deletions`) records the counts without personal data, and `quro documents retry-deleted` removes documents the store refused to delete. Backups are not changed. [Details](docs/data-export-and-deletion.md#deletion)
 - A savings account or the budget can import a bank's **CSV** with a reviewed flow: map the columns once (the mapping is remembered per source), review every row in a dry run with locale, date and currency handling, and write only approved rows in bounded batches that can be cancelled and resumed. Rows already imported are found again by a `(source, external id)` key, so repeating an import adds nothing, and a savings import compares the statement's closing balance with the ledger and can book the difference as one labelled adjustment. [Details](docs/csv-import.md)
-- A getting started card on the dashboard guides a new household through currency and number format, what is shared with a partner, the first account and the first transaction, and goes away once there is an account and a transaction. `GET /api/dashboard/setup` returns `hasAccount` and `hasTransaction` for it. [API changes](docs/upgrade.md#capabilities-and-the-setup-endpoint)
+- A getting started card on the dashboard guides a new household through currency and number format, what is shared with a partner, the first account and the first transaction, and goes away once there is an account and a transaction. `GET /api/dashboard/setup` returns `hasAccount` and `hasTransaction` for it. [API changes](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#capabilities-and-the-setup-endpoint)
 - Settings → Connections lists the features on this server with whether each is on, why not, and an experimental badge for statement import, instead of a fixed "Coming soon" list. The bunq Connect button and the statement import button are not shown on a server where that feature is not set up.
 - `quro doctor` reports background job lag and failures, data freshness, disk space, the age of the newest backup and whether referenced documents are in the store, with a new `unknown` status for anything without evidence. [Monitor an install](docs/operations.md)
 - Notices say when the data behind a figure is not current: an exchange rate older than 48 hours (with the currencies and the date), a holding whose synced price is older than a week, and a failed load of archived items, spending classes, banking entities or price history, each with a Retry where one applies. A failed load is never shown as an empty list.
@@ -150,7 +157,7 @@ Each item needs action from some operators or API clients and links to what to c
 
 ### Changed
 
-- A failed background job waits a minute, then two, and so on up to its interval before it retries, instead of retrying at every poll. [Details](docs/upgrade.md#background-job-backoff)
+- A failed background job waits a minute, then two, and so on up to its interval before it retries, instead of retrying at every poll. [Details](https://github.com/Pieter-OHearn/quro/blob/v1.0.0-rc.1/docs/upgrade.md#background-job-backoff)
 - Free-text fields have a maximum length, and the web inputs stop at the same length. No migration. [Limits](docs/text-limits.md)
 - On a phone, the dashboard puts net worth before the getting started list, Savings shows its total across the full width, and the stat cards use the shorter labels Salary, Dividends and Property equity. The Plan page shows the runway figure before the employment and spending class cards. Below 360px the currency button drops its flag and chevron so the page title fits.
 - Stored values that were saved in Title Case (savings account types, pension types, property types, asset allocation names, the generic rule set) are shown in sentence case. The stored values and the API are unchanged.
@@ -173,26 +180,26 @@ Each item needs action from some operators or API clients and links to what to c
 
 ## [v0.9.0] - 2026-10-15
 
-Quro 0.9.0 hardens the containers, encrypts bank-link secrets at rest, bounds statement processing, adds net worth chart ranges and brings the new design to every page, for laptop and phone, in light and dark mode. Read the [upgrade notes](docs/upgrade.md#upgrade-from-080-to-090) before you upgrade, and back up with 0.8.0 first.
+Quro 0.9.0 hardens the containers, encrypts bank-link secrets at rest, bounds statement processing, adds net worth chart ranges and brings the new design to every page, for laptop and phone, in light and dark mode. Read the [upgrade notes](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#upgrade-from-080-to-090) before you upgrade, and back up with 0.8.0 first.
 
 ### Breaking changes
 
 Each item needs action from some operators and links to what to change in the upgrade notes.
 
-- **A secrets key is required when bunq is configured.** Create a key file, mount it into `migrate` and `backend` (`QRO_SECRETS_KEY_FILE`, default `/run/secrets/secrets_key`; `quro init` creates one) and run `quro secrets encrypt` once while the backend is stopped. Without the key the backend stops at startup with exit code 2. [Details](docs/upgrade.md#secrets-key-for-bank-links)
-- **PostgreSQL 18 is the only supported server.** `quro migrate`, `quro doctor`, `quro backup` and `quro restore` refuse any other major version with exit code 3, before they change anything. [Details](docs/upgrade.md#postgresql-18-required)
-- **Settings that 0.8.0 retired are no longer recognised.** `DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY` are ignored like any unknown variable, and `quro doctor` no longer lists them. Run `quro doctor` with 0.8.0 and remove what it reports. [Details](docs/upgrade.md#settings-of-releases-before-080)
-- **The statement import Compose profile is renamed from `pension-import` to `ocr`.** A checkout that starts statement import uses `docker compose --profile ocr`, and `data/vllm-cache` must be owned by UID 1000 because the model server no longer runs as root. The example install does not include statement import. [Details](docs/upgrade.md#statement-import-profile)
-- **The images declare health checks.** Services that run the backend image for something other than the server (the `migrate` service, the import worker, a scheduled backup or other one-off maintenance services) need `healthcheck: disable: true`, or Docker reports them unhealthy. [Details](docs/upgrade.md#container-hardening)
-- **The frontend runs as a non-root user and ignores files mounted over `/etc/nginx/conf.d`.** Its configuration is rendered into `/tmp/nginx/conf.d`. The restrictions in the example Compose file (read-only root filesystem, dropped capabilities, limits) need the 0.9.0 images. [Details](docs/upgrade.md#container-hardening)
+- **A secrets key is required when bunq is configured.** Create a key file, mount it into `migrate` and `backend` (`QRO_SECRETS_KEY_FILE`, default `/run/secrets/secrets_key`; `quro init` creates one) and run `quro secrets encrypt` once while the backend is stopped. Without the key the backend stops at startup with exit code 2. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#secrets-key-for-bank-links)
+- **PostgreSQL 18 is the only supported server.** `quro migrate`, `quro doctor`, `quro backup` and `quro restore` refuse any other major version with exit code 3, before they change anything. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#postgresql-18-required)
+- **Settings that 0.8.0 retired are no longer recognised.** `DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY` are ignored like any unknown variable, and `quro doctor` no longer lists them. Run `quro doctor` with 0.8.0 and remove what it reports. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#settings-of-releases-before-080)
+- **The statement import Compose profile is renamed from `pension-import` to `ocr`.** A checkout that starts statement import uses `docker compose --profile ocr`, and `data/vllm-cache` must be owned by UID 1000 because the model server no longer runs as root. The example install does not include statement import. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#statement-import-profile)
+- **The images declare health checks.** Services that run the backend image for something other than the server (the `migrate` service, the import worker, a scheduled backup or other one-off maintenance services) need `healthcheck: disable: true`, or Docker reports them unhealthy. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#container-hardening)
+- **The frontend runs as a non-root user and ignores files mounted over `/etc/nginx/conf.d`.** Its configuration is rendered into `/tmp/nginx/conf.d`. The restrictions in the example Compose file (read-only root filesystem, dropped capabilities, limits) need the 0.9.0 images. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#container-hardening)
 
 ### Added
 
 - Bank-link secrets are encrypted at rest with a key that only you hold. New commands `quro secrets status`, `quro secrets encrypt` and `quro secrets rotate` check, encrypt and rotate it. `quro init` generates the key for new installs, the example Compose file mounts it, `quro doctor` has a `secrets` check, and a backup reports which key its bank links need.
 - When stored bank credentials cannot be opened, bunq sync asks you to reconnect (`409` with `code: bunq_reauthorization_required`) instead of failing, without calling bunq.
 - Container hardening in the [example Compose file](docs/compose.example.yaml): read-only root filesystems, dropped capabilities, `no-new-privileges`, and memory and process limits. The backend image contains production dependencies only and is smaller.
-- Net worth chart ranges: 1M with one point a day, 6M, 1Y and All, from your first dated record and at most 30 years back. `GET /api/dashboard/net-worth` takes a `range` (`1m`, `6m`, `1y` or `all`; `6m` when absent) and every point carries its `date`. See the [API changes](docs/upgrade.md#api-changes).
-- Limits on statement processing: file size, pages, page pixels, extracted text, concurrency and queue length, with fixed refusal messages. Each PDF is read in a resource-limited child process that is stopped at the time limit. The parser and model services run non-root on an internal network with resource limits. New optional settings `PARSER_MAX_FILE_MB`, `PARSER_MAX_PAGES`, `PARSER_MAX_PAGE_PIXELS`, `PARSER_MAX_TEXT_CHARS`, `PARSER_TIMEOUT_SECONDS`, `PARSER_CPU_SECONDS`, `PARSER_MEMORY_MB`, `PARSER_MAX_CONCURRENCY` and `PARSER_MAX_QUEUE`. [Details](docs/upgrade.md#statement-import-profile)
+- Net worth chart ranges: 1M with one point a day, 6M, 1Y and All, from your first dated record and at most 30 years back. `GET /api/dashboard/net-worth` takes a `range` (`1m`, `6m`, `1y` or `all`; `6m` when absent) and every point carries its `date`. See the [API changes](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#api-changes).
+- Limits on statement processing: file size, pages, page pixels, extracted text, concurrency and queue length, with fixed refusal messages. Each PDF is read in a resource-limited child process that is stopped at the time limit. The parser and model services run non-root on an internal network with resource limits. New optional settings `PARSER_MAX_FILE_MB`, `PARSER_MAX_PAGES`, `PARSER_MAX_PAGE_PIXELS`, `PARSER_MAX_TEXT_CHARS`, `PARSER_TIMEOUT_SECONDS`, `PARSER_CPU_SECONDS`, `PARSER_MEMORY_MB`, `PARSER_MAX_CONCURRENCY` and `PARSER_MAX_QUEUE`. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#statement-import-profile)
 - The new design: a denser, calmer look for every page, with a bottom tab bar and touch-sized controls on phones, light and dark themes, compact tables, and charts on one palette. See the [design guide](docs/design-v1.md) and the screenshots in the [README](README.md).
 - A synthetic demo household (`db:seed-household`) with a linked partner, private and joint rows, a monthly rate history and confirmed banks, for screenshots and manual checks.
 - Documentation: supported versions, severity targets and triage in `SECURITY.md`, the design token guide and reference screenshots.
@@ -205,7 +212,7 @@ Each item needs action from some operators and links to what to change in the up
 - Holding prices (current, manual, transaction and price history) are stored with six decimals instead of two, and unit prices show up to four decimals. Dividend amounts and other money stay at two decimals. No operator action; `quro migrate` widens the columns.
 - Pages and the dashboard share one set of domain rules: a holding's shares never go below zero, an oversell nets against later buys, rental counts as an investment property, joint rows use one household share, and money totals are summed in whole cents so pages and dashboard agree to the cent.
 - A cancelled or failed statement import deletes its PDF when it ends. Imports that ended before the upgrade are not touched.
-- `GET /api/pensions/imports` answers 400 for an invalid `limit` instead of falling back to 30, and malformed upload bodies answer 400 `Invalid upload` instead of 500. See the [API changes](docs/upgrade.md#api-changes).
+- `GET /api/pensions/imports` answers 400 for an invalid `limit` instead of falling back to 30, and malformed upload bodies answer 400 `Invalid upload` instead of 500. See the [API changes](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#api-changes).
 - The JSON output of `quro version --json`, `quro migrate --status --json`, `quro doctor --json` and the readiness report carries no stability promise before 1.0.0.
 - Release notes link to the files of the tag they describe, and CI scans the images, Dockerfiles and commit history for known vulnerabilities and secrets, on every change and weekly for the published images.
 
@@ -213,7 +220,7 @@ Each item needs action from some operators and links to what to change in the up
 
 - Editing or deleting a repayment that the zero-balance limit cut short restores exactly what it reduced, and a property repayment is reversed against the debt it paid, even after the property is linked to a mortgage or remortgaged.
 - A cascade archive no longer deadlocks with a concurrent edit of one of its transactions; the edit answers 404.
-- Two imports of the same pension statement can no longer both be committed; the second answers 409. `quro migrate` stops with a list of import ids if the database already holds such duplicates. [Details](docs/upgrade.md#duplicate-statement-imports)
+- Two imports of the same pension statement can no longer both be committed; the second answers 409. `quro migrate` stops with a list of import ids if the database already holds such duplicates. [Details](https://github.com/Pieter-OHearn/quro/blob/v0.9.0/docs/upgrade.md#duplicate-statement-imports)
 - The runway's tax rate is stable when payslips share a date, and its rule date lists the default tax rate only when that rate is used (`jurisdiction.rulesEffectiveFrom` can be `null`).
 - A mortgage without a fixed-until date no longer breaks its page, and the web app no longer calls bank or statement import routes that a deployment has switched off.
 - `quro backup` and `quro restore` check the PostgreSQL version before pausing writes or writing anything.

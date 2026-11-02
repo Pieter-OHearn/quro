@@ -4,6 +4,10 @@ Quro is a self-hosted personal finance app: budgeting, savings, investments, pen
 
 Quro has a single maintainer. Things are listed in the order they are likely to happen, but dates are deliberately left out.
 
+## Done
+
+- **Integration secrets are encrypted at rest.** Bank-link tokens and keys are stored encrypted with a key the operator holds (see [integration secrets](docs/security.md#integration-secrets)).
+
 ## Now: towards 1.0
 
 Version 1.0 is the release where a hobbyist or developer can install Quro, run it safely at home and keep their data. It contains:
@@ -14,7 +18,7 @@ Version 1.0 is the release where a hobbyist or developer can install Quro, run i
 - **Closed registration.** Registration closes once the first owner exists. Further accounts are created by the operator, and recovery does not need an email server.
 - **A new design.** A denser, calmer look for desktop and phone, in light and dark mode, with accessible tables, charts and forms.
 - **Data in and out.** CSV import with a review step before anything is committed, and a full export of your data.
-- **Trustworthy numbers.** Money, currency conversion and planning calculations are covered by tests, and integration secrets are encrypted at rest.
+- **Trustworthy numbers.** Money, currency conversion and planning calculations are covered by tests.
 - **Optional features stay optional.** Bank linking, statement OCR, S3 storage and tracing can be switched on or off without affecting the core app.
 
 ## After 1.0

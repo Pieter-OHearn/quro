@@ -1,4 +1,4 @@
-// Release versions (`v0.8.0`, `v1.0.0-rc.2`, the VERSION file; see lib/buildInfo.ts) and their
+// Release versions (`v1.0.0`, `v1.0.0-rc.2`, the VERSION file; see lib/buildInfo.ts) and their
 // order, so a restore can refuse an archive written by a newer release.
 
 const VERSION_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?$/;

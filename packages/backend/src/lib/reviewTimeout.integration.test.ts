@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test }
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { bunqConnections, bunqPaymentProgress, workerHeartbeats } from '../db/schema';
+import { sealBunqSecret } from './bunqCredentials';
 import { createOAuthAttempt } from './bunqOAuthAttempts';
 import { bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
@@ -33,8 +34,8 @@ for (const [kind, sync] of [
     const name = `review-${kind}-${crypto.randomUUID()}`;
     await db.insert(bunqConnections).values({
       userId: auth.user.id,
-      accessToken: 'synthetic',
-      sessionToken: 'synthetic',
+      accessToken: sealBunqSecret('access_token', auth.user.id, 'synthetic'),
+      sessionToken: sealBunqSecret('session_token', auth.user.id, 'synthetic'),
       sessionId: 1,
       sessionExpiresAt: new Date(Date.now() + 60_000),
       bunqUserId: '42',

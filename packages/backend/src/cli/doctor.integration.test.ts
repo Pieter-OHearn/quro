@@ -289,11 +289,10 @@ describe('quro doctor', () => {
       expect(withoutKey.exitCode).toBe(EXIT_OK);
       expect(secretsCheck(withoutKey.report)).toMatchObject({
         status: 'warn',
-        message:
-          '1 of 1 bank-link secret(s) are stored unencrypted. Set QRO_SECRETS_KEY_FILE, then run `quro secrets encrypt`.',
+        message: `1 of 1 bank-link secret(s) are stored unencrypted, which Quro does not read. Have users ${user!.id} connect bunq again in Settings.`,
       });
       const withKey = await report(settingsFor(migrated, { QRO_SECRETS_KEY_FILE: keyFile }));
-      expect(secretsCheck(withKey.report).message).toContain('Run `quro secrets encrypt`.');
+      expect(secretsCheck(withKey.report).message).toContain('which Quro does not read');
 
       const sealed = key.seal(marker, secretPlace('access_token', user!.id));
       await sql`update bunq_connections set access_token = ${sealed} where user_id = ${user!.id}`;
@@ -315,11 +314,28 @@ describe('quro doctor', () => {
       expect(secretsCheck(wrongKey.report).status).toBe('fail');
       expect(secretsCheck(wrongKey.report).message).toContain(`(users ${user!.id})`);
 
+      // An unencrypted value next to a sealed one is never hidden behind the missing key.
+      await sql`update bunq_connections set session_token = ${`${marker}-session`} where user_id = ${user!.id}`;
+      const mixedNoKey = await report(settingsFor(migrated));
+      expect(secretsCheck(mixedNoKey.report)).toMatchObject({
+        status: 'fail',
+        message: expect.stringContaining(`2 of 2 bank-link secret(s) cannot be opened`),
+      });
+      await sql`update bunq_connections set session_token = null where user_id = ${user!.id}`;
+
       const invalidKey = await doctor(settingsFor(migrated, { QRO_SECRETS_KEY_FILE: fakePgDump }));
       expect(invalidKey.exitCode).toBe(EXIT_USAGE);
       expect(invalidKey.out).toContain('QRO_SECRETS_KEY_FILE: the key in');
 
-      for (const run of [withoutKey, withKey, encrypted, noKeyHere, wrongKey, invalidKey]) {
+      for (const run of [
+        withoutKey,
+        withKey,
+        encrypted,
+        noKeyHere,
+        wrongKey,
+        mixedNoKey,
+        invalidKey,
+      ]) {
         expect(run.out).not.toContain(marker);
         expect(run.out).not.toContain(keyHex);
       }

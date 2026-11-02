@@ -1,17 +1,12 @@
-import { dirname, extname, resolve } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { dirname, extname } from 'node:path';
 import postgres from 'postgres';
 import { childProcessEnv, getConfig } from '../config';
-import {
-  backupDirectory,
-  ensureDirectory,
-  getTimestamp,
-  parseConnectionString,
-} from './maintenance';
+import { parseConnectionString } from './maintenance';
 
 type BackupOptions = {
   connectionString: string;
-  label?: string;
-  outputPath?: string;
+  outputPath: string;
   /** Dump the state of a snapshot exported by another session (`pg_export_snapshot()`). */
   snapshot?: string;
   /** Stops the dump when aborted. */
@@ -55,35 +50,26 @@ const OVERRIDE_KEY_BY_TOOL = {
 
 export async function createDatabaseBackup({
   connectionString,
-  label,
   outputPath,
   snapshot,
   signal,
   log = (line) => console.log(line),
 }: BackupOptions) {
-  const resolvedOutputPath = outputPath ?? buildBackupPath(connectionString, label);
   const pgDump = resolvePgTool('pg_dump');
   // Before anything is written: a refused dump must not leave an empty file behind.
   await assertToolCoversServer('pg_dump', pgDump, connectionString);
-  await ensureDirectory(dirname(resolvedOutputPath));
+  await mkdir(dirname(outputPath), { recursive: true });
   const env = buildPgEnv(connectionString, APP_NAME_BY_TOOL.pg_dump);
 
-  log(`Writing logical backup to ${resolvedOutputPath}`);
+  log(`Writing logical backup to ${outputPath}`);
   const snapshotArgs = snapshot ? [`--snapshot=${snapshot}`] : [];
   await runPgTool(
     pgDump,
-    [
-      '--format=custom',
-      '--no-owner',
-      '--no-privileges',
-      ...snapshotArgs,
-      '--file',
-      resolvedOutputPath,
-    ],
+    ['--format=custom', '--no-owner', '--no-privileges', ...snapshotArgs, '--file', outputPath],
     env,
     signal,
   );
-  return resolvedOutputPath;
+  return outputPath;
 }
 
 /** Refuses, before anything is written, when `pg_dump` is missing or older than the server. */
@@ -223,12 +209,6 @@ export async function readServerMajor(connectionString: string) {
   } finally {
     await sql.end({ timeout: 5 });
   }
-}
-
-function buildBackupPath(connectionString: string, label?: string) {
-  const { database } = parseConnectionString(connectionString);
-  const suffix = label ? `-${label}` : '';
-  return resolve(backupDirectory, `${database}-${getTimestamp()}${suffix}.dump`);
 }
 
 function buildPgEnv(connectionString: string, appName: string) {

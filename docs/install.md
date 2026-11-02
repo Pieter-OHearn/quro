@@ -2,7 +2,7 @@
 
 This guide installs Quro on one host with Docker Compose, from the release images and the example Compose file. It also covers an existing PostgreSQL server or S3-compatible store, the `quro` commands and what each one changes. The [install contract](install-contract.md) explains the decisions behind it.
 
-The steps apply from 0.8.0. CI runs these steps from empty directories on amd64 and arm64 for every change (`scripts/clean-install/run.sh`).
+CI runs these steps from empty directories on amd64 and arm64 for every change (`scripts/clean-install/run.sh`).
 
 ## Before you start
 
@@ -146,7 +146,7 @@ Every command runs from the backend image: `docker run --rm [mounts and settings
 | `quro worker pension-imports`    | Runs the optional statement import worker.                                                                                                                                                                                                                                                                                                                                                               |
 | `quro user …`                    | Accounts without a password for single sign-on, registration and password reset codes, session revocation. See `quro user --help`.                                                                                                                                                                                                                                                                       |
 | `quro documents migrate-from-s3` | Copies documents from S3 into the documents directory. See [document storage](document-storage.md).                                                                                                                                                                                                                                                                                                      |
-| `quro secrets …`                 | `status` changes nothing; `encrypt` and `rotate` encrypt the stored bank-link secrets with the secrets key, one connection per transaction. See [integration secrets](security.md#integration-secrets).                                                                                                                                                                                                  |
+| `quro secrets …`                 | `status` changes nothing; `rotate` re-encrypts the stored bank-link secrets sealed with the previous key, one connection per transaction. See [integration secrets](security.md#integration-secrets).                                                                                                                                                                                                    |
 
 `quro migrate` runs one at a time per database: a second run waits for the first (a PostgreSQL advisory lock) and then finds nothing to do. A run that is stopped part way applies none of its migrations, so running it again is always safe. Before it changes anything it checks the host, the PostgreSQL version, that the owner role owns the database, that the schema is not newer than the image, and the runtime role.
 
@@ -172,4 +172,4 @@ No command prints a password, a secret file's contents or a connection string wi
 
 ## Upgrades
 
-Quro does not update itself. To upgrade, read the upgrade notes of every version you skip, take a backup with the old version (see [backup and restore](backup-and-restore.md)), change the image tags in `compose.yaml`, then run `docker compose up -d`; `migrate` applies the new migrations before the backend starts. [Upgrade Quro](upgrade.md) has the steps, how to roll back, and the interfaces for automating it. Upgrades are supported from 0.8.0 on.
+Quro does not update itself. To upgrade, read the upgrade notes of every version you skip, take a backup with the old version (see [backup and restore](backup-and-restore.md)), change the image tags in `compose.yaml`, then run `docker compose up -d`; `migrate` applies the new migrations before the backend starts. [Upgrade Quro](upgrade.md) has the steps, how to roll back, and the interfaces for automating it. Upgrades are supported from the last 1.0.0 release candidate on.

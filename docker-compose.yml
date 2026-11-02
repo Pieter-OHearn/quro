@@ -35,10 +35,18 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-quro}
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
+      # Backups include the documents directory when documents are on the filesystem.
+      QRO_DOCUMENT_STORAGE: ${QRO_DOCUMENT_STORAGE:-}
     secrets:
       - postgres_admin_password
       - postgres_app_password
-    # The image's entry point is `quro`; its default command is `serve`.
+    volumes:
+      # `quro backup` writes archives to ./backups (QRO_BACKUP_DIR).
+      - ./backups:/var/lib/quro/backups
+      # Writable: `quro restore` puts the archive's documents back.
+      - ./data/documents:/var/lib/quro/documents
+    # The image's entry point is `quro`; its default command is `serve`. Maintenance commands run
+    # here too: `docker compose run --rm migrate backup` (or `restore`, `doctor`).
     command: ['migrate']
     # The image's health check is for the server; this service runs a command and exits.
     healthcheck:
@@ -141,39 +149,6 @@ services:
     networks:
       - backend-net
       - ocr-net
-
-  db-tools:
-    build:
-      context: .
-      dockerfile: packages/backend/Dockerfile
-    profiles: ['maintenance']
-    restart: 'no'
-    stdin_open: true
-    tty: true
-    environment:
-      POSTGRES_HOST: db
-      POSTGRES_DB: ${POSTGRES_DB:-quro}
-      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-quro_admin}
-      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-quro_app}
-      # Backups include the documents directory when documents are on the filesystem.
-      QRO_DOCUMENT_STORAGE: ${QRO_DOCUMENT_STORAGE:-}
-    secrets:
-      - postgres_admin_password
-      - postgres_app_password
-    volumes:
-      # `quro backup` writes archives to ./backups (QRO_BACKUP_DIR). The older `backup` and
-      # `restore` commands of this service use /app/backups/db, which the image links into it.
-      - ./backups:/var/lib/quro/backups
-      # Writable: `quro restore` puts the archive's documents back.
-      - ./data/documents:/var/lib/quro/documents
-    depends_on:
-      db:
-        condition: service_healthy
-    entrypoint: ['/bin/sh', '/app/docker/backend/run-db-tools.sh']
-    healthcheck:
-      disable: true
-    networks:
-      - backend-net
 
   # The model server and the parser are private: no published ports, an internal network shared
   # only with the import worker, non-root users and resource limits. The model server alone may
