@@ -124,3 +124,15 @@ test('leaving a settings form with unsaved edits asks first', async ({ page }) =
     .click();
   await expect(page).toHaveURL(/\/debts$/);
 });
+
+test('a dialog reopened while it fades out starts fresh', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/debts');
+  const dialog = await openAddDebt(page);
+  await dialog.getByPlaceholder('e.g. Volkswagen Golf Loan').fill('Example car loan');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  // Reopen at once, before the closing transition has ended.
+  await page.getByRole('button', { name: 'Add debt' }).first().click({ force: true });
+  const reopened = page.getByRole('dialog', { name: 'Add debt' });
+  await expect(reopened.getByPlaceholder('e.g. Volkswagen Golf Loan')).toHaveValue('');
+});

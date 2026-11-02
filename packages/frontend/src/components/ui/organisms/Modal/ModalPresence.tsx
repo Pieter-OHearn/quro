@@ -1,4 +1,4 @@
-import { createContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useModalPresence } from './useExitTransition';
 
 type ModalPresenceValue = { open: boolean; onExited: () => void };
@@ -19,7 +19,8 @@ type ModalPresenceProps = {
  * Keeps a dialog on screen until its closing transition has ended (`useModalPresence`), so every
  * dialog leaves with the fade, and the sheet slide on a phone, that it arrived with. While closing
  * it keeps showing the dialog it last rendered open, so the caller can clear the state the dialog
- * was opened for at once:
+ * was opened for at once. Each opening starts a fresh dialog, also when it reopens during the
+ * closing transition, so no step or field state carries over:
  *
  *     <ModalPresence open={editing !== null}>
  *       {editing && <EditDialog item={editing} onClose={() => setEditing(null)} />}
@@ -31,6 +32,12 @@ export function ModalPresence({ open, children }: Readonly<ModalPresenceProps>) 
   // a value from an earlier render.
   const [shown, setShown] = useState<ReactNode>(children);
   if (open && shown !== children) setShown(children);
+  const [wasOpen, setWasOpen] = useState(open);
+  const [opening, setOpening] = useState(0);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpening(opening + 1);
+  }
   const value = useMemo(
     () => ({ open: presence.open, onExited: presence.onExited }),
     [presence.open, presence.onExited],
@@ -39,7 +46,7 @@ export function ModalPresence({ open, children }: Readonly<ModalPresenceProps>) 
   if (!presence.mounted) return null;
   return (
     <ModalPresenceContext.Provider value={value}>
-      {open ? children : shown}
+      <Fragment key={opening}>{open ? children : shown}</Fragment>
     </ModalPresenceContext.Provider>
   );
 }
