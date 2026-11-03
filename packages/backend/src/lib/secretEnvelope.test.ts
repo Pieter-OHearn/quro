@@ -155,11 +155,18 @@ describe('envelope', () => {
     );
   });
 
-  test('a value without the marker is unencrypted and returned as it is', () => {
+  test('a value without the marker is unencrypted and refused, never returned', () => {
     const keyring = { current: key, previous: null };
     expect(classifySecret(MARKER, keyring)).toBe('unencrypted');
-    expect(openSecret(MARKER, PLACE, keyring)).toEqual({ value: MARKER, state: 'unencrypted' });
+    expect(unreadableReason(() => openSecret(MARKER, PLACE, keyring))).toBe('unencrypted');
     expect(envelopeKeyId(MARKER)).toBeNull();
+    try {
+      openSecret(MARKER, PLACE, keyring);
+    } catch (error) {
+      expect((error as Error).message).toBe(
+        'The bunq_connections.access_token value of user 7 cannot be opened: it is stored unencrypted, and only encrypted values are read.',
+      );
+    }
   });
 
   test('an unreadable value is reported without its content', () => {

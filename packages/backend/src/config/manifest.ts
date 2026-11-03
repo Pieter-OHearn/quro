@@ -66,13 +66,3 @@ export function settingsManifest(): ManifestEntry[] {
     };
   });
 }
-
-/** Optional features that stay off until one of their settings appears, and then need all of them. */
-export function featureManifest() {
-  return Object.entries(FEATURES).map(([id, feature]) => ({
-    id,
-    label: feature.label,
-    enabledBy: [...feature.enabledBy],
-    requires: [...feature.requires],
-  }));
-}

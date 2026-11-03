@@ -97,7 +97,7 @@ async function seedSource(): Promise<void> {
     insert into savings_accounts (user_id, name, bank, balance, currency, interest_rate, account_type)
     values (1, 'Everyday', 'Synthetic Bank', 1234.56, 'EUR', 1.5, 'savings'),
            (2, 'Rainy day', 'Synthetic Bank', -0.01, 'GBP', 0, 'savings')`;
-  // A bank link with one secret encrypted and one stored the way releases before 0.9.0 did.
+  // A bank link with one secret encrypted and one stored unencrypted, which Quro does not read.
   await source`
     insert into bunq_connections (user_id, access_token, session_token)
     values (1, ${SECRETS_KEY.seal('synthetic-backup-access', secretPlace('access_token', 1))},
@@ -181,7 +181,7 @@ function dependencies(overrides: Partial<RestoreDependencies> = {}): RestoreDepe
     checkDump: () => Promise.resolve(),
     readServerMajor: () => Promise.resolve(SUPPORTED_POSTGRES_MAJOR),
     now: () => new Date(),
-    appVersion: 'v0.8.0',
+    appVersion: 'v1.0.0-rc.1',
     revision: 'synthetic-revision',
     migrations: BUNDLED_MIGRATIONS,
     restore: () => copySourceIntoTarget(),
@@ -285,8 +285,8 @@ describe('quro backup', () => {
     await probe.end();
 
     const { manifest } = archive;
-    expect(manifest.app.version).toBe('v0.8.0');
-    expect(manifest.app).toEqual({ version: 'v0.8.0', revision: 'synthetic-revision' });
+    expect(manifest.app.version).toBe('v1.0.0-rc.1');
+    expect(manifest.app).toEqual({ version: 'v1.0.0-rc.1', revision: 'synthetic-revision' });
     expect(manifest.database.lastMigration).toEqual({
       tag: BUNDLED_MIGRATIONS.at(-1)!.tag,
       when: BUNDLED_MIGRATIONS.at(-1)!.when,
@@ -308,7 +308,7 @@ describe('quro backup', () => {
     });
     expect(describeIntegrationKeys(manifest.secrets.integrationKeys)).toEqual([
       `Bank-link secrets: encrypted with secrets key ${SECRETS_KEY.id}. Keep that key file (QRO_SECRETS_KEY_FILE) apart from this archive: a restore without it keeps the data, but connected bunq accounts must be connected again.`,
-      'Warning: 1 bank-link secret(s) in this archive are not encrypted. Run `quro secrets encrypt`.',
+      'Warning: 1 bank-link secret(s) in this archive are not encrypted. Quro does not read them: after a restore, their users connect bunq again.',
     ]);
     expect(JSON.stringify(manifest)).not.toContain('synthetic-unencrypted-session');
 

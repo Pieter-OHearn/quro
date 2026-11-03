@@ -27,8 +27,8 @@ Core artifacts stay public. A release is blocked when the two core images cannot
 It follows blob redirects itself and sends the pull token only to `ghcr.io`, never to the storage host a blob redirects to. Rate limits and server errors are retried; a missing tag, a refused token or an unreadable layer fails at once and says which.
 
 ```bash
-bun run check:image-access --tag v0.7.0
-bun run check:image-access --tag v0.7.0 --full
+bun run check:image-access --tag v1.0.0-rc.6
+bun run check:image-access --tag v1.0.0-rc.6 --full
 bun run check:image-access --tag sha-<commit> --expect quro-backend=sha256:<digest>
 ```
 
@@ -49,8 +49,8 @@ The script does not replace a real pull. To pull as a user with nothing configur
 
 ```bash
 config_dir="$(mktemp -d)"
-docker --config "$config_dir" pull --platform linux/arm64 ghcr.io/pieter-ohearn/quro-backend:v0.7.0
-docker --config "$config_dir" pull --platform linux/amd64 ghcr.io/pieter-ohearn/quro-backend:v0.7.0
+docker --config "$config_dir" pull --platform linux/arm64 ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.6
+docker --config "$config_dir" pull --platform linux/amd64 ghcr.io/pieter-ohearn/quro-backend:v1.0.0-rc.6
 ```
 
 An empty configuration directory also drops the active Docker context. On Docker Desktop, add `--host` with the socket of your context, which `docker context ls` prints.
@@ -73,27 +73,6 @@ Core Quro is the backend, the frontend and PostgreSQL. It needs no registry acco
 Other features make no outbound requests of their own: a search of the backend and frontend source for outbound URLs and clients found none besides the rows above. The scheduled provider jobs for prices and exchange rates are the only calls the backend makes without being asked to link a service. `QRO_DISABLE_SCHEDULERS` stops every interval job for development; it is not a way to turn off one provider.
 
 Checked on 2026-10-10 with the example Compose file and images built from `main`: with the database, the migration job and the backend on Docker networks marked `internal` and the schedulers on, names outside the host did not resolve in the backend container, the backend became ready, and sign-up, sign-in, a ledger write and a document upload and download worked. The only failing jobs were the exchange-rate refresh and the net-worth snapshot, which needs those rates; both retried every minute. A browser signed in to the app loaded nothing from another host while the emoji picker stayed closed.
-
-## Recorded evidence: v0.7.0
-
-Recorded on 2026-10-10 from a host with no Quro or GitHub credentials. Manifest and layer checks used `scripts/lib/image-access.ts`; pulls and runs used a clean container engine (Docker 29.9.0, containerd image store) with an empty `DOCKER_CONFIG` directory and no credential helper.
-
-| Image                                        | Index digest                                                              | Platform      | Image manifest digest                                                     | Blobs | Compressed size |
-| -------------------------------------------- | ------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------- | ----- | --------------- |
-| `ghcr.io/pieter-ohearn/quro-backend:v0.7.0`  | `sha256:54fe1e7b485c83b8ca448faa843619c3e2e6e566491f0d929a970323bad2923d` | `linux/amd64` | `sha256:e5eb8f44f7cde3ffa299dff05243b3c0bb5c781fa8165ff609be0ac2508eda27` | 20    | 226.2 MB        |
-|                                              |                                                                           | `linux/arm64` | `sha256:c9540657c2d87bba13668f25673a89582d34bbc824bf00172b4819aca735b289` | 20    | 224.2 MB        |
-| `ghcr.io/pieter-ohearn/quro-frontend:v0.7.0` | `sha256:362710fd5d1e328a69f14446010d3af8cf7c6db22dfa62900114dfafad239d52` | `linux/amd64` | `sha256:c2470c4747307d2aa0fd16900cb0805467c3994f30506ddfe258ab3c127bc290` | 11    | 26.8 MB         |
-|                                              |                                                                           | `linux/arm64` | `sha256:28b5f141b8db0e65d0396f03c3d27cf965200157585e2f1f2f1194bc41679483` | 11    | 26.6 MB         |
-
-`latest` pointed at the same two index digests.
-
-| Evidence   | What was done                                                                                                                                                                                                                                | Result                                                                                                                                                                                            |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest   | Anonymous token, image index and all four platform manifests for both images, digests recomputed from the bytes                                                                                                                              | Passed. Each index also lists one attestation manifest per platform                                                                                                                               |
-| Layer pull | `--full` run: every config and layer blob of all four platform images downloaded and hashed. Separately, `docker pull --platform` for both platforms of both images in the clean engine                                                      | All blobs matched their digests. All four pulls completed; the engine's per-platform image ids equal the manifest digests above                                                                   |
-| Runtime    | In the clean engine: `bun --version` and `pg_dump --version` in the backend, `nginx -v` in the frontend; the frontend serving `/` with HTTP 200; the backend process answering `GET /api/health` with HTTP 200 (schedulers off, no database) | Passed on both platforms. `linux/arm64` ran natively on an arm64 host; `linux/amd64` ran under emulation on the same host, which shows the binaries start, not how they perform on amd64 hardware |
-
-Not covered: native amd64 hardware, a machine without a container engine cache, and the full `quro` command set, which first ships in 0.8.0 (0.7.0 images have no `quro` command, so their runtime check uses the tools and entry points they do have).
 
 ## Visibility and private candidate channels
 

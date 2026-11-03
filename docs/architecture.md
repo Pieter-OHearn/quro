@@ -12,7 +12,6 @@ Quro is a self-hosted personal finance app intended for home/LAN use over plain 
 | ------------------------- | ------------------------------------------------------ |
 | default (no profile flag) | `frontend`, `backend`, `db`, `migrate`                 |
 | `ocr` (experimental)      | adds `pension-import-worker`, `vllm`, `pension-parser` |
-| `maintenance`             | adds `db-tools`                                        |
 
 ### Host-exposed ports
 
@@ -62,7 +61,6 @@ graph LR
 | pension-import-worker | no           | yes         | yes     | no         |
 | pension-parser        | no           | no          | yes     | no         |
 | vllm                  | no           | no          | yes     | yes        |
-| db-tools              | no           | yes         | no      | no         |
 
 The frontend can reach the backend (via `frontend-net`) but cannot directly reach the database, the documents directory or the OCR services. The pension import worker bridges `backend-net` (for the database) and `ocr-net` (for the parser), and mounts the same documents directory as the backend. The parser and vLLM are isolated on `ocr-net` and are unreachable from the browser or the Hono API server directly. Both run as non-root users with dropped capabilities and CPU, memory and process limits; the parser also has a read-only root filesystem.
 
@@ -70,8 +68,7 @@ Uploaded documents are stored on the filesystem (`./data/documents`, mounted at 
 
 ### One-shot services
 
-- `migrate`: runs `quro migrate` (schema migrations as the admin DB role, under a database lock, then the runtime role and its grants), then exits. The backend's health check is `quro health`.
-- `db-tools`: runs `quro backup`, `quro restore` (with `--entrypoint quro`) and the older dump commands; only started with the `maintenance` profile. See [backup and restore](backup-and-restore.md).
+- `migrate`: runs `quro migrate` (schema migrations as the admin DB role, under a database lock, then the runtime role and its grants), then exits. The backend's health check is `quro health`. Operator commands such as `quro backup` and `quro restore` run through it too (`docker compose run --rm migrate backup`); it mounts the backup and documents directories. See [backup and restore](backup-and-restore.md).
 
 ---
 
@@ -363,10 +360,10 @@ The server is started with `Bun.serve` in `src/index.ts` and stops gracefully on
 
 Every setting the backend reads is declared once, in `packages/backend/src/config/settings.ts`: its name, type, default, whether it is secret, and when it is required. `loadConfig` in `config/load.ts` parses the environment and the secret files it points at a single time, collects every problem instead of stopping at the first, and returns a frozen, typed `Config`. Nothing outside `src/config` reads `process.env` (a lint rule enforces it); code calls `getConfig()`.
 
-- **Fail fast, in full.** A process validates the sections it needs when it starts (`bootConfig('server')` for the API, `'worker'`, `'migrate'`, `'backup'`, `'restore'` and `'maintenance'` for the database commands) and exits with code 2 and one list of problems. The list names settings and never their values. A migration job does not need bunq, so its profile does not check it; a section that is invalid throws only when something reads it.
+- **Fail fast, in full.** A process validates the sections it needs when it starts (`bootConfig('server')` for the API, `'worker'`, `'migrate'`, `'backup'` and `'restore'` for the database commands) and exits with code 2 and one list of problems. The list names settings and never their values. A migration job does not need bunq, so its profile does not check it; a section that is invalid throws only when something reads it.
 - **Secrets are files.** Database and S3 secrets are read from the files named by `*_FILE` settings (defaults under `/run/secrets/`); a trailing newline is ignored and an empty file is an error. Values are wrapped in `Secret`, which prints as `[redacted]` and needs `.reveal()` to read, so logging the configuration cannot leak a credential.
 - **Optional features are all or nothing.** A feature such as S3 storage or bunq stays off until one of its settings is present, and then needs all of them; a half-configured feature stops startup instead of mounting half-working routes. S3 settings alone never select the S3 store: without `QRO_DOCUMENT_STORAGE` they stop every command (profiles all include the `documentStorage` section, which reads no secret), so documents in an existing store are never hidden behind an empty directory.
-- **Old settings are not read.** Names from releases before 0.8.0 are unknown variables: they are never used as a fallback and not reported. `config.notices` carries the remaining non-fatal observations, such as a replaced wildcard CORS origin.
+- **Only documented settings are read.** There are no aliases or fallback names: an unknown variable is ignored and not reported. `config.notices` carries the remaining non-fatal observations, such as a replaced wildcard CORS origin.
 - **The schema is the manifest.** `settingsManifest()` in `config/manifest.ts` lists every setting with its type, default, secrecy and requirement, generated from the same table; the installer and the configuration reference use it, and a test keeps the Compose files, the example files and the docs in step with it.
 
 To add a setting, add it to `SETTINGS`, read it in the section builder that owns it, and mention it in an example file or a doc. Tests that change settings use `applyTestSettings` (`src/test/config.ts`), which re-parses the configuration.

@@ -72,7 +72,6 @@ export const PROFILES = {
   backup: ['adminDatabase', 'tools', 'documentStorage', 'backup'],
   /** `quro backup verify`: reads an archive, and the key when it is encrypted. */
   backupVerify: ['documentStorage', 'backup'],
-  maintenance: ['adminDatabase', 'runtimeDatabase', 'tools', 'maintenance', 'documentStorage'],
   restore: [
     'adminDatabase',
     'runtimeDatabase',

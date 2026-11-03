@@ -70,7 +70,7 @@ In `packages/frontend/.env`, uncomment `VITE_API_URL=http://localhost:3000`. The
 - `APP_DATABASE_URL` should point at your runtime Postgres user on `127.0.0.1:5432`
 - Uploaded documents go to the directory in `QRO_DOCUMENTS_DIR` (default `/var/lib/quro/documents`). On the host, create a directory you own and set `QRO_DOCUMENTS_DIR` to its absolute path; the backend never creates it, and a relative path is refused. Leave `QRO_DOCUMENT_STORAGE` at `filesystem` and the `S3_*` settings commented out unless you work on the S3 driver; then set `QRO_DOCUMENT_STORAGE=s3` and all of `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY_FILE` for an S3-compatible store you run (see [document storage](document-storage.md)). An `S3_ENDPOINT`, `S3_BUCKET` or `S3_ACCESS_KEY_ID` without `QRO_DOCUMENT_STORAGE` stops the backend at startup.
 
-The backend validates every setting once at startup (see [Configuration](architecture.md#configuration)). Names that releases before 0.8.0 accepted (`DATABASE_HOST`, `DATABASE_PORT`, `APP_DB_USER`, `APP_DB_PASSWORD`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_ADMIN_PASSWORD`, `POSTGRES_APP_PASSWORD`, `MINIO_APP_USER` and `S3_SECRET_ACCESS_KEY`) are not read and not reported; use the settings in `.env.example`. To run the demo seed with a password of your own, set `DEMO_USER_PASSWORD`. The test scripts set `NODE_ENV=test`, which turns off rate limiting and the background jobs.
+The backend validates every setting once at startup (see [Configuration](architecture.md#configuration)). Names it does not know are not read and not reported; use the settings in `.env.example`. To run the demo seed with a password of your own, set `DEMO_USER_PASSWORD`. The test scripts set `NODE_ENV=test`, which turns off rate limiting and the background jobs.
 
 5. Start the database. The development override exposes Postgres on `127.0.0.1` for host-side Bun and Python processes without changing the public default compose file:
 
@@ -157,7 +157,7 @@ BUNQ_CLIENT_SECRET=<client secret>
 BUNQ_REDIRECT_URI=http://localhost:3000/api/bunq/oauth/callback
 ```
 
-bunq credentials are stored encrypted, so the backend also needs a secrets key once bunq is configured (see [integration secrets](security.md#integration-secrets)). Create one and point `QRO_SECRETS_KEY_FILE` at it: for a local Bun backend, `openssl rand -hex 32 > secrets/secrets_key.txt` and `QRO_SECRETS_KEY_FILE=../../secrets/secrets_key.txt` in `packages/backend/.env`; for the repository's Compose stack, mount the same file into the `backend` and `db-tools` services as a secret named `secrets_key` (it is then read from `/run/secrets/secrets_key`). The stack does not mount it by default, because Compose refuses to start a service whose secret file is missing.
+bunq credentials are stored encrypted, so the backend also needs a secrets key once bunq is configured (see [integration secrets](security.md#integration-secrets)). Create one and point `QRO_SECRETS_KEY_FILE` at it: for a local Bun backend, `openssl rand -hex 32 > secrets/secrets_key.txt` and `QRO_SECRETS_KEY_FILE=../../secrets/secrets_key.txt` in `packages/backend/.env`; for the repository's Compose stack, mount the same file into the `backend` and `migrate` services as a secret named `secrets_key` (it is then read from `/run/secrets/secrets_key`). The stack does not mount it by default, because Compose refuses to start a service whose secret file is missing.
 
 Setting any of `BUNQ_CLIENT_ID`, `BUNQ_CLIENT_SECRET` or `BUNQ_REDIRECT_URI` without the rest stops the backend at startup. The error names every missing variable and never prints their values. There is no default for `FRONTEND_ORIGIN`. The client id and secret can also come from files named by `BUNQ_CLIENT_ID_FILE` and `BUNQ_CLIENT_SECRET_FILE` (defaults `/run/secrets/bunq_client_id` and `/run/secrets/bunq_client_secret`); a variable wins over its file. `BUNQ_SANDBOX=true` talks to the bunq sandbox instead of the production API.
 
@@ -221,14 +221,11 @@ A refused document fails its import with a fixed message, such as "The PDF is pa
 These are still available for local development and maintenance:
 
 ```bash
-bun run db:backup
 bun run db:migrate
 bun run db:bootstrap-runtime-role
-QRO_CLEAR_CONFIRM=clear-all-data QRO_CLEAR_ALLOW_NON_EMPTY=1 bun run db:clear
-QRO_RESTORE_CONFIRM=restore-db QRO_RESTORE_ALLOW_NON_EMPTY=1 bun run db:restore -- backups/db/<dump-file>.dump
 ```
 
-`db:clear` and `db:restore` keep the current confirmation guards and automatic pre-destructive backups. These scripts write and read bare dumps; the operator commands `quro backup` and `quro restore` write one archive with the documents and a manifest (`bun run --filter '@quro/backend' quro backup --output <absolute dir>` from a checkout). Their tests replace `pg_dump` and `pg_restore` with stand-ins; `sh scripts/recovery-drill.sh` runs the real tools in Docker.
+Back up and restore a checkout's database with the operator commands `quro backup` and `quro restore`, which write and read one archive with the documents and a manifest (`bun run --filter '@quro/backend' quro backup --output <absolute dir>` from a checkout; see [backup and restore](backup-and-restore.md)). Their tests replace `pg_dump` and `pg_restore` with stand-ins; `sh scripts/recovery-drill.sh` runs the real tools in Docker.
 
 Accounts on a host-run backend are managed with the same operator commands as in Docker. Sign-up
 needs a code from `quro user invite`; `quro user --help` lists the others (password reset codes,
@@ -326,7 +323,7 @@ ships an integration test that creates pre-existing synthetic rows in the shape 
 release stored, runs the migration's SQL against them and checks the result: values, nulls and
 negative amounts kept, rows that would break the constraint refused with an actionable message,
 nothing guessed. `packages/backend/src/db/holdingPriceScaleMigration.test.ts` (a type change)
-and `packages/backend/src/db/sessionHashMigration.test.ts` (a rewrite) are examples. A rewrite done by a command instead of SQL, such as `quro secrets encrypt`, is tested the same way: `packages/backend/src/lib/integrationSecrets.integration.test.ts` seeds bank links in the shape 0.8.0 stored them and interrupts, kills, resumes and repeats the command. A migration
+and `packages/backend/src/db/propertyMortgageLedgerMigration.test.ts` (a rewrite) are examples. A rewrite done by a command instead of SQL, such as `quro secrets rotate`, is tested the same way: `packages/backend/src/lib/integrationSecrets.integration.test.ts` seeds bank links sealed with the previous key and interrupts, kills, resumes and repeats the command. A migration
 that only adds a table or a nullable column needs no such test; `bun run test` applies every
 migration to the throwaway database either way.
 

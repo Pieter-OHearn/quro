@@ -99,7 +99,7 @@ export function describeIntegrationKeys(keys: IntegrationKeys | undefined): stri
   }
   if (keys.unencrypted > 0) {
     lines.push(
-      `Warning: ${keys.unencrypted} bank-link secret(s) in this archive are not encrypted. Run \`quro secrets encrypt\`.`,
+      `Warning: ${keys.unencrypted} bank-link secret(s) in this archive are not encrypted. Quro does not read them: after a restore, their users connect bunq again.`,
     );
   }
   return lines;

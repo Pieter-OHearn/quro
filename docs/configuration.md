@@ -57,7 +57,7 @@ Each secret is one value in one file. A trailing newline is ignored; an empty fi
 - After an edit, run `docker compose up -d`. Compose recreates the services whose settings changed and leaves the rest running.
 - Every container checks all of its settings when it starts. Invalid values stop it with exit code 2 and one list of the problems; the list names settings, never values. An empty value counts as unset.
 - The switches `S3_FORCE_PATH_STYLE`, `BUNQ_SANDBOX` and `QRO_DISABLE_SCHEDULERS` accept `true`, `false`, `1`, `0`, `yes` and `no`. `SECURE_COOKIES` and `OTEL_SDK_DISABLED` accept only `true` or `false`.
-- Settings of releases before 0.8.0 are not read. They are ignored like any other unknown variable.
+- Names that are not listed here are not read. They are ignored like any other unknown variable.
 
 ## Backend settings
 
@@ -216,19 +216,17 @@ The frontend has no other setting. Its nginx accepts uploads up to 25 MB and set
 
 These exist for contributors and tests. Do not set them in an install.
 
-| Setting                     | Default       | Notes                                                                                                                                         |
-| --------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                  | `development` | Only `test` changes behaviour: no rate limits and no background jobs                                                                          |
-| `QRO_DISABLE_SCHEDULERS`    | `false`       | Turns off every background job, including the exchange-rate refresh. For tests that must not call a provider                                  |
-| `DATABASE_URL`              | unset         | One connection URL for both roles. It carries a password in the environment, which is why installs use the separate settings and secret files |
-| `ADMIN_DATABASE_URL`        | unset         | Connection URL for the owner role; wins over `DATABASE_URL`                                                                                   |
-| `APP_DATABASE_URL`          | unset         | Connection URL for the runtime role; wins over `DATABASE_URL`                                                                                 |
-| `BOOTSTRAP_DATABASE_URL`    | unset         | Superuser URL for `db:bootstrap-runtime-role` when the owner role cannot create roles                                                         |
-| `QRO_PG_DUMP_BIN`           | unset         | Path to `pg_dump` outside the image                                                                                                           |
-| `QRO_PG_RESTORE_BIN`        | unset         | Path to `pg_restore` outside the image                                                                                                        |
-| `QRO_PSQL_BIN`              | unset         | Path to `psql` outside the image                                                                                                              |
-| `QRO_CLEAR_CONFIRM`         | unset         | Must be `clear-all-data` for `db:clear`                                                                                                       |
-| `QRO_CLEAR_ALLOW_NON_EMPTY` | unset         | `1` lets `db:clear` run on a database that holds data                                                                                         |
-| `DEMO_USER_PASSWORD`        | unset         | Password of the demo accounts that `db:seed-demo` and `db:seed-household` create                                                              |
+| Setting                  | Default       | Notes                                                                                                                                         |
+| ------------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`               | `development` | Only `test` changes behaviour: no rate limits and no background jobs                                                                          |
+| `QRO_DISABLE_SCHEDULERS` | `false`       | Turns off every background job, including the exchange-rate refresh. For tests that must not call a provider                                  |
+| `DATABASE_URL`           | unset         | One connection URL for both roles. It carries a password in the environment, which is why installs use the separate settings and secret files |
+| `ADMIN_DATABASE_URL`     | unset         | Connection URL for the owner role; wins over `DATABASE_URL`                                                                                   |
+| `APP_DATABASE_URL`       | unset         | Connection URL for the runtime role; wins over `DATABASE_URL`                                                                                 |
+| `BOOTSTRAP_DATABASE_URL` | unset         | Superuser URL for `db:bootstrap-runtime-role` when the owner role cannot create roles                                                         |
+| `QRO_PG_DUMP_BIN`        | unset         | Path to `pg_dump` outside the image                                                                                                           |
+| `QRO_PG_RESTORE_BIN`     | unset         | Path to `pg_restore` outside the image                                                                                                        |
+| `QRO_PSQL_BIN`           | unset         | Path to `psql` outside the image                                                                                                              |
+| `DEMO_USER_PASSWORD`     | unset         | Password of the demo accounts that `db:seed-demo` and `db:seed-household` create                                                              |
 
 [Development](development.md) describes how a checkout uses them.

@@ -370,10 +370,10 @@ describe('parseArgs', () => {
   });
 
   test('defaults to the two core images and both platforms', () => {
-    expect(parseArgs(['--tag', 'v0.7.0'])).toEqual({
+    expect(parseArgs(['--tag', 'v1.0.0'])).toEqual({
       owner: 'pieter-ohearn',
       images: ['quro-backend', 'quro-frontend'],
-      tag: 'v0.7.0',
+      tag: 'v1.0.0',
       platforms: ['linux/amd64', 'linux/arm64'],
       expectedDigests: {},
       full: false,

@@ -24,7 +24,7 @@ function manifest(overrides: Partial<Manifest> = {}): Manifest {
     formatVersion: 1,
     createdAt: '2026-10-10T03:15:00.000Z',
     label: null,
-    app: { version: 'v0.8.0', revision: null },
+    app: { version: 'v1.1.0', revision: null },
     database: {
       entry: 'database.dump',
       bytes: 10,
@@ -41,14 +41,14 @@ function manifest(overrides: Partial<Manifest> = {}): Manifest {
 
 describe('application versions', () => {
   test('parse release and candidate versions only', () => {
-    expect(parseAppVersion('v0.8.0')).toEqual({ major: 0, minor: 8, patch: 0, rc: null });
+    expect(parseAppVersion('v1.2.3')).toEqual({ major: 1, minor: 2, patch: 3, rc: null });
     expect(parseAppVersion('v1.0.0-rc.2')).toEqual({ major: 1, minor: 0, patch: 0, rc: 2 });
     expect(parseAppVersion('latest')).toBeNull();
     expect(parseAppVersion('v1.0')).toBeNull();
   });
 
   test('order versions, with a release after its candidates', () => {
-    const order = ['v0.7.0', 'v0.8.0', 'v1.0.0-rc.1', 'v1.0.0-rc.2', 'v1.0.0', 'v1.0.1'];
+    const order = ['v1.0.0-rc.1', 'v1.0.0-rc.2', 'v1.0.0', 'v1.0.1', 'v1.1.0', 'v2.0.0-rc.1'];
     for (let index = 1; index < order.length; index += 1) {
       const older = parseAppVersion(order[index - 1]!)!;
       const newer = parseAppVersion(order[index]!)!;
@@ -108,13 +108,13 @@ describe('manifest', () => {
   });
 
   test('an archive from a newer release is refused, an older one is accepted', () => {
-    const image = { version: 'v0.8.0', migrations: MIGRATIONS };
+    const image = { version: 'v1.1.0', migrations: MIGRATIONS };
     expect(() => assertRestorableBy(manifest(), image)).not.toThrow();
     expect(() =>
-      assertRestorableBy(manifest({ app: { version: 'v0.7.0', revision: null } }), image),
+      assertRestorableBy(manifest({ app: { version: 'v1.0.0', revision: null } }), image),
     ).not.toThrow();
     expect(() =>
-      assertRestorableBy(manifest({ app: { version: 'v0.9.0', revision: null } }), image),
+      assertRestorableBy(manifest({ app: { version: 'v1.2.0', revision: null } }), image),
     ).toThrow('newer than this image');
     const newerSchema = manifest();
     newerSchema.database.lastMigration = { tag: '0002_third', when: 300 };

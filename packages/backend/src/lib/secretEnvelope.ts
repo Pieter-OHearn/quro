@@ -176,7 +176,7 @@ export function envelopeKeyId(value: string): string | null {
   return isEnvelope(value) ? (parseEnvelope(value)?.keyId ?? null) : null;
 }
 
-export type UnreadableReason = 'unknownKey' | 'malformed' | 'authentication';
+export type UnreadableReason = 'unencrypted' | 'unknownKey' | 'malformed' | 'authentication';
 
 /** A stored secret that cannot be opened. Its message names the reason, never the value. */
 export class SecretUnreadableError extends Error {
@@ -193,23 +193,24 @@ export class SecretUnreadableError extends Error {
 }
 
 const REASON_TEXT: Record<UnreadableReason, string> = {
+  unencrypted: 'it is stored unencrypted, and only encrypted values are read',
   unknownKey: 'it was encrypted with a key that is not configured',
   malformed: 'it is not a valid encrypted value',
   authentication: 'it was changed, moved from another row, or the key is wrong',
 };
 
-export type OpenedSecret = { value: string; state: 'unencrypted' | 'current' | 'previous' };
+export type OpenedSecret = { value: string; state: 'current' | 'previous' };
 
 /**
- * Opens a stored value. An unencrypted value is returned as it is, with its state, so callers can
- * encrypt it; anything that cannot be opened throws `SecretUnreadableError`.
+ * Opens a stored value. Anything that cannot be opened, an unencrypted value included, throws
+ * `SecretUnreadableError`.
  */
 export function openSecret(
   value: string,
   place: SecretPlace,
   keyring: SecretsKeyring,
 ): OpenedSecret {
-  if (!isEnvelope(value)) return { value, state: 'unencrypted' };
+  if (!isEnvelope(value)) throw new SecretUnreadableError('unencrypted', place, null);
   const envelope = parseEnvelope(value);
   if (!envelope) throw new SecretUnreadableError('malformed', place, null);
   const key = [keyring.current, keyring.previous].find((k) => k?.id === envelope.keyId);

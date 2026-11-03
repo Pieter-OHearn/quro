@@ -153,13 +153,10 @@ export const checkSignIn: SignInCheck = async (url) => {
   }
 };
 
-// From PostgreSQL 16, CREATEROLE only covers roles the owner holds ADMIN OPTION on.
-const ROLE_ADMIN_OPTION_MAJOR = 16;
-
 async function canChangeRole(sql: AdminSql, owner: OwnerFacts, roleName: string) {
   if (owner.superuser) return true;
   if (!owner.createRole) return false;
-  if (owner.serverMajor < ROLE_ADMIN_OPTION_MAJOR) return true;
+  // CREATEROLE only covers roles the owner holds ADMIN OPTION on.
   const [row] = await sql<{ admin: boolean }[]>`
     select pg_has_role(current_user, ${roleName}, 'MEMBER WITH ADMIN OPTION') as "admin"
   `;

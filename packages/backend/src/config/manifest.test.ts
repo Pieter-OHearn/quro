@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { loadConfig, PROFILES, type Environment, type Profile } from './index';
-import { featureManifest, settingsManifest } from './manifest';
+import { settingsManifest } from './manifest';
 import { FEATURES, SETTINGS, type SettingName } from './settings';
 
 const ROOT = join(import.meta.dir, '../../../..');
@@ -46,7 +46,7 @@ describe('settings manifest', () => {
   });
 
   test('every feature names settings that exist', () => {
-    for (const feature of featureManifest()) {
+    for (const feature of Object.values(FEATURES)) {
       for (const name of [...feature.enabledBy, ...feature.requires]) expect(names).toContain(name);
     }
   });
@@ -190,7 +190,6 @@ describe('the Compose stack configures the backend with names the schema knows',
     backend: 'server',
     'pension-import-worker': 'worker',
     migrate: 'migrate',
-    'db-tools': 'maintenance',
   };
 
   function environmentOf(service: Service): Record<string, string> {

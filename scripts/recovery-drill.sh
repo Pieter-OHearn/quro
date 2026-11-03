@@ -17,8 +17,8 @@
 #   5. A backup while a client keeps writing (maintenance mode), a third backup for retention,
 #      and a restore of the under-load archive over the restored target (pre-restore archive).
 #   6. Elapsed times for the recovery objectives.
-#   Bank-link secrets: a synthetic bunq connection is stored unencrypted, encrypted with
-#   `quro secrets encrypt`, and searched for in the database and in an archive's dump. After the
+#   Bank-link secrets: a synthetic bunq connection is stored sealed with the secrets key, and
+#   its values are searched for in the database and in an archive's dump. After the
 #   restore it opens with the key; without the key the restore still succeeds, `quro secrets
 #   status` reports the missing key, and a sync asks the user to reconnect.
 #
@@ -211,6 +211,23 @@ OTHER_SECRETS_KEY="-v $WORK/other-secrets-key:/run/quro-secrets:ro -e QRO_SECRET
 # bunq configured with synthetic client settings; the drill network has no route out.
 BUNQ_SETTINGS="-e BUNQ_CLIENT_ID=drill-client -e BUNQ_CLIENT_SECRET=drill-client-secret -e BUNQ_REDIRECT_URI=http://quro.drill.invalid/api/bunq/oauth/callback -e FRONTEND_ORIGIN=http://quro.drill.invalid"
 
+# Seals the synthetic bank-link secrets of user DRILL_USER_ID with the mounted secrets key, the
+# way the server stores them, and prints one envelope per line.
+SEAL_BANK_SECRETS='import { readFileSync } from "node:fs";
+import { secretPlace } from "./src/lib/integrationSecrets";
+import { SecretsKey } from "./src/lib/secretEnvelope";
+const key = SecretsKey.parse(readFileSync(process.env.QRO_SECRETS_KEY_FILE, "utf8"));
+const userId = Number(process.env.DRILL_USER_ID);
+for (const [column, part] of [["access_token", "access"], ["private_key", "private"], ["installation_token", "installation"], ["session_token", "session"]])
+  console.log(key.seal(process.env.DRILL_BANK_MARKER + "-" + part, secretPlace(column, userId)));'
+
+# insert_bank_link CONTAINER ACCESS PRIVATE INSTALLATION SESSION: the demo user's bunq connection.
+insert_bank_link() {
+  psql_on "$1" -c "insert into bunq_connections (user_id, access_token, private_key,
+    installation_token, session_token, session_id, session_expires_at, bunq_user_id)
+    values ($DEMO_USER_ID, '$2', '$3', '$4', '$5', 1, now() + interval '1 day', '42')" >/dev/null
+}
+
 # bank_rows CONTAINER: every column of every bunq connection as text.
 bank_rows() {
   psql_on "$1" -c "select t::text from bunq_connections t order by id"
@@ -224,25 +241,19 @@ backend "$RUN-db-source" "$RUN-docs-source" --entrypoint bun -- run db:seed-demo
 psql_on "$RUN-db-source" <scripts/fixtures/edge-case-rows.sql >/dev/null
 psql_on "$RUN-db-source" -v rows="$ROWS" <scripts/fixtures/recovery-drill.sql >/dev/null
 
-step "Bank-link secrets: stored unencrypted as before 0.9.0, then encrypted"
-psql_on "$RUN-db-source" -c "insert into bunq_connections (user_id, access_token, private_key,
-  installation_token, session_token, session_id, session_expires_at, bunq_user_id)
-  select id, '$BANK_MARKER-access', '$BANK_MARKER-private', '$BANK_MARKER-installation',
-    '$BANK_MARKER-session', 1, now() + interval '1 day', '42'
-  from users where email = 'demo@quro.local'" >/dev/null
+step "Bank-link secrets: stored encrypted with the secrets key"
+DEMO_USER_ID=$(psql_on "$RUN-db-source" -c "select id from users where email = 'demo@quro.local'")
 # shellcheck disable=SC2086
-expect_exit 1 "secrets status before encryption" quro "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -- secrets status
-grep -q 'unencrypted: 4' "$WORK/out.txt" || fail "secrets status did not count the unencrypted secrets"
+SEALED=$(backend "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -e DRILL_USER_ID="$DEMO_USER_ID" \
+  -e DRILL_BANK_MARKER="$BANK_MARKER" --entrypoint bun -- -e "$SEAL_BANK_SECRETS")
 # shellcheck disable=SC2086
-expect_exit 2 "secrets encrypt without a key" quro "$RUN-db-source" "$RUN-docs-source" -- secrets encrypt
+insert_bank_link "$RUN-db-source" $SEALED
 # shellcheck disable=SC2086
-expect_exit 0 "secrets encrypt" quro "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -- secrets encrypt
-grep -q 'Encrypted 4 secret(s) in 1 bank connection(s)' "$WORK/out.txt" || fail "secrets encrypt did not report its work"
-grep -q "$BANK_MARKER" "$WORK/out.txt" && fail "secrets encrypt printed a secret"
+expect_exit 0 "secrets status" quro "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -- secrets status
+grep -q 'encrypted with the current key: 4' "$WORK/out.txt" || fail "secrets status did not open the bank-link secrets"
+grep -q "$BANK_MARKER" "$WORK/out.txt" && fail "secrets status printed a secret"
 SECRETS_KEY_ID=$(sed -n 's/^Secrets key: \([0-9a-f]*\) .*/\1/p' "$WORK/out.txt")
-[ -n "$SECRETS_KEY_ID" ] || fail "secrets encrypt printed no key id"
-# shellcheck disable=SC2086
-expect_exit 0 "secrets status after encryption" quro "$RUN-db-source" "$RUN-docs-source" $SECRETS_KEY -- secrets status
+[ -n "$SECRETS_KEY_ID" ] || fail "secrets status printed no key id"
 bank_rows "$RUN-db-source" | grep -q "$BANK_MARKER" && fail "the database still holds a bank-link secret in plaintext"
 bank_rows "$RUN-db-source" | grep -q "quro-secret:v1:aes-256-gcm:$SECRETS_KEY_ID:" || fail "the bank-link secrets are not envelopes of the key"
 echo "database: no plaintext bank-link secret; envelopes of key $SECRETS_KEY_ID"

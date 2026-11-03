@@ -12,7 +12,7 @@ Thanks for helping improve Quro! This document focuses on the workflow for propo
 
 ## Versioning
 
-- `VERSION` holds the release version (for example `v0.7.0`) and is the only version in the repository. The workspace `package.json` files have no `version` field and are private; Quro ships as container images, not npm packages (see [packages and versions](development.md#packages-and-versions)).
+- `VERSION` holds the release version (for example `v1.0.0`) and is the only version in the repository. The workspace `package.json` files have no `version` field and are private; Quro ships as container images, not npm packages (see [packages and versions](development.md#packages-and-versions)).
 - Feature pull requests do not change `VERSION`. The release pull request sets it, together with the matching `CHANGELOG.md` section.
 - No CI job requires a version bump.
 

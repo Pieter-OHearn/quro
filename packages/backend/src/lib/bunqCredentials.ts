@@ -9,9 +9,8 @@ import {
   registerDevice,
   type BunqSessionResult,
 } from './bunqClient';
-import { SECRET_COLUMNS, sealRow, secretPlace, type SecretColumn } from './integrationSecrets';
+import { secretPlace, type SecretColumn } from './integrationSecrets';
 import {
-  classifySecret,
   openSecret,
   SecretUnreadableError,
   type SecretsKey,
@@ -81,13 +80,6 @@ function openCredentials(row: ConnectionRow, keys: CurrentKeyring): BunqCredenti
   }
 }
 
-function hasUnencrypted(row: ConnectionRow, keys: CurrentKeyring): boolean {
-  return SECRET_COLUMNS.some(({ field }) => {
-    const value = row[field];
-    return value !== null && classifySecret(value, keys) === 'unencrypted';
-  });
-}
-
 /**
  * Opens the credentials, or records on the connection that the user has to reconnect (what
  * Settings shows as the sync error) before throwing.
@@ -112,28 +104,14 @@ async function selectConnection(userId: number): Promise<ConnectionRow | null> {
 }
 
 /**
- * Loads a user's connection with its credentials opened, or null without one. A connection that
- * still holds unencrypted credentials (stored before encryption, or restored from such a backup)
- * is encrypted in place first, the way `quro secrets encrypt` does it, so the server never keeps
- * using plaintext. Throws `BunqCredentialsUnavailableError` when a credential cannot be opened.
+ * Loads a user's connection with its credentials opened, or null without one. Throws
+ * `BunqCredentialsUnavailableError` when a credential cannot be opened, an unencrypted one
+ * included: an unencrypted credential is never used, and the user connects bunq again.
  */
 export async function loadBunqConnection(userId: number): Promise<OpenBunqConnection | null> {
   const keys = keyring();
-  let row = await selectConnection(userId);
+  const row = await selectConnection(userId);
   if (!row) return null;
-  if (hasUnencrypted(row, keys)) {
-    const id = row.id;
-    const outcome = await db.transaction((tx) => sealRow(tx, id, keys, 'encrypt'));
-    if (outcome && outcome.sealed.length > 0) {
-      log.info('bunq.credentials_encrypted', {
-        userId,
-        count: outcome.sealed.length,
-        keyId: keys.current.id,
-      });
-    }
-    row = await selectConnection(userId);
-    if (!row) return null;
-  }
   const credentials = await openOrMarkFailed(row, keys);
   return {
     id: row.id,

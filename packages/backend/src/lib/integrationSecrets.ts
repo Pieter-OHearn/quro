@@ -17,7 +17,8 @@ import {
 // `bunq_connections`. Every one is stored as an envelope (lib/secretEnvelope.ts) sealed with the
 // operator's secrets key and bound to its column and its row's owner (the user id, unique in that
 // table). This module holds that inventory, reads its state for `quro secrets status` and
-// `quro doctor`, and moves rows to the current key for `quro secrets encrypt` and `rotate`.
+// `quro doctor`, and moves rows from the previous key to the current one for `quro secrets rotate`.
+// An unencrypted value is never read: its user connects bunq again.
 //
 // Rows are changed one at a time, each in its own transaction that locks the row, reads it again,
 // and writes every changed column in one UPDATE. An interrupted run leaves each row either as it
@@ -79,7 +80,7 @@ type SecretsStatus =
   | 'current'
   /** Some are sealed with the previous key: `quro secrets rotate`. */
   | 'rotation_pending'
-  /** Some are stored unencrypted: `quro secrets encrypt`. */
+  /** Some are stored unencrypted, which is not read: their users reconnect bunq. */
   | 'unencrypted'
   /** Some cannot be opened with the configured keys: their users reconnect bunq. */
   | 'unreadable';
@@ -139,6 +140,9 @@ export function summarizeSecrets(
       if (state === 'malformed') {
         counts.unreadable += 1;
         reconnect.add(row.userId);
+      } else if (state === 'unencrypted') {
+        counts.unencrypted += 1;
+        reconnect.add(row.userId);
       } else if (state === 'unknownKey') {
         counts.unknownKey += 1;
         unknownKeyIds.add(envelopeKeyId(value)!);
@@ -176,32 +180,27 @@ export function sealedKeyIds(rows: readonly SecretRow[]): {
   return { keyIds: [...keyIds].sort(), unencrypted };
 }
 
-// ── Encrypt and rotate ─────────────────────────────────────────────────────
+// ── Rotate ─────────────────────────────────────────────────────────────────
 
-/** `encrypt`: unencrypted values only. `rotate`: also values sealed with the previous key. */
-export type SealMode = 'encrypt' | 'rotate';
-
-export type RowOutcome = {
+type RowOutcome = {
   id: number;
   userId: number;
   /** Columns written in this row's transaction. */
   sealed: SecretColumn[];
-  /** Columns left as they were because they cannot be opened (or, for `encrypt`, need rotating). */
+  /** Columns left as they were because they cannot be opened with the configured keys. */
   left: Array<{ column: SecretColumn; state: SecretState | 'unreadable' }>;
 };
 
-/** The value a column gets in `mode`, or null to leave it unchanged. */
+/** The value a column gets: sealed again with the current key, or null to leave it unchanged. */
 function nextValue(
   value: string,
   place: SecretPlace,
   key: SecretsKey,
   keyring: SecretsKeyring,
-  mode: SealMode,
 ): { value: string } | { left: SecretState | 'unreadable' } | null {
   const state = classifySecret(value, keyring);
   if (state === 'current') return null;
-  if (state === 'unencrypted') return { value: key.seal(value, place) };
-  if (state !== 'previous' || mode !== 'rotate') return { left: state };
+  if (state !== 'previous') return { left: state };
   try {
     return { value: key.seal(openSecret(value, place, keyring).value, place) };
   } catch (error) {
@@ -214,11 +213,10 @@ function nextValue(
  * Converts one row inside `tx`: locks it, reads it again, and writes every column that needs the
  * current key in one UPDATE. Returns null when the row no longer exists.
  */
-export async function sealRow(
+async function sealRow(
   tx: DbTransaction,
   id: number,
   keyring: SecretsKeyring & { current: SecretsKey },
-  mode: SealMode,
 ): Promise<RowOutcome | null> {
   const [row] = await tx
     .select(SECRET_ROW_COLUMNS)
@@ -231,7 +229,7 @@ export async function sealRow(
   for (const { column, field } of SECRET_COLUMNS) {
     const value = row[field];
     if (value === null) continue;
-    const next = nextValue(value, secretPlace(column, row.userId), keyring.current, keyring, mode);
+    const next = nextValue(value, secretPlace(column, row.userId), keyring.current, keyring);
     if (next === null) continue;
     if ('left' in next) outcome.left.push({ column, state: next.left });
     else {
@@ -262,15 +260,14 @@ export type SealHooks = {
 };
 
 /**
- * Brings every row to the current key, one transaction per row, in id order. Stops at the first
- * error; rows committed before it stay converted and a new run skips them.
+ * Moves every row sealed with the previous key to the current key, one transaction per row, in id
+ * order. Stops at the first error; rows committed before it stay converted and a new run skips them.
  */
 export async function sealAllRows(
   database: {
     transaction: <T>(work: (tx: DbTransaction) => Promise<T>) => Promise<T>;
   } & DbExecutor,
   keyring: SecretsKeyring & { current: SecretsKey },
-  mode: SealMode,
   hooks: SealHooks = {},
 ): Promise<SealReport> {
   const ids = await database
@@ -280,7 +277,7 @@ export async function sealAllRows(
   const report: SealReport = { rows: 0, changedRows: 0, sealedSecrets: 0, left: [] };
   for (const { id } of ids) {
     const outcome = await database.transaction(async (tx) => {
-      const result = await sealRow(tx, id, keyring, mode);
+      const result = await sealRow(tx, id, keyring);
       if (result) await hooks.beforeCommit?.(result);
       return result;
     });

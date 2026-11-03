@@ -45,7 +45,7 @@ const fakes = (): BackupDependencies => ({
   checkDump: () => Promise.resolve(),
   readServerMajor: () => Promise.resolve(SUPPORTED_POSTGRES_MAJOR),
   now: () => new Date(Date.UTC(2026, 9, 10, 3, 0, tick++)),
-  appVersion: 'v0.8.0',
+  appVersion: 'v1.0.0-rc.1',
   revision: null,
   migrations: BUNDLED_MIGRATIONS,
 });

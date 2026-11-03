@@ -16,7 +16,7 @@ export type LinkBase = {
   origin: string;
   // owner/name
   repository: string;
-  // The release tag, e.g. v0.9.0
+  // The release tag, e.g. v1.0.0
   tag: string;
 };
 

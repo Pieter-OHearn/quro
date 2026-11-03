@@ -38,13 +38,11 @@ ARG QRO_IMAGE_REVISION=unknown
 
 # The data directories belong to UID 1000, so a new named volume mounted there is writable
 # without a chown. /var/lib/quro stays traversable for any --user with its own bind mounts.
-# The database backup scripts write under /app/backups, which points into the backup directory.
-RUN chmod +x /app/docker/backend/*.sh /app/docker/backend/quro && \
+RUN chmod +x /app/docker/backend/quro && \
     ln -s /app/docker/backend/quro /usr/local/bin/quro && \
     printf '%s\n' "$QRO_IMAGE_REVISION" > /app/REVISION && \
     install -d -m 0755 /var/lib/quro && \
-    install -d -o 1000 -g 1000 -m 0750 /var/lib/quro/documents /var/lib/quro/backups && \
-    ln -s /var/lib/quro/backups /app/backups
+    install -d -o 1000 -g 1000 -m 0750 /var/lib/quro/documents /var/lib/quro/backups
 
 WORKDIR /app/packages/backend
 # Unprivileged by default; any other UID works through --user (no passwd entry needed). At runtime

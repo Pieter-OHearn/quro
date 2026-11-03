@@ -1,12 +1,7 @@
 import { generateTestSecretsKey } from '../test/config';
 import { describe, expect, test } from 'bun:test';
 import { loadConfig, type Environment } from '../config';
-import {
-  CAPABILITIES,
-  describeCapabilities,
-  enabledCapabilities,
-  evaluateCapability,
-} from './capabilityRegistry';
+import { CAPABILITIES, enabledCapabilities, evaluateCapability } from './capabilityRegistry';
 
 const SECRETS_KEY = generateTestSecretsKey();
 const BASE: Environment = { DATABASE_URL: 'postgres://u:p@h/db' };
@@ -39,8 +34,11 @@ describe('capability registry', () => {
   test('a bare core install enables nothing optional and keeps documents on the filesystem', () => {
     const config = configFor({});
     expect([...enabledCapabilities(config)]).toEqual([]);
-    for (const state of describeCapabilities(config)) {
-      expect(state).toMatchObject({ enabled: false, reason: 'not_configured' });
+    for (const capability of CAPABILITIES) {
+      expect(capability.evaluate(config)).toMatchObject({
+        enabled: false,
+        reason: 'not_configured',
+      });
     }
   });
 
@@ -81,8 +79,10 @@ describe('capability registry', () => {
   });
 
   test('statement import is the only experimental capability', () => {
-    expect(
-      Object.fromEntries(describeCapabilities(configFor({})).map((c) => [c.id, c.lifecycle])),
-    ).toEqual({ bunq: 'stable', s3Storage: 'stable', pensionImport: 'experimental' });
+    expect(Object.fromEntries(CAPABILITIES.map((c) => [c.id, c.lifecycle]))).toEqual({
+      bunq: 'stable',
+      s3Storage: 'stable',
+      pensionImport: 'experimental',
+    });
   });
 });

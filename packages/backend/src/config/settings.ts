@@ -683,16 +683,6 @@ export const SETTINGS = defineSettings({
     audience: 'operator',
     description: '`1` allows a restore over a database that already holds data.',
   }),
-  QRO_CLEAR_CONFIRM: text({
-    group: 'Maintenance',
-    audience: 'development',
-    description: 'Must be `clear-all-data` for `db:clear` to run.',
-  }),
-  QRO_CLEAR_ALLOW_NON_EMPTY: text({
-    group: 'Maintenance',
-    audience: 'development',
-    description: '`1` allows `db:clear` on a database that already holds data.',
-  }),
 
   // ── Backups ──────────────────────────────────────────────────────────────
   QRO_BACKUP_DIR: absoluteDirectory({

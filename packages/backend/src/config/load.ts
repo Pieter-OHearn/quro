@@ -152,8 +152,6 @@ export type ToolsConfig = {
 export type MaintenanceConfig = {
   restoreConfirm: string | null;
   restoreAllowNonEmpty: boolean;
-  clearConfirm: string | null;
-  clearAllowNonEmpty: boolean;
 };
 
 export type DemoConfig = { userPassword: Secret | null };
@@ -683,8 +681,6 @@ function buildMaintenance(r: Reader): MaintenanceConfig {
   return {
     restoreConfirm: r.get('QRO_RESTORE_CONFIRM') ?? null,
     restoreAllowNonEmpty: r.get('QRO_RESTORE_ALLOW_NON_EMPTY') === '1',
-    clearConfirm: r.get('QRO_CLEAR_CONFIRM') ?? null,
-    clearAllowNonEmpty: r.get('QRO_CLEAR_ALLOW_NON_EMPTY') === '1',
   };
 }
 

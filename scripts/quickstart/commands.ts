@@ -72,7 +72,7 @@ export function namedBlock(markdown: string, name: string): Block {
   return { lines: found[0]!.lines, linuxOnly: false };
 }
 
-/** The image tag the example Compose file pins, for example `v0.8.0`. */
+/** The image tag the example Compose file pins, for example `v1.0.0`. */
 export function exampleTag(composeYaml: string): string {
   const tags = [...composeYaml.matchAll(/ghcr\.io\/pieter-ohearn\/quro-[a-z]+:([^\s@'"]+)/g)].map(
     (match) => match[1]!,

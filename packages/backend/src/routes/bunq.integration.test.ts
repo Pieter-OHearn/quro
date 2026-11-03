@@ -376,12 +376,12 @@ describe('stored bunq credentials', () => {
     return fetchMock;
   }
 
-  test('a connection stored unencrypted before is encrypted when the server next uses it', async () => {
-    const user = await newUser('legacy-plaintext');
+  test('unencrypted credentials are refused, not read: a reconnect is asked and no provider called', async () => {
+    const user = await newUser('plaintext');
     await db.insert(bunqConnections).values({
       userId: user.user.id,
-      accessToken: 'synthetic-legacy-access',
-      sessionToken: 'synthetic-legacy-session',
+      accessToken: 'synthetic-plaintext-access',
+      sessionToken: 'synthetic-plaintext-session',
       ...VALID_SESSION,
     });
     const fetchMock = mockEmptyBank();
@@ -392,15 +392,19 @@ describe('stored bunq credentials', () => {
       headers: { 'X-CSRF-Token': user.csrfToken },
     });
 
-    expect(response.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalled();
+    expect(response.status).toBe(409);
+    const body = (await response.json()) as { error: string; code: string };
+    expect(body.code).toBe('bunq_reauthorization_required');
+    expect(body.error).toContain('Reconnect bunq in Settings');
+    expect(JSON.stringify(body)).not.toContain('synthetic-plaintext');
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Neither encrypted nor removed: the value stays as it was until the user reconnects.
     const [row] = await connectionsFor(user.user.id);
-    expect(classifySecret(row.accessToken, keyring())).toBe('current');
-    expect(classifySecret(row.sessionToken!, keyring())).toBe('current');
-    expect(row.privateKey).toBeNull();
-    expect(openSecret(row.accessToken, accessTokenPlace(user.user.id), keyring()).value).toBe(
-      'synthetic-legacy-access',
-    );
+    expect(row).toMatchObject({
+      accessToken: 'synthetic-plaintext-access',
+      sessionToken: 'synthetic-plaintext-session',
+      syncStatus: 'error',
+    });
   });
 
   test('credentials the key cannot open ask for a reconnect and call no provider', async () => {
