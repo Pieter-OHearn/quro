@@ -20,7 +20,8 @@ const budget = [keys.budget.categories, keys.budget.transactions];
 
 // Declare server-side dependencies here; hooks should not maintain their own sets.
 const domainQueryDependencies = {
-  goals: [keys.goals],
+  // The insights carry the buys of the months an invest habit covers.
+  goals: [keys.goals, keys.dashboard.insights],
   budgetCategory: [...budget, keys.plan.all],
   budgetTransaction: [...budget, keys.dashboard.transactions, keys.dashboard.setup, keys.plan.all],
   budgetClassification: [keys.budget.categories, keys.plan.all],

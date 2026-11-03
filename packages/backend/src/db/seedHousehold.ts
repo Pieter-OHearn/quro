@@ -442,8 +442,7 @@ function goalCurrentAmount(goal: GoalSpec): number {
 function goalHabit(goal: GoalSpec) {
   return {
     monthlyTarget: goal.habit?.monthlyTarget ?? null,
-    monthsCompleted: goal.habit?.monthsCompleted ?? null,
-    totalMonths: goal.habit?.totalMonths ?? null,
+    startMonth: goal.habit?.startMonth ?? null,
     unit: goal.habit?.unit ?? null,
   };
 }
@@ -465,8 +464,6 @@ async function seedGoals(context: Context): Promise<void> {
       color: goal.color,
       notes: goal.notes,
       currency: goal.currency,
-      startMonth: goal.startMonth,
-      missedMonths: goal.missedMonths,
     });
   }
 }

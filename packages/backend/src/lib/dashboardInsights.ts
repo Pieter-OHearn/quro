@@ -1,7 +1,15 @@
 import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
-import type { DashboardInsights } from '@quro/shared';
+import {
+  goalMonthKey,
+  investHabitMonths,
+  nextGoalMonth,
+  sumInvestHabitBuys,
+  type DashboardInsights,
+  type GoalMonth,
+  type InvestHabitBuyTotal,
+} from '@quro/shared';
 import { db } from '../db/client';
-import { holdingTransactions, payslips } from '../db/schema';
+import { goals, holdings, holdingTransactions, payslips } from '../db/schema';
 
 const SALARY_WINDOW_MONTHS = 12;
 
@@ -28,8 +36,7 @@ export async function loadDashboardInsights(
     .limit(1);
 
   const month = sql<string>`to_char(${payslips.date}, 'YYYY-MM')`;
-  const buyMonth = sql<string>`to_char(${holdingTransactions.date}, 'YYYY-MM')`;
-  const [salaryMonths, buyMonths] = await Promise.all([
+  const [salaryMonths, investHabitBuys] = await Promise.all([
     latestPayslip
       ? db
           .select({
@@ -48,18 +55,7 @@ export async function loadDashboardInsights(
           .groupBy(month, payslips.currency)
           .orderBy(month, payslips.currency)
       : [],
-    db
-      .selectDistinct({ month: buyMonth })
-      .from(holdingTransactions)
-      .where(
-        and(
-          eq(holdingTransactions.userId, userId),
-          eq(holdingTransactions.type, 'buy'),
-          gte(holdingTransactions.date, `${year}-01-01`),
-          lt(holdingTransactions.date, `${year + 1}-01-01`),
-        ),
-      )
-      .orderBy(buyMonth),
+    loadInvestHabitBuys(userId, year),
   ]);
   return {
     latestPayslip: latestPayslip ?? null,
@@ -67,6 +63,52 @@ export async function loadDashboardInsights(
       ...row,
       date: `${monthKey}-01`,
     })),
-    investHabitBuyMonths: buyMonths.map((row) => row.month),
+    investHabitBuys,
   };
+}
+
+function firstDayOfMonth(month: GoalMonth): string {
+  return `${goalMonthKey(month)}-01`;
+}
+
+/**
+ * The buys an invest habit counts: per month and currency, over the months of the user's invest
+ * habits, so a habit that spans years sees every month it covers.
+ */
+async function loadInvestHabitBuys(userId: number, year: number): Promise<InvestHabitBuyTotal[]> {
+  const habits = await db
+    .select({
+      startMonth: goals.startMonth,
+      deadline: goals.deadline,
+      year: goals.year,
+      totalMonths: goals.totalMonths,
+    })
+    .from(goals)
+    .where(and(eq(goals.userId, userId), eq(goals.type, 'invest_habit')));
+  const months = habits.flatMap((habit) => investHabitMonths(habit, year));
+  if (months.length === 0) return [];
+
+  const keys = new Set(months.map(goalMonthKey));
+  const ordered = [...months].sort((a, b) => a.year - b.year || a.month - b.month);
+  const first = ordered[0]!;
+  const last = ordered[ordered.length - 1]!;
+  const afterLast = nextGoalMonth(last);
+  const buys = await db
+    .select({
+      date: holdingTransactions.date,
+      shares: holdingTransactions.shares,
+      price: holdingTransactions.price,
+      currency: holdings.currency,
+    })
+    .from(holdingTransactions)
+    .innerJoin(holdings, eq(holdings.id, holdingTransactions.holdingId))
+    .where(
+      and(
+        eq(holdingTransactions.userId, userId),
+        eq(holdingTransactions.type, 'buy'),
+        gte(holdingTransactions.date, firstDayOfMonth(first)),
+        lt(holdingTransactions.date, firstDayOfMonth(afterLast)),
+      ),
+    );
+  return sumInvestHabitBuys(buys).filter((total) => keys.has(total.month));
 }

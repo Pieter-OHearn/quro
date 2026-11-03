@@ -1,6 +1,12 @@
 import { allocationTotals } from '@/lib/allocationTotals';
 import { useEffect, useMemo } from 'react';
-import type { DashboardAllocationsSummary, Goal, HoldingTransaction } from '@quro/shared';
+import {
+  monthKeyOfDate,
+  todayIsoDate,
+  type DashboardAllocationsSummary,
+  type Goal,
+  type InvestHabitBuyTotal,
+} from '@quro/shared';
 import type {
   FilterKey,
   GoalProgressContext,
@@ -9,7 +15,8 @@ import type {
 } from '../types';
 import { GOAL_TYPE_META } from '../utils/goals-constants';
 import { computeGoalStats, computeGoalYears } from '../utils/goals-data';
-import { normalizeGoalType, parseGoalYear } from '../utils/goal-utils';
+import { goalCoversYear, normalizeGoalType } from '../utils/goal-utils';
+import { buildInvestHabitBuys } from '../utils/invest-habit';
 
 type SalaryPoint = {
   gross: number;
@@ -18,33 +25,12 @@ type SalaryPoint = {
   currency: string;
 };
 
-const MONTH_PAD_LENGTH = 2;
-
-function computeInvestHabitBuyMonths(
-  holdingTxns: readonly HoldingTransaction[],
-): ReadonlyMap<number, ReadonlySet<string>> {
-  const yearMap = new Map<number, Set<string>>();
-  for (const txn of holdingTxns) {
-    if (txn.type !== 'buy' || !txn.date) continue;
-    const date = new Date(txn.date + 'T00:00:00Z');
-    const year = date.getUTCFullYear();
-    const monthKey = `${year}-${String(date.getUTCMonth() + 1).padStart(MONTH_PAD_LENGTH, '0')}`;
-    let months = yearMap.get(year);
-    if (!months) {
-      months = new Set();
-      yearMap.set(year, months);
-    }
-    months.add(monthKey);
-  }
-  return yearMap;
-}
-
 export function useGoalsComputations(
   goals: Goal[],
   payslips: SalaryPoint[],
   savingsAccounts: GoalProgressSavingsAccount[],
   allocations: DashboardAllocationsSummary | null,
-  holdingTxns: readonly HoldingTransaction[],
+  investHabitBuyTotals: readonly InvestHabitBuyTotal[],
   convertToBase: (amount: number, fromCurrency: string) => number,
   currentYear: number,
   activeYear: number,
@@ -66,10 +52,11 @@ export function useGoalsComputations(
     [allocations, convertToBase],
   );
 
-  const investHabitBuyMonths = useMemo(
-    () => computeInvestHabitBuyMonths(holdingTxns),
-    [holdingTxns],
+  const investHabitBuys = useMemo(
+    () => buildInvestHabitBuys(investHabitBuyTotals, convertToBase),
+    [investHabitBuyTotals, convertToBase],
   );
+  const currentMonth = monthKeyOfDate(todayIsoDate());
 
   const goalProgressContext = useMemo<GoalProgressContext>(
     () => ({
@@ -77,10 +64,19 @@ export function useGoalsComputations(
       savingsAccounts,
       portfolioTotal,
       netWorth,
-      investHabitBuyMonths,
+      investHabitBuys,
+      currentMonth,
       convertToBase,
     }),
-    [annualGross, convertToBase, savingsAccounts, portfolioTotal, netWorth, investHabitBuyMonths],
+    [
+      annualGross,
+      convertToBase,
+      savingsAccounts,
+      portfolioTotal,
+      netWorth,
+      investHabitBuys,
+      currentMonth,
+    ],
   );
 
   const years = useMemo(() => computeGoalYears(goals, currentYear), [goals, currentYear]);
@@ -92,14 +88,14 @@ export function useGoalsComputations(
   }, [activeYear, years, currentYear, setActiveYear]);
 
   const yearGoals = useMemo(
-    () => goals.filter((goal) => parseGoalYear(goal, currentYear) === activeYear),
+    () => goals.filter((goal) => goalCoversYear(goal, activeYear, currentYear)),
     [goals, activeYear, currentYear],
   );
 
   const filteredGoals = useMemo(
     () =>
       goals.filter((goal) => {
-        if (parseGoalYear(goal, currentYear) !== activeYear) return false;
+        if (!goalCoversYear(goal, activeYear, currentYear)) return false;
         return (
           activeFilter === 'all' ||
           GOAL_TYPE_META[normalizeGoalType(goal)].filterKey === activeFilter

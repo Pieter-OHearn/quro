@@ -3,7 +3,8 @@ import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { ContentSection, LoadingSpinner, PageStack } from '@/components/ui';
 import { useGoals } from '@/features/goals/hooks';
 import type { GoalProgressContext } from '@/features/goals/types';
-import { parseGoalYear } from '@/features/goals/utils/goal-utils';
+import { goalCoversYear } from '@/features/goals/utils/goal-utils';
+import { buildInvestHabitBuys } from '@/features/goals/utils/invest-habit';
 import { useSavingsAccounts } from '@/features/savings/hooks';
 import type {
   DashboardAllocationsSummary,
@@ -67,7 +68,7 @@ const EMPTY_SAVINGS: SavingsAccount[] = [];
 const EMPTY_INSIGHTS: DashboardInsights = {
   latestPayslip: null,
   salaryMonths: [],
-  investHabitBuyMonths: [],
+  investHabitBuys: [],
 };
 
 const buildAllocationsByKey = (allocationData: ReadonlyArray<{ key: string; value: number }>) =>
@@ -166,6 +167,18 @@ function useDashboardData(
   return { ...derived, isLoading: queries.isLoading, queryFailures: queries.queryFailures };
 }
 
+function investHabitProgressFields(
+  insights: DashboardInsights,
+  currentMonth: string,
+  convertToBase: GoalProgressContext['convertToBase'],
+) {
+  return {
+    investHabitBuys: buildInvestHabitBuys(insights.investHabitBuys, convertToBase),
+    currentMonth,
+    convertToBase,
+  };
+}
+
 function deriveDashboardData({
   netWorthData,
   yearStart,
@@ -187,7 +200,7 @@ function deriveDashboardData({
 }) {
   const latest = insights.latestPayslip;
   const annualGross = latest ? convertToBase(latest.gross * 12, latest.currency) : 0;
-  const yearGoals = goals.filter((goal) => parseGoalYear(goal, currentYear) === currentYear);
+  const yearGoals = goals.filter((goal) => goalCoversYear(goal, currentYear, currentYear));
   const convertedTransactions = normalizeDashboardTransactions(transactions, convertToBase);
   const currentMonthTransactions = convertedTransactions.filter((tx) =>
     tx.date.startsWith(currentMonthKey),
@@ -200,8 +213,7 @@ function deriveDashboardData({
     savingsAccounts,
     portfolioTotal: allocationSummary.portfolioTotal,
     netWorth: allocationSummary.netWorth,
-    investHabitBuyMonths: new Map([[currentYear, new Set(insights.investHabitBuyMonths)]]),
-    convertToBase,
+    ...investHabitProgressFields(insights, currentMonthKey, convertToBase),
   };
   const nwMetrics = computeNWMetrics(chartData, allocationSummary.netWorth, yearStart);
   const {

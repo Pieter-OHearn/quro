@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import type { DashboardInsights } from '@quro/shared';
 import { db } from '../db/client';
-import { holdings, holdingTransactions, payslips } from '../db/schema';
+import { goals, holdings, holdingTransactions, payslips } from '../db/schema';
 import { getSalaryWindowStart } from '../lib/dashboardInsights';
 import { createIntegrationHelpers } from '../test/integration';
 
@@ -104,11 +104,73 @@ test('insights aggregate only the owner, keep currencies and a salary window anc
       price: 10,
     },
   ]);
-  const response = await integration.request('/api/dashboard/insights?year=2025', {
-    cookie: owner.cookie,
+  const insights = async () => {
+    const response = await integration.request('/api/dashboard/insights?year=2025', {
+      cookie: owner.cookie,
+    });
+    expect(response.status).toBe(200);
+    return ((await response.json()) as { data: DashboardInsights }).data;
+  };
+  // Without an invest habit there are no months to count buys for.
+  expect((await insights()).investHabitBuys).toEqual([]);
+
+  const [usdHolding] = await db
+    .insert(holdings)
+    .values({
+      userId: owner.user.id,
+      name: 'Dollar fund',
+      ticker: 'USDF',
+      currentPrice: 30,
+      currency: 'USD',
+      sector: 'Test',
+    })
+    .returning();
+  await db.insert(holdingTransactions).values([
+    // 1.5 × 33.333 = 49.9995 and 0.5 × 0.01 = 0.005: each buy rounds to cents once.
+    {
+      userId: owner.user.id,
+      holdingId: usdHolding.id,
+      type: 'buy',
+      date: '2025-01-15',
+      shares: 1.5,
+      price: 33.333,
+    },
+    {
+      userId: owner.user.id,
+      holdingId: usdHolding.id,
+      type: 'buy',
+      date: '2025-01-20',
+      shares: 0.5,
+      price: 0.01,
+    },
+  ]);
+  const habit = {
+    userId: owner.user.id,
+    type: 'invest_habit',
+    sourceType: 'invest_habit_buys',
+    name: 'Habit',
+    currentAmount: 0,
+    targetAmount: 0,
+    category: 'Investing',
+    monthlyContribution: 0,
+    monthlyTarget: 20,
+    currency: 'EUR' as const,
+  };
+  await db.insert(goals).values([
+    { ...habit, startMonth: 'Dec 2025', deadline: 'Jan 2026', year: 2026, totalMonths: 2 },
+    { ...habit, startMonth: 'Jan 2025', deadline: 'Feb 2025', year: 2025, totalMonths: 2 },
+    // Saved before start months existed: its first month of its year.
+    { ...habit, startMonth: null, deadline: 'Dec 2023', year: 2023, totalMonths: 1 },
+  ]);
+  await db.insert(goals).values({
+    ...habit,
+    userId: outsider.user.id,
+    startMonth: 'Jan 2024',
+    deadline: 'Dec 2024',
+    year: 2024,
   });
-  expect(response.status).toBe(200);
-  const { data } = (await response.json()) as { data: DashboardInsights };
+
+  const data = await insights();
   expect(data).toEqual({
     latestPayslip: { date: '2025-03-28', gross: 6000, currency: 'GBP' },
     salaryMonths: [
@@ -117,7 +179,14 @@ test('insights aggregate only the owner, keep currencies and a salary window anc
       { date: '2024-06-01', net: 3300, bonus: 0, currency: 'EUR' },
       { date: '2025-03-01', net: 4000, bonus: 500, currency: 'GBP' },
     ],
-    investHabitBuyMonths: ['2025-01', '2025-12'],
+    // The habits cover Jan 2023, Jan and Feb 2025, Dec 2025 and Jan 2026: the Dec 2024 buy, the
+    // sell, and the outsider's buy and habit are not counted.
+    investHabitBuys: [
+      { month: '2025-01', currency: 'EUR', amount: 20 },
+      { month: '2025-01', currency: 'USD', amount: 50.01 },
+      { month: '2025-12', currency: 'EUR', amount: 10 },
+      { month: '2026-01', currency: 'EUR', amount: 10 },
+    ],
   });
 });
 
@@ -134,7 +203,7 @@ test('validates insight years, requires authentication, and handles users with n
     cookie: owner.cookie,
   });
   expect(await response.json()).toEqual({
-    data: { latestPayslip: null, salaryMonths: [], investHabitBuyMonths: [] },
+    data: { latestPayslip: null, salaryMonths: [], investHabitBuys: [] },
   });
   expect(getSalaryWindowStart('2025-01-31')).toBe('2024-01-01');
 });

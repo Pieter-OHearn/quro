@@ -1318,9 +1318,8 @@ export type GoalSpec = {
   color: string;
   notes: string;
   currency: CurrencyCode;
-  startMonth: string | null;
-  missedMonths: readonly string[] | null;
-  habit?: { monthlyTarget: number; monthsCompleted: number; totalMonths: number; unit: string };
+  /** An invest habit counts the months from its start month to its deadline from the buys. */
+  habit?: { monthlyTarget: number; startMonth: string; unit: string };
 };
 
 export const GOALS: readonly GoalSpec[] = [
@@ -1338,8 +1337,6 @@ export const GOALS: readonly GoalSpec[] = [
     color: COLOR.income,
     notes: 'Six months of essential spending.',
     currency: 'EUR',
-    startMonth: '2025-01',
-    missedMonths: [],
   },
   {
     type: 'savings',
@@ -1354,8 +1351,6 @@ export const GOALS: readonly GoalSpec[] = [
     color: COLOR.milestone,
     notes: 'Flights, a rail pass and two weeks of lodging.',
     currency: 'EUR',
-    startMonth: '2026-01',
-    missedMonths: ['2026-03'],
   },
   {
     type: 'salary',
@@ -1370,8 +1365,6 @@ export const GOALS: readonly GoalSpec[] = [
     color: COLOR.primary,
     notes: '',
     currency: 'EUR',
-    startMonth: null,
-    missedMonths: null,
   },
   {
     type: 'portfolio',
@@ -1386,25 +1379,22 @@ export const GOALS: readonly GoalSpec[] = [
     color: COLOR.portfolio,
     notes: '',
     currency: 'EUR',
-    startMonth: null,
-    missedMonths: null,
   },
   {
     type: 'invest_habit',
     name: 'Invest every month',
     emoji: '🌱',
-    currentAmount: 2100,
-    targetAmount: 3600,
-    deadline: 'Feb 2027',
-    year: 2027,
+    currentAmount: 0,
+    targetAmount: 0,
+    // Spans two years; the buys reach 500 a month in every month but December 2025.
+    deadline: 'Feb 2026',
+    year: 2026,
     category: 'Habit',
     monthlyContribution: 0,
     color: COLOR.recurring,
     notes: '',
     currency: 'EUR',
-    startMonth: '2026-03',
-    missedMonths: ['2026-06'],
-    habit: { monthlyTarget: 300, monthsCompleted: 7, totalMonths: 12, unit: 'months' },
+    habit: { monthlyTarget: 500, startMonth: 'Mar 2025', unit: 'months' },
   },
 ];
 

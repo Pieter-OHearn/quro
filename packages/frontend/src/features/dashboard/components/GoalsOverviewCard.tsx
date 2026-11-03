@@ -8,8 +8,9 @@ import {
   getGoalPct,
   isAboveLowerIsBetterTarget,
   normalizeGoalType,
+  formatInvestHabitHits,
+  getInvestHabitProgress,
   resolveGoalCurrentAmount,
-  resolveInvestHabitMonthsCompleted,
 } from '@/features/goals/utils/goal-utils';
 import type { CompactFormatFn } from '../types';
 
@@ -36,7 +37,7 @@ const buildInvestHabitValueParts = (
   goal: Goal,
   context: GoalProgressContext,
 ): { primary: string; secondary: string } => ({
-  primary: `${resolveInvestHabitMonthsCompleted(goal, context)}/${goal.totalMonths ?? 12}`,
+  primary: formatInvestHabitHits(goal, context),
   secondary: ' months',
 });
 
@@ -94,8 +95,10 @@ const buildSalarySubtext = (
   return `+${formatPercent(raisePct, numberFormat, 1)} raise needed`;
 };
 
-const buildInvestHabitSubtext = (goal: Goal, context: GoalProgressContext): string =>
-  `${resolveInvestHabitMonthsCompleted(goal, context)} of ${goal.totalMonths ?? 12} months hit`;
+const buildInvestHabitSubtext = (goal: Goal, context: GoalProgressContext): string => {
+  const { hits, months } = getInvestHabitProgress(goal, context);
+  return `${hits} of ${months.length} months hit`;
+};
 
 const buildAnnualSubtext = (
   clampedPct: number,

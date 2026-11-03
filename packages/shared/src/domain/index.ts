@@ -1,5 +1,6 @@
 export * from './holdings.js';
 export * from './household.js';
+export * from './investHabit.js';
 export * from './ledgers.js';
 export * from './mortgageRepayment.js';
 export * from './properties.js';

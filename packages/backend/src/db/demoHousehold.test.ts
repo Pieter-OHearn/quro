@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { toCents } from '@quro/shared';
+import { goalMonthKey, investHabitMonths, sumInvestHabitBuys, toCents } from '@quro/shared';
 import {
   BUDGET_CATEGORIES,
   DEPOSIT_PROTECTION,
@@ -196,6 +196,46 @@ describe('demo household data', () => {
     expect(GOALS.map((goal): string => goal.type).sort()).toEqual(
       ['invest_habit', 'portfolio', 'salary', 'savings', 'savings'].sort(),
     );
+  });
+
+  test('gives the invest habit two years of months, all hit but one, from the demo buys', () => {
+    const habit = GOALS.find((goal) => goal.type === 'invest_habit')!;
+    const months = investHabitMonths({ ...habit, startMonth: habit.habit!.startMonth }, 2026);
+    expect(months.map(goalMonthKey)).toEqual([
+      '2025-03',
+      '2025-04',
+      '2025-05',
+      '2025-06',
+      '2025-07',
+      '2025-08',
+      '2025-09',
+      '2025-10',
+      '2025-11',
+      '2025-12',
+      '2026-01',
+      '2026-02',
+    ]);
+    const rates = new Map<string, number>(
+      buildSeedCurrencyRates(new Date(`${HOUSEHOLD_AS_OF}T12:00:00Z`)).map((rate) => [
+        rate.fromCurrency,
+        rate.rate,
+      ]),
+    );
+    const totals = sumInvestHabitBuys(
+      HOLDINGS.filter((holding) => holding.owner === 'demo').flatMap((holding) =>
+        holding.transactions
+          .filter((txn) => txn.type === 'buy')
+          .map((txn) => ({ ...txn, currency: holding.currency })),
+      ),
+    );
+    const eurCents = new Map<string, number>();
+    for (const total of totals) {
+      const rate = total.currency === 'EUR' ? 1 : rates.get(total.currency)!;
+      eurCents.set(total.month, (eurCents.get(total.month) ?? 0) + toCents(total.amount * rate));
+    }
+    const targetCents = toCents(habit.habit!.monthlyTarget);
+    const missed = months.map(goalMonthKey).filter((key) => (eurCents.get(key) ?? 0) < targetCents);
+    expect(missed).toEqual(['2025-12']);
   });
 
   test('includes a loss, negative equity and a pension statement that lost value', () => {

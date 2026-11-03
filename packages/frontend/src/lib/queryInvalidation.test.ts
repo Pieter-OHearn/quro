@@ -12,11 +12,19 @@ function isInvalidated(client: QueryClient, key: QueryKey) {
   return client.getQueryState(key)?.isInvalidated;
 }
 
-test('goal changes leave dashboard and plan data cached', async () => {
+test('goal changes refresh the invest habit buys and leave dashboard and plan data cached', async () => {
   const client = new QueryClient();
-  seed(client, [keys.goals, keys.dashboard.summary, keys.dashboard.transactions, keys.plan.runway]);
+  const insights = keys.dashboard.insightYear(2026);
+  seed(client, [
+    keys.goals,
+    insights,
+    keys.dashboard.summary,
+    keys.dashboard.transactions,
+    keys.plan.runway,
+  ]);
   await invalidateDomain(client, 'goals');
   expect(isInvalidated(client, keys.goals)).toBe(true);
+  expect(isInvalidated(client, insights)).toBe(true);
   expect(isInvalidated(client, keys.dashboard.summary)).toBe(false);
   expect(isInvalidated(client, keys.dashboard.transactions)).toBe(false);
   expect(isInvalidated(client, keys.plan.runway)).toBe(false);

@@ -59,8 +59,6 @@ export function GoalsMainContent({ state }: Readonly<GoalsMainContentProps>) {
         yearGoals={state.yearGoals}
         onDelete={state.handleDelete}
         onEdit={(id) => state.setEditingGoal(state.goals.find((g) => g.id === id) ?? null)}
-        onUpdateMonths={state.handleUpdateMonths}
-        onToggleMissedMonth={state.handleToggleMissedMonth}
         onAdd={() => state.setShowAdd(true)}
       />
     </PageStack>

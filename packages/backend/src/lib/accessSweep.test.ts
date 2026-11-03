@@ -64,7 +64,7 @@ const INLINE_OWNER_PREDICATES: Inventory = {
   'lib/bunqOAuthAttempts.ts': { bunqOauthAttempts: 1 },
   'lib/bunqPaymentProgress.ts': { bunqPaymentProgress: 1 },
   'lib/csvImport/service.ts': { budgetTransactions: 2, csvImports: 2, importProfiles: 2 },
-  'lib/dashboardInsights.ts': { holdingTransactions: 1, payslips: 2 },
+  'lib/dashboardInsights.ts': { goals: 1, holdingTransactions: 1, payslips: 2 },
   'lib/exposure.ts': { exposureSettings: 2, holdingTransactions: 1, holdings: 1 },
   'lib/holdingPriceSync.ts': { holdings: 3 },
   'lib/ledgerWrite.ts': { netWorthSnapshots: 1 },

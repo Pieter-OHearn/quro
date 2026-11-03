@@ -1,6 +1,6 @@
 import type { Goal } from '@quro/shared';
 import type { GoalProgressContext, GoalStatCard, GoalStatsData } from '../types';
-import { getGoalStatus, parseGoalYear } from './goal-utils';
+import { getGoalStatus, getGoalYears } from './goal-utils';
 
 export const computeGoalStats = (
   yearGoals: readonly Goal[],
@@ -28,7 +28,7 @@ export const computeGoalStats = (
 export const computeGoalYears = (goals: readonly Goal[], currentYear: number): number[] => {
   const uniqueYears = new Set<number>();
   for (const goal of goals) {
-    uniqueYears.add(parseGoalYear(goal, currentYear));
+    for (const year of getGoalYears(goal, currentYear)) uniqueYears.add(year);
   }
   uniqueYears.add(currentYear);
   return [...uniqueYears].sort((a, b) => a - b);
