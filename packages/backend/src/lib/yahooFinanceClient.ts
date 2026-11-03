@@ -102,13 +102,26 @@ function extractProfileStrings(profile: unknown): {
   };
 }
 
+// Yahoo lists a pair quoted from US dollars as `XXX=X`, and a batch quote sometimes answers a
+// request for `USDXXX=X` under that name.
+const YAHOO_USD_PAIR = /^(?<quote>[A-Z]{3})=X$/;
+
+function matchRequestedSymbol(rawSymbol: string, unique: string[]): string {
+  const upper = rawSymbol.toUpperCase();
+  const exact = unique.find((s) => s.toUpperCase() === upper);
+  if (exact) return exact;
+  const usdPair = YAHOO_USD_PAIR.exec(upper)?.groups?.quote;
+  const alias = usdPair && unique.find((s) => s.toUpperCase() === `USD${usdPair}=X`);
+  return alias || rawSymbol;
+}
+
 function parseQuoteRow(
   row: Record<string, unknown>,
   unique: string[],
 ): { key: string; quote: EodLatestQuote } | null {
   const rawSymbol = typeof row.symbol === 'string' ? row.symbol : null;
   if (!rawSymbol) return null;
-  const matched = unique.find((s) => s.toUpperCase() === rawSymbol.toUpperCase()) ?? rawSymbol;
+  const matched = matchRequestedSymbol(rawSymbol, unique);
   const tradeLast = toIsoString(row.regularMarketTime as Date | number | null | undefined);
   return {
     key: matched,

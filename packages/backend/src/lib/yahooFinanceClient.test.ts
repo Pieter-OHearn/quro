@@ -176,3 +176,41 @@ test('Yahoo keeps empty quotes for ordinary provider errors', async () => {
   );
   expect((await client.getLatestEod(['SYNTHETIC'])).SYNTHETIC.close).toBeNull();
 });
+
+function quotingClient(rows: Record<string, unknown>[]) {
+  return new YahooFinanceMarketDataClient(
+    () => ({ quote: () => Promise.resolve(rows) }) as unknown as InstanceType<typeof YahooFinance>,
+  );
+}
+
+const QUOTED_AT = new Date('2026-11-03T21:02:27.000Z');
+
+test('Yahoo quotes a US dollar pair it answers under its canonical name', async () => {
+  // A batch quote for USDEUR=X sometimes comes back as EUR=X (seen against Yahoo on 2026-11-03).
+  const client = quotingClient([
+    {
+      symbol: 'GBPEUR=X',
+      regularMarketPrice: 1.198,
+      regularMarketTime: QUOTED_AT,
+      currency: 'EUR',
+    },
+    { symbol: 'EUR=X', regularMarketPrice: 0.8933, regularMarketTime: QUOTED_AT, currency: 'EUR' },
+  ]);
+  const quotes = await client.getLatestEod(['GBPEUR=X', 'USDEUR=X']);
+  expect(quotes['USDEUR=X']).toMatchObject({
+    symbol: 'USDEUR=X',
+    close: 0.8933,
+    eodDate: '2026-11-03',
+  });
+  expect(quotes['GBPEUR=X']?.close).toBe(1.198);
+  expect(quotes['EUR=X']).toBeUndefined();
+});
+
+test('Yahoo keeps an exact symbol match over the US dollar pair name', async () => {
+  const client = quotingClient([
+    { symbol: 'EUR=X', regularMarketPrice: 0.8933, regularMarketTime: QUOTED_AT, currency: 'EUR' },
+  ]);
+  const quotes = await client.getLatestEod(['EUR=X', 'USDEUR=X']);
+  expect(quotes['EUR=X']?.close).toBe(0.8933);
+  expect(quotes['USDEUR=X']?.close).toBeNull();
+});
