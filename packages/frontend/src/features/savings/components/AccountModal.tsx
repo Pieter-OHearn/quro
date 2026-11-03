@@ -15,6 +15,7 @@ import {
   SelectInput,
   EmojiPickerField,
   IconButton,
+  ModalPresence,
 } from '@/components/ui';
 import { monthlyInterest, type SavingsAccount, TEXT_FIELD_LIMITS } from '@quro/shared';
 import { JointToggleField } from '@/features/partner';
@@ -350,24 +351,26 @@ export function AccountModal({ existing, onClose, onSave, onDelete }: AccountMod
         isEdit={isEdit}
         isBunqSynced={isBunqSynced}
       />
-      {confirmingDelete && existing ? (
-        <ArchiveOrDeleteDialog
-          entityLabel="Account"
-          entityName={existing.name}
-          balance={existing.balance}
-          balanceCurrency={existing.currency}
-          childrenLabel="transactions"
-          onArchive={() => {
-            runDelete('preserveTransactions');
-            setConfirmingDelete(false);
-          }}
-          onDelete={() => {
-            runDelete('deleteTransactions');
-            setConfirmingDelete(false);
-          }}
-          onCancel={() => setConfirmingDelete(false)}
-        />
-      ) : null}
+      <ModalPresence open={confirmingDelete && Boolean(existing)}>
+        {confirmingDelete && existing ? (
+          <ArchiveOrDeleteDialog
+            entityLabel="Account"
+            entityName={existing.name}
+            balance={existing.balance}
+            balanceCurrency={existing.currency}
+            childrenLabel="transactions"
+            onArchive={() => {
+              runDelete('preserveTransactions');
+              setConfirmingDelete(false);
+            }}
+            onDelete={() => {
+              runDelete('deleteTransactions');
+              setConfirmingDelete(false);
+            }}
+            onCancel={() => setConfirmingDelete(false)}
+          />
+        ) : null}
+      </ModalPresence>
     </Modal>
   );
 }

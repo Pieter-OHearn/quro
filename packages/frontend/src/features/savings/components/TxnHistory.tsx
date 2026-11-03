@@ -1,7 +1,7 @@
 import { usePagination } from '@/hooks/usePagination';
 import { useState } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
-import { Button, Pagination, TxnHistoryPanel, TxnRow } from '@/components/ui';
+import { Button, Pagination, TxnHistoryPanel, TxnRow, ModalPresence } from '@/components/ui';
 import { Upload } from 'lucide-react';
 import { CsvImportDialog } from '@/features/import/components';
 import { TxnAmount } from '@/components/finance/TxnAmount';
@@ -108,9 +108,11 @@ export function TxnHistory({ account, transactions, onAdd, onEdit, onDelete }: T
           );
         })}
       </TxnHistoryPanel>
-      {importing && (
-        <CsvImportDialog kind="savings" account={account} onClose={() => setImporting(false)} />
-      )}
+      <ModalPresence open={importing}>
+        {importing && (
+          <CsvImportDialog kind="savings" account={account} onClose={() => setImporting(false)} />
+        )}
+      </ModalPresence>
     </>
   );
 }

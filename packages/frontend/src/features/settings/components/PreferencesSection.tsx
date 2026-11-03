@@ -15,6 +15,7 @@ import { formatNumber, NUMBER_FORMATS, JURISDICTION_CODES } from '@quro/shared';
 import { CURRENCY_CODES, CURRENCY_META } from '@/lib/CurrencyContext';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
 
+import { UnsavedChangesGuard } from '@/components/ui';
 import { AppearanceSetting } from './AppearanceSetting';
 import {
   type PreferencesSectionProps,
@@ -114,6 +115,7 @@ function PreferencesForm({
 
   return (
     <div className="space-y-4">
+      <UnsavedChangesGuard when={hasChanges && !isSaving} />
       <SettingsCard
         title="Preferences"
         subtitle="Choose the app-wide defaults that drive balances, charts, and totals."

@@ -125,6 +125,7 @@ export function ArchiveOrDeleteDialog({
 
   return (
     <Modal
+      confirmDiscard={false}
       title={
         hideArchive ? `Delete ${entityLabel.toLowerCase()}` : `Remove ${entityLabel.toLowerCase()}`
       }

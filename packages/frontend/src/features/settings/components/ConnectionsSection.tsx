@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { AppCapabilities, AppCapabilityStatus } from '@quro/shared';
 
 import { Check, Link2, RefreshCw, Unlink } from 'lucide-react';
-import { Badge, Button, LoadingState, Modal, TextInput } from '@/components/ui';
+import { Badge, Button, LoadingState, Modal, TextInput, ModalPresence } from '@/components/ui';
 import { buildApiUrl, resolveApiErrorMessage } from '@/lib/api';
 import { useAppCapabilities, useBunqAvailability } from '@/lib/useAppCapabilities';
 import { cn } from '@/lib/utils';
@@ -304,15 +304,17 @@ export function ConnectionsSection() {
 
       <FeaturesCard />
 
-      {confirmingDisconnect ? (
-        <DisconnectBunqDialog
-          isPending={disconnect.isPending}
-          onCancel={() => setConfirmingDisconnect(false)}
-          onConfirm={() => {
-            void handleDisconnect();
-          }}
-        />
-      ) : null}
+      <ModalPresence open={confirmingDisconnect}>
+        {confirmingDisconnect ? (
+          <DisconnectBunqDialog
+            isPending={disconnect.isPending}
+            onCancel={() => setConfirmingDisconnect(false)}
+            onConfirm={() => {
+              void handleDisconnect();
+            }}
+          />
+        ) : null}
+      </ModalPresence>
     </div>
   );
 }

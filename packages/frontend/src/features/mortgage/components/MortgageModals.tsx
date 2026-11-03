@@ -1,4 +1,5 @@
 import type { Mortgage as MortgageType, MortgageTransaction, Property } from '@quro/shared';
+import { ModalPresence } from '@/components/ui';
 import type { MortgageFormPayload, SaveMortgageTxnInput } from '../types';
 import type { DeleteMortgageMode } from '../hooks/mutations';
 import { AddMortgageModal } from './AddMortgageModal';
@@ -38,25 +39,29 @@ export function MortgageModals({
 }: Readonly<MortgageModalsProps>) {
   return (
     <>
-      {(showTxnModal || editingTxn) && (
-        <AddMortgageTxnModal
-          mortgage={mortgage}
-          transactions={transactions}
-          existing={editingTxn ?? undefined}
-          onClose={onCloseTxnModal}
-          onSave={onSaveTxn}
-        />
-      )}
-      {showMortgageModal && (
-        <AddMortgageModal
-          existing={editingMortgage ?? undefined}
-          properties={properties}
-          linkedPropertyId={editingLinkedPropertyId}
-          onClose={onCloseMortgageModal}
-          onSave={onSaveMortgage}
-          onDelete={onDeleteMortgage}
-        />
-      )}
+      <ModalPresence open={showTxnModal || Boolean(editingTxn)}>
+        {(showTxnModal || editingTxn) && (
+          <AddMortgageTxnModal
+            mortgage={mortgage}
+            transactions={transactions}
+            existing={editingTxn ?? undefined}
+            onClose={onCloseTxnModal}
+            onSave={onSaveTxn}
+          />
+        )}
+      </ModalPresence>
+      <ModalPresence open={showMortgageModal}>
+        {showMortgageModal && (
+          <AddMortgageModal
+            existing={editingMortgage ?? undefined}
+            properties={properties}
+            linkedPropertyId={editingLinkedPropertyId}
+            onClose={onCloseMortgageModal}
+            onSave={onSaveMortgage}
+            onDelete={onDeleteMortgage}
+          />
+        )}
+      </ModalPresence>
     </>
   );
 }

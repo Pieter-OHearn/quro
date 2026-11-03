@@ -106,6 +106,7 @@ export function SignInModal({ onClose, onSwitchToSignUp }: Readonly<SignInModalP
 
   return (
     <Modal
+      confirmDiscard={false}
       title={resetting ? 'Reset your password' : 'Welcome back'}
       subtitle={resetting ? 'Use the code from your Quro operator' : 'Sign in to your Quro account'}
       onClose={onClose}

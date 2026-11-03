@@ -108,7 +108,10 @@ test('covers the MVP happy path from sign-in through dashboard verification', as
   await page.unroute('**/api/savings/accounts/*/banking-entity');
   await firstBankRow.getByRole('button', { name: 'Use automatic matching' }).click();
   await expect(firstBankRow.getByText('Needs review')).toBeVisible();
+  // The manual draft of the second row is still unsaved, so closing asks before discarding it.
   await bankingDialog.getByRole('button', { name: 'Close dialog' }).click();
+  await bankingDialog.getByRole('button', { name: 'Discard changes' }).click();
+  await expect(bankingDialog).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Budget', exact: true }).click();
   await page.getByTestId('budget-add-category-button').click();

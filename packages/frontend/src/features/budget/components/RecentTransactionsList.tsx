@@ -17,6 +17,7 @@ import {
   type DataTableSortState,
   FormField,
   SelectInput,
+  ModalPresence,
 } from '@/components/ui';
 import { dataColorToken } from '@/lib/dataColors';
 import { formatAsNegative } from '@/lib/liability';
@@ -314,15 +315,17 @@ export function RecentTransactionsList({
           />
         ))}
       </DataTable>
-      {editing && (
-        <EditTransactionModal
-          transaction={editing}
-          categories={categories}
-          onSave={(categoryId) => onChangeCategory(editing.id, categoryId)}
-          onDelete={() => onDelete(editing.id)}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      <ModalPresence open={Boolean(editing)}>
+        {editing && (
+          <EditTransactionModal
+            transaction={editing}
+            categories={categories}
+            onSave={(categoryId) => onChangeCategory(editing.id, categoryId)}
+            onDelete={() => onDelete(editing.id)}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </ModalPresence>
     </>
   );
 }

@@ -9,7 +9,7 @@ import {
   MIN_USER_AGE,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
-import { FormField, StatCard, TextInput } from '@/components/ui';
+import { FormField, StatCard, TextInput, UnsavedChangesGuard } from '@/components/ui';
 import { apiPut, resolveApiErrorMessage } from '@/lib/api';
 
 import {
@@ -49,6 +49,10 @@ function ProfileForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const formError = save.error ? resolveApiErrorMessage(save.error, DEFAULT_ERROR_MESSAGE) : '';
   const isSaving = save.isPending;
+  const initial = toProfileFormState(user);
+  const hasChanges = (Object.keys(initial) as (keyof ProfileFormState)[]).some(
+    (key) => form[key] !== initial[key],
+  );
 
   const yearsAway = (() => {
     const age = parseWholeNumber(form.age);
@@ -76,117 +80,120 @@ function ProfileForm({
   };
 
   return (
-    <SettingsCard
-      title="Profile"
-      subtitle="How Quro identifies you and personalises your planning assumptions."
-      footer={
-        <SaveActionButton
-          saved={saved}
-          loading={isSaving}
-          onClick={() => {
-            void handleSave();
-          }}
-        />
-      }
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="First name" required error={errors.firstName}>
-          <TextInput
-            placeholder="John"
-            value={form.firstName}
-            maxLength={TEXT_FIELD_LIMITS.profile.firstName}
-            error={Boolean(errors.firstName)}
-            onChange={(value) => {
-              setForm((current) => ({ ...current, firstName: value }));
-              setErrors((current) => ({ ...current, firstName: '' }));
+    <>
+      <UnsavedChangesGuard when={hasChanges && !isSaving} />
+      <SettingsCard
+        title="Profile"
+        subtitle="How Quro identifies you and personalises your planning assumptions."
+        footer={
+          <SaveActionButton
+            saved={saved}
+            loading={isSaving}
+            onClick={() => {
+              void handleSave();
             }}
           />
-        </FormField>
-        <FormField label="Last name" required error={errors.lastName}>
-          <TextInput
-            placeholder="Doe"
-            value={form.lastName}
-            maxLength={TEXT_FIELD_LIMITS.profile.lastName}
-            error={Boolean(errors.lastName)}
-            onChange={(value) => {
-              setForm((current) => ({ ...current, lastName: value }));
-              setErrors((current) => ({ ...current, lastName: '' }));
-            }}
-          />
-        </FormField>
-      </div>
-
-      <FormField label="Email address" required error={errors.email}>
-        <TextInput
-          type="email"
-          placeholder="you@example.com"
-          value={form.email}
-          maxLength={TEXT_FIELD_LIMITS.profile.email}
-          error={Boolean(errors.email)}
-          onChange={(value) => {
-            setForm((current) => ({ ...current, email: value }));
-            setErrors((current) => ({ ...current, email: '' }));
-          }}
-        />
-      </FormField>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          label="Current age"
-          hint="Used for pension projections"
-          required
-          error={errors.age}
-        >
-          <TextInput
-            type="number"
-            inputMode="numeric"
-            min={MIN_USER_AGE}
-            max={MAX_USER_AGE}
-            value={form.age}
-            error={Boolean(errors.age)}
-            onChange={(value) => {
-              setForm((current) => ({ ...current, age: value }));
-              setErrors((current) => ({ ...current, age: '' }));
-            }}
-          />
-        </FormField>
-        <FormField label="Target retirement age" required error={errors.retirementAge}>
-          <TextInput
-            type="number"
-            inputMode="numeric"
-            min={MIN_RETIREMENT_AGE}
-            max={MAX_RETIREMENT_AGE}
-            value={form.retirementAge}
-            error={Boolean(errors.retirementAge)}
-            onChange={(value) => {
-              setForm((current) => ({ ...current, retirementAge: value }));
-              setErrors((current) => ({ ...current, retirementAge: '' }));
-            }}
-          />
-        </FormField>
-      </div>
-
-      {yearsAway > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard label="Years remaining to retirement" value={String(yearsAway)} />
-          <StatCard label="Career timeline already elapsed" value={`${elapsedPercent}%`} />
-          <StatCard label="Runway left to keep contributing" value={`${remainingPercent}%`} />
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="First name" required error={errors.firstName}>
+            <TextInput
+              placeholder="John"
+              value={form.firstName}
+              maxLength={TEXT_FIELD_LIMITS.profile.firstName}
+              error={Boolean(errors.firstName)}
+              onChange={(value) => {
+                setForm((current) => ({ ...current, firstName: value }));
+                setErrors((current) => ({ ...current, firstName: '' }));
+              }}
+            />
+          </FormField>
+          <FormField label="Last name" required error={errors.lastName}>
+            <TextInput
+              placeholder="Doe"
+              value={form.lastName}
+              maxLength={TEXT_FIELD_LIMITS.profile.lastName}
+              error={Boolean(errors.lastName)}
+              onChange={(value) => {
+                setForm((current) => ({ ...current, lastName: value }));
+                setErrors((current) => ({ ...current, lastName: '' }));
+              }}
+            />
+          </FormField>
         </div>
-      ) : null}
 
-      <FormField label="Location">
-        <TextInput
-          placeholder="Amsterdam, Netherlands"
-          value={form.location}
-          maxLength={TEXT_FIELD_LIMITS.profile.location}
-          onChange={(value) => {
-            setForm((current) => ({ ...current, location: value }));
-          }}
-        />
-      </FormField>
+        <FormField label="Email address" required error={errors.email}>
+          <TextInput
+            type="email"
+            placeholder="you@example.com"
+            value={form.email}
+            maxLength={TEXT_FIELD_LIMITS.profile.email}
+            error={Boolean(errors.email)}
+            onChange={(value) => {
+              setForm((current) => ({ ...current, email: value }));
+              setErrors((current) => ({ ...current, email: '' }));
+            }}
+          />
+        </FormField>
 
-      {formError ? <FormErrorNotice>{formError}</FormErrorNotice> : null}
-    </SettingsCard>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            label="Current age"
+            hint="Used for pension projections"
+            required
+            error={errors.age}
+          >
+            <TextInput
+              type="number"
+              inputMode="numeric"
+              min={MIN_USER_AGE}
+              max={MAX_USER_AGE}
+              value={form.age}
+              error={Boolean(errors.age)}
+              onChange={(value) => {
+                setForm((current) => ({ ...current, age: value }));
+                setErrors((current) => ({ ...current, age: '' }));
+              }}
+            />
+          </FormField>
+          <FormField label="Target retirement age" required error={errors.retirementAge}>
+            <TextInput
+              type="number"
+              inputMode="numeric"
+              min={MIN_RETIREMENT_AGE}
+              max={MAX_RETIREMENT_AGE}
+              value={form.retirementAge}
+              error={Boolean(errors.retirementAge)}
+              onChange={(value) => {
+                setForm((current) => ({ ...current, retirementAge: value }));
+                setErrors((current) => ({ ...current, retirementAge: '' }));
+              }}
+            />
+          </FormField>
+        </div>
+
+        {yearsAway > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatCard label="Years remaining to retirement" value={String(yearsAway)} />
+            <StatCard label="Career timeline already elapsed" value={`${elapsedPercent}%`} />
+            <StatCard label="Runway left to keep contributing" value={`${remainingPercent}%`} />
+          </div>
+        ) : null}
+
+        <FormField label="Location">
+          <TextInput
+            placeholder="Amsterdam, Netherlands"
+            value={form.location}
+            maxLength={TEXT_FIELD_LIMITS.profile.location}
+            onChange={(value) => {
+              setForm((current) => ({ ...current, location: value }));
+            }}
+          />
+        </FormField>
+
+        {formError ? <FormErrorNotice>{formError}</FormErrorNotice> : null}
+      </SettingsCard>
+    </>
   );
 }
 

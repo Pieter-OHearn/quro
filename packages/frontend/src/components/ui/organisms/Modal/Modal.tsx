@@ -1,9 +1,20 @@
 import { X } from 'lucide-react';
-import { useId, useRef, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useContext,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from 'react';
+import type { Blocker } from 'react-router';
 import { cn } from '@/lib/utils';
 import { Button } from '../../atoms';
 import { useFocusTrap, useVisualViewport, type VisualViewportBox } from '../../hooks';
+import { ModalPresenceContext } from './ModalPresence';
 import { useExitTransition } from './useExitTransition';
+import { NavigationBlocker, useBeforeUnloadWarning, useEditedSinceOpen } from './useUnsavedChanges';
 
 export type ModalHeaderProps = {
   title: React.ReactNode;
@@ -26,13 +37,20 @@ export type ModalProps = {
   subtitle?: React.ReactNode;
   onClose: () => void;
   /**
-   * Whether the dialog is shown. It defaults to true, and a caller that unmounts a closed dialog
-   * needs nothing else. To play the closing transition, keep the dialog mounted with `open` false
-   * until `onExited` runs, which `useModalPresence` does.
+   * Whether the dialog is shown. Inside a `ModalPresence` it follows the presence, which keeps the
+   * dialog mounted until its closing transition has ended; otherwise it defaults to true. Pass it
+   * with `onExited` to drive the transition yourself (`useModalPresence`).
    */
   open?: boolean;
   /** Called once the closing transition has ended after `open` turned false. */
   onExited?: () => void;
+  /**
+   * Ask before closing a dialog whose fields were edited (on by default): the close button,
+   * Escape, the scrim, the browser's back button and leaving the page ask to discard the changes.
+   * A Cancel button is the explicit way to discard and closes at once. Turn it off for a dialog
+   * with nothing to lose, such as signing in.
+   */
+  confirmDiscard?: boolean;
   maxWidth?: keyof typeof MAX_WIDTH_MAP;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -77,6 +95,71 @@ const PANEL_CLASS_NAME = cn(
 // row of its own above them.
 const FOOTER_CLASS_NAME =
   'flex justify-end gap-2 border-t border-border-default bg-surface-sunken px-4 py-3 max-sm:sticky max-sm:bottom-0 max-sm:flex-wrap max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:*:h-11 max-sm:*:min-w-[calc(50%-0.25rem)] max-sm:*:flex-1';
+
+type DiscardRequest = { discard: () => void; keep?: () => void };
+
+/**
+ * The unsaved-changes guard: a dialog whose fields were edited asks before it closes or the page
+ * is left. `confirming` shows the question in place of the footer.
+ */
+function useDiscardGuard(
+  dialogRef: RefObject<HTMLDivElement | null>,
+  open: boolean,
+  enabled: boolean,
+) {
+  const edited = useEditedSinceOpen(dialogRef, open && enabled) && open && enabled;
+  const [request, setRequest] = useState<DiscardRequest | null>(null);
+  useBeforeUnloadWarning(edited);
+
+  const confirmClose = useCallback(
+    (close: () => void) => {
+      if (edited) setRequest({ discard: close });
+      else close();
+    },
+    [edited],
+  );
+  const onNavigationBlocked = useCallback((blocker: Blocker) => {
+    setRequest({ discard: () => blocker.proceed?.(), keep: () => blocker.reset?.() });
+  }, []);
+  const keepEditing = () => {
+    request?.keep?.();
+    setRequest(null);
+  };
+  const discardChanges = () => {
+    setRequest(null);
+    request?.discard();
+  };
+
+  return {
+    edited,
+    confirming: request !== null,
+    confirmClose,
+    onNavigationBlocked,
+    keepEditing,
+    discardChanges,
+  };
+}
+
+// Asks in the footer's place, on the sticky bar, with "Keep editing" focused so Enter keeps the
+// edits; Escape keeps them too.
+function DiscardChangesBar({
+  onKeep,
+  onDiscard,
+}: Readonly<{ onKeep: () => void; onDiscard: () => void }>) {
+  return (
+    <div className={cn(FOOTER_CLASS_NAME, 'items-center')}>
+      <p role="alert" className="mr-auto flex items-center text-cell text-fg max-sm:basis-full!">
+        Discard your changes?
+      </p>
+      <Button variant="secondary" onClick={onKeep} autoFocus>
+        Keep editing
+      </Button>
+      <Button variant="dangerSolid" onClick={onDiscard}>
+        Discard changes
+      </Button>
+    </div>
+  );
+}
 
 export function ModalHeader({
   title,
@@ -154,26 +237,94 @@ function keyboardOverlayStyle(box: VisualViewportBox | null): CSSProperties | un
   return box ? { top: box.top, bottom: 'auto', height: box.height } : undefined;
 }
 
-export function Modal({
+/**
+ * Whether the dialog is open (its own `open`, else its `ModalPresence`, else true), and the close
+ * request that goes through the unsaved-changes guard. Wires the focus trap and exit transition.
+ */
+function useModalState(
+  dialogRef: RefObject<HTMLDivElement | null>,
+  { open: openProp, onExited: onExitedProp, confirmDiscard = true, onClose }: ModalProps,
+) {
+  const presence = useContext(ModalPresenceContext);
+  const open = openProp ?? presence?.open ?? true;
+  const guard = useDiscardGuard(dialogRef, open, confirmDiscard);
+  const requestClose = () => {
+    guard.confirmClose(onClose);
+  };
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: open,
+    onEscape: guard.confirming ? guard.keepEditing : requestClose,
+  });
+  useExitTransition({ panelRef: dialogRef, open, onExited: onExitedProp ?? presence?.onExited });
+  return { open, guard, requestClose };
+}
+
+type ModalContentProps = Pick<
+  ModalProps,
+  | 'title'
+  | 'subtitle'
+  | 'children'
+  | 'footer'
+  | 'scrollable'
+  | 'header'
+  | 'headerProps'
+  | 'bodyClassName'
+> & {
+  titleId: string;
+  guard: ReturnType<typeof useDiscardGuard>;
+  requestClose: () => void;
+};
+
+// The header, body and footer, or the discard question in the footer's place. A dialog opened
+// from inside this one does not inherit this one's presence.
+function ModalContent({
   title,
   subtitle,
-  onClose,
-  open = true,
-  onExited,
-  maxWidth = 'md',
   children,
   footer,
   scrollable,
   header,
   headerProps,
-  backdropClassName,
-  contentClassName,
   bodyClassName,
-}: ModalProps) {
+  titleId,
+  guard,
+  requestClose,
+}: Readonly<ModalContentProps>) {
+  const footerBar = footer ? (
+    <div className={cn(FOOTER_CLASS_NAME, scrollable && 'flex-shrink-0')}>{footer}</div>
+  ) : null;
+  return (
+    <ModalPresenceContext.Provider value={null}>
+      {header ?? (
+        <ModalHeader
+          title={title}
+          subtitle={subtitle}
+          onClose={requestClose}
+          scrollable={scrollable}
+          titleId={titleId}
+          {...headerProps}
+        />
+      )}
+      <div
+        className={cn('p-4 space-y-4 text-body', scrollable && 'overflow-y-auto', bodyClassName)}
+      >
+        {children}
+      </div>
+      {guard.confirming ? (
+        <DiscardChangesBar onKeep={guard.keepEditing} onDiscard={guard.discardChanges} />
+      ) : (
+        footerBar
+      )}
+    </ModalPresenceContext.Provider>
+  );
+}
+
+export function Modal(props: ModalProps) {
+  const { title, maxWidth = 'md', scrollable, header, backdropClassName, contentClassName } = props;
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap({ containerRef: dialogRef, active: open, onEscape: onClose });
-  useExitTransition({ panelRef: dialogRef, open, onExited });
+  const { open, guard, requestClose } = useModalState(dialogRef, props);
   // While a virtual keyboard covers the page the overlay is sized to what is still visible.
   const visibleBox = useVisualViewport(open);
 
@@ -186,7 +337,7 @@ export function Modal({
       <div
         data-closing={open ? undefined : ''}
         className={cn(SCRIM_CLASS_NAME, backdropClassName)}
-        onClick={onClose}
+        onClick={requestClose}
       />
       <div
         ref={dialogRef}
@@ -202,24 +353,8 @@ export function Modal({
         {...dialogNameProps(Boolean(header), title, titleId)}
         tabIndex={-1}
       >
-        {header ?? (
-          <ModalHeader
-            title={title}
-            subtitle={subtitle}
-            onClose={onClose}
-            scrollable={scrollable}
-            titleId={titleId}
-            {...headerProps}
-          />
-        )}
-        <div
-          className={cn('p-4 space-y-4 text-body', scrollable && 'overflow-y-auto', bodyClassName)}
-        >
-          {children}
-        </div>
-        {footer && (
-          <div className={cn(FOOTER_CLASS_NAME, scrollable && 'flex-shrink-0')}>{footer}</div>
-        )}
+        <ModalContent {...props} titleId={titleId} guard={guard} requestClose={requestClose} />
+        {guard.edited && <NavigationBlocker onBlocked={guard.onNavigationBlocked} />}
       </div>
     </div>
   );

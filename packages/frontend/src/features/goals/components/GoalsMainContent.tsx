@@ -1,4 +1,4 @@
-import { PageStack } from '@/components/ui';
+import { PageStack, ModalPresence } from '@/components/ui';
 import type { GoalsPageState } from '../types';
 import { AddGoalModal } from './AddGoalModal';
 import { EditGoalModal } from './EditGoalModal';
@@ -16,20 +16,24 @@ export function GoalsMainContent({ state }: Readonly<GoalsMainContentProps>) {
 
   return (
     <PageStack>
-      {state.showAdd && (
-        <AddGoalModal
-          onClose={() => state.setShowAdd(false)}
-          onSave={state.handleAddGoal}
-          initialFilter={initialFilter}
-        />
-      )}
-      {state.editingGoal && (
-        <EditGoalModal
-          goal={state.editingGoal}
-          onClose={() => state.setEditingGoal(null)}
-          onSave={state.handleUpdateGoal}
-        />
-      )}
+      <ModalPresence open={state.showAdd}>
+        {state.showAdd && (
+          <AddGoalModal
+            onClose={() => state.setShowAdd(false)}
+            onSave={state.handleAddGoal}
+            initialFilter={initialFilter}
+          />
+        )}
+      </ModalPresence>
+      <ModalPresence open={Boolean(state.editingGoal)}>
+        {state.editingGoal && (
+          <EditGoalModal
+            goal={state.editingGoal}
+            onClose={() => state.setEditingGoal(null)}
+            onSave={state.handleUpdateGoal}
+          />
+        )}
+      </ModalPresence>
       <GoalsHeader
         years={state.years}
         activeYear={state.activeYear}

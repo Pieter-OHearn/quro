@@ -1,6 +1,6 @@
 import { RouteQueryErrorState } from '@/components/errors/RouteQueryErrorState';
 import { CurrencyReviewNotice } from '@/components/finance/CurrencyReviewNotice';
-import { ContentSection, PageStack } from '@/components/ui';
+import { ContentSection, PageStack, ModalPresence } from '@/components/ui';
 import {
   BudgetCategoriesSection,
   BudgetChartsRow,
@@ -67,23 +67,27 @@ export function Budget() {
           onChangeCategory={page.handleChangeTxCategory}
         />
       </ContentSection>
-      {page.isAddingCategory && (
-        <EditCategoryDialog
-          category={page.addCategoryDraft}
-          mode="create"
-          isSaving={page.isSavingCategory}
-          onSave={page.handleAddCategory}
-          onClose={page.closeCategoryDialog}
-        />
-      )}
-      {page.editingCategory && (
-        <EditCategoryDialog
-          category={page.editingCategory}
-          isSaving={page.isSavingCategory}
-          onSave={page.handleSaveEdit}
-          onClose={page.closeCategoryDialog}
-        />
-      )}
+      <ModalPresence open={page.isAddingCategory}>
+        {page.isAddingCategory && (
+          <EditCategoryDialog
+            category={page.addCategoryDraft}
+            mode="create"
+            isSaving={page.isSavingCategory}
+            onSave={page.handleAddCategory}
+            onClose={page.closeCategoryDialog}
+          />
+        )}
+      </ModalPresence>
+      <ModalPresence open={Boolean(page.editingCategory)}>
+        {page.editingCategory && (
+          <EditCategoryDialog
+            category={page.editingCategory}
+            isSaving={page.isSavingCategory}
+            onSave={page.handleSaveEdit}
+            onClose={page.closeCategoryDialog}
+          />
+        )}
+      </ModalPresence>
     </PageStack>
   );
 }
