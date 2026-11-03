@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [Unreleased]
+
+### Fixed
+
+- The US dollar exchange rate updates every day again. Yahoo sometimes answers the daily rate request for US dollars under another name for the same pair, and the sync then skipped it, so US dollar totals used a rate several days old and the out-of-date notice showed.
+
 ## [v1.0.0-rc.7] - 2026-11-03
 
 Quro 1.0.0-rc.7 corrects ledger and money rules before 1.0.0, removes the tools that only installs before 1.0.0 needed, builds the backend image on Alpine, tracks invest habit goals from investment buys across years and polishes the V1 interface: every dialog fades out and asks before it discards edits. It has one migration that moves dividend amounts to their own column, so take a backup first, and run the read-only count and the bank-link secrets check in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7) with 1.0.0-rc.6 before you upgrade.
