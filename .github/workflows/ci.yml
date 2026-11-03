@@ -70,6 +70,8 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    # The suite takes about 3 minutes; a hung test otherwise runs to GitHub's 6-hour default.
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:18-alpine

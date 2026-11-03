@@ -126,10 +126,17 @@ test('Yahoo library forwards the signal to its initial cookie/crumb fetch', asyn
         timeout.abort(new DOMException('Synthetic request timeout', 'TimeoutError'));
       }),
   ) as unknown as typeof fetch;
+  // If the library never reaches fetch, time out anyway so the test fails instead of hanging:
+  // bun's per-test timeout does not end a test that waits on a promise nothing will settle.
+  const fallback = setTimeout(
+    () => timeout.abort(new DOMException('No fetch', 'TimeoutError')),
+    2000,
+  );
   try {
     await expect(new YahooFinanceMarketDataClient().lookupSymbol('SYNTHETIC')).rejects.toThrow();
     expect(aborted).toBe(true);
   } finally {
+    clearTimeout(fallback);
     globalThis.fetch = originalFetch;
   }
 });
