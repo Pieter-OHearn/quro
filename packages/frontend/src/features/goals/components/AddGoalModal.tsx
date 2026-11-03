@@ -390,10 +390,18 @@ function AmountFieldsInvestHabit({
         />
       </FormField>
       <FormField label="Start month" required>
-        <MonthInput value={dateToMonthString(form.startMonth)} onChange={handleStartMonthChange} />
+        <MonthInput
+          aria-label="Start month"
+          value={dateToMonthString(form.startMonth)}
+          onChange={handleStartMonthChange}
+        />
       </FormField>
       <FormField label="End month" required>
-        <MonthInput value={deadlineToMonthString(form.deadline)} onChange={handleEndMonthChange} />
+        <MonthInput
+          aria-label="End month"
+          value={deadlineToMonthString(form.deadline)}
+          onChange={handleEndMonthChange}
+        />
       </FormField>
       <div className={cn('col-span-2', LINKED_BOX_CLASS_NAME)}>
         {range.error ? (

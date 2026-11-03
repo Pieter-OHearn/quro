@@ -13,6 +13,7 @@ import { Card } from './atoms/Card';
 import { Change } from './atoms/Change';
 import { CurrencyInput } from './atoms/CurrencyInput';
 import { DateInput } from './atoms/DateInput';
+import { MonthInput } from './atoms/MonthInput';
 import { IconButton } from './atoms/IconButton';
 import { LoadingSpinner } from './atoms/LoadingSpinner';
 import { PasswordInput } from './atoms/PasswordInput';
@@ -292,6 +293,29 @@ const smokeCases: readonly SmokeCase[] = [
     name: 'DateInput renders date field markup',
     element: <DateInput value="2026-03-10" onChange={noop} />,
     includes: ['type="date"', 'value="2026-03-10"'],
+  },
+  {
+    name: 'MonthInput renders the browser month field by default',
+    element: <MonthInput aria-label="Start month" value="2026-10" onChange={noop} />,
+    includes: ['type="month"', 'value="2026-10"', 'aria-label="Start month"'],
+  },
+  {
+    name: 'MonthInput selects show the chosen month and year without a text field',
+    element: <MonthInput selects aria-label="Start month" value="2026-10" onChange={noop} />,
+    includes: [
+      'role="group"',
+      'aria-label="Start month"',
+      'aria-label="Month"',
+      'aria-label="Year"',
+      '<option value="10" selected="">Oct</option>',
+      '<option value="2026" selected="">2026</option>',
+    ],
+    excludes: ['<input', 'type="month"', 'disabled="">Month', 'disabled="">Year'],
+  },
+  {
+    name: 'MonthInput selects start empty with month and year placeholders',
+    element: <MonthInput selects value="" onChange={noop} />,
+    includes: ['<option value="" disabled=""', '>Month</option>', '>Year</option>'],
   },
   {
     name: 'Textarea renders rows and content',
