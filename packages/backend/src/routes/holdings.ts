@@ -18,7 +18,7 @@ import {
   toDateOnlyOr,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
-import { db } from '../db/client';
+import { db, type DbTransaction } from '../db/client';
 import { holdings, holdingPriceHistory, holdingTransactions, stockExchanges } from '../db/schema';
 import { and, asc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { getAuthUser } from '../lib/authUser';
@@ -27,7 +27,7 @@ import { HTTP_STATUS } from '../constants/http';
 import { lookupTicker } from '../lib/marketData';
 import { syncHoldingPricesForUser, upsertHoldingPriceSnapshot } from '../lib/holdingPriceSync';
 import { earliestDate } from '../lib/netWorth';
-import { withLedgerWrite } from '../lib/ledgerWrite';
+import { LEDGER_ROW_CHANGED, lockLedgerRow, withLedgerWrite } from '../lib/ledgerWrite';
 import { parseListPageQuery, readListPage, type KeysetOrder } from '../lib/listPage';
 import {
   err,
@@ -39,9 +39,9 @@ import {
   parseDateString,
   parseId,
   parseIntegerField,
-  parseNormalizedDecimalField,
   parseOptionalDateField,
   parseOptionalIntegerField,
+  parseOptionalMoneyField,
   parseOptionalNormalizedDecimalField,
   parseOptionalTextField,
   parseOptionalUnitPriceField,
@@ -54,7 +54,6 @@ import {
   readJsonBody,
   rejectUnknownFields,
   roundUnitPrice,
-  toMoneyAmount,
 } from '../lib/requestValidation';
 import { log, errorFields } from '../lib/logger';
 
@@ -85,6 +84,7 @@ const HOLDING_TRANSACTION_FIELDS = [
   'type',
   'shares',
   'price',
+  'amount',
   'date',
   'note',
 ] as const;
@@ -171,11 +171,13 @@ type HoldingCreatePayload = HoldingPayload & {
   eodDate: string | null;
 };
 
+// A buy or sell has shares and a price per share; a dividend has an amount and neither.
 type HoldingTransactionPayload = {
   holdingId: number;
   type: HoldingTransactionType;
   shares: number | null;
-  price: number;
+  price: number | null;
+  amount: number | null;
   date: string;
   note: string | null;
 };
@@ -242,9 +244,16 @@ const holdingTransactionParsers: FieldParsers<HoldingTransactionPayload> = {
       'Shares must be greater than zero',
       Number.MIN_VALUE,
     ),
-  // Rounded once the type is known (`roundTransactionPrice`), so a patch is rounded only once.
+  // A unit price, rounded to six decimals once the type is known (`roundTransactionPrice`).
   price: (value) =>
-    parseNormalizedDecimalField(value, 'Price must be greater than zero', Number.MIN_VALUE),
+    parseOptionalNormalizedDecimalField(value, 'Price must be greater than zero', Number.MIN_VALUE),
+  // The amount a dividend paid: money, so the money input rule rounds it to cents and bounds it.
+  amount: (value) =>
+    parseOptionalMoneyField(value, {
+      field: 'amount',
+      error: 'Dividend amount must be greater than zero',
+      min: Number.MIN_VALUE,
+    }),
   date: (value) => parseDateField(value, 'Transaction date must be a valid ISO date'),
   note: (value) => parseOptionalTextField(value, 'Transaction note must be a string'),
 };
@@ -292,20 +301,13 @@ export function parseHoldingTransactionCreate(
   return validationError ? err(validationError) : roundTransactionPrice(parsed.value);
 }
 
-// A buy or sell carries a price per share, a unit price kept to six decimals. A dividend carries
-// the amount received in the same field: that is money, so the money input rule rounds it to
-// cents and bounds it, and six-decimal price storage never holds a sub-cent dividend.
+// A buy or sell carries a price per share, a unit price kept to six decimals. A dividend's
+// amount was rounded to cents when it was parsed.
 function roundTransactionPrice(
   payload: HoldingTransactionPayload,
 ): ParseResult<HoldingTransactionPayload> {
-  if (payload.type === 'dividend') {
-    const amount = toMoneyAmount(payload.price, 'price');
-    if (!amount.ok) return amount;
-    return amount.value > 0
-      ? ok({ ...payload, price: amount.value })
-      : err('Dividend amount must be greater than zero');
-  }
-  const price = roundUnitPrice(payload.price);
+  if (payload.type === 'dividend') return ok(payload);
+  const price = roundUnitPrice(payload.price ?? 0);
   return price > 0 ? ok({ ...payload, price }) : err('Price must be greater than zero');
 }
 
@@ -320,21 +322,29 @@ function parseHoldingTransactionPatch(
 
 function validateHoldingTransactionPayload(payload: HoldingTransactionPayload): string | null {
   if (payload.type === 'dividend') {
-    return payload.shares == null ? null : 'Dividend transactions cannot include shares';
+    if (payload.shares != null) return 'Dividend transactions cannot include shares';
+    if (payload.price != null) return 'A dividend records its amount in amount, not a price';
+    return payload.amount == null ? 'Dividend amount must be greater than zero' : null;
   }
-
+  if (payload.amount != null) return 'Only a dividend has an amount; a buy or sell has a price';
+  if (payload.price == null) return 'Price must be greater than zero';
   return payload.shares != null && payload.shares > 0 ? null : 'Shares must be greater than zero';
 }
 
+// A field the patch leaves out keeps its stored value, except that a change of type does not carry
+// a buy's price into a dividend or a dividend's amount into a buy: the patch supplies the new one.
 function mergeHoldingTransactionPayload(
   patch: Partial<HoldingTransactionPayload>,
   existing: typeof holdingTransactions.$inferSelect,
 ): ParseResult<HoldingTransactionPayload> {
+  const type = patch.type ?? existing.type;
+  const dividend = type === 'dividend';
   return parseHoldingTransactionCreate({
     holdingId: patch.holdingId ?? existing.holdingId,
-    type: patch.type ?? existing.type,
+    type,
     shares: patch.shares === undefined ? existing.shares : patch.shares,
-    price: patch.price ?? existing.price,
+    price: patch.price === undefined ? (dividend ? null : existing.price) : patch.price,
+    amount: patch.amount === undefined ? (dividend ? existing.amount : null) : patch.amount,
     date: patch.date ?? existing.date,
     note: patch.note === undefined ? existing.note : patch.note,
   });
@@ -392,6 +402,7 @@ function toHoldingTransactionInsertValues(
     type: payload.type,
     shares: payload.shares ?? null,
     price: payload.price,
+    amount: payload.amount,
     date: payload.date,
     note: payload.note,
   };
@@ -405,6 +416,7 @@ function toHoldingTransactionUpdateValues(
     type: payload.type,
     shares: payload.shares ?? null,
     price: payload.price,
+    amount: payload.amount,
     date: payload.date,
     note: payload.note,
   };
@@ -710,6 +722,31 @@ registerTransactionReadRoutes(app, {
   scopeByChildOwner: true,
 });
 
+const HOLDING_GONE = { error: 'Holding not found', status: HTTP_STATUS.NOT_FOUND } as const;
+const TRANSACTION_GONE = { error: 'Transaction not found', status: HTTP_STATUS.NOT_FOUND } as const;
+const ROW_MOVED = { error: LEDGER_ROW_CHANGED, status: HTTP_STATUS.CONFLICT } as const;
+
+/**
+ * Locks the holdings in ascending id order, before any of their ledger rows; false when one is
+ * gone or not the user's. A key-share lock, the one the foreign key takes: it waits for a cascade
+ * archive that deletes the holding, but not for a price sync that only updates its price, so a
+ * write and a sync of several holdings never wait for each other in opposite orders.
+ */
+async function lockOwnedHoldings(
+  tx: DbTransaction,
+  ids: readonly number[],
+  userId: number,
+): Promise<boolean> {
+  const unique = [...new Set(ids)].sort((left, right) => left - right);
+  const locked = await tx
+    .select({ id: holdings.id, userId: holdings.userId })
+    .from(holdings)
+    .where(inArray(holdings.id, unique))
+    .orderBy(asc(holdings.id))
+    .for('key share');
+  return unique.length === locked.length && locked.every((row) => row.userId === userId);
+}
+
 app.post('/holding-transactions', async (c) => {
   const user = getAuthUser(c);
   const rawBody = await readJsonBody(c.req, 'Invalid holding transaction payload');
@@ -723,14 +760,18 @@ app.post('/holding-transactions', async (c) => {
   const holding = await findOwnedRow(holdings, body.value.holdingId, user.id);
   if (!holding) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db.transaction(async (tx) => {
+  const data = await db.transaction(async (tx) => {
+    // The holding before its ledger row, in the order a cascade archive uses: a holding deleted
+    // in the meantime has nothing left to add to.
+    if (!(await lockOwnedHoldings(tx, [body.value.holdingId], user.id))) return null;
     const [created] = await tx
       .insert(holdingTransactions)
       .values(toHoldingTransactionInsertValues(body.value, user.id))
       .returning();
     await withLedgerWrite(tx, { userId: user.id }, body.value.date);
-    return [created];
+    return created;
   });
+  if (!data) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
   return c.json({ data }, HTTP_STATUS.CREATED);
 });
 
@@ -759,16 +800,26 @@ app.patch('/holding-transactions/:id', async (c) => {
   const holding = await findOwnedRow(holdings, merged.value.holdingId, user.id);
   if (!holding) return c.json({ error: 'Holding not found' }, HTTP_STATUS.NOT_FOUND);
 
-  const [data] = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // Both holdings (the old and, on a move, the new one) before the row, in ascending id order as
+    // a cascade archive takes them; then the row, whose committed values the edit applies to.
+    const holdingIds = [existing.holdingId, merged.value.holdingId];
+    if (!(await lockOwnedHoldings(tx, holdingIds, user.id))) return HOLDING_GONE;
+    const previous = await lockLedgerRow(tx, holdingTransactions, id);
+    if (!previous || previous.userId !== user.id) return TRANSACTION_GONE;
+    if (previous.holdingId !== existing.holdingId) return ROW_MOVED;
+    const next = mergeHoldingTransactionPayload(body.value, previous);
+    if (!next.ok) return { error: next.error, status: HTTP_STATUS.BAD_REQUEST } as const;
     const [updated] = await tx
       .update(holdingTransactions)
-      .set(toHoldingTransactionUpdateValues(merged.value))
-      .where(and(eq(holdingTransactions.id, id), eq(holdingTransactions.userId, user.id)))
+      .set(toHoldingTransactionUpdateValues(next.value))
+      .where(eq(holdingTransactions.id, id))
       .returning();
-    await withLedgerWrite(tx, { userId: user.id }, earliestDate(existing.date, merged.value.date));
-    return [updated];
+    await withLedgerWrite(tx, { userId: user.id }, earliestDate(previous.date, next.value.date));
+    return { data: updated };
   });
-  return c.json({ data });
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data });
 });
 
 app.delete('/holding-transactions/:id', async (c) => {
@@ -777,15 +828,29 @@ app.delete('/holding-transactions/:id', async (c) => {
   if (id === null) return c.json({ error: 'Invalid transaction id' }, HTTP_STATUS.BAD_REQUEST);
   const existing = await findOwnedRow(holdingTransactions, id, user.id);
   if (!existing) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
-  const [data] = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // The holding before the row, as on create and edit.
+    if (!(await lockOwnedHoldings(tx, [existing.holdingId], user.id))) return TRANSACTION_GONE;
     const [deleted] = await tx
       .delete(holdingTransactions)
-      .where(and(eq(holdingTransactions.id, id), eq(holdingTransactions.userId, user.id)))
+      .where(
+        and(
+          eq(holdingTransactions.id, id),
+          eq(holdingTransactions.userId, user.id),
+          eq(holdingTransactions.holdingId, existing.holdingId),
+        ),
+      )
       .returning();
-    await withLedgerWrite(tx, { userId: user.id }, existing.date);
-    return [deleted];
+    if (deleted) {
+      await withLedgerWrite(tx, { userId: user.id }, deleted.date);
+      return { data: deleted };
+    }
+    // Gone, or moved to another holding since it was read.
+    return (await findOwnedRow(holdingTransactions, id, user.id, tx))
+      ? ROW_MOVED
+      : TRANSACTION_GONE;
   });
-  if (!data) return c.json({ error: 'Transaction not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+  if ('error' in result) return c.json({ error: result.error }, result.status);
+  return c.json({ data: result.data });
 });
 export default app;

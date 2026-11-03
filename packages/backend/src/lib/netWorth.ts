@@ -1,5 +1,6 @@
 import { getPropertyDebt } from './propertyDebt';
 import {
+  holdingUnitPrice,
   holdingValue,
   netHoldingShares,
   sumMoney,
@@ -32,7 +33,11 @@ export type DerivedAllocationSummary = DashboardAllocationsSummary;
 
 type MoneyRow = { currency: string };
 type SavingsRow = MoneyRow & { balance: unknown };
-type HoldingRow = MoneyRow & { id: number; currentPrice: unknown };
+type HoldingRow = MoneyRow & {
+  id: number;
+  currentPrice: unknown;
+  manualPrice?: unknown;
+};
 type HoldingTransactionRow = { holdingId: number; type: string; shares: unknown };
 type PropertyRow = MoneyRow & {
   currentValue: unknown;
@@ -55,7 +60,8 @@ export function computeSharesByHolding(
 }
 
 // Current value of all holdings, converted with `convert` and summed in cents. Each holding is
-// worth its net shares (floored at zero) × its unrounded current price, rounded to cents once.
+// worth its net shares (floored at zero) × its unrounded value price (`holdingUnitPrice`: a manual
+// price when set, else the synced one), rounded to cents once.
 export function sumBrokerageValue(
   holdingRows: readonly HoldingRow[],
   transactions: readonly HoldingTransactionRow[],
@@ -65,7 +71,7 @@ export function sumBrokerageValue(
   return sumMoney(
     holdingRows.map((holding) =>
       convert(
-        holdingValue(shares.get(holding.id) ?? 0, toNumberOrZero(holding.currentPrice)),
+        holdingValue(shares.get(holding.id) ?? 0, holdingUnitPrice(holding)),
         holding.currency,
       ),
     ),

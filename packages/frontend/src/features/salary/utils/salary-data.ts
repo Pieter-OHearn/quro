@@ -2,7 +2,9 @@ import { sumMoney, type CurrencyCode, type Payslip } from '@quro/shared';
 import type { FmtFn, SalaryChartEntry, SalaryHistoryEntry, SalaryStatCard } from '../types';
 
 const DATE_YEAR_LENGTH = 4;
+const DATE_MONTH_LENGTH = 7;
 const MIN_GROWTH_POINTS = 2;
+const MONTHS_PER_YEAR = 12;
 
 type BreakdownLineKey = 'gross' | 'bonus' | 'tax' | 'pension' | 'net';
 
@@ -156,6 +158,69 @@ export const computeSalaryYears = (payslips: readonly Payslip[], currentYear: nu
   return [...uniqueYears].sort((a, b) => a - b);
 };
 
+/** Growth from the first year to the last, compared as full years. */
+export type SalaryGrowth = {
+  pct: number;
+  fromYear: string;
+  /** Compared years with fewer than twelve months of payslips, scaled to a full year. */
+  annualised: ReadonlyArray<{ year: string; months: number }>;
+};
+
+type PayslipYear = { regular: number; bonus: number; months: Set<string> };
+
+function collectPayslipYears(
+  payslips: readonly Payslip[],
+  convertToBase: ToBaseFn,
+  currentYear: number,
+): Map<number, PayslipYear> {
+  const byYear = new Map<number, PayslipYear>();
+  for (const payslip of payslips) {
+    const year = parsePayslipYear(payslip, currentYear);
+    const entry = byYear.get(year) ?? { regular: 0, bonus: 0, months: new Set<string>() };
+    entry.regular += convertToBase(payslip.gross, payslip.currency);
+    entry.bonus += convertToBase(payslip.bonus ?? 0, payslip.currency);
+    entry.months.add(payslip.date.slice(0, DATE_MONTH_LENGTH));
+    byYear.set(year, entry);
+  }
+  return byYear;
+}
+
+// A year compared with another counts as a full year. Payslips from fewer than twelve months are
+// scaled to twelve by their regular gross; a bonus is a one-off and is added once, unscaled.
+function comparableGross(
+  entry: SalaryChartEntry,
+  payslipYears: ReadonlyMap<number, PayslipYear>,
+): { gross: number; months: number | null } {
+  const payslipYear = payslipYears.get(Number(entry.year));
+  if (!payslipYear) return { gross: entry.gross, months: null };
+  const months = payslipYear.months.size;
+  const regular =
+    months >= MONTHS_PER_YEAR
+      ? payslipYear.regular
+      : (payslipYear.regular / months) * MONTHS_PER_YEAR;
+  return { gross: regular + payslipYear.bonus, months };
+}
+
+function computeSalaryGrowth(
+  chartData: readonly SalaryChartEntry[],
+  payslipYears: ReadonlyMap<number, PayslipYear>,
+): SalaryGrowth | null {
+  if (chartData.length < MIN_GROWTH_POINTS) return null;
+  const first = chartData[0]!;
+  const last = chartData[chartData.length - 1]!;
+  const from = comparableGross(first, payslipYears);
+  const to = comparableGross(last, payslipYears);
+  if (from.gross <= 0) return null;
+  const annualised = [
+    { year: first.year, months: from.months },
+    { year: last.year, months: to.months },
+  ].filter(
+    (year): year is { year: string; months: number } =>
+      year.months !== null && year.months < MONTHS_PER_YEAR,
+  );
+  return { pct: ((to.gross - from.gross) / from.gross) * 100, fromYear: first.year, annualised };
+}
+
 export function computeSalaryMetrics(
   annualPayslips: readonly Payslip[],
   allPayslips: readonly Payslip[],
@@ -202,12 +267,11 @@ export function computeSalaryMetrics(
           .sort(([leftYear], [rightYear]) => leftYear - rightYear)
           .map(([year, { gross, net }]) => ({ year: String(year), gross, net }));
 
-  const salaryGrowthPct =
-    salaryChartData.length >= MIN_GROWTH_POINTS && salaryChartData[0].gross > 0
-      ? ((salaryChartData[salaryChartData.length - 1].gross - salaryChartData[0].gross) /
-          salaryChartData[0].gross) *
-        100
-      : 0;
+  // The chart shows what was paid; growth compares full years, so a partial year is annualised.
+  const salaryGrowth = computeSalaryGrowth(
+    salaryChartData,
+    collectPayslipYears(allPayslips, convertToBase, currentYear),
+  );
 
-  return { annualGross, annualNet, annualTax, annualPension, salaryChartData, salaryGrowthPct };
+  return { annualGross, annualNet, annualTax, annualPension, salaryChartData, salaryGrowth };
 }

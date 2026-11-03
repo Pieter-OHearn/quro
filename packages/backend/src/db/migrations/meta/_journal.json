@@ -330,6 +330,13 @@
       "when": 1793279019161,
       "tag": "0046_property_mortgage_ledger_ownership",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793645086365,
+      "tag": "0047_holding_dividend_amount",
+      "breakpoints": true
     }
   ]
 }

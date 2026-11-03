@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** a dividend stores the amount it paid in its own money column, `amount`, instead of the price-per-share column. The holding transaction API takes and returns a dividend's `amount`; a dividend with a `price` answers `400` ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-the-next-release)).
+- Salary growth compares full years: a year with fewer than twelve months of payslips is annualised from those months, and the chart names the years it annualised.
+
+### Fixed
+
+- A price entered by hand for a holding now values it on the dashboard, in net worth and its history and in the brokerage total, as it already did on the holding's row and in Exposure, so the brokerage rows add up to the total and every view shows the same figure.
+- A budget category's spent amount is no longer floored at zero when a transaction is deleted or a bunq payment is revalued, so a later write cannot absorb the difference; a revaluation is worked out in whole cents.
+- A budget category with the name of another category in the same month is refused with a message instead of an error.
+- Adding, editing or moving a holding transaction waits for a holding being deleted at the same time and answers that the holding is gone, instead of failing.
+- Connecting bunq while a backup or restore runs changes nothing and says so, instead of writing during the backup.
+- Committing a pension statement import is refused only when another import of the same file is already committed to the pot, as the database enforces; an import of the same file still in review no longer blocks it.
+- The scheduled holding price sync reports each price as stored (six decimals), not as the provider quoted it.
+
+### Upgrade notes
+
+- **Migration `0047_holding_dividend_amount`** moves each dividend's amount to the new `holding_transactions.amount` column. Take a backup first: going back means restoring it. A dividend that is not whole cents stops the migration with its id and changes nothing; run the read-only count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-the-next-release) before you upgrade.
+
 ## [v1.0.0-rc.6] - 2026-10-29
 
 Quro 1.0.0-rc.6 gives a property and its mortgage separate ledgers: the property keeps its valuations, rent and expenses, the mortgage its repayments and rate changes, and each page shows the other's rows. A property's value follows its valuations and its equity is worked out from its linked mortgage, so the property card, the mortgage page and the dashboard agree. It has one migration that moves existing rows and drops columns, so take a backup first, and run the preflight count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc5-to-100-rc6) before you upgrade.

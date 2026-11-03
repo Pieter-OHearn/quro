@@ -304,6 +304,33 @@ test('legacy Bunq payments are repaired once using the payment currency and surf
   ).toBe(true);
 });
 
+test('a legacy payment revalued below its category moves spent by the cent difference, unclamped', async () => {
+  const session = await fundedUser('legacy-unclamped');
+  const date = monthDates[0]!;
+  const row = await category(session, date, 'EUR', 0);
+  // The category's spent was lowered by hand below its one legacy transaction.
+  await db.update(budgetCategories).set({ spent: 50 }).where(eq(budgetCategories.id, row.id));
+  await db.insert(budgetTransactions).values({
+    userId: session.user.id,
+    categoryId: row.id,
+    amount: 1000.03,
+    sourceAmount: 1000.03,
+    description: 'Food',
+    merchant: 'Food shop',
+    currencyNeedsReview: true,
+    date: date.toISOString().slice(0, 10),
+    bunqTransactionId: '250',
+  });
+  // USD 1,000 at 0.92 is EUR 920.00: spent moves by 920.00 - 1,000.03 = -80.03, to -30.03, so
+  // deleting the transaction later returns the category to the 50 entered by hand.
+  await importPayment(session, payment(250, date, 'USD'));
+  const [repaired] = await db
+    .select()
+    .from(budgetCategories)
+    .where(eq(budgetCategories.id, row.id));
+  expect(repaired!.spent).toBe(-30.03);
+});
+
 test('foreign manual/Bunq matches use source currency and never match equal numbers in another currency', async () => {
   const session = await fundedUser('dedup');
   const row = await category(session, monthDates[0]!, 'GBP');

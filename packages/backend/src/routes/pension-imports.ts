@@ -313,6 +313,29 @@ async function hasDuplicateImport(params: {
   return Boolean(existing);
 }
 
+// The commit check asks what the unique index enforces: whether another import of the same file
+// is already committed to this pot, whatever period was read from it. Imports still in review do
+// not block a commit; of two committed at once the index lets one through.
+async function hasCommittedStatement(
+  userId: number,
+  importRecord: Pick<ImportRecord, 'id' | 'potId' | 'fileHashSha256'>,
+): Promise<boolean> {
+  const [existing] = await db
+    .select({ id: pensionStatementImports.id })
+    .from(pensionStatementImports)
+    .where(
+      and(
+        eq(pensionStatementImports.userId, userId),
+        eq(pensionStatementImports.potId, importRecord.potId),
+        eq(pensionStatementImports.fileHashSha256, importRecord.fileHashSha256),
+        eq(pensionStatementImports.status, 'committed'),
+        ne(pensionStatementImports.id, importRecord.id),
+      ),
+    )
+    .limit(1);
+  return Boolean(existing);
+}
+
 function listImportFeedItems(params: {
   userId: number;
   statuses: ImportStatus[];
@@ -1072,15 +1095,7 @@ app.post('/:id/commit', async (c) => {
   if (importRecord.status !== 'ready_for_review')
     return c.json({ error: IMPORT_NOT_READY_FOR_COMMIT }, HTTP_STATUS.BAD_REQUEST);
 
-  const duplicate = await hasDuplicateImport({
-    userId: user.id,
-    potId: importRecord.potId,
-    fileHashSha256: importRecord.fileHashSha256,
-    statementPeriodStart: importRecord.statementPeriodStart,
-    statementPeriodEnd: importRecord.statementPeriodEnd,
-    excludingImportId: importRecord.id,
-  });
-  if (duplicate) {
+  if (await hasCommittedStatement(user.id, importRecord)) {
     return c.json({ error: DUPLICATE_STATEMENT_COMMITTED }, HTTP_STATUS.CONFLICT);
   }
 

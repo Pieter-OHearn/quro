@@ -4,7 +4,7 @@ import {
   buildExposureView,
   computeExposureFacts,
   defaultExposureSettings,
-  isHoldingPriceStale,
+  holdingValuePrice,
   parseExposureSettings,
   toIsoDate,
   type ExposureFxInput,
@@ -13,6 +13,7 @@ import {
   type ExposureReport,
   type ExposureSettings,
   type ExposureSettingsState,
+  type HoldingValuePrice,
 } from '@quro/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -23,6 +24,11 @@ import { computeSharesByHolding } from './netWorth';
 import { toNumberOrZero } from './numbers';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
+
+// Exposure values a holding at the price every other current figure uses.
+function exposurePrice(value: HoldingValuePrice) {
+  return { unitPrice: value.price, priceSource: value.source, priceStale: value.stale };
+}
 
 async function loadExposureSettings(userId: number): Promise<ExposureSettingsState> {
   const [row] = await db.select().from(exposureSettings).where(eq(exposureSettings.userId, userId));
@@ -130,13 +136,8 @@ async function loadExposureInput(
     assetClass: row.assetClass,
     riskClassOverride: row.riskClassOverride,
     shares: shares.get(row.id) ?? 0,
-    unitPrice: row.manualPrice ?? row.currentPrice,
-    priceSource: row.manualPrice == null ? 'synced' : 'manual',
+    ...exposurePrice(holdingValuePrice(row, now)),
     priceUpdatedAt: row.priceUpdatedAt ? row.priceUpdatedAt.toISOString() : null,
-    priceStale: isHoldingPriceStale(
-      { ...row, priceUpdatedAt: row.priceUpdatedAt?.toISOString() ?? null },
-      now,
-    ),
   }));
   return {
     asOf: toIsoDate(now),

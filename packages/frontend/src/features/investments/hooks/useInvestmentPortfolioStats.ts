@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  holdingUnitPrice,
   holdingValue,
   sumMoney,
   type Holding,
@@ -19,7 +20,8 @@ export function computeInvestmentPortfolioStats(
   convertToBase: ConvertToBaseFn,
 ): InvestmentPortfolioStats {
   // Totals are sums of cents, like the dashboard: each holding is worth its shares × its
-  // unrounded current price, rounded once, and each row is converted before it is added.
+  // unrounded value price (a manual price when set, as on its row), rounded once, and each row is
+  // converted before it is added, so the rows add up to the total.
   const sumHoldings = (amount: (holding: Holding, position: Position) => number) =>
     sumMoney(
       holdings.map((holding) =>
@@ -27,7 +29,7 @@ export function computeInvestmentPortfolioStats(
       ),
     );
   const totalBrokerageBase = sumHoldings((holding, position) =>
-    holdingValue(position.shares, holding.currentPrice),
+    holdingValue(position.shares, holdingUnitPrice(holding)),
   );
   const totalCostBase = sumHoldings((_, position) => position.costBasis);
   const totalDividendsBase = sumHoldings((_, position) => position.totalDividends);

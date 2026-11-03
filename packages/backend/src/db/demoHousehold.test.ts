@@ -91,7 +91,7 @@ describe('demo household data', () => {
       ]),
       ...HOLDINGS.flatMap((h) => [
         h.currentPrice,
-        ...h.transactions.map((t) => t.price),
+        ...h.transactions.map((t) => (t.type === 'dividend' ? t.amount : t.price)),
         ...h.priceHistory.map(([, close]) => close),
       ]),
       ...PROPERTIES.flatMap((p) => [
@@ -200,9 +200,9 @@ describe('demo household data', () => {
 
   test('includes a loss, negative equity and a pension statement that lost value', () => {
     const loss = HOLDINGS.filter((holding) => {
-      const bought = holding.transactions.filter((t) => t.type === 'buy');
-      const cost = bought.reduce((sum, t) => sum + (t.shares ?? 0) * t.price, 0);
-      const shares = bought.reduce((sum, t) => sum + (t.shares ?? 0), 0);
+      const bought = holding.transactions.flatMap((t) => (t.type === 'buy' ? [t] : []));
+      const cost = bought.reduce((sum, t) => sum + t.shares * t.price, 0);
+      const shares = bought.reduce((sum, t) => sum + t.shares, 0);
       return holding.currentPrice < cost / shares;
     });
     expect(loss.length).toBeGreaterThan(0);

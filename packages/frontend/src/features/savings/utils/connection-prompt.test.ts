@@ -38,6 +38,7 @@ describe('savings connection prompt dismissal', () => {
   it('accepts only supported OAuth outcomes', () => {
     expect(resolveBunqOAuthOutcome('connected')).toBe('connected');
     expect(resolveBunqOAuthOutcome('error')).toBe('error');
+    expect(resolveBunqOAuthOutcome('paused')).toBe('paused');
     expect(resolveBunqOAuthOutcome('anything-else')).toBeNull();
     expect(resolveBunqOAuthOutcome(null)).toBeNull();
   });

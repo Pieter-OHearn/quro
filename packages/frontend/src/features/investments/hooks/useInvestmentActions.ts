@@ -81,6 +81,7 @@ export function useInvestmentActions(
             type: 'buy',
             shares: initialBuy.shares,
             price: initialBuy.price,
+            amount: null,
             date: initialBuy.date,
             note: 'Initial position',
           });

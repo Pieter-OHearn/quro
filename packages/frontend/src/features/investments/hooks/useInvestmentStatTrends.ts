@@ -82,7 +82,7 @@ function sumDividendsYearToDate(
       .filter(
         (txn) => txn.type === 'dividend' && txn.timestamp >= yearStart && txn.timestamp <= nowTs,
       )
-      .map((txn) => txn.price),
+      .map((txn) => txn.amount ?? 0),
   );
 }
 

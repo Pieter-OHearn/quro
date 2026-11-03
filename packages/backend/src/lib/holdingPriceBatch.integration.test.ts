@@ -117,10 +117,17 @@ test('a synced quote keeps its decimals up to the six a price column stores', as
     expect(outcome.updates[0]!.price.price).toBe(123.456789);
     expect(await read()).toEqual([123.456789, 123.456789]);
 
-    // A seventh decimal is rounded half away from zero, as numeric(23,6) stores it.
+    // A seventh decimal is rounded half away from zero, as numeric(23,6) stores it, and both
+    // the scheduled and the per-user sync report the stored value rather than the quote.
     quoteClose = 0.1234565;
-    await syncAllHoldingPrices();
+    const scheduled = await syncAllHoldingPrices();
     expect(await read()).toEqual([0.123457, 0.123457]);
+    const update = scheduled.updates.find((entry) => entry.holding.id === row!.id)!;
+    expect([update.holding.currentPrice, update.price.price]).toEqual([0.123457, 0.123457]);
+
+    quoteClose = 7.0000004;
+    const own = await syncHoldingPricesForUser(owner.user.id);
+    expect([own.updates[0]!.holding.currentPrice, own.updates[0]!.price.price]).toEqual([7, 7]);
   } finally {
     quoteClose = 42;
   }

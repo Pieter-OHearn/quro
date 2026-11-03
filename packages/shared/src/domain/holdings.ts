@@ -5,8 +5,10 @@ export type HoldingLedgerRow = {
   id?: number;
   type: string;
   shares?: number | null;
-  /** Price per share for a buy or sell; the amount received for a dividend. */
+  /** Price per share of a buy or sell. */
   price?: number | null;
+  /** The money a dividend paid. */
+  amount?: number | null;
   date: string;
 };
 
@@ -14,6 +16,7 @@ export type HoldingTrade = {
   type: string;
   shares?: number | null;
   price?: number | null;
+  amount?: number | null;
 };
 
 /**
@@ -92,11 +95,11 @@ function applySell(state: PositionState, microShares: number, price: number): vo
 }
 
 function applyTrade(state: PositionState, trade: HoldingTrade): void {
-  const price = finite(trade.price);
   if (trade.type === 'dividend') {
-    state.dividendCents += toCents(price);
+    state.dividendCents += toCents(finite(trade.amount));
     return;
   }
+  const price = finite(trade.price);
   const microShares = toMicroShares(finite(trade.shares));
   if (microShares <= 0) return;
   if (trade.type === 'buy') applyBuy(state, microShares, price);
@@ -184,10 +187,14 @@ export const PRICE_STALE_AFTER_DAYS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type PricedHolding = {
-  priceUpdatedAt?: string | null;
+  priceUpdatedAt?: string | Date | null;
   manualPrice?: number | null;
   excludeFromSync?: boolean;
 };
+
+function timestampOf(value: string | Date): number {
+  return value instanceof Date ? value.getTime() : Date.parse(value);
+}
 
 /**
  * Whether a holding's synced price is old. A price someone entered by hand, or a holding with
@@ -197,7 +204,48 @@ type PricedHolding = {
 export function isHoldingPriceStale(holding: PricedHolding, now: Date = new Date()): boolean {
   if (holding.manualPrice != null || holding.excludeFromSync) return false;
   if (!holding.priceUpdatedAt) return false;
-  const updated = Date.parse(holding.priceUpdatedAt);
+  const updated = timestampOf(holding.priceUpdatedAt);
   if (!Number.isFinite(updated)) return false;
   return now.getTime() - updated > PRICE_STALE_AFTER_DAYS * MS_PER_DAY;
+}
+
+export type HoldingPriceSource = 'manual' | 'synced';
+
+// Database rows and API rows both fit: prices may arrive as numbers or decimal strings.
+type ValuedHolding = Omit<PricedHolding, 'manualPrice'> & {
+  currentPrice: unknown;
+  manualPrice?: unknown;
+};
+
+/** The price a holding is valued at, where it came from, and whether it is stale. */
+export type HoldingValuePrice = {
+  price: number;
+  source: HoldingPriceSource;
+  stale: boolean;
+};
+
+/**
+ * The one rule for the price a holding is worth today: a price entered by hand wins over the
+ * synced one, and a synced price follows the stale rule of `isHoldingPriceStale` (still used, and
+ * marked stale). Every current figure (the investments rows and totals, Exposure, the dashboard,
+ * net worth and the current point of its history) values a holding at this price.
+ */
+export function holdingValuePrice(
+  holding: ValuedHolding,
+  now: Date = new Date(),
+): HoldingValuePrice {
+  const manual = holding.manualPrice == null ? null : Number(holding.manualPrice);
+  if (manual !== null && Number.isFinite(manual)) {
+    return { price: manual, source: 'manual', stale: false };
+  }
+  return {
+    price: finite(holding.currentPrice),
+    source: 'synced',
+    stale: isHoldingPriceStale({ ...holding, manualPrice: null }, now),
+  };
+}
+
+/** The unit price of `holdingValuePrice`, for callers that only need the number. */
+export function holdingUnitPrice(holding: ValuedHolding): number {
+  return holdingValuePrice(holding).price;
 }

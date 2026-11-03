@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { Edit3 } from 'lucide-react';
 import {
   formatNumber,
+  holdingUnitPrice,
   holdingValue,
   sumMoney,
   unitPriceDecimals,
@@ -17,12 +18,6 @@ import type { Position } from '../utils/position';
 
 type ConvertFn = (value: number, currency: string) => number;
 
-/** The effective price of a holding: a manual price wins over the synced one. */
-export function getEffectivePrice(holding: Holding): number {
-  const manual = holding.manualPrice != null ? Number(holding.manualPrice) : null;
-  return manual != null && Number.isFinite(manual) ? manual : holding.currentPrice;
-}
-
 type Measure = {
   key: string;
   label: string;
@@ -36,7 +31,7 @@ export function buildPositionMeasures(
   position: Position,
   distributionsLabel = 'Distributions',
 ): Measure[] {
-  const price = getEffectivePrice(holding);
+  const price = holdingUnitPrice(holding);
   const marketValue = holdingValue(position.shares, price);
   return [
     { key: 'price', label: 'Price', kind: 'price', value: price },
@@ -177,7 +172,7 @@ export function HoldingPositionTable({
   const headingId = useId();
   const foreign = holding.currency !== baseCurrency;
   const measures = buildPositionMeasures(holding, position, getIncomeTxnLabels(holding).plural);
-  const decimals = unitPriceDecimals(getEffectivePrice(holding));
+  const decimals = unitPriceDecimals(holdingUnitPrice(holding));
 
   return (
     <section

@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Archive, ChevronDown, ChevronUp, Edit3, Plus, RefreshCcw } from 'lucide-react';
 import {
   formatItemType,
+  holdingUnitPrice,
   holdingValue,
   sumMoney,
   type Holding,
@@ -27,7 +28,7 @@ import { stopRowClick } from '@/components/finance/stopRowClick';
 import { useUnitPriceFormatter, type UnitPriceFormatFn } from '../hooks/useUnitPriceFormatter';
 import { formatShares, groupHoldingTransactions, type Position } from '../utils/position';
 import { isPriceStale } from '../utils/priceFreshness';
-import { HoldingPositionPanel, getEffectivePrice } from './HoldingPositionPanel';
+import { HoldingPositionPanel } from './HoldingPositionPanel';
 import { HoldingTxnHistory } from './HoldingTxnHistory';
 
 type FormatBaseFn = (value: number, currency?: string, compact?: boolean) => string;
@@ -133,7 +134,7 @@ function buildBrokerageHoldingColumns(
     },
     {
       key: 'current',
-      sortValue: (row) => getEffectivePrice(row),
+      sortValue: (row) => holdingUnitPrice(row),
       header: 'Price',
       phoneCard: 'metric',
       numeric: true,
@@ -219,7 +220,7 @@ export function computeHoldingRowMetrics(
   convertToBase: ConvertFn,
   isForeign: (currency: string) => boolean,
 ): HoldingRowMetrics {
-  const price = getEffectivePrice(holding);
+  const price = holdingUnitPrice(holding);
   const nativeValue = holdingValue(position.shares, price);
   const valueInBase = convertToBase(nativeValue, holding.currency);
   // No purchase-date rate is stored, so the cost converts at today's rate, like the totals.
@@ -409,7 +410,7 @@ function HoldingPriceCell({
               M
             </Badge>
           )}
-          {fmtPrice(getEffectivePrice(holding), holding.currency)}
+          {fmtPrice(holdingUnitPrice(holding), holding.currency)}
         </span>
       }
       caption={syncCaption}
@@ -743,7 +744,7 @@ function computeClosedHoldingMetrics(
   const costBasis = sumMoney(
     txns
       .filter((txn) => txn.type === 'buy')
-      .map((txn) => holdingValue(Number(txn.shares ?? 0), txn.price)),
+      .map((txn) => holdingValue(Number(txn.shares ?? 0), txn.price ?? 0)),
   );
   const realizedPct = costBasis > 0 ? (position.realizedGain / costBasis) * 100 : 0;
   return { txnCount, lastSellPrice, costBasis, realizedPct };

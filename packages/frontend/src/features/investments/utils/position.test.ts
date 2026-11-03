@@ -14,14 +14,24 @@ test('uses the full share for individually owned properties', () => {
   expect(getPropertyOwnershipShare(property(false))).toBe(1);
 });
 
+// `value` is a buy's or sell's price per share, or the amount a dividend paid.
 const txn = (
   id: number,
   holdingId: number,
   type: HoldingTransaction['type'],
   date: string,
   shares: number | null,
-  price: number,
-): HoldingTransaction => ({ id, holdingId, type, date, shares, price, note: '' });
+  value: number,
+): HoldingTransaction => ({
+  id,
+  holdingId,
+  type,
+  date,
+  shares,
+  price: type === 'dividend' ? null : value,
+  amount: type === 'dividend' ? value : null,
+  note: '',
+});
 
 test('groups positions without mixing holdings, mutating input, or reordering same-day trades', () => {
   const transactions = [

@@ -383,7 +383,10 @@ export type HoldingTransaction = {
   holdingId: number;
   type: HoldingTransactionType;
   shares: number | null;
-  price: number;
+  /** Price per share of a buy or sell; null on a dividend. */
+  price: number | null;
+  /** The money a dividend paid; null on a buy or sell. */
+  amount: number | null;
   date: string;
   note: string;
 };

@@ -505,7 +505,7 @@ describe('finance integration', () => {
         json: {
           type: 'dividend',
           shares: null,
-          price: 42,
+          amount: 42,
           note: 'Quarterly dividend',
         },
       },
@@ -1808,7 +1808,7 @@ describe('finance integration', () => {
           holdingId: createHoldingBody.data.id,
           type: 'dividend',
           shares: 1,
-          price: 5,
+          amount: 5,
           date: '2026-03-15',
           note: 'Should fail',
         },

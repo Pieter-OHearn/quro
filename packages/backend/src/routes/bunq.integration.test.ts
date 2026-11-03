@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { eq, inArray } from 'drizzle-orm';
+import postgres from 'postgres';
 import { db } from '../db/client';
 import {
   bunqConnections,
@@ -8,6 +9,7 @@ import {
   savingsTransactions,
 } from '../db/schema';
 import { consumeOAuthAttempt } from '../lib/bunqOAuthAttempts';
+import { enterMaintenance, leaveMaintenance } from '../lib/maintenanceMode';
 import { BUNQ_TEST_ORIGIN, bunqStateCookie, clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
 import { createIntegrationHelpers } from '../test/integration';
 import { applyTestSettings } from '../test/config';
@@ -197,6 +199,31 @@ describe('bunq OAuth attempts', () => {
     expect(
       openSecret(connection.accessToken, accessTokenPlace(user.user.id), keyring()).value,
     ).toBe('fake-access-token');
+  });
+
+  test('a callback during a backup or restore writes nothing and returns as paused', async () => {
+    const user = await newUser('paused');
+    const fetchMock = mockTokenExchange();
+    const state = await startAttempt(user.cookie, 'savings');
+    const maintenance = postgres(getConfig().adminDatabase.url.reveal(), {
+      max: 1,
+      onnotice: () => undefined,
+    });
+    try {
+      await enterMaintenance(maintenance, 5);
+      const response = await callback(state);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(`${ORIGIN}/settings?bunq=paused`);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(await connectionsFor(user.user.id)).toHaveLength(0);
+      await leaveMaintenance(maintenance);
+    } finally {
+      await maintenance.end();
+    }
+    // The attempt was not consumed, so the same sign-in still completes afterwards.
+    expect((await callback(state)).headers.get('location')).toBe(
+      `${ORIGIN}/savings?bunq=connected`,
+    );
   });
 
   test('stores only a hash of the state', async () => {

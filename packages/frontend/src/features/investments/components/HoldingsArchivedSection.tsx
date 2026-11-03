@@ -1,4 +1,4 @@
-import type { HoldingTransaction } from '@quro/shared';
+import { holdingUnitPrice, holdingValue, type HoldingTransaction } from '@quro/shared';
 import { ArchivedItemsSection } from '@/components/ui';
 import { useArchivedHoldings, useDeleteHolding, useUnarchiveHolding } from '../hooks';
 import { useInvestmentPositions } from '../hooks/useInvestmentPositions';
@@ -29,7 +29,7 @@ export function HoldingsArchivedSection({ holdingTxns }: Readonly<HoldingsArchiv
       getBalance={(holding) => {
         const position = positions[holding.id];
         return {
-          value: position.shares * holding.currentPrice,
+          value: holdingValue(position.shares, holdingUnitPrice(holding)),
           currency: holding.currency,
           label: 'value',
         };

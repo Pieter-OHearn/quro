@@ -7,6 +7,7 @@ import {
   MONTH_ABBREVIATIONS,
   type BudgetMonth,
   type CurrencyCode,
+  sumMoney,
   toIsoDate,
   isCurrencyCode,
 } from '@quro/shared';
@@ -317,11 +318,12 @@ async function repairLegacyBudgetPayment(
   }
   if (existing.currencyNeedsReview) {
     await tx.update(budgetTransactions).set(money).where(eq(budgetTransactions.id, existing.id));
+    // The revaluation moves `spent` by the difference in whole cents, unclamped, so the category
+    // keeps its entered amount plus its transactions.
+    const difference = sumMoney([money.amount, -existing.amount]);
     await tx
       .update(budgetCategories)
-      .set({
-        spent: sql`GREATEST(0, ${budgetCategories.spent} + ${money.amount - existing.amount}::numeric)`,
-      })
+      .set({ spent: sql`${budgetCategories.spent} + ${difference}::numeric` })
       .where(eq(budgetCategories.id, existing.categoryId));
   }
   return true;
@@ -700,11 +702,19 @@ async function persistBudgetBatch(
       })
       .returning({ categoryId: budgetTransactions.categoryId, amount: budgetTransactions.amount });
     if (!inserted.length) return;
-    const spentByCategory = new Map<number, number>();
-    for (const row of inserted)
-      spentByCategory.set(row.categoryId, (spentByCategory.get(row.categoryId) ?? 0) + row.amount);
+    // Each category's spending is summed in whole cents, never as a float sum.
+    const amountsByCategory = new Map<number, number[]>();
+    for (const row of inserted) {
+      amountsByCategory.set(row.categoryId, [
+        ...(amountsByCategory.get(row.categoryId) ?? []),
+        row.amount,
+      ]);
+    }
+    const spentByCategory = [...amountsByCategory].map(
+      ([id, amounts]) => [id, sumMoney(amounts)] as const,
+    );
     const deltas = sql.join(
-      [...spentByCategory].map(([id, amount]) => sql`(${id}::integer, ${amount}::numeric)`),
+      spentByCategory.map(([id, amount]) => sql`(${id}::integer, ${amount}::numeric)`),
       sql`, `,
     );
     await tx.execute(sql`update budget_categories as c set spent = c.spent + v.amount

@@ -44,7 +44,8 @@ Money is rounded to cents, half away from zero, at these points and nowhere else
   `@quro/shared`): interest, principal and amount are each whole cents.
 - In the clamped balance helpers in `packages/backend/src/lib/balance.ts`.
 - When a holding is valued or a trade is costed: shares × the stored six-decimal price, never a
-  price rounded for display (`holdingValue`, and each buy or sell in the position rule below).
+  price rounded for display (`holdingValue`, and each buy or sell in the position rule below). The
+  price a holding is valued at is its [value price](#holding-value-price).
 - When an amount is added to a total. `sumMoney` rounds each amount (after FX conversion and the
   household share, when they apply) to cents once and adds the cents exactly. Net worth and its
   components, stored snapshots, history points, runway liquidity tiers and burn, and the page
@@ -69,7 +70,7 @@ refuse an absolute value of 10^13 or more with a 400 that names the field.
 | Properties       | `purchasePrice`, `currentValue`, `monthlyRent`; transaction `amount`                                                                |
 | Mortgages        | `originalAmount`, `outstandingBalance`, `monthlyPayment`; transaction `interest`, `principal`, and `amount` except on a rate change |
 | Debts            | `originalAmount`, `remainingBalance`, `monthlyPayment`; payment `amount`, `interest`                                                |
-| Holdings         | a dividend transaction's `price` (the amount received)                                                                              |
+| Holdings         | a dividend transaction's `amount`                                                                                                   |
 | Payslips         | `gross`, `tax`, `pension`, `net`, `bonus`                                                                                           |
 | Goals            | `currentAmount`, `targetAmount`, `monthlyContribution`, `monthlyTarget`                                                             |
 | Plan assumptions | `leanBurnOverride`, `benefitMonthlyOverride`, `severanceMonthlySalaryOverride`                                                      |
@@ -80,11 +81,13 @@ change's `amount` (the new rate); `overpaymentLimit` (a percentage); `emergencyL
 durations and counts. bunq payments are provider data rather than requests and arrive with two
 decimals.
 
-Two edge cases. A goal with a `unit` may count something other than money, but its amounts are
-stored with two decimals either way, so the rule only does what storage already does. A dividend's
-amount travels in the holding transaction's `price` field, a six-decimal unit-price column, so
-the rule is applied by transaction type: a dividend's `price` is rounded to cents and refused at
-10^13 like any amount, and the column never holds a sub-cent dividend.
+One edge case: a goal with a `unit` may count something other than money, but its amounts are
+stored with two decimals either way, so the rule only does what storage already does.
+
+A holding transaction keeps money and unit prices apart: a dividend stores the amount it paid in
+`amount` (`numeric(19,2)`) and has no `price`; a buy or sell stores its price per share in `price`
+and has no `amount`. A check constraint (`holding_transactions_price_or_amount_check`) holds this
+for every row, and the API refuses a dividend with a `price` or a buy or sell with an `amount`.
 
 ### Unit prices
 
@@ -180,21 +183,33 @@ the dashboard, the net worth history, the runway and the investments page all us
   shares × price rounded to cents. A sell realises the difference between its proceeds and the
   average cost of the shares sold. A sell of more than is held sells what is held; the excess
   has no cost and is netted against later buys, which add cost only for the shares beyond it.
-- Dividends add to dividends (in cents) and never move shares. Rows of an unknown type, and buys
-  or sells without a positive share count, are ignored.
+- Dividends add their `amount` to dividends (in cents) and never move shares. Rows of an unknown
+  type, and buys or sells without a positive share count, are ignored.
 - A buy at price zero has no cost: the average cost is 0.
 
 Liabilities are positive and subtracted from assets. Property equity is value minus debt and may
 be negative; Quro keeps negative equity rather than flooring it.
 
+### Holding value price
+
+`holdingValuePrice` in `packages/shared/src/domain/holdings.ts` is the one rule for the price a
+holding is worth today: the price entered by hand when one is set, otherwise the synced price. A
+synced price older than seven days is still used and is marked stale (`isHoldingPriceStale`); a
+price entered by hand, or a holding with sync off, is never stale. Every current figure values a
+holding at this price: the Investments rows and their totals, Exposure, the dashboard, net worth,
+the stored snapshot and the current point of the net worth history and of the portfolio chart. So
+the brokerage rows add up to the brokerage total, and the dashboard, Investments and Exposure show
+the same brokerage figure. A past point of a history uses the close stored for that day, then the
+latest trade's price, then the value price.
+
 ### Exposure
 
-The Exposure view ([facts](exposure-facts.md)) values a holding as shares times the price in use,
-rounded to cents, then converts it to EUR and rounds to cents once, and sums cents. A price entered
-by hand is the price in use there, as on the Investments page; the dashboard's brokerage figure
-reads the synced price. A holding with no usable price or no stored rate is excluded and reported,
-never valued at a guess. Shares of the total are rounded to two decimals once, and the effective
-number of holdings is 1 divided by the sum of squared weights.
+The Exposure view ([facts](exposure-facts.md)) values a holding as shares times its
+[value price](#holding-value-price), rounded to cents, then converts it to EUR and rounds to cents
+once, and sums cents, so its total is the dashboard's brokerage figure. A holding with no usable
+price or no stored rate is excluded and reported, never valued at a guess. Shares of the total are
+rounded to two decimals once, and the effective number of holdings is 1 divided by the sum of
+squared weights.
 
 ### Expected mortgage repayment
 
@@ -261,7 +276,12 @@ counted as 3,000.01 for each partner).
 
 - **Balance equals its ledger.** A manual savings account, pension pot, mortgage and debt each
   keep `balance = opening balance + effect of the rows still in its ledger`. A budget category
-  keeps `spent = opening spent + its transactions`. A property with a valuation in effect keeps
+  keeps `spent = the amount entered for it + its transactions`, exactly: a transaction's create,
+  edit, move or delete, and a bunq payment revalued in another currency, change `spent` by the
+  difference in whole cents and are never floored at zero. When the amount entered by hand is lower
+  than the transactions already in the category, `spent` can go below zero after a delete, and
+  adding the same spending back restores the amount entered, so no later write absorbs a
+  difference. A property with a valuation in effect keeps
   `currentValue` equal to its latest valuation dated on or before today (ties by id).
 - **Each ledger owns its rows.** A property's ledger keeps what happens to the asset: valuations,
   rent income and expenses. A mortgage's keeps what happens to the loan: repayments and rate
@@ -295,15 +315,19 @@ counted as 3,000.01 for each partner).
   parent in the meantime is refused with `409`; budget, pension and debt rows are reached through
   their owner, and one that moved is refused with `409` too.
 - **Parents are locked before their rows.** Every edit or delete locks the parent rows it may
-  change (account, pot, debt, category, or mortgages and then properties) in ascending id order,
-  then the ledger row. A cascade archive locks the parent and then deletes its rows, so an archive
+  change (account, pot, debt, category, holding, or mortgages and then properties) in ascending id
+  order, then the ledger row. A holding transaction's create, edit, move and delete lock its
+  holding (and on a move the new one) first, so a write to a holding that is deleted meanwhile is
+  answered `404`. A cascade archive locks the parent and then deletes its rows, so an archive
   and an edit of one of its rows wait for each other instead of deadlocking; the edit then finds
   the row gone (`404`).
 - **Imports apply once.** bunq payments are keyed by `(user, bunqTransactionId)`; a repeated
   import adds nothing. A reviewed pension statement is claimed by its commit, so a second commit
   of the same import is refused and its rows reach the ledger once. A unique index allows one
   committed import per statement file (by SHA-256) and pot, so of two imports of the same file
-  committed at once one writes its rows and the other is answered `409`.
+  committed at once one writes its rows and the other is answered `409`. The check before a commit
+  asks the same question as the index: is another import of this file already committed to this
+  pot, whatever period was read from it. Imports still in review do not block a commit.
 - **CSV imports go through the ledger rules.** A reviewed file import ([import a CSV](csv-import.md))
   writes savings and budget rows keyed by `(source, externalId)`. Each amount is read in a stated
   notation, refused unless it fits whole cents and the 10^13 limit, summed in integer cents, and
@@ -430,37 +454,43 @@ household and a synthetic household run before and after the change.
 | Money totals                 | Float sums, rounded only when shown or stored                                            | Sums of cents, each amount rounded once                                                 | joint GBP 4,000.03 and EUR 6,000.01 at 1.18: 5,360.0227 (shown 5,360.02) → 5,360.03                |
 | Holding value in a total     | Unrounded inside the total                                                               | Rounded to cents once, then added                                                       | 3 shares at 123.4567: 370.3701 → 370.37 (shown 370.37 both times)                                  |
 | Percentages                  | `formatPercent` ignored the user's number format                                         | Uses it, with grouping                                                                  | 1.84 and 1234.5 for de-DE: `1.84%`, `1234.5%` → `1,84%`, `1.234,5%`                                |
+| Manual holding price         | Rows and Exposure used it; the brokerage total, dashboard and net worth the synced price | One value price everywhere (`holdingValuePrice`)                                        | 12 shares, synced USD 50, manual USD 60.125: dashboard brokerage 552.00 → 663.78 EUR               |
+| Budget `spent` after deletes | Floored at zero, so a later write absorbed the difference                                | The amount entered plus its transactions, exactly                                       | spent set to 10 under a 40 transaction, delete, add 40 again: 40 → 10                              |
+| Salary growth                | A partial year's payslips against a full year                                            | Partial years annualised by their payslip months                                        | 4 months of 2024, all of 2025, 3 months of 2026: −17% → +20%                                       |
 
 Runway months move in their sixth decimal because burn and liquidity totals are now sums of
 cents (for example 4.762747 → 4.762749 months).
 
 ### Remaining divergences
 
-| Topic                      | Backend                                                                                                                 | Frontend                                                      | Example                                                                   |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Savings history            | Each account floored at zero, UTC months                                                                                | Total floored, rounded to whole units, local-calendar months  | months differ around midnight on the first for users outside UTC          |
-| Current month vs dashboard | History floors negative savings and debt balances, leaves out future-dated rows, and prices holdings from price history | Dashboard allocations use current balances and `currentPrice` | an overdrawn account lowers allocations but not the current history point |
-| FX staleness               | None                                                                                                                    | Stale 48 hours after `updatedAt`, shown as a notice           | a provider outage is visible only to the frontend                         |
+| Topic                      | Backend                                                                            | Frontend                                                     | Example                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Savings history            | Each account floored at zero, UTC months                                           | Total floored, rounded to whole units, local-calendar months | months differ around midnight on the first for users outside UTC          |
+| Current month vs dashboard | History floors negative savings and debt balances and leaves out future-dated rows | Dashboard allocations use current balances                   | an overdrawn account lowers allocations but not the current history point |
+| FX staleness               | None                                                                               | Stale 48 hours after `updatedAt`, shown as a notice          | a provider outage is visible only to the frontend                         |
 
 ## Where the tests live
 
-| Invariant                                                         | Tests                                                                                                                                                                       |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cent rounding, round trips, float sums                            | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                                                                 |
-| Money input: cents, the 10^13 limit, non-money untouched          | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                                                          |
-| Unit prices: six decimals, dividends in cents, value              | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`                                           |
-| Allocation identities, order, additivity, FX, linked debt         | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                                                      |
-| Joint shares, signs, missing data                                 | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                                                          |
-| Positions, signs, property types, shares, sums, percents          | `packages/shared/test/domainMaths.test.ts`                                                                                                                                  |
-| Dashboard and page totals agree (golden household)                | `packages/backend/src/lib/goldenHousehold.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`                                                                |
-| FX cut-offs and fail-closed rates                                 | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                                                        |
-| Ledger balances under random edits, moves and deletes             | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                                                          |
-| Concurrent edits, deletes and import commits                      | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                                                         |
-| Clamped repayments, valuations and current value, archive vs edit | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                                                         |
-| Property and mortgage ledgers separated (migration preflight)     | `packages/backend/src/db/propertyMortgageLedgerMigration.test.ts`                                                                                                           |
-| Expected mortgage repayment                                       | `packages/shared/test/mortgageRepayment.test.ts`                                                                                                                            |
-| One committed import per statement (migration preflight)          | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                                                                |
-| Golden household reconciliation across API, pages and SQL         | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                                                                   |
-| CSV import: parsing, locale, duplicates, batches, balance check   | `packages/backend/src/lib/csvImport/csvImport.test.ts`, `packages/backend/src/routes/csvImports.integration.test.ts`, `packages/backend/src/db/csvImportsMigration.test.ts` |
-| Repeated bunq imports                                             | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts`                                      |
-| Stale and extrapolated rules                                      | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                                                      |
+| Invariant                                                         | Tests                                                                                                                                                                           |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cent rounding, round trips, float sums                            | `packages/shared/test/moneyPolicy.test.ts`, `packages/backend/src/db/driverNumeric.test.ts`                                                                                     |
+| Money input: cents, the 10^13 limit, non-money untouched          | `packages/backend/src/lib/requestValidation.test.ts`, `packages/backend/src/routes/moneyInput.integration.test.ts`                                                              |
+| Unit prices: six decimals, dividends in cents, value              | `packages/backend/src/routes/holdingPrices.integration.test.ts`, `packages/backend/src/lib/holdingPriceBatch.integration.test.ts`                                               |
+| Dividend amounts in their own column (migration preflight)        | `packages/backend/src/db/holdingDividendAmountMigration.test.ts`                                                                                                                |
+| One holding value price; rows add up to the brokerage total       | `packages/shared/test/domainMaths.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`, `packages/backend/src/routes/householdReconciliation.integration.test.ts` |
+| Allocation identities, order, additivity, FX, linked debt         | `packages/backend/src/lib/financialInvariants.test.ts`                                                                                                                          |
+| Joint shares, signs, missing data                                 | `packages/backend/src/lib/financialInvariants.test.ts`, `packages/backend/src/lib/partner.test.ts`                                                                              |
+| Positions, signs, property types, shares, sums, percents          | `packages/shared/test/domainMaths.test.ts`                                                                                                                                      |
+| Dashboard and page totals agree (golden household)                | `packages/backend/src/lib/goldenHousehold.test.ts`, `packages/frontend/src/features/goldenHousehold.test.ts`                                                                    |
+| FX cut-offs and fail-closed rates                                 | `packages/backend/src/lib/currencyRateCache.test.ts`                                                                                                                            |
+| Ledger balances under random edits, moves and deletes             | `packages/backend/src/routes/ledgerInvariants.integration.test.ts`                                                                                                              |
+| Concurrent edits, deletes and import commits                      | `packages/backend/src/routes/ledgerConcurrency.integration.test.ts`                                                                                                             |
+| Clamped repayments, valuations and current value, archive vs edit | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`                                                                                                             |
+| Budget `spent` unclamped, duplicate categories, holding locks     | `packages/backend/src/routes/ledgerCorrectness.integration.test.ts`, `packages/backend/src/routes/budget-currency.integration.test.ts`                                          |
+| Property and mortgage ledgers separated (migration preflight)     | `packages/backend/src/db/propertyMortgageLedgerMigration.test.ts`                                                                                                               |
+| Expected mortgage repayment                                       | `packages/shared/test/mortgageRepayment.test.ts`                                                                                                                                |
+| One committed import per statement (migration preflight)          | `packages/backend/src/db/ledgerCorrectnessMigration.test.ts`                                                                                                                    |
+| Golden household reconciliation across API, pages and SQL         | `packages/backend/src/routes/householdReconciliation.integration.test.ts`                                                                                                       |
+| CSV import: parsing, locale, duplicates, batches, balance check   | `packages/backend/src/lib/csvImport/csvImport.test.ts`, `packages/backend/src/routes/csvImports.integration.test.ts`, `packages/backend/src/db/csvImportsMigration.test.ts`     |
+| Repeated bunq imports                                             | `packages/backend/src/routes/budget-currency.integration.test.ts`, `packages/backend/src/services/bunqBudgetBatch.integration.test.ts`                                          |
+| Stale and extrapolated rules                                      | `packages/backend/src/lib/jurisdictions/jurisdictions.test.ts`, `packages/backend/src/routes/plan.integration.test.ts`                                                          |

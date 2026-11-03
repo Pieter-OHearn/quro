@@ -545,11 +545,19 @@ export const holdingTransactions = pgTable(
       .notNull(),
     type: text('type').notNull(), // buy | sell | dividend
     shares: numericAsNumber('shares', { precision: 19, scale: 6 }),
-    price: numericAsNumber('price', UNIT_PRICE_NUMERIC).notNull(),
+    // A buy's or sell's price per share; null on a dividend.
+    price: numericAsNumber('price', UNIT_PRICE_NUMERIC),
+    // The money a dividend paid; null on a buy or sell.
+    amount: numericAsNumber('amount', { precision: 19, scale: 2 }),
     date: date('date', { mode: 'string' }).notNull(),
     note: text('note'),
   },
   (table) => ({
+    priceOrAmount: check(
+      'holding_transactions_price_or_amount_check',
+      sql`case when ${table.type} = 'dividend' then ${table.amount} is not null and ${table.price} is null
+        else ${table.price} is not null and ${table.amount} is null end`,
+    ),
     userIdx: index('holding_transactions_user_id_idx').on(table.userId),
     userDateIdx: index('holding_transactions_user_date_idx').on(table.userId, table.date),
     holdingDateIdx: index('holding_transactions_holding_date_idx').on(table.holdingId, table.date),

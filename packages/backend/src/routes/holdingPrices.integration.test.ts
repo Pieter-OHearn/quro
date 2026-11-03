@@ -138,38 +138,67 @@ describe('dividend amounts are money', () => {
     const holding = await createHolding({ currentPrice: 50 });
 
     const dividend = await data<HoldingTransaction>(
-      await createTransaction(holding.id, { type: 'dividend', price: 12.345 }),
+      await createTransaction(holding.id, { type: 'dividend', amount: 12.345 }),
     );
-    expect(dividend.price).toBe(12.35);
+    expect([dividend.amount, dividend.price]).toEqual([12.35, null]);
 
-    const subCent = await createTransaction(holding.id, { type: 'dividend', price: 0.004 });
+    const subCent = await createTransaction(holding.id, { type: 'dividend', amount: 0.004 });
     expect(subCent.status).toBe(400);
     expect(await subCent.json()).toEqual({ error: 'Dividend amount must be greater than zero' });
 
-    const tooLarge = await createTransaction(holding.id, { type: 'dividend', price: 1e13 });
+    const tooLarge = await createTransaction(holding.id, { type: 'dividend', amount: 1e13 });
     expect(tooLarge.status).toBe(400);
-    expect(await tooLarge.json()).toEqual({ error: moneyLimitError('price') });
+    expect(await tooLarge.json()).toEqual({ error: moneyLimitError('amount') });
 
     const patched = await data<HoldingTransaction>(
       await send('PATCH', `/api/investments/holding-transactions/${dividend.id}`, {
-        price: 7.125,
+        amount: 7.125,
       }),
     );
-    expect(patched.price).toBe(7.13);
+    expect(patched.amount).toBe(7.13);
   });
 
-  test('a buy turned into a dividend has its amount rounded to cents', async () => {
+  test('a dividend has an amount and no price; a buy or sell a price and no amount', async () => {
+    const holding = await createHolding({ currentPrice: 50 });
+    const priced = await createTransaction(holding.id, { type: 'dividend', price: 12 });
+    expect(priced.status).toBe(400);
+    expect(await priced.json()).toEqual({
+      error: 'A dividend records its amount in amount, not a price',
+    });
+    const withAmount = await createTransaction(holding.id, {
+      type: 'buy',
+      shares: 1,
+      price: 10,
+      amount: 10,
+    });
+    expect(withAmount.status).toBe(400);
+    expect(await withAmount.json()).toEqual({
+      error: 'Only a dividend has an amount; a buy or sell has a price',
+    });
+  });
+
+  test('a buy turned into a dividend takes a new amount, and back into a buy a new price', async () => {
     const holding = await createHolding({ currentPrice: 50 });
     const buy = await data<HoldingTransaction>(
       await createTransaction(holding.id, { type: 'buy', shares: 1, price: 123.4567 }),
     );
+    const path = `/api/investments/holding-transactions/${buy.id}`;
+    // The buy's price per share is not carried over as the dividend's amount.
+    const missing = await send('PATCH', path, { type: 'dividend', shares: null });
+    expect(missing.status).toBe(400);
     const dividend = await data<HoldingTransaction>(
-      await send('PATCH', `/api/investments/holding-transactions/${buy.id}`, {
-        type: 'dividend',
-        shares: null,
-      }),
+      await send('PATCH', path, { type: 'dividend', shares: null, amount: 3.455 }),
     );
-    expect([dividend.type, dividend.shares, dividend.price]).toEqual(['dividend', null, 123.46]);
+    expect([dividend.type, dividend.shares, dividend.price, dividend.amount]).toEqual([
+      'dividend',
+      null,
+      null,
+      3.46,
+    ]);
+    const rebought = await data<HoldingTransaction>(
+      await send('PATCH', path, { type: 'buy', shares: 2, price: 9.5 }),
+    );
+    expect([rebought.price, rebought.amount]).toEqual([9.5, null]);
   });
 });
 

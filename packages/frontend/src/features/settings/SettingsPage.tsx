@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { ElementType } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -24,6 +24,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { getUserDisplayName, getUserInitials } from '@/lib/user';
 import { cn } from '@/lib/utils';
 import { PartnerSection } from '@/features/partner';
+import { SavingsConnectionOutcome } from '@/features/savings/components/SavingsConnectionPrompt';
+import { resolveBunqOAuthOutcome } from '@/features/savings/utils/connection-prompt';
 
 import { ProfileSection } from './components/ProfileSection';
 import { SecuritySection } from './components/SecuritySection';
@@ -148,11 +150,12 @@ export function Settings() {
     setSearchParams({ tab: nextTab });
   };
 
+  // The bunq sign-in returns here with its outcome; it is shown once, over the connections tab.
+  const [bunqOutcome, setBunqOutcome] = useState(() =>
+    resolveBunqOAuthOutcome(searchParams.get('bunq')),
+  );
   useEffect(() => {
-    const bunqStatus = searchParams.get('bunq');
-    if (bunqStatus === 'connected' || bunqStatus === 'error') {
-      setSearchParams({ tab: 'connections' }, { replace: true });
-    }
+    if (bunqOutcome) setSearchParams({ tab: 'connections' }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -191,7 +194,18 @@ export function Settings() {
               <PreferencesSection user={user} replaceUser={replaceUser} />
             ) : null}
             {activeTab === 'partner' ? <PartnerSection /> : null}
-            {activeTab === 'connections' ? <ConnectionsSection /> : null}
+            {activeTab === 'connections' ? (
+              <>
+                {bunqOutcome ? (
+                  <SavingsConnectionOutcome
+                    className="mb-4"
+                    outcome={bunqOutcome}
+                    onDismiss={() => setBunqOutcome(null)}
+                  />
+                ) : null}
+                <ConnectionsSection />
+              </>
+            ) : null}
             {activeTab === 'data' ? <DataSection user={user} /> : null}
           </div>
         </div>

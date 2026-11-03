@@ -4,7 +4,7 @@ import { AddPropertyModal } from './AddPropertyModal';
 import { AddPropertyTxnModal } from './AddPropertyTxnModal';
 import { EditHoldingModal } from './EditHoldingModal';
 import { UpdatePropertyModal } from './UpdatePropertyModal';
-import { toIsoDate } from '@quro/shared';
+import { holdingUnitPrice, holdingValue, toIsoDate } from '@quro/shared';
 import type { HoldingModalsProps, PropertyModalsProps } from '../types';
 import { computePosition } from '../utils/position';
 import { EMPTY_POSITION } from '../utils/portfolio';
@@ -79,7 +79,10 @@ function HoldingModals({
             existing={editingHolding ?? undefined}
             currentValue={
               editingHolding
-                ? (positions[editingHolding.id]?.shares ?? 0) * editingHolding.currentPrice
+                ? holdingValue(
+                    positions[editingHolding.id]?.shares ?? 0,
+                    holdingUnitPrice(editingHolding),
+                  )
                 : null
             }
             onClose={onCloseEditHolding}

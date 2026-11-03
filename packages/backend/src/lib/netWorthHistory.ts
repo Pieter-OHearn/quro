@@ -2,6 +2,7 @@ import { getPropertyDebt } from './propertyDebt';
 import {
   addMonthsUtc,
   DEFAULT_NET_WORTH_RANGE,
+  holdingUnitPrice,
   holdingValue,
   monthEndUtc,
   monthStartUtc,
@@ -85,7 +86,12 @@ type Archivable = { archivedAt?: Date | string | null };
 type SavingsAccountRow = { id: number; balance: unknown; currency: string };
 type HistoricalSavingsAccountRow = SavingsAccountRow & Archivable;
 type SavingsTransactionRow = { accountId: number; type: string; amount: unknown; date: string };
-type HoldingRow = { id: number; currentPrice: unknown; currency: string } & Archivable;
+type HoldingRow = {
+  id: number;
+  currentPrice: unknown;
+  manualPrice?: unknown;
+  currency: string;
+} & Archivable;
 type HoldingTransactionRow = {
   holdingId: number;
   type: string;
@@ -718,12 +724,13 @@ function computePensionAtCutoff(
   );
 }
 
+type HoldingCutoff = Pick<HistoryPeriod, 'cutoff' | 'asOfDate' | 'isCurrent'>;
+
 function computeBrokerageAtCutoff(
   portfolioHoldings: readonly HoldingRow[],
   txnsByHoldingId: ReadonlyMap<number, readonly DatedHoldingTransaction[]>,
   pricesByHoldingId: ReadonlyMap<number, readonly HoldingPriceRow[]>,
-  cutoff: number,
-  cutoffDate: string,
+  period: HoldingCutoff,
   rates: Map<string, number>,
 ): { value: number; isEstimated: boolean } {
   const totals = portfolioHoldings.map((holding) =>
@@ -731,8 +738,7 @@ function computeBrokerageAtCutoff(
       holding,
       txnsByHoldingId.get(holding.id) ?? [],
       pricesByHoldingId.get(holding.id) ?? [],
-      cutoff,
-      cutoffDate,
+      period,
       rates,
     ),
   );
@@ -742,20 +748,28 @@ function computeBrokerageAtCutoff(
   };
 }
 
+// The current point values a holding at the price the dashboard uses (`holdingUnitPrice`), so the
+// two agree; a past point uses the close stored for it, then the latest trade, then that price.
 function computeHoldingAtCutoff(
   holding: HoldingRow,
   transactions: readonly DatedHoldingTransaction[],
   prices: readonly HoldingPriceRow[],
-  cutoff: number,
-  cutoffDate: string,
+  { cutoff, asOfDate, isCurrent }: HoldingCutoff,
   rates: Map<string, number>,
 ): { value: number; isEstimated: boolean } {
   if (isArchivedAtCutoff(holding, cutoff)) return { value: 0, isEstimated: false };
   const upToCutoff = transactions.filter((transaction) => transaction.timestamp <= cutoff);
   const shares = netHoldingShares(upToCutoff);
+  const valuePrice = holdingUnitPrice(holding);
+  if (isCurrent) {
+    return {
+      value: convertToBase(holdingValue(shares, valuePrice), holding.currency, rates),
+      isEstimated: false,
+    };
+  }
   const latestTransactionPrice = upToCutoff[upToCutoff.length - 1]?.price ?? null;
-  const historicalPrice = resolvePreparedHoldingPrice(prices, cutoffDate);
-  const price = historicalPrice ?? latestTransactionPrice ?? toNumberOrZero(holding.currentPrice);
+  const historicalPrice = resolvePreparedHoldingPrice(prices, asOfDate);
+  const price = historicalPrice ?? latestTransactionPrice ?? valuePrice;
   return {
     value: convertToBase(holdingValue(shares, price), holding.currency, rates),
     isEstimated: historicalPrice === null && shares > 0,
@@ -1182,8 +1196,7 @@ function buildNetWorthHistoryPoint(
     sourceData.holdings,
     context.holdingsById,
     context.holdingPricesById,
-    period.cutoff,
-    period.asOfDate,
+    period,
     historicalRates.rates,
   );
   const propertyEquity = computePropertyEquityAtCutoff(

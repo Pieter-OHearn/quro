@@ -236,7 +236,8 @@ async function applyQuoteToHolding(
       holding: updatedHolding,
       price: {
         ticker,
-        price: quote.close,
+        // As stored (six decimals), not the provider's quote.
+        price: updatedHolding.currentPrice,
         currency: normalizedPriceCurrency ?? holding.currency,
         tradeLast: quote.tradeLast,
         eodDate,
@@ -392,14 +393,20 @@ async function persistHoldingPriceBatches(
         ),
         sql`, `,
       );
-      const updated = await tx.execute<{ id: number }>(sql`
+      const updated = await tx.execute<{ id: number; stored: string }>(sql`
         update holdings as h set current_price = v.price, currency = v.currency, price_updated_at = v.updated_at
         from (values ${values}) as v(id, user_id, price, currency, updated_at)
         where h.id = v.id and h.user_id = v.user_id and h.archived_at is null and h.exclude_from_sync = false
-        returning h.id
+        returning h.id, h.current_price::text as stored
       `);
-      const ids = new Set(updated.map((row) => row.id));
-      const changed = batch.filter(({ holding }) => ids.has(holding.id));
+      // Report the price as stored (six decimals), not the provider's quote.
+      const stored = new Map(updated.map((row) => [row.id, Number(row.stored)]));
+      const changed = batch.flatMap(({ holding, price }) => {
+        const currentPrice = stored.get(holding.id);
+        return currentPrice === undefined
+          ? []
+          : [{ holding: { ...holding, currentPrice }, price: { ...price, price: currentPrice } }];
+      });
       if (changed.length)
         await tx
           .insert(holdingPriceHistory)
