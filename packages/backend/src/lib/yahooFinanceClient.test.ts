@@ -107,8 +107,10 @@ test('Yahoo job timeout releases the lease, rejects late writes, and allows anot
 
 test('Yahoo library forwards the signal to its initial cookie/crumb fetch', async () => {
   const originalFetch = globalThis.fetch;
-  const timeout = AbortSignal.timeout.bind(AbortSignal);
-  spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout(30));
+  // The request times out once the library's first fetch is in flight, not after a timer that
+  // a slow machine can outrun before the library reaches fetch.
+  const timeout = new AbortController();
+  spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout.signal);
   let aborted = false;
   globalThis.fetch = mock(
     (_url: unknown, init?: RequestInit) =>
@@ -121,6 +123,7 @@ test('Yahoo library forwards the signal to its initial cookie/crumb fetch', asyn
           },
           { once: true },
         );
+        timeout.abort(new DOMException('Synthetic request timeout', 'TimeoutError'));
       }),
   ) as unknown as typeof fetch;
   try {
