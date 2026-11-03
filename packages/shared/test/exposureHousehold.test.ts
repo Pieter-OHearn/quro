@@ -99,13 +99,6 @@ describe('household positions', () => {
     expect(fact(facts, 'total_value').value).toBe(2500);
   });
 
-  test('a private partner account is not an input, so it is in no figure', () => {
-    // The loader leaves it out (covered in the route tests); nothing here can add it back.
-    const facts = run({ savingsAccounts: [savings({ id: 1, balance: 100 })] });
-    expect(facts.inputs.savingsAccounts.map((row) => row.id)).toEqual([1]);
-    expect(fact(facts, 'savings.value').value).toBe(100);
-  });
-
   test('a joint property with a joint mortgage counts at half its equity', () => {
     const facts = run({
       properties: [

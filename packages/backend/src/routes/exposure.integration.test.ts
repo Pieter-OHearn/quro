@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { defaultExposureSettings, type ExposureReport, type ExposureSettings } from '@quro/shared';
 import { db } from '../db/client';
-import { currencyRates, exposureSettings, holdings, savingsAccounts } from '../db/schema';
+import {
+  currencyRates,
+  exposureSettings,
+  holdings,
+  mortgages,
+  savingsAccounts,
+} from '../db/schema';
 import { invalidateCurrentCurrencyRateCache } from '../lib/currencyRateSync';
 import { useFixtureCurrencyRates } from '../test/currencyRates';
 import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
@@ -345,6 +351,28 @@ describe('the Everything view', () => {
     expect(JSON.stringify(report)).not.toContain('Partner Private');
     expect(JSON.stringify(report)).not.toContain('2 Private Lane');
     expect(JSON.stringify(report)).not.toContain('Partner Holding');
+  });
+
+  test("reads no partner's private mortgage through a joint property, as net worth does", async () => {
+    const owner = await integration.signUp('everything-private-debt');
+    const partner = await integration.signUp('everything-private-debt-partner');
+    await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
+    await addProperty(partner, {
+      address: '4 Joint Lane',
+      value: 300_000,
+      isJoint: true,
+      debt: 100_000,
+    });
+    await db.update(mortgages).set({ isJoint: false }).where(eq(mortgages.userId, partner.user.id));
+
+    const report = await getReport(owner);
+    expect(report.facts.inputs.properties[0]).toMatchObject({ mortgage: null, valueEur: 150_000 });
+    const dashboard = await readData<{ allocations: { key: string; value: number }[] }>(
+      await integration.request('/api/dashboard/allocations', { cookie: owner.cookie }),
+    );
+    expect(report.household.propertyValue).toBe(
+      dashboard.allocations.find((row) => row.key === 'property_equity')!.value,
+    );
   });
 
   test('stops counting a joint row when the partner link is gone', async () => {

@@ -12,6 +12,7 @@ import {
   StatsGrid,
   buildChartAlternative,
 } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { ExposureFormat } from '../useExposureFormat';
 import { Legend, StackedBar, type Segment } from './AllocationCard';
 
@@ -71,7 +72,7 @@ function TotalRow({
   return (
     <div className="flex items-baseline justify-between gap-3 text-cell">
       <dt className={strong ? 'font-semibold text-fg' : 'text-fg-muted'}>{label}</dt>
-      <dd className={`font-numeric text-fg ${strong ? 'font-semibold' : ''}`}>{value}</dd>
+      <dd className={cn('font-numeric text-fg', strong && 'font-semibold')}>{value}</dd>
     </div>
   );
 }

@@ -133,7 +133,7 @@ export function HouseholdDataNotices({
           tone="info"
           title={`${view.unclassified.holdingCount} ${view.unclassified.holdingCount === 1 ? 'holding is' : 'holdings are'} unclassified`}
           testId="exposure-household-unclassified"
-          action={{ label: 'Classify holdings', onClick: onClassify }}
+          action={{ label: 'Classify on Investments', onClick: onClassify }}
         >
           They count in the total and by currency, but not in a group.
         </StateNotice>

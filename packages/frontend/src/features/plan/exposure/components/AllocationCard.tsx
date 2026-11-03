@@ -48,15 +48,15 @@ export function Legend({
   format,
 }: Readonly<{ segments: readonly Segment[]; format: ExposureFormat }>) {
   return (
-    <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-cell sm:grid-cols-3 lg:grid-cols-5">
+    <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-cell">
       {segments.map((segment) => (
-        <li key={segment.key} className="flex items-center gap-2">
+        <li key={segment.key} className="flex items-center gap-1.5">
           <span
             aria-hidden
             className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', GROUP_BAR_CLASS[segment.key])}
           />
-          <span className="min-w-0 truncate text-fg-muted">{segment.label}</span>
-          <span className="ml-auto font-numeric text-fg">{format.percent(segment.share)}</span>
+          <span className="whitespace-nowrap text-fg-muted">{segment.label}</span>
+          <span className="font-numeric text-fg">{format.percent(segment.share)}</span>
         </li>
       ))}
     </ul>
