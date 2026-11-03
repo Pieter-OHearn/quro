@@ -5,6 +5,7 @@ import {
   exceedsGoalDuration,
   mergeGoalPayload,
   parseGoalCreate,
+  serializeGoal,
   validateGoalSource,
   validateInvestHabitGoal,
   type GoalPayload,
@@ -119,28 +120,79 @@ describe('parseGoalCreate', () => {
     if (result.ok) expect(result.value.sourceType).toBe('salary_latest_gross');
   });
 
-  test('accepts valid invest_habit goal', () => {
+  const investHabitBody = {
+    type: 'invest_habit',
+    name: 'Monthly ETF buys',
+    emoji: null,
+    currentAmount: 0,
+    targetAmount: 0,
+    deadline: 'Jun 2027',
+    year: 2027,
+    category: 'investing',
+    monthlyContribution: 0,
+    monthlyTarget: 200,
+    totalMonths: 36,
+    unit: null,
+    color: null,
+    notes: null,
+    currency: 'EUR',
+    startMonth: 'Oct 2026',
+  };
+
+  test('accepts an invest habit and takes its months from its start and end months', () => {
+    const result = parseGoalCreate(investHabitBody);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.sourceType).toBe('invest_habit_buys');
+    expect(result.value.totalMonths).toBe(9);
+    expect(result.value.monthsCompleted).toBeNull();
+    expect(result.value.missedMonths).toBeNull();
+  });
+
+  test('stores an invest habit range given as month keys as month labels', () => {
     const result = parseGoalCreate({
-      type: 'invest_habit',
-      name: 'Monthly ETF buys',
-      emoji: null,
-      currentAmount: 0,
-      targetAmount: 0,
-      deadline: '2027-12-31',
-      year: null,
-      category: 'investing',
-      monthlyContribution: 0,
-      monthlyTarget: 200,
-      monthsCompleted: 0,
-      totalMonths: 36,
-      unit: null,
-      color: null,
-      notes: null,
-      currency: 'EUR',
-      startMonth: null,
-      missedMonths: null,
+      ...investHabitBody,
+      startMonth: '2026-10',
+      deadline: '2027-06',
     });
     expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.startMonth).toBe('Oct 2026');
+    expect(result.value.deadline).toBe('Jun 2027');
+    expect(result.value.totalMonths).toBe(9);
+  });
+
+  test('refuses manual months on an invest habit', () => {
+    for (const manual of [
+      { monthsCompleted: 0 },
+      { monthsCompleted: 3 },
+      { missedMonths: [] },
+      { missedMonths: ['2026-10'] },
+    ]) {
+      const result = parseGoalCreate({ ...investHabitBody, ...manual });
+      expect(result).toEqual({
+        ok: false,
+        error: 'Invest habit months come from investment buys and cannot be set',
+      });
+    }
+    expect(
+      parseGoalCreate({ ...investHabitBody, monthsCompleted: null, missedMonths: null }).ok,
+    ).toBe(true);
+  });
+
+  test('validates an invest habit range', () => {
+    expect(parseGoalCreate({ ...investHabitBody, startMonth: null })).toEqual({
+      ok: false,
+      error: 'Start month is required for an invest habit',
+    });
+    expect(parseGoalCreate({ ...investHabitBody, startMonth: 'Jul 2027' })).toEqual({
+      ok: false,
+      error: 'Start month cannot be after the end month',
+    });
+    expect(parseGoalCreate({ ...investHabitBody, startMonth: 'Octember' }).ok).toBe(false);
+    expect(parseGoalCreate({ ...investHabitBody, deadline: 'TBD' }).ok).toBe(false);
+    const oneMonth = parseGoalCreate({ ...investHabitBody, startMonth: 'Jun 2027' });
+    expect(oneMonth.ok && oneMonth.value.totalMonths).toBe(1);
   });
 
   test('accepts valid portfolio goal', () => {
@@ -295,19 +347,35 @@ describe('validateInvestHabitGoal', () => {
   });
 
   test('requires monthlyTarget greater than zero', () => {
-    const base = { type: 'invest_habit' as const, totalMonths: 12 };
+    const base = {
+      type: 'invest_habit' as const,
+      startMonth: 'Jan 2027',
+      deadline: 'Dec 2027',
+    };
     expect(validateInvestHabitGoal(p({ ...base, monthlyTarget: null }))).not.toBeNull();
     expect(validateInvestHabitGoal(p({ ...base, monthlyTarget: 0 }))).not.toBeNull();
   });
 
-  test('requires totalMonths greater than zero', () => {
+  test('a habit saved without a start month still needs its total months', () => {
     const base = { type: 'invest_habit' as const, monthlyTarget: 100 };
-    expect(validateInvestHabitGoal(p({ ...base, totalMonths: null }))).not.toBeNull();
+    const legacy = { requireStartMonth: false };
+    expect(validateInvestHabitGoal(p({ ...base, totalMonths: null }), legacy)).not.toBeNull();
+    expect(validateInvestHabitGoal(p({ ...base, totalMonths: 12 }), legacy)).toBeNull();
+    expect(validateInvestHabitGoal(p({ ...base, totalMonths: 12 }))).toBe(
+      'Start month is required for an invest habit',
+    );
   });
 
-  test('returns null when both monthlyTarget and totalMonths are positive', () => {
+  test('returns null for a monthly target and a valid range', () => {
     expect(
-      validateInvestHabitGoal(p({ type: 'invest_habit', monthlyTarget: 100, totalMonths: 12 })),
+      validateInvestHabitGoal(
+        p({
+          type: 'invest_habit',
+          monthlyTarget: 100,
+          startMonth: 'Dec 2026',
+          deadline: 'Jan 2027',
+        }),
+      ),
     ).toBeNull();
   });
 });
@@ -403,6 +471,56 @@ describe('mergeGoalPayload', () => {
     }
   });
 
+  const storedHabit = () =>
+    existing({
+      type: 'invest_habit',
+      sourceType: 'invest_habit_buys',
+      sourceId: null,
+      targetAmount: 0,
+      monthlyContribution: 0,
+      monthlyTarget: 500,
+      deadline: 'Jun 2027',
+      year: 2027,
+      startMonth: 'Oct 2026',
+      totalMonths: 9,
+      monthsCompleted: 4,
+      missedMonths: ['2026-10'],
+    });
+
+  test('an invest habit write ignores and clears its stored manual months', () => {
+    const result = mergeGoalPayload({ name: 'Renamed' }, storedHabit());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.monthsCompleted).toBeNull();
+    expect(result.value.missedMonths).toBeNull();
+    expect(result.value.totalMonths).toBe(9);
+  });
+
+  test('an invest habit patch refuses manual months', () => {
+    expect(mergeGoalPayload({ monthsCompleted: 5 }, storedHabit()).ok).toBe(false);
+    expect(mergeGoalPayload({ missedMonths: ['2026-11'] }, storedHabit()).ok).toBe(false);
+  });
+
+  test('an invest habit patch re-validates and re-counts its range', () => {
+    expect(mergeGoalPayload({ deadline: 'Sep 2026' }, storedHabit()).ok).toBe(false);
+    expect(mergeGoalPayload({ startMonth: null }, storedHabit()).ok).toBe(false);
+    const longer = mergeGoalPayload({ deadline: 'Dec 2027' }, storedHabit());
+    expect(longer.ok && longer.value.totalMonths).toBe(15);
+  });
+
+  test('a habit saved without a start month can still be edited', () => {
+    const legacy = existing({
+      ...storedHabit(),
+      startMonth: null,
+      deadline: 'Dec 2026',
+      year: 2026,
+      totalMonths: 12,
+    });
+    const result = mergeGoalPayload({ name: 'Renamed' }, legacy);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.startMonth).toBeNull();
+  });
+
   test('merges name and targetAmount fields', () => {
     const ex = existing({ name: 'Old name', targetAmount: 5000 });
     const result = mergeGoalPayload({ name: 'New name', targetAmount: 8000 }, ex);
@@ -411,5 +529,17 @@ describe('mergeGoalPayload', () => {
       expect(result.value.name).toBe('New name');
       expect(result.value.targetAmount).toBe(8000);
     }
+  });
+});
+
+describe('serializeGoal', () => {
+  test('returns an invest habit without manual months', () => {
+    const row = existing({ type: 'invest_habit', monthsCompleted: 4, missedMonths: ['2026-10'] });
+    expect(serializeGoal(row)).toMatchObject({ monthsCompleted: null, missedMonths: null });
+  });
+
+  test('leaves other goals as stored', () => {
+    const row = existing({ type: 'savings', monthsCompleted: 4 });
+    expect(serializeGoal(row)).toBe(row);
   });
 });

@@ -4,6 +4,7 @@ import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import type { Goal } from '@quro/shared';
+import { EMPTY_INVEST_HABIT_BUYS } from '@/features/goals/utils/invest-habit';
 import { CurrencyContext, type CurrencyContextType } from '@/lib/currencyContextValue';
 import type { AllocationItem, DashboardTransaction } from '../types';
 import { AssetAllocationCard } from './AssetAllocationCard';
@@ -150,7 +151,8 @@ function renderGoals(goals: Goal[]) {
             savingsAccounts: [],
             portfolioTotal: 0,
             netWorth: 0,
-            investHabitBuyMonths: new Map(),
+            investHabitBuys: EMPTY_INVEST_HABIT_BUYS,
+            currentMonth: '2026-11',
             convertToBase: (amount: number) => amount,
           }}
           currentYear={2026}

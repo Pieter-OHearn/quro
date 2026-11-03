@@ -5,6 +5,7 @@ import type {
   UnemploymentModel,
 } from './jurisdiction.js';
 import type { AssetClass } from '../domain/exposureClasses.js';
+import type { InvestHabitBuyTotal } from '../domain/investHabit.js';
 
 export * from './jurisdiction.js';
 
@@ -1056,7 +1057,8 @@ export type CurrencyRate = {
 export type DashboardInsights = {
   latestPayslip: Pick<Payslip, 'date' | 'gross' | 'currency'> | null;
   salaryMonths: Pick<Payslip, 'date' | 'net' | 'bonus' | 'currency'>[];
-  investHabitBuyMonths: string[];
+  /** Buys per month and currency over the months of the user's invest habits. */
+  investHabitBuys: InvestHabitBuyTotal[];
 };
 
 export type DashboardTransaction = {

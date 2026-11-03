@@ -2,10 +2,13 @@ import { findOwnedRow } from '../lib/access';
 import { and, asc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
+  countGoalMonths,
+  formatGoalMonth,
   GOAL_SOURCE_TYPES,
   GOAL_TYPES,
   type GoalSourceType,
   type GoalType,
+  parseGoalMonth,
   TEXT_FIELD_LIMITS,
 } from '@quro/shared';
 import { HTTP_STATUS } from '../constants/http';
@@ -83,6 +86,7 @@ export type GoalPayload = {
 };
 
 type GoalInsert = typeof goals.$inferInsert;
+type GoalRow = typeof goals.$inferSelect;
 
 function parseGoalTypeField(value: unknown): ParseResult<GoalType> {
   return typeof value === 'string' && GOAL_TYPES.includes(value as GoalType)
@@ -181,15 +185,65 @@ export function exceedsGoalDuration(payload: GoalPayload): boolean {
   );
 }
 
-export function validateInvestHabitGoal(payload: GoalPayload): string | null {
+type GoalParseOptions = {
+  /** A new invest habit needs its start month; one saved before start months existed may lack it. */
+  requireStartMonth: boolean;
+};
+
+const CREATE_OPTIONS: GoalParseOptions = { requireStartMonth: true };
+
+function validateInvestHabitRange(payload: GoalPayload, options: GoalParseOptions): string | null {
+  if (payload.startMonth == null) {
+    return options.requireStartMonth ? 'Start month is required for an invest habit' : null;
+  }
+  const start = parseGoalMonth(payload.startMonth);
+  if (!start) return 'Start month must be a month such as "Oct 2026"';
+  const end = parseGoalMonth(payload.deadline);
+  if (!end) return 'End month must be a month such as "Jun 2027"';
+  return countGoalMonths(start, end) > 0 ? null : 'Start month cannot be after the end month';
+}
+
+function hasManualMonths(payload: GoalPayload): boolean {
+  return payload.monthsCompleted != null || payload.missedMonths != null;
+}
+
+export function validateInvestHabitGoal(
+  payload: GoalPayload,
+  options: GoalParseOptions = CREATE_OPTIONS,
+): string | null {
   if (payload.type !== 'invest_habit') return null;
+  if (hasManualMonths(payload)) {
+    return 'Invest habit months come from investment buys and cannot be set';
+  }
   if (payload.monthlyTarget == null || payload.monthlyTarget <= 0) {
     return 'Monthly target must be greater than zero';
   }
-  if (payload.totalMonths == null || payload.totalMonths <= 0) {
+  const rangeError = validateInvestHabitRange(payload, options);
+  if (rangeError) return rangeError;
+  if (payload.startMonth == null && (payload.totalMonths == null || payload.totalMonths <= 0)) {
     return 'Total months must be greater than zero';
   }
   return null;
+}
+
+/** An invest habit's months run from its start month to its end month; store them as such. */
+function normalizeInvestHabitRange(payload: GoalPayload): GoalPayload {
+  if (payload.type !== 'invest_habit' || payload.startMonth == null) return payload;
+  const start = parseGoalMonth(payload.startMonth);
+  const end = parseGoalMonth(payload.deadline);
+  if (!start || !end) return payload;
+  return {
+    ...payload,
+    startMonth: formatGoalMonth(start),
+    deadline: formatGoalMonth(end),
+    totalMonths: countGoalMonths(start, end),
+  };
+}
+
+/** Invest habits count their months from investment buys; stored manual months are ignored. */
+export function serializeGoal(row: GoalRow): GoalRow {
+  if (row.type !== 'invest_habit') return row;
+  return { ...row, monthsCompleted: null, missedMonths: null };
 }
 
 function validateManualGoalSource(payload: GoalPayload): string | null {
@@ -261,12 +315,12 @@ function requiresTargetAmount(type: GoalType): boolean {
   return type !== 'invest_habit';
 }
 
-function validateGoalPayload(payload: GoalPayload): string | null {
+function validateGoalPayload(payload: GoalPayload, options: GoalParseOptions): string | null {
   if (exceedsGoalDuration(payload)) {
     return 'Months completed cannot exceed total months';
   }
 
-  const investHabitError = validateInvestHabitGoal(payload);
+  const investHabitError = validateInvestHabitGoal(payload, options);
   if (investHabitError) return investHabitError;
 
   if (requiresTargetAmount(payload.type) && payload.targetAmount <= 0) {
@@ -296,7 +350,10 @@ export function applyGoalSourceDefaults(
   return payload;
 }
 
-export function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
+export function parseGoalCreate(
+  body: unknown,
+  options: GoalParseOptions = CREATE_OPTIONS,
+): ParseResult<GoalPayload> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return err('Invalid goal payload');
   }
@@ -307,8 +364,8 @@ export function parseGoalCreate(body: unknown): ParseResult<GoalPayload> {
   if (!parsed.ok) return parsed;
 
   const value = applyGoalSourceDefaults(parsed.value, body as Record<string, unknown>);
-  const validationError = validateGoalPayload(value);
-  return validationError ? err(validationError) : ok(value);
+  const validationError = validateGoalPayload(value, options);
+  return validationError ? err(validationError) : ok(normalizeInvestHabitRange(value));
 }
 
 function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>> {
@@ -322,7 +379,7 @@ function parseGoalPatch(body: unknown): ParseResult<Partial<GoalPayload>> {
 
 export function mergeGoalPayload(
   patch: Partial<GoalPayload>,
-  existing: typeof goals.$inferSelect,
+  existing: GoalRow,
 ): ParseResult<GoalPayload> {
   const sourceId =
     patch.sourceId !== undefined
@@ -330,32 +387,44 @@ export function mergeGoalPayload(
       : patch.sourceType === undefined
         ? existing.sourceId
         : null;
+  const type = pickPatchedValue(patch.type, existing.type);
+  // An invest habit's stored manual months are ignored, so a write clears them.
+  const kept =
+    type === 'invest_habit' ? { ...existing, monthsCompleted: null, missedMonths: null } : existing;
+  // A habit saved before start months existed keeps working until its start month is set.
+  const options = {
+    requireStartMonth: existing.type !== 'invest_habit' || existing.startMonth != null,
+  };
 
-  return parseGoalCreate({
-    type: pickPatchedValue(patch.type, existing.type),
-    sourceType: pickPatchedValue(patch.sourceType, existing.sourceType),
-    sourceId,
-    name: pickPatchedValue(patch.name, existing.name),
-    emoji: pickPatchedValue(patch.emoji, existing.emoji),
-    currentAmount: patch.currentAmount ?? existing.currentAmount,
-    targetAmount: patch.targetAmount ?? existing.targetAmount,
-    deadline: pickPatchedValue(patch.deadline, existing.deadline),
-    year: pickPatchedValue(patch.year, existing.year),
-    category: pickPatchedValue(patch.category, existing.category),
-    monthlyContribution: patch.monthlyContribution ?? existing.monthlyContribution,
-    monthlyTarget: patch.monthlyTarget === undefined ? existing.monthlyTarget : patch.monthlyTarget,
-    monthsCompleted: pickPatchedValue(patch.monthsCompleted, existing.monthsCompleted),
-    totalMonths: pickPatchedValue(patch.totalMonths, existing.totalMonths),
-    unit: pickPatchedValue(patch.unit, existing.unit),
-    color: pickPatchedValue(patch.color, existing.color),
-    notes: pickPatchedValue(patch.notes, existing.notes),
-    currency: pickPatchedValue(patch.currency, existing.currency),
-    startMonth: pickPatchedValue(patch.startMonth, existing.startMonth),
-    missedMonths:
-      patch.missedMonths === undefined
-        ? (existing.missedMonths as string[] | null)
-        : patch.missedMonths,
-  });
+  return parseGoalCreate(
+    {
+      type,
+      sourceType: pickPatchedValue(patch.sourceType, existing.sourceType),
+      sourceId,
+      name: pickPatchedValue(patch.name, existing.name),
+      emoji: pickPatchedValue(patch.emoji, existing.emoji),
+      currentAmount: patch.currentAmount ?? existing.currentAmount,
+      targetAmount: patch.targetAmount ?? existing.targetAmount,
+      deadline: pickPatchedValue(patch.deadline, existing.deadline),
+      year: pickPatchedValue(patch.year, existing.year),
+      category: pickPatchedValue(patch.category, existing.category),
+      monthlyContribution: patch.monthlyContribution ?? existing.monthlyContribution,
+      monthlyTarget:
+        patch.monthlyTarget === undefined ? existing.monthlyTarget : patch.monthlyTarget,
+      monthsCompleted: pickPatchedValue(patch.monthsCompleted, kept.monthsCompleted),
+      totalMonths: pickPatchedValue(patch.totalMonths, existing.totalMonths),
+      unit: pickPatchedValue(patch.unit, existing.unit),
+      color: pickPatchedValue(patch.color, existing.color),
+      notes: pickPatchedValue(patch.notes, existing.notes),
+      currency: pickPatchedValue(patch.currency, existing.currency),
+      startMonth: pickPatchedValue(patch.startMonth, existing.startMonth),
+      missedMonths:
+        patch.missedMonths === undefined
+          ? (kept.missedMonths as string[] | null)
+          : patch.missedMonths,
+    },
+    options,
+  );
 }
 
 async function validateGoalSourceOwnership(
@@ -383,7 +452,7 @@ app.get('/', async (c) => {
     .from(goals)
     .where(eq(goals.userId, user.id))
     .orderBy(asc(goals.id));
-  return c.json({ data });
+  return c.json({ data: data.map(serializeGoal) });
 });
 
 app.get('/:id', async (c) => {
@@ -393,7 +462,7 @@ app.get('/:id', async (c) => {
 
   const data = await findOwnedRow(goals, id, user.id);
   if (!data) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+  return c.json({ data: serializeGoal(data) });
 });
 
 app.post('/', async (c) => {
@@ -410,7 +479,7 @@ app.post('/', async (c) => {
   if (sourceError) return c.json({ error: sourceError }, HTTP_STATUS.BAD_REQUEST);
 
   const [data] = await db.insert(goals).values(toGoalInsertValues(body.value, user.id)).returning();
-  return c.json({ data }, HTTP_STATUS.CREATED);
+  return c.json({ data: serializeGoal(data!) }, HTTP_STATUS.CREATED);
 });
 
 // eslint-disable-next-line complexity
@@ -447,7 +516,7 @@ app.patch('/:id', async (c) => {
     .where(and(eq(goals.id, id), eq(goals.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+  return c.json({ data: serializeGoal(data) });
 });
 
 app.delete('/:id', async (c) => {
@@ -460,7 +529,7 @@ app.delete('/:id', async (c) => {
     .where(and(eq(goals.id, id), eq(goals.userId, user.id)))
     .returning();
   if (!data) return c.json({ error: 'Goal not found' }, HTTP_STATUS.NOT_FOUND);
-  return c.json({ data });
+  return c.json({ data: serializeGoal(data) });
 });
 
 export default app;

@@ -4,11 +4,16 @@ import { expect, test } from 'bun:test';
 import type { Goal } from '@quro/shared';
 import type { GoalProgressContext } from '../types';
 import {
+  formatInvestHabitHits,
   getGoalPct,
+  getGoalStatus,
+  getGoalYears,
+  goalCoversYear,
   isAboveLowerIsBetterTarget,
   resolveGoalCurrentAmount,
-  resolveInvestHabitMonthsCompleted,
 } from './goal-utils';
+import { computeGoalStats, computeGoalYears } from './goals-data';
+import { buildInvestHabitBuys, EMPTY_INVEST_HABIT_BUYS } from './invest-habit';
 
 const convertToBase = (amount: number, _currency: string) => amount;
 
@@ -17,7 +22,8 @@ const baseContext: GoalProgressContext = {
   savingsAccounts: [],
   portfolioTotal: 75000,
   netWorth: 200000,
-  investHabitBuyMonths: new Map(),
+  investHabitBuys: EMPTY_INVEST_HABIT_BUYS,
+  currentMonth: '2026-11',
   convertToBase,
 };
 
@@ -147,50 +153,126 @@ test('resolves net_worth goal from live net worth', () => {
   expect(getGoalPct(goal, baseContext)).toBe(50);
 });
 
-test('resolves invest_habit months from buy transaction data', () => {
-  const goal = buildGoal({
+const habit = (overrides: Partial<Goal> = {}): Goal =>
+  buildGoal({
     type: 'invest_habit',
     sourceType: 'invest_habit_buys',
-    year: 2026,
-    monthsCompleted: 0,
-    totalMonths: 12,
+    startMonth: 'Oct 2026',
+    deadline: 'Jun 2027',
+    year: 2027,
+    totalMonths: 9,
     monthlyTarget: 500,
+    monthlyContribution: 0,
+    currentAmount: 0,
+    targetAmount: 0,
+    ...overrides,
   });
 
-  const context: GoalProgressContext = {
-    ...baseContext,
-    investHabitBuyMonths: new Map([[2026, new Set(['2026-01', '2026-02', '2026-03', '2026-05'])]]),
-  };
-
-  expect(resolveInvestHabitMonthsCompleted(goal, context)).toBe(4);
-  expect(getGoalPct(goal, context)).toBeCloseTo((4 / 12) * 100);
+const withBuys = (
+  context: GoalProgressContext,
+  totals: Array<[string, number]>,
+  currentMonth = context.currentMonth,
+): GoalProgressContext => ({
+  ...context,
+  currentMonth,
+  investHabitBuys: buildInvestHabitBuys(
+    totals.map(([month, amount]) => ({ month, currency: 'EUR', amount })),
+    context.convertToBase,
+  ),
 });
 
-test('returns zero months for invest_habit_buys with no buy data for the year', () => {
-  const goal = buildGoal({
-    type: 'invest_habit',
-    sourceType: 'invest_habit_buys',
-    year: 2026,
-    monthsCompleted: 0,
-    totalMonths: 12,
-    monthlyTarget: 500,
-  });
-
-  expect(resolveInvestHabitMonthsCompleted(goal, baseContext)).toBe(0);
-  expect(getGoalPct(goal, baseContext)).toBe(0);
+test('a goal with a start month shows in every year from its start to its deadline', () => {
+  const goal = habit();
+  expect(getGoalYears(goal, 2026)).toEqual([2026, 2027]);
+  expect(goalCoversYear(goal, 2026, 2026)).toBe(true);
+  expect(goalCoversYear(goal, 2027, 2026)).toBe(true);
+  expect(goalCoversYear(goal, 2028, 2026)).toBe(false);
+  expect(getGoalYears(habit({ startMonth: 'Nov 2025', deadline: 'Feb 2028' }), 2026)).toEqual([
+    2025, 2026, 2027, 2028,
+  ]);
 });
 
-test('falls back to stored monthsCompleted for manual invest_habit goals', () => {
-  const goal = buildGoal({
-    type: 'invest_habit',
-    sourceType: 'manual',
-    monthsCompleted: 6,
-    totalMonths: 12,
-    monthlyTarget: 500,
-  });
+test('a goal without a start month keeps its one year', () => {
+  expect(getGoalYears(buildGoal({ year: 2027, deadline: 'Dec 2027' }), 2026)).toEqual([2027]);
+  expect(getGoalYears(habit({ startMonth: null, year: 2026 }), 2026)).toEqual([2026]);
+  // A range that does not parse or runs backwards falls back to the goal's year.
+  expect(getGoalYears(habit({ startMonth: 'Aug 2027' }), 2026)).toEqual([2027]);
+});
 
-  expect(resolveInvestHabitMonthsCompleted(goal, baseContext)).toBe(6);
-  expect(getGoalPct(goal, baseContext)).toBe(50);
+test('the year tabs include every year a goal covers, and each year counts the goal', () => {
+  const goals = [habit(), buildGoal({ id: 2, year: 2025, deadline: 'Dec 2025' })];
+  expect(computeGoalYears(goals, 2026)).toEqual([2025, 2026, 2027]);
+  const context = withBuys(baseContext, [['2026-10', 500]]);
+  for (const year of [2026, 2027]) {
+    const yearGoals = goals.filter((goal) => goalCoversYear(goal, year, 2026));
+    expect(yearGoals.map((goal) => goal.id)).toEqual([1]);
+    expect(computeGoalStats(yearGoals, context, 2026)).toMatchObject({
+      total: 1,
+      onTrack: 1,
+      monthly: 500,
+    });
+  }
+});
+
+test('an invest habit counts hits over its own months, across a year boundary', () => {
+  const context = withBuys(
+    baseContext,
+    [
+      ['2026-09', 900],
+      ['2026-10', 500],
+      ['2026-11', 499.99],
+      ['2026-12', 750],
+      ['2027-01', 600],
+      ['2027-07', 900],
+    ],
+    '2027-02',
+  );
+  const goal = habit();
+  // Sep 2026 and Jul 2027 are outside the range; Nov 2026 is one cent short.
+  expect(formatInvestHabitHits(goal, context, 'mo')).toBe('3/9mo');
+  expect(getGoalPct(goal, context)).toBeCloseTo((3 / 9) * 100);
+  expect(getGoalStatus(goal, context, 2027)).toBe('at_risk');
+});
+
+test('on track compares hits with the months that have passed, across a year boundary', () => {
+  const goal = habit();
+  const hits: Array<[string, number]> = [
+    ['2026-10', 500],
+    ['2026-11', 500],
+    ['2026-12', 500],
+  ];
+  // January has no buys yet: it is the current month, so it does not count against the habit.
+  expect(getGoalStatus(goal, withBuys(baseContext, hits, '2027-01'), 2027)).toBe('on_track');
+  // Once January has passed without reaching the target, the habit is behind.
+  expect(getGoalStatus(goal, withBuys(baseContext, hits, '2027-02'), 2027)).toBe('at_risk');
+  // Before the first month nothing is due.
+  expect(getGoalStatus(goal, withBuys(baseContext, [], '2026-09'), 2026)).toBe('on_track');
+  const all = [
+    '2026-10',
+    '2026-11',
+    '2026-12',
+    '2027-01',
+    '2027-02',
+    '2027-03',
+    '2027-04',
+    '2027-05',
+    '2027-06',
+  ];
+  expect(
+    getGoalStatus(
+      goal,
+      withBuys(
+        baseContext,
+        all.map((month) => [month, 500]),
+      ),
+      2027,
+    ),
+  ).toBe('complete');
+});
+
+test('stored manual months never count for an invest habit', () => {
+  const goal = habit({ monthsCompleted: 6, missedMonths: ['2026-10'], sourceType: 'manual' });
+  expect(formatInvestHabitHits(goal, withBuys(baseContext, [['2026-10', 500]]))).toBe('1/9');
 });
 
 test('normalizes missing source type to manual', () => {
@@ -230,7 +312,8 @@ const fxContext: GoalProgressContext = {
   savingsAccounts: [],
   portfolioTotal: 75000,
   netWorth: 200000,
-  investHabitBuyMonths: new Map(),
+  investHabitBuys: EMPTY_INVEST_HABIT_BUYS,
+  currentMonth: '2026-11',
   convertToBase: convertWithRates,
 };
 

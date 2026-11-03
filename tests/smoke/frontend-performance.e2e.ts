@@ -55,7 +55,7 @@ async function mockApi(page: Page, authenticated: boolean, importStatuses: strin
       }));
     if (path === '/api/dashboard/summary') data = { allocations: ALLOCATIONS, netWorth: [] };
     if (path === '/api/dashboard/insights')
-      data = { latestPayslip: null, salaryMonths: [], investHabitBuyMonths: [] };
+      data = { latestPayslip: null, salaryMonths: [], investHabitBuys: [] };
     if (path === '/api/pensions/imports') {
       const status = importStatuses[Math.min(importRequests, importStatuses.length - 1)];
       importRequests += 1;

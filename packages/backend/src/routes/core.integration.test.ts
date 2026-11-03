@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { budgetCategories, budgetTransactions, categoryMappings, sessions } from '../db/schema';
+import {
+  budgetCategories,
+  budgetTransactions,
+  categoryMappings,
+  goals,
+  sessions,
+} from '../db/schema';
 import { createIntegrationHelpers, integrationPassword, randomTestIp } from '../test/integration';
 import { applyTestSettings } from '../test/config';
 import { clearBunqTestEnv, setBunqTestEnv } from '../test/bunq';
@@ -2084,17 +2090,105 @@ describe('goals integration', () => {
         category: 'Investing',
         monthlyContribution: 0,
         monthlyTarget: 500,
-        monthsCompleted: 0,
-        totalMonths: 12,
+        startMonth: 'Oct 2026',
         currency: 'EUR',
       },
     });
     expect(createInvestHabitGoal.status).toBe(201);
     const investHabitGoal = (await createInvestHabitGoal.json()) as {
-      data: { sourceType: string; sourceId: number | null };
+      data: {
+        id: number;
+        sourceType: string;
+        sourceId: number | null;
+        startMonth: string;
+        deadline: string;
+        totalMonths: number;
+        monthsCompleted: number | null;
+        missedMonths: string[] | null;
+      };
     };
-    expect(investHabitGoal.data.sourceType).toBe('invest_habit_buys');
-    expect(investHabitGoal.data.sourceId).toBeNull();
+    expect(investHabitGoal.data).toMatchObject({
+      sourceType: 'invest_habit_buys',
+      sourceId: null,
+      startMonth: 'Oct 2026',
+      deadline: 'Dec 2026',
+      totalMonths: 3,
+      monthsCompleted: null,
+      missedMonths: null,
+    });
+
+    for (const manual of [{ monthsCompleted: 1 }, { missedMonths: ['2026-10'] }]) {
+      const refusedCreate = await integration.request('/api/goals', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          type: 'invest_habit',
+          name: 'Manual months',
+          currentAmount: 0,
+          targetAmount: 0,
+          deadline: 'Dec 2026',
+          year: 2026,
+          category: 'Investing',
+          monthlyContribution: 0,
+          monthlyTarget: 500,
+          startMonth: 'Oct 2026',
+          currency: 'EUR',
+          ...manual,
+        },
+      });
+      expect(refusedCreate.status).toBe(400);
+      expect(await refusedCreate.json()).toEqual({
+        error: 'Invest habit months come from investment buys and cannot be set',
+      });
+      const refusedPatch = await integration.request(`/api/goals/${investHabitGoal.data.id}`, {
+        method: 'PATCH',
+        cookie: owner.cookie,
+        json: manual,
+      });
+      expect(refusedPatch.status).toBe(400);
+    }
+
+    const invertedRange = await integration.request(`/api/goals/${investHabitGoal.data.id}`, {
+      method: 'PATCH',
+      cookie: owner.cookie,
+      json: { startMonth: 'Jan 2027' },
+    });
+    expect(invertedRange.status).toBe(400);
+    expect(await invertedRange.json()).toEqual({
+      error: 'Start month cannot be after the end month',
+    });
+
+    // Months stored by earlier versions are ignored on read and cleared by the next write.
+    await db
+      .update(goals)
+      .set({ monthsCompleted: 2, missedMonths: ['2026-10'] })
+      .where(eq(goals.id, investHabitGoal.data.id));
+    const storedHabit = await integration.request(`/api/goals/${investHabitGoal.data.id}`, {
+      cookie: owner.cookie,
+    });
+    expect(((await storedHabit.json()) as typeof investHabitGoal).data).toMatchObject({
+      monthsCompleted: null,
+      missedMonths: null,
+    });
+    const listed = (await (
+      await integration.request('/api/goals', { cookie: owner.cookie })
+    ).json()) as { data: Array<(typeof investHabitGoal)['data']> };
+    expect(listed.data.find((row) => row.id === investHabitGoal.data.id)).toMatchObject({
+      monthsCompleted: null,
+      missedMonths: null,
+    });
+    const renamed = await integration.request(`/api/goals/${investHabitGoal.data.id}`, {
+      method: 'PATCH',
+      cookie: owner.cookie,
+      json: { name: 'Monthly ETF buys', deadline: 'Jun 2027', year: 2027 },
+    });
+    expect(renamed.status).toBe(200);
+    expect(((await renamed.json()) as typeof investHabitGoal).data.totalMonths).toBe(9);
+    const [cleared] = await db
+      .select({ monthsCompleted: goals.monthsCompleted, missedMonths: goals.missedMonths })
+      .from(goals)
+      .where(eq(goals.id, investHabitGoal.data.id));
+    expect(cleared).toEqual({ monthsCompleted: null, missedMonths: null });
 
     const wrongSourceForPortfolio = await integration.request('/api/goals', {
       method: 'POST',
@@ -2155,7 +2249,7 @@ describe('goals integration', () => {
         category: 'Investing',
         monthlyContribution: 0,
         monthlyTarget: 500,
-        totalMonths: 12,
+        startMonth: '2026-01',
         currency: 'EUR',
       },
     });

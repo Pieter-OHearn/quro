@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { CATEGORY_COLOR_NAMES, categoryColorFor, dataColorToken } from '@/lib/dataColors';
 import { cn } from '@/lib/utils';
-import { Link2 } from 'lucide-react';
+import { AlertCircle, Link2 } from 'lucide-react';
 import {
   Badge,
   FormField,
@@ -24,6 +24,7 @@ import {
 } from '@quro/shared';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { useAddGoalModal } from '../hooks';
+import { getInvestHabitFormRange } from '../utils/goal-utils';
 import { COLORS, GOAL_CHIP_CLASS_NAME, GOAL_TYPE_META } from '../utils/goals-constants';
 import type {
   AddGoalModalProps,
@@ -56,19 +57,6 @@ function deadlineToDateString(deadline: string): string {
   if (month === -1) return '';
   const monthPad = String(month + 1).padStart(2, '0');
   return `${year}-${monthPad}-01`;
-}
-
-function monthsBetween(startDeadline: string, endDeadline: string): number {
-  const parseDeadline = (d: string) => {
-    const m = d.match(/^([A-Za-z]+)\s+(\d{4})$/);
-    if (!m) return null;
-    const mo = getMonthAbbreviationIndex(m[1]);
-    return mo === -1 ? null : { year: Number(m[2]), month: mo };
-  };
-  const s = parseDeadline(startDeadline);
-  const e = parseDeadline(endDeadline);
-  if (!s || !e) return 0;
-  return Math.max(0, (e.year - s.year) * 12 + (e.month - s.month) + 1);
 }
 
 type AmountFieldsSavingsPortfolioProps = {
@@ -387,9 +375,7 @@ function AmountFieldsInvestHabit({
     setField('year', year);
   };
 
-  const startDeadline = form.startMonth ? dateStringToDeadline(form.startMonth) : '';
-  const rangeMonths =
-    startDeadline && form.deadline ? monthsBetween(startDeadline, form.deadline) : 0;
+  const range = getInvestHabitFormRange(form);
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -403,17 +389,25 @@ function AmountFieldsInvestHabit({
           onChange={(value) => setField('monthlyTarget', value)}
         />
       </FormField>
-      <FormField label="Start month">
+      <FormField label="Start month" required>
         <MonthInput value={dateToMonthString(form.startMonth)} onChange={handleStartMonthChange} />
       </FormField>
-      <FormField label="End month">
+      <FormField label="End month" required>
         <MonthInput value={deadlineToMonthString(form.deadline)} onChange={handleEndMonthChange} />
       </FormField>
       <div className={cn('col-span-2', LINKED_BOX_CLASS_NAME)}>
-        <p className="flex items-center gap-1 text-caption text-fg-subtle">
-          <Link2 size={12} aria-hidden /> Monthly buy transactions auto-tracked from your
-          investments.
-          {rangeMonths > 0 && ` ${rangeMonths} month${rangeMonths > 1 ? 's' : ''} in range.`}
+        {range.error ? (
+          <p role="alert" className="flex items-center gap-1 text-caption text-danger">
+            <AlertCircle size={12} aria-hidden /> {range.error}.
+          </p>
+        ) : (
+          <p className="text-caption text-fg-muted">
+            {range.months} month{range.months > 1 ? 's' : ''} in range.
+          </p>
+        )}
+        <p className="mt-1 flex items-start gap-1 text-caption text-fg-subtle">
+          <Link2 size={12} className="mt-0.5 shrink-0" aria-hidden /> A month counts once the buys
+          you record on the Investments page in that month reach the monthly target.
         </p>
       </div>
     </div>

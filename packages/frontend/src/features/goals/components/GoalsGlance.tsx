@@ -7,7 +7,7 @@ import {
   getGoalPct,
   getGoalStatus,
   normalizeGoalType,
-  resolveInvestHabitMonthsCompleted,
+  formatInvestHabitHits,
 } from '../utils/goal-utils';
 
 type GlanceItemProps = {
@@ -32,7 +32,7 @@ function GlanceItem({ goal, goalProgressContext, currentYear }: Readonly<GlanceI
           <span className="truncate text-cell text-fg">{goal.name}</span>
           <span className="shrink-0 text-cell font-medium font-numeric text-fg">
             {type === 'invest_habit'
-              ? `${resolveInvestHabitMonthsCompleted(goal, goalProgressContext)}/${goal.totalMonths ?? 12}mo`
+              ? formatInvestHabitHits(goal, goalProgressContext, 'mo')
               : formatPercent(pct, numberFormat, 0)}
           </span>
         </div>

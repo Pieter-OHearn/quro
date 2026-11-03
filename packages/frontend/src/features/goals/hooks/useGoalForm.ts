@@ -6,7 +6,7 @@ import { useAssetAllocations } from '@/features/dashboard/hooks';
 import { useSavingsAccounts } from '@/features/savings/hooks';
 import type { CreateGoalInput, GoalFormField, GoalFormState } from '../types';
 import { GOAL_TYPE_META } from '../utils/goals-constants';
-import { buildGoalPayload } from '../utils/goal-utils';
+import { buildGoalPayload, getInvestHabitFormRange } from '../utils/goal-utils';
 
 const SOURCE_TYPE_DEFAULTS: Partial<Record<GoalType, Goal['sourceType']>> = {
   salary: 'salary_latest_gross',
@@ -15,8 +15,9 @@ const SOURCE_TYPE_DEFAULTS: Partial<Record<GoalType, Goal['sourceType']>> = {
   invest_habit: 'invest_habit_buys',
 };
 
-function goalProgressFields(goal?: Goal) {
-  if (!goal) return { monthsCompleted: null };
+function goalProgressFields(type: GoalType, goal?: Goal) {
+  // An invest habit's months come from investment buys, never from the form.
+  if (!goal || type === 'invest_habit') return { monthsCompleted: null };
   return {
     monthsCompleted: goal.monthsCompleted ?? null,
     startMonth: null,
@@ -44,7 +45,7 @@ export function buildGoalFormBase(
     targetAmount: 0,
     monthlyContribution: 0,
     monthlyTarget: null,
-    ...goalProgressFields(goal),
+    ...goalProgressFields(type, goal),
     totalMonths: null,
     unit: null,
     category: GOAL_TYPE_META[type].label,
@@ -70,7 +71,9 @@ export function useGoalForm(
   const setField = (key: GoalFormField, value: string) =>
     setForm((previous) => ({ ...previous, [key]: value }));
   const saveDisabled =
-    !form.name.trim() || (type === 'invest_habit' && (!form.monthlyTarget || !form.startMonth));
+    !form.name.trim() ||
+    (type === 'invest_habit' &&
+      (!form.monthlyTarget || getInvestHabitFormRange(form).error !== null));
   const handleSave = () => {
     if (saveDisabled) return;
     const base = buildGoalFormBase(type, form, baseCurrency, goal);

@@ -229,6 +229,19 @@ overpayment. Every field stays editable, a field the user changed is not overwri
 edited repayment is never re-suggested. A linear mortgage's current payment is this figure for
 today's balance rather than the payment stored when the mortgage was created.
 
+### Invest habit months
+
+An invest habit goal tracks the months from its start month to its end month, both included, and
+shows on every year tab those months cover. A month is hit when the buys dated in it reach the
+monthly target. Each buy is worth shares × price in its holding's currency (`holdingValue`, one
+rounding to cents); `sumInvestHabitBuys` in `@quro/shared` adds a month's buys per currency in
+cents, and the client converts each currency's total to the base currency at the current rate
+(historical rates are not stored) and compares cents. A currency without a rate is not counted and
+the goal says a rate is missing. Months cannot be set or marked by hand: the goals API refuses
+`monthsCompleted` and `missedMonths` on an invest habit and returns them as `null`. A habit is on
+track while every month before the current one was hit; the current month counts once its target
+is reached.
+
 ## FX conversion
 
 - Dashboard, snapshot and runway figures are computed in EUR on the backend and converted once

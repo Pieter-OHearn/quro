@@ -1,6 +1,7 @@
 import type { ElementType } from 'react';
 import type { Goal, SavingsAccount } from '@quro/shared';
 import type { FailedRouteQuery } from '@/lib/routeQueryErrors';
+import type { InvestHabitBuys } from './utils/invest-habit';
 
 export type GoalStatus = 'complete' | 'on_track' | 'at_risk' | 'pending';
 export type FilterKey = 'all' | 'savings' | 'career' | 'investing' | 'annual';
@@ -87,10 +88,8 @@ export type GoalsPageState = {
   filteredGoals: Goal[];
   stats: GoalStatsData;
   handleDelete: (id: number) => void;
-  handleUpdateMonths: (id: number, delta: number) => void;
   handleAddGoal: (goal: CreateGoalInput) => void;
   handleUpdateGoal: (input: UpdateGoalInput) => void;
-  handleToggleMissedMonth: (goalId: number, monthKey: string) => void;
 };
 
 export type GoalProgressSavingsAccount = Pick<
@@ -103,6 +102,8 @@ export type GoalProgressContext = {
   savingsAccounts: readonly GoalProgressSavingsAccount[];
   portfolioTotal: number;
   netWorth: number;
-  investHabitBuyMonths: ReadonlyMap<number, ReadonlySet<string>>;
+  investHabitBuys: InvestHabitBuys;
+  /** This month on the local calendar, `YYYY-MM`. */
+  currentMonth: string;
   convertToBase: (amount: number, fromCurrency: string) => number;
 };

@@ -1,12 +1,16 @@
 import {
+  countGoalMonths,
+  formatGoalMonth,
   GOAL_SOURCE_TYPES,
-  getMonthAbbreviationIndex,
-  MONTH_ABBREVIATIONS,
+  goalStartEndMonths,
+  monthKeyOfDate,
+  parseGoalMonth,
   type Goal,
   type GoalSourceType,
   type GoalType,
 } from '@quro/shared';
 import type { CreateGoalInput, GoalFormState, GoalProgressContext, GoalStatus } from '../types';
+import { computeInvestHabitProgress, type InvestHabitProgress } from './invest-habit';
 
 const DEFAULT_GOAL_TYPE: GoalType = 'savings';
 const TYPE_VALUES: GoalType[] = [
@@ -39,12 +43,27 @@ export const parseGoalYear = (goal: Goal, fallbackYear: number): number => {
   return fallbackYear;
 };
 
+/**
+ * The years a goal shows in: every year from its start month to its deadline when it has a start
+ * month, otherwise its one year.
+ */
+export const getGoalYears = (goal: Goal, fallbackYear: number): number[] => {
+  const range = goalStartEndMonths(goal);
+  if (!range) return [parseGoalYear(goal, fallbackYear)];
+  const years: number[] = [];
+  for (let year = range.start.year; year <= range.end.year; year += 1) years.push(year);
+  return years;
+};
+
+export const goalCoversYear = (goal: Goal, year: number, fallbackYear: number): boolean =>
+  getGoalYears(goal, fallbackYear).includes(year);
+
 export const normalizeGoalType = (goal: Goal): GoalType => {
   if (goal.type && TYPE_VALUES.includes(goal.type)) return goal.type;
   return DEFAULT_GOAL_TYPE;
 };
 
-export const normalizeGoalSourceType = (goal: Goal): GoalSourceType => {
+const normalizeGoalSourceType = (goal: Goal): GoalSourceType => {
   if (goal.sourceType && GOAL_SOURCE_TYPES.includes(goal.sourceType)) return goal.sourceType;
   return normalizeGoalType(goal) === 'salary' ? 'salary_latest_gross' : 'manual';
 };
@@ -137,22 +156,31 @@ export const isAboveLowerIsBetterTarget = (goal: Goal): boolean =>
   Boolean(goal.unit?.endsWith('/mo')) &&
   (goal.currentAmount || 0) > (goal.targetAmount || 0);
 
-export const resolveInvestHabitMonthsCompleted = (
+export const getInvestHabitProgress = (
   goal: Goal,
   context: GoalProgressContext,
-): number => {
-  const sourceType = normalizeGoalSourceType(goal);
-  if (sourceType !== 'invest_habit_buys') return goal.monthsCompleted ?? 0;
-  const year = parseGoalYear(goal, new Date().getFullYear());
-  const months = context.investHabitBuyMonths.get(year);
-  return months ? months.size : 0;
+): InvestHabitProgress =>
+  computeInvestHabitProgress(
+    goal,
+    context.investHabitBuys,
+    context.convertToBase,
+    context.currentMonth,
+  );
+
+/** "4/9" months hit, with a unit after it. */
+export const formatInvestHabitHits = (
+  goal: Goal,
+  context: GoalProgressContext,
+  unit = '',
+): string => {
+  const { hits, months } = getInvestHabitProgress(goal, context);
+  return `${hits}/${months.length}${unit}`;
 };
 
 const getInvestHabitPct = (goal: Goal, context: GoalProgressContext): number => {
-  const totalMonths = goal.totalMonths ?? 12;
-  if (totalMonths <= 0) return 0;
-  const monthsCompleted = resolveInvestHabitMonthsCompleted(goal, context);
-  return Math.min((monthsCompleted / totalMonths) * 100, 100);
+  const { hits, months } = getInvestHabitProgress(goal, context);
+  if (months.length === 0) return 0;
+  return Math.min((hits / months.length) * 100, 100);
 };
 
 export const getGoalPct = (goal: Goal, context: GoalProgressContext): number => {
@@ -183,6 +211,10 @@ export const getGoalStatus = (
   const pct = getGoalPct(goal, context);
   if (pct >= 100) return 'complete';
   if (normalizeGoalType(goal) === 'salary') return 'pending';
+  // A habit is on track while every month of its range that has passed was hit.
+  if (normalizeGoalType(goal) === 'invest_habit') {
+    return getInvestHabitProgress(goal, context).behind ? 'at_risk' : 'on_track';
+  }
   const year = parseGoalYear(goal, currentYear);
   const expectedProgress = getExpectedProgress(year, currentYear);
   return pct >= expectedProgress ? 'on_track' : 'at_risk';
@@ -223,43 +255,35 @@ const buildSalaryPayload = (base: CreateGoalInput, form: GoalFormState): CreateG
   return base;
 };
 
-function deadlineStringToYearMonth(deadline: string): { year: number; month: number } | null {
-  const match = deadline.match(/^([A-Za-z]+)\s+(\d{4})$/);
-  if (!match) return null;
-  const month = getMonthAbbreviationIndex(match[1]);
-  if (month === -1) return null;
-  return { year: Number(match[2]), month };
-}
+export type InvestHabitFormRange = { months: number; error: string | null };
 
-function monthsBetweenDeadlines(startDeadline: string, endDeadline: string): number {
-  const start = deadlineStringToYearMonth(startDeadline);
-  const end = deadlineStringToYearMonth(endDeadline);
-  if (!start || !end) return 12;
-  return Math.max(1, (end.year - start.year) * 12 + (end.month - start.month) + 1);
-}
-
-function dateStringToDeadline(dateStr: string): string {
-  if (!dateStr) return '';
-  const date = new Date(dateStr + 'T00:00:00Z');
-  const month = MONTH_ABBREVIATIONS[date.getUTCMonth()];
-  const year = date.getUTCFullYear();
-  return `${month} ${year}`;
-}
+/** The months between an invest habit form's start and end months, or why they do not work. */
+export const getInvestHabitFormRange = (
+  form: Pick<GoalFormState, 'startMonth' | 'deadline'>,
+): InvestHabitFormRange => {
+  const start = parseGoalMonth(monthKeyOfDate(form.startMonth));
+  if (!start) return { months: 0, error: 'Choose a start month' };
+  const end = parseGoalMonth(form.deadline);
+  if (!end) return { months: 0, error: 'Choose an end month' };
+  const months = countGoalMonths(start, end);
+  return months > 0
+    ? { months, error: null }
+    : { months: 0, error: 'The start month is after the end month' };
+};
 
 const buildInvestHabitPayload = (base: CreateGoalInput, form: GoalFormState): CreateGoalInput => {
   base.sourceType = 'invest_habit_buys';
   base.sourceId = null;
   base.monthlyTarget = Number.parseFloat(form.monthlyTarget) || 0;
-  base.monthsCompleted = base.monthsCompleted ?? 0;
+  // Its months come from investment buys, never from the form.
+  base.monthsCompleted = null;
+  base.missedMonths = null;
 
-  const startDeadline = form.startMonth ? dateStringToDeadline(form.startMonth) : null;
-  base.startMonth = startDeadline;
-
-  if (startDeadline && base.deadline) {
-    base.totalMonths = monthsBetweenDeadlines(startDeadline, base.deadline);
-  } else {
-    base.totalMonths = Number.parseInt(form.totalMonths, 10) || 12;
-  }
+  const start = parseGoalMonth(monthKeyOfDate(form.startMonth));
+  const end = parseGoalMonth(base.deadline);
+  base.startMonth = start ? formatGoalMonth(start) : null;
+  base.totalMonths = start && end ? countGoalMonths(start, end) : null;
+  if (end) base.year = end.year;
 
   return base;
 };
