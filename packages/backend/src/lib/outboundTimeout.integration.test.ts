@@ -21,14 +21,19 @@ afterEach(() => {
   mock.restore();
 });
 
-function hangFetch(onRequest: () => void = () => {}) {
+// A provider that answers late: the request ignores its abort signal unless `honourAbort` is
+// set, in which case it rejects on abort as a real fetch does.
+function hangFetch(onRequest: () => void = () => {}, { honourAbort = false } = {}) {
   let signal: AbortSignal | undefined;
   let finish: (response: Response) => void = () => {};
   globalThis.fetch = mock((_url: unknown, init?: RequestInit) => {
     signal = init?.signal ?? undefined;
     queueMicrotask(onRequest);
-    return new Promise<Response>((resolve) => {
+    return new Promise<Response>((resolve, reject) => {
       finish = resolve;
+      if (honourAbort) {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      }
     });
   }) as unknown as typeof fetch;
   return { signal: () => signal, finish: (response: Response) => finish(response) };
@@ -66,7 +71,9 @@ test('Yahoo ticker lookup request returns its existing error response on timeout
     new YahooFinanceMarketDataClient(),
   );
   shortTimeout();
-  const { signal } = hangFetch();
+  // yahoo-finance2 shares one cookie jar, and with it one pending crumb request, across every
+  // client in the process. A crumb fetch that never settles would hold up the next test's client.
+  const { signal } = hangFetch(undefined, { honourAbort: true });
   const response = await integration.request('/api/investments/ticker-lookup/SYNTHETIC', {
     cookie: auth.cookie,
   });
