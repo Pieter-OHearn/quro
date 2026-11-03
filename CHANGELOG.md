@@ -4,13 +4,15 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [v1.0.0-rc.7] - 2026-11-03
 
-Quro 1.0.0-rc.7 corrects ledger and money rules before 1.0.0, removes the tools that only installs before 1.0.0 needed, builds the backend image on Alpine and polishes the V1 interface: every dialog fades out and asks before it discards edits. It has one migration that moves dividend amounts to their own column, so take a backup first, and run the read-only count and the bank-link secrets check in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7) with 1.0.0-rc.6 before you upgrade.
+Quro 1.0.0-rc.7 corrects ledger and money rules before 1.0.0, removes the tools that only installs before 1.0.0 needed, builds the backend image on Alpine, tracks invest habit goals from investment buys across years and polishes the V1 interface: every dialog fades out and asks before it discards edits. It has one migration that moves dividend amounts to their own column, so take a backup first, and run the read-only count and the bank-link secrets check in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7) with 1.0.0-rc.6 before you upgrade.
 
 ### Changed
 
 - **Breaking:** a dividend stores the amount it paid in its own money column, `amount`, instead of the price-per-share column. The holding transaction API takes and returns a dividend's `amount`; a dividend with a `price` answers `400` ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7)).
 - **Breaking:** the backend image is built on Alpine instead of Debian. It is about 40% smaller and drops the Debian packages behind 47 high-severity findings that had no fix; the container has `sh` but no `bash`, `apt` or GNU coreutils. UID 1000, the `quro` entrypoint, the health check, the data directories and the PostgreSQL 18 client tools are unchanged.
 - Salary growth compares full years: a year with fewer than twelve months of payslips is annualised from those months, and the chart names the years it annualised.
+- **Breaking:** an invest habit goal is tracked only from buys recorded on the Investments page, over its own months from start to end: a month counts when that month's buys reach the monthly target. Months can no longer be marked by hand, the card shows what was invested in the range and how much of this month's target is reached, and a habit needs a start and an end month, at most 120 months apart. The goals API refuses `monthsCompleted` and `missedMonths` on an invest habit ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7)).
+- The images run Bun 1.4.4.
 - Every dialog leaves with its fade (a slide down on phones), and a dialog with edits asks "Discard your changes?" before the close button, Escape, the scrim or the back button closes it. The Profile, Password and Preferences forms in Settings ask the same before you leave the page.
 - The holdings table shows Gain / loss in euros, like Value; a foreign holding's cost converts at today's rate, which the table footer says.
 - Budget transactions show their date as `09 Oct 2026`.
@@ -26,6 +28,7 @@ Quro 1.0.0-rc.7 corrects ledger and money rules before 1.0.0, removes the tools 
 - Connecting bunq while a backup or restore runs changes nothing and says so, instead of writing during the backup.
 - Committing a pension statement import is refused only when another import of the same file is already committed to the pot, as the database enforces; an import of the same file still in review no longer blocks it.
 - The scheduled holding price sync reports each price as stored (six decimals), not as the provider quoted it.
+- An invest habit that runs into the next year shows on every year tab it covers, not only on its last year's, and counts the buys of all its months.
 - The emoji picker is dark in dark mode.
 - The collapsed sidebar scrolls on a short window, and its labels are no longer cut off.
 - A pension pot saved without a colour uses the pension chart colour instead of a fixed grey.
