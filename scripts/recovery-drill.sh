@@ -279,11 +279,23 @@ grep -q "quro-secret:v1:aes-256-gcm:$SECRETS_KEY_ID:" "$WORK/plain-dump.txt" || 
 grep -q "$BANK_MARKER" "$WORK/plain-dump.txt" && fail "the archive's dump holds a bank-link secret in plaintext"
 grep -q "\"$SECRETS_KEY_ID\"" "$WORK/plain-dump.txt" || fail "the manifest does not record the secrets key id"
 echo "archive: dump and manifest hold no plaintext bank-link secret; manifest names key $SECRETS_KEY_ID"
-# Rewrite its manifest as if a newer release had written it, entries in the same order.
-docker run --rm -v "$RUN-backups:/backups" --entrypoint sh "$IMAGE" -c "
-  set -e; mkdir /tmp/x && cd /tmp/x && tar -xf /backups/$PLAIN
-  sed -i 's/\"version\": \"[^\"]*\"/\"version\": \"v99.0.0\"/' manifest.json
-  tar --format=ustar --no-recursion -cf /backups/newer-release.tar database.dump \$(find documents -type f | LC_ALL=C sort) manifest.json"
+# Rewrite its manifest as if a newer release had written it, entries in the same order. The
+# image's own tar writer keeps the archive in the ustar form `quro restore` reads; the image has
+# no GNU tar.
+docker run --rm -v "$RUN-backups:/backups" -e PLAIN="$PLAIN" --entrypoint bun "$IMAGE" -e "
+  import { readTar, TarWriter } from '/app/packages/backend/src/backup/tar.ts';
+  const out = Bun.file('/backups/newer-release.tar').writer();
+  const tar = new TarWriter({ write: async (bytes) => void out.write(bytes) }, new Date());
+  await readTar(Bun.file('/backups/' + process.env.PLAIN).stream(), async (entry, body) => {
+    const chunks = [];
+    for await (const chunk of body) chunks.push(chunk);
+    let bytes = Buffer.concat(chunks);
+    if (entry.path === 'manifest.json')
+      bytes = Buffer.from(String(bytes).replace(/\"version\": \"[^\"]*\"/g, '\"version\": \"v99.0.0\"'));
+    await tar.addBytes(entry.path, bytes);
+  });
+  await tar.finish();
+  await out.end();"
 
 step "Failure cases against the empty, isolated target: refused, nothing changed"
 start_db "$RUN-db-target" "$RUN-pg-target"

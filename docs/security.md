@@ -547,7 +547,7 @@ Passing tests and scanners is evidence for the listed controls only.
 | 13.3.1 Secrets management                                  | Partial  | Docker secret files; no key vault. Stored bank-link secrets are encrypted with an operator-held key ([integration secrets](#integration-secrets)) |
 | 13.4.1 No source control metadata deployed                 | Met      | `.dockerignore` keeps `.git` out of the images                                                                                                    |
 | 15.1.1 Documented remediation time frames                  | Met      | [SECURITY.md](../SECURITY.md#how-findings-are-handled)                                                                                            |
-| 15.2.1 Components within their remediation time frames     | Partial  | Critical findings fail CI; high findings are listed for triage. Debian packages without a fixed version stay until Debian ships one               |
+| 15.2.1 Components within their remediation time frames     | Partial  | Critical findings fail CI; high findings are listed for triage. Distribution packages without a fixed version stay until a fix ships              |
 
 ## Rate Limiting
 

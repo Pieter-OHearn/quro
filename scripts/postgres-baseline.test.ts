@@ -46,7 +46,7 @@ describe('PostgreSQL baseline', () => {
     const dockerfile = await read('packages/backend/Dockerfile');
     const toolsMajor = Number(/^ARG POSTGRES_CLIENT_MAJOR=(\d+)$/m.exec(dockerfile)?.[1]);
     expect(toolsMajor).toBe(majorOfImage((await composeDb()).image));
-    expect(dockerfile).toContain('postgresql-client-${POSTGRES_CLIENT_MAJOR}');
+    expect(dockerfile).toContain('postgresql${POSTGRES_CLIENT_MAJOR}-client');
   });
 
   test('the Compose database is on the supported major and uses its own data directory', async () => {
