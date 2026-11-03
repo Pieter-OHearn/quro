@@ -2,12 +2,20 @@
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses [Semantic Versioning](https://semver.org/) for release numbers.
 
-## [Unreleased]
+## [v1.0.0-rc.7] - 2026-11-03
+
+Quro 1.0.0-rc.7 corrects ledger and money rules before 1.0.0, removes the tools that only installs before 1.0.0 needed, builds the backend image on Alpine and polishes the V1 interface: every dialog fades out and asks before it discards edits. It has one migration that moves dividend amounts to their own column, so take a backup first, and run the read-only count and the bank-link secrets check in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7) with 1.0.0-rc.6 before you upgrade.
 
 ### Changed
 
-- **Breaking:** a dividend stores the amount it paid in its own money column, `amount`, instead of the price-per-share column. The holding transaction API takes and returns a dividend's `amount`; a dividend with a `price` answers `400` ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-the-next-release)).
+- **Breaking:** a dividend stores the amount it paid in its own money column, `amount`, instead of the price-per-share column. The holding transaction API takes and returns a dividend's `amount`; a dividend with a `price` answers `400` ([upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7)).
+- **Breaking:** the backend image is built on Alpine instead of Debian. It is about 40% smaller and drops the Debian packages behind 47 high-severity findings that had no fix; the container has `sh` but no `bash`, `apt` or GNU coreutils. UID 1000, the `quro` entrypoint, the health check, the data directories and the PostgreSQL 18 client tools are unchanged.
 - Salary growth compares full years: a year with fewer than twelve months of payslips is annualised from those months, and the chart names the years it annualised.
+- Every dialog leaves with its fade (a slide down on phones), and a dialog with edits asks "Discard your changes?" before the close button, Escape, the scrim or the back button closes it. The Profile, Password and Preferences forms in Settings ask the same before you leave the page.
+- The holdings table shows Gain / loss in euros, like Value; a foreign holding's cost converts at today's rate, which the table footer says.
+- Budget transactions show their date as `09 Oct 2026`.
+- On a phone, a mortgage shows as a card like the other ledgers, and below 360px a transaction row folds edit and delete into one actions menu.
+- A low-confidence field in a pension statement import is marked in the danger colour, so it stands apart from a medium-confidence one.
 
 ### Fixed
 
@@ -18,6 +26,9 @@ All notable changes to this project will be documented in this file. The format 
 - Connecting bunq while a backup or restore runs changes nothing and says so, instead of writing during the backup.
 - Committing a pension statement import is refused only when another import of the same file is already committed to the pot, as the database enforces; an import of the same file still in review no longer blocks it.
 - The scheduled holding price sync reports each price as stored (six decimals), not as the provider quoted it.
+- The emoji picker is dark in dark mode.
+- The collapsed sidebar scrolls on a short window, and its labels are no longer cut off.
+- A pension pot saved without a colour uses the pension chart colour instead of a fixed grey.
 
 ### Removed
 
@@ -25,10 +36,14 @@ All notable changes to this project will be documented in this file. The format 
 - **Breaking:** `quro secrets encrypt`, and the server's encryption of unencrypted bank-link secrets when it uses them. An unencrypted secret is now refused, never read: the user connects bunq again, and `quro secrets status` and `quro doctor` name the users. `quro secrets rotate` moves secrets from the previous key only.
 - The upgrade notes of releases before the last 1.0.0 candidate. Upgrades are supported from the last 1.0.0 release candidate on; each release's notes stay in its tagged copy of the upgrade guide.
 
+### Security
+
+- Updated dependencies for published advisories: follow-redirects and minimatch, and pypdf 6.21.4 in the optional statement import service.
+
 ### Upgrade notes
 
-- **Migration `0047_holding_dividend_amount`** moves each dividend's amount to the new `holding_transactions.amount` column. Take a backup first: going back means restoring it. A dividend that is not whole cents stops the migration with its id and changes nothing; run the read-only count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-the-next-release) before you upgrade.
-- **Check the bank-link secrets before upgrading.** With 1.0.0-rc.6 still running, `docker compose run --rm migrate secrets status` must exit 0; if it reports unencrypted secrets, run `secrets encrypt` with 1.0.0-rc.6 first. See the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-the-next-release).
+- **Migration `0047_holding_dividend_amount`** moves each dividend's amount to the new `holding_transactions.amount` column. Take a backup first: going back means restoring it. A dividend that is not whole cents stops the migration with its id and changes nothing; run the read-only count in the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7) before you upgrade.
+- **Check the bank-link secrets before upgrading.** With 1.0.0-rc.6 still running, `docker compose run --rm migrate secrets status` must exit 0; if it reports unencrypted secrets, run `secrets encrypt` with 1.0.0-rc.6 first. See the [upgrade notes](docs/upgrade.md#upgrade-from-100-rc6-to-100-rc7).
 
 ## [v1.0.0-rc.6] - 2026-10-29
 
