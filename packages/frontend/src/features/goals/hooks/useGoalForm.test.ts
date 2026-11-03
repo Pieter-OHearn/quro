@@ -91,4 +91,10 @@ test('an invest habit range needs a start and an end month, in order', () => {
   expect(getInvestHabitFormRange({ startMonth: '2027-07-01', deadline: 'Jun 2027' }).error).toBe(
     'The start month is after the end month',
   );
+  expect(getInvestHabitFormRange({ startMonth: '2017-07-01', deadline: 'Jun 2027' }).error).toBe(
+    null,
+  );
+  expect(getInvestHabitFormRange({ startMonth: '2017-06-01', deadline: 'Jun 2027' }).error).toBe(
+    'The range is longer than 120 months',
+  );
 });

@@ -145,6 +145,7 @@ describe('parseGoalCreate', () => {
     if (!result.ok) return;
     expect(result.value.sourceType).toBe('invest_habit_buys');
     expect(result.value.totalMonths).toBe(9);
+    expect(result.value.year).toBe(2027);
     expect(result.value.monthsCompleted).toBeNull();
     expect(result.value.missedMonths).toBeNull();
   });
@@ -191,6 +192,16 @@ describe('parseGoalCreate', () => {
     });
     expect(parseGoalCreate({ ...investHabitBody, startMonth: 'Octember' }).ok).toBe(false);
     expect(parseGoalCreate({ ...investHabitBody, deadline: 'TBD' }).ok).toBe(false);
+    expect(parseGoalCreate({ ...investHabitBody, startMonth: 'Jun 2017' })).toEqual({
+      ok: false,
+      error: 'An invest habit can run for at most 120 months',
+    });
+    expect(
+      parseGoalCreate({ ...investHabitBody, startMonth: 'Jul 2017', deadline: 'Jun 2027' }).ok,
+    ).toBe(true);
+    expect(
+      parseGoalCreate({ ...investHabitBody, startMonth: 'Jan 1999', deadline: 'Jun 1999' }).ok,
+    ).toBe(false);
     const oneMonth = parseGoalCreate({ ...investHabitBody, startMonth: 'Jun 2027' });
     expect(oneMonth.ok && oneMonth.value.totalMonths).toBe(1);
   });

@@ -65,9 +65,10 @@ export function GoalsGlance({
         subtitle="All goals sorted by progress"
       />
       <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] gap-x-2 gap-y-3 p-4">
-        {[...yearGoals]
-          .sort((a, b) => getGoalPct(b, goalProgressContext) - getGoalPct(a, goalProgressContext))
-          .map((goal) => (
+        {yearGoals
+          .map((goal) => ({ goal, pct: getGoalPct(goal, goalProgressContext) }))
+          .sort((a, b) => b.pct - a.pct)
+          .map(({ goal }) => (
             <GlanceItem
               key={goal.id}
               goal={goal}

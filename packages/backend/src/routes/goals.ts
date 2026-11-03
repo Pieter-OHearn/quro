@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import {
   countGoalMonths,
   formatGoalMonth,
+  MAX_INVEST_HABIT_MONTHS,
   GOAL_SOURCE_TYPES,
   GOAL_TYPES,
   type GoalSourceType,
@@ -197,10 +198,14 @@ function validateInvestHabitRange(payload: GoalPayload, options: GoalParseOption
     return options.requireStartMonth ? 'Start month is required for an invest habit' : null;
   }
   const start = parseGoalMonth(payload.startMonth);
-  if (!start) return 'Start month must be a month such as "Oct 2026"';
+  if (!start || start.year < MIN_GOAL_YEAR) return 'Start month must be a month such as "Oct 2026"';
   const end = parseGoalMonth(payload.deadline);
-  if (!end) return 'End month must be a month such as "Jun 2027"';
-  return countGoalMonths(start, end) > 0 ? null : 'Start month cannot be after the end month';
+  if (!end || end.year > MAX_GOAL_YEAR) return 'End month must be a month such as "Jun 2027"';
+  const months = countGoalMonths(start, end);
+  if (months === 0) return 'Start month cannot be after the end month';
+  return months > MAX_INVEST_HABIT_MONTHS
+    ? `An invest habit can run for at most ${MAX_INVEST_HABIT_MONTHS} months`
+    : null;
 }
 
 function hasManualMonths(payload: GoalPayload): boolean {
@@ -236,6 +241,7 @@ function normalizeInvestHabitRange(payload: GoalPayload): GoalPayload {
     ...payload,
     startMonth: formatGoalMonth(start),
     deadline: formatGoalMonth(end),
+    year: end.year,
     totalMonths: countGoalMonths(start, end),
   };
 }

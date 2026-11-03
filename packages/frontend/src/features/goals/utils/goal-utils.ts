@@ -3,6 +3,7 @@ import {
   formatGoalMonth,
   GOAL_SOURCE_TYPES,
   goalStartEndMonths,
+  MAX_INVEST_HABIT_MONTHS,
   monthKeyOfDate,
   parseGoalMonth,
   type Goal,
@@ -266,9 +267,10 @@ export const getInvestHabitFormRange = (
   const end = parseGoalMonth(form.deadline);
   if (!end) return { months: 0, error: 'Choose an end month' };
   const months = countGoalMonths(start, end);
-  return months > 0
-    ? { months, error: null }
-    : { months: 0, error: 'The start month is after the end month' };
+  if (months === 0) return { months, error: 'The start month is after the end month' };
+  return months > MAX_INVEST_HABIT_MONTHS
+    ? { months, error: `The range is longer than ${MAX_INVEST_HABIT_MONTHS} months` }
+    : { months, error: null };
 };
 
 const buildInvestHabitPayload = (base: CreateGoalInput, form: GoalFormState): CreateGoalInput => {

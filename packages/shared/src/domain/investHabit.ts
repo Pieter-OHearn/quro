@@ -31,6 +31,8 @@ export type InvestHabitRangeFields = {
 };
 
 const MONTHS_PER_YEAR = 12;
+/** The longest range an invest habit may have: ten years of months. */
+export const MAX_INVEST_HABIT_MONTHS = 120;
 const MONTH_KEY_LENGTH = 'YYYY-MM'.length;
 const MONTH_DIGITS = 'MM'.length;
 const LABEL_PATTERN = /^(?<name>[A-Za-z]{3})\s+(?<year>\d{4})$/;
