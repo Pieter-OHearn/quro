@@ -3,7 +3,16 @@ import { Building2, ChevronDown, ChevronUp, Edit3, ExternalLink, Home, Plus } fr
 import { useId, useState, type ReactNode } from 'react';
 import { useCurrency } from '@/lib/CurrencyContext';
 import { Link } from 'react-router';
-import { Badge, Button, Card, Change, EmptyState, IconButton, RowActions } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Change,
+  DetailsToggle,
+  EmptyState,
+  IconButton,
+  RowActions,
+} from '@/components/ui';
 import { TxnAmount } from '@/components/finance/TxnAmount';
 import { cn } from '@/lib/utils';
 import { JointBadge } from '@/features/partner';
@@ -350,33 +359,6 @@ function PropertyCardHeader({
   );
 }
 
-/** The phone card keeps the value and equity up front; this button opens the rest. */
-function PropertyDetailsToggle({
-  open,
-  controlsId,
-  label,
-  onToggle,
-}: Readonly<{ open: boolean; controlsId: string; label: string; onToggle: () => void }>) {
-  const text = open ? 'Hide details' : 'Show details';
-  return (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-controls={controlsId}
-      aria-label={`${text} for ${label}`}
-      onClick={onToggle}
-      className="inline-flex min-h-11 items-center gap-1 text-label text-brand-fg underline-offset-2 hover:underline md:hidden focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring"
-    >
-      {text}
-      <ChevronDown
-        size={14}
-        aria-hidden
-        className={cn('transition-transform duration-fast', open && 'rotate-180')}
-      />
-    </button>
-  );
-}
-
 function PropertyCard(props: PropertyCardProps) {
   const { property, propertyTxns, mortgageById, mortgageTxns, isExpanded, fmtNative } = props;
   const { onUpdateProperty, onToggleExpanded, onAddTxnForProperty, onEditTxn, onDeleteTxn } = props;
@@ -409,7 +391,7 @@ function PropertyCard(props: PropertyCardProps) {
           stats={stats}
           fmtNative={fmtNative}
         />
-        <PropertyDetailsToggle
+        <DetailsToggle
           open={detailsOpen}
           controlsId={detailsId}
           label={property.address}

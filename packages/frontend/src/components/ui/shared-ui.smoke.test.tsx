@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowDownUp, Pencil, PiggyBank, Plus } from 'lucide-reac
 import { MemoryRouter } from 'react-router';
 import { CurrencyContext, type CurrencyContextType } from '@/lib/currencyContextValue';
 import { Badge } from './atoms/Badge';
+import { DetailsToggle } from './molecules/DetailsToggle';
 import { Button } from './atoms/Button';
 import { Card } from './atoms/Card';
 import { Change } from './atoms/Change';
@@ -76,6 +77,25 @@ const smokeCases: readonly SmokeCase[] = [
     element: <Badge>Soon</Badge>,
     includes: ['px-1.5 py-px', 'border-border-default text-fg-muted'],
     excludes: ['bg-'],
+  },
+  {
+    name: 'Badge danger tone is the loss colour on its soft fill',
+    element: <Badge tone="danger">Low</Badge>,
+    includes: ['border-danger bg-danger-soft text-danger'],
+  },
+  {
+    name: 'DetailsToggle is a 44px phone-only button that names what it opens',
+    element: (
+      <DetailsToggle open={false} controlsId="pot-details" label="Workplace" onToggle={noop} />
+    ),
+    includes: [
+      'aria-expanded="false"',
+      'aria-controls="pot-details"',
+      'aria-label="Show details for Workplace"',
+      'min-h-11',
+      'md:hidden',
+      'Show details',
+    ],
   },
   {
     name: 'Button renders loading state markup',
@@ -1229,6 +1249,44 @@ const smokeCases: readonly SmokeCase[] = [
       'max-sm:opacity-100',
     ],
     excludes: ['bg-gain-soft', 'Filter:', 'text-[10px]'],
+  },
+  {
+    name: 'TxnRow folds edit and delete into one menu below 360px',
+    element: (
+      <TxnRow
+        icon={Plus}
+        iconColor="text-gain"
+        label="Deposit"
+        date="2026-10-01"
+        amount="+EUR 10.00"
+        onEdit={noop}
+        onDelete={noop}
+      />
+    ),
+    includes: [
+      'max-[359px]:hidden',
+      'min-[360px]:hidden',
+      'aria-label="Transaction actions"',
+      'popover="auto"',
+      'Edit transaction',
+      'Delete transaction',
+    ],
+    excludes: ['max-[359px]:flex-wrap', 'max-[359px]:basis-full'],
+  },
+  {
+    name: 'TxnRow with a read-only action has no actions menu',
+    element: (
+      <TxnRow
+        icon={Plus}
+        iconColor="text-fg-muted"
+        label="Valuation"
+        date="2026-10-01"
+        amount="EUR 10.00"
+        readOnlyAction={<a href="/investments">Investments</a>}
+      />
+    ),
+    includes: ['Investments'],
+    excludes: ['Transaction actions', 'popover='],
   },
   {
     name: 'TxnHistoryPanel stripes rows only when asked and keeps hover and selection above the stripe',

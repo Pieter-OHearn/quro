@@ -1,3 +1,4 @@
+import { DATA_COLORS } from '@/lib/dataColors';
 import { normalizePdfDocument } from '@/lib/pdfDocuments';
 import {
   type PensionStatementImportFeedItem,
@@ -98,7 +99,8 @@ export const normalizePensionPot = (pot: ApiPensionPot): PensionPot => ({
   type: normalizePensionPotType(pot.type),
   investmentStrategy: toOptionalString(pot.investmentStrategy)?.trim() || null,
   metadata: normalizePensionMetadata(pot.metadata),
-  color: toOptionalString(pot.color)?.trim() || '#475569',
+  // A pot saved without a colour shows in the pension chart colour; a saved colour is kept as is.
+  color: toOptionalString(pot.color)?.trim() || DATA_COLORS.forecast,
   emoji: toOptionalString(pot.emoji)?.trim() || DEFAULT_EMOJI.pension,
   notes: toStringOr(pot.notes),
 });

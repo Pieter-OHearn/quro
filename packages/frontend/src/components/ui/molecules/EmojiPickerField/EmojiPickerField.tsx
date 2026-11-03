@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { EmojiClickData } from 'emoji-picker-react';
+import type { EmojiClickData, Theme } from 'emoji-picker-react';
 
+import { currentTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
@@ -112,6 +113,9 @@ function PickerPortal({
           height={pickerHeight}
           width={pickerWidth}
           previewConfig={{ showPreview: false }}
+          // The library's `Theme` values are 'light' and 'dark'. The panel opens fresh each time,
+          // so it follows the theme the page shows when it opens.
+          theme={currentTheme() as Theme}
         />
       </Suspense>
     </div>,

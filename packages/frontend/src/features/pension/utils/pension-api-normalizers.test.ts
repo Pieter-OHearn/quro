@@ -1,7 +1,9 @@
 /// <reference types="bun-types" />
 import { expect, test } from 'bun:test';
-import type { ApiPensionStatementImportRow } from '../types';
+import { DATA_COLORS } from '@/lib/dataColors';
+import type { ApiPensionPot, ApiPensionStatementImportRow } from '../types';
 import {
+  normalizePensionPot,
   normalizePensionStatementDocument,
   normalizePensionStatementImportRow,
 } from './pension-api-normalizers';
@@ -48,4 +50,25 @@ test('import row normalization retains server dates and timestamps, including ze
   expect(normalized.rowOrder).toBe(0);
   expect(normalized.evidence).toEqual([{ page: 1, snippet: 'Closing balance' }]);
   expect(normalized.collisionWarning).toBeNull();
+});
+
+test('pot normalization gives a pot without a colour the pension identity and keeps a saved one', () => {
+  const pot: ApiPensionPot = {
+    id: 4,
+    name: 'Workplace pension',
+    provider: 'Example provider',
+    type: 'workplace',
+    balance: 1000,
+    currency: 'EUR',
+    employeeMonthly: 0,
+    employerMonthly: 0,
+    investmentStrategy: null,
+    metadata: {},
+    color: null,
+    emoji: null,
+    notes: '',
+  };
+  expect(normalizePensionPot(pot).color).toBe(DATA_COLORS.forecast);
+  expect(normalizePensionPot({ ...pot, color: '  ' }).color).toBe(DATA_COLORS.forecast);
+  expect(normalizePensionPot({ ...pot, color: '#475569' }).color).toBe('#475569');
 });

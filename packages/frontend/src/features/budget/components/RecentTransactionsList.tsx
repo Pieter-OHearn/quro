@@ -21,9 +21,19 @@ import {
 } from '@/components/ui';
 import { dataColorToken } from '@/lib/dataColors';
 import { formatAsNegative } from '@/lib/liability';
+import { formatDate } from '@/lib/utils';
 import type { BudgetCategory, BudgetFormatFn, RecentBudgetTx } from '../types';
 
 const PAGE_SIZE = 6;
+
+// Dates read "01 Oct 2026". A transaction date is a calendar day, so it is read in UTC and does
+// not move with the browser's timezone.
+const TX_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+};
 
 const TRANSACTION_COLUMNS: readonly DataTableColumn<RecentBudgetTx>[] = [
   {
@@ -179,7 +189,9 @@ function TransactionRow({ transaction, fmtDec, onEdit }: Readonly<RowProps>) {
           </div>
         </div>
       </DataTableCell>
-      <DataTableCell columnKey="date">{transaction.date}</DataTableCell>
+      <DataTableCell columnKey="date">
+        <time dateTime={transaction.date}>{formatDate(transaction.date, TX_DATE_OPTIONS)}</time>
+      </DataTableCell>
       <DataTableCell columnKey="category">
         {transaction.category && transaction.color ? (
           <Badge size="sm" className="max-w-full">

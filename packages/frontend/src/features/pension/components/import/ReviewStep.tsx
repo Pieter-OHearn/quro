@@ -31,10 +31,13 @@ const TYPE_META: Record<PensionStatementImportRow['type'], TypeMeta> = {
   annual_statement: { label: 'Annual statement' },
 };
 
-const CONF_META: Record<ConfidenceLevel, { label: string; tone: 'success' | 'warning' }> = {
+const CONF_META: Record<
+  ConfidenceLevel,
+  { label: string; tone: 'success' | 'warning' | 'danger' }
+> = {
   high: { label: 'high', tone: 'success' },
   medium: { label: 'medium', tone: 'warning' },
-  low: { label: 'low', tone: 'warning' },
+  low: { label: 'low', tone: 'danger' },
 };
 
 // Fields inside the review table are 28px on desktop, like every control in a table.
