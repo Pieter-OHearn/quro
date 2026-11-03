@@ -59,3 +59,8 @@ export function applyTheme(preference: ThemePreference): ResolvedTheme {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme]);
   return theme;
 }
+
+/** The theme the page shows now: the `dark` class that `theme-init.js` and `applyTheme` set. */
+export function currentTheme(): ResolvedTheme {
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+}

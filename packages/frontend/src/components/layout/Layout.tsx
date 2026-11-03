@@ -25,13 +25,10 @@ type NavItemsProps = { collapsed: boolean; onNavigate: () => void };
 
 function SidebarNav({ collapsed, onNavigate }: NavItemsProps) {
   // The negative margin and padding leave room for the focus outline of the items at the edges,
-  // which the scroll container would otherwise clip. The collapsed sidebar does not scroll,
-  // because a scroll container would also clip the label tooltips beside the icons.
+  // which the scroll container would otherwise clip. The nav scrolls on a short window, collapsed
+  // too; the collapsed sidebar's label tooltips are fixed to the viewport, so they are not clipped.
   return (
-    <nav
-      aria-label="Main"
-      className={cn('-m-1 flex-1 p-1', collapsed ? 'overflow-visible' : 'overflow-y-auto')}
-    >
+    <nav aria-label="Main" className="-m-1 min-h-0 flex-1 overflow-y-auto p-1">
       <div className="space-y-0.5">
         {navItems.map(({ label, path, icon }) => (
           <SidebarLink

@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Edit3, Filter, Plus, Trash2 } from 'lucide-react';
+import { useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Edit3, Filter, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import type { ButtonProps } from '../../atoms';
@@ -400,7 +400,7 @@ function TxnRowActions({
   return (
     <RowActions
       className={cn(
-        'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100 max-[359px]:basis-full max-[359px]:justify-end',
+        'shrink-0 opacity-0 transition-opacity duration-fast group-hover:opacity-100 focus-within:opacity-100 sm:-my-px max-sm:opacity-100 max-[359px]:hidden',
         className,
       )}
     >
@@ -429,10 +429,94 @@ function TxnRowActions({
   );
 }
 
+// Below 360px the row's edit and delete buttons fold into one menu button, so the row keeps one
+// line. The menu is a light-dismiss popover in the top layer (Escape or a tap outside closes
+// it), placed under the button, or above it near the bottom of the screen. It is fixed where it
+// opened, so scrolling the page closes it rather than leaving it behind.
+const MENU_GAP_PX = 4;
+const MENU_ROOM_PX = 112;
+const MENU_ITEM_CLASS_NAME =
+  'flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-left text-cell transition-colors duration-fast hover:bg-surface-muted active:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring';
+
+function menuPosition(anchor: HTMLElement): CSSProperties {
+  const rect = anchor.getBoundingClientRect();
+  const right = window.innerWidth - rect.right;
+  if (window.innerHeight - rect.bottom < MENU_ROOM_PX) {
+    return { inset: 'auto', right, bottom: window.innerHeight - rect.top + MENU_GAP_PX };
+  }
+  return { inset: 'auto', right, top: rect.bottom + MENU_GAP_PX };
+}
+
+function TxnRowActionsMenu({
+  onEdit,
+  onDelete,
+  className,
+}: Pick<TxnRowProps, 'onEdit' | 'onDelete'> & { className?: string }) {
+  const menuId = useId();
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>();
+  const closeOnScroll = useRef<AbortController | null>(null);
+  const choose = (action: () => void) => () => {
+    menuRef.current?.hidePopover();
+    action();
+  };
+
+  return (
+    <div ref={anchorRef} className={cn('shrink-0 min-[360px]:hidden', className)}>
+      <IconButton
+        icon={MoreHorizontal}
+        label="Transaction actions"
+        title="Transaction actions"
+        size="sm"
+        variant="ghost"
+        popoverTarget={menuId}
+      />
+      <div
+        ref={menuRef}
+        id={menuId}
+        popover="auto"
+        style={menuStyle}
+        onBeforeToggle={(event) => {
+          const anchor = anchorRef.current;
+          if (event.newState === 'open' && anchor) setMenuStyle(menuPosition(anchor));
+        }}
+        onToggle={(event) => {
+          closeOnScroll.current?.abort();
+          closeOnScroll.current = null;
+          if (event.newState !== 'open') return;
+          const controller = new AbortController();
+          closeOnScroll.current = controller;
+          const close = () => menuRef.current?.hidePopover();
+          window.addEventListener('scroll', close, { capture: true, signal: controller.signal });
+        }}
+        className="m-0 min-w-44 rounded-lg border border-border-default bg-surface p-1 text-fg shadow-popover"
+      >
+        {onEdit && (
+          <button type="button" className={MENU_ITEM_CLASS_NAME} onClick={choose(onEdit)}>
+            <Edit3 size={14} aria-hidden className="text-fg-muted" />
+            Edit transaction
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            className={cn(MENU_ITEM_CLASS_NAME, 'text-danger')}
+            onClick={choose(onDelete)}
+          >
+            <Trash2 size={14} aria-hidden />
+            Delete transaction
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * One transaction on one 28px line on desktop: date, type icon, label, amount and actions.
  * Below 640px the row is 48px with the date under the label and the actions always visible;
- * below 360px the actions wrap to a line of their own so the label keeps its room.
+ * below 360px the edit and delete buttons fold into one menu button so the row stays one line.
  * The caller formats `amount` (sign and colour); the row right-aligns it in tabular figures.
  */
 export function TxnRow({
@@ -456,7 +540,7 @@ export function TxnRow({
   return (
     <div
       className={cn(
-        'group flex min-h-7 items-center gap-2 px-3 text-cell transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4 max-[359px]:flex-wrap',
+        'group flex min-h-7 items-center gap-2 px-3 text-cell transition-colors duration-fast hover:bg-surface-muted max-sm:min-h-12 max-sm:px-4',
         className,
       )}
     >
@@ -466,7 +550,7 @@ export function TxnRow({
       >
         <Icon size={iconSize} className={iconColor} />
       </span>
-      <div className="flex min-w-0 flex-1 items-center gap-3 max-sm:flex-col max-sm:items-start max-sm:gap-0 max-[359px]:min-w-32">
+      <div className="flex min-w-0 flex-1 items-center gap-3 max-sm:flex-col max-sm:items-start max-sm:gap-0">
         <p
           className={cn(
             'w-24 shrink-0 truncate text-caption text-fg-subtle font-numeric max-sm:order-last max-sm:w-auto max-sm:max-w-full',
@@ -491,6 +575,9 @@ export function TxnRow({
         readOnlyAction={readOnlyAction}
         className={actionsClassName}
       />
+      {!readOnlyAction && (onEdit || onDelete) && (
+        <TxnRowActionsMenu onEdit={onEdit} onDelete={onDelete} className={actionsClassName} />
+      )}
     </div>
   );
 }

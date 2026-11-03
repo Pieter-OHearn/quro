@@ -1,4 +1,5 @@
 export * from './DateNoteRow';
+export * from './DetailsToggle';
 export * from './EmojiPickerField';
 export * from './EmptyState';
 export * from './FormField';
