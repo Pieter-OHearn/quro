@@ -287,7 +287,7 @@ export function CustomiseModal({
   return (
     <Modal
       title="Customise exposure"
-      subtitle={`Defaults reviewed ${EXPOSURE_DEFAULTS_VERSION}${source === 'custom' ? ' · you have your own settings' : ''}`}
+      subtitle={`Applies to the Investments view · defaults reviewed ${EXPOSURE_DEFAULTS_VERSION}${source === 'custom' ? ' · you have your own settings' : ''}`}
       onClose={onClose}
       maxWidth="3xl"
       scrollable

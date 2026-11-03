@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
+
+- The Exposure tab opens on a new Everything view: your holdings, your savings accounts as cash and your property as its own group, at your share. A property counts at its value less its mortgage, the rule net worth uses. Pensions stay out. A property with negative equity is listed under the bar and taken off the total. The switch links to either view, and the Investments view keeps today's figures, reference ranges, notices and holdings.
+
+### Changed
+
+- `GET /api/exposure` adds `household`, the Everything view, beside `view`, and its facts document moves to schema version 2 with `inputs.savingsAccounts`, `inputs.properties`, `householdWarnings` and `exposure.household.*` facts. Nothing existing changes shape.
+- On the Investments view of Exposure, the Mix by group card says that Cash means cash funds in your brokerage, not savings accounts.
+
 ### Fixed
 
 - The US dollar exchange rate updates every day again. Yahoo sometimes answers the daily rate request for US dollars under another name for the same pair, and the sync then skipped it, so US dollar totals used a rate several days old and the out-of-date notice showed.

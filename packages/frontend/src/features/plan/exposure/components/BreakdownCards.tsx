@@ -1,4 +1,5 @@
-import { ASSET_CLASS_LABELS, type ExposureView } from '@quro/shared';
+import type { ReactNode } from 'react';
+import { ASSET_CLASS_LABELS, type ExposureBucketRow, type ExposureView } from '@quro/shared';
 import { Badge, ChartCard, buildChartAlternative } from '@/components/ui';
 import { assetClassBarClass } from '../exposureStyle';
 import type { ExposureFormat } from '../useExposureFormat';
@@ -55,7 +56,16 @@ export function AssetClassCard({
 export function CurrencyCard({
   view,
   format,
-}: Readonly<{ view: ExposureView; format: ExposureFormat }>) {
+  subject = 'Investments by currency',
+  subtitle = 'The currency each holding is priced in',
+  footer,
+}: Readonly<{
+  view: { currencies: readonly ExposureBucketRow[] };
+  format: ExposureFormat;
+  subject?: string;
+  subtitle?: string;
+  footer?: ReactNode;
+}>) {
   const rows: Row[] = view.currencies.map((row) => ({
     key: row.key,
     label: row.label,
@@ -73,9 +83,10 @@ export function CurrencyCard({
   return (
     <ChartCard
       title="By currency"
-      subtitle="The currency each holding is priced in"
+      subtitle={subtitle}
       hasData={rows.length > 0}
-      alternative={altFor('Investments by currency', 'Currency', rows, format)}
+      alternative={altFor(subject, 'Currency', rows, format)}
+      footer={footer}
     >
       <BarList rows={barRows} />
     </ChartCard>

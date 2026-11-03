@@ -1,10 +1,13 @@
 import {
   EXPOSURE_DEFAULTS_VERSION,
+  buildExposureHouseholdView,
   buildExposureView,
   computeExposureFacts,
   defaultExposureSettings,
   type ExposureHoldingInput,
+  type ExposurePropertyInput,
   type ExposureReport,
+  type ExposureSavingsInput,
 } from '@quro/shared';
 
 function holding(overrides: Partial<ExposureHoldingInput> & { id: number }): ExposureHoldingInput {
@@ -28,7 +31,12 @@ function holding(overrides: Partial<ExposureHoldingInput> & { id: number }): Exp
 /** A small synthetic report for component tests, built by the same code the API runs. */
 export function buildReport(
   holdings: ExposureHoldingInput[],
-  options: { selectedMix?: 'A' | 'B' | 'C' | 'D'; stale?: boolean } = {},
+  options: {
+    selectedMix?: 'A' | 'B' | 'C' | 'D';
+    stale?: boolean;
+    savingsAccounts?: ExposureSavingsInput[];
+    properties?: ExposurePropertyInput[];
+  } = {},
 ): ExposureReport {
   const settings = defaultExposureSettings();
   settings.selectedMix = options.selectedMix ?? null;
@@ -38,6 +46,8 @@ export function buildReport(
     settings,
     settingsSource: 'default',
     holdings,
+    savingsAccounts: options.savingsAccounts,
+    properties: options.properties,
     fxRates: [
       {
         currency: 'USD',
@@ -51,6 +61,7 @@ export function buildReport(
   return {
     facts,
     view: buildExposureView(facts),
+    household: buildExposureHouseholdView(facts),
     settings: {
       settings,
       source: 'default',

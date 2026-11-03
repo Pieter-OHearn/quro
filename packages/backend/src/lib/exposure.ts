@@ -1,6 +1,7 @@
 import {
   CURRENCY_RATE_STALE_AFTER_HOURS,
   EXPOSURE_DEFAULTS_VERSION,
+  buildExposureHouseholdView,
   buildExposureView,
   computeExposureFacts,
   defaultExposureSettings,
@@ -10,18 +11,28 @@ import {
   type ExposureFxInput,
   type ExposureHoldingInput,
   type ExposureInput,
+  type ExposurePropertyInput,
   type ExposureReport,
+  type ExposureSavingsInput,
   type ExposureSettings,
   type ExposureSettingsState,
   type HoldingValuePrice,
 } from '@quro/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
-import { exposureSettings, holdingTransactions, holdings } from '../db/schema';
+import {
+  exposureSettings,
+  holdingTransactions,
+  holdings,
+  mortgages,
+  properties,
+  savingsAccounts,
+} from '../db/schema';
 import { FX_BASE_CURRENCY } from './currencyRateCache';
 import { getStoredCurrentCurrencyRateRows } from './currencyRateSync';
 import { computeSharesByHolding } from './netWorth';
 import { toNumberOrZero } from './numbers';
+import { getAcceptedPartnerId, loadHouseholdRows } from './partner';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
@@ -102,15 +113,62 @@ function toFxInputs(
 }
 
 /**
+ * The open savings accounts and properties the caller can read: their own and an accepted partner's
+ * joint rows, whole, because the facts apply the household share. A property's debt is its linked
+ * active mortgage while the caller can read it, as in net worth.
+ */
+async function loadHouseholdInput(userId: number): Promise<{
+  savingsAccounts: ExposureSavingsInput[];
+  properties: ExposurePropertyInput[];
+}> {
+  const partnerId = await getAcceptedPartnerId(userId);
+  const [accountRows, propertyRows, mortgageRows] = await Promise.all([
+    loadHouseholdRows(savingsAccounts, userId, partnerId),
+    loadHouseholdRows(properties, userId, partnerId),
+    loadHouseholdRows(mortgages, userId, partnerId),
+  ]);
+  const mortgageById = new Map(mortgageRows.map((row) => [row.id, row]));
+  return {
+    savingsAccounts: accountRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      bank: row.bank,
+      currency: row.currency,
+      balance: toNumberOrZero(row.balance),
+      isJoint: row.isJoint,
+    })),
+    properties: propertyRows.map((row) => {
+      const mortgage = row.mortgageId === null ? undefined : mortgageById.get(row.mortgageId);
+      return {
+        id: row.id,
+        name: row.address,
+        propertyType: row.propertyType,
+        currency: row.currency,
+        currentValue: toNumberOrZero(row.currentValue),
+        isJoint: row.isJoint,
+        mortgage: mortgage
+          ? {
+              id: mortgage.id,
+              outstandingBalance: toNumberOrZero(mortgage.outstandingBalance),
+              isJoint: mortgage.isJoint,
+            }
+          : null,
+      };
+    }),
+  };
+}
+
+/**
  * The caller's own open holdings with the price in use, the shares held and the stored exchange
- * rates. Brokerage holdings are never joint, so a partner's holdings are never part of it.
+ * rates, plus the household's savings and property. Brokerage holdings are never joint, so a
+ * partner's holdings are never part of it.
  */
 async function loadExposureInput(
   userId: number,
   settingsState: ExposureSettingsState,
   now: Date = new Date(),
 ): Promise<ExposureInput> {
-  const [holdingRows, transactions, rateRows] = await Promise.all([
+  const [holdingRows, transactions, rateRows, household] = await Promise.all([
     db
       .select()
       .from(holdings)
@@ -124,6 +182,7 @@ async function loadExposureInput(
       .from(holdingTransactions)
       .where(eq(holdingTransactions.userId, userId)),
     getStoredCurrentCurrencyRateRows(),
+    loadHouseholdInput(userId),
   ]);
   const shares = computeSharesByHolding(transactions);
   const inputs: ExposureHoldingInput[] = holdingRows.map((row) => ({
@@ -145,6 +204,7 @@ async function loadExposureInput(
     settings: settingsState.settings,
     settingsSource: settingsState.source,
     holdings: inputs,
+    ...household,
     fxRates: toFxInputs(rateRows, now),
   };
 }
@@ -156,5 +216,10 @@ export async function buildExposureReport(
   const settings = await loadExposureSettings(userId);
   const input = await loadExposureInput(userId, settings, now);
   const facts = computeExposureFacts(input);
-  return { facts, view: buildExposureView(facts), settings };
+  return {
+    facts,
+    view: buildExposureView(facts),
+    household: buildExposureHouseholdView(facts),
+    settings,
+  };
 }

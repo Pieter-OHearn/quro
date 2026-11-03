@@ -6,9 +6,10 @@ import { useCurrency } from '@/lib/CurrencyContext';
  * once, to the display currency, here.
  */
 export function useExposureFormat() {
-  const { fmtBase, numberFormat } = useCurrency();
+  const { fmtBase, fmtNative, numberFormat } = useCurrency();
   return {
     money: (eur: number) => fmtBase(eur, 'EUR'),
+    native: (value: number, currency: string) => fmtNative(value, currency),
     percent: (share: number) => formatPercent(share, numberFormat, 1),
     decimal: (value: number, digits = 1) =>
       formatNumber(value, numberFormat, {

@@ -7,5 +7,7 @@ export * from './properties.js';
 export * from './textLimits.js';
 export * from './exposureClasses.js';
 export * from './exposureFacts.js';
+export * from './exposureHousehold.js';
+export * from './exposureHouseholdView.js';
 export * from './exposureSettings.js';
 export * from './exposureView.js';

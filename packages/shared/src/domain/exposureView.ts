@@ -9,6 +9,7 @@ import {
   type MixGroup,
 } from './exposureClasses.js';
 import { type ExposureFacts, type ExposureWarning, type Fact } from './exposureFacts.js';
+import type { ExposureHouseholdView } from './exposureHouseholdView.js';
 import {
   riskBandLabel,
   referenceMixName,
@@ -406,10 +407,14 @@ export type ExposureSettingsState = {
   storedInvalid: boolean;
 };
 
-/** `GET /api/exposure`: the facts, the breakdowns derived from them and the settings behind both. */
+/**
+ * `GET /api/exposure`: the facts, the breakdowns derived from them and the settings behind both.
+ * `view` is the Investments view; `household` is the Everything view.
+ */
 export type ExposureReport = {
   facts: ExposureFacts;
   view: ExposureView;
+  household: ExposureHouseholdView;
   settings: ExposureSettingsState;
 };
 

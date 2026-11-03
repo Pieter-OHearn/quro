@@ -1,11 +1,11 @@
-import { type ExposureGroupRow, type ExposureView, type MixGroup } from '@quro/shared';
+import { type ExposureGroupRow, type ExposureView, type HouseholdGroup } from '@quro/shared';
 import { ChartCard, buildChartAlternative } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { GROUP_BAR_CLASS, MIN_VISIBLE_SHARE } from '../exposureStyle';
 import type { ExposureFormat } from '../useExposureFormat';
 
-type Segment = {
-  key: MixGroup | 'unclassified';
+export type Segment = {
+  key: HouseholdGroup | 'unclassified';
   label: string;
   share: number;
   value: number;
@@ -27,7 +27,7 @@ function segmentsOf(view: ExposureView): Segment[] {
   return segments;
 }
 
-function StackedBar({ segments }: Readonly<{ segments: readonly Segment[] }>) {
+export function StackedBar({ segments }: Readonly<{ segments: readonly Segment[] }>) {
   return (
     <div className="flex h-5 w-full gap-px overflow-hidden rounded-md bg-surface-muted" aria-hidden>
       {segments
@@ -43,7 +43,7 @@ function StackedBar({ segments }: Readonly<{ segments: readonly Segment[] }>) {
   );
 }
 
-function Legend({
+export function Legend({
   segments,
   format,
 }: Readonly<{ segments: readonly Segment[]; format: ExposureFormat }>) {
@@ -160,6 +160,10 @@ export function AllocationCard({
     >
       <StackedBar segments={segments} />
       <Legend segments={segments} format={format} />
+      <p className="mt-3 text-caption text-fg-subtle">
+        Cash here means cash funds in your brokerage, not savings accounts. Savings accounts are on
+        the Everything view.
+      </p>
       <ReferenceComparison view={view} format={format} />
     </ChartCard>
   );

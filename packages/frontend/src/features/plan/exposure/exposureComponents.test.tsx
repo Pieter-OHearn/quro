@@ -1,9 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AllocationCard } from './components/AllocationCard';
-import { AssetClassCard } from './components/BreakdownCards';
+import { AssetClassCard, CurrencyCard } from './components/BreakdownCards';
 import { ConcentrationNotices } from './components/ConcentrationNotices';
-import { DataStateNotices } from './components/DataStateNotices';
+import { DataStateNotices, HouseholdDataNotices } from './components/DataStateNotices';
+import {
+  HouseholdMixCard,
+  HouseholdSummary,
+  InvestmentsOnlyCard,
+} from './components/HouseholdCards';
 import { MethodPanel } from './components/MethodPanel';
 import { SummaryCards } from './components/SummaryCards';
 import { buildReport, exposureHolding as holding } from './exposureFixture';
@@ -11,6 +16,7 @@ import type { ExposureFormat } from './useExposureFormat';
 
 const format: ExposureFormat = {
   money: (value) => `€${value.toFixed(2)}`,
+  native: (value, currency) => `${currency} ${value.toFixed(2)}`,
   percent: (value) => `${value.toFixed(1)}%`,
   decimal: (value, digits = 1) => value.toFixed(digits),
 };
@@ -25,6 +31,174 @@ const mixed = buildReport(
   ],
   { selectedMix: 'B' },
 );
+
+const household = buildReport(
+  [
+    holding({ id: 1, name: 'Global ETF', shares: 40 }),
+    holding({ id: 2, name: 'Mystery Fund', assetClass: null, shares: 5 }),
+  ],
+  {
+    selectedMix: 'B',
+    savingsAccounts: [
+      {
+        id: 1,
+        name: 'Joint Pot',
+        bank: 'Example Bank',
+        currency: 'EUR',
+        balance: 2000,
+        isJoint: true,
+      },
+    ],
+    properties: [
+      {
+        id: 1,
+        name: '1 Example Street',
+        propertyType: 'Primary Residence',
+        currency: 'EUR',
+        currentValue: 9000,
+        isJoint: false,
+        mortgage: null,
+      },
+      {
+        id: 2,
+        name: '2 Underwater Court',
+        propertyType: 'Buy-to-Let',
+        currency: 'USD',
+        currentValue: 1000,
+        isJoint: false,
+        mortgage: { id: 7, outstandingBalance: 2000, isJoint: false },
+      },
+    ],
+  },
+);
+
+describe('the Everything view', () => {
+  test('the summary states the total and the three figures it is made of', () => {
+    const markup = renderToStaticMarkup(
+      <HouseholdSummary view={household.household} format={format} />,
+    );
+    expect(markup).toContain('Property is 62.1% of your assets.');
+    expect(markup).toContain('€13600.00');
+    expect(markup).toContain('Investments');
+    expect(markup).toContain('€4500.00');
+    expect(markup).toContain('Savings accounts');
+    expect(markup).toContain('€1000.00');
+    expect(markup).toContain('Property equity');
+    expect(markup).toContain('€8100.00');
+    expect(markup).toContain('pensions not included');
+    expect(markup).not.toMatch(ADVICE);
+  });
+
+  test('the mix has a Property group, no reference range and says what Cash holds', () => {
+    const markup = renderToStaticMarkup(
+      <HouseholdMixCard view={household.household} format={format} />,
+    );
+    expect(markup).toContain('Everything by group: Stocks');
+    expect(markup).toContain('Property');
+    expect(markup).toContain('Cash is your savings accounts plus any cash funds');
+    expect(markup).not.toContain('Compared with Reference mix');
+    expect(markup).not.toContain('Within the range');
+    expect(markup).not.toMatch(ADVICE);
+  });
+
+  test('negative equity is listed apart and the sum shows it coming off the total', () => {
+    const markup = renderToStaticMarkup(
+      <HouseholdMixCard view={household.household} format={format} />,
+    );
+    expect(markup).toContain('Not in the bar, taken off the total');
+    expect(markup).toContain('2 Underwater Court');
+    expect(markup).toContain('Negative equity');
+    expect(markup).toContain('USD -1000.00');
+    expect(markup).toContain('€14500.00');
+    expect(markup).toContain('€-900.00');
+    expect(markup).toContain('€13600.00');
+  });
+
+  test('without a negative position there is no list', () => {
+    const report = buildReport([holding({ id: 1 })]);
+    const markup = renderToStaticMarkup(
+      <HouseholdMixCard view={report.household} format={format} />,
+    );
+    expect(markup).not.toContain('taken off the total');
+  });
+
+  test('by currency names the positions, not only holdings', () => {
+    const markup = renderToStaticMarkup(
+      <CurrencyCard
+        view={household.household}
+        format={format}
+        subject="Everything by currency"
+        subtitle="The currency each holding, account and property is in"
+      />,
+    );
+    expect(markup).toContain('The currency each holding, account and property is in');
+    expect(markup).toContain('EUR');
+  });
+
+  test('investment-only figures are labelled and link to the Investments view', () => {
+    const markup = renderToStaticMarkup(
+      <InvestmentsOnlyCard
+        view={household.view}
+        format={format}
+        onOpenInvestments={() => undefined}
+      />,
+    );
+    expect(markup).toContain('Investments only');
+    expect(markup).toContain('Weighted average risk class');
+    expect(markup).toContain('Effective number of holdings');
+    expect(markup).toContain('Concentration notices');
+    expect(markup).toContain('Open Investments');
+  });
+
+  test('without holdings the card only points at the Investments view', () => {
+    const report = buildReport([]);
+    const markup = renderToStaticMarkup(
+      <InvestmentsOnlyCard
+        view={report.view}
+        format={format}
+        onOpenInvestments={() => undefined}
+      />,
+    );
+    expect(markup).not.toContain('Weighted average risk class');
+    expect(markup).toContain('Open Investments');
+  });
+
+  test('names what is left out, the stale rates and the unclassified holdings', () => {
+    const report = buildReport([holding({ id: 1, currency: 'USD', assetClass: null })], {
+      stale: true,
+      savingsAccounts: [
+        {
+          id: 1,
+          name: 'Swiss Pot',
+          bank: 'Example Bank',
+          currency: 'CHF',
+          balance: 100,
+          isJoint: false,
+        },
+      ],
+    });
+    const markup = renderToStaticMarkup(
+      <HouseholdDataNotices report={report} onClassify={() => undefined} />,
+    );
+    expect(markup).toContain('1 item is left out of the figures');
+    expect(markup).toContain('Swiss Pot (account, CHF) has no stored exchange rate');
+    expect(markup).toContain('Exchange rates are out of date');
+    expect(markup).toContain('1 holding is unclassified');
+  });
+
+  test('the method says what each view counts, on Everything without the investment detail', () => {
+    const markup = renderToStaticMarkup(<MethodPanel report={household} view="everything" />);
+    expect(markup).toContain('What each view counts');
+    expect(markup).toContain('Pensions are not');
+    expect(markup).toContain('value less its linked mortgage');
+    expect(markup).toContain('counts at 50%');
+    expect(markup).toContain('listed under the bar and taken off the total');
+    expect(markup).toContain('Information, not advice.');
+    expect(markup).not.toContain('Concentration notices above');
+    expect(markup).not.toContain('Reference mix A');
+    expect(markup).not.toMatch(/\byou should\b/i);
+  });
+});
 
 describe('exposure summary', () => {
   test('states the largest group in plain words and the risk class on the 1 to 7 scale', () => {
@@ -53,6 +227,11 @@ describe('exposure allocation chart', () => {
     expect(markup).toContain('Above the range');
     expect(markup).toContain('Unclassified');
     expect(markup).not.toMatch(ADVICE);
+  });
+
+  test('says Cash means cash funds in the brokerage, not savings accounts', () => {
+    const markup = renderToStaticMarkup(<AllocationCard view={mixed.view} format={format} />);
+    expect(markup).toContain('Cash here means cash funds in your brokerage, not savings accounts');
   });
 
   test('draws no range when no reference mix is selected', () => {
@@ -137,6 +316,10 @@ describe('exposure notices', () => {
 
 describe('how this is worked out', () => {
   const markup = renderToStaticMarkup(<MethodPanel report={mixed} />);
+
+  test('states the rules of both views on Investments too', () => {
+    expect(markup).toContain('What each view counts');
+  });
 
   test('shows the formula, the defaults in use, their sources and version dates', () => {
     expect(markup).toContain('Effective number of holdings = 1 ÷');

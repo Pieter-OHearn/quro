@@ -51,6 +51,18 @@ export const MIX_GROUP_LABELS: Record<MixGroup, string> = {
 };
 
 /**
+ * The groups of the Everything view: the mix groups plus property, which is a group of its own
+ * there. The reference mixes are written in the mix groups, so they never apply to these.
+ */
+export const HOUSEHOLD_GROUPS = ['stocks', 'bonds', 'cash', 'property', 'other'] as const;
+export type HouseholdGroup = (typeof HOUSEHOLD_GROUPS)[number];
+
+export const HOUSEHOLD_GROUP_LABELS: Record<HouseholdGroup, string> = {
+  ...MIX_GROUP_LABELS,
+  property: 'Property',
+};
+
+/**
  * Property funds, gold and crypto sit in "other" with the classes that have no group of their own:
  * the published mixes only name stocks, bonds and cash.
  */

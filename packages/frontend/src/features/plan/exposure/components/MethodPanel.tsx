@@ -14,11 +14,53 @@ import {
 } from '@quro/shared';
 import { Badge, Card, PanelHeader } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
+import type { ExposureViewKey } from '../exposureViews';
 
 const DEFAULTS = defaultExposureSettings();
 
 const INTRO =
   'We add up your holdings by asset class and compare them with reference mixes published by fund providers. Each class gets a default risk score on the EU 1 to 7 scale. Where a fund reports its own score, we use that. The notices show where your mix differs from a reference. This is information, not advice, and it does not take your goals or circumstances into account. Percentages and thresholds are editable defaults reviewed once a year.';
+
+const EVERYTHING_INTRO =
+  'We add up your holdings, your share of your savings accounts and your share of your property equity, and show how they are spread by group and by currency. This is information, not advice, and it does not take your goals or circumstances into account.';
+
+function ViewRules() {
+  return (
+    <div className="max-w-3xl space-y-2" data-testid="exposure-view-rules">
+      <h4 className="text-label text-fg-muted">What each view counts</h4>
+      <ul className="list-disc space-y-1 pl-5 text-cell text-fg-muted">
+        <li>
+          <strong className="font-semibold text-fg">Everything</strong> counts your holdings, your
+          savings accounts as cash and your property as a group of its own. Pensions are not
+          counted, and neither are debts other than a property&apos;s mortgage, so this total is not
+          your net worth.
+        </li>
+        <li>
+          <strong className="font-semibold text-fg">Investments</strong> counts your brokerage
+          holdings only. Cash there means cash funds in the brokerage, not savings accounts. The
+          reference mixes, the risk class, the notices and Customise apply to this view only.
+        </li>
+        <li>
+          <strong className="font-semibold text-fg">Your share:</strong> a joint account or property
+          counts at 50% and one of your own in full. A partner&apos;s private accounts and
+          properties are never counted, and holdings are never shared.
+        </li>
+        <li>
+          <strong className="font-semibold text-fg">Property equity:</strong> a property counts at
+          its value less its linked mortgage, each at its own share, the rule net worth uses. A
+          property fund in your brokerage is an investment and stays in its asset class&apos;s
+          group.
+        </li>
+        <li>
+          <strong className="font-semibold text-fg">Negative equity:</strong> a share cannot be
+          below zero, so a property worth less than its mortgage, or an overdrawn account, is left
+          out of the bar and the shares. It is listed under the bar and taken off the total, so the
+          shares are of your assets before it.
+        </li>
+      </ul>
+    </div>
+  );
+}
 
 function InUse({ report }: Readonly<{ report: ExposureReport }>) {
   const { settings } = report.settings;
@@ -132,46 +174,74 @@ function Sources() {
   );
 }
 
+/** The steps, the defaults in use and their sources: all of them are about the holdings. */
+function InvestmentsMethod({ report }: Readonly<{ report: ExposureReport }>) {
+  return (
+    <>
+      <ol className="max-w-3xl list-decimal space-y-1 pl-5 text-cell text-fg-muted">
+        <li>
+          Each open holding is worth its shares times the price in use (a price you entered wins
+          over a synced one), rounded to cents, then converted to EUR with the stored exchange rate
+          and rounded to cents once. A holding with no price or no rate is left out and named above,
+          never valued at a guess.
+        </li>
+        <li>Weight is a holding&apos;s value divided by the total, as a percentage.</li>
+        <li>
+          Effective number of holdings = 1 ÷ (w₁² + w₂² + …), where each w is a holding&apos;s
+          weight as a fraction of 1. Ten equal holdings give 10, two equal holdings give 2 and one
+          holding gives 1. The lower it is against your count of holdings, the more your investments
+          rest on a few of them.
+        </li>
+        <li>
+          Weighted average risk class = the sum of each holding&apos;s risk class times its value,
+          divided by the value of the holdings that have a risk class. A holding uses its own risk
+          class when you set one, otherwise the default for its asset class.
+        </li>
+        <li>
+          Groups for the reference mixes: stocks are both equity classes; bonds are the four bond
+          classes; cash is cash and money market; other assets are gold and commodities, property
+          and REITs, crypto and other.
+        </li>
+      </ol>
+      <InUse report={report} />
+      <Sources />
+    </>
+  );
+}
+
+const NOT_ADVICE: Record<ExposureViewKey, string> = {
+  everything:
+    'This page describes how what you own is spread. It recommends no investment and no change to what you hold, and it does not take your goals, circumstances or tolerance for risk into account.',
+  investments:
+    'This page describes how your investments are spread. It recommends no investment and no change to your investments, and it does not take your goals, circumstances or tolerance for risk into account. The reference mixes are published examples, not targets for you.',
+};
+
 /** The method, the defaults in use with their sources and dates, and the "not advice" wording. */
-export function MethodPanel({ report }: Readonly<{ report: ExposureReport }>) {
+export function MethodPanel({
+  report,
+  view = 'investments',
+}: Readonly<{ report: ExposureReport; view?: ExposureViewKey }>) {
   const { facts, settings } = report;
   return (
     <Card padding="none" className="overflow-hidden" data-testid="exposure-method">
       <PanelHeader title="How this is worked out" />
       <div className="space-y-5 p-4">
-        <p className="max-w-3xl text-body text-fg-muted">{INTRO}</p>
-        <ol className="max-w-3xl list-decimal space-y-1 pl-5 text-cell text-fg-muted">
-          <li>
-            Each open holding is worth its shares times the price in use (a price you entered wins
-            over a synced one), rounded to cents, then converted to EUR with the stored exchange
-            rate and rounded to cents once. A holding with no price or no rate is left out and named
-            above, never valued at a guess.
-          </li>
-          <li>Weight is a holding&apos;s value divided by the total, as a percentage.</li>
-          <li>
-            Effective number of holdings = 1 ÷ (w₁² + w₂² + …), where each w is a holding&apos;s
-            weight as a fraction of 1. Ten equal holdings give 10, two equal holdings give 2 and one
-            holding gives 1. The lower it is against your count of holdings, the more your
-            investments rest on a few of them.
-          </li>
-          <li>
-            Weighted average risk class = the sum of each holding&apos;s risk class times its value,
-            divided by the value of the holdings that have a risk class. A holding uses its own risk
-            class when you set one, otherwise the default for its asset class.
-          </li>
-          <li>
-            Groups for the reference mixes: stocks are both equity classes; bonds are the four bond
-            classes; cash is cash and money market; other assets are gold and commodities, property
-            and REITs, crypto and other.
-          </li>
-        </ol>
-        <InUse report={report} />
-        <Sources />
+        <p className="max-w-3xl text-body text-fg-muted">
+          {view === 'everything' ? EVERYTHING_INTRO : INTRO}
+        </p>
+        <ViewRules />
+        {view === 'everything' ? (
+          <p className="max-w-3xl text-cell text-fg-muted">
+            Each account and property is converted to EUR with the stored exchange rate and rounded
+            to cents once. One with no stored rate is left out and named above, never converted at a
+            guess.
+          </p>
+        ) : (
+          <InvestmentsMethod report={report} />
+        )}
         <p className="max-w-3xl rounded-md bg-surface-muted px-3 py-2 text-cell text-fg-muted">
-          <strong className="font-semibold text-fg">Information, not advice.</strong> This page
-          describes how your investments are spread. It recommends no investment and no change to
-          your investments, and it does not take your goals, circumstances or tolerance for risk
-          into account. The reference mixes are published examples, not targets for you.
+          <strong className="font-semibold text-fg">Information, not advice.</strong>{' '}
+          {NOT_ADVICE[view]}
         </p>
         <p className="text-caption text-fg-subtle" data-testid="exposure-method-version">
           Method {facts.method.id} {facts.method.version} · facts schema {facts.schemaVersion} ·

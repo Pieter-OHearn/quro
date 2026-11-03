@@ -7,6 +7,7 @@ import {
   EmptyState,
   LoadingSpinner,
   PageStack,
+  SegmentedControl,
   StateNotice,
   ModalPresence,
 } from '@/components/ui';
@@ -15,29 +16,63 @@ import { AllocationCard } from './components/AllocationCard';
 import { AssetClassCard, CurrencyCard, SectorCard } from './components/BreakdownCards';
 import { ConcentrationNotices } from './components/ConcentrationNotices';
 import { CustomiseModal } from './components/CustomiseModal';
-import { DataStateNotices } from './components/DataStateNotices';
+import { DataStateNotices, HouseholdDataNotices } from './components/DataStateNotices';
 import { HoldingsCard } from './components/HoldingsCard';
+import {
+  HouseholdMixCard,
+  HouseholdSummary,
+  InvestmentsOnlyCard,
+} from './components/HouseholdCards';
 import { MethodPanel } from './components/MethodPanel';
 import { SummaryCards } from './components/SummaryCards';
+import {
+  DEFAULT_EXPOSURE_VIEW,
+  EXPOSURE_VIEWS,
+  resolveExposureView,
+  type ExposureViewKey,
+} from './exposureViews';
 import { useExposure } from './hooks';
 import { useExposureFormat, type ExposureFormat } from './useExposureFormat';
 
+const VIEW_PARAM = 'view';
 const CUSTOMISE_PARAM = 'customise';
 const HOLDINGS_ANCHOR = 'exposure-holdings';
 
-function Header({ onCustomise }: Readonly<{ onCustomise: () => void }>) {
+const VIEW_INTRO: Record<ExposureViewKey, string> = {
+  everything:
+    'What you own across your investments, savings accounts and property, at your share. Pensions are not included. It describes your mix; it is information, not advice.',
+  investments:
+    'How your brokerage investments are spread by asset class, currency, sector and holding. It describes your mix; it is information, not advice.',
+};
+
+function Header({
+  view,
+  onViewChange,
+  onCustomise,
+}: Readonly<{
+  view: ExposureViewKey;
+  onViewChange: (view: ExposureViewKey) => void;
+  onCustomise: () => void;
+}>) {
   return (
     <ContentSection className="flex flex-wrap items-start justify-between gap-3">
-      <div>
+      <div className="min-w-0 flex-1 basis-80">
         <h2 className="text-title-section text-fg">Exposure</h2>
-        <p className="mt-1 max-w-2xl text-cell text-fg-muted">
-          How your brokerage investments are spread by asset class, currency, sector and holding. It
-          describes your mix; it is information, not advice.
-        </p>
+        <p className="mt-1 max-w-2xl text-cell text-fg-muted">{VIEW_INTRO[view]}</p>
       </div>
-      <Button variant="secondary" onClick={onCustomise}>
-        Customise
-      </Button>
+      <div className="flex items-center gap-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
+        <SegmentedControl
+          aria-label="What Exposure counts"
+          options={EXPOSURE_VIEWS}
+          value={view}
+          onChange={onViewChange}
+        />
+        {view === 'investments' ? (
+          <Button variant="secondary" onClick={onCustomise}>
+            Customise
+          </Button>
+        ) : null}
+      </div>
     </ContentSection>
   );
 }
@@ -69,6 +104,86 @@ function Breakdowns({
   );
 }
 
+function Everything({
+  report,
+  format,
+  onOpenInvestments,
+}: Readonly<{ report: ExposureReport; format: ExposureFormat; onOpenInvestments: () => void }>) {
+  const { household, view } = report;
+  return (
+    <>
+      <HouseholdSummary view={household} format={format} />
+      <HouseholdMixCard view={household} format={format} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <CurrencyCard
+          view={household}
+          format={format}
+          subject="Everything by currency"
+          subtitle="The currency each holding, account and property is in"
+          footer={
+            household.negative.length > 0 ? (
+              <p className="mt-3 text-caption text-fg-subtle">
+                Positions below zero are in no currency share.
+              </p>
+            ) : undefined
+          }
+        />
+        <InvestmentsOnlyCard view={view} format={format} onOpenInvestments={onOpenInvestments} />
+      </div>
+    </>
+  );
+}
+
+function NothingCounted({ status }: Readonly<{ status: 'empty' | 'unvaluable' }>) {
+  return status === 'unvaluable' ? (
+    <EmptyState
+      icon={BarChart3}
+      tone="neutral"
+      title="Nothing could be valued"
+      description="Each item is missing a price or an exchange rate, so there is nothing to total yet."
+    />
+  ) : (
+    <EmptyState
+      icon={BarChart3}
+      title="Nothing to add up yet"
+      description="Add a savings account, a property or a brokerage holding, and this page shows how they are spread."
+    />
+  );
+}
+
+function EverythingView({
+  report,
+  format,
+  onOpenInvestments,
+}: Readonly<{ report: ExposureReport; format: ExposureFormat; onOpenInvestments: () => void }>) {
+  return (
+    <>
+      <HouseholdDataNotices report={report} onClassify={onOpenInvestments} />
+      {report.household.status === 'ready' ? (
+        <Everything report={report} format={format} onOpenInvestments={onOpenInvestments} />
+      ) : (
+        <NothingCounted status={report.household.status} />
+      )}
+    </>
+  );
+}
+
+function InvestmentsView({
+  report,
+  format,
+}: Readonly<{ report: ExposureReport; format: ExposureFormat }>) {
+  return (
+    <>
+      <DataStateNotices report={report} format={format} onClassify={scrollToHoldings} />
+      {report.view.status === 'ready' ? (
+        <Breakdowns report={report} format={format} />
+      ) : (
+        <NothingToShow status={report.view.status} />
+      )}
+    </>
+  );
+}
+
 function NothingToShow({ status }: Readonly<{ status: 'empty' | 'unvaluable' }>) {
   const navigate = useNavigate();
   if (status === 'unvaluable') {
@@ -91,12 +206,24 @@ function NothingToShow({ status }: Readonly<{ status: 'empty' | 'unvaluable' }>)
   );
 }
 
-/** The Exposure tab of the Plan page: what the brokerage holdings are made of, and how risky. */
+/**
+ * The Exposure tab of the Plan page. Everything adds up what the person owns; Investments is what
+ * the brokerage holdings are made of, and how risky. The URL names the view (`?view=investments`).
+ */
 export function ExposureTab() {
   const query = useExposure();
   const format = useExposureFormat();
   const [searchParams, setSearchParams] = useSearchParams();
+  const activeView = resolveExposureView(searchParams.get(VIEW_PARAM));
   const customising = searchParams.get(CUSTOMISE_PARAM) === '1';
+
+  const selectView = (next: ExposureViewKey) =>
+    setSearchParams((previous) => {
+      const params = new URLSearchParams(previous);
+      if (next === DEFAULT_EXPOSURE_VIEW) params.delete(VIEW_PARAM);
+      else params.set(VIEW_PARAM, next);
+      return params;
+    });
 
   const setCustomising = (open: boolean) =>
     setSearchParams(
@@ -132,17 +259,23 @@ export function ExposureTab() {
   }
 
   const report = query.data;
-  const { view } = report;
   return (
     <PageStack padding="none">
-      <Header onCustomise={() => setCustomising(true)} />
-      <DataStateNotices report={report} format={format} onClassify={scrollToHoldings} />
-      {view.status === 'ready' ? (
-        <Breakdowns report={report} format={format} />
+      <Header
+        view={activeView}
+        onViewChange={selectView}
+        onCustomise={() => setCustomising(true)}
+      />
+      {activeView === 'everything' ? (
+        <EverythingView
+          report={report}
+          format={format}
+          onOpenInvestments={() => selectView('investments')}
+        />
       ) : (
-        <NothingToShow status={view.status} />
+        <InvestmentsView report={report} format={format} />
       )}
-      <MethodPanel report={report} />
+      <MethodPanel report={report} view={activeView} />
       <ModalPresence open={customising}>
         {customising ? (
           <CustomiseModal

@@ -1,16 +1,17 @@
-import type { AssetClassKey, MixGroup } from '@quro/shared';
+import type { AssetClassKey, HouseholdGroup } from '@quro/shared';
 import { ASSET_CLASS_GROUP } from '@quro/shared';
 
 /**
  * Chart colours for the groups of the reference mixes. They are the fixed chart tokens: stocks are
- * investments (`viz-2`), bonds savings (`viz-1`), cash the neutral grey, and everything else the
- * amber and plum of the other asset series. Unclassified is a muted fill with a dashed edge, so it
+ * investments (`viz-2`), bonds savings (`viz-1`), cash the neutral grey, property its terracotta
+ * (`viz-4`), and everything else the amber of the other asset series. Unclassified is a muted fill with a dashed edge, so it
  * never reads as a group of its own.
  */
-export const GROUP_BAR_CLASS: Record<MixGroup | 'unclassified', string> = {
+export const GROUP_BAR_CLASS: Record<HouseholdGroup | 'unclassified', string> = {
   stocks: 'bg-viz-2',
   bonds: 'bg-viz-1',
   cash: 'bg-viz-6',
+  property: 'bg-viz-4',
   other: 'bg-viz-3',
   unclassified: 'bg-surface-muted border border-dashed border-border-control',
 };

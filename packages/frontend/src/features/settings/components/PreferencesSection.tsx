@@ -217,7 +217,7 @@ function PreferencesForm({
           reset them to the defaults.
         </p>
         <Link
-          to="/plan?tab=exposure&customise=1"
+          to="/plan?tab=exposure&view=investments&customise=1"
           className="inline-flex min-h-8 items-center rounded-sm text-cell font-medium text-brand-fg underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:min-h-11"
         >
           Open exposure settings
