@@ -168,9 +168,9 @@ Needs no settings and no database.
 
 ```json
 {
-  "version": "v1.0.0-rc.6",
+  "version": "v1.0.0-rc.7",
   "revision": "<commit the image was built from>",
-  "migrations": { "latest": "0046_property_mortgage_ledger_ownership", "count": 47 },
+  "migrations": { "latest": "0047_holding_dividend_amount", "count": 48 },
   "runtime": { "bun": "1.4.4", "platform": "linux", "arch": "arm64" }
 }
 ```
@@ -282,9 +282,9 @@ Read-only checks of everything an install depends on. The report has `status` (`
 
 Each release that needs action from operators, or changes an interface scripts rely on, adds a section here. Read every section between your version and the target before you start.
 
-### Upgrade from 1.0.0-rc.6 to the next release
+### Upgrade from 1.0.0-rc.6 to 1.0.0-rc.7
 
-The next release stores a dividend's amount in its own money column. Until now a dividend kept the amount it paid in `holding_transactions.price`, the six-decimal column for a price per share. Migration `0047_holding_dividend_amount` adds `holding_transactions.amount` (`numeric(19,2)`), moves each dividend's amount there, leaves the dividend's `price` empty, and adds a check that a dividend has an amount and no price and that any other row has a price and no amount. No balance or total changes: dividends were already rounded to cents.
+1.0.0-rc.7 stores a dividend's amount in its own money column. Until now a dividend kept the amount it paid in `holding_transactions.price`, the six-decimal column for a price per share. Migration `0047_holding_dividend_amount` adds `holding_transactions.amount` (`numeric(19,2)`), moves each dividend's amount there, leaves the dividend's `price` empty, and adds a check that a dividend has an amount and no price and that any other row has a price and no amount. No balance or total changes: dividends were already rounded to cents.
 
 What the operator does: take the backup of the general procedure first. 1.0.0-rc.6 refuses to run against the migrated database (`Status: ahead.`), so going back means [restoring that backup](#restore-the-snapshot-taken-before-the-upgrade). Before you upgrade, with 1.0.0-rc.6 still running, open the database (with the bundled one, `docker compose exec db psql -U quro_admin -d quro`) and run this read-only count:
 
@@ -299,7 +299,7 @@ FROM holding_transactions;
 
 #### Bank-link secrets and backup tools
 
-The next release also drops the tools and code paths that only releases before 1.0.0 needed.
+1.0.0-rc.7 also drops the tools and code paths that only releases before 1.0.0 needed.
 
 What the operator does: before you upgrade, with 1.0.0-rc.6 still running, check that every stored bank-link secret is encrypted:
 
@@ -309,8 +309,12 @@ docker compose run --rm migrate secrets status
 
 Exit code 0 means there is nothing to do. If it reports unencrypted secrets, run `docker compose run --rm migrate secrets encrypt` with 1.0.0-rc.6 while the backend is stopped, and check the status again. Then upgrade as in the general procedure.
 
-- **Unencrypted bank-link secrets are refused.** The next release reads only bank-link secrets encrypted with the secrets key. An unencrypted one is never read or encrypted: a sync answers `409` with `code: bunq_reauthorization_required`, Settings asks the user to connect bunq again, and `quro secrets status` and `quro doctor` name the users. The `quro secrets encrypt` command is gone; `quro secrets rotate` moves secrets from the previous key to the current one only.
+- **Unencrypted bank-link secrets are refused.** 1.0.0-rc.7 reads only bank-link secrets encrypted with the secrets key. An unencrypted one is never read or encrypted: a sync answers `409` with `code: bunq_reauthorization_required`, Settings asks the user to connect bunq again, and `quro secrets status` and `quro doctor` name the users. The `quro secrets encrypt` command is gone; `quro secrets rotate` moves secrets from the previous key to the current one only.
 - **Only `quro backup` and `quro restore` back up and restore.** The `db-tools` service of the repository's `docker-compose.yml`, the `db:backup`, `db:restore` and `db:clear` scripts, the `QRO_CLEAR_CONFIRM` and `QRO_CLEAR_ALLOW_NON_EMPTY` settings and the image's `/app/backups` link are gone. Quro no longer restores a bare `.dump` file. An archive that holds unencrypted bank-link secrets is not supported: it restores, but those bank links must be connected again. In a checkout, run the backup commands through the `migrate` service, which now mounts `./backups` and `./data/documents` (see [backup and restore](backup-and-restore.md#compose-stack-of-this-repository)).
+
+#### Backend image on Alpine
+
+What the operator does: nothing, unless your own scripts run commands inside the backend container. The image is built on Alpine instead of Debian: it has `sh` but no `bash`, `apt` or GNU coreutils. UID 1000, the `quro` entrypoint and `serve` command, the health check, the data directories and the PostgreSQL 18 client tools are unchanged.
 
 #### When the migration refuses
 
@@ -330,4 +334,6 @@ What the operator does: nothing, unless a script or client of your own calls the
 
 - `POST` and `PATCH /api/investments/holding-transactions` take a dividend's amount in `amount`; a dividend with a `price`, or a buy or sell with an `amount`, answers `400`. Responses carry `amount` (a number for a dividend, `null` otherwise), and a dividend's `price` is `null`. Changing a buy or sell into a dividend needs an `amount`, and a dividend into a buy or sell a `price`; the other one is not carried over.
 - Creating or renaming a budget category onto the name of another category in the same month answers `409` instead of `500`.
+- `POST` and `PATCH /api/goals`: on an `invest_habit` goal, `monthsCompleted` and `missedMonths` must be absent or `null`, otherwise `400`. A new invest habit needs `startMonth`; its range runs from `startMonth` to `deadline`, in order and at most 120 months. Responses return `monthsCompleted` and `missedMonths` as `null` for invest habits, store `startMonth` and `deadline` as "Mon YYYY", and derive `totalMonths` and `year` from the range. Months stored by hand on existing habits are ignored and cleared on the next write.
+- `GET /api/dashboard/insights` replaces `investHabitBuyMonths` (month keys) with `investHabitBuys`: `{ month, currency, amount }` per month and currency over the months of the user's invest habits.
 - The bunq callback (`GET /api/bunq/oauth/callback`) holds the maintenance lock like a write request. While `quro backup` or `quro restore` runs it changes nothing and redirects to `/settings?bunq=paused`; start the connection again afterwards.
