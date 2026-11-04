@@ -76,9 +76,66 @@ export function DataStateNotices({
           testId="exposure-unclassified"
           action={{ label: 'Classify holdings', onClick: onClassify }}
         >
-          {format.percent(view.unclassified.share)} of your investments have no asset class. They
-          count in the total and in the sector and currency breakdowns, but not in the groups. Their
-          risk counts only if the holding has a risk class of its own.
+          {format.percent(view.unclassified.share)} of your brokerage is in holdings with no asset
+          class. They count in the total and in the sector and currency breakdowns, but not in the
+          groups. Their risk counts only if the holding has a risk class of its own.
+        </StateNotice>
+      ) : null}
+    </div>
+  );
+}
+
+const EXCLUDED_KIND = { holding: 'holding', savings: 'account', property: 'property' } as const;
+
+/**
+ * The same plain warnings for the Overview: what is in no figure, what rests on an old
+ * price or rate, and holdings with no group. Classifying happens on the Brokerage view.
+ */
+export function HouseholdDataNotices({
+  report,
+  onClassify,
+}: Readonly<{ report: ExposureReport; onClassify: () => void }>) {
+  const { view, household } = report;
+  const staleHoldings = view.holdings.filter((row) => row.priceStale).map((row) => row.name);
+  const single = household.excluded.length === 1;
+  return (
+    <div className="space-y-2" data-testid="exposure-household-data-state">
+      {household.excluded.length > 0 ? (
+        <StateNotice
+          tone="warning"
+          title={`${household.excluded.length} ${single ? 'item is' : 'items are'} left out of the figures`}
+          testId="exposure-household-excluded"
+        >
+          <ul className="list-disc pl-4">
+            {household.excluded.map((row) => (
+              <li key={`${row.kind}-${row.id}`}>
+                {row.name} ({EXCLUDED_KIND[row.kind]}, {row.currency}) {EXCLUDED_REASON[row.reason]}
+                . It is not valued at a guess, so it is in no total or share.
+              </li>
+            ))}
+          </ul>
+        </StateNotice>
+      ) : null}
+      {staleHoldings.length > 0 ? (
+        <StateNotice tone="warning" title="Some prices have not synced for over a week">
+          {listNames(staleHoldings)}: values use the last synced price.
+        </StateNotice>
+      ) : null}
+      {household.staleRates.length > 0 ? (
+        <StateNotice tone="warning" title="Exchange rates are out of date">
+          {household.staleRates.map((rate) => rate.currency).join(', ')}: values converted from{' '}
+          {household.staleRates.length === 1 ? 'that currency use' : 'those currencies use'} the
+          last stored rate.
+        </StateNotice>
+      ) : null}
+      {view.unclassified.holdingCount > 0 ? (
+        <StateNotice
+          tone="info"
+          title={`${view.unclassified.holdingCount} ${view.unclassified.holdingCount === 1 ? 'holding is' : 'holdings are'} unclassified`}
+          testId="exposure-household-unclassified"
+          action={{ label: 'Classify on Brokerage', onClick: onClassify }}
+        >
+          They count in the total and by currency, but not in a group.
         </StateNotice>
       ) : null}
     </div>

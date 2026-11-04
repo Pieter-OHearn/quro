@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { defaultExposureSettings, type ExposureReport, type ExposureSettings } from '@quro/shared';
 import { db } from '../db/client';
-import { currencyRates, exposureSettings, holdings } from '../db/schema';
+import {
+  currencyRates,
+  exposureSettings,
+  holdings,
+  mortgages,
+  savingsAccounts,
+} from '../db/schema';
 import { invalidateCurrentCurrencyRateCache } from '../lib/currencyRateSync';
 import { useFixtureCurrencyRates } from '../test/currencyRates';
 import { createIntegrationHelpers, insertPartnerLink, type AuthSession } from '../test/integration';
@@ -68,6 +74,75 @@ async function addHolding(session: AuthSession, spec: HoldingSpec): Promise<numb
     201,
   );
   return created.id;
+}
+
+async function addSavings(
+  session: AuthSession,
+  spec: { name: string; balance: number; currency?: string; isJoint?: boolean },
+): Promise<number> {
+  const created = await readData<{ id: number }>(
+    await integration.request('/api/savings/accounts', {
+      method: 'POST',
+      cookie: session.cookie,
+      json: {
+        name: spec.name,
+        bank: 'Synthetic Bank',
+        balance: spec.balance,
+        currency: spec.currency ?? 'EUR',
+        interestRate: 1,
+        accountType: 'Easy Access',
+        color: '#0ea5e9',
+        emoji: 'S',
+        isJoint: spec.isJoint ?? false,
+      },
+    }),
+    201,
+  );
+  return created.id;
+}
+
+async function addProperty(
+  session: AuthSession,
+  spec: { address: string; value: number; currency?: string; isJoint?: boolean; debt?: number },
+): Promise<void> {
+  const property = await readData<{ id: number }>(
+    await integration.request('/api/investments/properties', {
+      method: 'POST',
+      cookie: session.cookie,
+      json: {
+        address: spec.address,
+        propertyType: 'primary_home',
+        purchasePrice: spec.value,
+        currentValue: spec.value,
+        monthlyRent: 0,
+        currency: spec.currency ?? 'EUR',
+        emoji: 'H',
+        isJoint: spec.isJoint ?? false,
+      },
+    }),
+    201,
+  );
+  if (spec.debt === undefined) return;
+  await readData(
+    await integration.request('/api/mortgages', {
+      method: 'POST',
+      cookie: session.cookie,
+      json: {
+        linkedPropertyId: property.id,
+        lender: 'Synthetic Lender',
+        originalAmount: spec.debt,
+        outstandingBalance: spec.debt,
+        monthlyPayment: 1_000,
+        interestRate: 3,
+        rateType: 'fixed',
+        fixedUntil: '2031-01-01',
+        termYears: 30,
+        startDate: '2021-01-01',
+        endDate: '2051-01-01',
+      },
+    }),
+    201,
+  );
 }
 
 beforeAll(async () => {
@@ -236,6 +311,154 @@ describe('exposure report', () => {
     });
     const { view } = await getReport(owner);
     expect(view.holdings.map((h) => h.name)).toEqual(['Kept Fund']);
+  });
+});
+
+describe('the Overview', () => {
+  test('answers an empty account honestly', async () => {
+    const { household } = await getReport(await integration.signUp('overview-empty'));
+    expect(household.status).toBe('empty');
+    expect(household.totalValue).toBe(0);
+  });
+
+  test("counts joint rows at the person's share and keeps a partner's private rows out", async () => {
+    const owner = await integration.signUp('overview-owner');
+    const partner = await integration.signUp('overview-partner');
+    await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
+    await addHolding(owner, { name: 'Owner Holding', price: 10, shares: 10 });
+    await addHolding(partner, { name: 'Partner Holding', price: 20, shares: 10 });
+    await addSavings(owner, { name: 'Owner Account', balance: 1_000 });
+    await addSavings(partner, { name: 'Partner Joint', balance: 3_000.01, isJoint: true });
+    await addSavings(partner, { name: 'Partner Private', balance: 9_000 });
+    await addProperty(owner, {
+      address: '1 Joint Lane',
+      value: 300_000,
+      isJoint: true,
+      debt: 100_000,
+    });
+    await addProperty(partner, { address: '2 Private Lane', value: 500_000 });
+
+    const report = await getReport(owner);
+    const { household, facts } = report;
+    expect(household.savingsValue).toBe(1_000 + 1_500.01);
+    expect(household.propertyValue).toBe(100_000);
+    expect(household.brokerageValue).toBe(100);
+    expect(household.totalValue).toBe(102_600.01);
+    expect(facts.inputs.savingsAccounts.map((row) => [row.name, row.share])).toEqual([
+      ['Partner Joint', 0.5],
+      ['Owner Account', 1],
+    ]);
+    expect(JSON.stringify(report)).not.toContain('Partner Private');
+    expect(JSON.stringify(report)).not.toContain('2 Private Lane');
+    expect(JSON.stringify(report)).not.toContain('Partner Holding');
+  });
+
+  test("reads no partner's private mortgage through a joint property, as net worth does", async () => {
+    const owner = await integration.signUp('overview-private-debt');
+    const partner = await integration.signUp('overview-private-debt-partner');
+    await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
+    await addProperty(partner, {
+      address: '4 Joint Lane',
+      value: 300_000,
+      isJoint: true,
+      debt: 100_000,
+    });
+    await db.update(mortgages).set({ isJoint: false }).where(eq(mortgages.userId, partner.user.id));
+
+    const report = await getReport(owner);
+    expect(report.facts.inputs.properties[0]).toMatchObject({ mortgage: null, valueEur: 150_000 });
+    const dashboard = await readData<{ allocations: { key: string; value: number }[] }>(
+      await integration.request('/api/dashboard/allocations', { cookie: owner.cookie }),
+    );
+    expect(report.household.propertyValue).toBe(
+      dashboard.allocations.find((row) => row.key === 'property_equity')!.value,
+    );
+  });
+
+  test('stops counting a joint row when the partner link is gone', async () => {
+    const owner = await integration.signUp('overview-unlinked');
+    const partner = await integration.signUp('overview-unlinked-partner');
+    await addSavings(partner, { name: 'Partner Joint', balance: 3_000 });
+    const { household } = await getReport(owner);
+    expect(household.status).toBe('empty');
+  });
+
+  test('keeps negative equity in the total and out of the shares', async () => {
+    const owner = await integration.signUp('overview-negative');
+    await addSavings(owner, { name: 'Owner Account', balance: 10_000 });
+    await addProperty(owner, {
+      address: '3 Underwater Court',
+      value: 100_000,
+      currency: 'GBP',
+      debt: 110_000,
+    });
+    const { household } = await getReport(owner);
+    expect(household.negative).toEqual([
+      expect.objectContaining({
+        kind: 'property',
+        name: '3 Underwater Court',
+        currency: 'GBP',
+        nativeValue: -10_000,
+        value: -11_800,
+      }),
+    ]);
+    expect(household.totalValue).toBe(-1_800);
+    expect(household.grossValue).toBe(10_000);
+    expect(household.groups.find((group) => group.key === 'cash')?.share).toBe(100);
+  });
+
+  test('leaves archived accounts out, and pensions are not part of it', async () => {
+    const owner = await integration.signUp('overview-archived');
+    await addSavings(owner, { name: 'Kept', balance: 100 });
+    const archived = await addSavings(owner, { name: 'Archived', balance: 900 });
+    await db
+      .update(savingsAccounts)
+      .set({ archivedAt: new Date() })
+      .where(eq(savingsAccounts.id, archived));
+    await readData(
+      await integration.request('/api/pensions/pots', {
+        method: 'POST',
+        cookie: owner.cookie,
+        json: {
+          name: 'Pension',
+          provider: 'Synthetic Provider',
+          type: 'Workplace Pension',
+          balance: 50_000,
+          currency: 'EUR',
+          employeeMonthly: 0,
+          employerMonthly: 0,
+          investmentStrategy: 'Balanced',
+          color: '#1d4ed8',
+          emoji: 'P',
+        },
+      }),
+      201,
+    );
+    const { household } = await getReport(owner);
+    expect(household.totalValue).toBe(100);
+    expect(household.counts.savingsAccounts).toBe(1);
+  });
+
+  test('excludes an account with no stored rate instead of converting it 1:1', async () => {
+    const owner = await integration.signUp('overview-missing-rate');
+    await addSavings(owner, { name: 'Euro Account', balance: 100 });
+    await addSavings(owner, { name: 'Swiss Account', balance: 100, currency: 'CHF' });
+    await db.delete(currencyRates).where(eq(currencyRates.fromCurrency, 'CHF'));
+    invalidateCurrentCurrencyRateCache();
+    try {
+      const { household, facts } = await getReport(owner);
+      expect(household.totalValue).toBe(100);
+      expect(household.excluded).toEqual([
+        expect.objectContaining({ kind: 'savings', name: 'Swiss Account', reason: 'no_fx_rate' }),
+      ]);
+      expect(facts.householdWarnings).toContainEqual({
+        code: 'fx_rate_missing',
+        subject: 'fx:CHF',
+      });
+    } finally {
+      await useFixtureCurrencyRates('exposure-integration-fixture');
+      invalidateCurrentCurrencyRateCache();
+    }
   });
 });
 

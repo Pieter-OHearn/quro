@@ -7,14 +7,19 @@ const dashboard = [
   keys.dashboard.transactions,
   keys.dashboard.setup,
 ];
-const savings = [keys.savings.accounts, keys.savings.transactions];
+// Exposure's Overview counts savings and property, so it follows their writes too.
+const savings = [keys.savings.accounts, keys.savings.transactions, keys.exposure.all];
 const holdings = [
   keys.investments.holdings,
   keys.investments.holdingTransactions,
   keys.investments.prices,
   keys.exposure.all,
 ];
-const properties = [keys.investments.properties, keys.investments.propertyTransactions];
+const properties = [
+  keys.investments.properties,
+  keys.investments.propertyTransactions,
+  keys.exposure.all,
+];
 const pension = [keys.pensions.pots, keys.pensions.transactions, keys.pensions.documents];
 const budget = [keys.budget.categories, keys.budget.transactions];
 
@@ -38,7 +43,13 @@ const domainQueryDependencies = {
     keys.plan.all,
   ],
   property: [...properties, keys.mortgages.all, ...dashboard, keys.plan.all],
-  mortgage: [keys.mortgages.all, keys.investments.properties, ...dashboard, keys.plan.all],
+  mortgage: [
+    keys.mortgages.all,
+    keys.investments.properties,
+    keys.exposure.all,
+    ...dashboard,
+    keys.plan.all,
+  ],
   debt: [keys.debts.all, ...dashboard, keys.plan.all],
   pension: [...pension, keys.pensions.imports, ...dashboard, keys.plan.all],
   pensionTransaction: [...pension, ...dashboard, keys.plan.all],

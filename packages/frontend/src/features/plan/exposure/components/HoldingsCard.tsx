@@ -308,7 +308,7 @@ export function HoldingsCard({
   return (
     <DataTable
       title="Holdings"
-      subtitle="Weight is each holding's share of your investments"
+      subtitle="Weight is each holding's share of your brokerage"
       toolbar={
         <BulkBar
           selectedIds={selectedIds}

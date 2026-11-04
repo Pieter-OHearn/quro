@@ -1,5 +1,6 @@
 import { fromCents, toCents } from '../utils/money.js';
 import { holdingValue } from './holdings.js';
+import { roundPercent } from './exposureMath.js';
 import {
   ASSET_CLASS_GROUP,
   MIX_GROUPS,
@@ -8,6 +9,13 @@ import {
   type AssetClassKey,
   type MixGroup,
 } from './exposureClasses.js';
+import {
+  computeHouseholdFacts,
+  type ExposurePropertyInput,
+  type ExposurePropertyPosition,
+  type ExposureSavingsInput,
+  type ExposureSavingsPosition,
+} from './exposureHousehold.js';
 import {
   EXPOSURE_DEFAULTS_VERSION,
   riskBandLabel,
@@ -19,13 +27,14 @@ import {
 
 /**
  * The facts behind the Exposure view: a pure, deterministic calculation over a person's
- * holdings, the exchange rates and their settings. Every number the page shows is one of these
+ * holdings, their share of the household's savings and property, the exchange rates and their
+ * settings. Every number the page shows is one of these
  * facts or is derived from them (see `buildExposureView`), and every fact says which inputs it
  * used, which method and version produced it and which settings it read, so a later explanation
  * can read the same document the charts do. Nothing here calls a service or reads the clock.
  */
 
-export const EXPOSURE_FACTS_SCHEMA_VERSION = 1;
+export const EXPOSURE_FACTS_SCHEMA_VERSION = 2;
 export const EXPOSURE_METHOD = { id: 'exposure-breakdown', version: '1.0.0' } as const;
 
 export type FactUnit = 'EUR' | 'percent' | 'count' | 'index' | 'risk_class' | 'rate' | 'flag';
@@ -69,7 +78,7 @@ export type ExposureWarningCode =
 
 export type ExposureWarning = {
   code: ExposureWarningCode;
-  /** `holding:12`, `fx:GBP` or `portfolio`. */
+  /** `holding:12`, `fx:GBP`, `portfolio` or `household`. */
   subject: string;
 };
 
@@ -106,6 +115,10 @@ export type ExposureInput = {
   settings: ExposureSettings;
   settingsSource: 'default' | 'custom';
   holdings: readonly ExposureHoldingInput[];
+  /** The open savings accounts the person can read; left out, the Overview has none. */
+  savingsAccounts?: readonly ExposureSavingsInput[];
+  /** The open properties the person can read; left out, the Overview has none. */
+  properties?: readonly ExposurePropertyInput[];
   fxRates: readonly ExposureFxInput[];
 };
 
@@ -126,15 +139,21 @@ export type ExposureFacts = {
   asOf: string;
   baseCurrency: string;
   settings: { version: number; source: 'default' | 'custom'; defaultsVersion: string };
-  inputs: { holdings: ExposureHoldingFact[]; fxRates: ExposureFxInput[] };
+  inputs: {
+    holdings: ExposureHoldingFact[];
+    savingsAccounts: ExposureSavingsPosition[];
+    properties: ExposurePropertyPosition[];
+    fxRates: ExposureFxInput[];
+  };
   facts: Fact[];
+  /** About the holdings, and so about the Brokerage view. */
   warnings: ExposureWarning[];
+  /** About the savings accounts and properties, which only the Overview counts. */
+  householdWarnings: ExposureWarning[];
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const PERCENT = 100;
-const PERCENT_PRECISION = 100;
 const HHI_SCALE = 10_000;
 const TOP_HOLDINGS = 3;
 const MIN_HOLDINGS_FOR_TOP_CHECK = 4;
@@ -162,10 +181,6 @@ export function sectorKey(sector: string): string {
 
 export function sectorLabel(sector: string): string {
   return sector.trim() || 'Unspecified';
-}
-
-function roundPercent(cents: number, totalCents: number): number {
-  return Math.round((cents / totalCents) * PERCENT * PERCENT_PRECISION) / PERCENT_PRECISION;
 }
 
 function method(id: string) {
@@ -227,7 +242,7 @@ function isValued(holding: ExposureHoldingFact): holding is Valued {
 
 // ── Fact builders ────────────────────────────────────────────────────────────
 
-type FactDraft = Pick<Fact, 'id' | 'kind' | 'value' | 'unit'> &
+export type FactDraft = Pick<Fact, 'id' | 'kind' | 'value' | 'unit'> &
   Partial<Pick<Fact, 'inputs' | 'context' | 'warnings'>> & { methodId: string };
 
 class FactBook {
@@ -700,7 +715,18 @@ export function computeExposureFacts(input: ExposureInput): ExposureFacts {
       methodId: 'sum_cents',
     });
   }
-  const usedRates = input.fxRates.filter((rate) => open.some((h) => h.currency === rate.currency));
+  const household = computeHouseholdFacts({
+    holdings,
+    savingsAccounts: input.savingsAccounts ?? [],
+    properties: input.properties ?? [],
+    rates,
+    baseCurrency: input.baseCurrency,
+  });
+  for (const draft of household.drafts) book.add(draft);
+  const usedCurrencies = new Set(
+    [...open, ...household.savingsAccounts, ...household.properties].map((row) => row.currency),
+  );
+  const usedRates = input.fxRates.filter((rate) => usedCurrencies.has(rate.currency));
   return {
     schema: 'quro.exposure.facts',
     schemaVersion: EXPOSURE_FACTS_SCHEMA_VERSION,
@@ -712,9 +738,15 @@ export function computeExposureFacts(input: ExposureInput): ExposureFacts {
       source: input.settingsSource,
       defaultsVersion: EXPOSURE_DEFAULTS_VERSION,
     },
-    inputs: { holdings: sortHoldings(holdings), fxRates: [...usedRates].sort(byCurrency) },
+    inputs: {
+      holdings: sortHoldings(holdings),
+      savingsAccounts: household.savingsAccounts,
+      properties: household.properties,
+      fxRates: [...usedRates].sort(byCurrency),
+    },
     facts: book.facts,
     warnings: collectWarnings(holdings, rates, valued),
+    householdWarnings: household.warnings,
   };
 }
 

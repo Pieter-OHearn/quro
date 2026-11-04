@@ -9,6 +9,7 @@ import {
   type MixGroup,
 } from './exposureClasses.js';
 import { type ExposureFacts, type ExposureWarning, type Fact } from './exposureFacts.js';
+import type { ExposureHouseholdView } from './exposureHouseholdView.js';
 import {
   riskBandLabel,
   referenceMixName,
@@ -267,7 +268,7 @@ function statementFor(groups: ExposureGroupRow[], unclassifiedShare: number): st
   ];
   const largest = candidates.reduce((best, c) => (c.share > best.share ? c : best));
   return largest.share > 0
-    ? `${largest.subject} ${formatShare(largest.share)} of your investments`
+    ? `${largest.subject} ${formatShare(largest.share)} of your brokerage`
     : null;
 }
 
@@ -296,15 +297,15 @@ function noticeMessage(id: ExposureNoticeId, fact: Fact, threshold: number): str
       threshold === DEFAULT_SINGLE_HOLDING_THRESHOLD
         ? `Many sources treat more than ${limit} in one holding as concentrated.`
         : `Your notice threshold for one holding is ${limit}.`;
-    return `${subject} holds ${measured} of your portfolio. ${basis}`;
+    return `${subject} holds ${measured} of your brokerage. ${basis}`;
   }
   if (id === 'top_three') {
-    return `Your three largest holdings make up ${measured} of your portfolio. The notice threshold is ${limit}, an editable assumption.`;
+    return `Your three largest holdings make up ${measured} of your brokerage. The notice threshold is ${limit}, an editable assumption.`;
   }
   if (id === 'sector') {
-    return `${subject} is ${measured} of your portfolio. The notice threshold for one sector is ${limit}, an editable assumption.`;
+    return `${subject} is ${measured} of your brokerage. The notice threshold for one sector is ${limit}, an editable assumption.`;
   }
-  return `${measured} of your portfolio is in ${subject}, outside EUR. The notice threshold for one currency is ${limit}, an editable assumption.`;
+  return `${measured} of your brokerage is in ${subject}, outside EUR. The notice threshold for one currency is ${limit}, an editable assumption.`;
 }
 
 const NOTICE_TITLES: Record<ExposureNoticeId, string> = {
@@ -406,10 +407,14 @@ export type ExposureSettingsState = {
   storedInvalid: boolean;
 };
 
-/** `GET /api/exposure`: the facts, the breakdowns derived from them and the settings behind both. */
+/**
+ * `GET /api/exposure`: the facts, the breakdowns derived from them and the settings behind both.
+ * `view` is the Brokerage view; `household` is the Overview.
+ */
 export type ExposureReport = {
   facts: ExposureFacts;
   view: ExposureView;
+  household: ExposureHouseholdView;
   settings: ExposureSettingsState;
 };
 

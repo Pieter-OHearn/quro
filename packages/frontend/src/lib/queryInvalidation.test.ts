@@ -254,3 +254,13 @@ test('ledger and price writes refresh every cached net-worth range; goal writes 
   for (const key of ranges) expect(isInvalidated(client, key)).toBe(false);
   client.clear();
 });
+
+test('every write the Overview counts refreshes the exposure report', async () => {
+  for (const domain of ['savings', 'property', 'mortgage', 'csvImport', 'bunqSync'] as const) {
+    const client = new QueryClient();
+    seed(client, [keys.exposure.report]);
+    await invalidateDomain(client, domain);
+    expect(isInvalidated(client, keys.exposure.report)).toBe(true);
+    client.clear();
+  }
+});

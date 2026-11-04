@@ -73,7 +73,9 @@ database/object storage for tests, migrations, demo seeding, clearing or recover
   Keep core functionality usable without OCR, bank linking, GPU or AI.
 - The Exposure view's numbers are the facts of `packages/shared/src/domain/exposureFacts.ts`
   and the breakdowns derived from them; change the facts, not a component, and keep them pure.
-  Holdings are private to their owner. See [exposure facts](docs/exposure-facts.md).
+  Holdings are private to their owner. Its Overview counts savings and property equity as net
+  worth does (`exposureHousehold.ts`), so the two agree to the cent. See
+  [exposure facts](docs/exposure-facts.md).
 - Write requests, background job cycles and the import worker hold the maintenance lock in shared
   mode (`packages/backend/src/lib/maintenanceMode.ts`); `quro backup` and `quro restore` take it
   exclusively. Start jobs with `startIntervalJob` or wrap other writers in `runUnlessMaintenance`.

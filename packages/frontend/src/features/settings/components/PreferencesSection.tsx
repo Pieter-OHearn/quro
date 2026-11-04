@@ -212,12 +212,12 @@ function PreferencesForm({
         subtitle="Risk classes, reference mixes and concentration notices on the Plan page."
       >
         <p className="text-cell text-fg-muted">
-          The Exposure tab compares your investments with published reference mixes. Change the
-          mixes, the default risk class of each asset class and the notice thresholds there, or
-          reset them to the defaults.
+          The Exposure tab compares your brokerage with published reference mixes. Change the mixes,
+          the default risk class of each asset class and the notice thresholds there, or reset them
+          to the defaults.
         </p>
         <Link
-          to="/plan?tab=exposure&customise=1"
+          to="/plan?tab=exposure&view=brokerage&customise=1"
           className="inline-flex min-h-8 items-center rounded-sm text-cell font-medium text-brand-fg underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring max-sm:min-h-11"
         >
           Open exposure settings

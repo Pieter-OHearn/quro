@@ -97,7 +97,7 @@ function MixSection({
   return (
     <Section
       title="Reference mixes"
-      description="Ranges as a percentage of your investments. A mix is an example from a fund provider, not a target. Choose the one to draw over the bar, or none."
+      description="Ranges as a percentage of your brokerage. A mix is an example from a fund provider, not a target. Choose the one to draw over the bar, or none."
     >
       <FormField label="Show on the chart" className="max-w-xs">
         <SelectInput value={form.selectedMix} onChange={onSelect} options={MIX_OPTIONS} />
@@ -145,7 +145,7 @@ function ThresholdSection({
   return (
     <Section
       title="Concentration notices"
-      description="A notice appears when a share of your investments is above its threshold, as a percentage. A notice that is switched off is not shown; the breakdown it reads from stays."
+      description="A notice appears when a share of your brokerage is above its threshold, as a percentage. A notice that is switched off is not shown; the breakdown it reads from stays."
     >
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {CONCENTRATION_THRESHOLD_KEYS.map((key) => (
@@ -287,7 +287,7 @@ export function CustomiseModal({
   return (
     <Modal
       title="Customise exposure"
-      subtitle={`Defaults reviewed ${EXPOSURE_DEFAULTS_VERSION}${source === 'custom' ? ' · you have your own settings' : ''}`}
+      subtitle={`Applies to the Brokerage view · defaults reviewed ${EXPOSURE_DEFAULTS_VERSION}${source === 'custom' ? ' · you have your own settings' : ''}`}
       onClose={onClose}
       maxWidth="3xl"
       scrollable

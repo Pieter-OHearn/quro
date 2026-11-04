@@ -9,6 +9,7 @@ import {
   toCents,
   toIsoDate,
   type DashboardAllocationsSummary,
+  type ExposureReport,
 } from '@quro/shared';
 import { db } from '../db/client';
 import { holdings, netWorthSnapshots } from '../db/schema';
@@ -337,8 +338,14 @@ async function expectReconciled(session: AuthSession, otherId: number, expected:
   const history = await get<Array<{ totalValue: number }>>(session, '/api/dashboard/net-worth');
   expect(toCents(history.at(-1)!.totalValue)).toBe(golden.netWorth);
   // Exposure values the holdings at the same price: its total is the brokerage figure.
-  const exposure = await get<{ view: { totalValue: number } }>(session, '/api/exposure');
+  const exposure = await get<ExposureReport>(session, '/api/exposure');
   expect(toCents(exposure.view.totalValue)).toBe(golden.brokerage);
+  // Its Overview counts savings and property as net worth does.
+  expect(toCents(exposure.household.savingsValue)).toBe(golden.savings);
+  expect(toCents(exposure.household.propertyValue)).toBe(golden.propertyEquity);
+  expect(toCents(exposure.household.totalValue)).toBe(
+    golden.savings + golden.propertyEquity + golden.brokerage,
+  );
 
   // A stored snapshot keeps each component and the total in whole cents: the components add up to
   // the total exactly, and the total matches the live figure.

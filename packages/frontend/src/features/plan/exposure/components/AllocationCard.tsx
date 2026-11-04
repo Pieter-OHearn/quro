@@ -1,11 +1,11 @@
-import { type ExposureGroupRow, type ExposureView, type MixGroup } from '@quro/shared';
+import { type ExposureGroupRow, type ExposureView, type HouseholdGroup } from '@quro/shared';
 import { ChartCard, buildChartAlternative } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { GROUP_BAR_CLASS, MIN_VISIBLE_SHARE } from '../exposureStyle';
 import type { ExposureFormat } from '../useExposureFormat';
 
-type Segment = {
-  key: MixGroup | 'unclassified';
+export type Segment = {
+  key: HouseholdGroup | 'unclassified';
   label: string;
   share: number;
   value: number;
@@ -27,7 +27,7 @@ function segmentsOf(view: ExposureView): Segment[] {
   return segments;
 }
 
-function StackedBar({ segments }: Readonly<{ segments: readonly Segment[] }>) {
+export function StackedBar({ segments }: Readonly<{ segments: readonly Segment[] }>) {
   return (
     <div className="flex h-5 w-full gap-px overflow-hidden rounded-md bg-surface-muted" aria-hidden>
       {segments
@@ -43,20 +43,20 @@ function StackedBar({ segments }: Readonly<{ segments: readonly Segment[] }>) {
   );
 }
 
-function Legend({
+export function Legend({
   segments,
   format,
 }: Readonly<{ segments: readonly Segment[]; format: ExposureFormat }>) {
   return (
-    <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-cell sm:grid-cols-3 lg:grid-cols-5">
+    <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-cell">
       {segments.map((segment) => (
-        <li key={segment.key} className="flex items-center gap-2">
+        <li key={segment.key} className="flex items-center gap-1.5">
           <span
             aria-hidden
             className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', GROUP_BAR_CLASS[segment.key])}
           />
-          <span className="min-w-0 truncate text-fg-muted">{segment.label}</span>
-          <span className="ml-auto font-numeric text-fg">{format.percent(segment.share)}</span>
+          <span className="whitespace-nowrap text-fg-muted">{segment.label}</span>
+          <span className="font-numeric text-fg">{format.percent(segment.share)}</span>
         </li>
       ))}
     </ul>
@@ -134,7 +134,7 @@ export function AllocationCard({
     (segment) => segment.share > 0 || segment.key !== 'unclassified',
   );
   const alternative = buildChartAlternative({
-    subject: 'Investments by group',
+    subject: 'Brokerage by group',
     xLabel: 'Group',
     ordered: false,
     x: (segment: Segment) => segment.label,
@@ -143,7 +143,7 @@ export function AllocationCard({
       { label: 'Share', value: (s) => s.share, format: format.percent },
       { label: 'Value', value: (s) => s.value, format: format.money },
     ],
-    summary: `Investments by group: ${segments
+    summary: `Brokerage by group: ${segments
       .map((segment) => `${segment.label} ${format.percent(segment.share)}`)
       .join(', ')}.${view.referenceStatement ? ` ${view.referenceStatement}` : ''}`,
   });
@@ -152,14 +152,18 @@ export function AllocationCard({
       title="Mix by group"
       subtitle={
         view.referenceMix
-          ? `Shares of your investments, with the range of ${view.referenceMix.name}`
-          : 'Shares of your investments'
+          ? `Shares of your brokerage, with the range of ${view.referenceMix.name}`
+          : 'Shares of your brokerage'
       }
       hasData
       alternative={alternative}
     >
       <StackedBar segments={segments} />
       <Legend segments={segments} format={format} />
+      <p className="mt-3 text-caption text-fg-subtle">
+        Cash here means cash funds in your brokerage, not savings accounts. Savings accounts are on
+        the Overview.
+      </p>
       <ReferenceComparison view={view} format={format} />
     </ChartCard>
   );

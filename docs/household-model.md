@@ -21,7 +21,9 @@ cashflow. Contractual payments and deposit-protection exposure retain the person
 
 Brokerage holdings are not shared: a holding has no joint flag, so net worth, the Exposure view
 and every other holdings figure count only the caller's own holdings, whether or not a partner
-is linked. See [Exposure and its facts](exposure-facts.md).
+is linked. The Overview of Exposure adds the person's share of savings accounts and property
+equity to those holdings, by the rules above: 50% of a joint row, and a partner's private rows never.
+See [Exposure and its facts](exposure-facts.md).
 
 ## One partner link per user
 

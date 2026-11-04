@@ -214,7 +214,7 @@ describe('exposure facts', () => {
     expect(fact(facts, 'exposure.currency.USD.share').value).toBe(10);
     expect(fact(facts, 'exposure.sector.technology.share').value).toBe(60);
     const view = buildExposureView(facts);
-    expect(view.statement).toBe('Stocks are 60% of your investments');
+    expect(view.statement).toBe('Stocks are 60% of your brokerage');
   });
 
   test('puts a share of 0 in empty groups and keeps shares of one decimal', () => {
@@ -230,7 +230,7 @@ describe('exposure facts', () => {
       ['cash', 0],
       ['other', 0],
     ]);
-    expect(view.statement).toBe('Bonds are 66.7% of your investments');
+    expect(view.statement).toBe('Bonds are 66.7% of your brokerage');
   });
 });
 
@@ -327,7 +327,7 @@ describe('exposure concentration', () => {
       ),
     );
     const notice = above.notices.find((entry) => entry.id === 'currency');
-    expect(notice?.message).toContain('70.6% of your portfolio is in USD, outside EUR');
+    expect(notice?.message).toContain('70.6% of your brokerage is in USD, outside EUR');
   });
 
   test('a switched-off notice is not raised and its check says it is off', () => {
@@ -408,7 +408,7 @@ describe('exposure reference mix', () => {
     expect(view.referenceStatement).toBe(
       'Compared with Reference mix B: stocks are below the range of 40 to 60%, bonds are above the range of 35 to 55%. Unclassified holdings are not part of any group.',
     );
-    expect(view.statement).toBe('Bonds are 62% of your investments');
+    expect(view.statement).toBe('Bonds are 62% of your brokerage');
     expect(`${view.statement} ${view.referenceStatement}`).not.toMatch(
       /should|buy|sell|recommend/i,
     );
