@@ -34,7 +34,7 @@ function riskCaption(view: ExposureView): string {
   if (!risk) return 'No holding has a risk class yet.';
   if (risk.holdingsWithoutRiskClass === 0) return 'From every holding, by value.';
   const covered = Math.round(risk.coverage);
-  return `From ${covered}% of your investments; ${risk.holdingsWithoutRiskClass} ${
+  return `From ${covered}% of your brokerage; ${risk.holdingsWithoutRiskClass} ${
     risk.holdingsWithoutRiskClass === 1 ? 'holding has' : 'holdings have'
   } no risk class.`;
 }

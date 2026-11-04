@@ -7,7 +7,7 @@ const dashboard = [
   keys.dashboard.transactions,
   keys.dashboard.setup,
 ];
-// Exposure's Everything view counts savings and property, so it follows their writes too.
+// Exposure's Overview counts savings and property, so it follows their writes too.
 const savings = [keys.savings.accounts, keys.savings.transactions, keys.exposure.all];
 const holdings = [
   keys.investments.holdings,

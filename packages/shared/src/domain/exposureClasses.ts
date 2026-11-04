@@ -51,7 +51,7 @@ export const MIX_GROUP_LABELS: Record<MixGroup, string> = {
 };
 
 /**
- * The groups of the Everything view: the mix groups plus property, which is a group of its own
+ * The groups of the Overview: the mix groups plus property, which is a group of its own
  * there. The reference mixes are written in the mix groups, so they never apply to these.
  */
 export const HOUSEHOLD_GROUPS = ['stocks', 'bonds', 'cash', 'property', 'other'] as const;

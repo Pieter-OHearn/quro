@@ -21,7 +21,7 @@ const DEFAULTS = defaultExposureSettings();
 const INTRO =
   'We add up your holdings by asset class and compare them with reference mixes published by fund providers. Each class gets a default risk score on the EU 1 to 7 scale. Where a fund reports its own score, we use that. The notices show where your mix differs from a reference. This is information, not advice, and it does not take your goals or circumstances into account. Percentages and thresholds are editable defaults reviewed once a year.';
 
-const EVERYTHING_INTRO =
+const OVERVIEW_INTRO =
   'We add up your holdings, your share of your savings accounts and your share of your property equity, and show how they are spread by group and by currency. This is information, not advice, and it does not take your goals or circumstances into account.';
 
 function ViewRules() {
@@ -30,13 +30,13 @@ function ViewRules() {
       <h4 className="text-label text-fg-muted">What each view counts</h4>
       <ul className="list-disc space-y-1 pl-5 text-cell text-fg-muted">
         <li>
-          <strong className="font-semibold text-fg">Everything</strong> counts your holdings, your
+          <strong className="font-semibold text-fg">Overview</strong> counts your holdings, your
           savings accounts as cash and your property as a group of its own. Pensions are not
           counted, and neither are debts other than a property&apos;s mortgage, so this total is not
           your net worth.
         </li>
         <li>
-          <strong className="font-semibold text-fg">Investments</strong> counts your brokerage
+          <strong className="font-semibold text-fg">Brokerage</strong> counts your brokerage
           holdings only. Cash there means cash funds in the brokerage, not savings accounts. The
           reference mixes, the risk class, the notices and Customise apply to this view only.
         </li>
@@ -48,8 +48,7 @@ function ViewRules() {
         <li>
           <strong className="font-semibold text-fg">Property equity:</strong> a property counts at
           its value less its linked mortgage, each at its own share, the rule net worth uses. A
-          property fund in your brokerage is an investment and stays in its asset class&apos;s
-          group.
+          property fund in your brokerage stays in its asset class&apos;s group.
         </li>
         <li>
           <strong className="font-semibold text-fg">Negative equity:</strong> a share cannot be
@@ -87,7 +86,7 @@ function InUse({ report }: Readonly<{ report: ExposureReport }>) {
         </ul>
       </div>
       <div>
-        <h4 className="text-label text-fg-muted">Reference mixes (share of investments)</h4>
+        <h4 className="text-label text-fg-muted">Reference mixes (share of brokerage)</h4>
         <ul className="mt-2 space-y-2 text-cell">
           {REFERENCE_MIX_IDS.map((id) => (
             <li key={id}>
@@ -175,7 +174,7 @@ function Sources() {
 }
 
 /** The steps, the defaults in use and their sources: all of them are about the holdings. */
-function InvestmentsMethod({ report }: Readonly<{ report: ExposureReport }>) {
+function BrokerageMethod({ report }: Readonly<{ report: ExposureReport }>) {
   return (
     <>
       <ol className="max-w-3xl list-decimal space-y-1 pl-5 text-cell text-fg-muted">
@@ -189,8 +188,8 @@ function InvestmentsMethod({ report }: Readonly<{ report: ExposureReport }>) {
         <li>
           Effective number of holdings = 1 ÷ (w₁² + w₂² + …), where each w is a holding&apos;s
           weight as a fraction of 1. Ten equal holdings give 10, two equal holdings give 2 and one
-          holding gives 1. The lower it is against your count of holdings, the more your investments
-          rest on a few of them.
+          holding gives 1. The lower it is against your count of holdings, the more your brokerage
+          rests on a few of them.
         </li>
         <li>
           Weighted average risk class = the sum of each holding&apos;s risk class times its value,
@@ -210,16 +209,16 @@ function InvestmentsMethod({ report }: Readonly<{ report: ExposureReport }>) {
 }
 
 const NOT_ADVICE: Record<ExposureViewKey, string> = {
-  everything:
+  overview:
     'This page describes how what you own is spread. It recommends no investment and no change to what you hold, and it does not take your goals, circumstances or tolerance for risk into account.',
-  investments:
-    'This page describes how your investments are spread. It recommends no investment and no change to your investments, and it does not take your goals, circumstances or tolerance for risk into account. The reference mixes are published examples, not targets for you.',
+  brokerage:
+    'This page describes how your brokerage is spread. It recommends no investment and no change to your holdings, and it does not take your goals, circumstances or tolerance for risk into account. The reference mixes are published examples, not targets for you.',
 };
 
 /** The method, the defaults in use with their sources and dates, and the "not advice" wording. */
 export function MethodPanel({
   report,
-  view = 'investments',
+  view = 'brokerage',
 }: Readonly<{ report: ExposureReport; view?: ExposureViewKey }>) {
   const { facts, settings } = report;
   return (
@@ -227,17 +226,17 @@ export function MethodPanel({
       <PanelHeader title="How this is worked out" />
       <div className="space-y-5 p-4">
         <p className="max-w-3xl text-body text-fg-muted">
-          {view === 'everything' ? EVERYTHING_INTRO : INTRO}
+          {view === 'overview' ? OVERVIEW_INTRO : INTRO}
         </p>
         <ViewRules />
-        {view === 'everything' ? (
+        {view === 'overview' ? (
           <p className="max-w-3xl text-cell text-fg-muted">
             Each account and property is converted to EUR with the stored exchange rate and rounded
             to cents once. One with no stored rate is left out and named above, never converted at a
             guess.
           </p>
         ) : (
-          <InvestmentsMethod report={report} />
+          <BrokerageMethod report={report} />
         )}
         <p className="max-w-3xl rounded-md bg-surface-muted px-3 py-2 text-cell text-fg-muted">
           <strong className="font-semibold text-fg">Information, not advice.</strong>{' '}

@@ -314,16 +314,16 @@ describe('exposure report', () => {
   });
 });
 
-describe('the Everything view', () => {
+describe('the Overview', () => {
   test('answers an empty account honestly', async () => {
-    const { household } = await getReport(await integration.signUp('everything-empty'));
+    const { household } = await getReport(await integration.signUp('overview-empty'));
     expect(household.status).toBe('empty');
     expect(household.totalValue).toBe(0);
   });
 
   test("counts joint rows at the person's share and keeps a partner's private rows out", async () => {
-    const owner = await integration.signUp('everything-owner');
-    const partner = await integration.signUp('everything-partner');
+    const owner = await integration.signUp('overview-owner');
+    const partner = await integration.signUp('overview-partner');
     await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
     await addHolding(owner, { name: 'Owner Holding', price: 10, shares: 10 });
     await addHolding(partner, { name: 'Partner Holding', price: 20, shares: 10 });
@@ -342,7 +342,7 @@ describe('the Everything view', () => {
     const { household, facts } = report;
     expect(household.savingsValue).toBe(1_000 + 1_500.01);
     expect(household.propertyValue).toBe(100_000);
-    expect(household.investmentsValue).toBe(100);
+    expect(household.brokerageValue).toBe(100);
     expect(household.totalValue).toBe(102_600.01);
     expect(facts.inputs.savingsAccounts.map((row) => [row.name, row.share])).toEqual([
       ['Partner Joint', 0.5],
@@ -354,8 +354,8 @@ describe('the Everything view', () => {
   });
 
   test("reads no partner's private mortgage through a joint property, as net worth does", async () => {
-    const owner = await integration.signUp('everything-private-debt');
-    const partner = await integration.signUp('everything-private-debt-partner');
+    const owner = await integration.signUp('overview-private-debt');
+    const partner = await integration.signUp('overview-private-debt-partner');
     await insertPartnerLink(owner.user.id, partner.user.id, 'accepted');
     await addProperty(partner, {
       address: '4 Joint Lane',
@@ -376,15 +376,15 @@ describe('the Everything view', () => {
   });
 
   test('stops counting a joint row when the partner link is gone', async () => {
-    const owner = await integration.signUp('everything-unlinked');
-    const partner = await integration.signUp('everything-unlinked-partner');
+    const owner = await integration.signUp('overview-unlinked');
+    const partner = await integration.signUp('overview-unlinked-partner');
     await addSavings(partner, { name: 'Partner Joint', balance: 3_000 });
     const { household } = await getReport(owner);
     expect(household.status).toBe('empty');
   });
 
   test('keeps negative equity in the total and out of the shares', async () => {
-    const owner = await integration.signUp('everything-negative');
+    const owner = await integration.signUp('overview-negative');
     await addSavings(owner, { name: 'Owner Account', balance: 10_000 });
     await addProperty(owner, {
       address: '3 Underwater Court',
@@ -408,7 +408,7 @@ describe('the Everything view', () => {
   });
 
   test('leaves archived accounts out, and pensions are not part of it', async () => {
-    const owner = await integration.signUp('everything-archived');
+    const owner = await integration.signUp('overview-archived');
     await addSavings(owner, { name: 'Kept', balance: 100 });
     const archived = await addSavings(owner, { name: 'Archived', balance: 900 });
     await db
@@ -440,7 +440,7 @@ describe('the Everything view', () => {
   });
 
   test('excludes an account with no stored rate instead of converting it 1:1', async () => {
-    const owner = await integration.signUp('everything-missing-rate');
+    const owner = await integration.signUp('overview-missing-rate');
     await addSavings(owner, { name: 'Euro Account', balance: 100 });
     await addSavings(owner, { name: 'Swiss Account', balance: 100, currency: 'CHF' });
     await db.delete(currencyRates).where(eq(currencyRates.fromCurrency, 'CHF'));

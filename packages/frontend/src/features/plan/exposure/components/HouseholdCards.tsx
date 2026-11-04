@@ -40,8 +40,8 @@ export function HouseholdSummary({
           testId="exposure-household-total"
         />
         <StatCard
-          label="Investments"
-          value={format.money(view.investmentsValue)}
+          label="Brokerage"
+          value={format.money(view.brokerageValue)}
           subtitle={`${count(view.counts.holdings, 'holding', 'holdings')}, yours alone`}
         />
         <StatCard
@@ -132,14 +132,14 @@ function segmentsOf(view: ExposureHouseholdView): Segment[] {
   return segments;
 }
 
-/** Everything by group. Shares are of the assets in the bar; no reference range applies here. */
+/** Overview by group. Shares are of the assets in the bar; no reference range applies here. */
 export function HouseholdMixCard({
   view,
   format,
 }: Readonly<{ view: ExposureHouseholdView; format: ExposureFormat }>) {
   const segments = segmentsOf(view);
   const alternative = buildChartAlternative({
-    subject: 'Everything by group',
+    subject: 'Overview by group',
     xLabel: 'Group',
     ordered: false,
     x: (segment: Segment) => segment.label,
@@ -148,7 +148,7 @@ export function HouseholdMixCard({
       { label: 'Share', value: (s) => s.share, format: format.percent },
       { label: 'Value', value: (s) => s.value, format: format.money },
     ],
-    summary: `Everything by group: ${segments
+    summary: `Overview by group: ${segments
       .map((segment) => `${segment.label} ${format.percent(segment.share)}`)
       .join(', ')}.`,
   });
@@ -163,15 +163,15 @@ export function HouseholdMixCard({
       <Legend segments={segments} format={format} />
       <p className="mt-3 text-caption text-fg-subtle">
         Cash is your savings accounts plus any cash funds in your brokerage. Property is what your
-        properties are worth less their mortgages. A property fund in your brokerage stays with your
-        investments, under Other assets.
+        properties are worth less their mortgages. A property fund in your brokerage counts under
+        Other assets.
       </p>
       <NegativePositions view={view} format={format} />
     </ChartCard>
   );
 }
 
-function InvestmentFigure({
+function BrokerageFigure({
   label,
   value,
   testId,
@@ -190,30 +190,30 @@ function InvestmentFigure({
  * The figures that only describe the brokerage. They stay labelled as such here, so none of them
  * reads as a figure about everything.
  */
-export function InvestmentsOnlyCard({
+export function BrokerageOnlyCard({
   view,
   format,
-  onOpenInvestments,
-}: Readonly<{ view: ExposureView; format: ExposureFormat; onOpenInvestments: () => void }>) {
+  onOpenBrokerage,
+}: Readonly<{ view: ExposureView; format: ExposureFormat; onOpenBrokerage: () => void }>) {
   const { risk } = view;
   return (
-    <Card className="flex flex-col gap-3" data-testid="exposure-investments-only">
+    <Card className="flex flex-col gap-3" data-testid="exposure-brokerage-only">
       <div>
-        <h3 className="text-title-section text-fg">Investments only</h3>
+        <h3 className="text-title-section text-fg">Brokerage only</h3>
         <p className="mt-1 text-cell text-fg-muted">
           Risk, concentration, sectors, asset classes and your holdings describe your brokerage, so
-          they are on the Investments view.
+          they are on the Brokerage view.
         </p>
       </div>
       {view.status === 'ready' ? (
         <dl className="space-y-1">
-          <InvestmentFigure
+          <BrokerageFigure
             label="Weighted average risk class"
             value={
               risk ? `${risk.roundedClass} of ${MAX_RISK_CLASS} · ${risk.band}` : 'Not available'
             }
           />
-          <InvestmentFigure
+          <BrokerageFigure
             label="Effective number of holdings"
             value={
               view.effectiveHoldings === null
@@ -221,16 +221,16 @@ export function InvestmentsOnlyCard({
                 : `${format.decimal(view.effectiveHoldings, 1)} of ${view.holdings.length}`
             }
           />
-          <InvestmentFigure
+          <BrokerageFigure
             label="Concentration notices"
             value={String(view.notices.length)}
-            testId="exposure-investments-notices"
+            testId="exposure-brokerage-notices"
           />
         </dl>
       ) : null}
       <div className="mt-auto">
-        <Button variant="secondary" onClick={onOpenInvestments}>
-          Open Investments
+        <Button variant="secondary" onClick={onOpenBrokerage}>
+          Open Brokerage
         </Button>
       </div>
     </Card>

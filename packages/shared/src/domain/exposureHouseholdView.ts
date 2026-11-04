@@ -8,7 +8,7 @@ import type { ExposureFacts, ExposureFxInput, ExposureWarning, Fact } from './ex
 import { formatShare, type ExposureBucketRow } from './exposureView.js';
 
 /**
- * The render-ready Everything view, derived from the facts and nothing else. Every share is a
+ * The render-ready Overview, derived from the facts and nothing else. Every share is a
  * share of the positive positions; a negative position is listed in `negative` and subtracted in
  * `totalValue`.
  */
@@ -38,13 +38,13 @@ export type ExposureHouseholdExcludedRow = {
 export type ExposureHouseholdView = {
   status: 'empty' | 'unvaluable' | 'ready';
   baseCurrency: string;
-  /** Everything counted, negative positions subtracted. */
+  /** All counted, negative positions subtracted. */
   totalValue: number;
   /** The positive positions: what every share is a share of. */
   grossValue: number;
   /** The negative positions, zero or below. */
   negativeValue: number;
-  investmentsValue: number;
+  brokerageValue: number;
   savingsValue: number;
   /** Property equity with negative equity in it: the dashboard's figure. */
   propertyValue: number;
@@ -172,7 +172,7 @@ export function buildExposureHouseholdView(facts: ExposureFacts): ExposureHouseh
     totalValue: amount('total_value'),
     grossValue,
     negativeValue,
-    investmentsValue: amount('investments.value'),
+    brokerageValue: amount('brokerage.value'),
     savingsValue: amount('savings.value'),
     propertyValue: amount('property.value'),
     counts: {

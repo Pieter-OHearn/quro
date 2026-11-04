@@ -46,7 +46,7 @@ export function AssetClassCard({
       title="By asset class"
       subtitle="Largest first"
       hasData={rows.length > 0}
-      alternative={altFor('Investments by asset class', 'Asset class', rows, format)}
+      alternative={altFor('Brokerage by asset class', 'Asset class', rows, format)}
     >
       <BarList rows={barRows} />
     </ChartCard>
@@ -56,7 +56,7 @@ export function AssetClassCard({
 export function CurrencyCard({
   view,
   format,
-  subject = 'Investments by currency',
+  subject = 'Brokerage by currency',
   subtitle = 'The currency each holding is priced in',
   footer,
 }: Readonly<{
@@ -125,7 +125,7 @@ export function SectorCard({
       title="By sector"
       subtitle="As recorded on each holding"
       hasData={rows.length > 0}
-      alternative={altFor('Investments by sector', 'Sector', rows, format)}
+      alternative={altFor('Brokerage by sector', 'Sector', rows, format)}
       footer={
         view.sectors.some((row) => row.generic) ? (
           <p className="mt-3 text-caption text-fg-subtle">

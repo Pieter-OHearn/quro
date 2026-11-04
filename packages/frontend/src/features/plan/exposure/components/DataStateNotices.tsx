@@ -76,9 +76,9 @@ export function DataStateNotices({
           testId="exposure-unclassified"
           action={{ label: 'Classify holdings', onClick: onClassify }}
         >
-          {format.percent(view.unclassified.share)} of your investments have no asset class. They
-          count in the total and in the sector and currency breakdowns, but not in the groups. Their
-          risk counts only if the holding has a risk class of its own.
+          {format.percent(view.unclassified.share)} of your brokerage is in holdings with no asset
+          class. They count in the total and in the sector and currency breakdowns, but not in the
+          groups. Their risk counts only if the holding has a risk class of its own.
         </StateNotice>
       ) : null}
     </div>
@@ -88,8 +88,8 @@ export function DataStateNotices({
 const EXCLUDED_KIND = { holding: 'holding', savings: 'account', property: 'property' } as const;
 
 /**
- * The same plain warnings for the Everything view: what is in no figure, what rests on an old
- * price or rate, and holdings with no group. Classifying happens on the Investments view.
+ * The same plain warnings for the Overview: what is in no figure, what rests on an old
+ * price or rate, and holdings with no group. Classifying happens on the Brokerage view.
  */
 export function HouseholdDataNotices({
   report,
@@ -133,7 +133,7 @@ export function HouseholdDataNotices({
           tone="info"
           title={`${view.unclassified.holdingCount} ${view.unclassified.holdingCount === 1 ? 'holding is' : 'holdings are'} unclassified`}
           testId="exposure-household-unclassified"
-          action={{ label: 'Classify on Investments', onClick: onClassify }}
+          action={{ label: 'Classify on Brokerage', onClick: onClassify }}
         >
           They count in the total and by currency, but not in a group.
         </StateNotice>

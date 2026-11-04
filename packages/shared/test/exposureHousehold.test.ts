@@ -191,7 +191,7 @@ describe('household positions', () => {
   });
 });
 
-describe('the Everything view', () => {
+describe('the Overview', () => {
   const facts = run({
     holdings: [
       holding({ id: 1, shares: 40 }),
@@ -234,12 +234,12 @@ describe('the Everything view', () => {
     expect(view.statement).toBe('Stocks are 30.8% of your assets');
   });
 
-  test('leaves the Investments view as it was', () => {
-    const investments = buildExposureView(facts);
+  test('leaves the Brokerage view as it was', () => {
+    const brokerage = buildExposureView(facts);
     const alone = buildExposureView(run({ holdings: facts.inputs.holdings }));
-    expect(investments).toEqual(alone);
-    expect(investments.totalValue).toBe(6500);
-    expect(investments.groups.map((row) => row.key)).toEqual(['stocks', 'bonds', 'cash', 'other']);
+    expect(brokerage).toEqual(alone);
+    expect(brokerage.totalValue).toBe(6500);
+    expect(brokerage.groups.map((row) => row.key)).toEqual(['stocks', 'bonds', 'cash', 'other']);
   });
 
   test('takes no reference range and has no risk or concentration facts of its own', () => {

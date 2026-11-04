@@ -211,7 +211,7 @@ price or no stored rate is excluded and reported, never valued at a guess. Share
 rounded to two decimals once, and the effective number of holdings is 1 divided by the sum of
 squared weights.
 
-Its Everything view adds savings accounts and property equity worked out as net worth works them
+Its Overview adds savings accounts and property equity worked out as net worth works them
 out: each row at its household share, property through `propertyEquity`, converted and rounded to
 cents once, so both figures equal the dashboard's. Pensions are not part of it, and neither are debts
 other than a property's mortgage, so its total is not net worth. A position below zero is in no share:

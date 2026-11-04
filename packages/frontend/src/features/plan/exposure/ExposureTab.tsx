@@ -18,11 +18,7 @@ import { ConcentrationNotices } from './components/ConcentrationNotices';
 import { CustomiseModal } from './components/CustomiseModal';
 import { DataStateNotices, HouseholdDataNotices } from './components/DataStateNotices';
 import { HoldingsCard } from './components/HoldingsCard';
-import {
-  HouseholdMixCard,
-  HouseholdSummary,
-  InvestmentsOnlyCard,
-} from './components/HouseholdCards';
+import { HouseholdMixCard, HouseholdSummary, BrokerageOnlyCard } from './components/HouseholdCards';
 import { MethodPanel } from './components/MethodPanel';
 import { SummaryCards } from './components/SummaryCards';
 import {
@@ -39,10 +35,10 @@ const CUSTOMISE_PARAM = 'customise';
 const HOLDINGS_ANCHOR = 'exposure-holdings';
 
 const VIEW_INTRO: Record<ExposureViewKey, string> = {
-  everything:
-    'What you own across your investments, savings accounts and property, at your share. Pensions are not included. It describes your mix; it is information, not advice.',
-  investments:
-    'How your brokerage investments are spread by asset class, currency, sector and holding. It describes your mix; it is information, not advice.',
+  overview:
+    'What you own across your brokerage, savings accounts and property, at your share. Pensions are not included. It describes your mix; it is information, not advice.',
+  brokerage:
+    'How your brokerage holdings are spread by asset class, currency, sector and holding. It describes your mix; it is information, not advice.',
 };
 
 function Header({
@@ -67,7 +63,7 @@ function Header({
           value={view}
           onChange={onViewChange}
         />
-        {view === 'investments' ? (
+        {view === 'brokerage' ? (
           <Button variant="secondary" onClick={onCustomise}>
             Customise
           </Button>
@@ -104,11 +100,11 @@ function Breakdowns({
   );
 }
 
-function Everything({
+function OverviewCards({
   report,
   format,
-  onOpenInvestments,
-}: Readonly<{ report: ExposureReport; format: ExposureFormat; onOpenInvestments: () => void }>) {
+  onOpenBrokerage,
+}: Readonly<{ report: ExposureReport; format: ExposureFormat; onOpenBrokerage: () => void }>) {
   const { household, view } = report;
   return (
     <>
@@ -118,7 +114,7 @@ function Everything({
         <CurrencyCard
           view={household}
           format={format}
-          subject="Everything by currency"
+          subject="Overview by currency"
           subtitle="The currency each holding, account and property is in"
           footer={
             household.negative.length > 0 ? (
@@ -128,7 +124,7 @@ function Everything({
             ) : undefined
           }
         />
-        <InvestmentsOnlyCard view={view} format={format} onOpenInvestments={onOpenInvestments} />
+        <BrokerageOnlyCard view={view} format={format} onOpenBrokerage={onOpenBrokerage} />
       </div>
     </>
   );
@@ -151,16 +147,16 @@ function NothingCounted({ status }: Readonly<{ status: 'empty' | 'unvaluable' }>
   );
 }
 
-function EverythingView({
+function OverviewView({
   report,
   format,
-  onOpenInvestments,
-}: Readonly<{ report: ExposureReport; format: ExposureFormat; onOpenInvestments: () => void }>) {
+  onOpenBrokerage,
+}: Readonly<{ report: ExposureReport; format: ExposureFormat; onOpenBrokerage: () => void }>) {
   return (
     <>
-      <HouseholdDataNotices report={report} onClassify={onOpenInvestments} />
+      <HouseholdDataNotices report={report} onClassify={onOpenBrokerage} />
       {report.household.status === 'ready' ? (
-        <Everything report={report} format={format} onOpenInvestments={onOpenInvestments} />
+        <OverviewCards report={report} format={format} onOpenBrokerage={onOpenBrokerage} />
       ) : (
         <NothingCounted status={report.household.status} />
       )}
@@ -168,7 +164,7 @@ function EverythingView({
   );
 }
 
-function InvestmentsView({
+function BrokerageView({
   report,
   format,
 }: Readonly<{ report: ExposureReport; format: ExposureFormat }>) {
@@ -199,7 +195,7 @@ function NothingToShow({ status }: Readonly<{ status: 'empty' | 'unvaluable' }>)
   return (
     <EmptyState
       icon={BarChart3}
-      title="No investments to break down yet"
+      title="No holdings to break down yet"
       description="Add a brokerage holding and its shares, and this page shows how they are spread."
       action={{ label: 'Go to Investments', onClick: () => void navigate('/investments') }}
     />
@@ -207,8 +203,8 @@ function NothingToShow({ status }: Readonly<{ status: 'empty' | 'unvaluable' }>)
 }
 
 /**
- * The Exposure tab of the Plan page. Everything adds up what the person owns; Investments is what
- * the brokerage holdings are made of, and how risky. The URL names the view (`?view=investments`).
+ * The Exposure tab of the Plan page. Overview adds up what the person owns; Brokerage is what
+ * the brokerage holdings are made of, and how risky. The URL names the view (`?view=brokerage`).
  */
 export function ExposureTab() {
   const query = useExposure();
@@ -266,14 +262,14 @@ export function ExposureTab() {
         onViewChange={selectView}
         onCustomise={() => setCustomising(true)}
       />
-      {activeView === 'everything' ? (
-        <EverythingView
+      {activeView === 'overview' ? (
+        <OverviewView
           report={report}
           format={format}
-          onOpenInvestments={() => selectView('investments')}
+          onOpenBrokerage={() => selectView('brokerage')}
         />
       ) : (
-        <InvestmentsView report={report} format={format} />
+        <BrokerageView report={report} format={format} />
       )}
       <MethodPanel report={report} view={activeView} />
       <ModalPresence open={customising}>

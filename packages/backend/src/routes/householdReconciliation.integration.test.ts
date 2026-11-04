@@ -340,7 +340,7 @@ async function expectReconciled(session: AuthSession, otherId: number, expected:
   // Exposure values the holdings at the same price: its total is the brokerage figure.
   const exposure = await get<ExposureReport>(session, '/api/exposure');
   expect(toCents(exposure.view.totalValue)).toBe(golden.brokerage);
-  // Its Everything view counts savings and property as net worth does.
+  // Its Overview counts savings and property as net worth does.
   expect(toCents(exposure.household.savingsValue)).toBe(golden.savings);
   expect(toCents(exposure.household.propertyValue)).toBe(golden.propertyEquity);
   expect(toCents(exposure.household.totalValue)).toBe(

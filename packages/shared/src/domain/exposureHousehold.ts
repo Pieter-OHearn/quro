@@ -13,7 +13,7 @@ import { householdShare } from './household.js';
 import { propertyEquity, type PropertyDebtSource } from './properties.js';
 
 /**
- * The facts of the Everything view: the holdings, plus the person's share of the household's
+ * The facts of the Overview: the holdings, plus the person's share of the household's
  * savings accounts and of its property equity. The positions are worked out as net worth works
  * them out (each row at its household share, converted and rounded to cents once), so the savings
  * and property figures here are the dashboard's. Pensions are not part of it.
@@ -268,7 +268,7 @@ function totalDrafts(parts: readonly Part[], rates: Rates): FactDraft[] {
       parts.filter((part) => part.cents < 0),
       rates,
     ),
-    amountDraft('exposure.household.investments.value', ofKind('holding'), rates),
+    amountDraft('exposure.household.brokerage.value', ofKind('holding'), rates),
     amountDraft('exposure.household.savings.value', ofKind('savings'), rates),
     amountDraft('exposure.household.property.value', ofKind('property'), rates),
   ];
@@ -330,7 +330,7 @@ function householdWarnings(
 }
 
 /**
- * Values the savings accounts and properties, and works out the facts of the Everything view over
+ * Values the savings accounts and properties, and works out the facts of the Overview over
  * them and the valued holdings. A position with no stored exchange rate is kept as excluded and
  * named in the warnings, never converted at 1:1.
  */

@@ -1250,7 +1250,7 @@ export const ACCESS_CASES: AccessCase[] = [
   {
     kind: 'list',
     route: 'GET /api/exposure',
-    // The Everything view reads an accepted partner's joint accounts and properties; holdings and
+    // The Overview reads an accepted partner's joint accounts and properties; holdings and
     // private rows stay out.
     scope: 'joint',
     build: () => get('/api/exposure'),

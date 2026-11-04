@@ -4,11 +4,7 @@ import { AllocationCard } from './components/AllocationCard';
 import { AssetClassCard, CurrencyCard } from './components/BreakdownCards';
 import { ConcentrationNotices } from './components/ConcentrationNotices';
 import { DataStateNotices, HouseholdDataNotices } from './components/DataStateNotices';
-import {
-  HouseholdMixCard,
-  HouseholdSummary,
-  InvestmentsOnlyCard,
-} from './components/HouseholdCards';
+import { HouseholdMixCard, HouseholdSummary, BrokerageOnlyCard } from './components/HouseholdCards';
 import { MethodPanel } from './components/MethodPanel';
 import { SummaryCards } from './components/SummaryCards';
 import { buildReport, exposureHolding as holding } from './exposureFixture';
@@ -72,14 +68,14 @@ const household = buildReport(
   },
 );
 
-describe('the Everything view', () => {
+describe('the Overview', () => {
   test('the summary states the total and the three figures it is made of', () => {
     const markup = renderToStaticMarkup(
       <HouseholdSummary view={household.household} format={format} />,
     );
     expect(markup).toContain('Property is 62.1% of your assets.');
     expect(markup).toContain('€13600.00');
-    expect(markup).toContain('Investments');
+    expect(markup).toContain('Brokerage');
     expect(markup).toContain('€4500.00');
     expect(markup).toContain('Savings accounts');
     expect(markup).toContain('€1000.00');
@@ -93,7 +89,7 @@ describe('the Everything view', () => {
     const markup = renderToStaticMarkup(
       <HouseholdMixCard view={household.household} format={format} />,
     );
-    expect(markup).toContain('Everything by group: Stocks');
+    expect(markup).toContain('Overview by group: Stocks');
     expect(markup).toContain('Property');
     expect(markup).toContain('Cash is your savings accounts plus any cash funds');
     expect(markup).not.toContain('Compared with Reference mix');
@@ -127,7 +123,7 @@ describe('the Everything view', () => {
       <CurrencyCard
         view={household.household}
         format={format}
-        subject="Everything by currency"
+        subject="Overview by currency"
         subtitle="The currency each holding, account and property is in"
       />,
     );
@@ -135,32 +131,24 @@ describe('the Everything view', () => {
     expect(markup).toContain('EUR');
   });
 
-  test('investment-only figures are labelled and link to the Investments view', () => {
+  test('brokerage-only figures are labelled and link to the Brokerage view', () => {
     const markup = renderToStaticMarkup(
-      <InvestmentsOnlyCard
-        view={household.view}
-        format={format}
-        onOpenInvestments={() => undefined}
-      />,
+      <BrokerageOnlyCard view={household.view} format={format} onOpenBrokerage={() => undefined} />,
     );
-    expect(markup).toContain('Investments only');
+    expect(markup).toContain('Brokerage only');
     expect(markup).toContain('Weighted average risk class');
     expect(markup).toContain('Effective number of holdings');
     expect(markup).toContain('Concentration notices');
-    expect(markup).toContain('Open Investments');
+    expect(markup).toContain('Open Brokerage');
   });
 
-  test('without holdings the card only points at the Investments view', () => {
+  test('without holdings the card only points at the Brokerage view', () => {
     const report = buildReport([]);
     const markup = renderToStaticMarkup(
-      <InvestmentsOnlyCard
-        view={report.view}
-        format={format}
-        onOpenInvestments={() => undefined}
-      />,
+      <BrokerageOnlyCard view={report.view} format={format} onOpenBrokerage={() => undefined} />,
     );
     expect(markup).not.toContain('Weighted average risk class');
-    expect(markup).toContain('Open Investments');
+    expect(markup).toContain('Open Brokerage');
   });
 
   test('names what is left out, the stale rates and the unclassified holdings', () => {
@@ -186,8 +174,8 @@ describe('the Everything view', () => {
     expect(markup).toContain('1 holding is unclassified');
   });
 
-  test('the method says what each view counts, on Everything without the investment detail', () => {
-    const markup = renderToStaticMarkup(<MethodPanel report={household} view="everything" />);
+  test('the method says what each view counts, on Overview without the brokerage detail', () => {
+    const markup = renderToStaticMarkup(<MethodPanel report={household} view="overview" />);
     expect(markup).toContain('What each view counts');
     expect(markup).toContain('Pensions are not');
     expect(markup).toContain('value less its linked mortgage');
@@ -203,7 +191,7 @@ describe('the Everything view', () => {
 describe('exposure summary', () => {
   test('states the largest group in plain words and the risk class on the 1 to 7 scale', () => {
     const markup = renderToStaticMarkup(<SummaryCards view={mixed.view} format={format} />);
-    expect(markup).toContain('Bonds are 57.1% of your investments.');
+    expect(markup).toContain('Bonds are 57.1% of your brokerage.');
     expect(markup).toContain('Weighted average risk class');
     expect(markup).toContain('of 7');
     expect(markup).toContain('Effective number of holdings');
@@ -221,7 +209,7 @@ describe('exposure summary', () => {
 describe('exposure allocation chart', () => {
   test('carries a text alternative with every share and the reference comparison', () => {
     const markup = renderToStaticMarkup(<AllocationCard view={mixed.view} format={format} />);
-    expect(markup).toContain('Investments by group: Stocks');
+    expect(markup).toContain('Brokerage by group: Stocks');
     expect(markup).toContain('Show values');
     expect(markup).toContain('Compared with Reference mix B');
     expect(markup).toContain('Above the range');
@@ -255,7 +243,7 @@ describe('exposure notices', () => {
       holding({ id: 2, shares: 10 }),
     ]);
     const markup = renderToStaticMarkup(<ConcentrationNotices notices={report.view.notices} />);
-    expect(markup).toContain('Big Fund holds 90% of your portfolio');
+    expect(markup).toContain('Big Fund holds 90% of your brokerage');
     expect(markup).toContain('role="status"');
     expect(markup).not.toMatch(ADVICE);
   });
@@ -317,7 +305,7 @@ describe('exposure notices', () => {
 describe('how this is worked out', () => {
   const markup = renderToStaticMarkup(<MethodPanel report={mixed} />);
 
-  test('states the rules of both views on Investments too', () => {
+  test('states the rules of both views on Brokerage too', () => {
     expect(markup).toContain('What each view counts');
   });
 

@@ -55,7 +55,7 @@ function dashboardFigures() {
   return { savings: value('savings'), propertyEquity: value('property_equity') };
 }
 
-function everything() {
+function overview() {
   const savingsAccounts: ExposureSavingsInput[] = ACCOUNTS.map((row) => ({
     ...row,
     name: `Account ${row.id}`,
@@ -87,8 +87,8 @@ function everything() {
   );
 }
 
-describe('the Everything view against net worth', () => {
-  const view = everything();
+describe('the Overview against net worth', () => {
+  const view = overview();
   const dashboard = dashboardFigures();
 
   test('savings agree to the cent', () => {

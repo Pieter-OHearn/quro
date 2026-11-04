@@ -115,9 +115,9 @@ export type ExposureInput = {
   settings: ExposureSettings;
   settingsSource: 'default' | 'custom';
   holdings: readonly ExposureHoldingInput[];
-  /** The open savings accounts the person can read; left out, the Everything view has none. */
+  /** The open savings accounts the person can read; left out, the Overview has none. */
   savingsAccounts?: readonly ExposureSavingsInput[];
-  /** The open properties the person can read; left out, the Everything view has none. */
+  /** The open properties the person can read; left out, the Overview has none. */
   properties?: readonly ExposurePropertyInput[];
   fxRates: readonly ExposureFxInput[];
 };
@@ -146,9 +146,9 @@ export type ExposureFacts = {
     fxRates: ExposureFxInput[];
   };
   facts: Fact[];
-  /** About the holdings, and so about the Investments view. */
+  /** About the holdings, and so about the Brokerage view. */
   warnings: ExposureWarning[];
-  /** About the savings accounts and properties, which only the Everything view counts. */
+  /** About the savings accounts and properties, which only the Overview counts. */
   householdWarnings: ExposureWarning[];
 };
 

@@ -255,7 +255,7 @@ test('ledger and price writes refresh every cached net-worth range; goal writes 
   client.clear();
 });
 
-test('every write the Everything view counts refreshes the exposure report', async () => {
+test('every write the Overview counts refreshes the exposure report', async () => {
   for (const domain of ['savings', 'property', 'mortgage', 'csvImport', 'bunqSync'] as const) {
     const client = new QueryClient();
     seed(client, [keys.exposure.report]);

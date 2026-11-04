@@ -134,7 +134,7 @@ export function AllocationCard({
     (segment) => segment.share > 0 || segment.key !== 'unclassified',
   );
   const alternative = buildChartAlternative({
-    subject: 'Investments by group',
+    subject: 'Brokerage by group',
     xLabel: 'Group',
     ordered: false,
     x: (segment: Segment) => segment.label,
@@ -143,7 +143,7 @@ export function AllocationCard({
       { label: 'Share', value: (s) => s.share, format: format.percent },
       { label: 'Value', value: (s) => s.value, format: format.money },
     ],
-    summary: `Investments by group: ${segments
+    summary: `Brokerage by group: ${segments
       .map((segment) => `${segment.label} ${format.percent(segment.share)}`)
       .join(', ')}.${view.referenceStatement ? ` ${view.referenceStatement}` : ''}`,
   });
@@ -152,8 +152,8 @@ export function AllocationCard({
       title="Mix by group"
       subtitle={
         view.referenceMix
-          ? `Shares of your investments, with the range of ${view.referenceMix.name}`
-          : 'Shares of your investments'
+          ? `Shares of your brokerage, with the range of ${view.referenceMix.name}`
+          : 'Shares of your brokerage'
       }
       hasData
       alternative={alternative}
@@ -162,7 +162,7 @@ export function AllocationCard({
       <Legend segments={segments} format={format} />
       <p className="mt-3 text-caption text-fg-subtle">
         Cash here means cash funds in your brokerage, not savings accounts. Savings accounts are on
-        the Everything view.
+        the Overview.
       </p>
       <ReferenceComparison view={view} format={format} />
     </ChartCard>

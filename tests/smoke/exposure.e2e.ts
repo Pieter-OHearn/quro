@@ -89,9 +89,7 @@ async function signIn(page: Page) {
   await expect(page.getByTestId('dashboard-net-worth-value')).toBeVisible();
 }
 
-test('Exposure opens on Everything and switches to Investments by link and back', async ({
-  page,
-}) => {
+test('Exposure opens on Overview and switches to Brokerage by link and back', async ({ page }) => {
   await signIn(page);
   await page.route('**/api/exposure', (route) =>
     route.fulfill({ json: { data: syntheticReport() } }),
@@ -99,24 +97,24 @@ test('Exposure opens on Everything and switches to Investments by link and back'
   await page.goto('/plan?tab=exposure');
 
   const switcher = page.getByRole('group', { name: 'What Exposure counts' });
-  const everything = switcher.getByRole('button', { name: 'Everything' });
-  const investments = switcher.getByRole('button', { name: 'Investments' });
-  await expect(everything).toHaveAttribute('aria-pressed', 'true');
+  const overview = switcher.getByRole('button', { name: 'Overview' });
+  const brokerage = switcher.getByRole('button', { name: 'Brokerage' });
+  await expect(overview).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('exposure-household-total')).toContainText('2,500.00');
   await expect(page.getByTestId('exposure-negative')).toContainText('8 Example Court');
   await expect(page.getByRole('button', { name: 'Customise' })).toBeHidden();
 
-  await investments.click();
-  await expect(page).toHaveURL(/[?&]view=investments/);
+  await brokerage.click();
+  await expect(page).toHaveURL(/[?&]view=brokerage/);
   await expect(page).toHaveURL(/[?&]tab=exposure/);
   await expect(page.getByTestId('exposure-statement')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Customise' })).toBeVisible();
   await expect(page.getByTestId('exposure-household-total')).toBeHidden();
 
   await page.reload();
-  await expect(investments).toHaveAttribute('aria-pressed', 'true');
+  await expect(brokerage).toHaveAttribute('aria-pressed', 'true');
 
   await page.goBack();
-  await expect(everything).toHaveAttribute('aria-pressed', 'true');
+  await expect(overview).toHaveAttribute('aria-pressed', 'true');
   await expect(page).not.toHaveURL(/[?&]view=/);
 });

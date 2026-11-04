@@ -3,13 +3,13 @@
  * list.
  */
 export const EXPOSURE_VIEWS = [
-  { value: 'everything', label: 'Everything' },
-  { value: 'investments', label: 'Investments' },
+  { value: 'overview', label: 'Overview' },
+  { value: 'brokerage', label: 'Brokerage' },
 ] as const;
 
 export type ExposureViewKey = (typeof EXPOSURE_VIEWS)[number]['value'];
 
-export const DEFAULT_EXPOSURE_VIEW: ExposureViewKey = 'everything';
+export const DEFAULT_EXPOSURE_VIEW: ExposureViewKey = 'overview';
 
 /** The view a `?view=` value names; anything else opens the default one. */
 export function resolveExposureView(value: string | null): ExposureViewKey {
